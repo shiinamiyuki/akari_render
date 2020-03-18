@@ -19,32 +19,7 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-
-#ifndef AKARIRENDER_BINARYMESH_H
-#define AKARIRENDER_BINARYMESH_H
-
-#include <Akari/Core/Plugin.h>
-#include <Akari/Render/Geometry.hpp>
-#include <Akari/Render/Material.h>
-
 namespace Akari {
-    class AKR_EXPORT BinaryMesh : public Mesh {
-        std::vector<Vertex> vertexBuffer;
-        std::vector<ivec3> indexBuffer;
-        std::vector<int> groups;
-        std::vector<MaterialSlot> materials;
-        std::string file;
+    Serializable::Type *ReviveContext::getType(const std::string &s) { return Context::getType(s); }
+}
 
-      public:
-        AKR_SER(materials, file);
-        AKR_DECL_COMP(BinaryMesh, "BinaryMesh")
-        const MaterialSlot &GetMaterialSlot(int group) const;
-        const Vertex *GetVertexBuffer() const override;
-        const ivec3 *GetIndexBuffer() const override;
-        size_t GetTriangleCount() const override;
-        int GetPrimitiveGroup(int idx) const override;
-        bool Load(const char *path) override;
-    };
-} // namespace Akari
-
-#endif // AKARIRENDER_BINARYMESH_H

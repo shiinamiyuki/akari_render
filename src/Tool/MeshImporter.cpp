@@ -21,10 +21,13 @@
 // SOFTWARE.
 
 #include <Akari/Render/Plugins/BinaryMesh.h>
+#include <Akari/Render/SceneGraph.h>
+#define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
 namespace Akari {
-    bool Convert(const fs::path &obj, const fs::path &binary) {
+    bool Convert(const fs::path &obj, const fs::path &binary, SceneGraph *graph = nullptr) {
+        std::shared_ptr<BinaryMesh> mesh;
         {
             fs::path parent_path = fs::absolute(obj).parent_path();
             fs::path file = obj.filename();
@@ -53,9 +56,10 @@ namespace Akari {
                     int fv = shapes[s].mesh.num_face_vertices[f];
 
                     Vertex vertex[3];
+                    ivec3 index;
                     for (size_t v = 0; v < fv; v++) {
                         tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
-                        indices.emplace_back(indices.size());
+                        index[v] = int(indices.size() + v);
                         for (int i = 0; i < 3; i++) {
                             vertex[v].pos[i] = attrib.vertices[3 * idx.vertex_index + i];
                         }
@@ -84,12 +88,32 @@ namespace Akari {
                     for (auto &i : vertex) {
                         vertices.emplace_back(i);
                     }
+                    indices.emplace_back(index);
                     // per-face material
                     // shapes[s].mesh.material_ids[f];
                 }
             }
+            mesh = std::make_shared<BinaryMesh>();
+            mesh->file = binary.string();
+            mesh->vertexBuffer = std::move(vertices);
+            mesh->indexBuffer = std::move(indices);
         }
-
+        mesh->Save(binary.string().c_str());
+        if (graph) {
+            graph->meshes.emplace_back(mesh);
+        }
         return true;
     }
 } // namespace Akari
+
+int main(int argc, char ** argv) {
+    using namespace Akari;
+    if(argc < 2) {
+        fprintf(stderr, "Usage: MeshImporter input-filename output-filename [scene-filename]");
+        exit(-1);
+    }
+    fs::path in = argv[1];
+    fs::path out = argv[2];
+    std::shared_ptr<SceneGraph> graph;
+
+}

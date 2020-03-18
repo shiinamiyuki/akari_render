@@ -70,7 +70,7 @@ endfunction()
 
 add_plugin(Foo src/app/lib.cpp)
 add_subdirectory(src/Render)
-
+add_subdirectory(src/Tool)
 
 add_executable(akari src/app/Akari.cpp)
 target_link_libraries(akari AkariCore)

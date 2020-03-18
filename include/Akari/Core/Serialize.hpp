@@ -31,5 +31,10 @@ namespace Akari {
     using miyuki::serialize::Context;
     using TypeInfo = Serializable::Type;
 #define AKR_SER(...) MYK_SER(__VA_ARGS__)
+    class ReviveContext : miyuki::serialize::Context{
+      public:
+      private:
+        Serializable::Type *getType(const std::string &s) override;
+    };
 }
 #endif // AKARIRENDER_SERIALIZE_HPP

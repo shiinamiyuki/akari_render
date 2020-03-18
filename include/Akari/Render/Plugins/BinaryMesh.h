@@ -24,18 +24,17 @@
 #define AKARIRENDER_BINARYMESH_H
 
 #include <Akari/Core/Plugin.h>
-#include <Akari/Render/Mesh.h>
 #include <Akari/Render/Material.h>
+#include <Akari/Render/Mesh.h>
 
 namespace Akari {
     class AKR_EXPORT BinaryMesh : public Mesh {
+      public:
         std::vector<Vertex> vertexBuffer;
         std::vector<ivec3> indexBuffer;
         std::vector<int> groups;
         std::vector<MaterialSlot> materials;
         std::string file;
-
-      public:
         AKR_SER(materials, file);
         AKR_DECL_COMP(BinaryMesh, "BinaryMesh")
         const MaterialSlot &GetMaterialSlot(int group) const override;
@@ -44,6 +43,7 @@ namespace Akari {
         size_t GetTriangleCount() const override;
         int GetPrimitiveGroup(int idx) const override;
         bool Load(const char *path) override;
+        void Save(const char *path);
     };
 } // namespace Akari
 

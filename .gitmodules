@@ -4,3 +4,6 @@
 [submodule "external/tinyobjloader"]
 	path = external/tinyobjloader
 	url = https://github.com/tinyobjloader/tinyobjloader
+[submodule "external/cxxopts"]
+	path = external/cxxopts
+	url = https://github.com/jarro2783/cxxopts

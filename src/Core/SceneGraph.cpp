@@ -20,27 +20,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <Akari/Core/Plugin.h>
-#include <Akari/Render/Geometry.hpp>
-#include <Akari/Render/Material.h>
-#include <tiny_obj_loader.h>
-namespace Akari {
-    class ObjMesh : public Mesh {
-        std::vector<std::shared_ptr<Material>> materials;
-        std::string path;
+#include <Akari/Render/SceneGraph.h>
 
-      public:
-        AKR_SER(materials, path)
-        AKR_DECL_COMP(ObjMesh, "ObjMesh")
-        std::shared_ptr<MaterialSlot> GetMaterial(int group) const override { return nullptr; }
-        std::shared_ptr<TriangleMesh> BuildMesh() const override { return std::shared_ptr<TriangleMesh>(); }
-        IndexBuffer GetIndexBuffer() const override { return nullptr; }
-        NormalBuffer GetNormalBuffer() const override { return nullptr; }
-        VertexBuffer GetVertexBuffer() const override { return nullptr; }
-        TexCoordBuffer GetTexCoordBuffer() const override { return nullptr; }
-        size_t GetVertexCount() const override { return 0; }
-        int GetPrimitiveGroup(int idx) const override { return 0; }
-        bool Load(const char *_path) const override { return false; }
-    };
-    AKR_EXPORT_COMP(ObjMesh, "Mesh")
-} // namespace Akari
+namespace Akari{
+
+}

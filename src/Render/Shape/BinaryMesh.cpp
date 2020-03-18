@@ -50,6 +50,14 @@ namespace Akari {
         in.read(reinterpret_cast<char *>(groups.data()), sizeof(int) * vertexCount);
         return true;
     }
-
+    void BinaryMesh::Save(const char *path) {
+        std::ofstream out(path, std::ios::binary | std::ios::out);
+        out.write(AKR_MESH_MAGIC, strlen(AKR_MESH_MAGIC));
+        size_t vertexCount = vertexBuffer.size();
+        out.write(reinterpret_cast<char *>(&vertexCount), sizeof(size_t));
+        out.write(reinterpret_cast<char *>(vertexBuffer.data()), sizeof(Vertex) * vertexCount);
+        out.write(reinterpret_cast<char *>(indexBuffer.data()), sizeof(ivec3) * vertexCount);
+        out.write(reinterpret_cast<char *>(groups.data()), sizeof(int) * vertexCount);
+    }
     AKR_EXPORT_COMP(BinaryMesh, "Mesh");
 } // namespace Akari

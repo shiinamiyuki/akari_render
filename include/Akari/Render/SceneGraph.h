@@ -23,11 +23,22 @@
 #ifndef AKARIRENDER_SCENEGRAPH_H
 #define AKARIRENDER_SCENEGRAPH_H
 
+#include <Akari/Core/Component.h>
+#include <Akari/Render/Accelerator.h>
+#include <Akari/Render/Camera.h>
+#include <Akari/Render/Light.h>
+#include <Akari/Render/Material.h>
+#include <Akari/Render/Mesh.h>
+#include <Akari/Render/Sampler.h>
+
 namespace Akari {
-    template<typename T>
-    struct Node {
-        std::shared_ptr<T> _ptr;
+    struct SceneGraph {
+        std::shared_ptr<Camera> camera;
+        std::shared_ptr<Accelerator> accelerator;
+        std::shared_ptr<Sampler> sampler;
+        std::vector<std::shared_ptr<Mesh>> meshes;
+        AKR_SER(camera, accelerator, sampler, meshes)
     };
-}
+} // namespace Akari
 
 #endif // AKARIRENDER_SCENEGRAPH_H
