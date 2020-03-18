@@ -1,0 +1,96 @@
+// MIT License
+//
+// Copyright (c) 2019 椎名深雪
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+#include <Akari/Core/Plugin.h>
+#ifdef _MSC_VER
+#include <Windows.h>
+#include <Akari/Core/Logger.h>
+
+namespace Akari {
+    void SharedLibraryLoader::Load(const char *path) { handle = LoadLibraryA(path); }
+
+    SharedLibraryFunc SharedLibraryLoader::GetFuncPointer(const char *name) {
+        return (SharedLibraryFunc)GetProcAddress((HMODULE)handle, name);
+    }
+
+    SharedLibraryLoader::~SharedLibraryLoader() {
+        if (handle)
+            FreeLibrary((HMODULE)handle);
+    }
+
+} // namespace Akari
+#else
+#include <dlfcn.h>
+
+#endif
+
+namespace Akari {
+    class PluginManager : public IPluginManager {
+        std::unordered_map<std::string, IPlugin *> plugins;
+        std::vector<std::unique_ptr<SharedLibraryLoader>> sharedLibraries;
+        fs::path prefix = "./plugins/";
+
+      public:
+        void SetPluginPath(const char *path) override { prefix = path; }
+        bool LoadPath(const char *path) override {
+            Info("Loading {}\n",path);
+            auto lib = std::make_unique<SharedLibraryLoader>(path);
+            if (!lib)
+                return false;
+            auto p = lib->GetFuncPointer(AKARI_PLUGIN_FUNC_NAME);
+            if (!p)
+                return false;
+            auto plugin = ((GetPluginFunc)p)();
+            plugins[plugin->GetTypeInfo()->name()] = plugin;
+            sharedLibraries.emplace_back(std::move(lib));
+            return true;
+        }
+
+        IPlugin *LoadPlugin(const char *name) override {
+            auto it = plugins.find(name);
+            if (it != plugins.end()) {
+                return it->second;
+            }
+            auto path = prefix / fs::path(name);
+#ifdef _WIN32
+            path = path.concat(".dll");
+#else
+            path = path.concat(".so");
+#endif
+            if (LoadPath(path.string().c_str())) {
+                return plugins.at(name);
+            }
+            return nullptr;
+        }
+
+        void ForeachPlugin(const std::function<void(IPlugin *)> &func) override {
+            for (auto &el : plugins) {
+                func(el.second);
+            }
+        }
+    };
+
+    AKR_EXPORT IPluginManager *GetPluginManager() {
+        static PluginManager manager;
+        return &manager;
+    }
+} // namespace Akari

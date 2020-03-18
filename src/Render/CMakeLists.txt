@@ -1,0 +1,6 @@
+add_subdirectory(Accelerator)
+add_subdirectory(Camera)
+add_subdirectory(Material)
+add_subdirectory(Texture)
+add_subdirectory(Shape)
+add_subdirectory(Sampler)

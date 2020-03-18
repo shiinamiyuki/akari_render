@@ -1,0 +1,97 @@
+// MIT License
+//
+// Copyright (c) 2019 椎名深雪
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+#ifndef AKARIRENDER_FILM_H
+#define AKARIRENDER_FILM_H
+
+#include "Spectrum.h"
+#include <Akari/Core/Image.hpp>
+#include <Akari/Core/Parallel.h>
+
+namespace Akari {
+    struct Pixel {
+        Spectrum radiance = Spectrum(0);
+        Float weight = 0;
+    };
+
+    const size_t TileSize = 16;
+    struct Tile {
+        Bounds2i bounds{};
+        ivec2 _size;
+        std::vector<Pixel> pixels;
+
+        explicit Tile(const Bounds2i &bounds)
+            : bounds(bounds), _size(bounds.Size() + ivec2(2, 2)), pixels(_size.x * _size.y) {}
+
+        auto &operator()(const vec2 &p) {
+            auto q = ivec2(floor(p + vec2(0.5) - vec2(bounds.p_min) + vec2(1)));
+            return pixels[q.x + q.y * _size.x];
+        }
+
+        const auto &operator()(const vec2 &p) const {
+            auto q = ivec2(floor(p + vec2(0.5) - vec2(bounds.p_min) + vec2(1)));
+            return pixels[q.x + q.y * _size.x];
+        }
+
+        void AddSample(const vec2 &p, const Spectrum &radiance, Float weight) {
+            auto &pix = (*this)(p);
+            pix.weight += weight;
+            pix.radiance += radiance;
+        }
+    };
+
+    class Film {
+        TImage<Spectrum> radiance;
+        TImage<float> weight;
+
+      public:
+        explicit Film(const ivec2 &dimension) : radiance(dimension), weight(dimension) {}
+        Tile GetTile(const Bounds2i &bounds) { return Tile(bounds); }
+
+        [[nodiscard]] ivec2 Dimension() const { return radiance.Dimension(); }
+
+        [[nodiscard]] Bounds2i Bounds() const { return Bounds2i{ivec2(0), Dimension()}; }
+        void MergeTile(const Tile &tile) {
+            const auto lo = max(tile.bounds.p_min - ivec2(1, 1), ivec2(0, 0));
+            const auto hi = min(tile.bounds.p_max + ivec2(1, 1), radiance.Dimension());
+            for (int y = lo.y; y < hi.y; y++) {
+                for (int x = lo.x; x < hi.x; x++) {
+                    auto &pix = tile(vec2(x, y));
+                    radiance(x, y) += pix.radiance;
+                    weight(x, y) += pix.weight;
+                }
+            }
+        }
+
+        void WriteImage(const fs::path & path, const PostProcessor & postProcessor = GammaCorrection()){
+            RGBAImage image(Dimension());
+            ParallelFor(radiance.Dimension().y, [&](int y){
+              for(int x = 0; x < radiance.Dimension().x;x++){
+                  if(weight(x,y) != 0)
+                      image(x,y) = vec4(radiance(x, y)/ weight(x,y), 1);
+              }
+            }, 1024);
+            GetDefaultImageWriter()->Write(image, path, postProcessor);
+        }
+    };
+} // namespace Akari
+#endif // AKARIRENDER_FILM_H

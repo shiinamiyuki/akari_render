@@ -1,0 +1,1 @@
+add_plugin(Random Random.cpp)

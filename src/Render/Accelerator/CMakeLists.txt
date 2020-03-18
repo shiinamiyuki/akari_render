@@ -1,0 +1,1 @@
+add_plugin(BVHAccelerator BVH-Backend.cpp)
