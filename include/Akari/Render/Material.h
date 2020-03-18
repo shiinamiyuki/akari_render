@@ -26,22 +26,25 @@
 #include <Akari/Core/Component.h>
 #include <Akari/Core/MemoryArena.hpp>
 #include <Akari/Render/BSDF.h>
+#include <Akari/Render/Light.h>
 namespace Akari {
     class Material;
     class Light;
+    struct ScatteringEvent;
 
-    struct MaterialSlot {
-        std::string name;
-        std::shared_ptr<Material> material;
-        std::shared_ptr<Light> light;
-        bool markedAsLight;
-        AKR_SER(material, name, markedAsLight)
-    };
 
     class AKR_EXPORT Material : public Component {
       public:
         virtual void computeScatteringFunctions(ScatteringEvent *event, MemoryArena &arena) const = 0;
         [[nodiscard]] virtual std::string GetName() const = 0;
+    };
+
+    struct MaterialSlot {
+        std::string name;
+        std::shared_ptr<Material> material;
+        std::shared_ptr<Light> light;
+        bool markedAsLight = false;
+        AKR_SER(material, name, markedAsLight, light)
     };
 } // namespace Akari
 #endif // AKARIRENDER_MATERIAL_H

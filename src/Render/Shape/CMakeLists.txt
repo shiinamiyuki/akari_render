@@ -1,1 +1,1 @@
-add_plugin(ObjMesh ObjMesh.cpp)
+add_plugin(BinaryMesh BinaryMesh.cpp)

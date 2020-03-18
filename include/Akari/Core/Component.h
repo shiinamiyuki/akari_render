@@ -60,5 +60,8 @@ namespace Akari {
     }
 
     using GetPluginFunc = IPlugin *(*)();
+    AKR_EXPORT Ptr<Component> CreateComponent(const char * type);
+
+
 } // namespace Akari
 #endif // AKARIRENDER_COMPONENT_H

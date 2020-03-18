@@ -20,60 +20,31 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef AKARIRENDER_GEOMETRY_HPP
-#define AKARIRENDER_GEOMETRY_HPP
+#ifndef AKARIRENDER_BINARYMESH_H
+#define AKARIRENDER_BINARYMESH_H
 
-#include <Akari/Core/Component.h>
-#include <Akari/Core/Math.h>
-
+#include <Akari/Core/Plugin.h>
+#include <Akari/Render/Geometry.hpp>
+#include <Akari/Render/Material.h>
 
 namespace Akari {
-    struct Ray {
-        vec3 o, d;
-        float t_min, t_max;
+    class AKR_EXPORT BinaryMesh : public Mesh {
+        std::vector<Vertex> vertexBuffer;
+        std::vector<ivec3> indexBuffer;
+        std::vector<int> groups;
+        std::vector<MaterialSlot> materials;
+        std::string file;
 
-        Ray() = default;
-
-        Ray(const vec3 &o, const vec3 &d, float t_min, float t_max = std::numeric_limits<float>::infinity())
-            : o(o), d(d), t_min(t_min), t_max(t_max) {}
+      public:
+        AKR_SER(materials, file);
+        AKR_DECL_COMP(BinaryMesh, "BinaryMesh")
+        const MaterialSlot &GetMaterialSlot(int group) const;
+        const Vertex *GetVertexBuffer() const override;
+        const ivec3 *GetIndexBuffer() const override;
+        size_t GetTriangleCount() const override;
+        int GetPrimitiveGroup(int idx) const override;
+        bool Load(const char *path) override;
     };
-
-    struct Vertex{
-        vec3 pos, Ng, Ns;
-        vec2 texCoord;
-        Vertex()= default;
-    };
-    struct Triangle {
-        std::array<vec3, 3> v;
-        std::array<vec2, 3> texCoords;
-        std::array<vec3, 3> Ns;
-        vec3 Ng;
-    };
-
-
-    struct Intersection {
-        Float t;
-        Triangle triangle;
-        int32_t meshId = -1;
-        int32_t primId = -1;
-        int32_t primGroup = -1;
-        vec2 uv;
-        vec3 Ng;
-    };
-    class BSDF;
-
-    struct ShadingPoint {
-        vec2 texCoords;
-    };
-
-    struct ScatteringEvent {
-        vec3 wo;
-        vec3 p;
-        vec3 wi;
-        ShadingPoint sp;
-        BSDF *bsdf = nullptr;
-    };
-
-
 } // namespace Akari
-#endif // AKARIRENDER_GEOMETRY_HPP
+
+#endif // AKARIRENDER_BINARYMESH_H

@@ -22,7 +22,7 @@
 
 #include <Akari/Core/Plugin.h>
 #include <Akari/Render/Accelerator.h>
-#include <Akari/Render/Geometry.hpp>
+#include <Akari/Render/Mesh.h>
 #include <Akari/Render/Scene.h>
 #include <optional>
 
@@ -249,9 +249,9 @@ namespace Akari {
                 auto v = mesh->GetVertexBuffer();
                 auto i = mesh->GetIndexBuffer();
                 Bounds3f box{{MaxFloat, MaxFloat, MaxFloat}, {MinFloat, MinFloat, MinFloat}};
-                box = box.UnionOf(v[i[idx][0]]);
-                box = box.UnionOf(v[i[idx][1]]);
-                box = box.UnionOf(v[i[idx][2]]);
+                box = box.UnionOf(v[i[idx][0]].pos);
+                box = box.UnionOf(v[i[idx][1]].pos);
+                box = box.UnionOf(v[i[idx][2]].pos);
                 return box;
             }
         };
@@ -302,7 +302,7 @@ namespace Akari {
         AKR_DECL_COMP(BVHAccelerator, "BVHAccelerator")
         void Build(const Scene &scene) override {
             for (auto &mesh : scene.GetMeshes()) {
-                meshBVHs.emplace_back(mesh.get(), mesh->GetVertexCount() / 3);
+                meshBVHs.emplace_back(mesh.get(), mesh->GetTriangleCount());
             }
             topLevelBVH.emplace(&meshBVHs, meshBVHs.size());
         }

@@ -20,60 +20,35 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef AKARIRENDER_GEOMETRY_HPP
-#define AKARIRENDER_GEOMETRY_HPP
+#ifndef AKARIRENDER_STREAM_H
+#define AKARIRENDER_STREAM_H
 
 #include <Akari/Core/Component.h>
-#include <Akari/Core/Math.h>
-
 
 namespace Akari {
-    struct Ray {
-        vec3 o, d;
-        float t_min, t_max;
+    class Stream;
 
-        Ray() = default;
-
-        Ray(const vec3 &o, const vec3 &d, float t_min, float t_max = std::numeric_limits<float>::infinity())
-            : o(o), d(d), t_min(t_min), t_max(t_max) {}
+    template <typename T> struct StreamWriter { static void Write(const T &value, Stream &); };
+    class Stream {
+      public:
+        virtual size_t GetStreamType() const = 0;
+        virtual size_t WriteBytes(const uint8_t *buffer, size_t count) = 0;
+        virtual void WriteInt32(int32_t) = 0;
+        virtual void WriteUInt32(uint32_t) = 0;
+        virtual void WriteInt64(int64_t) = 0;
+        virtual void WriteUInt64(uint64_t) = 0;
+        virtual void WriteFloat(float) = 0;
+        virtual void WriteString(const std::string &) = 0;
+        virtual void WriteArrayBegin(size_t) = 0;
+        virtual void WriteArrayEnd() = 0;
+        template <typename T> void Write(const T &value) { StreamWriter<T>::Write(value, *this); }
+        template <typename T> void WriteArray(const std::vector<T> &vec) {
+            WriteArrayBegin(vec.size());
+            for (const auto &i : vec) {
+                Write(i);
+            }
+            WriteArrayEnd();
+        }
     };
-
-    struct Vertex{
-        vec3 pos, Ng, Ns;
-        vec2 texCoord;
-        Vertex()= default;
-    };
-    struct Triangle {
-        std::array<vec3, 3> v;
-        std::array<vec2, 3> texCoords;
-        std::array<vec3, 3> Ns;
-        vec3 Ng;
-    };
-
-
-    struct Intersection {
-        Float t;
-        Triangle triangle;
-        int32_t meshId = -1;
-        int32_t primId = -1;
-        int32_t primGroup = -1;
-        vec2 uv;
-        vec3 Ng;
-    };
-    class BSDF;
-
-    struct ShadingPoint {
-        vec2 texCoords;
-    };
-
-    struct ScatteringEvent {
-        vec3 wo;
-        vec3 p;
-        vec3 wi;
-        ShadingPoint sp;
-        BSDF *bsdf = nullptr;
-    };
-
-
 } // namespace Akari
-#endif // AKARIRENDER_GEOMETRY_HPP
+#endif // AKARIRENDER_STREAM_H

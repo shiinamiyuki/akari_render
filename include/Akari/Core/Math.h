@@ -36,7 +36,7 @@ namespace Akari::math {
 namespace glm {
     template <int N, typename T, qualifier Q> void from_json(const nlohmann::json &j, glm::vec<N, T, Q> &vec) {
         for (int i = 0; i < N; i++) {
-            vec[i] = j[i].get<float>();
+            vec[i] = j[i].get<T>();
         }
     }
 

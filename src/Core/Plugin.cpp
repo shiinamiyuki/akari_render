@@ -22,8 +22,8 @@
 
 #include <Akari/Core/Plugin.h>
 #ifdef _MSC_VER
-#include <Windows.h>
 #include <Akari/Core/Logger.h>
+#include <Windows.h>
 
 namespace Akari {
     void SharedLibraryLoader::Load(const char *path) { handle = LoadLibraryA(path); }
@@ -44,6 +44,20 @@ namespace Akari {
 #endif
 
 namespace Akari {
+
+    struct ComponentManager {
+        std::shared_ptr<Component> Create(const char *type) {
+            return std::shared_ptr<Component>(dynamic_cast<Component *>(map.at(type)->_create()));
+        }
+        std::unordered_map<std::string, Component::Type *> map;
+        void Register(Component::Type *type) { map.insert(std::make_pair(type->name(), type)); }
+
+        static ComponentManager *GetInstance() {
+            static ComponentManager instance;
+            return &instance;
+        }
+    };
+
     class PluginManager : public IPluginManager {
         std::unordered_map<std::string, IPlugin *> plugins;
         std::vector<std::unique_ptr<SharedLibraryLoader>> sharedLibraries;
@@ -52,7 +66,7 @@ namespace Akari {
       public:
         void SetPluginPath(const char *path) override { prefix = path; }
         bool LoadPath(const char *path) override {
-            Info("Loading {}\n",path);
+            Info("Loading {}\n", path);
             auto lib = std::make_unique<SharedLibraryLoader>(path);
             if (!lib)
                 return false;
@@ -61,6 +75,7 @@ namespace Akari {
                 return false;
             auto plugin = ((GetPluginFunc)p)();
             plugins[plugin->GetTypeInfo()->name()] = plugin;
+            ComponentManager::GetInstance()->Register(plugin->GetTypeInfo());
             sharedLibraries.emplace_back(std::move(lib));
             return true;
         }
@@ -92,5 +107,10 @@ namespace Akari {
     AKR_EXPORT IPluginManager *GetPluginManager() {
         static PluginManager manager;
         return &manager;
+    }
+
+    std::shared_ptr<Component> CreateComponent(const char *type) {
+        auto manager = ComponentManager::GetInstance();
+        return manager->Create(type);
     }
 } // namespace Akari

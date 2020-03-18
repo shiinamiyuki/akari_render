@@ -40,14 +40,14 @@ namespace Akari {
         vec3 normal;
         float pdfPos, pdfDir;
     };
-    
+    struct VisibilityTester;
     class Light : public Component {
       public:
         virtual Spectrum Li(ShadingPoint &sp) const = 0;
 
-        virtual void SampleLi(const Point2f &u, Intersection &isct, LightSample &sample, VisibilityTester &) const = 0;
+        virtual void SampleLi(const vec2 &u, Intersection &isct, LightSample &sample, VisibilityTester &) const = 0;
 
-        virtual Float PdfLi(const Intersection &intersection, const Vec3f &wi) const = 0;
+        virtual Float PdfLi(const Intersection &intersection, const vec3 &wi) const = 0;
 
 //        virtual void SampleLe(const Point2f &u1, const Point2f &u2, LightRaySample &sample) = 0;
     };

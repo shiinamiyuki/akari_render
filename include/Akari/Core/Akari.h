@@ -39,6 +39,14 @@ namespace Akari {
         fprintf(stderr, "%s\n", msg);
         abort();
     }
+
+    struct CurrentPathGuard{
+        fs::path _cur;
+        CurrentPathGuard():_cur(fs::current_path()){}
+        ~CurrentPathGuard(){
+            fs::current_path(_cur);
+        }
+    };
 #define AKARI_NON_COPYABLE(CLASS)                                                                                      \
     CLASS(const CLASS &) = delete;                                                                                     \
     CLASS &operator=(const CLASS &) = delete;

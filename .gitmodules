@@ -4,6 +4,3 @@
 [submodule "external/tinyobjloader"]
 	path = external/tinyobjloader
 	url = https://github.com/tinyobjloader/tinyobjloader
-[submodule "external/tbb"]
-	path = external/tbb
-	url = https://github.com/intel/tbb

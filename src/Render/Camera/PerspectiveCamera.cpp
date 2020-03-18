@@ -30,7 +30,7 @@ namespace Akari {
         std::shared_ptr<Film> film;
         ivec2 filmDimension{};
         float lensRadius = 0;
-        float fov = DegreesToRadians(80);
+        float fov = DegreesToRadians(80.0f);
         Transform _transform, inv_transform;
         AffineTransform transform;
 
