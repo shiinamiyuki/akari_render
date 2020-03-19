@@ -19,7 +19,22 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-namespace Akari {
-    Serializable::Type *ReviveContext::getType(const std::string &s) { return Context::getType(s); }
-}
+#include <Akari/Core/Component.h>
+#include <Akari/Core/Plugin.h>
+#include <Akari/Core/Serialize.hpp>
 
+namespace Akari {
+    Serializable::Type *ReviveContext::getType(const std::string &s) {
+        try {
+            return Context::getType(s);
+        } catch (miyuki::serialize::NoSuchTypeError &err) {
+            auto pluginManager = GetPluginManager();
+            auto plugin = pluginManager->LoadPlugin(s.c_str());
+            if (!plugin) {
+                throw err;
+            }
+            Context::registerTye(plugin->GetTypeInfo());
+            return plugin->GetTypeInfo();
+        }
+    }
+} // namespace Akari

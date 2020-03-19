@@ -1,2 +1,2 @@
-add_executable(MeshImporter MeshImporter.cpp)
-target_link_libraries(MeshImporter AkariCore BinaryMesh)
+add_tool(MeshImporter MeshImporter.cpp)
+target_link_libraries(MeshImporter BinaryMesh)

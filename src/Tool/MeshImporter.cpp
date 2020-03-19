@@ -22,6 +22,8 @@
 
 #include <Akari/Render/Plugins/BinaryMesh.h>
 #include <Akari/Render/SceneGraph.h>
+#include <Akari/Core/Serialize.hpp>
+#include <memory>
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
@@ -45,13 +47,22 @@ namespace Akari {
             bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err, _file.c_str());
             std::vector<Vertex> vertices;
             std::vector<ivec3> indices;
-
+            std::unordered_map<std::string, int> name_to_group;
+            std::vector<int> group;
             for (size_t s = 0; s < shapes.size(); s++) {
                 // Loop over faces(polygon)
                 size_t index_offset = 0;
                 for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
 
                     auto mat = materials[shapes[s].mesh.material_ids[f]].name;
+
+                    auto name = shapes[s].name + "_" + mat;
+
+                    if(name_to_group.find(name) != name_to_group.end()){
+                        name_to_group[name] = name_to_group.size();
+                    }
+
+                    group.push_back(name_to_group[name]);
 
                     int fv = shapes[s].mesh.num_face_vertices[f];
 
@@ -97,6 +108,7 @@ namespace Akari {
             mesh->file = binary.string();
             mesh->vertexBuffer = std::move(vertices);
             mesh->indexBuffer = std::move(indices);
+            mesh->groups = std::move(group);
         }
         mesh->Save(binary.string().c_str());
         if (graph) {
@@ -114,6 +126,23 @@ int main(int argc, char ** argv) {
     }
     fs::path in = argv[1];
     fs::path out = argv[2];
+    fs::path scenePath;
     std::shared_ptr<SceneGraph> graph;
+    ReviveContext ctx;
+    if(argc >= 4) {
+        scenePath = fs::path(argv[3]);
+        std::ifstream in(scenePath);
+        std::string str((std::istreambuf_iterator<char>(in)),
+                        std::istreambuf_iterator<char>());
+        json data = str.empty() ? json::object(): json::parse(str);
 
+        graph = std::make_shared<SceneGraph>(miyuki::serialize::fromJson<SceneGraph>(ctx, data));
+    }
+    Convert(in, out, graph.get());
+    if(graph){
+        auto data = miyuki::serialize::toJson(ctx, *graph);
+        std::ofstream out(scenePath);
+        out << data.dump(1) << std::endl;
+    }
+    return 0;
 }

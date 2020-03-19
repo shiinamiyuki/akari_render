@@ -61,12 +61,21 @@ function(add_plugin target)
     set_property(TARGET ${target} PROPERTY POSITION_INDEPENDENT_CODE ON)
     set_target_properties(${target} PROPERTIES PREFIX "")
     set_target_properties(${target} PROPERTIES
-            LIBRARY_OUTPUT_DIRECTORY  "${CMAKE_BINARY_DIR}/plugins/"
+            LIBRARY_OUTPUT_DIRECTORY  "${CMAKE_BINARY_DIR}/"
 #            ARCHIVE_OUTPUT_DIRECTORY  "${CMAKE_BINARY_DIR}/plugins/"
-            RUNTIME_OUTPUT_DIRECTORY   "${CMAKE_BINARY_DIR}/plugins/")
+            RUNTIME_OUTPUT_DIRECTORY   "${CMAKE_BINARY_DIR}/")
     target_link_libraries(${target} AkariCore)
 endfunction()
-
+function(add_tool target)
+    list(SUBLIST ARGN 0 -1 FILES)
+    add_executable(${target} ${FILES})
+    set_property(TARGET ${target} PROPERTY POSITION_INDEPENDENT_CODE ON)
+    set_target_properties(${target} PROPERTIES PREFIX "")
+    set_target_properties(${target} PROPERTIES
+            #            ARCHIVE_OUTPUT_DIRECTORY  "${CMAKE_BINARY_DIR}/plugins/"
+            RUNTIME_OUTPUT_DIRECTORY   "${CMAKE_BINARY_DIR}/")
+    target_link_libraries(${target} AkariCore)
+endfunction()
 
 add_plugin(Foo src/app/lib.cpp)
 add_subdirectory(src/Render)

@@ -61,7 +61,7 @@ namespace Akari {
     class PluginManager : public IPluginManager {
         std::unordered_map<std::string, IPlugin *> plugins;
         std::vector<std::unique_ptr<SharedLibraryLoader>> sharedLibraries;
-        fs::path prefix = "./plugins/";
+        fs::path prefix = "./";
 
       public:
         void SetPluginPath(const char *path) override { prefix = path; }
