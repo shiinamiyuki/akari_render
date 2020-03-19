@@ -28,13 +28,14 @@
 namespace Akari {
     const MaterialSlot &BinaryMesh::GetMaterialSlot(int group) const { return materials[group]; }
     const Vertex *BinaryMesh::GetVertexBuffer() const { return vertexBuffer.data(); }
-    const ivec3 *BinaryMesh::GetIndexBuffer() const { return indexBuffer.data(); }
+    const int *BinaryMesh::GetIndexBuffer() const { return indexBuffer.data(); }
     size_t BinaryMesh::GetTriangleCount() const { return vertexBuffer.size() / 3; }
     int BinaryMesh::GetPrimitiveGroup(int idx) const { return groups[idx]; }
     const char *AKR_MESH_MAGIC = "AKARI_BINARY_MESH";
     bool BinaryMesh::Load(const char *path) {
+        Info("Loading {}\n",path);
         std::ifstream in(path, std::ios::binary | std::ios::in);
-        char buffer[128];
+        char buffer[128] = {0};
         in.read(buffer, strlen(AKR_MESH_MAGIC));
         if (strcmp(buffer, AKR_MESH_MAGIC) != 0) {
             Error("Failed to load mesh: invalid format\n");
@@ -45,10 +46,17 @@ namespace Akari {
         vertexBuffer.resize(vertexCount);
         in.read(reinterpret_cast<char *>(vertexBuffer.data()), sizeof(Vertex) * vertexCount);
         indexBuffer.resize(vertexCount);
-        in.read(reinterpret_cast<char *>(indexBuffer.data()), sizeof(ivec3) * vertexCount);
+        in.read(reinterpret_cast<char *>(indexBuffer.data()), sizeof(int) * vertexCount);
         groups.resize(vertexCount / 3);
-        in.read(reinterpret_cast<char *>(groups.data()), sizeof(int) * vertexCount);
+        in.read(reinterpret_cast<char *>(groups.data()), sizeof(int) * groups.size());
+        memset(buffer, 0, sizeof(buffer));
+        in.read(buffer, strlen(AKR_MESH_MAGIC));
+        if (strcmp(buffer, AKR_MESH_MAGIC) != 0) {
+            Error("Failed to load mesh: invalid format\n");
+            return false;
+        }
         _loaded = true;
+        Info("Loaded {} triangles\n",groups.size());
         return true;
     }
     void BinaryMesh::Save(const char *path) {
@@ -57,8 +65,9 @@ namespace Akari {
         size_t vertexCount = vertexBuffer.size();
         out.write(reinterpret_cast<char *>(&vertexCount), sizeof(size_t));
         out.write(reinterpret_cast<char *>(vertexBuffer.data()), sizeof(Vertex) * vertexCount);
-        out.write(reinterpret_cast<char *>(indexBuffer.data()), sizeof(ivec3) * vertexCount);
-        out.write(reinterpret_cast<char *>(groups.data()), sizeof(int) * vertexCount);
+        out.write(reinterpret_cast<char *>(indexBuffer.data()), sizeof(int) * vertexCount);
+        out.write(reinterpret_cast<char *>(groups.data()), sizeof(int) * groups.size());
+        out.write(AKR_MESH_MAGIC, strlen(AKR_MESH_MAGIC));
     }
     void BinaryMesh::Commit() {
         if(_loaded){

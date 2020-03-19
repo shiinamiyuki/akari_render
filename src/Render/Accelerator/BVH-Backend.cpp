@@ -20,6 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <Akari/Core/Logger.h>
 #include <Akari/Core/Plugin.h>
 #include <Akari/Render/Accelerator.h>
 #include <Akari/Render/Mesh.h>
@@ -146,7 +147,10 @@ namespace Akari {
                             b1 = b1.UnionOf(buckets[j].bound);
                             count1 += buckets[j].count;
                         }
-                        cost[i] = 0.125f + (count0 * b0.SurfaceArea() + count1 * b1.SurfaceArea()) / box.SurfaceArea();
+                        float cost0 = count0 == 0 ? 0 : count0 * b0.SurfaceArea();
+                        float cost1 = count1 == 0 ? 0 : count1 * b1.SurfaceArea();
+                        cost[i] = 0.125f + (cost0 + cost1) / box.SurfaceArea();
+                        assert(cost[i]>=0);
                     }
                     int splitBuckets = 0;
                     Float minCost = cost[0];
@@ -249,9 +253,9 @@ namespace Akari {
                 auto v = mesh->GetVertexBuffer();
                 auto i = mesh->GetIndexBuffer();
                 Bounds3f box{{MaxFloat, MaxFloat, MaxFloat}, {MinFloat, MinFloat, MinFloat}};
-                box = box.UnionOf(v[i[idx][0]].pos);
-                box = box.UnionOf(v[i[idx][1]].pos);
-                box = box.UnionOf(v[i[idx][2]].pos);
+                box = box.UnionOf(v[i[idx * 3 + 0]].pos);
+                box = box.UnionOf(v[i[idx * 3 + 1]].pos);
+                box = box.UnionOf(v[i[idx * 3 + 2]].pos);
                 return box;
             }
         };

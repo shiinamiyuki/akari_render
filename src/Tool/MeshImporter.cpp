@@ -46,7 +46,7 @@ namespace Akari {
             std::string _file = file.string();
             bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err, _file.c_str());
             std::vector<Vertex> vertices;
-            std::vector<ivec3> indices;
+            std::vector<int> indices;
             std::unordered_map<std::string, int> name_to_group;
             std::vector<int> group;
             for (size_t s = 0; s < shapes.size(); s++) {
@@ -67,10 +67,9 @@ namespace Akari {
                     int fv = shapes[s].mesh.num_face_vertices[f];
 
                     Vertex vertex[3];
-                    ivec3 index;
                     for (size_t v = 0; v < fv; v++) {
                         tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
-                        index[v] = int(indices.size() + v);
+                        indices.push_back(indices.size());
                         for (int i = 0; i < 3; i++) {
                             vertex[v].pos[i] = attrib.vertices[3 * idx.vertex_index + i];
                         }
@@ -99,7 +98,6 @@ namespace Akari {
                     for (auto &i : vertex) {
                         vertices.emplace_back(i);
                     }
-                    indices.emplace_back(index);
                     // per-face material
                     // shapes[s].mesh.material_ids[f];
                 }

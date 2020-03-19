@@ -32,7 +32,7 @@ namespace Akari {
         bool _loaded = false;
       public:
         std::vector<Vertex> vertexBuffer;
-        std::vector<ivec3> indexBuffer;
+        std::vector<int> indexBuffer;
         std::vector<int> groups;
         std::vector<MaterialSlot> materials;
         std::string file;
@@ -40,7 +40,7 @@ namespace Akari {
         AKR_DECL_COMP(BinaryMesh, "BinaryMesh")
         const MaterialSlot &GetMaterialSlot(int group) const override;
         const Vertex *GetVertexBuffer() const override;
-        const ivec3 *GetIndexBuffer() const override;
+        const int *GetIndexBuffer() const override;
         size_t GetTriangleCount() const override;
         int GetPrimitiveGroup(int idx) const override;
         bool Load(const char *path) override;

@@ -20,6 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <Akari/Core/Logger.h>
 #include <Akari/Render/SceneGraph.h>
 
 namespace Akari {
@@ -35,15 +36,16 @@ namespace Akari {
         }
         scene = std::make_shared<Scene>();
         for (auto &mesh : meshes) {
+            mesh->Commit();
             scene->AddMesh(mesh);
         }
         scene->SetAccelerator(Cast<Accelerator>(CreateComponent("BVHAccelerator")));
+        Info("Building Accelerator\n");
         scene->Commit();
         camera->Commit();
         sampler->Commit();
     }
     std::shared_ptr<RenderTask> SceneGraph::CreateRenderTask() {
-        Commit();
         RenderContext ctx;
         ctx.scene = scene;
         ctx.sampler = sampler;

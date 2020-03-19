@@ -38,7 +38,7 @@ namespace Akari{
     };
 
     [[nodiscard]] virtual const Vertex * GetVertexBuffer() const = 0;
-    [[nodiscard]] virtual const ivec3 * GetIndexBuffer() const = 0;
+    [[nodiscard]] virtual const int * GetIndexBuffer() const = 0;
     [[nodiscard]] virtual size_t GetTriangleCount() const = 0;
     [[nodiscard]] virtual int GetPrimitiveGroup(int idx) const = 0;
     virtual bool Load(const char *path)  = 0;
@@ -46,9 +46,9 @@ namespace Akari{
     bool Intersect(const Ray &ray, int idx, RayHit *hit) const {
         auto vertices = GetVertexBuffer();
         auto indices = GetIndexBuffer();
-        auto v0 = vertices[indices[idx][0]].pos;
-        auto v1 = vertices[indices[idx][1]].pos;
-        auto v2 = vertices[indices[idx][2]].pos;
+        auto v0 = vertices[indices[idx * 3 + 0]].pos;
+        auto v1 = vertices[indices[idx * 3 + 1]].pos;
+        auto v2 = vertices[indices[idx * 3 + 2]].pos;
         vec3 e1 = (v1 - v0);
         vec3 e2 = (v2 - v0);
         auto Ng = normalize(cross(e1, e2));

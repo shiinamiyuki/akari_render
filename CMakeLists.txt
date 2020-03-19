@@ -48,7 +48,7 @@ set(AKARI_CORE_EXT_LIBS ${AKARI_CORE_EXT_LIBS} fmt)
 ##set(AKARI_CORE_EXT_LIBS ${AKARI_CORE_EXT_LIBS} embree embree_sse42 embree_avx embree_avx2 lexers math simd tasking sys)
 #
 file(GLOB AKARI_API_SRC include/Akari/Core/*.* include/Akari/Render/*.*)
-file(GLOB AKARI_CORE_SRC src/Core/*.* )
+file(GLOB AKARI_CORE_SRC src/Core/*.* src/Render/*.*)
 add_library(AkariCore SHARED ${AKARI_CORE_SRC})
 target_link_libraries(AkariCore  ${AKARI_CORE_EXT_LIBS})
 #
