@@ -23,16 +23,17 @@
 #include <Akari/Core/Plugin.h>
 #include <Akari/Render/Integrator.h>
 #include <condition_variable>
+#include <future>
 #include <mutex>
-
 namespace Akari {
     struct RTDebugRenderTask : RenderTask {
         RenderContext ctx;
         std::mutex mutex;
         std::condition_variable filmAvailable, done;
+        std::future<void> future;
         explicit RTDebugRenderTask(const RenderContext &ctx) : ctx(ctx) {}
         bool HasFilmUpdate() override { return false; }
-        std::shared_ptr<Film> GetFilmUpdate() override { return std::shared_ptr<Film>(); }
+        std::shared_ptr<const Film> GetFilmUpdate() override { return ctx.camera->GetFilm(); }
         bool IsDone() override { return false; }
         bool WaitEvent(Event event) override {
             if (event == Event::EFILM_AVAILABLE) {
@@ -48,25 +49,31 @@ namespace Akari {
             }
             return false;
         }
+        void Wait() override {
+            future.wait();
+            done.notify_all();
+        }
         void Start() override {
-            auto scene = ctx.scene;
-            auto &camera = ctx.camera;
-            auto &sampler = ctx.sampler;
-            auto film = camera->GetFilm();
-            auto nTiles = ivec2(film->Dimension() + ivec2(TileSize - 1)) / ivec2(TileSize);
-            ParallelFor2D(nTiles, [=](ivec2 tilePos, uint32_t tid) {
-                (void)tid;
-                Bounds2i tileBounds = Bounds2i{tilePos * (int)TileSize, (tilePos + ivec2(1)) * (int)TileSize};
-                auto tile = film->GetTile(tileBounds);
-                for (int y = tile.bounds.p_min.y; y < tile.bounds.p_max.y; y++) {
-                    for (int x = tile.bounds.p_min.x; x < tile.bounds.p_max.x; x++) {
-                        CameraSample sample;
-                        camera->GenerateRay(vec2(0), vec2(0), ivec2(x, y), sample);
-                        tile.AddSample(ivec2(x, y), Spectrum(1), 1.0f);
+            future = std::async(std::launch::async, [=]() {
+                auto scene = ctx.scene;
+                auto &camera = ctx.camera;
+                auto &sampler = ctx.sampler;
+                auto film = camera->GetFilm();
+                auto nTiles = ivec2(film->Dimension() + ivec2(TileSize - 1)) / ivec2(TileSize);
+                ParallelFor2D(nTiles, [=](ivec2 tilePos, uint32_t tid) {
+                    (void)tid;
+                    Bounds2i tileBounds = Bounds2i{tilePos * (int)TileSize, (tilePos + ivec2(1)) * (int)TileSize};
+                    auto tile = film->GetTile(tileBounds);
+                    for (int y = tile.bounds.p_min.y; y < tile.bounds.p_max.y; y++) {
+                        for (int x = tile.bounds.p_min.x; x < tile.bounds.p_max.x; x++) {
+                            CameraSample sample;
+                            camera->GenerateRay(vec2(0), vec2(0), ivec2(x, y), sample);
+                            tile.AddSample(ivec2(x, y), Spectrum(1), 1.0f);
+                        }
                     }
-                }
-                std::lock_guard<std::mutex> lock(mutex);
-                film->MergeTile(tile);
+                    std::lock_guard<std::mutex> lock(mutex);
+                    film->MergeTile(tile);
+                });
             });
         }
     };

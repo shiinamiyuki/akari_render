@@ -20,8 +20,65 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <deque>
+#include <Akari/Core/Logger.h>
+#include <Akari/Render/SceneGraph.h>
+#include <cxxopts.hpp>
+#include <fstream>
+using namespace Akari;
 
-int main(){
+static std::string inputFilename;
+static std::string outputFilename;
 
+void parse(int argc, char **argv) {
+    try {
+        cxxopts::Options options("Akari", " - AkariRender Command Line Interface");
+        options.positional_help("input output").show_positional_help();
+        {
+            auto opt = options.allow_unrecognised_options().add_options();
+            opt("i,input", "Input Scene Description File", cxxopts::value<std::string>());
+            opt("o,output", "Output Image file", cxxopts::value<std::string>()->default_value("render.png"));
+            opt("help", "Show this help");
+        }
+        options.parse_positional({"input", "output"});
+        auto result = options.parse(argc, argv);
+        if (!result.count("input")) {
+            Fatal("Input file must be provided\n");
+            std::cout << options.help() << std::endl;
+            exit(0);
+        }
+        if (result.arguments().empty() || result.count("help")) {
+            std::cout << options.help() << std::endl;
+            exit(0);
+        }
+        inputFilename = result["input"].as<std::string>();
+        outputFilename = result["output"].as<std::string>();
+    } catch (const cxxopts::OptionException &e) {
+        std::cout << "error parsing options: " << e.what() << std::endl;
+        exit(1);
+    }
+}
+int main(int argc, char **argv) {
+    parse(argc, argv);
+    try {
+        ReviveContext ctx;
+        std::shared_ptr<SceneGraph> graph;
+        {
+            Info("Loading {}\n", inputFilename);
+            std::ifstream in(inputFilename);
+            std::string str((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+            json data = str.empty() ? json::object() : json::parse(str);
+
+            graph = std::make_shared<SceneGraph>(miyuki::serialize::fromJson<SceneGraph>(ctx, data));
+        }
+        graph->Commit();
+        Info("Start Rendering ...\n");
+        auto task = graph->CreateRenderTask();
+        task->Start();
+        task->Wait();
+        auto film = task->GetFilmUpdate();
+        film->WriteImage(outputFilename);
+    } catch (std::exception &e) {
+        Fatal("Exception: {}", e.what());
+        exit(1);
+    }
 }

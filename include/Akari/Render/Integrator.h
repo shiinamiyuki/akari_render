@@ -41,7 +41,7 @@ namespace Akari {
             EFILM_AVAILABLE
         };
         virtual bool HasFilmUpdate() = 0;
-        virtual std::shared_ptr<Film> GetFilmUpdate() = 0;
+        virtual std::shared_ptr<const Film> GetFilmUpdate() = 0;
         virtual bool IsDone() = 0;
         virtual bool WaitEvent(Event event) = 0;
     };

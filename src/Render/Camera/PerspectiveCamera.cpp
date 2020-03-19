@@ -28,7 +28,7 @@
 namespace Akari {
     class PerspectiveCamera final: public Camera {
         std::shared_ptr<Film> film;
-        ivec2 filmDimension{};
+        ivec2 filmDimension = ivec2(500,500);
         float lensRadius = 0;
         float fov = DegreesToRadians(80.0f);
         Transform _transform, inv_transform;

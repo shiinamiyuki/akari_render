@@ -45,18 +45,6 @@ namespace Akari {
 
 namespace Akari {
 
-    struct ComponentManager {
-        std::shared_ptr<Component> Create(const char *type) {
-            return std::shared_ptr<Component>(dynamic_cast<Component *>(map.at(type)->_create()));
-        }
-        std::unordered_map<std::string, Component::Type *> map;
-        void Register(Component::Type *type) { map.insert(std::make_pair(type->name(), type)); }
-
-        static ComponentManager *GetInstance() {
-            static ComponentManager instance;
-            return &instance;
-        }
-    };
 
     class PluginManager : public IPluginManager {
         std::unordered_map<std::string, IPlugin *> plugins;
@@ -79,7 +67,6 @@ namespace Akari {
             }
             auto plugin = ((GetPluginFunc)p)();
             plugins[plugin->GetTypeInfo()->name()] = plugin;
-            ComponentManager::GetInstance()->Register(plugin->GetTypeInfo());
             sharedLibraries.emplace_back(std::move(lib));
             return true;
         }
@@ -96,7 +83,12 @@ namespace Akari {
             path = path.concat(".so");
 #endif
             if (LoadPath(path.string().c_str())) {
-                return plugins.at(name);
+                it = plugins.find(name);
+                if(it != plugins.end()){
+                    return it->second;
+                }
+                Fatal("Unknown plugin: `{}`\n", name);
+                return nullptr;
             }
             return nullptr;
         }
@@ -114,7 +106,13 @@ namespace Akari {
     }
 
     std::shared_ptr<Component> CreateComponent(const char *type) {
-        auto manager = ComponentManager::GetInstance();
-        return manager->Create(type);
+        auto manager = GetPluginManager();
+        auto plugin = manager->LoadPlugin(type);
+        if(!plugin){
+            Error("Failed to create component: `{}`\n", type);
+            return nullptr;
+        }
+        auto obj = std::shared_ptr<Serializable>(plugin->GetTypeInfo()->_create());
+        return Cast<Component>(obj);
     }
 } // namespace Akari

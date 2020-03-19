@@ -29,6 +29,7 @@
 
 namespace Akari {
     class AKR_EXPORT BinaryMesh : public Mesh {
+        bool _loaded = false;
       public:
         std::vector<Vertex> vertexBuffer;
         std::vector<ivec3> indexBuffer;
@@ -44,6 +45,7 @@ namespace Akari {
         int GetPrimitiveGroup(int idx) const override;
         bool Load(const char *path) override;
         void Save(const char *path);
+        void Commit()override;
     };
 } // namespace Akari
 

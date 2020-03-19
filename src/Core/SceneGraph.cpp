@@ -39,6 +39,8 @@ namespace Akari {
         }
         scene->SetAccelerator(Cast<Accelerator>(CreateComponent("BVHAccelerator")));
         scene->Commit();
+        camera->Commit();
+        sampler->Commit();
     }
     std::shared_ptr<RenderTask> SceneGraph::CreateRenderTask() {
         Commit();

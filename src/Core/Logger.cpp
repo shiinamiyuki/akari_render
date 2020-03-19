@@ -21,48 +21,37 @@
 // SOFTWARE.
 
 #include <Akari/Core/Logger.h>
-#include <mutex>
 #include <chrono>
+#include <mutex>
 
 namespace Akari {
     class DefaultLogger : public Logger {
         decltype(std::chrono::system_clock::now()) start = std::chrono::system_clock::now();
-        std::string GetMessageHeader(const std::string & level) {
+        std::string GetMessageHeader(const std::string &level) {
             std::chrono::duration<double> elapsed = std::chrono::system_clock::now() - start;
             return fmt::format("[{}] [{:.3f}] ", level, elapsed.count());
         }
-        void DoLogMessage(const std::string & msg){
-            printf("%s",msg.c_str());
-            fflush(stdout);
-        }
-    public:
-        void Warning(const std::string &msg) override {
-            DoLogMessage(GetMessageHeader("WARNING").append(msg));
+        void DoLogMessage(const std::string &msg, FILE *fp = stdout) {
+            fprintf(fp, "%s", msg.c_str());
+            fflush(fp);
         }
 
-        void Error(const std::string &msg) override {
-            DoLogMessage(GetMessageHeader("ERROR").append(msg));
-        }
+      public:
+        void Warning(const std::string &msg) override { DoLogMessage(GetMessageHeader("WARNING").append(msg), stderr); }
 
-        void Info(const std::string &msg) override {
-            DoLogMessage(GetMessageHeader("INFO").append(msg));
-        }
+        void Error(const std::string &msg) override { DoLogMessage(GetMessageHeader("ERROR").append(msg), stderr); }
 
-        void Debug(const std::string &msg) override {
-            DoLogMessage(GetMessageHeader("DEBUG").append(msg));
-        }
+        void Info(const std::string &msg) override { DoLogMessage(GetMessageHeader("INFO").append(msg)); }
 
-        void Fatal(const std::string &msg) override {
-            DoLogMessage(GetMessageHeader("FATAL").append(msg));
-        }
+        void Debug(const std::string &msg) override { DoLogMessage(GetMessageHeader("DEBUG").append(msg)); }
+
+        void Fatal(const std::string &msg) override { DoLogMessage(GetMessageHeader("FATAL").append(msg), stderr); }
     };
 
     Logger *GetDefaultLogger() {
         static std::unique_ptr<DefaultLogger> logger;
         static std::once_flag flag;
-        std::call_once(flag, [&]() {
-            logger = std::make_unique<DefaultLogger>();
-        });
+        std::call_once(flag, [&]() { logger = std::make_unique<DefaultLogger>(); });
         return logger.get();
     }
-}
+} // namespace Akari

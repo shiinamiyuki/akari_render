@@ -48,6 +48,7 @@ namespace Akari {
         in.read(reinterpret_cast<char *>(indexBuffer.data()), sizeof(ivec3) * vertexCount);
         groups.resize(vertexCount / 3);
         in.read(reinterpret_cast<char *>(groups.data()), sizeof(int) * vertexCount);
+        _loaded = true;
         return true;
     }
     void BinaryMesh::Save(const char *path) {
@@ -58,6 +59,12 @@ namespace Akari {
         out.write(reinterpret_cast<char *>(vertexBuffer.data()), sizeof(Vertex) * vertexCount);
         out.write(reinterpret_cast<char *>(indexBuffer.data()), sizeof(ivec3) * vertexCount);
         out.write(reinterpret_cast<char *>(groups.data()), sizeof(int) * vertexCount);
+    }
+    void BinaryMesh::Commit() {
+        if(_loaded){
+            return;;
+        }
+        Load(file.c_str());
     }
     AKR_EXPORT_COMP(BinaryMesh, "Mesh");
 } // namespace Akari

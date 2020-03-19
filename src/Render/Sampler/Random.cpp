@@ -26,7 +26,7 @@ namespace Akari {
     class RandomSampler : public Sampler {
       public:
         Float Next1D() override { return 0; }
-        AKR_DECL_COMP(RandomSampler, "Random")
+        AKR_DECL_COMP(RandomSampler, "RandomSampler")
     };
     AKR_EXPORT_COMP(RandomSampler, "Sampler")
 }

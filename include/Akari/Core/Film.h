@@ -82,7 +82,7 @@ namespace Akari {
             }
         }
 
-        void WriteImage(const fs::path & path, const PostProcessor & postProcessor = GammaCorrection()){
+        void WriteImage(const fs::path & path, const PostProcessor & postProcessor = GammaCorrection())const{
             RGBAImage image(Dimension());
             ParallelFor(radiance.Dimension().y, [&](uint32_t y, uint32_t){
               for(int x = 0; x < radiance.Dimension().x;x++){
