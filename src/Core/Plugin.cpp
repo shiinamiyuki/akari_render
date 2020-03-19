@@ -68,11 +68,15 @@ namespace Akari {
         bool LoadPath(const char *path) override {
             Info("Loading {}\n", path);
             auto lib = std::make_unique<SharedLibraryLoader>(path);
-            if (!lib)
+            if (!lib) {
+                Error("Cannot load {}\n", path);
                 return false;
+            }
             auto p = lib->GetFuncPointer(AKARI_PLUGIN_FUNC_NAME);
-            if (!p)
+            if (!p) {
+                Error("Cannot resolve symbol {} in {}\n", AKARI_PLUGIN_FUNC_NAME, path);
                 return false;
+            }
             auto plugin = ((GetPluginFunc)p)();
             plugins[plugin->GetTypeInfo()->name()] = plugin;
             ComponentManager::GetInstance()->Register(plugin->GetTypeInfo());

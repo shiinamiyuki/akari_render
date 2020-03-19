@@ -30,6 +30,9 @@ namespace Akari {
         if(!camera){
             camera = Cast<Camera>(CreateComponent("PerspectiveCamera"));
         }
+        if(!integrator){
+            integrator = Cast<Integrator>(CreateComponent("RTDebug"));
+        }
         scene = std::make_shared<Scene>();
         for (auto &mesh : meshes) {
             scene->AddMesh(mesh);
