@@ -9,6 +9,7 @@ option(AKARI_BUILD_GUI OFF)
 include_directories(external/glm)
 include_directories(external/misc)
 include_directories(external/miyuki.serialize/include)
+include_directories(external/cxxopts/include)
 
 include_directories(include)
 if(MSVC)
@@ -77,7 +78,6 @@ function(add_tool target)
     target_link_libraries(${target} AkariCore)
 endfunction()
 
-add_plugin(Foo src/app/lib.cpp)
 add_subdirectory(src/Render)
 add_subdirectory(src/Tool)
 

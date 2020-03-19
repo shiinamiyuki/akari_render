@@ -23,13 +23,25 @@
 #ifndef AKARIRENDER_PARALLEL_HPP
 #define AKARIRENDER_PARALLEL_HPP
 
-
 #include <Akari/Core/Config.h>
+#include <Akari/Core/Math.h>
 #include <functional>
 
-namespace Akari{
+namespace Akari {
 
-    AKR_EXPORT void ParallelFor(int count, const std::function<void(int)>& func, size_t chunkSize = 1);
+    AKR_EXPORT void ParallelFor(int count, const std::function<void(uint32_t, uint32_t)> &func, size_t chunkSize = 1);
 
-}
+    inline void ParallelFor2D(const ivec2 &dim, const std::function<void(ivec2, uint32_t)> &func,
+                              size_t chunkSize = 1) {
+        ParallelFor(
+            dim.x * dim.y,
+            [&](uint32_t idx, int tid) {
+                auto x = idx % dim.x;
+                auto y = idx / dim.x;
+                func(ivec2(x, y), tid);
+            },
+            chunkSize);
+    }
+
+} // namespace Akari
 #endif // AKARIRENDER_PARALLEL_HPP

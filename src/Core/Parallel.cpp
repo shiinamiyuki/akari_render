@@ -21,12 +21,12 @@
 // SOFTWARE.
 #include <Akari/Core/Parallel.h>
 
+#include <atomic>
+#include <condition_variable>
+#include <deque>
 #include <memory>
 #include <mutex>
 #include <thread>
-#include <condition_variable>
-#include <deque>
-#include <atomic>
 
 namespace Akari {
 
@@ -35,7 +35,7 @@ namespace Akari {
         size_t count = 0;
         uint32_t chunkSize = 0;
         ParallelForContext() : workIndex(0) {}
-        const std::function<void(int)> *func = nullptr;
+        const std::function<void(uint32_t, uint32_t)> *func = nullptr;
         bool done() const { return workIndex >= count; }
         ParallelForContext(const ParallelForContext &rhs)
             : workIndex(rhs.workIndex.load()), count(rhs.count), chunkSize(rhs.chunkSize), func(rhs.func) {}
@@ -52,7 +52,7 @@ namespace Akari {
         ParallelForWorkPool() : workId(0), nThreadFinished(0) {
             stopped = false;
             auto n = (int)GetConfig()->NumCore;
-            for (int i = 0; i < n; i++) {
+            for (int tid = 0; tid < n; tid++) {
                 threads.emplace_back([=]() {
                     while (!stopped) {
                         std::unique_lock<std::mutex> lock(workMutex);
@@ -66,13 +66,12 @@ namespace Akari {
                         while (!loop.done()) {
                             auto begin = loop.workIndex.fetch_add(loop.chunkSize);
                             for (auto i = begin; i < begin + loop.chunkSize && i < loop.count; i++) {
-                                (*loop.func)(i);
+                                (*loop.func)(i, tid);
                             }
                         }
                         lock.lock();
                         nThreadFinished++;
                         oneThreadFinished.notify_all();
-
 
                         while (nThreadFinished != (uint32_t)threads.size() && workId == id) {
                             oneThreadFinished.wait(lock);
@@ -110,13 +109,13 @@ namespace Akari {
             }
         }
     };
-    void ParallelFor(int count, const std::function<void(int)>& func, size_t chunkSize) {
+    void ParallelFor(int count, const std::function<void(uint32_t, uint32_t)> &func, size_t chunkSize) {
         static std::once_flag flag;
         static std::unique_ptr<ParallelForWorkPool> pool;
         std::call_once(flag, [&]() { pool = std::make_unique<ParallelForWorkPool>(); });
         ParallelForContext ctx;
         ctx.func = &func;
-        ctx.chunkSize = (uint32_t )chunkSize;
+        ctx.chunkSize = (uint32_t)chunkSize;
         ctx.count = count;
         ctx.workIndex = 0;
         pool->enqueue(ctx);

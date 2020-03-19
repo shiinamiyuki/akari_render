@@ -36,7 +36,6 @@ namespace Akari {
     class AKR_EXPORT Material : public Component {
       public:
         virtual void computeScatteringFunctions(ScatteringEvent *event, MemoryArena &arena) const = 0;
-        [[nodiscard]] virtual std::string GetName() const = 0;
     };
 
     struct MaterialSlot {

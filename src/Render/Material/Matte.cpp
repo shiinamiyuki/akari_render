@@ -23,23 +23,30 @@
 #include <Akari/Core/Plugin.h>
 #include <Akari/Render/Geometry.hpp>
 #include <Akari/Render/Material.h>
+#include <Akari/Render/Plugins/Matte.h>
 #include <Akari/Render/Reflection.hpp>
+#include <utility>
 #include <Akari/Render/Texture.h>
+
 namespace Akari {
     class MatteMaterial final : public Material {
         std::shared_ptr<Texture> color;
-        std::string name;
 
       public:
-        AKR_SER(color, name)
+        MatteMaterial() = default;
+        explicit MatteMaterial(std::shared_ptr<Texture> color) : color(std::move(color)) {}
+        AKR_SER(color)
         AKR_DECL_COMP(MatteMaterial, "Matte")
         void computeScatteringFunctions(ScatteringEvent *event, MemoryArena &arena) const override {
             auto c = color->Evaluate(event->sp);
             event->bsdf->AddComponent(arena.alloc<LambertianReflection>(c));
         }
-        std::string GetName() const override { return name; }
     };
 
     AKR_EXPORT_COMP(MatteMaterial, "Material")
+
+    std::shared_ptr<Material> CreateMatteMaterial(const std::shared_ptr<Texture> &color) {
+        return std::make_shared<MatteMaterial>(color);
+    }
 
 } // namespace Akari

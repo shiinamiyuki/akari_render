@@ -36,7 +36,7 @@ namespace Akari {
            auto & texels = image.texels();
            auto dimension = image.Dimension();
            std::vector<uint8_t> buffer(texels.size() * 3);
-           ParallelFor(texels.size(), [&](int i) {
+           ParallelFor(texels.size(), [&](uint32_t i,uint32_t) {
                auto pixel = static_cast<uint8_t *>(&buffer[i * 3]);
                auto rgb = vec3(texels[i]);
                rgb = clamp(rgb, vec3(0),vec3(1));
@@ -56,7 +56,7 @@ namespace Akari {
         auto & texels = in.texels();
         out.Resize(in.Dimension());
         auto & outTexels = out.texels();
-        ParallelFor(in.Dimension().y, [&](int y) {
+        ParallelFor(in.Dimension().y, [&](uint32_t y, uint32_t) {
             for(int i = 0;i< in.Dimension().x;i++)
                 out(i, y) = vec4(pow(vec3(in(i,y)), vec3(gamma)), in(i,y).w);
         },1024);

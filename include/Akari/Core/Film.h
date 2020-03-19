@@ -84,7 +84,7 @@ namespace Akari {
 
         void WriteImage(const fs::path & path, const PostProcessor & postProcessor = GammaCorrection()){
             RGBAImage image(Dimension());
-            ParallelFor(radiance.Dimension().y, [&](int y){
+            ParallelFor(radiance.Dimension().y, [&](uint32_t y, uint32_t){
               for(int x = 0; x < radiance.Dimension().x;x++){
                   if(weight(x,y) != 0)
                       image(x,y) = vec4(radiance(x, y)/ weight(x,y), 1);

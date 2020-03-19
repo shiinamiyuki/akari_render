@@ -20,29 +20,19 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <Akari/Render/SceneGraph.h>
+#ifndef AKARIRENDER_TASK_H
+#define AKARIRENDER_TASK_H
 
 namespace Akari {
-    void SceneGraph::Commit() {
-        if(!sampler){
-            sampler = Cast<Sampler>(CreateComponent("RandomSampler"));
-        }
-        if(!camera){
-            camera = Cast<Camera>(CreateComponent("PerspectiveCamera"));
-        }
-        scene = std::make_shared<Scene>();
-        for (auto &mesh : meshes) {
-            scene->AddMesh(mesh);
-        }
-        scene->SetAccelerator(Cast<Accelerator>(CreateComponent("BVHAccelerator")));
-        scene->Commit();
-    }
-    std::shared_ptr<RenderTask> SceneGraph::CreateRenderTask() {
-        Commit();
-        RenderContext ctx;
-        ctx.scene = scene;
-        ctx.sampler = sampler;
-        ctx.camera = camera;
-        return integrator->CreateRenderTask(ctx);
-    }
+    class Task {
+      public:
+        virtual bool CanPause() const {return false;}
+        // Try to pause the task, might not work at all!
+        virtual void Pause() {}
+        virtual void Start() = 0;
+        virtual void Stop() {}
+        virtual void Resume() {}
+    };
+
 } // namespace Akari
+#endif // AKARIRENDER_TASK_H

@@ -30,14 +30,20 @@
 #include <Akari/Render/Material.h>
 #include <Akari/Render/Mesh.h>
 #include <Akari/Render/Sampler.h>
+#include <Akari/Render/Integrator.h>
 
 namespace Akari {
-    struct SceneGraph {
+    struct AKR_EXPORT SceneGraph {
         std::shared_ptr<Camera> camera;
         std::shared_ptr<Accelerator> accelerator;
         std::shared_ptr<Sampler> sampler;
+        std::shared_ptr<Integrator> integrator;
         std::vector<std::shared_ptr<Mesh>> meshes;
-        AKR_SER(camera, accelerator, sampler, meshes)
+        AKR_SER(camera, accelerator, sampler, meshes, integrator)
+        std::shared_ptr<RenderTask> CreateRenderTask();
+        void Commit();
+      private:
+        std::shared_ptr<Scene> scene;
     };
 } // namespace Akari
 

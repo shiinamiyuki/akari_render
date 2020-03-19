@@ -9,8 +9,8 @@
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
 //
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
 //
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -19,12 +19,14 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-#include <Akari/Core/Component.h>
-#include <cstdio>
-#include <Akari/Core/Plugin.h>
+
+#ifndef AKARIRENDER_MATTE_H
+#define AKARIRENDER_MATTE_H
+
+#include <Akari/Render/Material.h>
+#include <Akari/Render/Texture.h>
+
 namespace Akari {
-    struct Foo : Component {
-        AKR_DECL_COMP(Foo,"Foo")
-    };
-    AKR_EXPORT_COMP(Foo,"")
-} // namespace akari
+    AKR_EXPORT std::shared_ptr<Material> CreateMatteMaterial(const std::shared_ptr<Texture> & color);
+} // namespace Akari
+#endif // AKARIRENDER_MATTE_H
