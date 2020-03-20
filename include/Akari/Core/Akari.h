@@ -27,6 +27,10 @@
 #else
 #pragma GCC diagnostic error "-Wall"
 #pragma clang diagnostic error "-Wall"
+#pragma GCC diagnostic ignored "-Wc++11-compat"
+#pragma clang diagnostic ignored "-Wc++11-compat"
+#pragma GCC diagnostic ignored "-Wunused-variable"
+#pragma clang diagnostic ignored "-Wunused-variable"
 #endif
 
 #include <filesystem>
@@ -52,7 +56,7 @@ namespace Akari {
     CLASS &operator=(const CLASS &) = delete;
 #define _AKARI_STR(x)    #x
 #define AKARI_STR(x)     _AKARI_STR(x)
-#define AKARI_PANIC(msg) panic(__FILE__, __LINE__, msg)
+#define AKARI_PANIC(msg) panic(msg)
 #define AKARI_ASSERT(expr)                                                                                             \
     do {                                                                                                               \
         if (!(expr)) {                                                                                                 \

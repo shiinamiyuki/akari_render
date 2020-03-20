@@ -30,8 +30,7 @@
 
 namespace Akari {
     template <class UserData, class Hit, class Intersector, class ShapeHandleConstructor> struct TBVHAccelerator {
-        Intersector _intersector;
-        ShapeHandleConstructor _ctor;
+       
 
         struct BVHNode {
             Bounds3f box{};
@@ -50,6 +49,8 @@ namespace Akari {
 
         Bounds3f boundBox;
         const UserData *user_data;
+         Intersector _intersector;
+        ShapeHandleConstructor _ctor;
         std::vector<Index> primitives;
         std::vector<BVHNode> nodes;
 
@@ -136,15 +137,15 @@ namespace Akari {
                         buckets[b].bound = buckets[b].bound.UnionOf(get(primitives[i]).getBoundingBox());
                     }
                     Float cost[nBuckets - 1] = {0};
-                    for (int i = 0; i < nBuckets - 1; i++) {
+                    for (uint32_t i = 0; i < nBuckets - 1; i++) {
                         Bounds3f b0{{MaxFloat, MaxFloat, MaxFloat}, {MinFloat, MinFloat, MinFloat}};
                         Bounds3f b1{{MaxFloat, MaxFloat, MaxFloat}, {MinFloat, MinFloat, MinFloat}};
                         int count0 = 0, count1 = 0;
-                        for (int j = 0; j <= i; j++) {
+                        for (uint32_t j = 0; j <= i; j++) {
                             b0 = b0.UnionOf(buckets[j].bound);
                             count0 += buckets[j].count;
                         }
-                        for (int j = i + 1; j < nBuckets; j++) {
+                        for (uint32_t j = i + 1; j < nBuckets; j++) {
                             b1 = b1.UnionOf(buckets[j].bound);
                             count1 += buckets[j].count;
                         }
@@ -155,7 +156,7 @@ namespace Akari {
                     }
                     int splitBuckets = 0;
                     Float minCost = cost[0];
-                    for (int i = 1; i < nBuckets - 1; i++) {
+                    for (uint32_t i = 1; i < nBuckets - 1; i++) {
                         if (cost[i] <= minCost) {
                             minCost = cost[i];
                             splitBuckets = i;

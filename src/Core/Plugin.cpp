@@ -21,7 +21,7 @@
 // SOFTWARE.
 
 #include <Akari/Core/Plugin.h>
-#ifdef _MSC_VER
+#ifdef _WIN32
 #include <Akari/Core/Logger.h>
 #include <Windows.h>
 

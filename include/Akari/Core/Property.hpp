@@ -23,6 +23,7 @@
 #ifndef AKARIRENDER_PROPERTY_HPP
 #define AKARIRENDER_PROPERTY_HPP
 
+#include <Akari/Core/Akari.h>
 #include <Akari/Core/Component.h>
 #include <Akari/Core/Math.h>
 #include <variant>
@@ -68,7 +69,7 @@ namespace Akari {
                         if constexpr (std::is_convertible_v<U, T>) {
                             v = (T)item;
                             value = v;
-                        } else if constexpr (std::is_construc<T, U>) {
+                        } else if constexpr (std::is_constructible_v<T, U>) {
                             v = T(item);
                             value = v;
                         } else {

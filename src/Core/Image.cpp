@@ -53,9 +53,7 @@ namespace Akari {
    };
 
     void GammaCorrection::Process(const RGBAImage &in, RGBAImage &out) const {
-        auto & texels = in.texels();
         out.Resize(in.Dimension());
-        auto & outTexels = out.texels();
         ParallelFor(in.Dimension().y, [&](uint32_t y, uint32_t) {
             for(int i = 0;i< in.Dimension().x;i++)
                 out(i, y) = vec4(pow(vec3(in(i,y)), vec3(gamma)), in(i,y).w);
@@ -65,4 +63,25 @@ namespace Akari {
     std::shared_ptr<ImageWriter> GetDefaultImageWriter() {
         return std::make_shared<DefaultImageWriter>();
     }
+
+    class DefaultImageReader : public ImageReader{
+
+    };
+    class ImageLoaderImpl : public ImageLoader{
+        struct Record{
+            std::shared_ptr<RGBAImage> image;
+//            std::filesystem::file_time_type lwt;
+        };
+        std::unordered_map<std::string, Record> dict;
+      public:
+        std::shared_ptr<RGBAImage> Load(const fs::path &path) override {
+            auto f = fs::absolute(path).string();
+            auto it = dict.find(f);
+            if(it != dict.end()){
+                return it->second.image;
+            }
+            dict[f] = Record{nullptr};
+            return dict.at(f).image;
+        }
+    };
 }

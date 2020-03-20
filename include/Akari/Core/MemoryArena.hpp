@@ -73,7 +73,7 @@ namespace Akari{
             p = currentBlock.data + currentBlockPos;
             currentBlockPos += allocSize;
             if constexpr (!std::is_trivially_constructible_v<T>) {
-                for (int i = 0; i < count; i++) {
+                for (size_t i = 0; i < count; i++) {
                     new(p + i * sizeof(T)) T(std::forward<Args>(args)...);
                 }
             }

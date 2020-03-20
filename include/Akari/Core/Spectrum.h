@@ -116,5 +116,10 @@ namespace Akari {
             s[i] = j[i].get<float>();
         }
     }
+    inline void to_json(nlohmann::json &j, const Spectrum &s) {
+        for (int i = 0; i < Spectrum::nChannel; i++) {
+            j[i] = s[i];
+        }
+    }
 }
 #endif // AKARIRENDER_SPECTRUM_H

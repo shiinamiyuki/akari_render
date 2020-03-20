@@ -34,7 +34,7 @@ namespace Akari {
         ivec2 dimension;
 
       public:
-        TImage(const ivec2 &dim = ivec2(1)) : dimension(dim), _texels(dim[0] * dim[1]) {}
+        TImage(const ivec2 &dim = ivec2(1)) :  _texels(dim[0] * dim[1]),dimension(dim) {}
 
         const T &operator()(int x, int y) const {
             x = std::clamp(x, 0, dimension[0] - 1);
@@ -132,6 +132,12 @@ namespace Akari {
     };
 
     AKR_EXPORT std::shared_ptr<ImageWriter> GetDefaultImageWriter();
+    AKR_EXPORT std::shared_ptr<ImageReader> GetDefaultImageReader();
+    class AKR_EXPORT ImageLoader {
+      public:
+        virtual std::shared_ptr<RGBAImage> Load(const fs::path &) = 0;
+    };
+    AKR_EXPORT std::shared_ptr<ImageLoader> GetImageLoader();
 } // namespace Akari
 
 #endif // AKARIRENDER_IMAGE_HPP

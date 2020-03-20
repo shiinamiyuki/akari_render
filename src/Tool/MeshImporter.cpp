@@ -23,6 +23,7 @@
 #include <Akari/Render/Plugins/BinaryMesh.h>
 #include <Akari/Render/SceneGraph.h>
 #include <Akari/Core/Serialize.hpp>
+#include <Akari/Render/Plugins/Matte.h>
 #include <memory>
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
@@ -48,6 +49,7 @@ namespace Akari {
             std::vector<Vertex> vertices;
             std::vector<int> indices;
             std::unordered_map<std::string, int> name_to_group;
+            std::vector<MaterialSlot> cvtMaterials;
             std::vector<int> group;
             for (size_t s = 0; s < shapes.size(); s++) {
                 // Loop over faces(polygon)
@@ -60,6 +62,13 @@ namespace Akari {
 
                     if(name_to_group.find(name) != name_to_group.end()){
                         name_to_group[name] = name_to_group.size();
+
+                        // Convert material
+                        {
+                            auto material = materials[shapes[s].mesh.material_ids[f]];
+                            MaterialSlot cvtMaterial;
+                            cvtMaterial.material = CreateMatteMaterial(nullptr);
+                        }
                     }
 
                     group.push_back(name_to_group[name]);
@@ -67,7 +76,7 @@ namespace Akari {
                     int fv = shapes[s].mesh.num_face_vertices[f];
 
                     Vertex vertex[3];
-                    for (size_t v = 0; v < fv; v++) {
+                    for (int v = 0; v < fv; v++) {
                         tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
                         indices.push_back(indices.size());
                         for (int i = 0; i < 3; i++) {
@@ -78,7 +87,7 @@ namespace Akari {
                     for (auto &i : vertex) {
                         i.Ng = Ng;
                     }
-                    for (size_t v = 0; v < fv; v++) {
+                    for (int v = 0; v < fv; v++) {
                         // access to vertex
                         tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
                         if (idx.normal_index >= 0) {

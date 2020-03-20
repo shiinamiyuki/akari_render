@@ -9,8 +9,8 @@
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
 //
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
 //
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -20,18 +20,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef AKARIRENDER_PLATFORM_H
-#define AKARIRENDER_PLATFORM_H
-#include <cstdint>
+#ifndef AKARIRENDER_COMPLEXTEXTURE_H
+#define AKARIRENDER_COMPLEXTEXTURE_H
+#include <Akari/Core/Plugin.h>
+#include <Akari/Core/Spectrum.h>
+#include <Akari/Render/Texture.h>
+
 namespace Akari {
-#ifdef _MSC_VER
-#define AKR_EXPORT __declspec(dllexport)
-#pragma warning(disable : 4275)
-#pragma warning(disable : 4251) // 'field' : class 'A' needs to have dll-interface to be used by clients of class 'B'
-#pragma warning(disable : 4800) // 'type' : forcing value to bool 'true' or 'false' (performance warning)
-#pragma warning(disable : 4996) // Secure SCL warnings
-#else
-#define AKR_EXPORT __declspec(dllexport)
-#endif
-} // namespace akari
-#endif // AKARIRENDER_PLATFORM_H
+    AKR_EXPORT std::shared_ptr<Texture> CreateComplexTexture(const json & program);
+} // namespace Akari
+#endif // AKARIRENDER_COMPLEXTEXTURE_H
