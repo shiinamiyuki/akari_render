@@ -41,7 +41,7 @@ namespace Akari {
                auto rgb = vec3(texels[i]);
                rgb = clamp(rgb, vec3(0),vec3(1));
                for (int comp = 0; comp < 3; comp++) {
-                   pixel[comp] = std::clamp<int>(std::round(rgb[comp] * 255.5), 0, 255);
+                   pixel[comp] = (uint8_t)std::clamp<int>((int)std::round(rgb[comp] * 255.5), 0, 255);
                }
            }, 1024);
            if (ext == ".png")

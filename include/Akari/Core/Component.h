@@ -52,7 +52,7 @@ namespace Akari {
         struct ThisPlugin : IPlugin {                                                                                  \
             TypeInfo *GetTypeInfo() override { return Name::staticType(); }                                            \
             const char *GetInterface() override {                                                                      \
-                return Interface == nullptr || strlen(Interface) == 0 ? "Default" : Interface;                         \
+                return strlen(Interface) == 0 ? "Default" : Interface;                         \
             }                                                                                                          \
         };                                                                                                             \
         static ThisPlugin plugin;                                                                                      \

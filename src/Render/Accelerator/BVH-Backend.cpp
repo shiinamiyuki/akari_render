@@ -34,8 +34,8 @@ namespace Akari {
 
         struct BVHNode {
             Bounds3f box{};
-            uint32_t first = -1;
-            uint32_t count = -1;
+            uint32_t first = (uint32_t)-1;
+            uint32_t count = (uint32_t)-1;
             int left = -1, right = -1;
 
             [[nodiscard]] bool is_leaf() const { return left < 0 && right < 0; }
@@ -178,7 +178,7 @@ namespace Akari {
 
                 BVHNode &node = nodes.back();
                 node.box = box;
-                node.count = -1;
+                node.count = (uint32_t)-1;
                 nodes.push_back(node);
                 nodes[ret].left = (int)recursiveBuild(begin, int(mid - &primitives[0]), depth + 1);
                 nodes[ret].right = (int)recursiveBuild(int(mid - &primitives[0]), end, depth + 1);
