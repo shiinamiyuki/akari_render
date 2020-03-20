@@ -19,31 +19,3 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-
-#ifndef AKARIRENDER_SCENE_H
-#define AKARIRENDER_SCENE_H
-
-#include <Akari/Render/Accelerator.h>
-#include <Akari/Render/Geometry.hpp>
-#include <atomic>
-namespace Akari {
-    class Mesh;
-    class Material;
-    class Acceleator;
-    class Scene {
-        std::vector<std::shared_ptr<const Mesh>> meshes;
-        std::shared_ptr<Accelerator> accelerator;
-        std::atomic<size_t> rayCounter;
-
-      public:
-        void AddMesh(const std::shared_ptr<const Mesh> &mesh) { meshes.emplace_back(mesh); }
-        [[nodiscard]] const std::vector<std::shared_ptr<const Mesh>> &GetMeshes() const { return meshes; }
-        void SetAccelerator(std::shared_ptr<Accelerator> p) { accelerator = std::move(p); }
-        void Commit() { accelerator->Build(*this); }
-        size_t GetRayCounter() const { return rayCounter.load(); }
-        bool Intersect(const Ray &ray, Intersection *intersection) const {
-            return accelerator->Intersect(ray, intersection);
-        }
-    };
-} // namespace Akari
-#endif // AKARIRENDER_SCENE_H

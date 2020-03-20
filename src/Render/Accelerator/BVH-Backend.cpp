@@ -25,6 +25,7 @@
 #include <Akari/Render/Accelerator.h>
 #include <Akari/Render/Mesh.h>
 #include <Akari/Render/Scene.h>
+#include <fmt/format.h>
 #include <optional>
 
 namespace Akari {
@@ -58,9 +59,9 @@ namespace Akari {
             for (auto i = 0; i < (int)N; i++) {
                 primitives.push_back(Index{i});
             }
-            printf("Buiding BVH for %zd objects\n", primitives.size());
+            Info("Buiding BVH for {} objects\n", primitives.size());
             recursiveBuild(0, (int)primitives.size(), 0);
-            printf("BVHNodes: %zd\n", nodes.size());
+            Info("BVHNodes: {}\n", nodes.size());
         }
 
         static Float intersectAABB(const Bounds3f &box, const Ray &ray, const vec3 &invd) {
@@ -184,7 +185,12 @@ namespace Akari {
                 return (int)ret;
             }
         }
-
+        static std::string PrintVec3(const vec3 & v){
+            return fmt::format("{} {} {}",v.x,v.y,v.z);
+        }
+        static void PrintBox(const Bounds3f & box, const char * name){
+            Debug("{}.p_min: {}, {}.p_max: {}\n", name,PrintVec3(box.p_min), name,PrintVec3(box.p_max));
+        }
         bool intersect(const Ray &ray, Hit &isct) const {
             bool hit = false;
             auto invd = vec3(1) / ray.d;
@@ -194,6 +200,7 @@ namespace Akari {
             stack[sp++] = &nodes[0];
             while (sp > 0) {
                 auto p = stack[--sp];
+//                PrintBox(p->box, "p->box");
                 auto t = intersectAABB(p->box, ray, invd);
 
                 if (t < 0 || t > isct.t) {
@@ -279,11 +286,13 @@ namespace Akari {
         };
 
         struct BVHHandleConstructor {
-            auto operator()(const MeshBVHes *scene, int idx) const -> BVHHandle { return BVHHandle{scene, idx}; }
+            auto operator()(const MeshBVHes *scene, int idx) const -> BVHHandle {
+                return BVHHandle{scene, idx}; }
         };
 
         struct BVHIntersector {
             auto operator()(const Ray &ray, const BVHHandle &handle, Intersection &record) const -> bool {
+
                 Mesh::RayHit localHit;
                 localHit.t = record.t;
                 auto &bvh = (*handle.scene)[handle.idx];

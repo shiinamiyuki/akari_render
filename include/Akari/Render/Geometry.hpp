@@ -52,7 +52,7 @@ namespace Akari {
 
 
     struct Intersection {
-        Float t;
+        Float t = Inf;
         Triangle triangle;
         int32_t meshId = -1;
         int32_t primId = -1;

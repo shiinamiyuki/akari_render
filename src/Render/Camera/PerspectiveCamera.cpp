@@ -30,7 +30,7 @@ namespace Akari {
         std::shared_ptr<Film> film;
         ivec2 filmDimension = ivec2(500,500);
         float lensRadius = 0;
-        float fov = DegreesToRadians(80.0f);
+        Angle<float> fov = {DegreesToRadians(80.0f)};
         Transform _transform, inv_transform;
         AffineTransform transform;
 
@@ -54,7 +54,7 @@ namespace Akari {
             } else {
                 p.x *= float(filmDimension.x) / filmDimension.y;
             }
-            auto z = 1 / std::atan(fov / 2);
+            auto z = 1 / std::atan(fov.value / 2);
             vec3 ro = _transform.ApplyPoint(vec3(0));
             vec3 rd = _transform.ApplyVector(normalize(vec3(p, 0) - vec3(0, 0, z)));
             sample.primary = Ray(ro, rd, GetConfig()->RayBias);

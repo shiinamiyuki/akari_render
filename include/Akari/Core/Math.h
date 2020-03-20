@@ -68,9 +68,9 @@ namespace Akari {
 
     template <typename T> void from_json(const json &j, Angle<T> &angle) {
         if (j.contains("deg")) {
-            angle.value = DegreesToRadians(j.at("deg").get<vec3>());
+            angle.value = DegreesToRadians(j.at("deg").get<T>());
         } else {
-            angle.value = j.at("rad").get<vec3>();
+            angle.value = j.at("rad").get<T>();
         }
     }
 

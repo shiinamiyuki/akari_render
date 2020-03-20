@@ -19,12 +19,14 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+
+#include <Akari/Core/Logger.h>
 #include <Akari/Core/Parallel.h>
 #include <Akari/Core/Plugin.h>
 #include <Akari/Render/Integrator.h>
-#include <condition_variable>
 #include <future>
 #include <mutex>
+
 namespace Akari {
     struct RTDebugRenderTask : RenderTask {
         RenderContext ctx;
@@ -68,7 +70,16 @@ namespace Akari {
                         for (int x = tile.bounds.p_min.x; x < tile.bounds.p_max.x; x++) {
                             CameraSample sample;
                             camera->GenerateRay(vec2(0), vec2(0), ivec2(x, y), sample);
-                            tile.AddSample(ivec2(x, y), Spectrum(1), 1.0f);
+                            Intersection intersection;
+                            auto ray = sample.primary;
+//                            Debug("ray.o: {} {} {}\n",ray.o.x,ray.o.y,ray.o.z);
+//                            Debug("ray.d: {} {} {}\n",ray.d.x,ray.d.y,ray.d.z);
+                            if(scene->Intersect(ray, &intersection)){
+//                                Debug("Hit!\n");
+                                auto Ng = intersection.Ng;
+                                tile.AddSample(ivec2(x, y), Spectrum(Ng.x,Ng.y,Ng.z), 1.0f);
+                            }else
+                                tile.AddSample(ivec2(x, y), Spectrum(0), 1.0f);
                         }
                     }
                     std::lock_guard<std::mutex> lock(mutex);

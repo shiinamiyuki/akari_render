@@ -74,6 +74,7 @@ namespace Akari{
                     hit->uv = vec2(u, v);
                     hit->face = idx;
                     hit->group = GetPrimitiveGroup(idx);
+                    hit->t = t;
                     return true;
                 }
                 return false;
