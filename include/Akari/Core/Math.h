@@ -51,6 +51,7 @@ namespace Akari {
     using namespace math;
     using namespace nlohmann;
     constexpr Float Eps = 1e-5f;
+    constexpr Float ShadowEps = 1e-5f;
     constexpr Float Pi = 3.1415926535897932f;
     constexpr Float Pi2 = Pi * 0.5f;
     constexpr Float Pi4 = Pi * 0.25f;

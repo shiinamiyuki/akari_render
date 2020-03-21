@@ -39,6 +39,7 @@ namespace Akari {
         AKR_DECL_COMP(MatteMaterial, "Matte")
         void computeScatteringFunctions(ScatteringEvent *event, MemoryArena &arena) const override {
             auto c = color->Evaluate(event->sp);
+            event->bsdf = arena.alloc<BSDF>(event->Ng,event->Ns);
             event->bsdf->AddComponent(arena.alloc<LambertianReflection>(c));
         }
     };

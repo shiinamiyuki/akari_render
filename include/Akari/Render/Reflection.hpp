@@ -31,7 +31,12 @@ namespace Akari {
       public:
         explicit LambertianReflection(const Spectrum &R)
             : BSDFComponent(BSDFType(BSDF_DIFFUSE | BSDF_REFLECTION)), R(R) {}
-        [[nodiscard]] Spectrum Evaluate(const vec3 &wo, const vec3 &wi) const override { return Akari::Spectrum(); }
+        [[nodiscard]] Spectrum Evaluate(const vec3 &wo, const vec3 &wi) const override {
+            if (!SameHemisphere(wo, wi)) {
+                return Spectrum(0);
+            }
+            return R * InvPi;
+        }
     };
     class SpecularReflection : public BSDFComponent {
         Spectrum R;
@@ -42,7 +47,7 @@ namespace Akari {
         [[nodiscard]] Float EvaluatePdf(const vec3 &wo, const vec3 &wi) const override { return 0; }
         [[nodiscard]] Spectrum Evaluate(const vec3 &wo, const vec3 &wi) const override { return Spectrum(0); }
         void Sample(BSDFSample &sample) const override {
-            sample.wi = Reflect(sample.wi, vec3(0, 1, 0));
+            sample.wi = Reflect(sample.wo, vec3(0, 1, 0));
             sample.f = R / AbsCosTheta(sample.wi);
             sample.pdf = 1;
         }

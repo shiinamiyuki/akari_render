@@ -89,9 +89,6 @@ namespace Akari {
                         }
                     }
                     auto Ng = normalize(cross(vertex[1].pos - vertex[0].pos, vertex[2].pos - vertex[0].pos));
-                    for (auto &i : vertex) {
-                        i.Ng = Ng;
-                    }
                     for (int v = 0; v < fv; v++) {
                         // access to vertex
                         tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];

@@ -84,6 +84,26 @@ namespace Akari{
             return false;
         }
     }
+    void GetTriangle(uint32_t primId, Triangle * triangle)const {
+        auto vertices = GetVertexBuffer();
+        auto indices = GetIndexBuffer();
+        auto v0 = vertices[indices[primId * 3 + 0]].pos;
+        auto v1 = vertices[indices[primId * 3 + 1]].pos;
+        auto v2 = vertices[indices[primId * 3 + 2]].pos;
+        vec3 e1 = (v1 - v0);
+        vec3 e2 = (v2 - v0);
+        auto Ng = normalize(cross(e1, e2));
+        triangle->v[0] = v0;
+        triangle->v[1] = v1;
+        triangle->v[2] = v2;
+        triangle->Ng = Ng;
+        triangle->Ns[0] = vertices[indices[primId * 3 + 0]].Ns;
+        triangle->Ns[1] = vertices[indices[primId * 3 + 1]].Ns;
+        triangle->Ns[2] = vertices[indices[primId * 3 + 2]].Ns;
+        triangle->texCoords[0] = vertices[indices[primId * 3 + 0]].texCoord;
+        triangle->texCoords[1] = vertices[indices[primId * 3 + 1]].texCoord;
+        triangle->texCoords[2] = vertices[indices[primId * 3 + 2]].texCoord;
+    }
 };
 }
 #endif // AKARIRENDER_MESH_H

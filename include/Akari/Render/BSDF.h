@@ -23,9 +23,9 @@
 #ifndef AKARIRENDER_BSDF_H
 #define AKARIRENDER_BSDF_H
 
-#include <Akari/Core/Spectrum.h>
 #include <Akari/Core/Sampling.hpp>
-
+#include <Akari/Core/Spectrum.h>
+#include <Akari/Render/Geometry.hpp>
 namespace Akari {
     enum BSDFType : int {
         BSDF_NONE = 0u,
@@ -36,7 +36,6 @@ namespace Akari {
         BSDF_SPECULAR = 1u << 4u,
         BSDF_ALL = BSDF_DIFFUSE | BSDF_GLOSSY | BSDF_SPECULAR | BSDF_REFLECTION | BSDF_TRANSMISSION,
     };
-
 
     inline Float CosTheta(const vec3 &w) { return w.y; }
 
@@ -57,14 +56,14 @@ namespace Akari {
     inline vec3 Reflect(const vec3 &w, const vec3 &n) { return -1.0f * w + 2.0f * dot(w, n) * n; }
 
     struct BSDFSample {
-        const vec3 &wo;
+        const vec3 wo;
         Float u0{};
         vec2 u{};
         vec3 wi{};
         Spectrum f{};
-        Float pdf;
+        Float pdf = -1;
         BSDFType sampledType = BSDF_NONE;
-        explicit BSDFSample(const vec3 &wo) : wo(wo), pdf(-1) {}
+        inline BSDFSample(Float u0, const vec2 &u, const ScatteringEvent &event);
     };
 
     class BSDFComponent {
@@ -76,8 +75,8 @@ namespace Akari {
         }
         [[nodiscard]] virtual Spectrum Evaluate(const vec3 &wo, const vec3 &wi) const = 0;
         virtual void Sample(BSDFSample &sample) const {
-            sample.wi = CosineHemisphereSampling(sample.wo);
-            if(!SameHemisphere(sample.wi,sample.wo)){
+            sample.wi = CosineHemisphereSampling(sample.u);
+            if (!SameHemisphere(sample.wi, sample.wo)) {
                 sample.wi.y *= -1;
             }
             sample.pdf = AbsCosTheta(sample.wi) * InvPi;
@@ -135,6 +134,7 @@ namespace Akari {
             }
             int selected = std::clamp(int(sample.u0 * (float)nComp), 0, nComp - 1);
             sample.u0 = std::min(sample.u0 * (float)nComp - (float)selected, 1.0f - Eps);
+
             {
                 auto *comp = components[selected];
                 comp->Sample(sample);
@@ -148,27 +148,24 @@ namespace Akari {
             auto &wi = sample.wi;
             auto woW = LocalToWorld(wo);
             auto wiW = LocalToWorld(wi);
-            int cnt = 0;
             for (int i = 0; i < nComp; i++) {
                 if (i == selected)
                     continue;
                 auto *comp = components[i];
-                if (!comp->IsDelta()) {
-                    auto reflect = (dot(woW, Ng) * dot(wiW, Ng) > 0);
-                    if ((reflect && comp->MatchFlag(BSDF_REFLECTION)) ||
-                        (!reflect && comp->MatchFlag(BSDF_TRANSMISSION))) {
-                        f += comp->Evaluate(wo, wi);
-                    }
-                    sample.pdf += comp->EvaluatePdf(wo, wi);
-                    cnt++;
+
+                auto reflect = (dot(woW, Ng) * dot(wiW, Ng) > 0);
+                if ((reflect && comp->MatchFlag(BSDF_REFLECTION)) || (!reflect && comp->MatchFlag(BSDF_TRANSMISSION))) {
+                    f += comp->Evaluate(wo, wi);
                 }
+                sample.pdf += comp->EvaluatePdf(wo, wi);
             }
-            if (cnt > 1) {
-                f /= (float)cnt;
+            if (nComp > 1) {
+                sample.pdf /= nComp;
             }
         }
     };
-
+    inline BSDFSample::BSDFSample(Float u0, const vec2 &u, const Akari::ScatteringEvent &event)
+        : wo(event.bsdf->WorldToLocal(event.wo)), u0(u0), u(u) {}
 
 } // namespace Akari
 #endif // AKARIRENDER_BSDF_H

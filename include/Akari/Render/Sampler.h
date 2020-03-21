@@ -30,6 +30,9 @@ namespace Akari {
       public:
         virtual Float Next1D() = 0;
         vec2 Next2D() { return vec2(Next1D(), Next1D()); }
+        virtual std::shared_ptr<Sampler> Clone() const = 0;
+        virtual void SetSampleIndex(size_t) = 0;
+        virtual void StartNextSample() = 0;
     };
 } // namespace Akari
 

@@ -55,31 +55,64 @@ namespace Akari {
             future.wait();
             done.notify_all();
         }
+        static std::string PrintVec3(const vec3 &v) { return fmt::format("{} {} {}", v.x, v.y, v.z); }
         void Start() override {
             future = std::async(std::launch::async, [=]() {
                 auto scene = ctx.scene;
                 auto &camera = ctx.camera;
-                auto &sampler = ctx.sampler;
+                auto &_sampler = ctx.sampler;
                 auto film = camera->GetFilm();
                 auto nTiles = ivec2(film->Dimension() + ivec2(TileSize - 1)) / ivec2(TileSize);
                 ParallelFor2D(nTiles, [=](ivec2 tilePos, uint32_t tid) {
                     (void)tid;
+                    MemoryArena arena;
                     Bounds2i tileBounds = Bounds2i{tilePos * (int)TileSize, (tilePos + ivec2(1)) * (int)TileSize};
                     auto tile = film->GetTile(tileBounds);
+                    auto sampler = _sampler->Clone();
                     for (int y = tile.bounds.p_min.y; y < tile.bounds.p_max.y; y++) {
                         for (int x = tile.bounds.p_min.x; x < tile.bounds.p_max.x; x++) {
                             CameraSample sample;
-                            camera->GenerateRay(vec2(0), vec2(0), ivec2(x, y), sample);
-                            Intersection intersection;
+
+                            sampler->SetSampleIndex(x + y * film->Dimension().x);
+                            sampler->StartNextSample();
+                            camera->GenerateRay(sampler->Next2D(), sampler->Next2D(), ivec2(x, y), sample);
+
                             auto ray = sample.primary;
-//                            Debug("ray.o: {} {} {}\n",ray.o.x,ray.o.y,ray.o.z);
-//                            Debug("ray.d: {} {} {}\n",ray.d.x,ray.d.y,ray.d.z);
-                            if(scene->Intersect(ray, &intersection)){
-//                                Debug("Hit!\n");
-                                auto Ng = intersection.Ng;
-                                tile.AddSample(ivec2(x, y), Spectrum(Ng.x,Ng.y,Ng.z), 1.0f);
-                            }else
-                                tile.AddSample(ivec2(x, y), Spectrum(0), 1.0f);
+                            Spectrum Li(0), beta(1);
+                            for (int depth = 0; depth < 5; depth++) {
+                                Intersection intersection;
+                                if (scene->Intersect(ray, &intersection)) {
+                                    auto &mesh = scene->GetMesh(intersection.meshId);
+                                    int group = mesh.GetPrimitiveGroup(intersection.primId);
+                                    const auto &materialSlot = mesh.GetMaterialSlot(group);
+                                    auto material = materialSlot.material;
+                                    if (!material) {
+                                        Debug("no material!!\n");
+                                        break;
+                                    }
+                                    Triangle triangle{};
+                                    mesh.GetTriangle(intersection.primId, &triangle);
+                                    vec3 p = ray.At(intersection.t);
+                                    ScatteringEvent event(-ray.d, p, triangle, intersection);
+                                    material->computeScatteringFunctions(&event, arena);
+                                    BSDFSample bsdfSample(sampler->Next1D(), sampler->Next2D(), event);
+                                    event.bsdf->Sample(bsdfSample);
+                                    //                                    Debug("pdf:{}\n",bsdfSample.pdf);
+                                    assert(bsdfSample.pdf >= 0);
+                                    if (bsdfSample.pdf <= 0) {
+                                        break;
+                                    }
+//                                    Debug("wi: {}\n",PrintVec3(bsdfSample.wi));
+                                    auto wiW = event.bsdf->LocalToWorld(bsdfSample.wi);
+                                    beta *= bsdfSample.f * abs(dot(wiW, event.Ns)) / bsdfSample.pdf;
+                                    ray = event.SpawnRay(wiW);
+                                } else {
+                                    Li += beta * Spectrum(1);
+                                    break;
+                                }
+                            }
+                            arena.reset();
+                            tile.AddSample(ivec2(x, y), Li, 1.0f);
                         }
                     }
                     std::lock_guard<std::mutex> lock(mutex);

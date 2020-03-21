@@ -44,6 +44,7 @@ namespace Akari {
         bool Intersect(const Ray &ray, Intersection *intersection) const {
             return accelerator->Intersect(ray, intersection);
         }
+        const Mesh & GetMesh(const uint32_t id)const{return *meshes[id];}
     };
 } // namespace Akari
 #endif // AKARIRENDER_SCENE_H
