@@ -26,24 +26,31 @@
 #include <Akari/Core/Component.h>
 #include <Akari/Core/MemoryArena.hpp>
 #include <Akari/Render/BSDF.h>
-#include <Akari/Render/Light.h>
+#include <Akari/Render/Texture.h>
 namespace Akari {
     class Material;
     class Light;
     struct ScatteringEvent;
-
 
     class AKR_EXPORT Material : public Component {
       public:
         virtual void computeScatteringFunctions(ScatteringEvent *event, MemoryArena &arena) const = 0;
     };
 
+    struct Emission {
+        std::shared_ptr<Texture> color;
+        std::shared_ptr<Texture> strength;
+        AKR_SER(color, strength)
+    };
+
     struct MaterialSlot {
         std::string name;
         std::shared_ptr<Material> material;
-        std::shared_ptr<Light> light;
+        Emission emission;
         bool markedAsLight = false;
-        AKR_SER(material, name, markedAsLight, light)
+        AKR_SER(material, name, markedAsLight, emission)
     };
 } // namespace Akari
 #endif // AKARIRENDER_MATERIAL_H
+
+

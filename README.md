@@ -7,4 +7,7 @@ AkariRender is a modular physically based renderer written in C++17.
 
 ## Features
     - Modular Design: Every functionality is implemented using plugins
-    
+
+## Road Map:
+    - Bidirectional Path Tracing
+    - Vertex Connection and Merging

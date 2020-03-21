@@ -20,22 +20,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#ifndef AKARIRENDER_RGBTEXTURE_H
+#define AKARIRENDER_RGBTEXTURE_H
 #include <Akari/Core/Plugin.h>
 #include <Akari/Core/Spectrum.h>
-#include <Akari/Render/Plugins/RGBTexture.h>
 #include <Akari/Render/Texture.h>
 
 namespace Akari {
-    class RGBTexture final : public Texture {
-      public:
-        vec3 rgb{};
-        RGBTexture() = default;
-        explicit RGBTexture(const vec3 &rgb) : rgb(rgb) {}
-        AKR_SER(rgb)
-        AKR_DECL_COMP(RGBTexture, "RGBTexture")
-        Spectrum Evaluate(const ShadingPoint &sp) const override { return Spectrum(rgb.x, rgb.y, rgb.z); }
-    };
-
-    AKR_EXPORT std::shared_ptr<Texture> CreateRGBTexture(const vec3 &rgb) { return std::make_shared<RGBTexture>(rgb); }
-    AKR_EXPORT_COMP(RGBTexture, "Texture")
+    AKR_EXPORT std::shared_ptr<Texture> CreateRGBTexture(const vec3 & rgb);
 } // namespace Akari
+#endif // AKARIRENDER_RGBTEXTURE_H

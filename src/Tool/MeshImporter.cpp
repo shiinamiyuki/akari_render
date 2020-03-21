@@ -24,6 +24,7 @@
 #include <Akari/Render/SceneGraph.h>
 #include <Akari/Core/Serialize.hpp>
 #include <Akari/Render/Plugins/Matte.h>
+#include <Akari/Render/Plugins/RGBTexture.h>
 #include <memory>
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
@@ -60,14 +61,18 @@ namespace Akari {
 
                     auto name = shapes[s].name + "_" + mat;
 
-                    if(name_to_group.find(name) != name_to_group.end()){
+                    if(name_to_group.find(name) == name_to_group.end()){
                         name_to_group[name] = name_to_group.size();
 
                         // Convert material
                         {
                             auto material = materials[shapes[s].mesh.material_ids[f]];
                             MaterialSlot cvtMaterial;
-                            cvtMaterial.material = CreateMatteMaterial(nullptr);
+                            vec3 kd = vec3(material.diffuse[0],material.diffuse[1],material.diffuse[2]);
+                            cvtMaterial.material = CreateMatteMaterial(CreateRGBTexture(kd));
+                            cvtMaterial.name = name;
+                            cvtMaterial.markedAsLight = false;
+                            cvtMaterials.emplace_back(std::move(cvtMaterial));
                         }
                     }
 
@@ -116,6 +121,7 @@ namespace Akari {
             mesh->vertexBuffer = std::move(vertices);
             mesh->indexBuffer = std::move(indices);
             mesh->groups = std::move(group);
+            mesh->materials = std::move(cvtMaterials);
         }
         mesh->Save(binary.string().c_str());
         if (graph) {
