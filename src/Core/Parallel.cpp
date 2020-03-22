@@ -56,9 +56,10 @@ namespace Akari {
                 threads.emplace_back([=]() {
                     while (!stopped) {
                         std::unique_lock<std::mutex> lock(workMutex);
-                        while (works.empty()) {
+                        while (works.empty() && ! stopped) {
                             hasWork.wait(lock);
                         }
+                        if(stopped)return;
                         auto &loop = works.front();
                         auto id = workId;
                         lock.unlock();
@@ -104,14 +105,16 @@ namespace Akari {
         }
         ~ParallelForWorkPool() {
             stopped = true;
+            hasWork.notify_all();
             for (auto &thr : threads) {
                 thr.join();
             }
         }
     };
+    static std::once_flag flag;
+    static std::unique_ptr<ParallelForWorkPool> pool;
     void ParallelFor(int count, const std::function<void(uint32_t, uint32_t)> &func, size_t chunkSize) {
-        static std::once_flag flag;
-        static std::unique_ptr<ParallelForWorkPool> pool;
+
         std::call_once(flag, [&]() { pool = std::make_unique<ParallelForWorkPool>(); });
         ParallelForContext ctx;
         ctx.func = &func;
@@ -120,5 +123,9 @@ namespace Akari {
         ctx.workIndex = 0;
         pool->enqueue(ctx);
         pool->wait();
+    }
+
+    void ThreadPoolFinalize(){
+        pool.reset(nullptr);
     }
 } // namespace Akari

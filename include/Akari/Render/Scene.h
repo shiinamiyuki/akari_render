@@ -33,18 +33,20 @@ namespace Akari {
     class Scene {
         std::vector<std::shared_ptr<const Mesh>> meshes;
         std::shared_ptr<Accelerator> accelerator;
-        std::atomic<size_t> rayCounter;
+        mutable std::atomic<size_t> rayCounter;
 
       public:
         void AddMesh(const std::shared_ptr<const Mesh> &mesh) { meshes.emplace_back(mesh); }
         [[nodiscard]] const std::vector<std::shared_ptr<const Mesh>> &GetMeshes() const { return meshes; }
         void SetAccelerator(std::shared_ptr<Accelerator> p) { accelerator = std::move(p); }
         void Commit() { accelerator->Build(*this); }
+        void ClearRayCounter()const { rayCounter = 0; }
         size_t GetRayCounter() const { return rayCounter.load(); }
-        bool Intersect(const Ray &ray, Intersection *intersection) const {
+        bool Intersect(const Ray &ray, Intersection *intersection)const {
+            rayCounter++;
             return accelerator->Intersect(ray, intersection);
         }
-        const Mesh & GetMesh(const uint32_t id)const{return *meshes[id];}
+        const Mesh &GetMesh(const uint32_t id) const { return *meshes[id]; }
     };
 } // namespace Akari
 #endif // AKARIRENDER_SCENE_H

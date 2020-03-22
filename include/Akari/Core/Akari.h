@@ -35,12 +35,31 @@
 #pragma clang diagnostic ignored "-Wunused-variable"
 #endif
 
+#ifdef __GNUC__
+#if __GNUC__   >= 8
+
 #include <filesystem>
+namespace Akari {
+    namespace fs = std::filesystem;
+}
+#else
+#include <experimental/filesystem>
+namespace Akari {
+    namespace fs = std::experimental::filesystem;
+}
+#endif
+#else
+#include <filesystem>
+namespace Akari {
+    namespace fs = std::filesystem;
+}
+
+#endif
+
 #include <functional>
 #include <string_view>
 
 namespace Akari {
-    namespace fs = std::filesystem;
     [[noreturn]] inline void panic(const char *msg) {
         fprintf(stderr, "%s\n", msg);
         abort();

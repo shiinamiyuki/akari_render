@@ -21,8 +21,9 @@
 // SOFTWARE.
 
 #include <Akari/Core/Plugin.h>
-#ifdef _WIN32
 #include <Akari/Core/Logger.h>
+#ifdef _WIN32
+
 #include <Windows.h>
 
 namespace Akari {
@@ -40,6 +41,18 @@ namespace Akari {
 } // namespace Akari
 #else
 #include <dlfcn.h>
+namespace Akari {
+    void SharedLibraryLoader::Load(const char *path) { handle = dlopen(path,RTLD_LAZY); }
+
+    SharedLibraryFunc SharedLibraryLoader::GetFuncPointer(const char *name) {
+        return (SharedLibraryFunc )dlsym(handle,name);
+    }
+
+    SharedLibraryLoader::~SharedLibraryLoader() {
+        if (handle)
+            dlclose(handle);
+    }
+}
 
 #endif
 

@@ -20,30 +20,17 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef AKARIRENDER_PARALLEL_HPP
-#define AKARIRENDER_PARALLEL_HPP
+#ifndef AKARIRENDER_FILTER_H
+#define AKARIRENDER_FILTER_H
 
-#include <Akari/Core/Config.h>
-#include <Akari/Core/Math.h>
-#include <functional>
+#include <Akari/Core/Component.h>
 
 namespace Akari {
+    class Filter : public Component{
+      public:
+        virtual Float Evaluate(const vec2& p)const = 0;
+    };
 
-    AKR_EXPORT void ParallelFor(int count, const std::function<void(uint32_t, uint32_t)> &func, size_t chunkSize = 1);
+}
 
-    inline void ParallelFor2D(const ivec2 &dim, const std::function<void(ivec2, uint32_t)> &func,
-                              size_t chunkSize = 1) {
-        ParallelFor(
-            dim.x * dim.y,
-            [&](uint32_t idx, int tid) {
-                auto x = idx % dim.x;
-                auto y = idx / dim.x;
-                func(ivec2(x, y), tid);
-            },
-            chunkSize);
-    }
-
-    AKR_EXPORT void ThreadPoolFinalize();
-
-} // namespace Akari
-#endif // AKARIRENDER_PARALLEL_HPP
+#endif // AKARIRENDER_FILTER_H

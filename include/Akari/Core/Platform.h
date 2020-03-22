@@ -31,7 +31,20 @@ namespace Akari {
 #pragma warning(disable : 4800) // 'type' : forcing value to bool 'true' or 'false' (performance warning)
 #pragma warning(disable : 4996) // Secure SCL warnings
 #else
-#define AKR_EXPORT __declspec(dllexport)
+#if defined _WIN32 || defined __CYGWIN__
+    #ifdef __GNUC__
+      #define AKR_EXPORT __attribute__ ((dllexport))
+    #else
+      #define AKR_EXPORT __declspec(dllexport) // Note: actually gcc seems to also supports this syntax.
+    #endif
+#else
+#if __GNUC__ >= 4
+#define AKR_EXPORT __attribute__ ((visibility ("default")))
+#else
+    #define AKR_EXPORT
+#endif
+#endif
+
 #endif
 } // namespace akari
 #endif // AKARIRENDER_PLATFORM_H

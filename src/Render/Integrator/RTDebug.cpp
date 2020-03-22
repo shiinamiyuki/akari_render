@@ -33,7 +33,8 @@ namespace Akari {
         std::mutex mutex;
         std::condition_variable filmAvailable, done;
         std::future<void> future;
-        explicit RTDebugRenderTask(const RenderContext &ctx) : ctx(ctx) {}
+        int spp;
+        RTDebugRenderTask(const RenderContext &ctx, int spp) : ctx(ctx), spp(spp) {}
         bool HasFilmUpdate() override { return false; }
         std::shared_ptr<const Film> GetFilmUpdate() override { return ctx.camera->GetFilm(); }
         bool IsDone() override { return false; }
@@ -56,8 +57,48 @@ namespace Akari {
             done.notify_all();
         }
         static std::string PrintVec3(const vec3 &v) { return fmt::format("{} {} {}", v.x, v.y, v.z); }
+        Spectrum Li(Ray ray, Sampler *sampler, MemoryArena &arena) {
+            auto scene = ctx.scene;
+
+            Spectrum Li(0), beta(1);
+            for (int depth = 0; depth < 5; depth++) {
+                Intersection intersection;
+                if (scene->Intersect(ray, &intersection)) {
+                    auto &mesh = scene->GetMesh(intersection.meshId);
+                    int group = mesh.GetPrimitiveGroup(intersection.primId);
+                    const auto &materialSlot = mesh.GetMaterialSlot(group);
+                    auto material = materialSlot.material;
+                    if (!material) {
+                        Debug("no material!!\n");
+                        break;
+                    }
+                    Triangle triangle{};
+                    mesh.GetTriangle(intersection.primId, &triangle);
+                    vec3 p = ray.At(intersection.t);
+                    ScatteringEvent event(-ray.d, p, triangle, intersection);
+                    material->computeScatteringFunctions(&event, arena);
+                    BSDFSample bsdfSample(sampler->Next1D(), sampler->Next2D(), event);
+                    event.bsdf->Sample(bsdfSample);
+                    //                                    Debug("pdf:{}\n",bsdfSample.pdf);
+                    assert(bsdfSample.pdf >= 0);
+                    if (bsdfSample.pdf <= 0) {
+                        break;
+                    }
+                    //                                    Debug("wi: {}\n",PrintVec3(bsdfSample.wi));
+                    auto wiW = event.bsdf->LocalToWorld(bsdfSample.wi);
+                    beta *= bsdfSample.f * abs(dot(wiW, event.Ns)) / bsdfSample.pdf;
+                    ray = event.SpawnRay(wiW);
+                } else {
+                    Li += beta * Spectrum(1);
+                    break;
+                }
+            }
+            return Li;
+        }
         void Start() override {
             future = std::async(std::launch::async, [=]() {
+              auto beginTime = std::chrono::high_resolution_clock::now();
+
                 auto scene = ctx.scene;
                 auto &camera = ctx.camera;
                 auto &_sampler = ctx.sampler;
@@ -71,61 +112,38 @@ namespace Akari {
                     auto sampler = _sampler->Clone();
                     for (int y = tile.bounds.p_min.y; y < tile.bounds.p_max.y; y++) {
                         for (int x = tile.bounds.p_min.x; x < tile.bounds.p_max.x; x++) {
-                            CameraSample sample;
-
                             sampler->SetSampleIndex(x + y * film->Dimension().x);
-                            sampler->StartNextSample();
-                            camera->GenerateRay(sampler->Next2D(), sampler->Next2D(), ivec2(x, y), sample);
-
-                            auto ray = sample.primary;
-                            Spectrum Li(0), beta(1);
-                            for (int depth = 0; depth < 5; depth++) {
-                                Intersection intersection;
-                                if (scene->Intersect(ray, &intersection)) {
-                                    auto &mesh = scene->GetMesh(intersection.meshId);
-                                    int group = mesh.GetPrimitiveGroup(intersection.primId);
-                                    const auto &materialSlot = mesh.GetMaterialSlot(group);
-                                    auto material = materialSlot.material;
-                                    if (!material) {
-                                        Debug("no material!!\n");
-                                        break;
-                                    }
-                                    Triangle triangle{};
-                                    mesh.GetTriangle(intersection.primId, &triangle);
-                                    vec3 p = ray.At(intersection.t);
-                                    ScatteringEvent event(-ray.d, p, triangle, intersection);
-                                    material->computeScatteringFunctions(&event, arena);
-                                    BSDFSample bsdfSample(sampler->Next1D(), sampler->Next2D(), event);
-                                    event.bsdf->Sample(bsdfSample);
-                                    //                                    Debug("pdf:{}\n",bsdfSample.pdf);
-                                    assert(bsdfSample.pdf >= 0);
-                                    if (bsdfSample.pdf <= 0) {
-                                        break;
-                                    }
-//                                    Debug("wi: {}\n",PrintVec3(bsdfSample.wi));
-                                    auto wiW = event.bsdf->LocalToWorld(bsdfSample.wi);
-                                    beta *= bsdfSample.f * abs(dot(wiW, event.Ns)) / bsdfSample.pdf;
-                                    ray = event.SpawnRay(wiW);
-                                } else {
-                                    Li += beta * Spectrum(1);
-                                    break;
-                                }
+                            for (int s = 0; s < spp; s++) {
+                                sampler->StartNextSample();
+                                CameraSample sample;
+                                camera->GenerateRay(sampler->Next2D(), sampler->Next2D(), ivec2(x, y), sample);
+                                auto Li = this->Li(sample.primary, sampler.get(), arena);
+                                arena.reset();
+                                tile.AddSample(ivec2(x, y), Li, 1.0f);
                             }
-                            arena.reset();
-                            tile.AddSample(ivec2(x, y), Li, 1.0f);
                         }
                     }
                     std::lock_guard<std::mutex> lock(mutex);
                     film->MergeTile(tile);
                 });
+              auto endTime = std::chrono::high_resolution_clock::now();
+              std::chrono::duration<double> elapsed = (endTime - beginTime);
+              Info("Rendering done in {} secs, traced {} rays, {} M rays/sec\n",elapsed.count(),
+                  scene->GetRayCounter(), scene->GetRayCounter() / elapsed.count() / 1e6);
             });
+
+
         }
     };
+
     class RTDebug : public Integrator {
+        int spp = 16;
+
       public:
         AKR_DECL_COMP(RTDebug, "RTDebug")
+        AKR_SER(spp)
         std::shared_ptr<RenderTask> CreateRenderTask(const RenderContext &ctx) override {
-            return std::make_shared<RTDebugRenderTask>(ctx);
+            return std::make_shared<RTDebugRenderTask>(ctx, spp);
         }
     };
     AKR_EXPORT_COMP(RTDebug, "Integrator");

@@ -24,6 +24,7 @@
 #define AKARIRENDER_CONFIG_H
 
 #include <Akari/Core/Platform.h>
+#include <stddef.h>
 #define AKR_USE_SIMD
 
 namespace Akari {
