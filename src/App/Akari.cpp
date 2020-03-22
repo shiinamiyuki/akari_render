@@ -24,6 +24,7 @@
 #include <Akari/Render/SceneGraph.h>
 #include <cxxopts.hpp>
 #include <fstream>
+#include <Akari/Core/Application.h>
 using namespace Akari;
 
 static std::string inputFilename;
@@ -58,6 +59,7 @@ void parse(int argc, char **argv) {
     }
 }
 int main(int argc, char **argv) {
+    Application app;
     parse(argc, argv);
     try {
         ReviveContext ctx;
