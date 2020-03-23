@@ -75,9 +75,6 @@ namespace Akari {
             ;
         }
         Load(file.c_str());
-    }
-    std::vector<std::shared_ptr<Light>> BinaryMesh::GetMeshLights() const {
-        std::vector<std::shared_ptr<Light>> lights;
         for (uint32_t id = 0; id < GetTriangleCount(); id++) {
             int group = GetPrimitiveGroup(id);
             const auto &mat = GetMaterialSlot(group);
@@ -89,8 +86,16 @@ namespace Akari {
                 continue;
             }
             lights.emplace_back(CreateAreaLight(*this, id));
+            lightMap[id] = lights.back().get();
         }
-        return lights;
+    }
+    std::vector<std::shared_ptr<Light>> BinaryMesh::GetMeshLights() const { return lights; }
+    const Light *BinaryMesh::GetLight(int primId) const {
+        auto it = lightMap.find(primId);
+        if (it == lightMap.end()) {
+            return nullptr;
+        }
+        return it->second;
     }
     AKR_EXPORT_COMP(BinaryMesh, "Mesh");
 } // namespace Akari

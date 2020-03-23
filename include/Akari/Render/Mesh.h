@@ -107,6 +107,7 @@ namespace Akari {
         }
 
         [[nodiscard]] virtual std::vector<std::shared_ptr<Light>> GetMeshLights() const { return {}; }
+        virtual const Light *GetLight(int primId) const { return nullptr; }
     };
 } // namespace Akari
 #endif // AKARIRENDER_MESH_H

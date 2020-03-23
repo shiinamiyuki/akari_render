@@ -70,6 +70,8 @@ namespace Akari {
                     auto &mesh = scene->GetMesh(intersection.meshId);
                     int group = mesh.GetPrimitiveGroup(intersection.primId);
                     const auto &materialSlot = mesh.GetMaterialSlot(group);
+                    const auto *light = mesh.GetLight(intersection.primId);
+
                     auto material = materialSlot.material;
                     if (!material) {
                         Debug("no material!!\n");
@@ -79,6 +81,9 @@ namespace Akari {
                     mesh.GetTriangle(intersection.primId, &triangle);
                     vec3 p = ray.At(intersection.t);
                     ScatteringEvent event(-ray.d, p, triangle, intersection);
+                    if (light) {
+                        Li += beta * light->Li(event.sp);
+                    }
                     material->computeScatteringFunctions(&event, arena);
                     BSDFSample bsdfSample(sampler->Next1D(), sampler->Next2D(), event);
                     event.bsdf->Sample(bsdfSample);
@@ -92,7 +97,7 @@ namespace Akari {
                     beta *= bsdfSample.f * abs(dot(wiW, event.Ns)) / bsdfSample.pdf;
                     ray = event.SpawnRay(wiW);
                 } else {
-                    Li += beta * Spectrum(1);
+                    Li += beta * Spectrum(0);
                     break;
                 }
             }

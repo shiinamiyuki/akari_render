@@ -30,6 +30,9 @@
 namespace Akari {
     class AKR_EXPORT BinaryMesh : public Mesh {
         bool _loaded = false;
+        std::vector<std::shared_ptr<Light>> lights;
+        std::unordered_map<int, const Light *> lightMap;
+
       public:
         std::vector<Vertex> vertexBuffer;
         std::vector<int> indexBuffer;
@@ -45,8 +48,9 @@ namespace Akari {
         int GetPrimitiveGroup(int idx) const override;
         bool Load(const char *path) override;
         void Save(const char *path);
-        void Commit()override;
+        void Commit() override;
         std::vector<std::shared_ptr<Light>> GetMeshLights() const override;
+        const Light *GetLight(int primId) const override;
     };
 } // namespace Akari
 
