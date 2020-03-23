@@ -20,34 +20,32 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef AKARIRENDER_BINARYMESH_H
-#define AKARIRENDER_BINARYMESH_H
-
-#include <Akari/Core/Plugin.h>
+#include <Akari/Core/Logger.h>
 #include <Akari/Render/Material.h>
 #include <Akari/Render/Mesh.h>
+#include <Akari/Render/Plugins/AreaLight.h>
+#include <Akari/Render/Scene.h>
 
 namespace Akari {
-    class AKR_EXPORT BinaryMesh : public Mesh {
-        bool _loaded = false;
-      public:
-        std::vector<Vertex> vertexBuffer;
-        std::vector<int> indexBuffer;
-        std::vector<int> groups;
-        std::vector<MaterialSlot> materials;
-        std::string file;
-        AKR_SER(materials, file);
-        AKR_DECL_COMP(BinaryMesh, "BinaryMesh")
-        const MaterialSlot &GetMaterialSlot(int group) const override;
-        const Vertex *GetVertexBuffer() const override;
-        const int *GetIndexBuffer() const override;
-        size_t GetTriangleCount() const override;
-        int GetPrimitiveGroup(int idx) const override;
-        bool Load(const char *path) override;
-        void Save(const char *path);
-        void Commit()override;
-        std::vector<std::shared_ptr<Light>> GetMeshLights() const override;
-    };
-} // namespace Akari
+    void Scene::Commit() {
+        accelerator->Build(*this);
 
-#endif // AKARIRENDER_BINARYMESH_H
+        for (auto &mesh : meshes) {
+            auto meshLights = mesh->GetMeshLights();
+            for (auto &light : meshLights)
+                lights.emplace_back(light);
+        }
+
+        Info("Building distribution for {} lights\n", lights.size());
+        {
+            std::vector<Float> func;
+            for (auto &light : lights) {
+                func.emplace_back(light->Power());
+            }
+            lightDistribution = std::make_unique<Distribution1D>(func.data(), func.size());
+            for (size_t i = 0; i < lights.size(); i++) {
+                lightPdfMap[lights[i].get()] = lightDistribution->PdfDiscrete(i);
+            }
+        }
+    }
+} // namespace Akari

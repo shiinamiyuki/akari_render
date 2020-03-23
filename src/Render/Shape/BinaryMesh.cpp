@@ -22,9 +22,9 @@
 
 #include <Akari/Core/Logger.h>
 #include <Akari/Core/Stream.h>
+#include <Akari/Render/Plugins/AreaLight.h>
 #include <Akari/Render/Plugins/BinaryMesh.h>
 #include <fstream>
-
 namespace Akari {
     const MaterialSlot &BinaryMesh::GetMaterialSlot(int group) const { return materials[group]; }
     const Vertex *BinaryMesh::GetVertexBuffer() const { return vertexBuffer.data(); }
@@ -33,7 +33,7 @@ namespace Akari {
     int BinaryMesh::GetPrimitiveGroup(int idx) const { return groups[idx]; }
     const char *AKR_MESH_MAGIC = "AKARI_BINARY_MESH";
     bool BinaryMesh::Load(const char *path) {
-        Info("Loading {}\n",path);
+        Info("Loading {}\n", path);
         std::ifstream in(path, std::ios::binary | std::ios::in);
         char buffer[128] = {0};
         in.read(buffer, strlen(AKR_MESH_MAGIC));
@@ -56,7 +56,7 @@ namespace Akari {
             return false;
         }
         _loaded = true;
-        Info("Loaded {} triangles\n",groups.size());
+        Info("Loaded {} triangles\n", groups.size());
         return true;
     }
     void BinaryMesh::Save(const char *path) {
@@ -70,10 +70,27 @@ namespace Akari {
         out.write(AKR_MESH_MAGIC, strlen(AKR_MESH_MAGIC));
     }
     void BinaryMesh::Commit() {
-        if(_loaded){
-            return;;
+        if (_loaded) {
+            return;
+            ;
         }
         Load(file.c_str());
+    }
+    std::vector<std::shared_ptr<Light>> BinaryMesh::GetMeshLights() const {
+        std::vector<std::shared_ptr<Light>> lights;
+        for (uint32_t id = 0; id < GetTriangleCount(); id++) {
+            int group = GetPrimitiveGroup(id);
+            const auto &mat = GetMaterialSlot(group);
+            if (!mat.markedAsLight) {
+                continue;
+            }
+            if (!mat.emission.color || !mat.emission.strength) {
+                Info("Mesh [{}] prim: [{}] of group: [{}] marked as light but don't have texture\n");
+                continue;
+            }
+            lights.emplace_back(CreateAreaLight(*this, id));
+        }
+        return lights;
     }
     AKR_EXPORT_COMP(BinaryMesh, "Mesh");
 } // namespace Akari

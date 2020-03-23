@@ -27,7 +27,7 @@
 #include <miyuki.serialize/json/json.hpp>
 namespace Akari {
     template<size_t N>
-    struct CoefficientSpectrum : vec<N, float, defaultp> {
+    struct CoefficientSpectrum : public vec<N, float, defaultp> {
         using vec<N, float, defaultp>::vec;
         using Base = vec<N, float, defaultp>;
         using Self = CoefficientSpectrum<N>;
@@ -106,6 +106,10 @@ namespace Akari {
             tmp /= rhs;
             return tmp;
         }
+
+        [[nodiscard]] Float Luminance()const{
+            return 0.2126 * (*this)[0] + 0.7152 * (*this)[1] + 0.0722 * (*this)[2];
+        }
     };
 
     using RGBSpectrum = CoefficientSpectrum<3>;
@@ -121,5 +125,6 @@ namespace Akari {
             j[i] = s[i];
         }
     }
+
 }
 #endif // AKARIRENDER_SPECTRUM_H

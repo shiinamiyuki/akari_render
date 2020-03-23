@@ -20,11 +20,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <Akari/Render/Plugins/BinaryMesh.h>
-#include <Akari/Render/SceneGraph.h>
 #include <Akari/Core/Serialize.hpp>
+#include <Akari/Render/Plugins/BinaryMesh.h>
 #include <Akari/Render/Plugins/Matte.h>
 #include <Akari/Render/Plugins/RGBTexture.h>
+#include <Akari/Render/SceneGraph.h>
 #include <memory>
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
@@ -61,17 +61,29 @@ namespace Akari {
 
                     auto name = shapes[s].name + "_" + mat;
 
-                    if(name_to_group.find(name) == name_to_group.end()){
+                    if (name_to_group.find(name) == name_to_group.end()) {
                         name_to_group[name] = name_to_group.size();
 
                         // Convert material
                         {
                             auto material = materials[shapes[s].mesh.material_ids[f]];
                             MaterialSlot cvtMaterial;
-                            vec3 kd = vec3(material.diffuse[0],material.diffuse[1],material.diffuse[2]);
+                            vec3 kd = vec3(material.diffuse[0], material.diffuse[1], material.diffuse[2]);
+                            vec3 ke = vec3(material.emission[0], material.emission[1], material.emission[2]);
+                            Float strength = 1;
+                            if (MaxComp(ke) > 0) {
+                                strength = MaxComp(ke);
+                                ke /= strength;
+                            }
+                            if (MinComp(ke) > 0.01) {
+                                cvtMaterial.markedAsLight = true;
+                            } else {
+                                cvtMaterial.markedAsLight = false;
+                            }
                             cvtMaterial.material = CreateMatteMaterial(CreateRGBTexture(kd));
                             cvtMaterial.name = name;
-                            cvtMaterial.markedAsLight = false;
+                            cvtMaterial.emission.strength = CreateRGBTexture(vec3(strength));
+                            cvtMaterial.emission.color = CreateRGBTexture(ke);
                             cvtMaterials.emplace_back(std::move(cvtMaterial));
                         }
                     }
@@ -128,9 +140,9 @@ namespace Akari {
     }
 } // namespace Akari
 
-int main(int argc, char ** argv) {
+int main(int argc, char **argv) {
     using namespace Akari;
-    if(argc < 2) {
+    if (argc < 2) {
         fprintf(stderr, "Usage: MeshImporter input-filename output-filename [scene-filename]");
         exit(-1);
     }
@@ -139,17 +151,16 @@ int main(int argc, char ** argv) {
     fs::path scenePath;
     std::shared_ptr<SceneGraph> graph;
     ReviveContext ctx;
-    if(argc >= 4) {
+    if (argc >= 4) {
         scenePath = fs::path(argv[3]);
         std::ifstream in(scenePath);
-        std::string str((std::istreambuf_iterator<char>(in)),
-                        std::istreambuf_iterator<char>());
-        json data = str.empty() ? json::object(): json::parse(str);
+        std::string str((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        json data = str.empty() ? json::object() : json::parse(str);
 
         graph = std::make_shared<SceneGraph>(miyuki::serialize::fromJson<SceneGraph>(ctx, data));
     }
     Convert(in, out, graph.get());
-    if(graph){
+    if (graph) {
         auto data = miyuki::serialize::toJson(ctx, *graph);
         std::ofstream out(scenePath);
         out << data.dump(1) << std::endl;

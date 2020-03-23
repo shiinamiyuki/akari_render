@@ -30,6 +30,9 @@ namespace Akari {
     class Texture : public Component {
       public:
         virtual Spectrum Evaluate(const ShadingPoint &sp) const = 0;
+        virtual Float AverageLuminance()const {
+            return 0.0f;
+        }
     };
 } // namespace Akari
 #endif // AKARIRENDER_TEXTURE_H

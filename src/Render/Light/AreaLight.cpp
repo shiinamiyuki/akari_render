@@ -24,6 +24,7 @@
 #include <Akari/Render/Light.h>
 #include <Akari/Render/Material.h>
 #include <Akari/Render/Mesh.h>
+
 namespace Akari {
     class AreaLight final : public Light {
         const Mesh *mesh = nullptr;
@@ -74,6 +75,16 @@ namespace Akari {
             Float SA = triangle.Area() * (-dot(wi, _isct.Ng)) / (_isct.t * _isct.t);
             return 1.0f / SA;
         }
+        Float Power() const override {
+            if (emission.strength && emission.color) {
+                return triangle.Area() * emission.strength->AverageLuminance() * emission.color->AverageLuminance();
+            }
+            return 0.0f;
+        }
     };
     AKR_EXPORT_COMP(AreaLight, "Light");
+
+    AKR_EXPORT std::shared_ptr<Light> CreateAreaLight(const Mesh &mesh, int primId) {
+        return std::make_shared<AreaLight>(&mesh, primId);
+    }
 } // namespace Akari

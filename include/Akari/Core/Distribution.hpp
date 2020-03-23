@@ -46,36 +46,45 @@ namespace Akari {
     struct Distribution1D {
         Distribution1D(const Float *f, size_t n) : func(f, f + n), cdf(n + 1) {
             cdf[0] = 0;
-            for (size_t i = 0; i < N; i++) {
+            for (size_t i = 0; i < n; i++) {
                 cdf[i + 1] = cdf[i] + func[i] / n;
             }
             funcInt = cdf[n];
             if (funcInt == 0) {
-                for (int i = 1; i < n + 1; ++i)
+                for (uint32_t i = 1; i < n + 1; ++i)
                     cdf[i] = Float(i) / Float(n);
             } else {
-                for (int i = 1; i < n + 1; ++i)
+                for (uint32_t i = 1; i < n + 1; ++i)
                     cdf[i] /= funcInt;
             }
         }
         // y = F^{-1}(u)
         // P(Y <= y) = P(F^{-1}(U) <= u) = P(U <= F(u)) = F(u)
         // Assume: 0 <= i < n
-        Float PdfDiscrete(int i) const { return func[i] / (funcInt * func.size()); }
-        Float PdfContinuous(Float x) const { int offset = x * func.size();return func[offset0 / funcInt;] }
+        [[nodiscard]] Float PdfDiscrete(int i) const { return func[i] / (funcInt * Count()); }
+        [[nodiscard]] Float PdfContinuous(Float x) const {
+            uint32_t offset = x * Count();
+            return func[offset / funcInt];
+        }
         int SampleDiscrete(Float u, Float *pdf = nullptr) {
-            int i = UpperBound(0, func.size(), [=](int idx){
-                return func[idx] <= u;
-            });
-            if(pdf){
+            uint32_t i = UpperBound(0, func.size(), [=](int idx) { return func[idx] <= u; });
+            if (pdf) {
                 *pdf = PdfDiscrete(i);
             }
             return i;
         }
 
-        Float SampleContinuous(Float u, Float * pdf = nullptr){
-
+        Float SampleContinuous(Float u, Float *pdf = nullptr) {
+            uint32_t offset = UpperBound(0, func.size(), [=](int idx) { return func[idx] <= u; });
+            Float du = u - cdf[offset];
+            if ((cdf[offset + 1] - cdf[offset]) > 0)
+                du /= (cdf[offset + 1] - cdf[offset]);
+            if (pdf)
+                *pdf = func[offset] / funcInt;
+            return ((float)offset + du) / Count();
         }
+
+        size_t Count() const { return func.size(); }
 
       private:
         std::vector<Float> func, cdf;

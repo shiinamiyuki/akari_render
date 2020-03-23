@@ -26,6 +26,7 @@
 #include <Akari/Core/Component.h>
 #include <Akari/Render/Geometry.hpp>
 #include <Akari/Render/Scene.h>
+#include <Akari/Core/Spectrum.h>
 
 namespace Akari {
     struct LightSample {
@@ -47,6 +48,7 @@ namespace Akari {
     };
     class Light : public Component {
       public:
+        virtual Float Power() const = 0;
         virtual Spectrum Li(ShadingPoint &sp) const = 0;
 
         virtual void SampleLi(const vec2 &u, Intersection &isct, LightSample &sample, VisibilityTester &) const = 0;

@@ -23,6 +23,7 @@
 #ifndef AKARIRENDER_SCENE_H
 #define AKARIRENDER_SCENE_H
 
+#include <Akari/Core/Distribution.hpp>
 #include <Akari/Render/Accelerator.h>
 #include <Akari/Render/Geometry.hpp>
 #include <atomic>
@@ -30,27 +31,30 @@ namespace Akari {
     class Mesh;
     class Material;
     class Acceleator;
-    class Scene {
+    class Light;
+    class AKR_EXPORT Scene {
         std::vector<std::shared_ptr<const Mesh>> meshes;
         std::shared_ptr<Accelerator> accelerator;
         mutable std::atomic<size_t> rayCounter;
-
+        std::unique_ptr<Distribution1D> lightDistribution;
+        std::vector<std::shared_ptr<Light>> lights;
+        std::unordered_map<const Light * ,Float> lightPdfMap;
       public:
         void AddMesh(const std::shared_ptr<const Mesh> &mesh) { meshes.emplace_back(mesh); }
         [[nodiscard]] const std::vector<std::shared_ptr<const Mesh>> &GetMeshes() const { return meshes; }
         void SetAccelerator(std::shared_ptr<Accelerator> p) { accelerator = std::move(p); }
-        void Commit() { accelerator->Build(*this); }
-        void ClearRayCounter()const { rayCounter = 0; }
+        void Commit();
+        void ClearRayCounter() const { rayCounter = 0; }
         size_t GetRayCounter() const { return rayCounter.load(); }
-        bool Intersect(const Ray &ray, Intersection *intersection)const {
+        bool Intersect(const Ray &ray, Intersection *intersection) const {
             rayCounter++;
-            if(!accelerator->Intersect(ray, intersection)){
+            if (!accelerator->Intersect(ray, intersection)) {
                 return false;
             }
             intersection->p = ray.o + intersection->t * ray.d;
             return true;
         }
-        bool Occlude(const Ray & ray)const {
+        bool Occlude(const Ray &ray) const {
             rayCounter++;
             return accelerator->Occlude(ray);
         }

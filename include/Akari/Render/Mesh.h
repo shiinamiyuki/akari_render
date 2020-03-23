@@ -25,85 +25,88 @@
 
 #include <Akari/Render/Geometry.hpp>
 
-namespace Akari{
+namespace Akari {
     struct MaterialSlot;
+    class Light;
     class AKR_EXPORT Mesh : public Component {
-    public:
-    struct RayHit {
-        vec2 uv;
-        vec3 Ng;
-        Float t = Inf;
-        int face = -1;
-        int group = -1;
-    };
+      public:
+        struct RayHit {
+            vec2 uv;
+            vec3 Ng;
+            Float t = Inf;
+            int face = -1;
+            int group = -1;
+        };
 
-    [[nodiscard]] virtual const Vertex * GetVertexBuffer() const = 0;
-    [[nodiscard]] virtual const int * GetIndexBuffer() const = 0;
-    [[nodiscard]] virtual size_t GetTriangleCount() const = 0;
-    [[nodiscard]] virtual int GetPrimitiveGroup(int idx) const = 0;
-    virtual bool Load(const char *path)  = 0;
-    virtual const MaterialSlot & GetMaterialSlot(int group)const =0 ;
-    bool Intersect(const Ray &ray, int idx, RayHit *hit) const {
-        auto vertices = GetVertexBuffer();
-        auto indices = GetIndexBuffer();
-        auto v0 = vertices[indices[idx * 3 + 0]].pos;
-        auto v1 = vertices[indices[idx * 3 + 1]].pos;
-        auto v2 = vertices[indices[idx * 3 + 2]].pos;
-        vec3 e1 = (v1 - v0);
-        vec3 e2 = (v2 - v0);
-        auto Ng = normalize(cross(e1, e2));
-        float a, f, u, v;
-        auto h = cross(ray.d, e2);
-        a = dot(e1, h);
-        if (a > -1e-6f && a < 1e-6f)
-            return false;
-        f = 1.0f / a;
-        auto s = ray.o - v0;
-        u = f * dot(s, h);
-        if (u < 0.0 || u > 1.0)
-            return false;
-        auto q = cross(s, e1);
-        v = f * dot(ray.d, q);
-        if (v < 0.0 || u + v > 1.0)
-            return false;
-        float t = f * dot(e2, q);
-        if (t > ray.t_min && t < ray.t_max) {
-            if (hit) {
-                if (t < hit->t) {
-                    hit->Ng = Ng;
-                    hit->uv = vec2(u, v);
-                    hit->face = idx;
-                    hit->group = GetPrimitiveGroup(idx);
-                    hit->t = t;
-                    return true;
+        [[nodiscard]] virtual const Vertex *GetVertexBuffer() const = 0;
+        [[nodiscard]] virtual const int *GetIndexBuffer() const = 0;
+        [[nodiscard]] virtual size_t GetTriangleCount() const = 0;
+        [[nodiscard]] virtual int GetPrimitiveGroup(int idx) const = 0;
+        virtual bool Load(const char *path) = 0;
+        virtual const MaterialSlot &GetMaterialSlot(int group) const = 0;
+        bool Intersect(const Ray &ray, int idx, RayHit *hit) const {
+            auto vertices = GetVertexBuffer();
+            auto indices = GetIndexBuffer();
+            auto v0 = vertices[indices[idx * 3 + 0]].pos;
+            auto v1 = vertices[indices[idx * 3 + 1]].pos;
+            auto v2 = vertices[indices[idx * 3 + 2]].pos;
+            vec3 e1 = (v1 - v0);
+            vec3 e2 = (v2 - v0);
+            auto Ng = normalize(cross(e1, e2));
+            float a, f, u, v;
+            auto h = cross(ray.d, e2);
+            a = dot(e1, h);
+            if (a > -1e-6f && a < 1e-6f)
+                return false;
+            f = 1.0f / a;
+            auto s = ray.o - v0;
+            u = f * dot(s, h);
+            if (u < 0.0 || u > 1.0)
+                return false;
+            auto q = cross(s, e1);
+            v = f * dot(ray.d, q);
+            if (v < 0.0 || u + v > 1.0)
+                return false;
+            float t = f * dot(e2, q);
+            if (t > ray.t_min && t < ray.t_max) {
+                if (hit) {
+                    if (t < hit->t) {
+                        hit->Ng = Ng;
+                        hit->uv = vec2(u, v);
+                        hit->face = idx;
+                        hit->group = GetPrimitiveGroup(idx);
+                        hit->t = t;
+                        return true;
+                    }
+                    return false;
                 }
+                return true;
+            } else {
                 return false;
             }
-            return true;
-        } else {
-            return false;
         }
-    }
-    void GetTriangle(uint32_t primId, Triangle * triangle)const {
-        auto vertices = GetVertexBuffer();
-        auto indices = GetIndexBuffer();
-        auto v0 = vertices[indices[primId * 3 + 0]].pos;
-        auto v1 = vertices[indices[primId * 3 + 1]].pos;
-        auto v2 = vertices[indices[primId * 3 + 2]].pos;
-        vec3 e1 = (v1 - v0);
-        vec3 e2 = (v2 - v0);
-        auto Ng = normalize(cross(e1, e2));
-        triangle->v[0] = v0;
-        triangle->v[1] = v1;
-        triangle->v[2] = v2;
-        triangle->Ng = Ng;
-        triangle->Ns[0] = vertices[indices[primId * 3 + 0]].Ns;
-        triangle->Ns[1] = vertices[indices[primId * 3 + 1]].Ns;
-        triangle->Ns[2] = vertices[indices[primId * 3 + 2]].Ns;
-        triangle->texCoords[0] = vertices[indices[primId * 3 + 0]].texCoord;
-        triangle->texCoords[1] = vertices[indices[primId * 3 + 1]].texCoord;
-        triangle->texCoords[2] = vertices[indices[primId * 3 + 2]].texCoord;
-    }
-};
-}
+        void GetTriangle(uint32_t primId, Triangle *triangle) const {
+            auto vertices = GetVertexBuffer();
+            auto indices = GetIndexBuffer();
+            auto v0 = vertices[indices[primId * 3 + 0]].pos;
+            auto v1 = vertices[indices[primId * 3 + 1]].pos;
+            auto v2 = vertices[indices[primId * 3 + 2]].pos;
+            vec3 e1 = (v1 - v0);
+            vec3 e2 = (v2 - v0);
+            auto Ng = normalize(cross(e1, e2));
+            triangle->v[0] = v0;
+            triangle->v[1] = v1;
+            triangle->v[2] = v2;
+            triangle->Ng = Ng;
+            triangle->Ns[0] = vertices[indices[primId * 3 + 0]].Ns;
+            triangle->Ns[1] = vertices[indices[primId * 3 + 1]].Ns;
+            triangle->Ns[2] = vertices[indices[primId * 3 + 2]].Ns;
+            triangle->texCoords[0] = vertices[indices[primId * 3 + 0]].texCoord;
+            triangle->texCoords[1] = vertices[indices[primId * 3 + 1]].texCoord;
+            triangle->texCoords[2] = vertices[indices[primId * 3 + 2]].texCoord;
+        }
+
+        [[nodiscard]] virtual std::vector<std::shared_ptr<Light>> GetMeshLights() const { return {}; }
+    };
+} // namespace Akari
 #endif // AKARIRENDER_MESH_H

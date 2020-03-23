@@ -91,3 +91,4 @@ add_subdirectory(src/Tool)
 add_executable(Akari src/app/Akari.cpp)
 target_link_libraries(Akari AkariCore)
 
+
