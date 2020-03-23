@@ -20,42 +20,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef AKARIRENDER_LIGHT_H
-#define AKARIRENDER_LIGHT_H
+#ifndef AKARIRENDER_AREALIGHT_H
+#define AKARIRENDER_AREALIGHT_H
+#include <Akari/Render/Light.h>
 
-#include <Akari/Core/Component.h>
-#include <Akari/Render/Geometry.hpp>
-#include <Akari/Render/Scene.h>
+namespace Akari{
+    AKR_EXPORT std::shared_ptr<Light> CreateAreaLight(const Mesh & mesh, int primId);
+}
 
-namespace Akari {
-    struct LightSample {
-        vec3 wi;
-        Spectrum Li;
-        vec3 normal;
-        float pdf;
-    };
-
-    struct LightRaySample {
-        Ray ray;
-        Spectrum Le;
-        vec3 normal;
-        float pdfPos, pdfDir;
-    };
-    struct VisibilityTester {
-        Ray shadowRay;
-        bool visible(Scene &scene) const { return !scene.Occlude(shadowRay); }
-    };
-    class Light : public Component {
-      public:
-        virtual Spectrum Li(ShadingPoint &sp) const = 0;
-
-        virtual void SampleLi(const vec2 &u, Intersection &isct, LightSample &sample, VisibilityTester &) const = 0;
-
-        virtual Float PdfLi(const Intersection &intersection, const vec3 &wi) const = 0;
-
-        //        virtual void SampleLe(const Point2f &u1, const Point2f &u2, LightRaySample &sample) = 0;
-    };
-
-} // namespace Akari
-
-#endif // AKARIRENDER_LIGHT_H
+#endif // AKARIRENDER_AREALIGHT_H

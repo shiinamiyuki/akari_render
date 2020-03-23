@@ -1,0 +1,1 @@
+add_plugin(AreaLight AreaLight.cpp)

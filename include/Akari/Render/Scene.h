@@ -44,7 +44,15 @@ namespace Akari {
         size_t GetRayCounter() const { return rayCounter.load(); }
         bool Intersect(const Ray &ray, Intersection *intersection)const {
             rayCounter++;
-            return accelerator->Intersect(ray, intersection);
+            if(!accelerator->Intersect(ray, intersection)){
+                return false;
+            }
+            intersection->p = ray.o + intersection->t * ray.d;
+            return true;
+        }
+        bool Occlude(const Ray & ray)const {
+            rayCounter++;
+            return accelerator->Occlude(ray);
         }
         const Mesh &GetMesh(const uint32_t id) const { return *meshes[id]; }
     };

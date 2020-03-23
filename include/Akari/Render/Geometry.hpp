@@ -44,6 +44,13 @@ namespace Akari {
         vec2 texCoord;
         Vertex() = default;
     };
+    struct SurfaceSample {
+        vec2 uv;
+        Float pdf;
+        vec3 p;
+        vec3 normal;
+    };
+    struct Intersection;
     struct Triangle {
         std::array<vec3, 3> v;
         std::array<vec2, 3> texCoords;
@@ -53,6 +60,23 @@ namespace Akari {
         [[nodiscard]] vec2 InterpolatedTexCoord(const vec2 &uv) const {
             return Interpolate(texCoords[0], texCoords[1], texCoords[2], uv);
         }
+        [[nodiscard]] Float Area() const {
+            vec3 e1 = (v[1] - v[0]);
+            vec3 e2 = (v[2] - v[0]);
+            return length(cross(e1, e2)) * 0.5f;
+        }
+        void Sample(vec2 u, SurfaceSample *sample) const {
+            if (u.x + u.y > 1) {
+                u.x = 1 - u.x;
+                u.y = 1 - u.y;
+            }
+            sample->uv = u;
+            sample->p = Interpolate(v[0], v[1], v[2], u);
+            sample->pdf = 1.0 / Area();
+            sample->normal = InterpolatedNormal(u);
+        }
+
+        bool Intersect(const Ray &ray, Intersection *) const;
     };
 
     struct Intersection {
@@ -62,7 +86,39 @@ namespace Akari {
         int32_t primId = -1;
         vec2 uv;
         vec3 Ng;
+        vec3 p;
     };
+    inline bool Triangle::Intersect(const Ray &ray, Intersection *intersection) const {
+        auto &v0 = v[0];
+        auto &v1 = v[1];
+        auto &v2 = v[2];
+        vec3 e1 = (v1 - v0);
+        vec3 e2 = (v2 - v0);
+        float a, f, u, v;
+        auto h = cross(ray.d, e2);
+        a = dot(e1, h);
+        if (a > -1e-6f && a < 1e-6f)
+            return false;
+        f = 1.0f / a;
+        auto s = ray.o - v0;
+        u = f * dot(s, h);
+        if (u < 0.0 || u > 1.0)
+            return false;
+        auto q = cross(s, e1);
+        v = f * dot(ray.d, q);
+        if (v < 0.0 || u + v > 1.0)
+            return false;
+        float t = f * dot(e2, q);
+        if (t > ray.t_min && t < ray.t_max) {
+            intersection->t = t;
+            intersection->p = ray.o + t * ray.d;
+            intersection->Ng = Ng;
+            intersection->uv = vec2(u, v);
+            return true;
+        } else {
+            return false;
+        }
+    }
     class BSDF;
 
     struct ShadingPoint {
