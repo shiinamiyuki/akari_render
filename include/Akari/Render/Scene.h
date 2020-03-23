@@ -38,7 +38,8 @@ namespace Akari {
         mutable std::atomic<size_t> rayCounter;
         std::unique_ptr<Distribution1D> lightDistribution;
         std::vector<std::shared_ptr<Light>> lights;
-        std::unordered_map<const Light * ,Float> lightPdfMap;
+        std::unordered_map<const Light *, Float> lightPdfMap;
+
       public:
         void AddMesh(const std::shared_ptr<const Mesh> &mesh) { meshes.emplace_back(mesh); }
         [[nodiscard]] const std::vector<std::shared_ptr<const Mesh>> &GetMeshes() const { return meshes; }
@@ -59,6 +60,20 @@ namespace Akari {
             return accelerator->Occlude(ray);
         }
         const Mesh &GetMesh(const uint32_t id) const { return *meshes[id]; }
+        const Light *SampleOneLight(const Float u0, Float *pdf) const {
+            if (lights.empty()) {
+                return nullptr;
+            }
+            auto idx = lightDistribution->SampleDiscrete(u0, pdf);
+            auto light = lights[idx].get();
+            return light;
+        }
+        Float PdfLight(const Light *light) const {
+            auto it = lightPdfMap.find(light);
+            if (it == lightPdfMap.end())
+                return 0.0f;
+            return it->second;
+        }
     };
 } // namespace Akari
 #endif // AKARIRENDER_SCENE_H
