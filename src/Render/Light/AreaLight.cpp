@@ -75,19 +75,20 @@ namespace Akari {
             if (!triangle.Intersect(ray, &_isct)) {
                 return 0.0f;
             }
-            Float SA = triangle.Area() * (-dot(wi, _isct.Ng)) / (_isct.t * _isct.t);
+            Float SA = area * (-dot(wi, _isct.Ng)) / (_isct.t * _isct.t);
             return 1.0f / SA;
         }
         Float Power() const override {
             if (emission.strength && emission.color) {
-                return triangle.Area() * emission.strength->AverageLuminance() * emission.color->AverageLuminance();
+                return area * emission.strength->AverageLuminance() * emission.color->AverageLuminance();
             }
             return 0.0f;
         }
     };
     AKR_EXPORT_COMP(AreaLight, "Light");
 
-    AKR_EXPORT std::shared_ptr<Light> CreateAreaLight(const Mesh &mesh, int primId) {
-        return std::make_shared<AreaLight>(&mesh, primId);
+    AKR_EXPORT std::shared_ptr<Light> CreateAreaLight(const Mesh *mesh, int primId) {
+        return std::make_shared<AreaLight>(mesh, primId);
     }
+    AKR_EXPORT_CREATE(CreateAreaLight)
 } // namespace Akari

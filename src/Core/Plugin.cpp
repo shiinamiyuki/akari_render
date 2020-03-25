@@ -20,8 +20,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <Akari/Core/Plugin.h>
 #include <Akari/Core/Logger.h>
+#include <Akari/Core/Plugin.h>
 #ifdef _WIN32
 
 #include <Windows.h>
@@ -42,25 +42,25 @@ namespace Akari {
 #else
 #include <dlfcn.h>
 namespace Akari {
-    void SharedLibraryLoader::Load(const char *path) { handle = dlopen(path,RTLD_LAZY); }
+    void SharedLibraryLoader::Load(const char *path) { handle = dlopen(path, RTLD_LAZY); }
 
     SharedLibraryFunc SharedLibraryLoader::GetFuncPointer(const char *name) {
-        return (SharedLibraryFunc )dlsym(handle,name);
+        return (SharedLibraryFunc)dlsym(handle, name);
     }
 
     SharedLibraryLoader::~SharedLibraryLoader() {
         if (handle)
             dlclose(handle);
     }
-}
+} // namespace Akari
 
 #endif
 
 namespace Akari {
 
-
     class PluginManager : public IPluginManager {
         std::unordered_map<std::string, IPlugin *> plugins;
+        std::unordered_map<std::string, CreateComponentFunc> createFuncs;
         std::vector<std::unique_ptr<SharedLibraryLoader>> sharedLibraries;
         fs::path prefix = "./";
 
@@ -78,8 +78,14 @@ namespace Akari {
                 Error("Cannot resolve symbol {} in {}\n", AKARI_PLUGIN_FUNC_NAME, path);
                 return false;
             }
+
             auto plugin = ((GetPluginFunc)p)();
             plugins[plugin->GetTypeInfo()->name()] = plugin;
+
+            if (auto f = lib->GetFuncPointer(AKARI_PLUGIN_CREATE_FUNC_NAME)) {
+                createFuncs[plugin->GetTypeInfo()->name()] = (CreateComponentFunc)f;
+            }
+
             sharedLibraries.emplace_back(std::move(lib));
             return true;
         }
@@ -97,7 +103,7 @@ namespace Akari {
 #endif
             if (LoadPath(path.string().c_str())) {
                 it = plugins.find(name);
-                if(it != plugins.end()){
+                if (it != plugins.end()) {
                     return it->second;
                 }
                 Fatal("Unknown plugin: `{}`\n", name);
@@ -111,6 +117,13 @@ namespace Akari {
                 func(el.second);
             }
         }
+        CreateComponentFunc GetCreateFunc(const char *name) override {
+            auto it = createFuncs.find(name);
+            if (it != createFuncs.end()) {
+                return it->second;
+            }
+            return nullptr;
+        }
     };
 
     AKR_EXPORT IPluginManager *GetPluginManager() {
@@ -121,11 +134,27 @@ namespace Akari {
     std::shared_ptr<Component> CreateComponent(const char *type) {
         auto manager = GetPluginManager();
         auto plugin = manager->LoadPlugin(type);
-        if(!plugin){
+        if (!plugin) {
             Error("Failed to create component: `{}`\n", type);
             return nullptr;
         }
         auto obj = std::shared_ptr<Serializable>(plugin->GetTypeInfo()->_create());
         return Cast<Component>(obj);
+    }
+    std::shared_ptr<Component> CreateComponentArgs(const char *type, std::vector<Any> args) {
+        auto manager = GetPluginManager();
+        auto plugin = manager->LoadPlugin(type);
+        if (!plugin) {
+            Error("Failed to create component: `{}`\n", type);
+            return nullptr;
+        }
+        auto func = manager->GetCreateFunc(type);
+        if (!func) {
+            Error("No AkariPluginCreate for plugin [{}]\n", type);
+            return nullptr;
+        }
+        std::shared_ptr<Component> result;
+        func(std::move(args),result);
+        return result;
     }
 } // namespace Akari

@@ -22,7 +22,7 @@
 
 #include <Akari/Core/Logger.h>
 #include <Akari/Core/Stream.h>
-#include <Akari/Render/Plugins/AreaLight.h>
+#include <Akari/Render/Light.h>
 #include <Akari/Render/Plugins/BinaryMesh.h>
 #include <fstream>
 namespace Akari {
@@ -85,7 +85,7 @@ namespace Akari {
                 Info("Mesh [{}] prim: [{}] of group: [{}] marked as light but don't have texture\n");
                 continue;
             }
-            lights.emplace_back(CreateAreaLight(*this, id));
+            lights.emplace_back(Cast<Light>(CreateComponent("AreaLight", (const Mesh*)this, (int)id)));
             lightMap[id] = lights.back().get();
         }
     }

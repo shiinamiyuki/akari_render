@@ -25,7 +25,7 @@
 #include <Akari/Render/Light.h>
 
 namespace Akari{
-    AKR_EXPORT std::shared_ptr<Light> CreateAreaLight(const Mesh & mesh, int primId);
+    AKR_EXPORT std::shared_ptr<Light> CreateAreaLight(const Mesh * mesh, int primId);
 }
 
 #endif // AKARIRENDER_AREALIGHT_H
