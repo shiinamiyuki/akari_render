@@ -1,1 +1,1 @@
-add_plugin(Matte Matte.cpp)
+add_plugin(MatteMaterial Matte.cpp)

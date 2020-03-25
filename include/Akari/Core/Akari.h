@@ -25,7 +25,7 @@
 
 #ifdef _MSC_VER
 #pragma warning(push, 4)
-#pragma warning(disable: 4100)
+#pragma warning(disable : 4100)
 #else
 #pragma GCC diagnostic error "-Wall"
 #pragma clang diagnostic error "-Wall"
@@ -36,7 +36,7 @@
 #endif
 
 #ifdef __GNUC__
-#if __GNUC__   >= 8
+#if __GNUC__ >= 8
 
 #include <filesystem>
 namespace Akari {
@@ -60,28 +60,24 @@ namespace Akari {
 #include <string_view>
 
 namespace Akari {
-    [[noreturn]] inline void panic(const char *msg) {
-        fprintf(stderr, "%s\n", msg);
+    [[noreturn]] inline void panic(const char *file, int line, const char *msg) {
+        fprintf(stderr, "PANIC at %s:%d: %s\n", file, line, msg);
         abort();
     }
 
-    struct CurrentPathGuard{
+    struct CurrentPathGuard {
         fs::path _cur;
-        CurrentPathGuard():_cur(fs::current_path()){}
-        ~CurrentPathGuard(){
-            fs::current_path(_cur);
-        }
+        CurrentPathGuard() : _cur(fs::current_path()) {}
+        ~CurrentPathGuard() { fs::current_path(_cur); }
     };
 #define AKARI_NON_COPYABLE(CLASS)                                                                                      \
     CLASS(const CLASS &) = delete;                                                                                     \
     CLASS &operator=(const CLASS &) = delete;
-#define _AKARI_STR(x)    #x
-#define AKARI_STR(x)     _AKARI_STR(x)
-#define AKARI_PANIC(msg) panic(msg)
+#define AKARI_PANIC(msg) panic(__FILE__, __LINE__, msg)
 #define AKARI_ASSERT(expr)                                                                                             \
     do {                                                                                                               \
         if (!(expr)) {                                                                                                 \
-            AKARI_PANIC(#expr " not satisfied at " __FILE__ ":" AKARI_STR(__LINE__));                                  \
+            AKARI_PANIC(#expr " not satisfied");                                  \
         }                                                                                                              \
     } while (0)
 } // namespace Akari

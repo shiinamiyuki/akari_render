@@ -23,9 +23,9 @@
 #ifndef AKARIRENDER_CAMERA_H
 #define AKARIRENDER_CAMERA_H
 
-#include <Akari/Render/Geometry.hpp>
 #include <Akari/Core/Component.h>
 #include <Akari/Core/Film.h>
+#include <Akari/Render/Geometry.hpp>
 
 namespace Akari {
     struct CameraSample {
@@ -36,14 +36,20 @@ namespace Akari {
     };
 
     class Camera : public Component {
-    public:
+      public:
         [[nodiscard]] virtual bool IsProjective() const { return false; }
 
         virtual void GenerateRay(const vec2 &u1, const vec2 &u2, const ivec2 &raster, CameraSample &sample) const = 0;
 
-        [[nodiscard]] virtual std::shared_ptr<Film> GetFilm() const =0 ;
+        [[nodiscard]] virtual std::shared_ptr<Film> GetFilm() const = 0;
+
+        virtual Spectrum We(const Ray &ray, vec2 &pRaster) const {
+            AKARI_PANIC("Camera::We(const Ray &, vec2 &) is not implemented");
+        }
+        virtual void PdfWe(const Ray &ray, Float *pdfPos, Float *pdfDir) const {
+            AKARI_PANIC("Camera::PdfWe(const Ray &ray, Float *pdfPos, Float *pdfDir) is not implemented");
+        }
     };
 
-
-}
+} // namespace Akari
 #endif // AKARIRENDER_CAMERA_H

@@ -20,34 +20,19 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <Akari/Core/Plugin.h>
-#include <Akari/Render/Geometry.hpp>
-#include <Akari/Render/Material.h>
-#include <Akari/Render/Plugins/Matte.h>
 #include <Akari/Render/Reflection.h>
-#include <Akari/Render/Texture.h>
-#include <utility>
 
 namespace Akari {
-    class MatteMaterial final : public Material {
-        std::shared_ptr<Texture> color;
-
-      public:
-        MatteMaterial() = default;
-        explicit MatteMaterial(std::shared_ptr<Texture> color) : color(std::move(color)) {}
-        AKR_SER(color)
-        AKR_DECL_COMP(MatteMaterial, "MatteMaterial")
-        void computeScatteringFunctions(ScatteringEvent *event, MemoryArena &arena) const override {
-            auto c = color->Evaluate(event->sp);
-            event->bsdf = arena.alloc<BSDF>(event->Ng,event->Ns);
-            event->bsdf->AddComponent(arena.alloc<LambertianReflection>(c));
+    Spectrum LambertianReflection::Evaluate(const vec3 &wo, const vec3 &wi) const {
+        if (!SameHemisphere(wo, wi)) {
+            return Spectrum(0);
         }
-    };
-
-    AKR_EXPORT_COMP(MatteMaterial, "Material")
-
-    std::shared_ptr<Material> CreateMatteMaterial(const std::shared_ptr<Texture> &color) {
-        return std::make_shared<MatteMaterial>(color);
+        return R * InvPi;
+    }
+    void SpecularReflection::Sample(BSDFSample &sample) const {
+        sample.wi = Reflect(sample.wo, vec3(0, 1, 0));
+        sample.f = R / AbsCosTheta(sample.wi);
+        sample.pdf = 1;
     }
 
 } // namespace Akari

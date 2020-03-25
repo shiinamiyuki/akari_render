@@ -26,18 +26,21 @@
 #include <Akari/Core/Sampling.hpp>
 #include <Akari/Render/Camera.h>
 namespace Akari {
-    class PerspectiveCamera final: public Camera {
+    class PerspectiveCamera final : public Camera {
         std::shared_ptr<Film> film;
-        ivec2 filmDimension = ivec2(500,500);
+        ivec2 filmDimension = ivec2(500, 500);
         float lensRadius = 0;
         Angle<float> fov = {DegreesToRadians(80.0f)};
         Transform _transform, inv_transform;
         AffineTransform transform;
+        Float lensArea = 1;
+        Float focalDistance = 1;
+        Transform rasterToCamera{}, cameraToRaster{};
 
       public:
         AKR_DECL_COMP(PerspectiveCamera, "PerspectiveCamera")
 
-        AKR_SER(filmDimension, lensRadius, fov, transform)
+        AKR_SER(filmDimension, lensRadius, fov, transform, focalDistance)
         PerspectiveCamera() : _transform(identity<mat4>()), inv_transform(identity<mat4>()) {}
         [[nodiscard]] bool IsProjective() const override { return true; }
 
@@ -46,14 +49,7 @@ namespace Akari {
             sample.p_film = vec2(raster) + (u2 - 0.5f);
             sample.weight = 1;
 
-            vec2 p = sample.p_film / vec2(filmDimension);
-            p = 2.0f * p - 1.0f;
-            p.y = -p.y;
-            if (filmDimension.x > filmDimension.y) {
-                p.y *= float(filmDimension.y) / filmDimension.x;
-            } else {
-                p.x *= float(filmDimension.x) / filmDimension.y;
-            }
+            vec2 p = vec2(rasterToCamera.ApplyPoint(vec3(sample.p_film, 0)));
             auto z = 1 / std::atan(fov.value / 2);
             vec3 ro = _transform.ApplyPoint(vec3(0));
             vec3 rd = _transform.ApplyVector(normalize(vec3(p, 0) - vec3(0, 0, z)));
@@ -64,8 +60,47 @@ namespace Akari {
             film = std::make_shared<Film>(filmDimension);
             _transform = Transform(transform.ToMatrix4());
             inv_transform = _transform.Inverse();
+            mat4 m = identity<mat4>();
+            m = scale(mat4(1.0), vec3(1.0f / filmDimension.x, 1.0f / filmDimension.y, 1)) * m;
+            m = scale(mat4(1.0), vec3(2, 2, 1)) * m;
+            m = translate(mat4(1.0), vec3(-1, -1, 0)) * m;
+            m = scale(mat4(1.0), vec3(1, -1, 1)) * m;
+            if (filmDimension.x > filmDimension.y) {
+                m = scale(mat4(1.0), vec3(1, float(filmDimension.y) / filmDimension.x, 1)) * m;
+            } else {
+                m = scale(mat4(1.0), vec3(float(filmDimension.x) / filmDimension.y, 1, 1)) * m;
+            }
+            rasterToCamera = Transform(m);
+            cameraToRaster = rasterToCamera.Inverse();
         }
         [[nodiscard]] std::shared_ptr<Film> GetFilm() const override { return film; }
+        Spectrum We(const Ray &ray, vec2 &pRaster) const override {
+            Float cosTheta = dot(_transform.ApplyVector(vec3(0, 0, -1)), ray.d);
+            vec3 pFocus = ray.At((lensRadius == 0 ? 1 : focalDistance) / cosTheta);
+            vec2 raster = cameraToRaster.ApplyPoint(inv_transform.ApplyPoint(pFocus));
+            if (cosTheta <= 0) {
+                return Spectrum(0);
+            }
+        }
+        void PdfWe(const Ray &ray, Float *pdfPos, Float *pdfDir) const override {
+            Float cosTheta = dot(_transform.ApplyVector(vec3(0, 0, -1)), ray.d);
+            vec3 pFocus = ray.At((lensRadius == 0 ? 1 : focalDistance) / cosTheta);
+            vec2 raster = cameraToRaster.ApplyPoint(inv_transform.ApplyPoint(pFocus));
+            if (cosTheta <= 0) {
+                return;
+            }
+            Float filmArea;
+            if (filmDimension.x > filmDimension.y) {
+                filmArea = 2 * float(filmDimension.y) / filmDimension.x;
+            } else {
+                filmArea = 2 * float(filmDimension.x) / filmDimension.y;
+            }
+            auto z = 1 / std::atan(fov.value / 2);
+            Float d = z / cosTheta;
+            // pw = pa(p) * da/dw = 1 / filmArea * d^2 / cosTheta
+            *pdfPos = 1 / lensArea;
+            *pdfDir = 1 / filmArea * d * d / cosTheta;
+        }
     };
     AKR_EXPORT_COMP(PerspectiveCamera, "Camera")
 } // namespace Akari
