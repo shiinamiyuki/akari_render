@@ -64,8 +64,8 @@ namespace Akari {
             auto scene = ctx.scene;
 
             Spectrum Li(0), beta(1);
-            for (int depth = 0; depth < 5; depth++) {
-                Intersection intersection;
+            for (int depth = 0; depth < maxDepth; depth++) {
+                Intersection intersection(ray);
                 if (scene->Intersect(ray, &intersection)) {
                     auto &mesh = scene->GetMesh(intersection.meshId);
                     int group = mesh.GetPrimitiveGroup(intersection.primId);
@@ -79,20 +79,37 @@ namespace Akari {
                     }
                     Triangle triangle{};
                     mesh.GetTriangle(intersection.primId, &triangle);
-                    vec3 p = ray.At(intersection.t);
+                    const auto &p = intersection.p;
                     ScatteringEvent event(-ray.d, p, triangle, intersection);
-                    if (light) {
-                        Li += beta * light->Li(event.sp);
+                    if (light && depth == 0) {
+                        Li += beta * light->Li(event.wo, event.sp);
                     }
                     material->computeScatteringFunctions(&event, arena);
+                    {
+                        Float lightPdf = 0;
+                        auto sampledLight = scene->SampleOneLight(sampler->Next1D(), &lightPdf);
+                        if (sampledLight && lightPdf > 0) {
+                            LightSample lightSample{};
+                            VisibilityTester tester{};
+                            sampledLight->SampleLi(sampler->Next2D(), intersection, lightSample, tester);
+                            lightPdf *= lightSample.pdf;
+                            auto wi = event.bsdf->WorldToLocal(lightSample.wi);
+                            auto wo = event.bsdf->WorldToLocal(event.wo);
+                            auto f = event.bsdf->Evaluate(wo, wi) * abs(dot(lightSample.wi, event.Ns));
+                            if (lightPdf > 0 && MaxComp(f) > 0 && tester.visible(*scene) ) {
+                                Li += beta * f * lightSample.Li / lightPdf;
+                            }
+                        }
+                    }
+
                     BSDFSample bsdfSample(sampler->Next1D(), sampler->Next2D(), event);
                     event.bsdf->Sample(bsdfSample);
-                    //                                    Debug("pdf:{}\n",bsdfSample.pdf);
+
                     assert(bsdfSample.pdf >= 0);
                     if (bsdfSample.pdf <= 0) {
                         break;
                     }
-                    //                                    Debug("wi: {}\n",PrintVec3(bsdfSample.wi));
+
                     auto wiW = event.bsdf->LocalToWorld(bsdfSample.wi);
                     beta *= bsdfSample.f * abs(dot(wiW, event.Ns)) / bsdfSample.pdf;
                     ray = event.SpawnRay(wiW);

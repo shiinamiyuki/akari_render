@@ -26,13 +26,12 @@
 #include <Akari/Core/Platform.h>
 #include <Akari/Core/Property.hpp>
 #include <Akari/Core/Serialize.hpp>
-#include <Akari/Core/Any.hpp>
 #include <list>
 #include <memory>
 namespace Akari {
     class Component;
     class IPlugin;
-    class AKR_EXPORT Component : public Serializable, public std::enable_shared_from_this<Component> {
+    class AKR_EXPORT Component : public Serializable, std::enable_shared_from_this<Component> {
         bool dirty = true;
 
       public:
@@ -46,29 +45,23 @@ namespace Akari {
     };
 #define AKARI_GET_PLUGIN           AkariGetPlugin
 #define AKARI_PLUGIN_FUNC_NAME     "AkariGetPlugin"
-
-#define AKARI_PLUGIN_CREATE_FUNC AkariPluginCreate
-#define AKARI_PLUGIN_CREATE_FUNC_NAME "AkariPluginCreate"
 #define AKR_DECL_COMP(Name, Alias) MYK_TYPE(Name, Alias)
-    typedef void (*CreateComponentFunc)(std::vector<Any>,std::shared_ptr<Component> & );
+
 #define AKR_EXPORT_COMP(Name, Interface)                                                                               \
     extern "C" AKR_EXPORT IPlugin *AKARI_GET_PLUGIN() {                                                                \
         struct ThisPlugin : IPlugin {                                                                                  \
             TypeInfo *GetTypeInfo() override { return Name::staticType(); }                                            \
-            const char *GetInterface() override { return strlen(Interface) == 0 ? "Default" : Interface; }             \
+            const char *GetInterface() override {                                                                      \
+                return strlen(Interface) == 0 ? "Default" : Interface;                         \
+            }                                                                                                          \
         };                                                                                                             \
         static ThisPlugin plugin;                                                                                      \
         return &plugin;                                                                                                \
     }
 
     using GetPluginFunc = IPlugin *(*)();
-    AKR_EXPORT std::shared_ptr<Component> CreateComponent(const char *type);
-    AKR_EXPORT std::shared_ptr<Component> CreateComponentArgs(const char *type, std::vector<Any> args);
-    template <typename... Args>
-    AKR_EXPORT std::shared_ptr<Component> CreateComponent(const char *type, Args &&... args) {
-        std::vector<Any> v = {args...};
-        return CreateComponentArgs(type, std::move(v));
-    }
+    AKR_EXPORT Ptr<Component> CreateComponent(const char * type);
+
 
 } // namespace Akari
 #endif // AKARIRENDER_COMPONENT_H

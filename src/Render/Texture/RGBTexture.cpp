@@ -37,11 +37,6 @@ namespace Akari {
         Float AverageLuminance() const override { return Spectrum(rgb.x, rgb.y, rgb.z).Luminance(); }
     };
 
-    AKR_EXPORT std::shared_ptr<Texture> CreateRGBTexture(const vec3 &rgb) {
-        return std::make_shared<RGBTexture>(rgb);
-    }
+    AKR_EXPORT std::shared_ptr<Texture> CreateRGBTexture(const vec3 &rgb) { return std::make_shared<RGBTexture>(rgb); }
     AKR_EXPORT_COMP(RGBTexture, "Texture")
-
-    AKR_EXPORT_CREATE(CreateRGBTexture)
-
 } // namespace Akari

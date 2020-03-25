@@ -42,7 +42,10 @@ namespace Akari {
             emission = mat.emission;
         }
         AKR_DECL_COMP(AreaLight, "AreaLight")
-        Spectrum Li(ShadingPoint &sp) const override {
+        Spectrum Li(const vec3 &wo, ShadingPoint &sp) const override {
+            if (dot(wo, triangle.Ng) < 0) {
+                return Spectrum(0);
+            }
             if (emission.strength && emission.color) {
                 return emission.color->Evaluate(sp) * emission.strength->Evaluate(sp);
             }
@@ -58,7 +61,7 @@ namespace Akari {
 
             ShadingPoint sp{};
             sp.texCoords = triangle.InterpolatedNormal(surfaceSample.uv);
-            sample.Li = Li(sp);
+            sample.Li = Li(-wi, sp);
             sample.wi = wi;
             sample.pdf = dist2 / (-dot(sample.wi, surfaceSample.normal)) * surfaceSample.pdf;
             sample.normal = surfaceSample.normal;
@@ -72,20 +75,19 @@ namespace Akari {
             if (!triangle.Intersect(ray, &_isct)) {
                 return 0.0f;
             }
-            Float SA = area * (-dot(wi, _isct.Ng)) / (_isct.t * _isct.t);
+            Float SA = triangle.Area() * (-dot(wi, _isct.Ng)) / (_isct.t * _isct.t);
             return 1.0f / SA;
         }
         Float Power() const override {
             if (emission.strength && emission.color) {
-                return area * emission.strength->AverageLuminance() * emission.color->AverageLuminance();
+                return triangle.Area() * emission.strength->AverageLuminance() * emission.color->AverageLuminance();
             }
             return 0.0f;
         }
     };
     AKR_EXPORT_COMP(AreaLight, "Light");
 
-    AKR_EXPORT std::shared_ptr<Light> CreateAreaLight(const Mesh *mesh, int primId) {
-        return std::make_shared<AreaLight>(mesh, primId);
+    AKR_EXPORT std::shared_ptr<Light> CreateAreaLight(const Mesh &mesh, int primId) {
+        return std::make_shared<AreaLight>(&mesh, primId);
     }
-    AKR_EXPORT_CREATE(CreateAreaLight)
 } // namespace Akari
