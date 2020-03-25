@@ -44,12 +44,12 @@ namespace Akari {
     };
     struct VisibilityTester {
         Ray shadowRay;
-        bool visible(const Scene &scene) const { return !scene.Occlude(shadowRay); }
+        bool visible(Scene &scene) const { return !scene.Occlude(shadowRay); }
     };
     class Light : public Component {
       public:
         virtual Float Power() const = 0;
-        virtual Spectrum Li(const vec3 &wo, ShadingPoint &sp) const = 0;
+        virtual Spectrum Li(ShadingPoint &sp) const = 0;
 
         virtual void SampleLi(const vec2 &u, Intersection &isct, LightSample &sample, VisibilityTester &) const = 0;
 

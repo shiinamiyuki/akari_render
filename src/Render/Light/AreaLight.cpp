@@ -42,10 +42,7 @@ namespace Akari {
             emission = mat.emission;
         }
         AKR_DECL_COMP(AreaLight, "AreaLight")
-        Spectrum Li(const vec3 &wo, ShadingPoint &sp) const override {
-            if (dot(wo, triangle.Ng) < 0) {
-                return Spectrum(0);
-            }
+        Spectrum Li(ShadingPoint &sp) const override {
             if (emission.strength && emission.color) {
                 return emission.color->Evaluate(sp) * emission.strength->Evaluate(sp);
             }
@@ -61,7 +58,7 @@ namespace Akari {
 
             ShadingPoint sp{};
             sp.texCoords = triangle.InterpolatedNormal(surfaceSample.uv);
-            sample.Li = Li(-wi, sp);
+            sample.Li = Li(sp);
             sample.wi = wi;
             sample.pdf = dist2 / (-dot(sample.wi, surfaceSample.normal)) * surfaceSample.pdf;
             sample.normal = surfaceSample.normal;

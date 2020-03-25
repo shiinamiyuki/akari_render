@@ -62,7 +62,7 @@ namespace Akari {
 
             Spectrum Li(0), beta(1);
             for (int depth = 0; depth < 5; depth++) {
-                Intersection intersection(ray);
+                Intersection intersection;
                 if (scene->Intersect(ray, &intersection)) {
                     auto &mesh = scene->GetMesh(intersection.meshId);
                     int group = mesh.GetPrimitiveGroup(intersection.primId);

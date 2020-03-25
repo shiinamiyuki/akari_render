@@ -87,9 +87,6 @@ namespace Akari {
         vec2 uv;
         vec3 Ng;
         vec3 p;
-        vec3 wo;
-        Intersection() = default;
-        explicit Intersection(const Ray &ray) : wo(-ray.d) {}
     };
     inline bool Triangle::Intersect(const Ray &ray, Intersection *intersection) const {
         auto &v0 = v[0];
