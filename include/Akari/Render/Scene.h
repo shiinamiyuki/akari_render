@@ -74,6 +74,10 @@ namespace Akari {
                 return 0.0f;
             return it->second;
         }
+
+        Bounds3f GetBounds()const{
+            return accelerator->GetBounds();
+        }
     };
 } // namespace Akari
 #endif // AKARIRENDER_SCENE_H

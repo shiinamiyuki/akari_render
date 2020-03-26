@@ -25,9 +25,34 @@
 
 #include <Akari/Core/Config.h>
 #include <Akari/Core/Math.h>
+#include <atomic>
 #include <functional>
 
 namespace Akari {
+    class AtomicFloat {
+        std::atomic<float> val;
+      public:
+        explicit AtomicFloat(Float v = 0) : val(v) {}
+
+        AtomicFloat(const AtomicFloat &rhs) : val((float)rhs.val) {}
+
+        void add(Float v) {
+            auto current = val.load();
+            while (!val.compare_exchange_weak(current, current + v)){}
+        }
+
+        float value() const {
+            return val.load();
+        }
+
+        explicit operator float() const {
+            return value();
+        }
+
+        void set(Float v){
+            val = v;
+        }
+    };
 
     AKR_EXPORT void ParallelFor(int count, const std::function<void(uint32_t, uint32_t)> &func, size_t chunkSize = 1);
 

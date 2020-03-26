@@ -31,14 +31,64 @@ namespace Akari {
         enum Type : uint8_t { ENone, ESurface, ELight, ECamera };
         Type type = ENone;
         union {
-            Interaction si;
+            SurfaceInteraction si;
             EndPointInteraction ei;
         };
         Float pdfFwd = 0, pdfRev = 0;
+        [[nodiscard]] Float IsInfiniteLight() const { return false; }
+        [[nodiscard]] const Interaction *getInteraction() const {
+            if (type == ESurface) {
+                return &si;
+            } else if (type == ELight || type == ECamera) {
+                return &ei;
+            }
+            return nullptr;
+        }
+        [[nodiscard]] vec3 Ng() const { return getInteraction()->Ng; }
+        [[nodiscard]] vec3 Ns() const {
+            if (type == ESurface) {
+                return si.Ns;
+            } else if (type == ELight || type == ECamera) {
+                return ei.Ng;
+            } else {
+                return vec3(0);
+            }
+        }
+
+        [[nodiscard]] vec3 wo() const { return getInteraction()->wo; }
+
+        [[nodiscard]] vec3 p() const { return getInteraction()->p; }
+
+        Spectrum f(const PathVertex &next) {
+            auto wi = normalize(next.p() - p());
+            switch (type) {
+            case ESurface: {
+                wi = si.bsdf->WorldToLocal(wi);
+                return si.bsdf->Evaluate(si.wo, wi);
+            }
+            default:
+                AKARI_PANIC("not implemented Vertex::f()");
+            }
+        }
+        Float PdfSAToArea(Float pdf, const PathVertex &next) {
+            return 0;
+        }
+        Float Pdf(const Scene &scene, const PathVertex *prev, const PathVertex &next) {
+            auto wiNext = normalize(next.p() - p());
+            vec3 wiPrev;
+            if (prev) {
+                wiPrev = normalize(prev->p() - p());
+            } else {
+                AKARI_ASSERT(type == ECamera);
+            }
+            (void)wiNext;
+            (void)wiPrev;
+            return 0.0;
+        }
     };
 
-    AKR_EXPORT size_t RandomWalk(const Scene &scene, Sampler &sampler, const Ray &ray, Spectrum beta, Float pdf,
-                                 PathVertex *path, size_t maxDepth);
+    AKR_EXPORT size_t RandomWalk(const Scene &scene, Sampler &sampler, TransportMode mode, const Ray &ray,
+                                 Spectrum beta, Float pdf, PathVertex *path, size_t maxDepth);
 
     AKR_EXPORT size_t TraceEyePath(const Scene &scene, const Camera &camera, Sampler &sampler, PathVertex *path,
                                    size_t maxDepth);

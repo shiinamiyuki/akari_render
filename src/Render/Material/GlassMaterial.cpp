@@ -20,18 +20,30 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef AKARIRENDER_ACCELERATOR_H
-#define AKARIRENDER_ACCELERATOR_H
-#include <Akari/Core/Component.h>
+#include <Akari/Core/Plugin.h>
 #include <Akari/Render/Geometry.hpp>
+#include <Akari/Render/Material.h>
+#include <Akari/Render/Plugins/Matte.h>
+#include <Akari/Render/Reflection.h>
+#include <Akari/Render/Texture.h>
+#include <utility>
+
 namespace Akari {
-    class Scene;
-    class AKR_EXPORT Accelerator : public Component {
+    class GlassMaterial final : public Material {
+        std::shared_ptr<Texture> color;
+
       public:
-        virtual void Build(const Scene &scene) = 0;
-        virtual bool Intersect(const Ray &ray, Intersection *intersection) const = 0;
-        [[nodiscard]] virtual bool Occlude(const Ray &ray) const = 0;
-        virtual Bounds3f GetBounds()const =0 ;
+        GlassMaterial() = default;
+        explicit GlassMaterial(std::shared_ptr<Texture> color) : color(std::move(color)) {}
+        AKR_SER(color)
+        AKR_DECL_COMP(GlassMaterial, "GlassMaterial")
+        void computeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
+                                        Float scale) const override {
+            auto c = color->Evaluate(si->sp);
+            si->bsdf->AddComponent(arena.alloc<SpecularReflection>(c * scale));
+        }
     };
+
+    AKR_EXPORT_COMP(GlassMaterial, "Material")
+
 } // namespace Akari
-#endif // AKARIRENDER_ACCELERATOR_H

@@ -44,6 +44,7 @@ namespace Akari {
         struct Index {
             int idx;
         };
+        static_assert(sizeof(Index) == sizeof(int));
 
         auto get(const Index &handle) { return _ctor(user_data, handle.idx); }
 
@@ -320,6 +321,7 @@ namespace Akari {
             }
             topLevelBVH.emplace(&meshBVHs, meshBVHs.size());
         }
+        Bounds3f GetBounds() const override { return topLevelBVH->boundBox; }
         bool Intersect(const Ray &ray, Intersection *intersection) const override {
             return topLevelBVH->intersect(ray, *intersection);
         }

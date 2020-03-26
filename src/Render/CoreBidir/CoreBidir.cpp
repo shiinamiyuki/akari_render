@@ -22,6 +22,10 @@
 
 #include <Akari/Render/Plugins/CoreBidir.h>
 
-namespace Akari{
+namespace Akari {
+    size_t RandomWalk(const Scene &scene, Sampler &sampler, TransportMode mode, const Ray &ray, Spectrum beta,
+                      Float pdf, PathVertex *path, size_t maxDepth) {
 
-}
+        return 0;
+    }
+} // namespace Akari

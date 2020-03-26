@@ -30,6 +30,7 @@ namespace Akari{
         vec3 wo; // world space wo
         vec3 p;
         vec3 Ng{};
+        Interaction()= default;
         Interaction(const vec3 &wo, const vec3 &p, const vec3 &Ng) : wo(wo), p(p), Ng(Ng) {}
 
         [[nodiscard]] Ray SpawnRay(const vec3 &w, Float rayBias = Eps) const {

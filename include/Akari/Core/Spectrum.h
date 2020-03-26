@@ -26,8 +26,7 @@
 #include <Akari/Core/Math.h>
 #include <miyuki.serialize/json/json.hpp>
 namespace Akari {
-    template<size_t N>
-    struct CoefficientSpectrum : public vec<N, float, defaultp> {
+    template <size_t N> struct CoefficientSpectrum : public vec<N, float, defaultp> {
         using vec<N, float, defaultp>::vec;
         using Base = vec<N, float, defaultp>;
         using Self = CoefficientSpectrum<N>;
@@ -35,7 +34,7 @@ namespace Akari {
         using vec<N, float, defaultp>::operator[];
 
         static const int nChannel = N;
-
+        CoefficientSpectrum(const Base & v):Base(v){}
         Self &operator+=(const Self &v) {
             static_cast<Base &>(*this) += Base(v);
             return *this;
@@ -51,7 +50,6 @@ namespace Akari {
             return *this;
         }
 
-
         Self &operator/=(const Self &v) {
             static_cast<Base &>(*this) /= Base(v);
             return *this;
@@ -61,7 +59,6 @@ namespace Akari {
             static_cast<Base &>(*this) *= v;
             return *this;
         }
-
 
         Self &operator/=(const float &v) {
             static_cast<Base &>(*this) /= v;
@@ -80,13 +77,11 @@ namespace Akari {
             return tmp;
         }
 
-
         friend Self operator*(const Self &lhs, const Self &rhs) {
             Self tmp = lhs;
             tmp *= rhs;
             return tmp;
         }
-
 
         friend Self operator/(const Self &lhs, const Self &rhs) {
             Self tmp = lhs;
@@ -100,15 +95,26 @@ namespace Akari {
             return tmp;
         }
 
-
         friend Self operator/(const Self &lhs, const float &rhs) {
             Self tmp = lhs;
             tmp /= rhs;
             return tmp;
         }
 
-        [[nodiscard]] Float Luminance()const{
+        [[nodiscard]] Float Luminance() const {
             return 0.2126 * (*this)[0] + 0.7152 * (*this)[1] + 0.0722 * (*this)[2];
+        }
+        [[nodiscard]] Self RemoveNaN() const {
+            Self tmp;
+            for (size_t i = 0; i < N; i++) {
+                auto x = (*this)[i];
+                if (std::isnan(x)) {
+                    tmp[i] = 0;
+                } else {
+                    tmp[i] = x;
+                }
+            }
+            return tmp;
         }
     };
 
@@ -126,5 +132,5 @@ namespace Akari {
         }
     }
 
-}
+} // namespace Akari
 #endif // AKARIRENDER_SPECTRUM_H

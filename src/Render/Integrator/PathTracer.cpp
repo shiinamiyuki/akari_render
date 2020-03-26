@@ -72,7 +72,8 @@ namespace Akari {
             bool specular = false;
             Float prevScatteringPdf = 0;
             Interaction *prevInteraction = nullptr;
-            for (int depth = 0; depth < maxDepth; depth++) {
+            int depth = 0;
+            while (true) {
                 Intersection intersection(ray);
                 if (scene->Intersect(ray, &intersection)) {
                     auto &mesh = scene->GetMesh(intersection.meshId);
@@ -97,6 +98,9 @@ namespace Akari {
                             auto lightPdf = light->PdfIncidence(*prevInteraction, ray.d);
                             Li += beta * light->Li(si->wo, si->sp) * MisWeight(prevScatteringPdf, lightPdf);
                         }
+                    }
+                    if (++depth > maxDepth) {
+                        break;
                     }
                     BSDFSample bsdfSample(sampler->Next1D(), sampler->Next2D(), *si);
                     si->bsdf->Sample(bsdfSample);

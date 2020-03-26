@@ -74,10 +74,16 @@ namespace Akari {
     CLASS(const CLASS &) = delete;                                                                                     \
     CLASS &operator=(const CLASS &) = delete;
 #define AKARI_PANIC(msg) panic(__FILE__, __LINE__, msg)
+#define AKARI_CHECK(expr)                                                                                              \
+    do {                                                                                                               \
+        if (!(expr)) {                                                                                                 \
+            fprintf(stderr, #expr " not satisfied at %s:%d\n", __FILE__, __LINE__);                                    \
+        }                                                                                                              \
+    } while (0)
 #define AKARI_ASSERT(expr)                                                                                             \
     do {                                                                                                               \
         if (!(expr)) {                                                                                                 \
-            AKARI_PANIC(#expr " not satisfied");                                  \
+            AKARI_PANIC(#expr " not satisfied");                                                                       \
         }                                                                                                              \
     } while (0)
 } // namespace Akari
