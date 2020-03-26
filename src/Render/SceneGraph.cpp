@@ -36,8 +36,8 @@ namespace Akari {
         }
         scene = std::make_shared<Scene>();
         for (auto &mesh : meshes) {
-            mesh->Commit();
-            scene->AddMesh(mesh);
+            mesh.mesh->Commit();
+            scene->AddMesh(mesh.mesh);
         }
         if(!accelerator) {
 #ifdef AKARI_USE_EMBREE

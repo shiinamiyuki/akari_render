@@ -30,12 +30,14 @@
 #include <tiny_obj_loader.h>
 
 namespace Akari {
-    bool Convert(const fs::path &obj, const fs::path &binary, SceneGraph *graph = nullptr) {
+    std::shared_ptr<BinaryMesh> Convert(const fs::path &obj, fs::path output) {
         std::shared_ptr<BinaryMesh> mesh;
+        if (output.extension().empty()) {
+            output.concat(".mesh");
+        }
         {
             fs::path parent_path = fs::absolute(obj).parent_path();
             fs::path file = obj.filename();
-            CurrentPathGuard _guard;
             if (!parent_path.empty())
                 fs::current_path(parent_path);
 
@@ -126,44 +128,36 @@ namespace Akari {
                 }
             }
             mesh = std::make_shared<BinaryMesh>();
-            mesh->file = binary.string();
+            mesh->file = output.string();
             mesh->vertexBuffer = std::move(vertices);
             mesh->indexBuffer = std::move(indices);
             mesh->groups = std::move(group);
             mesh->materials = std::move(cvtMaterials);
         }
-        mesh->Save(binary.string().c_str());
-        if (graph) {
-            graph->meshes.emplace_back(mesh);
-        }
-        return true;
+        mesh->Save(output.string().c_str());
+        return mesh;
     }
 } // namespace Akari
 
 int main(int argc, char **argv) {
     using namespace Akari;
     if (argc < 2) {
-        fprintf(stderr, "Usage: MeshImporter input-filename output-filename [scene-filename]");
+        fprintf(stderr, "Usage: AkariConvert input-filename output-filename ");
         exit(-1);
     }
     fs::path in = argv[1];
-    fs::path out = argv[2];
-    fs::path scenePath;
+    fs::path out = argc >= 3 ? argv[2] : fs::path(in).replace_extension("");
+
     std::shared_ptr<SceneGraph> graph;
     ReviveContext ctx;
-    if (argc >= 4) {
-        scenePath = fs::path(argv[3]);
-        std::ifstream in(scenePath);
-        std::string str((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-        json data = str.empty() ? json::object() : json::parse(str);
+    CurrentPathGuard _guard;
+    auto mesh = Convert(in, out);
+    if(out.extension().empty()){
+        out.concat(".json");
+    }
+    auto data = miyuki::serialize::toJson(ctx, mesh);
+    std::ofstream o(out);
+    o << data.dump(1) << std::endl;
 
-        graph = std::make_shared<SceneGraph>(miyuki::serialize::fromJson<SceneGraph>(ctx, data));
-    }
-    Convert(in, out, graph.get());
-    if (graph) {
-        auto data = miyuki::serialize::toJson(ctx, *graph);
-        std::ofstream out(scenePath);
-        out << data.dump(1) << std::endl;
-    }
     return 0;
 }

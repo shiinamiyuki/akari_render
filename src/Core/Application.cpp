@@ -20,12 +20,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <Akari/Core/Akari.h>
 #include <Akari/Core/Application.h>
 #include <Akari/Core/Parallel.h>
+#include <Akari/Core/Plugin.h>
 
-namespace Akari{
-    Application::Application() {}
-    Application::~Application() {
-        ThreadPoolFinalize();
-    }
-}
+namespace Akari {
+    Application::Application() { GetPluginManager();}
+    Application::~Application() { ThreadPoolFinalize(); }
+} // namespace Akari

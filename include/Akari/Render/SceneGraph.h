@@ -26,22 +26,45 @@
 #include <Akari/Core/Component.h>
 #include <Akari/Render/Accelerator.h>
 #include <Akari/Render/Camera.h>
+#include <Akari/Render/Integrator.h>
 #include <Akari/Render/Light.h>
 #include <Akari/Render/Material.h>
 #include <Akari/Render/Mesh.h>
 #include <Akari/Render/Sampler.h>
-#include <Akari/Render/Integrator.h>
+#include <fstream>
 
 namespace Akari {
+    struct MeshWrapper {
+        std::string file; // path to json file
+        std::shared_ptr<Mesh> mesh;
+//        AKR_SER(file, mesh)
+        template <class Archive> void save(Archive &ar) const {
+            miyuki::serialize::AutoSaveVisitor v{ar}; MYK_REFL(v, file, mesh);
+            std::ofstream out(file);
+            ReviveContext ctx;
+            auto j = miyuki::serialize::toJson(ctx, mesh);
+            out << j.dump(1) << std::endl;
+        }
+        template <class Archive> void load(Archive &ar) {
+            miyuki::serialize::AutoLoadVisitor v{ar}; MYK_REFL(v, file, mesh);
+            std::ifstream in(file);
+            std::string str((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+            json data = str.empty() ? json::object() : json::parse(str);
+            ReviveContext ctx;
+            mesh = miyuki::serialize::fromJson<std::shared_ptr<Mesh>>(ctx, data);
+        }
+    };
+
     struct AKR_EXPORT SceneGraph {
         std::shared_ptr<Camera> camera;
         std::shared_ptr<Accelerator> accelerator;
         std::shared_ptr<Sampler> sampler;
         std::shared_ptr<Integrator> integrator;
-        std::vector<std::shared_ptr<Mesh>> meshes;
+        std::vector<MeshWrapper> meshes;
         AKR_SER(camera, accelerator, sampler, meshes, integrator)
         std::shared_ptr<RenderTask> CreateRenderTask();
         void Commit();
+
       private:
         std::shared_ptr<Scene> scene;
     };

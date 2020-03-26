@@ -73,9 +73,9 @@ namespace Akari {
             m = scale(mat4(1.0), vec3(1, -1, 1)) * m;
             auto s = std::atan(fov.value / 2);
             if (filmDimension.x > filmDimension.y) {
-                m = scale(mat4(1.0), vec3(s, s * float(filmDimension.x) / filmDimension.y, 1)) * m;
+                m = scale(mat4(1.0), vec3(s, s * float(filmDimension.y) / filmDimension.x, 1)) * m;
             } else {
-                m = scale(mat4(1.0), vec3(s * float(filmDimension.y) / filmDimension.x, s, 1)) * m;
+                m = scale(mat4(1.0), vec3(s * float(filmDimension.x) / filmDimension.y, s, 1)) * m;
             }
             rasterToCamera = Transform(m);
             cameraToRaster = rasterToCamera.Inverse();

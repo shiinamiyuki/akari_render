@@ -20,10 +20,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <fstream>
 #include <Akari/Core/Logger.h>
 #include <Akari/Render/SceneGraph.h>
 #include <cxxopts.hpp>
-#include <fstream>
 #include <Akari/Core/Application.h>
 using namespace Akari;
 
@@ -62,6 +62,9 @@ int main(int argc, char **argv) {
     Application app;
     parse(argc, argv);
     try {
+        CurrentPathGuard _guard;
+        fs::current_path(fs::absolute(fs::path(inputFilename)).parent_path());
+        inputFilename = fs::path(inputFilename).filename().string();
         ReviveContext ctx;
         std::shared_ptr<SceneGraph> graph;
         {

@@ -20,8 +20,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <Akari/Core/Plugin.h>
 #include <Akari/Core/Logger.h>
+#include <Akari/Core/Plugin.h>
 #ifdef _WIN32
 
 #include <Windows.h>
@@ -43,27 +43,26 @@ namespace Akari {
 #else
 #include <dlfcn.h>
 namespace Akari {
-    void SharedLibraryLoader::Load(const char *path) { handle = dlopen(path,RTLD_LAZY); }
+    void SharedLibraryLoader::Load(const char *path) { handle = dlopen(path, RTLD_LAZY); }
 
     SharedLibraryFunc SharedLibraryLoader::GetFuncPointer(const char *name) {
-        return (SharedLibraryFunc )dlsym(handle,name);
+        return (SharedLibraryFunc)dlsym(handle, name);
     }
 
     SharedLibraryLoader::~SharedLibraryLoader() {
         if (handle)
             dlclose(handle);
     }
-}
+} // namespace Akari
 
 #endif
 
 namespace Akari {
 
-
     class PluginManager : public IPluginManager {
         std::unordered_map<std::string, IPlugin *> plugins;
         std::vector<std::unique_ptr<SharedLibraryLoader>> sharedLibraries;
-        fs::path prefix = "./";
+        fs::path prefix = fs::absolute(fs::path("./"));
 
       public:
         void SetPluginPath(const char *path) override { prefix = path; }
@@ -98,7 +97,7 @@ namespace Akari {
 #endif
             if (LoadPath(path.string().c_str())) {
                 it = plugins.find(name);
-                if(it != plugins.end()){
+                if (it != plugins.end()) {
                     return it->second;
                 }
                 Fatal("Unknown plugin: `{}`\n", name);
@@ -122,11 +121,12 @@ namespace Akari {
     std::shared_ptr<Component> CreateComponent(const char *type) {
         auto manager = GetPluginManager();
         auto plugin = manager->LoadPlugin(type);
-        if(!plugin){
+        if (!plugin) {
             Error("Failed to create component: `{}`\n", type);
             return nullptr;
         }
         auto obj = std::shared_ptr<Serializable>(plugin->GetTypeInfo()->_create());
         return Cast<Component>(obj);
     }
+
 } // namespace Akari
