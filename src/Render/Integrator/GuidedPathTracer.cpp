@@ -557,14 +557,14 @@ namespace Akari {
             Interaction *prevInteraction = nullptr;
             int nVertices = 0;
             auto addRadiance = [&](const Spectrum &L) {
-                for (int i = 0; i < nVertices; i++) {
+                for (int i = 0; i < nVertices && training; i++) {
                     vertices[i].L += vertices[i].beta * L;
                 }
                 Li += beta * L;
             };
             auto updateBeta = [&](const Spectrum &k) {
                 beta *= k;
-                for (int i = 0; i < nVertices; i++) {
+                for (int i = 0; i < nVertices && training; i++) {
                     vertices[i].beta *= k;
                 }
             };
@@ -645,7 +645,7 @@ namespace Akari {
                         break;
                     }
                     specular = bsdfSample.sampledType & BSDF_SPECULAR;
-                    if(enableNEE){
+                    if (enableNEE) {
                         Float lightPdf = 0;
                         auto sampledLight = scene->SampleOneLight(sampler->Next1D(), &lightPdf);
                         if (sampledLight && lightPdf > 0) {
@@ -721,7 +721,7 @@ namespace Akari {
                     for (int y = tile.bounds.p_min.y; y < tile.bounds.p_max.y; y++) {
                         for (int x = tile.bounds.p_min.x; x < tile.bounds.p_max.x; x++) {
                             sampler->SetSampleIndex(x + y * film->Dimension().x);
-                            for(uint32_t s = 0; s < samples;s++) {
+                            for (uint32_t s = 0; s < samples; s++) {
                                 //                          sampler->startSample(accumulatedSamples);
                                 sampler->StartNextSample();
                                 CameraSample sample;
@@ -737,21 +737,22 @@ namespace Akari {
                 Info("nodes: {}\n", sTree->nodes.size());
                 sTree->refine(12000 * std::sqrt(samples));
             }
-//            int cnt = 0;
-//            for (auto &i : sTree->nodes) {
-//                auto &tree = i.dTree.sampling;
-//                if (i.isLeaf() && tree.sum.value() > 0) {
-//                    RGBAImage image(ivec2(512, 512));
-//                    for (int j = 0; j < 512; j++) {
-//                        for (int i = 0; i < 512; i++) {
-//                            auto pdf = tree.pdf(vec2(i, 511 - j) / vec2(image.Dimension()));
-//                            pdf = std::log(1.0 + pdf) / std::log(10);
-//                            image(i, j) = vec4(Spectrum(pdf), 1.0f);
-//                        }
-//                    }
-//                    GetDefaultImageWriter()->Write(image, fmt::format("tree{}.png", cnt++), IdentityProcessor());
-//                }
-//            }
+            //            int cnt = 0;
+            //            for (auto &i : sTree->nodes) {
+            //                auto &tree = i.dTree.sampling;
+            //                if (i.isLeaf() && tree.sum.value() > 0) {
+            //                    RGBAImage image(ivec2(512, 512));
+            //                    for (int j = 0; j < 512; j++) {
+            //                        for (int i = 0; i < 512; i++) {
+            //                            auto pdf = tree.pdf(vec2(i, 511 - j) / vec2(image.Dimension()));
+            //                            pdf = std::log(1.0 + pdf) / std::log(10);
+            //                            image(i, j) = vec4(Spectrum(pdf), 1.0f);
+            //                        }
+            //                    }
+            //                    GetDefaultImageWriter()->Write(image, fmt::format("tree{}.png", cnt++),
+            //                    IdentityProcessor());
+            //                }
+            //            }
         }
         void Start() override {
             future = std::async(std::launch::async, [=]() {

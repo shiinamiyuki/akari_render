@@ -72,7 +72,7 @@ namespace Akari {
             }
             sample->uv = u;
             sample->p = Interpolate(v[0], v[1], v[2], u);
-            sample->pdf = 1.0 / Area();
+            sample->pdf = 1.0f / Area();
             sample->normal = InterpolatedNormal(u);
         }
 
@@ -97,7 +97,7 @@ namespace Akari {
         auto &v2 = v[2];
         vec3 e1 = (v1 - v0);
         vec3 e2 = (v2 - v0);
-        float a, f, u, v;
+        float a, f, u, _v;
         auto h = cross(ray.d, e2);
         a = dot(e1, h);
         if (a > -1e-6f && a < 1e-6f)
@@ -108,15 +108,15 @@ namespace Akari {
         if (u < 0.0 || u > 1.0)
             return false;
         auto q = cross(s, e1);
-        v = f * dot(ray.d, q);
-        if (v < 0.0 || u + v > 1.0)
+        _v = f * dot(ray.d, q);
+        if (_v < 0.0 || u + _v > 1.0)
             return false;
         float t = f * dot(e2, q);
         if (t > ray.t_min && t < ray.t_max) {
             intersection->t = t;
             intersection->p = ray.o + t * ray.d;
             intersection->Ng = Ng;
-            intersection->uv = vec2(u, v);
+            intersection->uv = vec2(u, _v);
             return true;
         } else {
             return false;

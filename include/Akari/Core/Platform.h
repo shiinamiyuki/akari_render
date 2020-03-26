@@ -27,6 +27,7 @@ namespace Akari {
 #ifdef _MSC_VER
 #define AKR_EXPORT __declspec(dllexport)
 #pragma warning(disable : 4275)
+#pragma warning(disable : 4267)
 #pragma warning(disable : 4251) // 'field' : class 'A' needs to have dll-interface to be used by clients of class 'B'
 #pragma warning(disable : 4800) // 'type' : forcing value to bool 'true' or 'false' (performance warning)
 #pragma warning(disable : 4996) // Secure SCL warnings

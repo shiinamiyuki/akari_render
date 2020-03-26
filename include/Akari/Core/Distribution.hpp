@@ -63,7 +63,7 @@ namespace Akari {
         // Assume: 0 <= i < n
         [[nodiscard]] Float PdfDiscrete(int i) const { return func[i] / (funcInt * Count()); }
         [[nodiscard]] Float PdfContinuous(Float x) const {
-            uint32_t offset = x * Count();
+            uint32_t offset = static_cast<uint32_t>(x * Count());
             return func[offset / funcInt];
         }
         int SampleDiscrete(Float u, Float *pdf = nullptr) {

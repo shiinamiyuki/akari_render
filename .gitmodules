@@ -7,3 +7,6 @@
 [submodule "external/cxxopts"]
 	path = external/cxxopts
 	url = https://github.com/jarro2783/cxxopts
+[submodule "external/oidn"]
+	path = external/oidn
+	url = https://github.com/OpenImageDenoise/oidn.git

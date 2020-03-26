@@ -4,6 +4,8 @@
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/external/cxxopts" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/external/miyuki.serialize" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/external/oidn" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/external/oidn/mkl-dnn" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/external/tinyobjloader" vcs="Git" />
   </component>
 </project>

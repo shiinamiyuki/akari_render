@@ -43,7 +43,7 @@ namespace Akari {
                for (int comp = 0; comp < 3; comp++) {
                    pixel[comp] = (uint8_t)std::clamp<int>((int)std::round(rgb[comp] * 255.5), 0, 255);
                }
-           }, 1024);
+           }, 1024u);
            if (ext == ".png")
                return stbi_write_png(path.string().c_str(),dimension.x,dimension.y, 3, buffer.data(), 0);
            else if (ext == ".jpg")
