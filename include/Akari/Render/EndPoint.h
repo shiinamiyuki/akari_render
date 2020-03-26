@@ -27,11 +27,13 @@
 #include <Akari/Render/Geometry.hpp>
 #include <Akari/Render/Scene.h>
 #include <Akari/Render/Interaction.h>
+#include <Akari/Core/Spectrum.h>
 namespace Akari {
     struct RayIncidentSample {
         vec3 wi;
         Spectrum I;
         vec3 normal;
+        vec2 pos; // the uv coordinate of the sampled position or the raster position
         float pdf;
     };
     struct RayEmissionSample {

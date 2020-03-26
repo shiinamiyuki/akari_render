@@ -81,7 +81,7 @@ namespace Akari {
             cameraToRaster = rasterToCamera.Inverse();
         }
         [[nodiscard]] std::shared_ptr<Film> GetFilm() const override { return film; }
-        Spectrum We(const Ray &ray, vec2 &pRaster) const override {
+        Spectrum We(const Ray &ray, vec2 *pRaster) const override {
             Float cosTheta = dot(cameraToWorld.ApplyVector(vec3(0, 0, -1)), ray.d);
             vec3 pFocus = ray.At((lensRadius == 0 ? 1 : focalDistance) / cosTheta);
             vec2 raster = cameraToRaster.ApplyPoint(worldToCamera.ApplyPoint(pFocus));
@@ -94,6 +94,7 @@ namespace Akari {
                 raster.y > bounds.p_max.y) {
                 return Spectrum(0);
             }
+            *pRaster = raster;
             Float lensArea = lensRadius == 0 ? 1.0f : lensRadius * lensRadius * Pi;
             return Spectrum(1 / (A() * lensArea * Power<4>(cosTheta)));
         }
@@ -132,7 +133,7 @@ namespace Akari {
             Float lensArea = lensRadius == 0 ? 1.0f : lensRadius * lensRadius * Pi;
 
             sample->pdf = (dist * dist) / (lensArea * abs(dot(sample->normal, sample->wi)));
-            sample->I = Spectrum(0);
+            sample->I = We(Ray(pLensWorld, -sample->wi, Eps), &sample->pos);
         }
     };
     AKR_EXPORT_COMP(PerspectiveCamera, "Camera")

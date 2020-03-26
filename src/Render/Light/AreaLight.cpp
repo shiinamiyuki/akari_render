@@ -32,7 +32,7 @@ namespace Akari {
         Triangle triangle{};
         Float area = 0.0f;
         Emission emission;
-
+        CoordinateSystem localFrame;
       public:
         AreaLight() = default;
         AreaLight(const Mesh *mesh, int primId) : mesh(mesh), primId(primId) {
@@ -40,6 +40,7 @@ namespace Akari {
             area = triangle.Area();
             auto mat = mesh->GetMaterialSlot(mesh->GetPrimitiveGroup(primId));
             emission = mat.emission;
+            localFrame = CoordinateSystem(triangle.Ng);
         }
         AKR_DECL_COMP(AreaLight, "AreaLight")
         Spectrum Li(const vec3 &wo, ShadingPoint &sp) const override {
@@ -51,7 +52,8 @@ namespace Akari {
             }
             return Spectrum(0);
         }
-        void SampleIncidence(const vec2 &u, const Interaction &ref, RayIncidentSample *sample, VisibilityTester *tester) const override {
+        void SampleIncidence(const vec2 &u, const Interaction &ref, RayIncidentSample *sample,
+                             VisibilityTester *tester) const override {
             SurfaceSample surfaceSample{};
             triangle.Sample(u, &surfaceSample);
             auto wi = surfaceSample.p - ref.p;
@@ -75,20 +77,30 @@ namespace Akari {
             if (!triangle.Intersect(ray, &_isct)) {
                 return 0.0f;
             }
-            Float SA = triangle.Area() * (-dot(wi, _isct.Ng)) / (_isct.t * _isct.t);
+            Float SA = area * (-dot(wi, _isct.Ng)) / (_isct.t * _isct.t);
             return 1.0f / SA;
         }
         Float Power() const override {
             if (emission.strength && emission.color) {
-                return triangle.Area() * emission.strength->AverageLuminance() * emission.color->AverageLuminance();
+                return area * emission.strength->AverageLuminance() * emission.color->AverageLuminance();
             }
             return 0.0f;
         }
         void PdfEmission(const Ray &ray, Float *pdfPos, Float *pdfDir) const override {
-            AKARI_PANIC("Not Implemented");
+            *pdfPos = 1 / area;
+            *pdfDir = std::fmax(0.0f, CosineHemispherePDF(dot(triangle.Ng, ray.d)));
         }
         void SampleEmission(const vec2 &u1, const vec2 &u2, RayEmissionSample *sample) const override {
-            AKARI_PANIC("Not Implemented");
+            SurfaceSample surfaceSample{};
+            triangle.Sample(u1, &surfaceSample);
+            auto wi = CosineHemisphereSampling(u2);
+
+            sample->pdfPos = surfaceSample.pdf;
+            sample->pdfDir = CosineHemispherePDF(wi.y);
+            sample->ray = Ray(surfaceSample.p, localFrame.LocalToWorld(wi), Eps);
+            ShadingPoint sp{};
+            sp.texCoords = triangle.InterpolatedTexCoord(surfaceSample.uv);
+            sample->E = Li(-wi, sp);
         }
     };
     AKR_EXPORT_COMP(AreaLight, "Light");

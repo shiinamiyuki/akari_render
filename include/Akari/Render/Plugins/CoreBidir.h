@@ -20,36 +20,31 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef AKARIRENDER_SAMPLING_HPP
-#define AKARIRENDER_SAMPLING_HPP
-#include <algorithm>
-#include <Akari/Core/Math.h>
+#ifndef AKARIRENDER_COREBIDIR_H
+#define AKARIRENDER_COREBIDIR_H
 
+#include <Akari/Render/EndPoint.h>
+#include <Akari/Render/Integrator.h>
 namespace Akari {
-    inline vec2 ConcentricSampleDisk(const vec2 &u) {
-        vec2 uOffset = 2.f * u - vec2(1, 1);
-        if (uOffset.x == 0 && uOffset.y == 0)
-            return vec2(0, 0);
 
-        Float theta, r;
-        if (std::abs(uOffset.x) > std::abs(uOffset.y)) {
-            r = uOffset.x;
-            theta = Pi4 * (uOffset.y / uOffset.x);
-        } else {
-            r = uOffset.y;
-            theta = Pi2 - Pi4 * (uOffset.x / uOffset.y);
-        }
-        return r * vec2(std::cos(theta), std::sin(theta));
-    }
+    struct PathVertex {
+        enum Type : uint8_t { ENone, ESurface, ELight, ECamera };
+        Type type = ENone;
+        union {
+            Interaction si;
+            EndPointInteraction ei;
+        };
+        Float pdfFwd = 0, pdfRev = 0;
+    };
 
-    inline vec3 CosineHemisphereSampling(const vec2 &u) {
-        auto uv = ConcentricSampleDisk(u);
-        auto r = dot(uv, uv);
-        auto h = std::sqrt(std::max(0.0f, 1 - r));
-        return vec3(uv.x, h, uv.y);
-    }
-    inline Float CosineHemispherePDF(Float cosTheta){
-        return cosTheta * InvPi;
-    }
-}
-#endif // AKARIRENDER_SAMPLING_HPP
+    AKR_EXPORT size_t RandomWalk(const Scene &scene, Sampler &sampler, const Ray &ray, Spectrum beta, Float pdf,
+                                 PathVertex *path, size_t maxDepth);
+
+    AKR_EXPORT size_t TraceEyePath(const Scene &scene, const Camera &camera, Sampler &sampler, PathVertex *path,
+                                   size_t maxDepth);
+
+    AKR_EXPORT size_t TraceLightPath(const Scene &scene, Sampler &sampler, PathVertex *path, size_t maxDepth);
+
+} // namespace Akari
+
+#endif // AKARIRENDER_COREBIDIR_H

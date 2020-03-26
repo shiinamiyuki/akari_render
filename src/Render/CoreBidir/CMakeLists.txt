@@ -1,0 +1,2 @@
+add_library(AkariCoreBidir SHARED CoreBidir.cpp)
+target_link_libraries(AkariCoreBidir AkariCore)

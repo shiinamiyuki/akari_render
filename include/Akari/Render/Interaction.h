@@ -54,6 +54,10 @@ namespace Akari{
         }
         SurfaceInteraction(const vec3 &wo, const vec3 &p, const Triangle &triangle, const Intersection &intersection, MemoryArena &arena);
     };
+    class EndPoint;
+    struct AKR_EXPORT EndPointInteraction : Interaction {
+        EndPoint * ep = nullptr;
+    };
 }
 
 

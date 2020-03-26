@@ -46,7 +46,7 @@ namespace Akari {
 
         [[nodiscard]] virtual std::shared_ptr<Film> GetFilm() const = 0;
 
-        virtual Spectrum We(const Ray &ray, vec2 &pRaster) const {
+        virtual Spectrum We(const Ray &ray, vec2 *pRaster) const {
             AKARI_PANIC("Camera::We(const Ray &, vec2 &) is not implemented");
         }
         void PdfEmission(const Ray &ray, Float *pdfPos, Float *pdfDir) const override{
