@@ -13,17 +13,17 @@ include_directories(external/cxxopts/include)
 
 include_directories(include)
 if(MSVC)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /std:c++17 /MD  /MP /GL /fp:fast /arch:AVX2")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /std:c++17 /MD  /MP /GL ")
     set(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} /LTCG:INCREMENTAL")
     set(CMAKE_STATIC_LINKER_FLAGS  "${CMAKE_STATIC_LINKER_FLAGS} /LTCG:INCREMENTAL")
     set(CMAKE_SHARED_LINKER_FLAGS   "${CMAKE_SHARED_LINKER_FLAGS} /LTCG:INCREMENTAL")
 else()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
-    link_libraries(stdc++fs)
+    set(AKARI_CORE_EXT_LIBS "stdc++fs")
 endif()
 
 if(NOT WIN32)
-    link_libraries(pthread dl)
+    set(AKARI_CORE_EXT_LIBS "pthread dl")
 endif()
 
 set(AKARI_CORE_EXT_LIBS "")
@@ -35,7 +35,7 @@ set(AKARI_CORE_EXT_LIBS "")
 #endif()
 #
 include_directories(external/tinyobjloader/)
-add_subdirectory(external/tinyobjloader)
+add_library(tinyobjloader external/tinyobjloader/tiny_obj_loader.cc)
 set(AKARI_CORE_EXT_LIBS ${AKARI_CORE_EXT_LIBS} tinyobjloader)
 
 
@@ -47,16 +47,8 @@ set(AKARI_CORE_EXT_LIBS ${AKARI_CORE_EXT_LIBS} fmt)
 
 include_directories(external/oidn/include)
 add_subdirectory(external/oidn)
-set(AKARI_CORE_EXT_LIBS ${AKARI_CORE_EXT_LIBS} OpenImageDenoise)
 
-#set(EMBREE_ISPC_SUPPORT OFF CACHE BOOL "" FORCE)
-#set(EMBREE_STATIC_LIB ON CACHE BOOL "" FORCE)
-#set(EMBREE_TUTORIALS OFF CACHE BOOL "" FORCE)
-#set(EMBREE_FILTER_FUNCTION ON CACHE BOOL "" FORCE)
-#set(EMBREE_MAX_ISA AVX2 CACHE STRING "" FORCE)
-#set(EMBREE_TASKING_SYSTEM INTERNAL CACHE STRING "" FORCE)
-#include_directories(external/embree-3.8.0/include)
-#add_subdirectory(external/embree-3.8.0)
+include(cmake/Embree.cmake)
 ##set(AKARI_CORE_EXT_LIBS ${AKARI_CORE_EXT_LIBS} embree embree_sse42 embree_avx embree_avx2 lexers math simd tasking sys)
 #
 file(GLOB AKARI_API_SRC include/Akari/Core/*.* include/Akari/Render/*.*)
