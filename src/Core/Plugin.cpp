@@ -30,7 +30,8 @@ namespace Akari {
     void SharedLibraryLoader::Load(const char *path) { handle = LoadLibraryA(path); }
 
     SharedLibraryFunc SharedLibraryLoader::GetFuncPointer(const char *name) {
-        return (SharedLibraryFunc)GetProcAddress((HMODULE)handle, name);
+        auto func = (SharedLibraryFunc)GetProcAddress((HMODULE)handle, name);
+        return func;
     }
 
     SharedLibraryLoader::~SharedLibraryLoader() {

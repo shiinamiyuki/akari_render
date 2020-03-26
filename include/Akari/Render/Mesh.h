@@ -38,7 +38,7 @@ namespace Akari {
             int group = -1;
         };
 
-        [[nodiscard]] virtual const Vertex *GetVertexBuffer() const = 0;
+        [[nodiscard]] virtual const Vertex * GetVertexBuffer() const = 0;
         [[nodiscard]] virtual const int *GetIndexBuffer() const = 0;
         [[nodiscard]] virtual size_t GetTriangleCount() const = 0;
         [[nodiscard]] virtual int GetPrimitiveGroup(int idx) const = 0;

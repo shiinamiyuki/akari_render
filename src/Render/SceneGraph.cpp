@@ -39,7 +39,13 @@ namespace Akari {
             mesh->Commit();
             scene->AddMesh(mesh);
         }
-        scene->SetAccelerator(Cast<Accelerator>(CreateComponent("BVHAccelerator")));
+        if(!accelerator) {
+#ifdef AKARI_USE_EMBREE
+            scene->SetAccelerator(Cast<Accelerator>(CreateComponent("EmbreeAccelerator")));
+#else
+            scene->SetAccelerator(Cast<Accelerator>(CreateComponent("BVHAccelerator")));
+#endif
+        }
         Info("Building Accelerator\n");
         scene->Commit();
         camera->Commit();

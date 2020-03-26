@@ -44,11 +44,8 @@ include_directories(external/fmt-6.1.2/include)
 add_subdirectory(external/fmt-6.1.2)
 set(AKARI_CORE_EXT_LIBS ${AKARI_CORE_EXT_LIBS} fmt)
 
-
-include_directories(external/oidn/include)
-add_subdirectory(external/oidn)
-
 include(cmake/Embree.cmake)
+include(cmake/OIDN.cmake)
 ##set(AKARI_CORE_EXT_LIBS ${AKARI_CORE_EXT_LIBS} embree embree_sse42 embree_avx embree_avx2 lexers math simd tasking sys)
 #
 file(GLOB AKARI_API_SRC include/Akari/Core/*.* include/Akari/Render/*.*)
