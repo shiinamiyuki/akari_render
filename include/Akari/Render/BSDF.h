@@ -102,9 +102,10 @@ namespace Akari {
             for (int i = 0; i < nComp; i++) {
                 auto *comp = components[i];
                 if (!comp->IsDelta()) {
-                    cnt++;
+
                     pdf += comp->EvaluatePdf(wo, wi);
                 }
+                cnt++;
             }
             if (cnt > 1) {
                 pdf /= (float)cnt;

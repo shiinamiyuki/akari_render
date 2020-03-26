@@ -95,7 +95,7 @@ namespace Akari {
                         if (specular || depth == 0)
                             Li += beta * light->Li(si->wo, si->sp);
                         else {
-                            auto lightPdf = light->PdfIncidence(*prevInteraction, ray.d);
+                            auto lightPdf = light->PdfIncidence(*prevInteraction, ray.d) * scene->PdfLight(light);
                             Li += beta * light->Li(si->wo, si->sp) * MisWeight(prevScatteringPdf, lightPdf);
                         }
                     }

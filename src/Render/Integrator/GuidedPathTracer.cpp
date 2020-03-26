@@ -514,7 +514,7 @@ namespace Akari {
         int trainingSamples = 16;
         std::shared_ptr<STree> sTree;
         GPTRenderTask(const RenderContext &ctx, int spp, int minDepth, int maxDepth, int trainingSamples)
-            : ctx(ctx), spp(spp), minDepth(minDepth), maxDepth(maxDepth),trainingSamples(trainingSamples) {
+            : ctx(ctx), spp(spp), minDepth(minDepth), maxDepth(maxDepth), trainingSamples(trainingSamples) {
             sTree.reset(new STree(ctx.scene->GetBounds()));
         }
         bool HasFilmUpdate() override { return false; }
@@ -594,10 +594,10 @@ namespace Akari {
                     material->computeScatteringFunctions(si, arena, TransportMode::EImportance, 1.0f);
                     auto dTree = sTree->dTree(si->p);
                     if (light) {
-                        if (specular || depth == 0)
+                        if (!enableNEE || specular || depth == 0)
                             addRadiance(light->Li(si->wo, si->sp));
                         else {
-                            auto lightPdf = light->PdfIncidence(*prevInteraction, ray.d);
+                            auto lightPdf = light->PdfIncidence(*prevInteraction, ray.d) * scene->PdfLight(light);
                             addRadiance(light->Li(si->wo, si->sp) * MisWeight(prevScatteringPdf, lightPdf));
                         }
                     }
@@ -614,8 +614,9 @@ namespace Akari {
                         if (u0 < bsdfSamplingFraction) {
                             si->bsdf->Sample(bsdfSample);
                             AKARI_CHECK(bsdfSample.pdf >= 0);
+                            bsdfSample.pdf *= bsdfSamplingFraction;
                             if (!(bsdfSample.sampledType & BSDF_SPECULAR)) {
-                                bsdfSample.pdf *= bsdfSamplingFraction;
+
                                 bsdfSample.pdf = bsdfSample.pdf + (1.0f - bsdfSamplingFraction) *
                                                                       dTree->pdf(si->bsdf->LocalToWorld(bsdfSample.wi));
                             }
@@ -644,7 +645,7 @@ namespace Akari {
                         break;
                     }
                     specular = bsdfSample.sampledType & BSDF_SPECULAR;
-                    {
+                    if(enableNEE){
                         Float lightPdf = 0;
                         auto sampledLight = scene->SampleOneLight(sampler->Next1D(), &lightPdf);
                         if (sampledLight && lightPdf > 0) {
@@ -666,9 +667,10 @@ namespace Akari {
                                     weight = MisWeight(lightPdf, scatteringPdf);
                                     radiance = (f * lightSample.I / lightPdf * weight);
                                 }
-                                sTree->deposit(intersection.p, lightSample.wi,
-                                               Spectrum(weight * lightSample.I / lightPdf / absCos).Luminance());
-
+                                if (training && !enableNEE) {
+                                    sTree->deposit(intersection.p, lightSample.wi,
+                                                   Spectrum(weight * lightSample.I / lightPdf / absCos).Luminance());
+                                }
                                 addRadiance(radiance);
                             }
                         }
@@ -691,7 +693,7 @@ namespace Akari {
                 for (int i = 0; i < nVertices; i++) {
                     auto irradiance = vertices[i].L.RemoveNaN().Luminance();
                     //                    if(irradiance>0)
-                    //                        log::log("deposit {} {}\n", i, irradiance);
+                    //                        Info("deposit {} {}\n", i, irradiance);
                     AKARI_CHECK(irradiance >= 0);
                     sTree->deposit(vertices[i].p, vertices[i].wi, irradiance);
                 }
@@ -719,13 +721,15 @@ namespace Akari {
                     for (int y = tile.bounds.p_min.y; y < tile.bounds.p_max.y; y++) {
                         for (int x = tile.bounds.p_min.x; x < tile.bounds.p_max.x; x++) {
                             sampler->SetSampleIndex(x + y * film->Dimension().x);
-                            //                          sampler->startSample(accumulatedSamples);
-                            sampler->StartNextSample();
-                            CameraSample sample;
-                            camera->GenerateRay(sampler->Next2D(), sampler->Next2D(), ivec2(x, y), &sample);
-                            auto Li = this->Li(true, true, sample.primary, sampler.get(), arena);
-                            (void)Li;
-                            arena.reset();
+                            for(uint32_t s = 0; s < samples;s++) {
+                                //                          sampler->startSample(accumulatedSamples);
+                                sampler->StartNextSample();
+                                CameraSample sample;
+                                camera->GenerateRay(sampler->Next2D(), sampler->Next2D(), ivec2(x, y), &sample);
+                                auto Li = this->Li(true, true, sample.primary, sampler.get(), arena);
+                                (void)Li;
+                                arena.reset();
+                            }
                         }
                     }
                 });
@@ -733,6 +737,21 @@ namespace Akari {
                 Info("nodes: {}\n", sTree->nodes.size());
                 sTree->refine(12000 * std::sqrt(samples));
             }
+//            int cnt = 0;
+//            for (auto &i : sTree->nodes) {
+//                auto &tree = i.dTree.sampling;
+//                if (i.isLeaf() && tree.sum.value() > 0) {
+//                    RGBAImage image(ivec2(512, 512));
+//                    for (int j = 0; j < 512; j++) {
+//                        for (int i = 0; i < 512; i++) {
+//                            auto pdf = tree.pdf(vec2(i, 511 - j) / vec2(image.Dimension()));
+//                            pdf = std::log(1.0 + pdf) / std::log(10);
+//                            image(i, j) = vec4(Spectrum(pdf), 1.0f);
+//                        }
+//                    }
+//                    GetDefaultImageWriter()->Write(image, fmt::format("tree{}.png", cnt++), IdentityProcessor());
+//                }
+//            }
         }
         void Start() override {
             future = std::async(std::launch::async, [=]() {
@@ -777,11 +796,12 @@ namespace Akari {
         int spp = 16;
         int minDepth = 5, maxDepth = 16;
         int trainingSamples = 16;
+
       public:
         AKR_DECL_COMP(GuidedPathTracer, "GuidedPathTracer")
         AKR_SER(spp, trainingSamples, minDepth, maxDepth)
         std::shared_ptr<RenderTask> CreateRenderTask(const RenderContext &ctx) override {
-            return std::make_shared<GPTRenderTask>(ctx, spp, minDepth, maxDepth,trainingSamples);
+            return std::make_shared<GPTRenderTask>(ctx, spp, minDepth, maxDepth, trainingSamples);
         }
     };
     AKR_EXPORT_COMP(GuidedPathTracer, "Integrator");
