@@ -23,6 +23,7 @@
 #ifndef AKARIRENDER_BSDF_H
 #define AKARIRENDER_BSDF_H
 
+#include "Interaction.h"
 #include <Akari/Core/Sampling.hpp>
 #include <Akari/Core/Spectrum.h>
 #include <Akari/Render/Geometry.hpp>
@@ -63,7 +64,7 @@ namespace Akari {
         Spectrum f{};
         Float pdf = -1;
         BSDFType sampledType = BSDF_NONE;
-        inline BSDFSample(Float u0, const vec2 &u, const ScatteringEvent &event);
+        inline BSDFSample(Float u0, const vec2 &u, const SurfaceInteraction &si);
     };
 
     class BSDFComponent {
@@ -164,8 +165,8 @@ namespace Akari {
             }
         }
     };
-    inline BSDFSample::BSDFSample(Float u0, const vec2 &u, const Akari::ScatteringEvent &event)
-        : wo(event.bsdf->WorldToLocal(event.wo)), u0(u0), u(u) {}
+    inline BSDFSample::BSDFSample(Float u0, const vec2 &u, const SurfaceInteraction &si)
+        : wo(si.bsdf->WorldToLocal(si.wo)), u0(u0), u(u) {}
 
 } // namespace Akari
 #endif // AKARIRENDER_BSDF_H

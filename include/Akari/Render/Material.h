@@ -27,6 +27,7 @@
 #include <Akari/Core/MemoryArena.hpp>
 #include <Akari/Render/BSDF.h>
 #include <Akari/Render/Texture.h>
+#include <Akari/Render/Interaction.h>
 namespace Akari {
     class Material;
     class Light;
@@ -34,7 +35,7 @@ namespace Akari {
 
     class AKR_EXPORT Material : public Component {
       public:
-        virtual void computeScatteringFunctions(ScatteringEvent *event, MemoryArena &arena) const = 0;
+        virtual void computeScatteringFunctions(SurfaceInteraction * si, MemoryArena &arena, TransportMode mode, Float scale) const = 0;
     };
 
     struct Emission {

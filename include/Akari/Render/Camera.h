@@ -23,9 +23,11 @@
 #ifndef AKARIRENDER_CAMERA_H
 #define AKARIRENDER_CAMERA_H
 
+#include "Light.h"
 #include <Akari/Core/Component.h>
 #include <Akari/Core/Film.h>
 #include <Akari/Render/Geometry.hpp>
+#include <Akari/Render/EndPoint.h>
 
 namespace Akari {
     struct CameraSample {
@@ -35,20 +37,28 @@ namespace Akari {
         Float weight = 1;
     };
 
-    class Camera : public Component {
+
+    class Camera : public EndPoint {
       public:
         [[nodiscard]] virtual bool IsProjective() const { return false; }
 
-        virtual void GenerateRay(const vec2 &u1, const vec2 &u2, const ivec2 &raster, CameraSample &sample) const = 0;
+        virtual void GenerateRay(const vec2 &u1, const vec2 &u2, const ivec2 &raster, CameraSample *sample) const = 0;
 
         [[nodiscard]] virtual std::shared_ptr<Film> GetFilm() const = 0;
 
         virtual Spectrum We(const Ray &ray, vec2 &pRaster) const {
             AKARI_PANIC("Camera::We(const Ray &, vec2 &) is not implemented");
         }
-        virtual void PdfWe(const Ray &ray, Float *pdfPos, Float *pdfDir) const {
+        void PdfEmission(const Ray &ray, Float *pdfPos, Float *pdfDir) const override{
             AKARI_PANIC("Camera::PdfWe(const Ray &ray, Float *pdfPos, Float *pdfDir) is not implemented");
         }
+        Float PdfIncidence(const Interaction& ref, const vec3& wi) const override{
+            return 0;
+        }
+        void SampleEmission(const vec2& u1, const vec2& u2, RayEmissionSample* sample) const override{
+            AKARI_PANIC("void Camera::SampleEmission(const vec2& u1, const vec2& u2, RayEmissionSample* sample)  is not implemented");
+        }
+
     };
 
 } // namespace Akari

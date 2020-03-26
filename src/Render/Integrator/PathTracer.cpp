@@ -28,7 +28,7 @@
 #include <mutex>
 
 namespace Akari {
-    static Float MisWeight(Float pdfA, Float pdfB){
+    static Float MisWeight(Float pdfA, Float pdfB) {
         pdfA *= pdfA;
         pdfB *= pdfB;
         return pdfA / (pdfA + pdfB);
@@ -71,7 +71,7 @@ namespace Akari {
             Spectrum Li(0), beta(1);
             bool specular = false;
             Float prevScatteringPdf = 0;
-            Intersection prevIntersection;
+            Interaction *prevInteraction = nullptr;
             for (int depth = 0; depth < maxDepth; depth++) {
                 Intersection intersection(ray);
                 if (scene->Intersect(ray, &intersection)) {
@@ -88,18 +88,18 @@ namespace Akari {
                     Triangle triangle{};
                     mesh.GetTriangle(intersection.primId, &triangle);
                     const auto &p = intersection.p;
-                    ScatteringEvent event(-ray.d, p, triangle, intersection);
+                    auto *si = arena.alloc<SurfaceInteraction>(-ray.d, p, triangle, intersection, arena);
+                    material->computeScatteringFunctions(si, arena, TransportMode::EImportance, 1.0f);
                     if (light) {
-                        if(specular || depth == 0)
-                            Li += beta * light->Li(event.wo, event.sp);
-                        else{
-                            auto lightPdf =light->PdfLi(prevIntersection, ray.d);
-                            Li += beta * light->Li(event.wo, event.sp) * MisWeight(prevScatteringPdf, lightPdf);
+                        if (specular || depth == 0)
+                            Li += beta * light->Li(si->wo, si->sp);
+                        else {
+                            auto lightPdf = light->PdfIncidence(*prevInteraction, ray.d);
+                            Li += beta * light->Li(si->wo, si->sp) * MisWeight(prevScatteringPdf, lightPdf);
                         }
                     }
-                    material->computeScatteringFunctions(&event, arena);
-                    BSDFSample bsdfSample(sampler->Next1D(), sampler->Next2D(), event);
-                    event.bsdf->Sample(bsdfSample);
+                    BSDFSample bsdfSample(sampler->Next1D(), sampler->Next2D(), *si);
+                    si->bsdf->Sample(bsdfSample);
 
                     assert(bsdfSample.pdf >= 0);
                     if (bsdfSample.pdf <= 0) {
@@ -112,26 +112,26 @@ namespace Akari {
                         if (sampledLight && lightPdf > 0) {
                             LightSample lightSample{};
                             VisibilityTester tester{};
-                            sampledLight->SampleLi(sampler->Next2D(), intersection, lightSample, tester);
+                            sampledLight->SampleIncidence(sampler->Next2D(), *si, &lightSample, &tester);
                             lightPdf *= lightSample.pdf;
-                            auto wi = event.bsdf->WorldToLocal(lightSample.wi);
-                            auto wo = event.bsdf->WorldToLocal(event.wo);
-                            auto f = event.bsdf->Evaluate(wo, wi) * abs(dot(lightSample.wi, event.Ns));
-                            if (lightPdf > 0 && MaxComp(f) > 0 && tester.visible(*scene) ) {
-                                if(specular) {
-                                    Li += beta * f * lightSample.Li / lightPdf;
-                                }else{
-                                    auto scatteringPdf = event.bsdf->EvaluatePdf(wo, wi);
-                                    Li += beta * f * lightSample.Li / lightPdf * MisWeight(lightPdf, scatteringPdf);
+                            auto wi = si->bsdf->WorldToLocal(lightSample.wi);
+                            auto wo = si->bsdf->WorldToLocal(si->wo);
+                            auto f = si->bsdf->Evaluate(wo, wi) * abs(dot(lightSample.wi, si->Ns));
+                            if (lightPdf > 0 && MaxComp(f) > 0 && tester.visible(*scene)) {
+                                if (specular) {
+                                    Li += beta * f * lightSample.I / lightPdf;
+                                } else {
+                                    auto scatteringPdf = si->bsdf->EvaluatePdf(wo, wi);
+                                    Li += beta * f * lightSample.I / lightPdf * MisWeight(lightPdf, scatteringPdf);
                                 }
                             }
                         }
                     }
                     prevScatteringPdf = bsdfSample.pdf;
-                    auto wiW = event.bsdf->LocalToWorld(bsdfSample.wi);
-                    beta *= bsdfSample.f * abs(dot(wiW, event.Ns)) / bsdfSample.pdf;
-                    ray = event.SpawnRay(wiW);
-                    prevIntersection = intersection;
+                    auto wiW = si->bsdf->LocalToWorld(bsdfSample.wi);
+                    beta *= bsdfSample.f * abs(dot(wiW, si->Ns)) / bsdfSample.pdf;
+                    ray = si->SpawnRay(wiW);
+                    prevInteraction = si;
                 } else {
                     Li += beta * Spectrum(0);
                     break;
@@ -160,7 +160,7 @@ namespace Akari {
                             for (int s = 0; s < spp; s++) {
                                 sampler->StartNextSample();
                                 CameraSample sample;
-                                camera->GenerateRay(sampler->Next2D(), sampler->Next2D(), ivec2(x, y), sample);
+                                camera->GenerateRay(sampler->Next2D(), sampler->Next2D(), ivec2(x, y), &sample);
                                 auto Li = this->Li(sample.primary, sampler.get(), arena);
                                 arena.reset();
                                 tile.AddSample(ivec2(x, y), Li, 1.0f);

@@ -27,33 +27,19 @@
 #include <Akari/Render/Geometry.hpp>
 #include <Akari/Render/Scene.h>
 #include <Akari/Core/Spectrum.h>
+#include <Akari/Render/EndPoint.h>
 
 namespace Akari {
-    struct LightSample {
-        vec3 wi;
-        Spectrum Li;
-        vec3 normal;
-        float pdf;
-    };
+    struct LightSample : RayIncidentSample{};
 
-    struct LightRaySample {
-        Ray ray;
-        Spectrum Le;
-        vec3 normal;
-        float pdfPos, pdfDir;
-    };
-    struct VisibilityTester {
-        Ray shadowRay;
-        bool visible(const Scene &scene) const { return !scene.Occlude(shadowRay); }
-    };
-    class Light : public Component {
+    struct LightRaySample : RayEmissionSample{};
+
+
+    class Light : public EndPoint {
       public:
         virtual Float Power() const = 0;
         virtual Spectrum Li(const vec3 &wo, ShadingPoint &sp) const = 0;
 
-        virtual void SampleLi(const vec2 &u, Intersection &isct, LightSample &sample, VisibilityTester &) const = 0;
-
-        virtual Float PdfLi(const Intersection &intersection, const vec3 &wi) const = 0;
 
         //        virtual void SampleLe(const Point2f &u1, const Point2f &u2, LightRaySample &sample) = 0;
     };

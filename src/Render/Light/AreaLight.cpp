@@ -51,27 +51,27 @@ namespace Akari {
             }
             return Spectrum(0);
         }
-        void SampleLi(const vec2 &u, Intersection &isct, LightSample &sample, VisibilityTester &tester) const override {
+        void SampleIncidence(const vec2 &u, const Interaction &ref, RayIncidentSample *sample, VisibilityTester *tester) const override {
             SurfaceSample surfaceSample{};
             triangle.Sample(u, &surfaceSample);
-            auto wi = surfaceSample.p - isct.p;
+            auto wi = surfaceSample.p - ref.p;
             auto dist2 = dot(wi, wi);
             auto dist = std::sqrt(dist2);
             wi /= dist;
 
             ShadingPoint sp{};
             sp.texCoords = triangle.InterpolatedNormal(surfaceSample.uv);
-            sample.Li = Li(-wi, sp);
-            sample.wi = wi;
-            sample.pdf = dist2 / (-dot(sample.wi, surfaceSample.normal)) * surfaceSample.pdf;
-            sample.normal = surfaceSample.normal;
+            sample->I = Li(-wi, sp);
+            sample->wi = wi;
+            sample->pdf = dist2 / (-dot(sample->wi, surfaceSample.normal)) * surfaceSample.pdf;
+            sample->normal = surfaceSample.normal;
 
-            tester.shadowRay =
-                Ray(surfaceSample.p, -1.0f * wi, Eps / abs(dot(sample.wi, surfaceSample.normal)), dist * 0.99);
+            tester->shadowRay =
+                Ray(surfaceSample.p, -1.0f * wi, Eps / abs(dot(sample->wi, surfaceSample.normal)), dist * 0.99);
         }
-        Float PdfLi(const Intersection &intersection, const vec3 &wi) const override {
+        Float PdfIncidence(const Interaction &ref, const vec3 &wi) const override {
             Intersection _isct;
-            Ray ray(intersection.p, wi, Eps);
+            Ray ray(ref.p, wi, Eps);
             if (!triangle.Intersect(ray, &_isct)) {
                 return 0.0f;
             }
@@ -83,6 +83,12 @@ namespace Akari {
                 return triangle.Area() * emission.strength->AverageLuminance() * emission.color->AverageLuminance();
             }
             return 0.0f;
+        }
+        void PdfEmission(const Ray &ray, Float *pdfPos, Float *pdfDir) const override {
+            AKARI_PANIC("Not Implemented");
+        }
+        void SampleEmission(const vec2 &u1, const vec2 &u2, RayEmissionSample *sample) const override {
+            AKARI_PANIC("Not Implemented");
         }
     };
     AKR_EXPORT_COMP(AreaLight, "Light");

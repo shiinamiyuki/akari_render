@@ -20,40 +20,38 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef AKARIRENDER_INTEGRATOR_H
-#define AKARIRENDER_INTEGRATOR_H
+#ifndef AKARIRENDER_ENDPOINT_H
+#define AKARIRENDER_ENDPOINT_H
 
 #include <Akari/Core/Component.h>
-#include <Akari/Render/Accelerator.h>
-#include <Akari/Render/Camera.h>
-#include <Akari/Render/Light.h>
-#include <Akari/Render/Material.h>
-#include <Akari/Render/Mesh.h>
-#include <Akari/Render/Sampler.h>
+#include <Akari/Render/Geometry.hpp>
 #include <Akari/Render/Scene.h>
-#include <Akari/Render/Task.h>
-
+#include <Akari/Render/Interaction.h>
 namespace Akari {
-    class RenderTask : public Task {
-      public:
-        enum class Event { ERENDER_DONE, EFILM_AVAILABLE };
-        virtual bool HasFilmUpdate() = 0;
-        virtual std::shared_ptr<const Film> GetFilmUpdate() = 0;
-        virtual bool IsDone() = 0;
-        virtual bool WaitEvent(Event event) = 0;
+    struct RayIncidentSample {
+        vec3 wi;
+        Spectrum I;
+        vec3 normal;
+        float pdf;
+    };
+    struct RayEmissionSample {
+        Ray ray;
+        Spectrum E;
+        vec3 normal;
+        float pdfPos, pdfDir;
+    };
+    struct VisibilityTester {
+        Ray shadowRay;
+        [[nodiscard]] bool visible(const Scene &scene) const { return !scene.Occlude(shadowRay); }
     };
 
-    struct RenderContext {
-        std::shared_ptr<const Scene> scene;
-        std::shared_ptr<const Camera> camera;
-        std::shared_ptr<const Sampler> sampler;
-    };
-
-    class Integrator : public Component {
+    class EndPoint : public Component {
       public:
-        virtual std::shared_ptr<RenderTask> CreateRenderTask(const RenderContext &ctx) = 0;
-
+        virtual Float PdfIncidence(const Interaction &ref, const vec3 &wi) const = 0;
+        virtual void PdfEmission(const Ray &ray, Float *pdfPos, Float *pdfDir) const = 0;
+        virtual void SampleIncidence(const vec2 &u, const Interaction &ref, RayIncidentSample *sample,
+                                     VisibilityTester *tester) const = 0;
+        virtual void SampleEmission(const vec2 &u1, const vec2 &u2, RayEmissionSample *sample) const = 0;
     };
 } // namespace Akari
-
-#endif // AKARIRENDER_INTEGRATOR_H
+#endif // AKARIRENDER_ENDPOINT_H

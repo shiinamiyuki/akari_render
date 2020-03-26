@@ -128,27 +128,9 @@ namespace Akari {
         vec2 texCoords;
     };
 
-    struct ScatteringEvent {
-        vec3 wo; // world space wo
-        vec3 p;
-        vec3 Ns{};
-        vec3 Ng{};
-        ShadingPoint sp{};
-        BSDF *bsdf = nullptr;
-        Float rayBias = Eps;
-        ScatteringEvent(const vec3 &wo, const vec3 &p, const Triangle &triangle, const Intersection &intersection)
-            : wo(wo), p(p) {
-            sp.texCoords = triangle.InterpolatedTexCoord(intersection.uv);
-            Ns = triangle.InterpolatedNormal(intersection.uv);
-            Ng = triangle.Ng;
-        }
+    enum TransportMode : uint32_t { EImportance, ERadiance };
 
-        [[nodiscard]] Ray SpawnRay(const vec3 &w) const { return Ray(p, w, rayBias / abs(dot(w, Ng)), Inf); }
-        [[nodiscard]] Ray SpawnTo(const vec3 &q) const {
-            auto w = (q - p);
-            return Ray(p, w, rayBias / abs(dot(w, Ng)) / length(w), 1 - ShadowEps);
-        }
-    };
+
 
 } // namespace Akari
 #endif // AKARIRENDER_GEOMETRY_HPP

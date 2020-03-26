@@ -22,7 +22,9 @@
 
 #ifndef AKARIRENDER_MEMORYARENA_HPP
 #define AKARIRENDER_MEMORYARENA_HPP
-
+#include <cstddef>
+#include <cstdint>
+#include <list>
 namespace Akari{
     class MemoryArena {
         static constexpr size_t align16(size_t x) {

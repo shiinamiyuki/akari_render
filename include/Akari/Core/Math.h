@@ -201,6 +201,16 @@ namespace Akari {
     template <typename V> inline V Interpolate(const V &v0, const V &v1, const V &v2, const vec2 &uv) {
         return (1.0f - uv.x - uv.y) * v0 + uv.x * v1 + uv.y * v2;
     }
-
+    template <int N, typename T> T Power(const T &x) {
+        if constexpr (N == 0) {
+            return T(1);
+        } else if constexpr (N % 2 == 0) {
+            auto tmp = Power<N / 2>(x);
+            return tmp * tmp;
+        } else {
+            auto tmp = Power<N / 2>(x);
+            return tmp * tmp * x;
+        }
+    }
 } // namespace Akari
 #endif // AKARIRENDER_MATH_H

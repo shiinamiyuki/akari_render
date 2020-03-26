@@ -20,40 +20,17 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef AKARIRENDER_INTEGRATOR_H
-#define AKARIRENDER_INTEGRATOR_H
-
-#include <Akari/Core/Component.h>
-#include <Akari/Render/Accelerator.h>
-#include <Akari/Render/Camera.h>
-#include <Akari/Render/Light.h>
-#include <Akari/Render/Material.h>
-#include <Akari/Render/Mesh.h>
-#include <Akari/Render/Sampler.h>
-#include <Akari/Render/Scene.h>
-#include <Akari/Render/Task.h>
+#include <Akari/Core/MemoryArena.hpp>
+#include <Akari/Render/BSDF.h>
+#include <Akari/Render/Interaction.h>
 
 namespace Akari {
-    class RenderTask : public Task {
-      public:
-        enum class Event { ERENDER_DONE, EFILM_AVAILABLE };
-        virtual bool HasFilmUpdate() = 0;
-        virtual std::shared_ptr<const Film> GetFilmUpdate() = 0;
-        virtual bool IsDone() = 0;
-        virtual bool WaitEvent(Event event) = 0;
-    };
-
-    struct RenderContext {
-        std::shared_ptr<const Scene> scene;
-        std::shared_ptr<const Camera> camera;
-        std::shared_ptr<const Sampler> sampler;
-    };
-
-    class Integrator : public Component {
-      public:
-        virtual std::shared_ptr<RenderTask> CreateRenderTask(const RenderContext &ctx) = 0;
-
-    };
+    SurfaceInteraction::SurfaceInteraction(const glm::vec3 &wo, const glm::vec3 &p, const Akari::Triangle &triangle,
+                                           const Akari::Intersection &intersection, Akari::MemoryArena &arena)
+        : Interaction(wo, p, triangle.Ng) {
+        sp.texCoords = triangle.InterpolatedTexCoord(intersection.uv);
+        Ns = triangle.InterpolatedNormal(intersection.uv);
+        Ng = triangle.Ng;
+        bsdf = arena.alloc<BSDF>(Ng, Ns);
+    }
 } // namespace Akari
-
-#endif // AKARIRENDER_INTEGRATOR_H

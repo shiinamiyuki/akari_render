@@ -75,19 +75,19 @@ namespace Akari {
                     Triangle triangle{};
                     mesh.GetTriangle(intersection.primId, &triangle);
                     vec3 p = ray.At(intersection.t);
-                    ScatteringEvent event(-ray.d, p, triangle, intersection);
-                    material->computeScatteringFunctions(&event, arena);
-                    BSDFSample bsdfSample(sampler->Next1D(), sampler->Next2D(), event);
-                    event.bsdf->Sample(bsdfSample);
+                    SurfaceInteraction si(-ray.d, p, triangle, intersection, arena);
+                    material->computeScatteringFunctions(&si, arena, TransportMode::EImportance, 1.0f);
+                    BSDFSample bsdfSample(sampler->Next1D(), sampler->Next2D(), si);
+                    si.bsdf->Sample(bsdfSample);
                     //                                    Debug("pdf:{}\n",bsdfSample.pdf);
                     assert(bsdfSample.pdf >= 0);
                     if (bsdfSample.pdf <= 0) {
                         break;
                     }
                     //                                    Debug("wi: {}\n",PrintVec3(bsdfSample.wi));
-                    auto wiW = event.bsdf->LocalToWorld(bsdfSample.wi);
-                    beta *= bsdfSample.f * abs(dot(wiW, event.Ns)) / bsdfSample.pdf;
-                    ray = event.SpawnRay(wiW);
+                    auto wiW = si.bsdf->LocalToWorld(bsdfSample.wi);
+                    beta *= bsdfSample.f * abs(dot(wiW, si.Ns)) / bsdfSample.pdf;
+                    ray = si.SpawnRay(wiW);
                 } else {
                     Li += beta * Spectrum(1);
                     break;
@@ -97,7 +97,7 @@ namespace Akari {
         }
         void Start() override {
             future = std::async(std::launch::async, [=]() {
-              auto beginTime = std::chrono::high_resolution_clock::now();
+                auto beginTime = std::chrono::high_resolution_clock::now();
 
                 auto scene = ctx.scene;
                 auto &camera = ctx.camera;
@@ -116,7 +116,7 @@ namespace Akari {
                             for (int s = 0; s < spp; s++) {
                                 sampler->StartNextSample();
                                 CameraSample sample;
-                                camera->GenerateRay(sampler->Next2D(), sampler->Next2D(), ivec2(x, y), sample);
+                                camera->GenerateRay(sampler->Next2D(), sampler->Next2D(), ivec2(x, y), &sample);
                                 auto Li = this->Li(sample.primary, sampler.get(), arena);
                                 arena.reset();
                                 tile.AddSample(ivec2(x, y), Li, 1.0f);
@@ -126,13 +126,11 @@ namespace Akari {
                     std::lock_guard<std::mutex> lock(mutex);
                     film->MergeTile(tile);
                 });
-              auto endTime = std::chrono::high_resolution_clock::now();
-              std::chrono::duration<double> elapsed = (endTime - beginTime);
-              Info("Rendering done in {} secs, traced {} rays, {} M rays/sec\n",elapsed.count(),
-                  scene->GetRayCounter(), scene->GetRayCounter() / elapsed.count() / 1e6);
+                auto endTime = std::chrono::high_resolution_clock::now();
+                std::chrono::duration<double> elapsed = (endTime - beginTime);
+                Info("Rendering done in {} secs, traced {} rays, {} M rays/sec\n", elapsed.count(),
+                     scene->GetRayCounter(), scene->GetRayCounter() / elapsed.count() / 1e6);
             });
-
-
         }
     };
 

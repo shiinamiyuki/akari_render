@@ -37,10 +37,10 @@ namespace Akari {
         explicit MatteMaterial(std::shared_ptr<Texture> color) : color(std::move(color)) {}
         AKR_SER(color)
         AKR_DECL_COMP(MatteMaterial, "MatteMaterial")
-        void computeScatteringFunctions(ScatteringEvent *event, MemoryArena &arena) const override {
-            auto c = color->Evaluate(event->sp);
-            event->bsdf = arena.alloc<BSDF>(event->Ng,event->Ns);
-            event->bsdf->AddComponent(arena.alloc<LambertianReflection>(c));
+        void computeScatteringFunctions(SurfaceInteraction * si, MemoryArena &arena, TransportMode mode,
+                                        Float scale) const override {
+            auto c = color->Evaluate(si->sp);
+            si->bsdf->AddComponent(arena.alloc<LambertianReflection>(c * scale));
         }
     };
 
