@@ -38,7 +38,7 @@ namespace Akari {
         std::vector<int> indexBuffer;
         std::vector<int> groups;
         std::vector<MaterialSlot> materials;
-        std::string file;
+        fs::path file;
         AKR_SER(materials, file);
         AKR_DECL_COMP(BinaryMesh, "BinaryMesh")
         const MaterialSlot &GetMaterialSlot(int group) const override;

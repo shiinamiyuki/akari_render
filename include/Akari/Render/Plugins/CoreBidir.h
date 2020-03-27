@@ -70,8 +70,19 @@ namespace Akari {
                 AKARI_PANIC("not implemented Vertex::f()");
             }
         }
+        [[nodiscard]] bool IsOnSurface() const { return all(equal(Ng(), vec3(0))); }
         Float PdfSAToArea(Float pdf, const PathVertex &next) {
-            return 0;
+            if (next.IsInfiniteLight())
+                return pdf;
+            auto w = next.p() - p();
+            auto invDistSqr = 1.0f / dot(w, w);
+            if (next.IsOnSurface()) {
+                // dw = dA cos(t) / r^2
+                // p(w) dw/dA = p(A)
+                // p(A) = p(w) * cos(t)/r^2
+                pdf *=  abs(dot(next.Ng(), w * std::sqrt(invDistSqr)));
+            }
+            return pdf * invDistSqr;
         }
         Float Pdf(const Scene &scene, const PathVertex *prev, const PathVertex &next) {
             auto wiNext = normalize(next.p() - p());
@@ -81,9 +92,14 @@ namespace Akari {
             } else {
                 AKARI_ASSERT(type == ECamera);
             }
-            (void)wiNext;
-            (void)wiPrev;
-            return 0.0;
+            Float pdf = 0;
+            {
+                AKARI_ASSERT(type == ESurface);
+                auto wo = si.bsdf->WorldToLocal(-wiPrev);
+                auto wi = si.bsdf->WorldToLocal(wiNext);
+                pdf = si.bsdf->EvaluatePdf(wi, wi);
+            }
+            return PdfSAToArea(pdf, next);
         }
     };
 

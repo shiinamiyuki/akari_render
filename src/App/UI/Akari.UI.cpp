@@ -19,3 +19,20 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+#include <GL/gl3w.h>
+#include <GLFW/glfw3.h>
+#include <imgui.h>
+#include <examples/imgui_impl_glfw.h>
+#include <examples/imgui_impl_opengl3.h>
+
+#include <stdio.h>
+#include <Akari/Core/Application.h>
+#include "WindowContext.h"
+int main() {
+    using namespace Akari;
+    Application app;
+    Gui::GLFWContext ctx;
+    auto window = Gui::CreateAppWindow(ctx);
+    window->Show();
+    return 0;
+}

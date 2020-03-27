@@ -35,7 +35,7 @@
 
 namespace Akari {
     struct MeshWrapper {
-        std::string file; // path to json file
+        fs::path file; // path to json file
         std::shared_ptr<Mesh> mesh;
 //        AKR_SER(file, mesh)
         template <class Archive> void save(Archive &ar) const {

@@ -74,7 +74,7 @@ namespace Akari {
             return;
             ;
         }
-        Load(file.c_str());
+        Load(file.string().c_str());
         for (uint32_t id = 0; id < GetTriangleCount(); id++) {
             int group = GetPrimitiveGroup(id);
             const auto &mat = GetMaterialSlot(group);

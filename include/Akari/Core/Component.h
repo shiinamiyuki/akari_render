@@ -51,17 +51,16 @@ namespace Akari {
     extern "C" AKR_EXPORT IPlugin *AKARI_GET_PLUGIN() {                                                                \
         struct ThisPlugin : IPlugin {                                                                                  \
             TypeInfo *GetTypeInfo() override { return Name::staticType(); }                                            \
-            const char *GetInterface() override {                                                                      \
-                return strlen(Interface) == 0 ? "Default" : Interface;                         \
-            }                                                                                                          \
+            const char *GetInterface() override { return strlen(Interface) == 0 ? "Default" : Interface; }             \
         };                                                                                                             \
         static ThisPlugin plugin;                                                                                      \
         return &plugin;                                                                                                \
     }
-
+    template <typename T, typename U> std::shared_ptr<T> Cast(const std::shared_ptr<U> &p) {
+        return std::dynamic_pointer_cast<T>(p);
+    }
     using GetPluginFunc = IPlugin *(*)();
-    AKR_EXPORT Ptr<Component> CreateComponent(const char * type);
-
+    AKR_EXPORT std::shared_ptr<Component> CreateComponent(const char *type);
 
 } // namespace Akari
 #endif // AKARIRENDER_COMPONENT_H

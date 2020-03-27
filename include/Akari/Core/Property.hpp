@@ -26,71 +26,38 @@
 #include <Akari/Core/Akari.h>
 #include <Akari/Core/Component.h>
 #include <Akari/Core/Math.h>
-#include <variant>
+#include <Akari/Core/Spectrum.h>
+#include <functional>
 #include <memory>
 #include <string>
-#include <functional>
+#include <variant>
+
+namespace nlohmann {
+    template <> struct adl_serializer<Akari::fs::path> {
+        static void from_json(const json &j,  Akari::fs::path &path) { path = Akari::fs::path(j.get<std::string>()); }
+
+        static void to_json(json &j, const Akari::fs::path &path) { j = path.string(); }
+    };
+} // namespace nlohmann
 namespace Akari {
     class Component;
-    template <typename T> using Ptr = std::shared_ptr<T>;
-    template <typename T, typename U> Ptr<T> Cast(const Ptr<U> &p) { return std::dynamic_pointer_cast<T>(p); }
-    template <typename... T> using RefVariant = std::variant<std::reference_wrapper<T>...>;
-    //    using PropertyValue =
-    //        RefVariant<bool, int, float, vec2, vec3, ivec2, ivec3, std::string, std::shared_ptr<Component>>;
-    template <typename... T> struct TPropertyTypes {
-        using RefValue = RefVariant<T...>;
-        using Value = std::variant<T...>;
-    };
-    using PropertyTypes =
-        TPropertyTypes<bool, int, float, vec2, vec3, ivec2, ivec3, std::string, std::shared_ptr<Component>>;
-    struct Property {
-        std::weak_ptr<Component> object;
 
-        template <typename T> Property(const char *name, T &v) : name(name) { Load(v); }
-        [[nodiscard]] const char *GetName() const { return name; }
-        [[nodiscard]] const PropertyTypes::Value &GetValue() const { return value; }
-        template <typename T> void SetValue(T v) { setValueCallback(PropertyTypes::Value(std::move(v))); }
+    inline void from_json(const json &j, fs::path &path) { path = fs::path(j.get<std::string>()); }
+    inline void to_json(json &j, const fs::path &path) { j = path.string(); }
+
+    template <typename... T> using TRefVariant = std::variant<std::reference_wrapper<T>...>;
+    struct Variant : std::variant<bool, int, float, ivec2, vec2, vec3, fs::path, Angle<float>, Angle<vec3>, Spectrum,
+                                  std::string, fs::path, std::shared_ptr<Component>, std::vector<Variant>> {};
+
+    struct Property {
+        const char *name{};
+        Variant value;
+        void SetModified() { _dirty = true; }
+        [[nodiscard]] bool IsModified() const { return _dirty; }
 
       private:
-        const char *name = nullptr;
-        PropertyTypes::Value value;
-        template <typename T, typename _ = void> struct is_of_component : std::false_type {};
-        template <typename T>
-        struct is_of_component<T, std::enable_if_t<std::is_base_of_v<Component, T>, std::void_t<T>>> : std::true_type {
-        };
-        template <typename T> inline static constexpr bool is_of_component_v = is_of_component<T>::value;
-
-        template <typename T> std::enable_if_t<!is_of_component_v<T>, void> Load(T &v) {
-            value = v;
-            setValueCallback = [=](const PropertyTypes::Value &newVal) {
-                std::visit(
-                    [&](auto &&item) {
-                        using U = std::decay_t<decltype(item)>;
-                        if constexpr (std::is_convertible_v<U, T>) {
-                            v = (T)item;
-                            value = v;
-                        } else if constexpr (std::is_constructible_v<T, U>) {
-                            v = T(item);
-                            value = v;
-                        } else {
-                            AKARI_PANIC("Invalid Type for Property");
-                        }
-                    },
-                    newVal);
-            };
-        }
-        template <typename T> std::enable_if_t<is_of_component_v<T>, void> Load(std::shared_ptr<T> &v) {
-            value = std::shared_ptr<Component>(v);
-            setValueCallback = [=](const PropertyTypes::Value &newVal) {
-                auto ptr = Cast<T>(std::get<std::shared_ptr<Component>>(newVal));
-                value = ptr;
-                v = ptr;
-            };
-        }
-
-        std::function<void(const PropertyTypes::Value &)> setValueCallback;
+        bool _dirty = false;
     };
-
     class PropertyVisitor {
       public:
         virtual void visit(Property &property) = 0;

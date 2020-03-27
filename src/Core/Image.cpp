@@ -21,67 +21,88 @@
 // SOFTWARE.
 
 #include <Akari/Core/Image.hpp>
+#include <memory>
 #define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <Akari/Core/Parallel.h>
 #include <stb_image.h>
 #include <stb_image_write.h>
-#include <Akari/Core/Parallel.h>
 
 namespace Akari {
-   class DefaultImageWriter : public ImageWriter{
-   public:
-       bool Write(const RGBAImage &_image, const fs::path &path, const PostProcessor& postProcessor) override {
-           const auto ext = path.extension().string();
-           RGBAImage image;
-           postProcessor.Process(_image, image);
-           auto & texels = image.texels();
-           auto dimension = image.Dimension();
-           std::vector<uint8_t> buffer(texels.size() * 3);
-           ParallelFor(texels.size(), [&](uint32_t i,uint32_t) {
-               auto pixel = static_cast<uint8_t *>(&buffer[i * 3]);
-               auto rgb = vec3(texels[i]);
-               rgb = clamp(rgb, vec3(0),vec3(1));
-               for (int comp = 0; comp < 3; comp++) {
-                   pixel[comp] = (uint8_t)std::clamp<int>((int)std::round(rgb[comp] * 255.5), 0, 255);
-               }
-           }, 1024u);
-           if (ext == ".png")
-               return stbi_write_png(path.string().c_str(),dimension.x,dimension.y, 3, buffer.data(), 0);
-           else if (ext == ".jpg")
-               return stbi_write_jpg(path.string().c_str(), dimension.x,dimension.y, 3, buffer.data(), 0);
-           return false;
-       }
-   };
+    class DefaultImageWriter : public ImageWriter {
+      public:
+        bool Write(const RGBAImage &_image, const fs::path &path, const PostProcessor &postProcessor) override {
+            const auto ext = path.extension().string();
+            RGBAImage image;
+            postProcessor.Process(_image, image);
+            auto &texels = image.texels();
+            auto dimension = image.Dimension();
+            std::vector<uint8_t> buffer(texels.size() * 3);
+            ParallelFor(
+                texels.size(),
+                [&](uint32_t i, uint32_t) {
+                    auto pixel = static_cast<uint8_t *>(&buffer[i * 3]);
+                    auto rgb = vec3(texels[i]);
+                    rgb = clamp(rgb, vec3(0), vec3(1));
+                    for (int comp = 0; comp < 3; comp++) {
+                        pixel[comp] = (uint8_t)std::clamp<int>((int)std::round(rgb[comp] * 255.5), 0, 255);
+                    }
+                },
+                1024u);
+            if (ext == ".png")
+                return stbi_write_png(path.string().c_str(), dimension.x, dimension.y, 3, buffer.data(), 0);
+            else if (ext == ".jpg")
+                return stbi_write_jpg(path.string().c_str(), dimension.x, dimension.y, 3, buffer.data(), 0);
+            return false;
+        }
+    };
 
     void GammaCorrection::Process(const RGBAImage &in, RGBAImage &out) const {
         out.Resize(in.Dimension());
-        ParallelFor(in.Dimension().y, [&](uint32_t y, uint32_t) {
-            for(int i = 0;i< in.Dimension().x;i++)
-                out(i, y) = vec4(pow(vec3(in(i,y)), vec3(gamma)), in(i,y).w);
-        },1024);
+        ParallelFor(
+            in.Dimension().y,
+            [&](uint32_t y, uint32_t) {
+                for (int i = 0; i < in.Dimension().x; i++)
+                    out(i, y) = vec4(pow(vec3(in(i, y)), vec3(gamma)), in(i, y).w);
+            },
+            1024);
     }
 
-    std::shared_ptr<ImageWriter> GetDefaultImageWriter() {
-        return std::make_shared<DefaultImageWriter>();
-    }
+    std::shared_ptr<ImageWriter> GetDefaultImageWriter() { return std::make_shared<DefaultImageWriter>(); }
 
-    class DefaultImageReader : public ImageReader{
-
-    };
-    class ImageLoaderImpl : public ImageLoader{
-        struct Record{
+    class DefaultImageReader : public ImageReader {
+      public:
+        std::shared_ptr<RGBAImage> Read(const fs::path &path) override {
             std::shared_ptr<RGBAImage> image;
-//            std::filesystem::file_time_type lwt;
+            int x, y, channel;
+            const auto *data = stbi_load(path.string().c_str(), &x, &y, &channel, 3);
+            image = std::make_shared<RGBAImage>(ivec2(x,y));
+            ParallelFor(
+                image->Dimension().y,
+                [&image](uint32_t y, uint32_t) {
+                  for (int x = 0; x < image->Dimension().x; x++){
+
+                  }
+
+                },
+                1024);
+        }
+    };
+    class ImageLoaderImpl : public ImageLoader {
+        struct Record {
+            std::shared_ptr<RGBAImage> image;
+            //            std::filesystem::file_time_type lwt;
         };
         std::unordered_map<std::string, Record> dict;
+
       public:
         std::shared_ptr<RGBAImage> Load(const fs::path &path) override {
             auto f = fs::absolute(path).string();
             auto it = dict.find(f);
-            if(it != dict.end()){
+            if (it != dict.end()) {
                 return it->second.image;
             }
             dict[f] = Record{nullptr};
             return dict.at(f).image;
         }
     };
-}
+} // namespace Akari
