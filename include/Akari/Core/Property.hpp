@@ -34,7 +34,7 @@
 
 namespace nlohmann {
     template <> struct adl_serializer<Akari::fs::path> {
-        static void from_json(const json &j,  Akari::fs::path &path) { path = Akari::fs::path(j.get<std::string>()); }
+        static void from_json(const json &j, Akari::fs::path &path) { path = Akari::fs::path(j.get<std::string>()); }
 
         static void to_json(json &j, const Akari::fs::path &path) { j = path.string(); }
     };
@@ -47,13 +47,18 @@ namespace Akari {
 
     template <typename... T> using TRefVariant = std::variant<std::reference_wrapper<T>...>;
     struct Variant : std::variant<bool, int, float, ivec2, vec2, vec3, fs::path, Angle<float>, Angle<vec3>, Spectrum,
-                                  std::string, fs::path, std::shared_ptr<Component>, std::vector<Variant>> {};
+                                  std::string, fs::path, std::shared_ptr<Component>, std::vector<Variant>> {
+        using variant::variant;
+    };
 
     struct Property {
         const char *name{};
         Variant value;
         void SetModified() { _dirty = true; }
         [[nodiscard]] bool IsModified() const { return _dirty; }
+        template <typename T> Property(const char *name, const T &v) : name(name), value(v) {}
+
+        template <typename T> const T *get() const { return std::get_if<T>(&value); }
 
       private:
         bool _dirty = false;
@@ -61,6 +66,43 @@ namespace Akari {
     class PropertyVisitor {
       public:
         virtual void visit(Property &property) = 0;
+        virtual void EnterComponent() = 0;
+        virtual void LeaveComponent() = 0;
+    };
+
+    template <typename T> struct is_shared_ptr : std::false_type {};
+    template <typename T> struct is_shared_ptr<std::shared_ptr<T>> : std::true_type {};
+    struct DefaultTraversal {
+        PropertyVisitor &visitor;
+        explicit DefaultTraversal(PropertyVisitor &visitor) : visitor(visitor) {}
+        template <typename T> void Traverse(const char *name, std::shared_ptr<T> &v) {
+            std::shared_ptr<Component> p = v;
+            Property prop(name, p);
+            visitor.EnterComponent();
+            visitor.visit(prop);
+            if (prop.IsModified()) {
+                auto p = prop.get<std::shared_ptr<Component>>();
+                if (!p) {
+                    fprintf(stderr, "error traversing property `%s` \n", name);
+                } else {
+                    v = Cast<T>(*p);
+                }
+            }
+            visitor.LeaveComponent();
+        }
+
+        template <typename T> std::enable_if_t<!is_shared_ptr<T>::value, void> Traverse(const char *name, T &v) {
+            Property prop(name, v);
+            visitor.visit(prop);
+            if (prop.IsModified()) {
+                auto p = prop.get<T>();
+                if (!p) {
+                    fprintf(stderr, "error traversing property `%s` \n", name);
+                } else {
+                    v = *p;
+                }
+            }
+        }
     };
 
 } // namespace Akari

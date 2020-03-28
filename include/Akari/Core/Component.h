@@ -36,8 +36,7 @@ namespace Akari {
 
       public:
         Component() : dirty(true) {}
-        virtual void Accept(PropertyVisitor &visitor) {}
-        virtual std::list<Property> GetProperties() { return std::list<Property>(); }
+        virtual void TraverseProperties(PropertyVisitor &visitor) {}
         virtual void Commit() {}
         virtual void ClearDirtyBit() { dirty = false; }
         virtual void SetDirtyBit() { dirty = true; }

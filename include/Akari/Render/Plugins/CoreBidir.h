@@ -25,6 +25,7 @@
 
 #include <Akari/Render/EndPoint.h>
 #include <Akari/Render/Integrator.h>
+
 namespace Akari {
 
     struct PathVertex {
@@ -70,7 +71,9 @@ namespace Akari {
                 AKARI_PANIC("not implemented Vertex::f()");
             }
         }
+
         [[nodiscard]] bool IsOnSurface() const { return all(equal(Ng(), vec3(0))); }
+
         Float PdfSAToArea(Float pdf, const PathVertex &next) {
             if (next.IsInfiniteLight())
                 return pdf;
@@ -80,10 +83,29 @@ namespace Akari {
                 // dw = dA cos(t) / r^2
                 // p(w) dw/dA = p(A)
                 // p(A) = p(w) * cos(t)/r^2
-                pdf *=  abs(dot(next.Ng(), w * std::sqrt(invDistSqr)));
+                pdf *= abs(dot(next.Ng(), w * std::sqrt(invDistSqr)));
             }
             return pdf * invDistSqr;
         }
+
+        Float PdfLight(const Scene &scene, const PathVertex &next) {
+            auto *light = dynamic_cast<Light *>(ei.ep);
+            auto w = next.p() - p();
+            w = normalize(w);
+            Float pdfPos = 0, pdfDir = 0;
+            light->PdfEmission(Ray(p(), w), &pdfPos, &pdfDir);
+            return pdfPos * pdfDir;
+        }
+
+        Float PdfLightOrigin(const Scene &scene, const PathVertex &next) {
+            auto *light = dynamic_cast<Light *>(ei.ep);
+            auto w = next.p() - p();
+            w = normalize(w);
+            Float pdfPos = 0, pdfDir = 0;
+            light->PdfEmission(Ray(p(), w), &pdfPos, &pdfDir);
+            return scene.PdfLight(light) * pdfPos * pdfDir;
+        }
+
         Float Pdf(const Scene &scene, const PathVertex *prev, const PathVertex &next) {
             auto wiNext = normalize(next.p() - p());
             vec3 wiPrev;
@@ -97,7 +119,7 @@ namespace Akari {
                 AKARI_ASSERT(type == ESurface);
                 auto wo = si.bsdf->WorldToLocal(-wiPrev);
                 auto wi = si.bsdf->WorldToLocal(wiNext);
-                pdf = si.bsdf->EvaluatePdf(wi, wi);
+                pdf = si.bsdf->EvaluatePdf(wo, wi);
             }
             return PdfSAToArea(pdf, next);
         }
