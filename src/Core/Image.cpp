@@ -85,6 +85,7 @@ namespace Akari {
 
                 },
                 1024);
+            return nullptr;
         }
     };
     class ImageLoaderImpl : public ImageLoader {

@@ -37,16 +37,18 @@ namespace Akari {
     struct MeshWrapper {
         fs::path file; // path to json file
         std::shared_ptr<Mesh> mesh;
-//        AKR_SER(file, mesh)
+        //        AKR_SER(file, mesh)
         template <class Archive> void save(Archive &ar) const {
-            miyuki::serialize::AutoSaveVisitor v{ar}; MYK_REFL(v, file, mesh);
+            miyuki::serialize::AutoSaveVisitor v{ar};
+            MYK_REFL(v, file);
             std::ofstream out(file);
             ReviveContext ctx;
             auto j = miyuki::serialize::toJson(ctx, mesh);
             out << j.dump(1) << std::endl;
         }
         template <class Archive> void load(Archive &ar) {
-            miyuki::serialize::AutoLoadVisitor v{ar}; MYK_REFL(v, file, mesh);
+            miyuki::serialize::AutoLoadVisitor v{ar};
+            MYK_REFL(v, file);
             std::ifstream in(file);
             std::string str((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
             json data = str.empty() ? json::object() : json::parse(str);
@@ -55,18 +57,29 @@ namespace Akari {
         }
     };
 
-    struct AKR_EXPORT SceneGraph {
+    struct RenderSetting {
         std::shared_ptr<Camera> camera;
-        std::shared_ptr<Accelerator> accelerator;
+
         std::shared_ptr<Sampler> sampler;
         std::shared_ptr<Integrator> integrator;
+        fs::path output;
+        AKR_SER(camera, sampler, integrator, output)
+    };
+    struct SceneSetting {
         std::vector<MeshWrapper> meshes;
-        AKR_SER(camera, accelerator, sampler, meshes, integrator)
-        std::shared_ptr<RenderTask> CreateRenderTask();
+        std::shared_ptr<Accelerator> accelerator;
+        AKR_SER(meshes, accelerator)
+    };
+    struct AKR_EXPORT SceneGraph {
+        std::vector<RenderSetting> render;
+        SceneSetting scene;
+        AKR_SER(render, scene)
+        std::shared_ptr<RenderTask> CreateRenderTask(int settingId);
         void Commit();
 
       private:
-        std::shared_ptr<Scene> scene;
+        void CommitSetting(RenderSetting &setting);
+        std::shared_ptr<Scene> pScene;
     };
 } // namespace Akari
 

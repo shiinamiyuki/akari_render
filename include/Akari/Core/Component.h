@@ -55,9 +55,7 @@ namespace Akari {
         static ThisPlugin plugin;                                                                                      \
         return &plugin;                                                                                                \
     }
-    template <typename T, typename U> std::shared_ptr<T> Cast(const std::shared_ptr<U> &p) {
-        return std::dynamic_pointer_cast<T>(p);
-    }
+
     using GetPluginFunc = IPlugin *(*)();
     AKR_EXPORT std::shared_ptr<Component> CreateComponent(const char *type);
 

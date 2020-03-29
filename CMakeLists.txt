@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.13)
 project(AkariRender)
 
 set(CMAKE_CXX_STANDARD 17)
-option(AKARI_BUILD_GUI OFF)
+option(AKARI_BUILD_GUI "Build Gui / Editor" OFF)
 
 #
 #
@@ -12,6 +12,8 @@ include_directories(external/miyuki.serialize/include)
 include_directories(external/cxxopts/include)
 
 include_directories(include)
+
+set(AKARI_CORE_EXT_LIBS "")
 if(MSVC)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /std:c++17 /MD  /MP /GL ")
     set(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} /LTCG:INCREMENTAL")
@@ -19,14 +21,14 @@ if(MSVC)
     set(CMAKE_SHARED_LINKER_FLAGS   "${CMAKE_SHARED_LINKER_FLAGS} /LTCG:INCREMENTAL")
 else()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
-    set(AKARI_CORE_EXT_LIBS "stdc++fs")
+    set(AKARI_CORE_EXT_LIBS ${AKARI_CORE_EXT_LIBS} stdc++fs)
 endif()
 
 if(NOT WIN32)
-    set(AKARI_CORE_EXT_LIBS "pthread dl")
+    set(AKARI_CORE_EXT_LIBS ${AKARI_CORE_EXT_LIBS} pthread dl)
 endif()
 
-set(AKARI_CORE_EXT_LIBS "")
+
 #
 #if(AKARI_BUILD_GUI)
 #    include_directories(external/glfw-3.3.2/include)

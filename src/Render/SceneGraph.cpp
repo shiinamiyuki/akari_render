@@ -24,38 +24,48 @@
 #include <Akari/Render/SceneGraph.h>
 
 namespace Akari {
-    void SceneGraph::Commit() {
-        if(!sampler){
+    void SceneGraph::CommitSetting(RenderSetting &setting) {
+        auto &camera = setting.camera;
+        auto &sampler = setting.sampler;
+        auto &integrator = setting.integrator;
+        if (!sampler) {
             sampler = Cast<Sampler>(CreateComponent("RandomSampler"));
         }
-        if(!camera){
+        if (!camera) {
             camera = Cast<Camera>(CreateComponent("PerspectiveCamera"));
         }
-        if(!integrator){
+        if (!integrator) {
             integrator = Cast<Integrator>(CreateComponent("PathTracer"));
         }
-        scene = std::make_shared<Scene>();
-        for (auto &mesh : meshes) {
-            mesh.mesh->Commit();
-            scene->AddMesh(mesh.mesh);
-        }
-        if(!accelerator) {
-#ifdef AKARI_USE_EMBREE
-            scene->SetAccelerator(Cast<Accelerator>(CreateComponent("EmbreeAccelerator")));
-#else
-            scene->SetAccelerator(Cast<Accelerator>(CreateComponent("BVHAccelerator")));
-#endif
-        }
-        Info("Building Accelerator\n");
-        scene->Commit();
         camera->Commit();
         sampler->Commit();
+        integrator->Commit();
     }
-    std::shared_ptr<RenderTask> SceneGraph::CreateRenderTask() {
+    void SceneGraph::Commit() {
+
+        pScene = std::make_shared<Scene>();
+        for (auto &mesh : scene.meshes) {
+            mesh.mesh->Commit();
+            pScene->AddMesh(mesh.mesh);
+        }
+        if (!scene.accelerator) {
+#ifdef AKARI_USE_EMBREE
+            scene.accelerator = Cast<Accelerator>(CreateComponent("EmbreeAccelerator"));
+#else
+            scene.accelerator = Cast<Accelerator>(CreateComponent("BVHAccelerator"));
+#endif
+        }
+        pScene->SetAccelerator(scene.accelerator);
+        Info("Building Accelerator\n");
+        pScene->Commit();
+    }
+    std::shared_ptr<RenderTask> SceneGraph::CreateRenderTask(int settingId) {
+        CommitSetting(render.at(settingId));
         RenderContext ctx;
-        ctx.scene = scene;
-        ctx.sampler = sampler;
-        ctx.camera = camera;
-        return integrator->CreateRenderTask(ctx);
+        ctx.scene = pScene;
+        ctx.sampler = render.at(settingId).sampler;
+        ctx.camera = render.at(settingId).camera;
+        pScene->ClearRayCounter();
+        return render.at(settingId).integrator->CreateRenderTask(ctx);
     }
 } // namespace Akari

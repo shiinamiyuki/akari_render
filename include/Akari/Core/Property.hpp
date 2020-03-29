@@ -41,7 +41,9 @@ namespace nlohmann {
 } // namespace nlohmann
 namespace Akari {
     class Component;
-
+    template <typename T, typename U> std::shared_ptr<T> Cast(const std::shared_ptr<U> &p) {
+        return std::dynamic_pointer_cast<T>(p);
+    }
     inline void from_json(const json &j, fs::path &path) { path = fs::path(j.get<std::string>()); }
     inline void to_json(json &j, const fs::path &path) { j = path.string(); }
 

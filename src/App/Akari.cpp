@@ -20,15 +20,14 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <fstream>
+#include <Akari/Core/Application.h>
 #include <Akari/Core/Logger.h>
 #include <Akari/Render/SceneGraph.h>
 #include <cxxopts.hpp>
-#include <Akari/Core/Application.h>
+#include <fstream>
 using namespace Akari;
 
 static std::string inputFilename;
-static std::string outputFilename;
 
 void parse(int argc, char **argv) {
     try {
@@ -37,10 +36,9 @@ void parse(int argc, char **argv) {
         {
             auto opt = options.allow_unrecognised_options().add_options();
             opt("i,input", "Input Scene Description File", cxxopts::value<std::string>());
-            opt("o,output", "Output Image file", cxxopts::value<std::string>()->default_value("render.png"));
             opt("help", "Show this help");
         }
-        options.parse_positional({"input", "output"});
+        options.parse_positional({"input"});
         auto result = options.parse(argc, argv);
         if (!result.count("input")) {
             Fatal("Input file must be provided\n");
@@ -52,7 +50,6 @@ void parse(int argc, char **argv) {
             exit(0);
         }
         inputFilename = result["input"].as<std::string>();
-        outputFilename = result["output"].as<std::string>();
     } catch (const cxxopts::OptionException &e) {
         std::cout << "error parsing options: " << e.what() << std::endl;
         exit(1);
@@ -77,11 +74,13 @@ int main(int argc, char **argv) {
         }
         graph->Commit();
         Info("Start Rendering ...\n");
-        auto task = graph->CreateRenderTask();
-        task->Start();
-        task->Wait();
-        auto film = task->GetFilmUpdate();
-        film->WriteImage(outputFilename);
+        for (size_t i = 0; i < graph->render.size(); i++) {
+            auto task = graph->CreateRenderTask(i);
+            task->Start();
+            task->Wait();
+            auto film = task->GetFilmUpdate();
+            film->WriteImage(graph->render[i].output);
+        }
     } catch (std::exception &e) {
         Fatal("Exception: {}", e.what());
         exit(1);
