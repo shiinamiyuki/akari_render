@@ -20,12 +20,57 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <Akari/Core/Logger.h>
 #include <Akari/Render/Plugins/CoreBidir.h>
 
 namespace Akari {
-    size_t RandomWalk(const Scene &scene, Sampler &sampler, TransportMode mode, const Ray &ray, Spectrum beta,
-                      Float pdf, PathVertex *path, size_t maxDepth) {
+    size_t RandomWalk(const Scene &scene, MemoryArena &arena, Sampler &sampler, TransportMode mode, Ray ray,
+                      Spectrum beta, Float pdf, PathVertex *path, size_t maxDepth) {
+        if (maxDepth == 0) {
+            return 0;
+        }
+        Float pdfFwd = pdf;
+        Float pdfRev = 0;
+        size_t depth = 0;
+        while (true) {
+            Intersection intersection(ray);
+            bool foundIntersection = scene.Intersect(ray, &intersection);
+            if (!foundIntersection) {
+                break;
+            }
+            auto &mesh = scene.GetMesh(intersection.meshId);
+            int group = mesh.GetPrimitiveGroup(intersection.primId);
+            const auto &materialSlot = mesh.GetMaterialSlot(group);
 
-        return 0;
+            auto material = materialSlot.material;
+            if (!material) {
+                Debug("no material!!\n");
+                break;
+            }
+            Triangle triangle{};
+            mesh.GetTriangle(intersection.primId, &triangle);
+            const auto &p = intersection.p;
+            auto &vertex = path[depth];
+            auto &prev = path[depth - 1];
+            vertex = PathVertex::CreateSurfaceVertex(-ray.d, p, triangle, intersection, pdfFwd);
+            prev.pdfFwd = prev.PdfSAToArea(prev.pdfFwd, vertex);
+            material->computeScatteringFunctions(&vertex.si, arena, mode, 1.0f);
+            if (++depth >= maxDepth) {
+                break;
+            }
+            auto &si = vertex.si;
+            BSDFSample bsdfSample(sampler.Next1D(), sampler.Next2D(), si);
+            si.bsdf->Sample(bsdfSample);
+            pdfRev = si.bsdf->EvaluatePdf(bsdfSample.wi, bsdfSample.wo);
+            auto wiW = si.bsdf->LocalToWorld(bsdfSample.wi);
+            beta *= bsdfSample.f * abs(dot(wiW, si.Ns)) / bsdfSample.pdf;
+            if (bsdfSample.sampledType & BSDF_SPECULAR) {
+                vertex.delta = true;
+                pdfFwd = pdfRev = 0;
+            }
+            ray = si.SpawnRay(wiW);
+            prev.pdfRev = vertex.PdfSAToArea(pdfRev, prev);
+        }
+        return depth;
     }
 } // namespace Akari

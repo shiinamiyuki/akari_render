@@ -23,19 +23,42 @@
 #ifndef AKARIRENDER_COREBIDIR_H
 #define AKARIRENDER_COREBIDIR_H
 
+#include <Akari/Render/Camera.h>
 #include <Akari/Render/EndPoint.h>
 #include <Akari/Render/Integrator.h>
-
+#include <Akari/Render/Light.h>
 namespace Akari {
 
     struct PathVertex {
         enum Type : uint8_t { ENone, ESurface, ELight, ECamera };
         Type type = ENone;
+        Float pdfFwd = 0, pdfRev = 0;
         union {
             SurfaceInteraction si;
             EndPointInteraction ei;
         };
-        Float pdfFwd = 0, pdfRev = 0;
+        bool delta = false;
+        PathVertex() : si() {}
+        static PathVertex CreateSurfaceVertex(const vec3 &wo, const vec3 &p, const Triangle &triangle,
+                                              const Intersection &intersection, Float pdf) {
+            PathVertex vertex;
+            vertex.type = ESurface;
+            vertex.si = SurfaceInteraction(wo, p, triangle, intersection);
+            vertex.pdfFwd = pdf;
+            return vertex;
+        }
+        static PathVertex CreateLightVertex(const Light *light, const vec3 &p, const vec3 &normal) {
+            PathVertex vertex;
+            vertex.type = ELight;
+            vertex.ei = EndPointInteraction(light, p, normal);
+            return vertex;
+        }
+        static PathVertex CreateCameraVertex(const Camera *camera, const vec3 &p, const vec3 &normal) {
+            PathVertex vertex;
+            vertex.type = ECamera;
+            vertex.ei = EndPointInteraction(camera, p, normal);
+            return vertex;
+        }
         [[nodiscard]] Float IsInfiniteLight() const { return false; }
         [[nodiscard]] const Interaction *getInteraction() const {
             if (type == ESurface) {
@@ -89,7 +112,7 @@ namespace Akari {
         }
 
         Float PdfLight(const Scene &scene, const PathVertex &next) {
-            auto *light = dynamic_cast<Light *>(ei.ep);
+            auto *light = dynamic_cast<const Light *>(ei.ep);
             auto w = next.p() - p();
             w = normalize(w);
             Float pdfPos = 0, pdfDir = 0;
@@ -98,7 +121,7 @@ namespace Akari {
         }
 
         Float PdfLightOrigin(const Scene &scene, const PathVertex &next) {
-            auto *light = dynamic_cast<Light *>(ei.ep);
+            auto *light = dynamic_cast<const Light *>(ei.ep);
             auto w = next.p() - p();
             w = normalize(w);
             Float pdfPos = 0, pdfDir = 0;
@@ -125,7 +148,7 @@ namespace Akari {
         }
     };
 
-    AKR_EXPORT size_t RandomWalk(const Scene &scene, Sampler &sampler, TransportMode mode, const Ray &ray,
+    AKR_EXPORT size_t RandomWalk(const Scene &scene, MemoryArena &arena, Sampler &sampler, TransportMode mode, Ray ray,
                                  Spectrum beta, Float pdf, PathVertex *path, size_t maxDepth);
 
     AKR_EXPORT size_t TraceEyePath(const Scene &scene, const Camera &camera, Sampler &sampler, PathVertex *path,

@@ -25,12 +25,12 @@
 
 #include <Akari/Render/Geometry.hpp>
 
-namespace Akari{
+namespace Akari {
     struct Interaction {
-        vec3 wo; // world space wo
-        vec3 p;
-        vec3 Ng{};
-        Interaction()= default;
+        vec3 wo = vec3(0); // world space wo
+        vec3 p = vec3(0);
+        vec3 Ng = vec3(0);
+        Interaction() = default;
         Interaction(const vec3 &wo, const vec3 &p, const vec3 &Ng) : wo(wo), p(p), Ng(Ng) {}
 
         [[nodiscard]] Ray SpawnRay(const vec3 &w, Float rayBias = Eps) const {
@@ -44,23 +44,24 @@ namespace Akari{
     class MemoryArena;
 
     struct AKR_EXPORT SurfaceInteraction : Interaction {
+        using Interaction::Interaction;
         ShadingPoint sp{};
-        vec3 Ns{};
+        vec3 Ns = vec3(0);
         BSDF *bsdf = nullptr;
         SurfaceInteraction(const vec3 &wo, const vec3 &p, const Triangle &triangle, const Intersection &intersection)
             : Interaction(wo, p, triangle.Ng) {
             sp.texCoords = triangle.InterpolatedTexCoord(intersection.uv);
             Ns = triangle.InterpolatedNormal(intersection.uv);
-            Ng = triangle.Ng;
         }
-        SurfaceInteraction(const vec3 &wo, const vec3 &p, const Triangle &triangle, const Intersection &intersection, MemoryArena &arena);
+        SurfaceInteraction(const vec3 &wo, const vec3 &p, const Triangle &triangle, const Intersection &intersection,
+                           MemoryArena &arena);
     };
     class EndPoint;
     struct AKR_EXPORT EndPointInteraction : Interaction {
-        EndPoint * ep = nullptr;
+        using Interaction::Interaction;
+        const EndPoint *ep = nullptr;
+        EndPointInteraction(const EndPoint *ep, const vec3 &p, const vec3 &Ng) : Interaction(vec3(0), p, Ng), ep(ep) {}
     };
-}
-
-
+} // namespace Akari
 
 #endif // AKARIRENDER_INTERACTION_H
