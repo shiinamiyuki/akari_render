@@ -25,10 +25,10 @@
 #include <Akari/Core/Plugin.h>
 #include <Akari/Render/Integrator.h>
 
+#include <Akari/Core/Progress.hpp>
 #include <future>
 #include <mutex>
 #include <stack>
-
 namespace Akari {
 
     class QTreeNode {
@@ -512,9 +512,11 @@ namespace Akari {
         int minDepth;
         int maxDepth;
         int trainingSamples = 16;
+        bool enableRR;
         std::shared_ptr<STree> sTree;
-        GPTRenderTask(const RenderContext &ctx, int spp, int minDepth, int maxDepth, int trainingSamples)
-            : ctx(ctx), spp(spp), minDepth(minDepth), maxDepth(maxDepth), trainingSamples(trainingSamples) {
+        GPTRenderTask(const RenderContext &ctx, int spp, int minDepth, int maxDepth, int trainingSamples, bool enableRR)
+            : ctx(ctx), spp(spp), minDepth(minDepth), maxDepth(maxDepth), trainingSamples(trainingSamples),
+              enableRR(enableRR) {
             sTree.reset(new STree(ctx.scene->GetBounds()));
         }
         bool HasFilmUpdate() override { return false; }
@@ -601,7 +603,7 @@ namespace Akari {
                             addRadiance(light->Li(si->wo, si->sp) * MisWeight(prevScatteringPdf, lightPdf));
                         }
                     }
-                    if (++depth > maxDepth) {
+                    if (++depth >= maxDepth) {
                         break;
                     }
                     auto u0 = sampler->Next1D();
@@ -681,6 +683,17 @@ namespace Akari {
                     vertices[nVertices].wi = wiW;
                     vertices[nVertices].beta = Spectrum(1 / bsdfSample.pdf);
                     updateBeta(bsdfSample.f * abs(dot(wiW, si->Ns)) / bsdfSample.pdf);
+
+                    if (enableRR) {
+                        if (depth > minDepth) {
+                            Float continueProb = std::min(0.95f, MaxComp(beta));
+                            if (sampler->Next1D() < continueProb) {
+                                updateBeta(Spectrum(1.0f) / continueProb);
+                            } else {
+                                break;
+                            }
+                        }
+                    }
                     nVertices++;
                     ray = si->SpawnRay(wiW);
                     prevInteraction = si;
@@ -692,8 +705,6 @@ namespace Akari {
             if (training) {
                 for (int i = 0; i < nVertices; i++) {
                     auto irradiance = vertices[i].L.RemoveNaN().Luminance();
-                    //                    if(irradiance>0)
-                    //                        Info("deposit {} {}\n", i, irradiance);
                     AKARI_CHECK(irradiance >= 0);
                     sTree->deposit(vertices[i].p, vertices[i].wi, irradiance);
                 }
@@ -709,8 +720,13 @@ namespace Akari {
             auto nTiles = ivec2(film->Dimension() + ivec2(TileSize - 1)) / ivec2(TileSize);
             uint32_t pass = 0;
             uint32_t accumulatedSamples = 0;
-            for (pass = 0; pass < (uint32_t)trainingSamples; pass++) {
+            for (pass = 0; accumulatedSamples < (uint32_t)trainingSamples; pass++) {
                 auto samples = 1u << pass; // 2 * std::pow(1.1, pass);//1ull << pass;
+                auto nextPassSamples = 2u << pass;
+                if (accumulatedSamples + samples + nextPassSamples > (uint32_t)trainingSamples) {
+                    samples = (uint32_t)trainingSamples - accumulatedSamples;
+                }
+                Info("Learning pass {}, spp:{}\n", pass + 1, samples);
                 accumulatedSamples += samples;
                 ParallelFor2D(nTiles, [=](ivec2 tilePos, uint32_t tid) {
                     (void)tid;
@@ -737,22 +753,6 @@ namespace Akari {
                 Info("nodes: {}\n", sTree->nodes.size());
                 sTree->refine(12000 * std::sqrt(samples));
             }
-            //            int cnt = 0;
-            //            for (auto &i : sTree->nodes) {
-            //                auto &tree = i.dTree.sampling;
-            //                if (i.isLeaf() && tree.sum.value() > 0) {
-            //                    RGBAImage image(ivec2(512, 512));
-            //                    for (int j = 0; j < 512; j++) {
-            //                        for (int i = 0; i < 512; i++) {
-            //                            auto pdf = tree.pdf(vec2(i, 511 - j) / vec2(image.Dimension()));
-            //                            pdf = std::log(1.0 + pdf) / std::log(10);
-            //                            image(i, j) = vec4(Spectrum(pdf), 1.0f);
-            //                        }
-            //                    }
-            //                    GetDefaultImageWriter()->Write(image, fmt::format("tree{}.png", cnt++),
-            //                    IdentityProcessor());
-            //                }
-            //            }
         }
         void Start() override {
             future = std::async(std::launch::async, [=]() {
@@ -763,7 +763,16 @@ namespace Akari {
                 auto &_sampler = ctx.sampler;
                 auto film = camera->GetFilm();
                 auto nTiles = ivec2(film->Dimension() + ivec2(TileSize - 1)) / ivec2(TileSize);
-                ParallelFor2D(nTiles, [=](ivec2 tilePos, uint32_t tid) {
+                ProgressReporter progressReporter(nTiles.x * nTiles.y, [=](size_t cur, size_t tot) {
+                    if (spp <= 16) {
+                        if (cur % (tot / 10) == 0) {
+                            ShowProgress(double(cur) / tot, 70);
+                        }
+                    } else {
+                        ShowProgress(double(cur) / tot, 70);
+                    }
+                });
+                ParallelFor2D(nTiles, [=, &progressReporter](ivec2 tilePos, uint32_t tid) {
                     (void)tid;
                     MemoryArena arena;
                     Bounds2i tileBounds = Bounds2i{tilePos * (int)TileSize, (tilePos + ivec2(1)) * (int)TileSize};
@@ -784,6 +793,7 @@ namespace Akari {
                     }
                     std::lock_guard<std::mutex> lock(mutex);
                     film->MergeTile(tile);
+                    progressReporter.Update();
                 });
                 auto endTime = std::chrono::high_resolution_clock::now();
                 std::chrono::duration<double> elapsed = (endTime - beginTime);
@@ -797,12 +807,13 @@ namespace Akari {
         int spp = 16;
         int minDepth = 5, maxDepth = 16;
         int trainingSamples = 16;
+        bool enableRR = false;
 
       public:
         AKR_DECL_COMP(GuidedPathTracer, "GuidedPathTracer")
-        AKR_SER(spp, trainingSamples, minDepth, maxDepth)
+        AKR_SER(spp, trainingSamples, minDepth, maxDepth, enableRR)
         std::shared_ptr<RenderTask> CreateRenderTask(const RenderContext &ctx) override {
-            return std::make_shared<GPTRenderTask>(ctx, spp, minDepth, maxDepth, trainingSamples);
+            return std::make_shared<GPTRenderTask>(ctx, spp, minDepth, maxDepth, trainingSamples, enableRR);
         }
     };
     AKR_EXPORT_COMP(GuidedPathTracer, "Integrator");

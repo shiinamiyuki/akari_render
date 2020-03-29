@@ -23,10 +23,11 @@
 #include <Akari/Core/Logger.h>
 #include <Akari/Core/Parallel.h>
 #include <Akari/Core/Plugin.h>
+#include <Akari/Core/Progress.hpp>
 #include <Akari/Render/Integrator.h>
 #include <future>
 #include <mutex>
-
+#include <Akari/Core/Profiler.hpp>
 namespace Akari {
     static Float MisWeight(Float pdfA, Float pdfB) {
         pdfA *= pdfA;
@@ -41,8 +42,9 @@ namespace Akari {
         int spp;
         int minDepth;
         int maxDepth;
-        PTRenderTask(const RenderContext &ctx, int spp, int minDepth, int maxDepth)
-            : ctx(ctx), spp(spp), minDepth(minDepth), maxDepth(maxDepth) {}
+        bool enableRR;
+        PTRenderTask(const RenderContext &ctx, int spp, int minDepth, int maxDepth,bool enableRR)
+            : ctx(ctx), spp(spp), minDepth(minDepth), maxDepth(maxDepth),enableRR(enableRR) {}
         bool HasFilmUpdate() override { return false; }
         std::shared_ptr<const Film> GetFilmUpdate() override { return ctx.camera->GetFilm(); }
         bool IsDone() override { return false; }
@@ -99,7 +101,7 @@ namespace Akari {
                             Li += beta * light->Li(si->wo, si->sp) * MisWeight(prevScatteringPdf, lightPdf);
                         }
                     }
-                    if (++depth > maxDepth) {
+                    if (++depth >= maxDepth) {
                         break;
                     }
                     BSDFSample bsdfSample(sampler->Next1D(), sampler->Next2D(), *si);
@@ -134,6 +136,14 @@ namespace Akari {
                     prevScatteringPdf = bsdfSample.pdf;
                     auto wiW = si->bsdf->LocalToWorld(bsdfSample.wi);
                     beta *= bsdfSample.f * abs(dot(wiW, si->Ns)) / bsdfSample.pdf;
+                    if(enableRR && depth > minDepth){
+                        Float continueProb = std::min(0.95f, MaxComp(beta));
+                        if(sampler->Next1D() < continueProb){
+                            beta /= continueProb;
+                        }else{
+                            break;
+                        }
+                    }
                     ray = si->SpawnRay(wiW);
                     prevInteraction = si;
                 } else {
@@ -152,7 +162,16 @@ namespace Akari {
                 auto &_sampler = ctx.sampler;
                 auto film = camera->GetFilm();
                 auto nTiles = ivec2(film->Dimension() + ivec2(TileSize - 1)) / ivec2(TileSize);
-                ParallelFor2D(nTiles, [=](ivec2 tilePos, uint32_t tid) {
+                ProgressReporter progressReporter(nTiles.x * nTiles.y,[=](size_t cur ,size_t tot){
+                    if(spp <= 16){
+                        if(cur % (tot / 10) == 0){
+                            ShowProgress(double(cur)/tot, 70);
+                        }
+                    }else{
+                        ShowProgress(double(cur)/tot, 70);
+                    }
+                });
+                ParallelFor2D(nTiles, [=, &progressReporter](ivec2 tilePos, uint32_t tid) {
                     (void)tid;
                     MemoryArena arena;
                     Bounds2i tileBounds = Bounds2i{tilePos * (int)TileSize, (tilePos + ivec2(1)) * (int)TileSize};
@@ -173,6 +192,7 @@ namespace Akari {
                     }
                     std::lock_guard<std::mutex> lock(mutex);
                     film->MergeTile(tile);
+                    progressReporter.Update();
                 });
                 auto endTime = std::chrono::high_resolution_clock::now();
                 std::chrono::duration<double> elapsed = (endTime - beginTime);
@@ -185,12 +205,12 @@ namespace Akari {
     class PathTracer : public Integrator {
         int spp = 16;
         int minDepth = 5, maxDepth = 16;
-
+        bool enableRR = true;
       public:
         AKR_DECL_COMP(PathTracer, "PathTracer")
-        AKR_SER(spp, minDepth, maxDepth)
+        AKR_SER(spp, minDepth, maxDepth,enableRR)
         std::shared_ptr<RenderTask> CreateRenderTask(const RenderContext &ctx) override {
-            return std::make_shared<PTRenderTask>(ctx, spp, minDepth, maxDepth);
+            return std::make_shared<PTRenderTask>(ctx, spp, minDepth, maxDepth,enableRR);
         }
     };
     AKR_EXPORT_COMP(PathTracer, "Integrator");

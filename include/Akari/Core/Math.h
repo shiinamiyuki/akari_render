@@ -83,11 +83,11 @@ namespace Akari {
 
         [[nodiscard]] mat4 ToMatrix4() const {
             auto m = identity<mat4>();
+            m = math::scale(mat4(1.0), scale) * m;
             m = math::rotate(mat4(1.0), rotation.value.z, vec3(0, 0, 1)) * m;
             m = math::rotate(mat4(1.0), rotation.value.y, vec3(1, 0, 0)) * m;
             m = math::rotate(mat4(1.0), rotation.value.x, vec3(0, 1, 0)) * m;
             m = math::translate(mat4(1.0), translation) * m;
-            m = math::scale(mat4(1.0), scale) * m;
             return m;
         }
     };
