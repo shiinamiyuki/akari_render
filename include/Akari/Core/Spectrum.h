@@ -34,7 +34,7 @@ namespace Akari {
         using vec<N, float, defaultp>::operator[];
 
         static const int nChannel = N;
-        CoefficientSpectrum(const Base & v):Base(v){}
+        CoefficientSpectrum(const Base &v) : Base(v) {}
         Self &operator+=(const Self &v) {
             static_cast<Base &>(*this) += Base(v);
             return *this;
@@ -116,6 +116,7 @@ namespace Akari {
             }
             return tmp;
         }
+        [[nodiscard]] Float IsBlack() const { return MaxComp(*this) <= 0; }
     };
 
     using RGBSpectrum = CoefficientSpectrum<3>;

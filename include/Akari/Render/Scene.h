@@ -23,6 +23,7 @@
 #ifndef AKARIRENDER_SCENE_H
 #define AKARIRENDER_SCENE_H
 
+#include "Material.h"
 #include <Akari/Core/Distribution.hpp>
 #include <Akari/Render/Accelerator.h>
 #include <Akari/Render/Geometry.hpp>
@@ -32,6 +33,7 @@ namespace Akari {
     class Material;
     class Acceleator;
     class Light;
+    struct MaterialSlot;
     class AKR_EXPORT Scene {
         std::vector<std::shared_ptr<const Mesh>> meshes;
         std::shared_ptr<Accelerator> accelerator;
@@ -59,6 +61,9 @@ namespace Akari {
             rayCounter++;
             return accelerator->Occlude(ray);
         }
+        void GetTriangle(const PrimitiveHandle & handle, Triangle * triangle)const;
+        const MaterialSlot& GetMaterialSlot(const PrimitiveHandle & handle)const;
+        const Light * GetLight(const PrimitiveHandle & handle)const;
         const Mesh &GetMesh(const uint32_t id) const { return *meshes[id]; }
         const Light *SampleOneLight(const Float u0, Float *pdf) const {
             if (lights.empty()) {
@@ -75,9 +80,7 @@ namespace Akari {
             return it->second;
         }
 
-        Bounds3f GetBounds()const{
-            return accelerator->GetBounds();
-        }
+        Bounds3f GetBounds() const { return accelerator->GetBounds(); }
     };
 } // namespace Akari
 #endif // AKARIRENDER_SCENE_H

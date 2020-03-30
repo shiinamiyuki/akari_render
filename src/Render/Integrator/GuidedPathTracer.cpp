@@ -597,10 +597,10 @@ namespace Akari {
                     auto dTree = sTree->dTree(si->p);
                     if (light) {
                         if (!enableNEE || specular || depth == 0)
-                            addRadiance(light->Li(si->wo, si->sp));
+                            addRadiance(light->Li(si->wo, si->uv));
                         else {
                             auto lightPdf = light->PdfIncidence(*prevInteraction, ray.d) * scene->PdfLight(light);
-                            addRadiance(light->Li(si->wo, si->sp) * MisWeight(prevScatteringPdf, lightPdf));
+                            addRadiance(light->Li(si->wo, si->uv) * MisWeight(prevScatteringPdf, lightPdf));
                         }
                     }
                     if (++depth >= maxDepth) {

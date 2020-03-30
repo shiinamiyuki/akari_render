@@ -95,10 +95,10 @@ namespace Akari {
                     material->computeScatteringFunctions(si, arena, TransportMode::EImportance, 1.0f);
                     if (light) {
                         if (specular || depth == 0)
-                            Li += beta * light->Li(si->wo, si->sp);
+                            Li += beta * light->Li(si->wo, si->uv);
                         else {
                             auto lightPdf = light->PdfIncidence(*prevInteraction, ray.d) * scene->PdfLight(light);
-                            Li += beta * light->Li(si->wo, si->sp) * MisWeight(prevScatteringPdf, lightPdf);
+                            Li += beta * light->Li(si->wo, si->uv) * MisWeight(prevScatteringPdf, lightPdf);
                         }
                     }
                     if (++depth >= maxDepth) {

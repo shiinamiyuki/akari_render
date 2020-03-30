@@ -24,27 +24,38 @@
 #define AKARIRENDER_ENDPOINT_H
 
 #include <Akari/Core/Component.h>
-#include <Akari/Render/Geometry.hpp>
-#include <Akari/Render/Scene.h>
-#include <Akari/Render/Interaction.h>
 #include <Akari/Core/Spectrum.h>
+#include <Akari/Render/Geometry.hpp>
+#include <Akari/Render/Interaction.h>
+#include <Akari/Render/Scene.h>
 namespace Akari {
     struct RayIncidentSample {
         vec3 wi;
         Spectrum I;
         vec3 normal;
-        vec2 pos; // the uv coordinate of the sampled position or the raster position
+        vec2 pos; // the uv coordinate of the sampled position or the raster position (0,0) to (bound.x, boubd.y)
         float pdf;
     };
     struct RayEmissionSample {
         Ray ray;
         Spectrum E;
         vec3 normal;
+        vec2 uv; // 2D parameterized position
         float pdfPos, pdfDir;
     };
     struct VisibilityTester {
-        Ray shadowRay;
+        Ray shadowRay{};
+        VisibilityTester() = default;
+        VisibilityTester(const Interaction &p1, const Interaction &p2) {
+            auto w = p2.p - p1.p;
+            auto dist = length(w);
+            w /= dist * dist;
+            shadowRay = Ray(p1.p, w, Eps / abs(dot(w, p1.Ng)), dist * 0.99);
+        }
         [[nodiscard]] bool visible(const Scene &scene) const { return !scene.Occlude(shadowRay); }
+        [[nodiscard]] Spectrum Tr(const Scene &scene) const {
+            return scene.Occlude(shadowRay) ? Spectrum(0) : Spectrum(1);
+        }
     };
 
     class EndPoint : public Component {

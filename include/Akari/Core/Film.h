@@ -32,7 +32,12 @@ namespace Akari {
         Spectrum radiance = Spectrum(0);
         Float weight = 0;
     };
-
+    struct SplatPixel {
+        std::array<AtomicFloat, 3> color;
+        static_assert(sizeof(AtomicFloat) == sizeof(float));
+        float _padding{};
+    };
+    static_assert(sizeof(SplatPixel) == 4 * sizeof(float));
     const size_t TileSize = 16;
     struct Tile {
         Bounds2i bounds{};
@@ -62,9 +67,10 @@ namespace Akari {
     class Film {
         TImage<Spectrum> radiance;
         TImage<float> weight;
+        TImage<SplatPixel> splat;
 
       public:
-        explicit Film(const ivec2 &dimension) : radiance(dimension), weight(dimension) {}
+        explicit Film(const ivec2 &dimension) : radiance(dimension), weight(dimension), splat(dimension) {}
         Tile GetTile(const Bounds2i &bounds) { return Tile(bounds); }
 
         [[nodiscard]] ivec2 Dimension() const { return radiance.Dimension(); }
@@ -82,15 +88,28 @@ namespace Akari {
             }
         }
 
-        void WriteImage(const fs::path & path, const PostProcessor & postProcessor = GammaCorrection())const{
+        void WriteImage(const fs::path &path, const PostProcessor &postProcessor = GammaCorrection()) const {
             RGBAImage image(Dimension());
-            ParallelFor(radiance.Dimension().y, [&](uint32_t y, uint32_t){
-              for(int x = 0; x < radiance.Dimension().x;x++){
-                  if(weight(x,y) != 0)
-                      image(x,y) = vec4(radiance(x, y)/ weight(x,y), 1);
-              }
-            }, 1024);
+            ParallelFor(
+                radiance.Dimension().y,
+                [&](uint32_t y, uint32_t) {
+                    for (int x = 0; x < radiance.Dimension().x; x++) {
+                        if (weight(x, y) != 0) {
+                            Spectrum s = Spectrum(splat(x, y).color[0], splat(x, y).color[1], splat(x, y).color[2]);
+                            vec3 color = (radiance(x, y) + s) / weight(x, y);
+                            image(x, y) = vec4(color, 1);
+                        }
+                    }
+                },
+                1024);
             GetDefaultImageWriter()->Write(image, path, postProcessor);
+        }
+
+        void AddSplat(const Spectrum &L, vec2 p) {
+            p = p / vec2(Dimension());
+            splat(p).color[0].add(L[0]);
+            splat(p).color[1].add(L[1]);
+            splat(p).color[2].add(L[2]);
         }
     };
 } // namespace Akari

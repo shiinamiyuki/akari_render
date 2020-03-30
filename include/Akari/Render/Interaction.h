@@ -30,6 +30,7 @@ namespace Akari {
         vec3 wo = vec3(0); // world space wo
         vec3 p = vec3(0);
         vec3 Ng = vec3(0);
+        vec2 uv;
         Interaction() = default;
         Interaction(const vec3 &wo, const vec3 &p, const vec3 &Ng) : wo(wo), p(p), Ng(Ng) {}
 
@@ -48,10 +49,14 @@ namespace Akari {
         ShadingPoint sp{};
         vec3 Ns = vec3(0);
         BSDF *bsdf = nullptr;
+        PrimitiveHandle handle;
         SurfaceInteraction(const vec3 &wo, const vec3 &p, const Triangle &triangle, const Intersection &intersection)
             : Interaction(wo, p, triangle.Ng) {
             sp.texCoords = triangle.InterpolatedTexCoord(intersection.uv);
+            uv = intersection.uv;
             Ns = triangle.InterpolatedNormal(intersection.uv);
+            handle.meshId = intersection.meshId;
+            handle.primId = intersection.primId;
         }
         SurfaceInteraction(const vec3 &wo, const vec3 &p, const Triangle &triangle, const Intersection &intersection,
                            MemoryArena &arena);

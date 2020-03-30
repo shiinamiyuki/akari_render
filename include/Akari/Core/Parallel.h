@@ -41,7 +41,7 @@ namespace Akari {
             while (!val.compare_exchange_weak(current, current + v)){}
         }
 
-        float value() const {
+        [[nodiscard]] float value() const {
             return val.load();
         }
 

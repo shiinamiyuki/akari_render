@@ -58,7 +58,8 @@ namespace Akari {
             }
             ray.o = cameraToWorld.ApplyPoint(ray.o);
             ray.d = cameraToWorld.ApplyNormal(ray.d);
-
+            sample->normal = cameraToWorld.ApplyNormal(vec3(0, 0, -1));
+            ;
             sample->primary = ray;
         }
 

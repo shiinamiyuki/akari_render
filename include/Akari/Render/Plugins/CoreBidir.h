@@ -38,23 +38,27 @@ namespace Akari {
             EndPointInteraction ei;
         };
         bool delta = false;
+        Spectrum beta;
         PathVertex() : si() {}
-        static PathVertex CreateSurfaceVertex(const vec3 &wo, const vec3 &p, const Triangle &triangle,
+        static PathVertex CreateSurfaceVertex(const Spectrum beta, const vec3 &wo, const vec3 &p, const Triangle &triangle,
                                               const Intersection &intersection, Float pdf) {
             PathVertex vertex;
+            vertex.beta = beta;
             vertex.type = ESurface;
             vertex.si = SurfaceInteraction(wo, p, triangle, intersection);
             vertex.pdfFwd = pdf;
             return vertex;
         }
-        static PathVertex CreateLightVertex(const Light *light, const vec3 &p, const vec3 &normal) {
+        static PathVertex CreateLightVertex(const Spectrum beta, const Light *light, const vec3 &p, const vec3 &normal) {
             PathVertex vertex;
+            vertex.beta = beta;
             vertex.type = ELight;
             vertex.ei = EndPointInteraction(light, p, normal);
             return vertex;
         }
-        static PathVertex CreateCameraVertex(const Camera *camera, const vec3 &p, const vec3 &normal) {
+        static PathVertex CreateCameraVertex(const Spectrum beta, const Camera *camera, const vec3 &p, const vec3 &normal) {
             PathVertex vertex;
+            vertex.beta = beta;
             vertex.type = ECamera;
             vertex.ei = EndPointInteraction(camera, p, normal);
             return vertex;
@@ -119,16 +123,59 @@ namespace Akari {
             light->PdfEmission(Ray(p(), w), &pdfPos, &pdfDir);
             return pdfPos * pdfDir;
         }
-
+        [[nodiscard]] bool IsConnectible(const PathVertex &next) const {
+            switch (type) {
+            case ENone:
+                return false;
+            case ESurface:
+                return !delta;
+            case ELight:
+                return ((uint32_t) dynamic_cast<const Light *>(ei.ep)->GetLightType() &
+                        (uint32_t)LightType::EDeltaDirection) != 0;
+            case ECamera:
+                return true;
+            }
+        }
+        static Spectrum G(const Scene &scene, const PathVertex &v1, const PathVertex &v2) {
+            auto w = v1.p() - v2.p();
+            auto invDist2 = 1.0f / dot(w, w);
+            w *= std::sqrt(invDist2);
+            Float g = invDist2;
+            if (v1.IsOnSurface()) {
+                g *= abs(dot(v1.Ng(), w));
+            }
+            if (v2.IsOnSurface()) {
+                g *= abs(dot(v2.Ng(), w));
+            }
+            VisibilityTester tester(*v1.getInteraction(), *v2.getInteraction());
+            return tester.Tr(scene) * g;
+        }
         Float PdfLightOrigin(const Scene &scene, const PathVertex &next) {
             auto *light = dynamic_cast<const Light *>(ei.ep);
             auto w = next.p() - p();
             w = normalize(w);
             Float pdfPos = 0, pdfDir = 0;
             light->PdfEmission(Ray(p(), w), &pdfPos, &pdfDir);
-            return scene.PdfLight(light) * pdfPos * pdfDir;
+            return scene.PdfLight(light) * pdfPos;
         }
-
+        Spectrum Le(const Scene &scene, const PathVertex &next) {
+            switch (type) {
+            case ENone:
+                return Spectrum(0);
+            case ESurface: {
+                auto *light = scene.GetLight(si.handle);
+                auto wo = next.p() - p();
+                return light->Li(wo, si.uv);
+            }
+            case ELight: {
+                auto *light = dynamic_cast<const Light *>(ei.ep);
+                auto wo = next.p() - p();
+                return light->Li(wo, ei.uv);
+            }
+            case ECamera:
+                return Spectrum(0);
+            }
+        }
         Float Pdf(const Scene &scene, const PathVertex *prev, const PathVertex &next) {
             auto wiNext = normalize(next.p() - p());
             vec3 wiPrev;
@@ -151,10 +198,14 @@ namespace Akari {
     AKR_EXPORT size_t RandomWalk(const Scene &scene, MemoryArena &arena, Sampler &sampler, TransportMode mode, Ray ray,
                                  Spectrum beta, Float pdf, PathVertex *path, size_t maxDepth);
 
-    AKR_EXPORT size_t TraceEyePath(const Scene &scene, const Camera &camera, Sampler &sampler, PathVertex *path,
-                                   size_t maxDepth);
+    AKR_EXPORT size_t TraceEyePath(const Scene &scene, MemoryArena &arena, const Camera &camera, const ivec2 &raster,
+                                   Sampler &sampler, PathVertex *path, size_t maxDepth);
 
-    AKR_EXPORT size_t TraceLightPath(const Scene &scene, Sampler &sampler, PathVertex *path, size_t maxDepth);
+    AKR_EXPORT size_t TraceLightPath(const Scene &scene, MemoryArena &arena, Sampler &sampler, PathVertex *path,
+                                     size_t maxDepth);
+
+    AKR_EXPORT Spectrum ConnectPath(const Scene &scene,  Sampler & sampler, PathVertex *eyePath, size_t t, PathVertex *lightPath, size_t s,
+                                    vec2 *pRaster);
 
 } // namespace Akari
 

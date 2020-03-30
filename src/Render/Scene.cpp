@@ -48,4 +48,14 @@ namespace Akari {
             }
         }
     }
+    void Scene::GetTriangle(const PrimitiveHandle &handle, Triangle *triangle) const {
+        meshes[handle.meshId]->GetTriangle(handle.primId, triangle);
+    }
+    const MaterialSlot &Scene::GetMaterialSlot(const PrimitiveHandle &handle) const {
+        auto &mesh = meshes[handle.meshId];
+        return mesh->GetMaterialSlot(mesh->GetPrimitiveGroup(handle.primId));
+    }
+    const Light * Scene::GetLight(const PrimitiveHandle &handle) const {
+        return meshes[handle.meshId]->GetLight(handle.primId);
+    }
 } // namespace Akari

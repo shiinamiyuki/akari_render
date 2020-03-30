@@ -33,7 +33,9 @@ namespace Akari {
         Float area = 0.0f;
         Emission emission;
         CoordinateSystem localFrame;
+
       public:
+        LightType GetLightType() const override { return LightType::ENone; }
         AreaLight() = default;
         AreaLight(const Mesh *mesh, int primId) : mesh(mesh), primId(primId) {
             mesh->GetTriangle(primId, &triangle);
@@ -43,7 +45,9 @@ namespace Akari {
             localFrame = CoordinateSystem(triangle.Ng);
         }
         AKR_DECL_COMP(AreaLight, "AreaLight")
-        Spectrum Li(const vec3 &wo, ShadingPoint &sp) const override {
+        Spectrum Li(const vec3 &wo, const vec2 &uv) const override {
+            ShadingPoint sp;
+            sp.texCoords = triangle.InterpolatedTexCoord(uv);
             if (dot(wo, triangle.Ng) < 0) {
                 return Spectrum(0);
             }
@@ -61,9 +65,7 @@ namespace Akari {
             auto dist = std::sqrt(dist2);
             wi /= dist;
 
-            ShadingPoint sp{};
-            sp.texCoords = triangle.InterpolatedNormal(surfaceSample.uv);
-            sample->I = Li(-wi, sp);
+            sample->I = Li(-wi, surfaceSample.uv);
             sample->wi = wi;
             sample->pdf = dist2 / (-dot(sample->wi, surfaceSample.normal)) * surfaceSample.pdf;
             sample->normal = surfaceSample.normal;
@@ -100,7 +102,8 @@ namespace Akari {
             sample->ray = Ray(surfaceSample.p, localFrame.LocalToWorld(wi), Eps);
             ShadingPoint sp{};
             sp.texCoords = triangle.InterpolatedTexCoord(surfaceSample.uv);
-            sample->E = Li(-wi, sp);
+            sample->uv = surfaceSample.uv;
+            sample->E = Li(-wi, sample->uv);
         }
     };
     AKR_EXPORT_COMP(AreaLight, "Light");

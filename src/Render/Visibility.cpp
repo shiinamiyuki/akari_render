@@ -20,33 +20,5 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef AKARIRENDER_LIGHT_H
-#define AKARIRENDER_LIGHT_H
-
-#include <Akari/Core/Component.h>
-#include <Akari/Core/Spectrum.h>
 #include <Akari/Render/EndPoint.h>
-#include <Akari/Render/Geometry.hpp>
-#include <Akari/Render/Scene.h>
-
-namespace Akari {
-    struct LightSample : RayIncidentSample {};
-
-    struct LightRaySample : RayEmissionSample {};
-
-    enum class LightType : uint32_t {
-        ENone = 1u,
-        EDeltaPosition = 1u << 1u,
-        EDeltaDirection = 1u << 2u,
-    };
-    class Light : public EndPoint {
-      public:
-        virtual Float Power() const = 0;
-        virtual Spectrum Li(const vec3 &wo, const vec2 &uv) const = 0;
-        virtual LightType GetLightType()const = 0;
-        //        virtual void SampleLe(const Point2f &u1, const Point2f &u2, LightRaySample &sample) = 0;
-    };
-
-} // namespace Akari
-
-#endif // AKARIRENDER_LIGHT_H
+namespace Akari {}

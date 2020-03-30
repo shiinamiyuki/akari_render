@@ -35,6 +35,7 @@ namespace Akari {
         vec2 p_lens;
         Ray primary;
         Float weight = 1;
+        vec3 normal;
     };
 
 

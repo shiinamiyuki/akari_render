@@ -52,8 +52,8 @@ namespace Akari {
             const auto &p = intersection.p;
             auto &vertex = path[depth];
             auto &prev = path[depth - 1];
-            vertex = PathVertex::CreateSurfaceVertex(-ray.d, p, triangle, intersection, pdfFwd);
-            prev.pdfFwd = prev.PdfSAToArea(prev.pdfFwd, vertex);
+            vertex = PathVertex::CreateSurfaceVertex(beta, -ray.d, p, triangle, intersection, pdfFwd);
+            vertex.pdfFwd = prev.PdfSAToArea(prev.pdfFwd, vertex);
             material->computeScatteringFunctions(&vertex.si, arena, mode, 1.0f);
             if (++depth >= maxDepth) {
                 break;
@@ -72,5 +72,79 @@ namespace Akari {
             prev.pdfRev = vertex.PdfSAToArea(pdfRev, prev);
         }
         return depth;
+    }
+
+    size_t TraceEyePath(const Scene &scene, MemoryArena &arena, const Camera &camera, const ivec2 &raster,
+                        Sampler &sampler, PathVertex *path, size_t maxDepth) {
+        if (maxDepth == 0)
+            return 0;
+        CameraSample cameraSample;
+        camera.GenerateRay(sampler.Next2D(), sampler.Next2D(), raster, &cameraSample);
+        auto beta = Spectrum(1);
+        Float pdfPos, pdfDir;
+        camera.PdfEmission(cameraSample.primary, &pdfPos, &pdfDir);
+        path[0] = PathVertex::CreateCameraVertex(beta, &camera, cameraSample.primary.o, cameraSample.normal);
+        return 1 + RandomWalk(scene, arena, sampler, TransportMode ::EImportance, cameraSample.primary, beta, pdfDir,
+                              path + 1, maxDepth - 1);
+    }
+
+    size_t TraceLightPath(const Scene &scene, MemoryArena &arena, Sampler &sampler, PathVertex *path, size_t maxDepth) {
+        Float pdfLight;
+        const auto *light = scene.SampleOneLight(sampler.Next1D(), &pdfLight);
+        RayEmissionSample sample;
+        light->SampleEmission(sampler.Next2D(), sampler.Next2D(), &sample);
+        Spectrum beta = sample.E * abs(dot(sample.ray.d, sample.normal)) / (pdfLight * sample.pdfPos * sample.pdfDir);
+        path[0] = PathVertex::CreateLightVertex(beta, light, sample.ray.o, sample.normal);
+        return 1 + RandomWalk(scene, arena, sampler, TransportMode::ERadiance, sample.ray, beta, sample.pdfDir,
+                              path + 1, maxDepth - 1);
+    }
+
+    Spectrum ConnectPath(const Scene &scene, Sampler &sampler, PathVertex *eyePath, size_t t, PathVertex *lightPath,
+                         size_t s, vec2 *pRaster) {
+        if (t > 1 && s != 0 && eyePath[t - 1].type == PathVertex::ELight)
+            return Spectrum(0.f);
+        Spectrum L(0);
+        PathVertex sampled{};
+        if (s == 0) {
+            // eye path is complete
+            auto &pt = lightPath[t - 1];
+            L = pt.Le(scene, lightPath[t - 2]) * pt.beta;
+        } else if (t == 1) {
+            auto &cameraVertex = eyePath[0];
+            auto *camera = dynamic_cast<const Camera *>(cameraVertex.ei.ep);
+            auto &qs = lightPath[s - 1];
+            RayIncidentSample sample;
+            VisibilityTester tester;
+            camera->SampleIncidence(sampler.Next2D(), *qs.getInteraction(), &sample, &tester);
+            *pRaster = sample.pos;
+            if (sample.pdf > 0 && !sample.I.IsBlack()) {
+                sampled =
+                    PathVertex::CreateCameraVertex(sample.I / sample.pdf, camera, tester.shadowRay.o, sample.normal);
+                if (qs.IsOnSurface()) {
+                    L *= abs(dot(sample.wi, qs.Ns()));
+                }
+                if (!L.IsBlack()) {
+                    L *= tester.Tr(scene);
+                }
+            }
+        } else if (s == 1) {
+            auto &lightVertex = lightPath[0];
+            auto &pt = lightPath[t - 1];
+            auto *light = dynamic_cast<const Light *>(lightVertex.ei.ep);
+            RayIncidentSample sample;
+            VisibilityTester tester;
+            light->SampleIncidence(sampler.Next2D(), *pt.getInteraction(), &sample, &tester);
+            if (sample.pdf > 0 && !sample.I.IsBlack()) {
+                sampled =
+                    PathVertex::CreateLightVertex(sample.I / sample.pdf, light, tester.shadowRay.o, sample.normal);
+                sampled.pdfFwd = sampled.PdfLightOrigin(scene, pt);
+                if (pt.IsOnSurface()) {
+                    L *= abs(dot(sample.wi, pt.Ns()));
+                }
+                if (!L.IsBlack()) {
+                    L *= tester.Tr(scene);
+                }
+            }
+        }
     }
 } // namespace Akari

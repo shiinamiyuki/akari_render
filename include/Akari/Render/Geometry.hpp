@@ -78,7 +78,10 @@ namespace Akari {
 
         bool Intersect(const Ray &ray, Intersection *) const;
     };
-
+    struct PrimitiveHandle{
+        int32_t meshId = -1;
+        int32_t primId = -1;
+    };
     struct Intersection {
         Float t = Inf;
         Triangle triangle;
