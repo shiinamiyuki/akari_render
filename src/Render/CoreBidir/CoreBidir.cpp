@@ -126,12 +126,17 @@ namespace Akari {
         auto *ptMinus = t > 1 ? &eyePath[t - 2] : nullptr;
         auto *qsMinus = s > 1 ? &lightPath[s - 2] : nullptr;
 
+        //        if(s == 1){
+        //            printf("a %f\n",sampled.pdfFwd);
+        //        }
         ScopedAssignment<PathVertex> _a1;
         if (s == 1)
             _a1 = {qs, sampled};
         else if (t == 1)
             _a1 = {pt, sampled};
-
+        //        if(s == 1){
+        //            printf("b %f\n",lightPath[s-1].pdfFwd);
+        //        }
         ScopedAssignment<bool> _a2, _a3;
         if (pt)
             _a2 = {&pt->delta, false};
@@ -173,7 +178,7 @@ namespace Akari {
             AKARI_ASSERT(pt);
             _a6 = {&qs->pdfRev, pt->Pdf(scene, ptMinus, *qs)};
         }
-
+        //        printf("%f\n",sampled.pdfFwd);
         // now qsMinus
         ScopedAssignment<float> _a7;
         if (qsMinus) {
@@ -245,9 +250,8 @@ namespace Akari {
                 light->SampleIncidence(sampler.Next2D(), *pt.getInteraction(), &sample, &tester);
                 sampled = PathVertex::CreateLightVertex(sample.I / (scene.PdfLight(light) * sample.pdf), light,
                                                         tester.shadowRay.o, sample.normal);
+                sampled.pdfFwd = sampled.PdfLightOrigin(scene, pt);
                 if (sample.pdf > 0 && !sample.I.IsBlack()) {
-
-                    sampled.pdfFwd = sampled.PdfLightOrigin(scene, pt);
                     L = pt.beta * pt.f(sampled, TransportMode::ERadiance) * sampled.beta;
                     if (pt.IsOnSurface()) {
                         L *= abs(dot(sample.wi, pt.Ns()));

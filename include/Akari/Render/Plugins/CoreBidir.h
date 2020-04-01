@@ -141,7 +141,7 @@ namespace Akari {
             }
             auto w = next.p() - p();
             Float invDist2 = 1 / dot(w, w);
-            w /= std::sqrt(invDist2);
+            w *= std::sqrt(invDist2);
             Float pdf;
             Float pdfPos = 0, pdfDir = 0;
             light->PdfEmission(Ray(p(), w), &pdfPos, &pdfDir);
