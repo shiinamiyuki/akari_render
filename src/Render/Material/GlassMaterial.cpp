@@ -37,7 +37,7 @@ namespace Akari {
         explicit GlassMaterial(std::shared_ptr<Texture> color) : color(std::move(color)) {}
         AKR_SER(color)
         AKR_DECL_COMP(GlassMaterial, "GlassMaterial")
-        void computeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
+        void ComputeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
                                         Float scale) const override {
             auto c = color->Evaluate(si->sp);
             si->bsdf->AddComponent(arena.alloc<SpecularReflection>(c * scale));

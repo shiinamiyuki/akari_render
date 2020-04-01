@@ -592,11 +592,12 @@ namespace Akari {
                     Triangle triangle{};
                     mesh.GetTriangle(intersection.primId, &triangle);
                     const auto &p = intersection.p;
-                    auto *si = arena.alloc<SurfaceInteraction>(-ray.d, p, triangle, intersection, arena);
-                    material->computeScatteringFunctions(si, arena, TransportMode::EImportance, 1.0f);
+                    auto *si = arena.alloc<SurfaceInteraction>(&materialSlot,-ray.d, p, triangle, intersection, arena);
+                    si->ComputeScatteringFunctions(arena, TransportMode::EImportance, 1.0f);
                     auto dTree = sTree->dTree(si->p);
-                    if (light) {
-                        if (!enableNEE || specular || depth == 0)
+                    auto Le = si->Le(si->wo);
+                    if(!Le.IsBlack()){
+                        if (!light || !enableNEE || specular || depth == 0)
                             addRadiance(light->Li(si->wo, si->uv));
                         else {
                             auto lightPdf = light->PdfIncidence(*prevInteraction, ray.d) * scene->PdfLight(light);

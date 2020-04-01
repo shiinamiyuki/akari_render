@@ -34,29 +34,6 @@
 #include <fstream>
 
 namespace Akari {
-    struct MeshWrapper {
-        fs::path file; // path to json file
-        std::shared_ptr<Mesh> mesh;
-        //        AKR_SER(file, mesh)
-        template <class Archive> void save(Archive &ar) const {
-            miyuki::serialize::AutoSaveVisitor v{ar};
-            MYK_REFL(v, file);
-            std::ofstream out(file);
-            ReviveContext ctx;
-            auto j = miyuki::serialize::toJson(ctx, mesh);
-            out << j.dump(1) << std::endl;
-        }
-        template <class Archive> void load(Archive &ar) {
-            miyuki::serialize::AutoLoadVisitor v{ar};
-            MYK_REFL(v, file);
-            std::ifstream in(file);
-            std::string str((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-            json data = str.empty() ? json::object() : json::parse(str);
-            ReviveContext ctx;
-            mesh = miyuki::serialize::fromJson<std::shared_ptr<Mesh>>(ctx, data);
-        }
-    };
-
     struct RenderSetting {
         std::shared_ptr<Camera> camera;
 

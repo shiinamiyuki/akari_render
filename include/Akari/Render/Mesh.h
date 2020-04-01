@@ -24,6 +24,7 @@
 #define AKARIRENDER_MESH_H
 
 #include <Akari/Render/Geometry.hpp>
+#include <fstream>
 
 namespace Akari {
     struct MaterialSlot;
@@ -108,6 +109,30 @@ namespace Akari {
 
         [[nodiscard]] virtual std::vector<std::shared_ptr<Light>> GetMeshLights() const { return {}; }
         virtual const Light *GetLight(int primId) const { return nullptr; }
+    };
+
+    struct MeshWrapper {
+        fs::path file; // path to json file
+        AffineTransform transform;
+        std::shared_ptr<Mesh> mesh;
+        //        AKR_SER(file, mesh)
+        template <class Archive> void save(Archive &ar) const {
+            miyuki::serialize::AutoSaveVisitor v{ar};
+            MYK_REFL(v, file, transform);
+            std::ofstream out(file);
+            auto& ctx = ar.getContext();
+            auto j = miyuki::serialize::toJson(ctx, mesh);
+            out << j.dump(1) << std::endl;
+        }
+        template <class Archive> void load(Archive &ar) {
+            miyuki::serialize::AutoLoadVisitor v{ar};
+            MYK_REFL(v, file, transform);
+            std::ifstream in(file);
+            std::string str((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+            json data = str.empty() ? json::object() : json::parse(str);
+            auto& ctx = ar.getContext();
+            mesh = miyuki::serialize::fromJson<std::shared_ptr<Mesh>>(ctx, data);
+        }
     };
 } // namespace Akari
 #endif // AKARIRENDER_MESH_H

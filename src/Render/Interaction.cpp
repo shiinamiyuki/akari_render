@@ -23,14 +23,35 @@
 #include <Akari/Core/MemoryArena.hpp>
 #include <Akari/Render/BSDF.h>
 #include <Akari/Render/Interaction.h>
+#include <Akari/Render/Material.h>
+#include <Akari/Render/Scene.h>
 
 namespace Akari {
-    SurfaceInteraction::SurfaceInteraction(const glm::vec3 &wo, const glm::vec3 &p, const Akari::Triangle &triangle,
-                                           const Akari::Intersection &intersection, Akari::MemoryArena &arena)
-        : Interaction(wo, p, triangle.Ng) {
+    SurfaceInteraction::SurfaceInteraction(const MaterialSlot *materialSlot, const glm::vec3 &wo, const glm::vec3 &p,
+                                           const Akari::Triangle &triangle, const Akari::Intersection &intersection,
+                                           Akari::MemoryArena &arena)
+        : Interaction(wo, p, triangle.Ng), materialSlot(materialSlot) {
         sp.texCoords = triangle.InterpolatedTexCoord(intersection.uv);
         Ns = triangle.InterpolatedNormal(intersection.uv);
         Ng = triangle.Ng;
         bsdf = arena.alloc<BSDF>(Ng, Ns);
+        handle.meshId = intersection.meshId;
+        handle.primId = intersection.primId;
+    }
+    void SurfaceInteraction::ComputeScatteringFunctions(MemoryArena &arena, TransportMode mode, float scale) {
+        if (!bsdf) {
+            bsdf = arena.alloc<BSDF>(Ng, Ns);
+        }
+        materialSlot->material->ComputeScatteringFunctions(this, arena, mode, scale);
+    }
+    Spectrum SurfaceInteraction::Le(const vec3 &wo) {
+        if (!materialSlot) {
+            return Spectrum(0);
+        }
+        auto &emission = materialSlot->emission;
+        if (dot(wo, Ng) > 0 && emission.color && emission.strength) {
+            return emission.color->Evaluate(sp) * emission.strength->Evaluate(sp);
+        }
+        return Spectrum(0);
     }
 } // namespace Akari

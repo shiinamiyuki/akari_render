@@ -23,11 +23,11 @@
 #include <Akari/Core/Logger.h>
 #include <Akari/Core/Parallel.h>
 #include <Akari/Core/Plugin.h>
+#include <Akari/Core/Profiler.hpp>
 #include <Akari/Core/Progress.hpp>
 #include <Akari/Render/Integrator.h>
 #include <future>
 #include <mutex>
-#include <Akari/Core/Profiler.hpp>
 namespace Akari {
     static Float MisWeight(Float pdfA, Float pdfB) {
         pdfA *= pdfA;
@@ -43,8 +43,8 @@ namespace Akari {
         int minDepth;
         int maxDepth;
         bool enableRR;
-        PTRenderTask(const RenderContext &ctx, int spp, int minDepth, int maxDepth,bool enableRR)
-            : ctx(ctx), spp(spp), minDepth(minDepth), maxDepth(maxDepth),enableRR(enableRR) {}
+        PTRenderTask(const RenderContext &ctx, int spp, int minDepth, int maxDepth, bool enableRR)
+            : ctx(ctx), spp(spp), minDepth(minDepth), maxDepth(maxDepth), enableRR(enableRR) {}
         bool HasFilmUpdate() override { return false; }
         std::shared_ptr<const Film> GetFilmUpdate() override { return ctx.camera->GetFilm(); }
         bool IsDone() override { return false; }
@@ -91,14 +91,15 @@ namespace Akari {
                     Triangle triangle{};
                     mesh.GetTriangle(intersection.primId, &triangle);
                     const auto &p = intersection.p;
-                    auto *si = arena.alloc<SurfaceInteraction>(-ray.d, p, triangle, intersection, arena);
-                    material->computeScatteringFunctions(si, arena, TransportMode::EImportance, 1.0f);
-                    if (light) {
-                        if (specular || depth == 0)
-                            Li += beta * light->Li(si->wo, si->uv);
+                    auto *si = arena.alloc<SurfaceInteraction>(&materialSlot, -ray.d, p, triangle, intersection, arena);
+                    si->ComputeScatteringFunctions(arena, TransportMode::EImportance, 1.0f);
+                    auto Le = si->Le(si->wo);
+                    if (!Le.IsBlack()) {
+                        if (!light || specular || depth == 0)
+                            Li += beta * (light->Li(si->wo, si->uv));
                         else {
                             auto lightPdf = light->PdfIncidence(*prevInteraction, ray.d) * scene->PdfLight(light);
-                            Li += beta * light->Li(si->wo, si->uv) * MisWeight(prevScatteringPdf, lightPdf);
+                            Li += beta * (light->Li(si->wo, si->uv) * MisWeight(prevScatteringPdf, lightPdf));
                         }
                     }
                     if (++depth >= maxDepth) {
@@ -136,11 +137,11 @@ namespace Akari {
                     prevScatteringPdf = bsdfSample.pdf;
                     auto wiW = si->bsdf->LocalToWorld(bsdfSample.wi);
                     beta *= bsdfSample.f * abs(dot(wiW, si->Ns)) / bsdfSample.pdf;
-                    if(enableRR && depth > minDepth){
+                    if (enableRR && depth > minDepth) {
                         Float continueProb = std::min(0.95f, MaxComp(beta));
-                        if(sampler->Next1D() < continueProb){
+                        if (sampler->Next1D() < continueProb) {
                             beta /= continueProb;
-                        }else{
+                        } else {
                             break;
                         }
                     }
@@ -162,13 +163,13 @@ namespace Akari {
                 auto &_sampler = ctx.sampler;
                 auto film = camera->GetFilm();
                 auto nTiles = ivec2(film->Dimension() + ivec2(TileSize - 1)) / ivec2(TileSize);
-                ProgressReporter progressReporter(nTiles.x * nTiles.y,[=](size_t cur ,size_t tot){
-                    if(spp <= 16){
-                        if(cur % (tot / 10) == 0){
-                            ShowProgress(double(cur)/tot, 70);
+                ProgressReporter progressReporter(nTiles.x * nTiles.y, [=](size_t cur, size_t tot) {
+                    if (spp <= 16) {
+                        if (cur % (tot / 10) == 0) {
+                            ShowProgress(double(cur) / tot, 70);
                         }
-                    }else{
-                        ShowProgress(double(cur)/tot, 70);
+                    } else {
+                        ShowProgress(double(cur) / tot, 70);
                     }
                 });
                 ParallelFor2D(nTiles, [=, &progressReporter](ivec2 tilePos, uint32_t tid) {
@@ -206,11 +207,12 @@ namespace Akari {
         int spp = 16;
         int minDepth = 5, maxDepth = 16;
         bool enableRR = true;
+
       public:
         AKR_DECL_COMP(PathTracer, "PathTracer")
-        AKR_SER(spp, minDepth, maxDepth,enableRR)
+        AKR_SER(spp, minDepth, maxDepth, enableRR)
         std::shared_ptr<RenderTask> CreateRenderTask(const RenderContext &ctx) override {
-            return std::make_shared<PTRenderTask>(ctx, spp, minDepth, maxDepth,enableRR);
+            return std::make_shared<PTRenderTask>(ctx, spp, minDepth, maxDepth, enableRR);
         }
     };
     AKR_EXPORT_COMP(PathTracer, "Integrator");

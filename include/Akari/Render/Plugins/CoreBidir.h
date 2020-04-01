@@ -40,23 +40,35 @@ namespace Akari {
         bool delta = false;
         Spectrum beta;
         PathVertex() : si() {}
-        static PathVertex CreateSurfaceVertex(const Spectrum beta, const vec3 &wo, const vec3 &p, const Triangle &triangle,
-                                              const Intersection &intersection, Float pdf) {
+        static PathVertex CreateSurfaceVertex(const MaterialSlot *materialSlot, const Spectrum beta, const vec3 &wo,
+                                              const vec3 &p, const Triangle &triangle, const Intersection &intersection,
+                                              Float pdf, MemoryArena &arena) {
             PathVertex vertex;
             vertex.beta = beta;
             vertex.type = ESurface;
-            vertex.si = SurfaceInteraction(wo, p, triangle, intersection);
+            vertex.si = SurfaceInteraction(materialSlot, wo, p, triangle, intersection, arena);
             vertex.pdfFwd = pdf;
             return vertex;
         }
-        static PathVertex CreateLightVertex(const Spectrum beta, const Light *light, const vec3 &p, const vec3 &normal) {
+        static PathVertex CreateLightVertex(const Spectrum beta, const Light *light, const vec3 &p,
+                                            const vec3 &normal) {
             PathVertex vertex;
             vertex.beta = beta;
             vertex.type = ELight;
             vertex.ei = EndPointInteraction(light, p, normal);
             return vertex;
         }
-        static PathVertex CreateCameraVertex(const Spectrum beta, const Camera *camera, const vec3 &p, const vec3 &normal) {
+        static PathVertex CreateLightVertex(const Spectrum beta, const Light *light, const vec3 &p, const vec3 &normal,
+                                            Float pdf) {
+            PathVertex vertex;
+            vertex.beta = beta;
+            vertex.type = ELight;
+            vertex.ei = EndPointInteraction(light, p, normal);
+            vertex.pdfFwd = pdf;
+            return vertex;
+        }
+        static PathVertex CreateCameraVertex(const Spectrum beta, const Camera *camera, const vec3 &p,
+                                             const vec3 &normal) {
             PathVertex vertex;
             vertex.beta = beta;
             vertex.type = ECamera;
@@ -87,12 +99,13 @@ namespace Akari {
 
         [[nodiscard]] vec3 p() const { return getInteraction()->p; }
 
-        Spectrum f(const PathVertex &next) {
+        Spectrum f(const PathVertex &next, TransportMode) {
             auto wi = normalize(next.p() - p());
             switch (type) {
             case ESurface: {
                 wi = si.bsdf->WorldToLocal(wi);
-                return si.bsdf->Evaluate(si.wo, wi);
+                auto wo = si.bsdf->WorldToLocal(si.wo);
+                return si.bsdf->Evaluate(wo, wi);
             }
             default:
                 AKARI_PANIC("not implemented Vertex::f()");
@@ -160,12 +173,13 @@ namespace Akari {
         }
         Spectrum Le(const Scene &scene, const PathVertex &next) {
             switch (type) {
+            default:
             case ENone:
                 return Spectrum(0);
             case ESurface: {
-                auto *light = scene.GetLight(si.handle);
                 auto wo = next.p() - p();
-                return light->Li(wo, si.uv);
+                wo = normalize(wo);
+                return si.Le(wo);
             }
             case ELight: {
                 auto *light = dynamic_cast<const Light *>(ei.ep);
@@ -204,8 +218,44 @@ namespace Akari {
     AKR_EXPORT size_t TraceLightPath(const Scene &scene, MemoryArena &arena, Sampler &sampler, PathVertex *path,
                                      size_t maxDepth);
 
-    AKR_EXPORT Spectrum ConnectPath(const Scene &scene,  Sampler & sampler, PathVertex *eyePath, size_t t, PathVertex *lightPath, size_t s,
-                                    vec2 *pRaster);
+    AKR_EXPORT Spectrum ConnectPath(const Scene &scene, Sampler &sampler, PathVertex *eyePath, size_t t,
+                                    PathVertex *lightPath, size_t s, vec2 *pRaster);
+
+    template <typename T> class ScopedAssignment {
+      public:
+        ScopedAssignment(T *target = nullptr, T value = T()) : target(target) {
+            if (target) {
+                backup = *target;
+                *target = value;
+            }
+        }
+        ~ScopedAssignment() {
+            if (target)
+                *target = backup;
+        }
+        ScopedAssignment(ScopedAssignment && other)noexcept {
+            if (target)
+                *target = backup;
+            target = other.target;
+            backup = other.backup;
+            other.target = nullptr;
+            return *this;
+        }
+
+        ScopedAssignment(const ScopedAssignment &) = delete;
+        ScopedAssignment &operator=(const ScopedAssignment &) = delete;
+        ScopedAssignment &operator=(ScopedAssignment &&other) noexcept {
+            if (target)
+                *target = backup;
+            target = other.target;
+            backup = other.backup;
+            other.target = nullptr;
+            return *this;
+        }
+
+      private:
+        T *target, backup;
+    };
 
 } // namespace Akari
 

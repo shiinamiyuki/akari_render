@@ -24,17 +24,21 @@
 #include <Akari/Core/Parallel.h>
 #include <Akari/Core/Plugin.h>
 #include <Akari/Render/Integrator.h>
+#include <Akari/Render/Plugins/CoreBidir.h>
 #include <future>
 #include <mutex>
 
 namespace Akari {
-    struct RTDebugRenderTask : RenderTask {
+    class BDPTRenderTask : public RenderTask {
         RenderContext ctx;
         std::mutex mutex;
         std::condition_variable filmAvailable, done;
         std::future<void> future;
         int spp;
-        RTDebugRenderTask(const RenderContext &ctx, int spp) : ctx(ctx), spp(spp) {}
+        int maxDepth;
+
+      public:
+        BDPTRenderTask(const RenderContext &ctx, int spp, int maxDepth) : ctx(ctx), spp(spp), maxDepth(maxDepth) {}
         bool HasFilmUpdate() override { return false; }
         std::shared_ptr<const Film> GetFilmUpdate() override { return ctx.camera->GetFilm(); }
         bool IsDone() override { return false; }
@@ -56,50 +60,34 @@ namespace Akari {
             future.wait();
             done.notify_all();
         }
-        static std::string PrintVec3(const vec3 &v) { return fmt::format("{} {} {}", v.x, v.y, v.z); }
-        Spectrum Li(Ray ray, Sampler *sampler, MemoryArena &arena) {
-            auto scene = ctx.scene;
-
-            Spectrum Li(0), beta(1);
-            for (int depth = 0; depth < 5; depth++) {
-                Intersection intersection(ray);
-                if (scene->Intersect(ray, &intersection)) {
-                    auto &mesh = scene->GetMesh(intersection.meshId);
-                    int group = mesh.GetPrimitiveGroup(intersection.primId);
-                    const auto &materialSlot = mesh.GetMaterialSlot(group);
-                    auto material = materialSlot.material;
-                    if (!material) {
-                        Debug("no material!!\n");
-                        break;
+        Spectrum Li(Film *film, const Scene &scene, const Camera &camera, const vec2 &raster, Sampler *sampler,
+                    MemoryArena &arena) {
+            auto lightPath = arena.allocN<PathVertex>(maxDepth + 1);
+            auto eyePath = arena.allocN<PathVertex>(maxDepth + 1);
+            size_t nCamera = TraceEyePath(scene, arena, camera, raster, *sampler, eyePath, maxDepth);
+            size_t nLight = TraceLightPath(scene, arena, *sampler, lightPath, maxDepth);
+            Spectrum L(0);
+            for (size_t t = 1; t <= nCamera; ++t) {
+                for (size_t s = 0; s <= nLight; ++s) {
+                    int depth = int(t + s) - 2;
+                    if ((s == 1 && t == 1) || depth < 0 || depth > maxDepth)
+                        continue;
+                    vec2 pRaster = raster;
+                    Spectrum LPath = ConnectPath(scene, *sampler, eyePath, t, lightPath, s, &pRaster);
+                    if (t != 1) {
+                        L += LPath;
+                    } else {
+                        film->AddSplat(LPath, pRaster);
                     }
-                    Triangle triangle{};
-                    mesh.GetTriangle(intersection.primId, &triangle);
-                    vec3 p = ray.At(intersection.t);
-                    SurfaceInteraction si(&materialSlot, -ray.d, p, triangle, intersection, arena);
-                    si.ComputeScatteringFunctions(arena, TransportMode::EImportance, 1.0f);
-                    BSDFSample bsdfSample(sampler->Next1D(), sampler->Next2D(), si);
-                    si.bsdf->Sample(bsdfSample);
-                    //                                    Debug("pdf:{}\n",bsdfSample.pdf);
-                    assert(bsdfSample.pdf >= 0);
-                    if (bsdfSample.pdf <= 0) {
-                        break;
-                    }
-                    //                                    Debug("wi: {}\n",PrintVec3(bsdfSample.wi));
-                    auto wiW = si.bsdf->LocalToWorld(bsdfSample.wi);
-                    beta *= bsdfSample.f * abs(dot(wiW, si.Ns)) / bsdfSample.pdf;
-                    ray = si.SpawnRay(wiW);
-                } else {
-                    Li += beta * Spectrum(1);
-                    break;
                 }
             }
-            return Li;
+            return L;
         }
         void Start() override {
             future = std::async(std::launch::async, [=]() {
                 auto beginTime = std::chrono::high_resolution_clock::now();
 
-                auto scene = ctx.scene;
+                auto &scene = ctx.scene;
                 auto &camera = ctx.camera;
                 auto &_sampler = ctx.sampler;
                 auto film = camera->GetFilm();
@@ -115,9 +103,7 @@ namespace Akari {
                             sampler->SetSampleIndex(x + y * film->Dimension().x);
                             for (int s = 0; s < spp; s++) {
                                 sampler->StartNextSample();
-                                CameraSample sample;
-                                camera->GenerateRay(sampler->Next2D(), sampler->Next2D(), ivec2(x, y), &sample);
-                                auto Li = this->Li(sample.primary, sampler.get(), arena);
+                                auto Li = this->Li(film.get(), *scene, *camera, ivec2(x, y), sampler.get(), arena);
                                 arena.reset();
                                 tile.AddSample(ivec2(x, y), Li, 1.0f);
                             }
@@ -133,16 +119,16 @@ namespace Akari {
             });
         }
     };
-
-    class RTDebug : public Integrator {
-        int spp = 16;
+    class BDPT : public Integrator {
+        int spp = 4;
+        int maxDepth = 5;
 
       public:
-        AKR_DECL_COMP(RTDebug, "RTDebug")
-        AKR_SER(spp)
+        AKR_DECL_COMP(BDPT, "BDPT")
+        AKR_SER(spp, maxDepth)
         std::shared_ptr<RenderTask> CreateRenderTask(const RenderContext &ctx) override {
-            return std::make_shared<RTDebugRenderTask>(ctx, spp);
+            return std::make_shared<BDPTRenderTask>(ctx, spp, maxDepth);
         }
     };
-    AKR_EXPORT_COMP(RTDebug, "Integrator");
+    AKR_EXPORT_COMP(BDPT, "Integrator")
 } // namespace Akari

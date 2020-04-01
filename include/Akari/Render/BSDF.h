@@ -135,7 +135,7 @@ namespace Akari {
                 return;
             }
             int selected = std::clamp(int(sample.u0 * (float)nComp), 0, nComp - 1);
-            sample.u0 = std::min(sample.u0 * (float)nComp - (float)selected, 1.0f - Eps);
+            sample.u0 = std::min(sample.u0 * (float)nComp - (float)selected, 1.0f - 1e-7f);
 
             {
                 auto *comp = components[selected];

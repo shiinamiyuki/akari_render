@@ -21,14 +21,15 @@
 // SOFTWARE.
 
 #include <Akari/Core/Config.h>
-#include <thread>
 #include <mutex>
-namespace Akari{
-    AKR_EXPORT Config* GetConfig(){
-        static Config config;static std::once_flag flag;
-        std::call_once(flag, [&](){
-          config.NumCore = std::thread::hardware_concurrency();
-        });
+#include <thread>
+namespace Akari {
+    AKR_EXPORT Config *GetConfig() {
+        static Config config;
+        static std::once_flag flag;
+        std::call_once(flag, [&]() { config.NumCore = std::thread::hardware_concurrency(); });
         return &config;
     }
-}
+    AKR_EXPORT Float Eps() { return 1e-3f; }
+    AKR_EXPORT  Float ShadowEps() { return 1e-4f; }
+} // namespace Akari

@@ -21,6 +21,7 @@
 // SOFTWARE.
 #include <Akari/Core/Plugin.h>
 #include <Akari/Core/Spectrum.h>
+#include <Akari/Core/Math.h>
 #include <Akari/Render/Light.h>
 #include <Akari/Render/Material.h>
 #include <Akari/Render/Mesh.h>
@@ -71,11 +72,11 @@ namespace Akari {
             sample->normal = surfaceSample.normal;
 
             tester->shadowRay =
-                Ray(surfaceSample.p, -1.0f * wi, Eps / abs(dot(sample->wi, surfaceSample.normal)), dist * 0.99);
+                Ray(surfaceSample.p, -1.0f * wi, Eps() / abs(dot(sample->wi, surfaceSample.normal)), dist * 0.99);
         }
         Float PdfIncidence(const Interaction &ref, const vec3 &wi) const override {
             Intersection _isct;
-            Ray ray(ref.p, wi, Eps);
+            Ray ray(ref.p, wi);
             if (!triangle.Intersect(ray, &_isct)) {
                 return 0.0f;
             }
@@ -99,7 +100,7 @@ namespace Akari {
 
             sample->pdfPos = surfaceSample.pdf;
             sample->pdfDir = CosineHemispherePDF(wi.y);
-            sample->ray = Ray(surfaceSample.p, localFrame.LocalToWorld(wi), Eps);
+            sample->ray = Ray(surfaceSample.p, localFrame.LocalToWorld(wi), Eps());
             ShadingPoint sp{};
             sp.texCoords = triangle.InterpolatedTexCoord(surfaceSample.uv);
             sample->uv = surfaceSample.uv;

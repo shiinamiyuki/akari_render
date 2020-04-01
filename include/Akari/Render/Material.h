@@ -35,7 +35,7 @@ namespace Akari {
 
     class AKR_EXPORT Material : public Component {
       public:
-        virtual void computeScatteringFunctions(SurfaceInteraction * si, MemoryArena &arena, TransportMode mode, Float scale) const = 0;
+        virtual void ComputeScatteringFunctions(SurfaceInteraction * si, MemoryArena &arena, TransportMode mode, Float scale) const = 0;
     };
 
     struct Emission {

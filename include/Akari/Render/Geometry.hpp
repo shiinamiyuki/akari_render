@@ -33,7 +33,7 @@ namespace Akari {
 
         Ray() = default;
 
-        Ray(const vec3 &o, const vec3 &d, float t_min = Eps, float t_max = std::numeric_limits<float>::infinity())
+        Ray(const vec3 &o, const vec3 &d, float t_min = Eps(), float t_max = std::numeric_limits<float>::infinity())
             : o(o), d(d), t_min(t_min), t_max(t_max) {}
 
         [[nodiscard]] vec3 At(Float t) const { return o + t * d; }

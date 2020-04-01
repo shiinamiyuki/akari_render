@@ -30,36 +30,42 @@ namespace Akari {
         vec3 wo = vec3(0); // world space wo
         vec3 p = vec3(0);
         vec3 Ng = vec3(0);
-        vec2 uv;
+        vec2 uv{};
         Interaction() = default;
         Interaction(const vec3 &wo, const vec3 &p, const vec3 &Ng) : wo(wo), p(p), Ng(Ng) {}
 
-        [[nodiscard]] Ray SpawnRay(const vec3 &w, Float rayBias = Eps) const {
+        [[nodiscard]] Ray SpawnRay(const vec3 &w, Float rayBias = Eps()) const {
             return Ray(p, w, rayBias / abs(dot(w, Ng)), Inf);
         }
-        [[nodiscard]] Ray SpawnTo(const vec3 &q, Float rayBias = Eps) const {
+        [[nodiscard]] Ray SpawnTo(const vec3 &q, Float rayBias = Eps()) const {
             auto w = (q - p);
-            return Ray(p, w, rayBias / abs(dot(w, Ng)) / length(w), 1 - ShadowEps);
+            return Ray(p, w, rayBias / abs(dot(w, Ng)) / length(w), 1 - ShadowEps());
         }
     };
     class MemoryArena;
-
+    class Scene;
+    struct MaterialSlot;
     struct AKR_EXPORT SurfaceInteraction : Interaction {
         using Interaction::Interaction;
         ShadingPoint sp{};
         vec3 Ns = vec3(0);
         BSDF *bsdf = nullptr;
         PrimitiveHandle handle;
-        SurfaceInteraction(const vec3 &wo, const vec3 &p, const Triangle &triangle, const Intersection &intersection)
-            : Interaction(wo, p, triangle.Ng) {
+
+        const MaterialSlot *materialSlot = nullptr;
+        SurfaceInteraction(const MaterialSlot *materialSlot, const vec3 &wo, const vec3 &p, const Triangle &triangle,
+                           const Intersection &intersection)
+            : Interaction(wo, p, triangle.Ng),materialSlot(materialSlot) {
             sp.texCoords = triangle.InterpolatedTexCoord(intersection.uv);
             uv = intersection.uv;
             Ns = triangle.InterpolatedNormal(intersection.uv);
             handle.meshId = intersection.meshId;
             handle.primId = intersection.primId;
         }
-        SurfaceInteraction(const vec3 &wo, const vec3 &p, const Triangle &triangle, const Intersection &intersection,
-                           MemoryArena &arena);
+        SurfaceInteraction(const MaterialSlot *materialSlot, const vec3 &wo, const vec3 &p, const Triangle &triangle,
+                           const Intersection &intersection, MemoryArena &arena);
+        void ComputeScatteringFunctions(MemoryArena &, TransportMode mode, float scale);
+        Spectrum Le(const vec3 &wo);
     };
     class EndPoint;
     struct AKR_EXPORT EndPointInteraction : Interaction {

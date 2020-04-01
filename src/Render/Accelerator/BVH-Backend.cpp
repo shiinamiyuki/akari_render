@@ -71,8 +71,8 @@ namespace Akari {
             vec3 t1 = (box.p_max - ray.o) * invd;
             vec3 tMin = min(t0, t1), tMax = max(t0, t1);
             if (MaxComp(tMin) <= MinComp(tMax)) {
-                auto t = std::max(ray.t_min + Eps, MaxComp(tMin));
-                if (t >= ray.t_max + Eps) {
+                auto t = std::max(ray.t_min, MaxComp(tMin));
+                if (t >= ray.t_max) {
                     return -1;
                 }
                 return t;

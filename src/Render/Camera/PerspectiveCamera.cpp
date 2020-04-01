@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 #include <Akari/Core/Config.h>
+#include <Akari/Core/Logger.h>
 #include <Akari/Core/Math.h>
 #include <Akari/Core/Plugin.h>
 #include <Akari/Core/Sampling.hpp>
@@ -95,6 +96,7 @@ namespace Akari {
                 raster.y > bounds.p_max.y) {
                 return Spectrum(0);
             }
+//            Info("raster {}, {}, A(): {}\n", raster.x,raster.y, A());
             *pRaster = raster;
             Float lensArea = lensRadius == 0 ? 1.0f : lensRadius * lensRadius * Pi;
             return Spectrum(1 / (A() * lensArea * Power<4>(cosTheta)));
@@ -104,7 +106,7 @@ namespace Akari {
             vec3 pMax = vec3(film->Dimension(), 0);
             pMin = rasterToCamera.ApplyPoint(pMin);
             pMax = rasterToCamera.ApplyPoint(pMax);
-            return (pMax.y - pMin.y) * (pMax.x - pMin.x);
+            return std::abs((pMax.y - pMin.y) * (pMax.x - pMin.x));
         }
         void PdfEmission(const Ray &ray, Float *pdfPos, Float *pdfDir) const override {
             Float cosTheta = dot(cameraToWorld.ApplyVector(vec3(0, 0, -1)), ray.d);
@@ -132,9 +134,9 @@ namespace Akari {
             Float dist = length(sample->wi);
             sample->wi /= dist;
             Float lensArea = lensRadius == 0 ? 1.0f : lensRadius * lensRadius * Pi;
-
+            tester->shadowRay = Ray(pLensWorld, -sample->wi, ShadowEps(), dist);
             sample->pdf = (dist * dist) / (lensArea * abs(dot(sample->normal, sample->wi)));
-            sample->I = We(Ray(pLensWorld, -sample->wi, Eps), &sample->pos);
+            sample->I = We(tester->shadowRay, &sample->pos);
         }
     };
     AKR_EXPORT_COMP(PerspectiveCamera, "Camera")
