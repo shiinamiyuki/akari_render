@@ -116,6 +116,7 @@ namespace Akari {
         if (s + t == 2)
             return 1;
         auto remap0 = [](Float x) { return x != 0 ? Akari::Power<Power>(x) : 1.0f; };
+        (void)remap0;
         Float sumRi = 0;
 
         // p_0 ... pt  qs ... q_0
@@ -123,14 +124,13 @@ namespace Akari {
         auto *qs = s > 0 ? &lightPath[s - 1] : nullptr;
 
         auto *ptMinus = t > 1 ? &eyePath[t - 2] : nullptr;
-        auto *qsMinus = s > 1 ? &lightPath[t - 2] : nullptr;
+        auto *qsMinus = s > 1 ? &lightPath[s - 2] : nullptr;
 
         ScopedAssignment<PathVertex> _a1;
-        if (t == 1) {
-            _a1 = ScopedAssignment<PathVertex>(pt, sampled);
-        } else if (s == 1) {
-            _a1 = ScopedAssignment<PathVertex>(qs, sampled);
-        }
+        if (s == 1)
+            _a1 = {qs, sampled};
+        else if (t == 1)
+            _a1 = {pt, sampled};
 
         ScopedAssignment<bool> _a2, _a3;
         if (pt)
@@ -140,10 +140,62 @@ namespace Akari {
 
         // now connect pt to qs
 
-        // if qs is sampled, we need to update qsMinus->pdfRev
-        if(t == 1){
-
+        // we need to compute pt->pdfRev
+        // segfault ?
+        ScopedAssignment<float> _a4;
+        if (pt) {
+            Float pdfRev;
+            if (s > 0) {
+                pdfRev = qs->Pdf(scene, qsMinus, *pt);
+            } else {
+                pdfRev = pt->PdfLightOrigin(scene, *ptMinus);
+            }
+            _a4 = {&pt->pdfRev, pdfRev};
         }
+
+        // now ptMinus->pdfRev
+        ScopedAssignment<float> _a5;
+        if (ptMinus) {
+            Float pdfRev;
+            if (s > 0) {
+                AKARI_ASSERT(qs);
+                pdfRev = pt->Pdf(scene, qs, *ptMinus);
+            } else {
+                AKARI_ASSERT(pt);
+                pdfRev = pt->PdfLight(scene, *ptMinus);
+            }
+            _a5 = {&ptMinus->pdfRev, pdfRev};
+        }
+
+        // now qs
+        ScopedAssignment<float> _a6;
+        if (qs) {
+            AKARI_ASSERT(pt);
+            _a6 = {&qs->pdfRev, pt->Pdf(scene, ptMinus, *qs)};
+        }
+
+        // now qsMinus
+        ScopedAssignment<float> _a7;
+        if (qsMinus) {
+            AKARI_ASSERT(pt);
+            _a7 = {&qsMinus->pdfRev, qs->Pdf(scene, pt, *qsMinus)};
+        }
+        Float ri = 1;
+        for (int i = (int)t - 1; i > 0; i--) {
+            ri *= remap0(eyePath[i].pdfRev) / remap0(eyePath[i].pdfFwd);
+            if (!eyePath[i].delta && !eyePath[i - 1].delta) {
+                sumRi += ri;
+            }
+        }
+        ri = 1;
+        for (int i = (int)s - 1; i >= 0; i--) {
+            ri *= remap0(lightPath[i].pdfRev) / remap0(lightPath[i].pdfFwd);
+            bool delta = i > 0 ? lightPath[i - 1].delta : lightPath[i].IsDeltaLight();
+            if (!lightPath[i].delta && !delta) {
+                sumRi += ri;
+            }
+        }
+        return 1.0 / (1.0 + sumRi);
     }
     Spectrum ConnectPath(const Scene &scene, Sampler &sampler, PathVertex *eyePath, size_t t, PathVertex *lightPath,
                          size_t s, vec2 *pRaster) {
@@ -161,54 +213,64 @@ namespace Akari {
             auto *camera = dynamic_cast<const Camera *>(cameraVertex.ei.ep);
             AKARI_ASSERT(camera);
             auto &qs = lightPath[s - 1];
-            RayIncidentSample sample;
-            VisibilityTester tester;
-            AKARI_ASSERT(qs.getInteraction());
-            camera->SampleIncidence(sampler.Next2D(), *qs.getInteraction(), &sample, &tester);
-            *pRaster = sample.pos;
-            if (sample.pdf > 0 && !sample.I.IsBlack()) {
+            if (qs.IsConnectible()) {
+                RayIncidentSample sample;
+                VisibilityTester tester;
+                AKARI_ASSERT(qs.getInteraction());
+                camera->SampleIncidence(sampler.Next2D(), *qs.getInteraction(), &sample, &tester);
+                *pRaster = sample.pos;
                 sampled =
                     PathVertex::CreateCameraVertex(sample.I / sample.pdf, camera, tester.shadowRay.o, sample.normal);
-                L = qs.beta * qs.f(sampled, TransportMode::EImportance) * sampled.beta;
-                if (qs.IsOnSurface()) {
-                    L *= abs(dot(sample.wi, qs.Ns()));
-                }
-                if (!L.IsBlack()) {
-                    L *= tester.Tr(scene);
+                if (sample.pdf > 0 && !sample.I.IsBlack()) {
+
+                    L = qs.beta * qs.f(sampled, TransportMode::EImportance) * sampled.beta;
+                    if (qs.IsOnSurface()) {
+                        L *= abs(dot(sample.wi, qs.Ns()));
+                    }
+                    if (!L.IsBlack()) {
+                        L *= tester.Tr(scene);
+                    }
                 }
             }
         } else if (s == 1) {
             auto &lightVertex = lightPath[0];
             auto &pt = eyePath[t - 1];
-            AKARI_ASSERT(t >= 1);
-            auto *light = dynamic_cast<const Light *>(lightVertex.ei.ep);
-            RayIncidentSample sample;
-            VisibilityTester tester;
-            AKARI_ASSERT(light);
-            AKARI_ASSERT(pt.getInteraction());
-            light->SampleIncidence(sampler.Next2D(), *pt.getInteraction(), &sample, &tester);
-            if (sample.pdf > 0 && !sample.I.IsBlack()) {
+            if (pt.IsConnectible()) {
+                AKARI_ASSERT(t >= 1);
+                auto *light = dynamic_cast<const Light *>(lightVertex.ei.ep);
+                RayIncidentSample sample;
+                VisibilityTester tester;
+                AKARI_ASSERT(light);
+                AKARI_ASSERT(pt.getInteraction());
+                light->SampleIncidence(sampler.Next2D(), *pt.getInteraction(), &sample, &tester);
                 sampled = PathVertex::CreateLightVertex(sample.I / (scene.PdfLight(light) * sample.pdf), light,
                                                         tester.shadowRay.o, sample.normal);
-                sampled.pdfFwd = sampled.PdfLightOrigin(scene, pt);
-                L = pt.beta * pt.f(sampled, TransportMode::ERadiance) * sampled.beta;
-                if (pt.IsOnSurface()) {
-                    L *= abs(dot(sample.wi, pt.Ns()));
-                }
-                if (!L.IsBlack()) {
-                    L *= tester.Tr(scene);
+                if (sample.pdf > 0 && !sample.I.IsBlack()) {
+
+                    sampled.pdfFwd = sampled.PdfLightOrigin(scene, pt);
+                    L = pt.beta * pt.f(sampled, TransportMode::ERadiance) * sampled.beta;
+                    if (pt.IsOnSurface()) {
+                        L *= abs(dot(sample.wi, pt.Ns()));
+                    }
+                    if (!L.IsBlack()) {
+                        L *= tester.Tr(scene);
+                    }
                 }
             }
         } else {
             auto &pt = eyePath[t - 1];
             auto &qs = lightPath[s - 1];
-            VisibilityTester tester(*pt.getInteraction(), *qs.getInteraction());
-            auto g = PathVertex::G(scene, pt, qs);
-            L = g * qs.f(pt, TransportMode::EImportance) * pt.f(qs, TransportMode::ERadiance) * pt.beta * qs.beta;
-            if (!L.IsBlack())
-                L *= tester.Tr(scene);
+            if (pt.IsConnectible() && qs.IsConnectible()) {
+                VisibilityTester tester(*pt.getInteraction(), *qs.getInteraction());
+                auto g = PathVertex::G(scene, pt, qs);
+                L = g * qs.f(pt, TransportMode::EImportance) * pt.f(qs, TransportMode::ERadiance) * pt.beta * qs.beta;
+                if (!L.IsBlack())
+                    L *= tester.Tr(scene);
+            }
         }
         Float misWeight = 1.0f / (s + t);
+        misWeight = MisWeight<1>(scene, sampler, eyePath, t, lightPath, s, sampled);
+        AKARI_ASSERT(misWeight >= 0);
         L *= misWeight;
         return L;
     }

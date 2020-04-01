@@ -75,7 +75,8 @@ namespace Akari {
             vertex.ei = EndPointInteraction(camera, p, normal);
             return vertex;
         }
-        [[nodiscard]] Float IsInfiniteLight() const { return false; }
+        [[nodiscard]] bool IsInfiniteLight() const { return false; }
+        [[nodiscard]] bool IsDeltaLight() const { return false; }
         [[nodiscard]] const Interaction *getInteraction() const {
             if (type == ESurface) {
                 return &si;
@@ -112,7 +113,7 @@ namespace Akari {
             }
         }
 
-        [[nodiscard]] bool IsOnSurface() const { return all(equal(Ng(), vec3(0))); }
+        [[nodiscard]] bool IsOnSurface() const { return !all(equal(Ng(), vec3(0))); }
 
         Float PdfSAToArea(Float pdf, const PathVertex &next) {
             if (next.IsInfiniteLight())
@@ -129,14 +130,48 @@ namespace Akari {
         }
 
         Float PdfLight(const Scene &scene, const PathVertex &next) {
-            auto *light = dynamic_cast<const Light *>(ei.ep);
+            const Light *light = nullptr;
+            if (type == ELight) {
+                light = dynamic_cast<const Light *>(ei.ep);
+
+            } else if (type == ESurface) {
+                auto &handle = si.handle;
+                light = scene.GetLight(handle);
+            }
+            if (!light) {
+                return 0;
+            }
+            auto w = next.p() - p();
+            Float invDist2 = 1 / dot(w, w);
+            w /= std::sqrt(invDist2);
+            Float pdf;
+            Float pdfPos = 0, pdfDir = 0;
+            light->PdfEmission(Ray(p(), w), &pdfPos, &pdfDir);
+            pdf = pdfDir / invDist2;
+            if (next.IsOnSurface()) {
+                pdf *= abs(dot(next.Ng(), w));
+            }
+            return pdf;
+        }
+        Float PdfLightOrigin(const Scene &scene, const PathVertex &next) {
+            const Light *light = nullptr;
+            if (type == ELight) {
+                light = dynamic_cast<const Light *>(ei.ep);
+
+            } else if (type == ESurface) {
+                auto &handle = si.handle;
+                light = scene.GetLight(handle);
+            }
+            if (!light) {
+                return 0.0f;
+            }
             auto w = next.p() - p();
             w = normalize(w);
             Float pdfPos = 0, pdfDir = 0;
             light->PdfEmission(Ray(p(), w), &pdfPos, &pdfDir);
-            return pdfPos * pdfDir;
+            return scene.PdfLight(light) * pdfPos;
         }
-        [[nodiscard]] bool IsConnectible(const PathVertex &next) const {
+        [[nodiscard]] bool IsConnectible() const {
             switch (type) {
             case ENone:
                 return false;
@@ -148,6 +183,7 @@ namespace Akari {
             case ECamera:
                 return true;
             }
+            return false;
         }
         static Spectrum G(const Scene &scene, const PathVertex &v1, const PathVertex &v2) {
             auto w = v1.p() - v2.p();
@@ -163,14 +199,7 @@ namespace Akari {
             VisibilityTester tester(*v1.getInteraction(), *v2.getInteraction());
             return tester.Tr(scene) * g;
         }
-        Float PdfLightOrigin(const Scene &scene, const PathVertex &next) {
-            auto *light = dynamic_cast<const Light *>(ei.ep);
-            auto w = next.p() - p();
-            w = normalize(w);
-            Float pdfPos = 0, pdfDir = 0;
-            light->PdfEmission(Ray(p(), w), &pdfPos, &pdfDir);
-            return scene.PdfLight(light) * pdfPos;
-        }
+
         Spectrum Le(const Scene &scene, const PathVertex &next) {
             switch (type) {
             default:
@@ -191,6 +220,9 @@ namespace Akari {
             }
         }
         Float Pdf(const Scene &scene, const PathVertex *prev, const PathVertex &next) {
+            if (type == ELight) {
+                return PdfLight(scene, next);
+            }
             auto wiNext = normalize(next.p() - p());
             vec3 wiPrev;
             if (prev) {
@@ -199,11 +231,16 @@ namespace Akari {
                 AKARI_ASSERT(type == ECamera);
             }
             Float pdf = 0;
-            {
-                AKARI_ASSERT(type == ESurface);
+            if (type == ESurface) {
                 auto wo = si.bsdf->WorldToLocal(-wiPrev);
                 auto wi = si.bsdf->WorldToLocal(wiNext);
                 pdf = si.bsdf->EvaluatePdf(wo, wi);
+            } else if (type == ECamera) {
+                auto *camera = dynamic_cast<const Camera *>(ei.ep);
+                Float _;
+                camera->PdfEmission(ei.SpawnRay(wiNext), &_, &pdf);
+            } else {
+                AKARI_PANIC("???");
             }
             return PdfSAToArea(pdf, next);
         }
@@ -222,8 +259,12 @@ namespace Akari {
                                     PathVertex *lightPath, size_t s, vec2 *pRaster);
 
     template <typename T> class ScopedAssignment {
+        T *target = nullptr;
+        T backup;
+
       public:
-        ScopedAssignment(T *target = nullptr, T value = T()) : target(target) {
+        ScopedAssignment() : target(nullptr), backup(T()) {}
+        ScopedAssignment(T *target, T value) : target(target) {
             if (target) {
                 backup = *target;
                 *target = value;
@@ -233,15 +274,7 @@ namespace Akari {
             if (target)
                 *target = backup;
         }
-        ScopedAssignment(ScopedAssignment && other)noexcept {
-            if (target)
-                *target = backup;
-            target = other.target;
-            backup = other.backup;
-            other.target = nullptr;
-            return *this;
-        }
-
+        ScopedAssignment(ScopedAssignment &&) = delete;
         ScopedAssignment(const ScopedAssignment &) = delete;
         ScopedAssignment &operator=(const ScopedAssignment &) = delete;
         ScopedAssignment &operator=(ScopedAssignment &&other) noexcept {
@@ -252,9 +285,6 @@ namespace Akari {
             other.target = nullptr;
             return *this;
         }
-
-      private:
-        T *target, backup;
     };
 
 } // namespace Akari

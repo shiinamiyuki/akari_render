@@ -134,7 +134,7 @@ namespace Akari {
             Float dist = length(sample->wi);
             sample->wi /= dist;
             Float lensArea = lensRadius == 0 ? 1.0f : lensRadius * lensRadius * Pi;
-            tester->shadowRay = Ray(pLensWorld, -sample->wi, ShadowEps(), dist);
+            tester->shadowRay = Ray(pLensWorld, -sample->wi, ShadowEps(), dist * 0.99);
             sample->pdf = (dist * dist) / (lensArea * abs(dot(sample->normal, sample->wi)));
             sample->I = We(tester->shadowRay, &sample->pos);
         }

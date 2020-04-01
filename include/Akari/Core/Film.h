@@ -70,6 +70,7 @@ namespace Akari {
         TImage<SplatPixel> splat;
 
       public:
+        Float splatScale = 1.0f;
         explicit Film(const ivec2 &dimension) : radiance(dimension), weight(dimension), splat(dimension) {}
         Tile GetTile(const Bounds2i &bounds) { return Tile(bounds); }
 
@@ -94,10 +95,13 @@ namespace Akari {
                 radiance.Dimension().y,
                 [&](uint32_t y, uint32_t) {
                     for (int x = 0; x < radiance.Dimension().x; x++) {
+                        Spectrum s =
+                            Spectrum(splat(x, y).color[0], splat(x, y).color[1], splat(x, y).color[2]) * splatScale;
                         if (weight(x, y) != 0) {
-                            Spectrum s = Spectrum(splat(x, y).color[0], splat(x, y).color[1], splat(x, y).color[2]);
                             vec3 color = (radiance(x, y) + s) / weight(x, y);
                             image(x, y) = vec4(color, 1);
+                        } else {
+                            image(x, y) = vec4(s, 1);
                         }
                     }
                 },
@@ -105,11 +109,11 @@ namespace Akari {
             GetDefaultImageWriter()->Write(image, path, postProcessor);
         }
 
-        void AddSplat(const Spectrum &L, vec2 p) {
-            p = p / vec2(Dimension());
-            splat(p).color[0].add(L[0]);
-            splat(p).color[1].add(L[1]);
-            splat(p).color[2].add(L[2]);
+        void AddSplat(const Spectrum &L, const vec2 &p) {
+            ivec2 ip = ivec2(p);
+            splat(ip).color[0].add(L[0]);
+            splat(ip).color[1].add(L[1]);
+            splat(ip).color[2].add(L[2]);
         }
     };
 } // namespace Akari

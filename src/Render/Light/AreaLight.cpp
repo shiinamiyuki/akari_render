@@ -101,6 +101,7 @@ namespace Akari {
             sample->pdfPos = surfaceSample.pdf;
             sample->pdfDir = CosineHemispherePDF(wi.y);
             sample->ray = Ray(surfaceSample.p, localFrame.LocalToWorld(wi), Eps());
+            sample->normal = surfaceSample.normal;
             ShadingPoint sp{};
             sp.texCoords = triangle.InterpolatedTexCoord(surfaceSample.uv);
             sample->uv = surfaceSample.uv;
