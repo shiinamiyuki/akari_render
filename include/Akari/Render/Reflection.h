@@ -41,7 +41,7 @@ namespace Akari {
             : BSDFComponent(BSDFType(BSDF_SPECULAR | BSDF_REFLECTION)), R(R) {}
         [[nodiscard]] Float EvaluatePdf(const vec3 &wo, const vec3 &wi) const override { return 0; }
         [[nodiscard]] Spectrum Evaluate(const vec3 &wo, const vec3 &wi) const override { return Spectrum(0); }
-        void Sample(BSDFSample &sample) const override;
+        Spectrum Sample(const vec2 & u, const vec3 & wo, vec3 * wi, Float *pdf ) const override;
     };
 } // namespace Akari
 

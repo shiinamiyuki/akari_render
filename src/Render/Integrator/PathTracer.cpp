@@ -121,8 +121,8 @@ namespace Akari {
                             VisibilityTester tester{};
                             sampledLight->SampleIncidence(sampler->Next2D(), *si, &lightSample, &tester);
                             lightPdf *= lightSample.pdf;
-                            auto wi = si->bsdf->WorldToLocal(lightSample.wi);
-                            auto wo = si->bsdf->WorldToLocal(si->wo);
+                            auto wi = lightSample.wi;
+                            auto wo = si->wo;
                             auto f = si->bsdf->Evaluate(wo, wi) * abs(dot(lightSample.wi, si->Ns));
                             if (lightPdf > 0 && MaxComp(f) > 0 && tester.visible(*scene)) {
                                 if (specular) {
@@ -135,7 +135,7 @@ namespace Akari {
                         }
                     }
                     prevScatteringPdf = bsdfSample.pdf;
-                    auto wiW = si->bsdf->LocalToWorld(bsdfSample.wi);
+                    auto wiW = bsdfSample.wi;
                     beta *= bsdfSample.f * abs(dot(wiW, si->Ns)) / bsdfSample.pdf;
                     if (enableRR && depth > minDepth) {
                         Float continueProb = std::min(0.95f, MaxComp(beta));

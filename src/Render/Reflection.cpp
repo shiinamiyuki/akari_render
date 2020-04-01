@@ -29,10 +29,10 @@ namespace Akari {
         }
         return R * InvPi;
     }
-    void SpecularReflection::Sample(BSDFSample &sample) const {
-        sample.wi = Reflect(sample.wo, vec3(0, 1, 0));
-        sample.f = R / AbsCosTheta(sample.wi);
-        sample.pdf = 1;
+    Spectrum SpecularReflection::Sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf) const {
+        *wi = Reflect(wo, vec3(0, 1, 0));
+        *pdf = 1;
+        return R / AbsCosTheta(*wi);
     }
 
 } // namespace Akari

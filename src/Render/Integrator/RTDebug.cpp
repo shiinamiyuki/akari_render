@@ -85,7 +85,7 @@ namespace Akari {
                         break;
                     }
                     //                                    Debug("wi: {}\n",PrintVec3(bsdfSample.wi));
-                    auto wiW = si.bsdf->LocalToWorld(bsdfSample.wi);
+                    auto wiW =bsdfSample.wi;
                     beta *= bsdfSample.f * abs(dot(wiW, si.Ns)) / bsdfSample.pdf;
                     ray = si.SpawnRay(wiW);
                 } else {

@@ -75,13 +75,13 @@ namespace Akari {
             return AbsCosTheta(wi) * InvPi;
         }
         [[nodiscard]] virtual Spectrum Evaluate(const vec3 &wo, const vec3 &wi) const = 0;
-        virtual void Sample(BSDFSample &sample) const {
-            sample.wi = CosineHemisphereSampling(sample.u);
-            if (!SameHemisphere(sample.wi, sample.wo)) {
-                sample.wi.y *= -1;
+        virtual Spectrum Sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf) const {
+            *wi = CosineHemisphereSampling(u);
+            if (!SameHemisphere(*wi, wo)) {
+                wi->y *= -1;
             }
-            sample.pdf = AbsCosTheta(sample.wi) * InvPi;
-            sample.f = Evaluate(sample.wo, sample.wi);
+            *pdf = AbsCosTheta(*wi) * InvPi;
+            return Evaluate(wo, *wi);
         }
         [[nodiscard]] bool IsDelta() const { return ((uint32_t)type & (uint32_t)BSDF_SPECULAR) != 0; }
         [[nodiscard]] bool MatchFlag(BSDFType flag) const { return ((uint32_t)type & (uint32_t)flag) != 0; }
@@ -96,7 +96,9 @@ namespace Akari {
       public:
         BSDF(const vec3 &Ng, const vec3 &Ns) : frame(Ns), Ng(Ng) {}
         void AddComponent(const BSDFComponent *comp) { components[nComp++] = comp; }
-        [[nodiscard]] Float EvaluatePdf(const vec3 &wo, const vec3 &wi) const {
+        [[nodiscard]] Float EvaluatePdf(const vec3 &woW, const vec3 &wiW) const {
+            auto wo = WorldToLocal(woW);
+            auto wi = WorldToLocal(wiW);
             Float pdf = 0;
             int cnt = 0;
             for (int i = 0; i < nComp; i++) {
@@ -112,11 +114,11 @@ namespace Akari {
             }
             return pdf;
         }
-        [[nodiscard]] auto LocalToWorld(const vec3 &w) const { return frame.LocalToWorld(w); }
-        [[nodiscard]] auto WorldToLocal(const vec3 &w) const { return frame.WorldToLocal(w); }
-        [[nodiscard]] Spectrum Evaluate(const vec3 &wo, const vec3 &wi) const {
-            auto woW = LocalToWorld(wo);
-            auto wiW = LocalToWorld(wi);
+        [[nodiscard]] vec3 LocalToWorld(const vec3 &w) const { return frame.LocalToWorld(w); }
+        [[nodiscard]] vec3 WorldToLocal(const vec3 &w) const { return frame.WorldToLocal(w); }
+        [[nodiscard]] Spectrum Evaluate(const vec3 &woW, const vec3 &wiW) const {
+            auto wo = WorldToLocal(woW);
+            auto wi = WorldToLocal(wiW);
             Spectrum f(0);
             for (int i = 0; i < nComp; i++) {
                 auto *comp = components[i];
@@ -136,18 +138,18 @@ namespace Akari {
             }
             int selected = std::clamp(int(sample.u0 * (float)nComp), 0, nComp - 1);
             sample.u0 = std::min(sample.u0 * (float)nComp - (float)selected, 1.0f - 1e-7f);
-
+            vec3 wo, wi;
+            wo = WorldToLocal(sample.wo);
             {
                 auto *comp = components[selected];
-                comp->Sample(sample);
+                sample.f = comp->Sample(sample.u, wo, &wi, &sample.pdf);
                 sample.sampledType = comp->type;
+                sample.wi = LocalToWorld(wi);
                 if (comp->IsDelta()) {
                     return;
                 }
             }
             auto &f = sample.f;
-            auto &wo = sample.wo;
-            auto &wi = sample.wi;
             auto woW = LocalToWorld(wo);
             auto wiW = LocalToWorld(wi);
             for (int i = 0; i < nComp; i++) {
@@ -166,8 +168,7 @@ namespace Akari {
             }
         }
     };
-    inline BSDFSample::BSDFSample(Float u0, const vec2 &u, const SurfaceInteraction &si)
-        : wo(si.bsdf->WorldToLocal(si.wo)), u0(u0), u(u) {}
+    inline BSDFSample::BSDFSample(Float u0, const vec2 &u, const SurfaceInteraction &si) : wo(si.wo), u0(u0), u(u) {}
 
 } // namespace Akari
 #endif // AKARIRENDER_BSDF_H

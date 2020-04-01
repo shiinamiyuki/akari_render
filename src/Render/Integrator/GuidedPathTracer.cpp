@@ -621,11 +621,11 @@ namespace Akari {
                             if (!(bsdfSample.sampledType & BSDF_SPECULAR)) {
 
                                 bsdfSample.pdf = bsdfSample.pdf + (1.0f - bsdfSamplingFraction) *
-                                                                      dTree->pdf(si->bsdf->LocalToWorld(bsdfSample.wi));
+                                                                      dTree->pdf(bsdfSample.wi);
                             }
                         } else {
                             auto w = dTree->sample(u1, u2);
-                            bsdfSample.wi = si->bsdf->WorldToLocal(w);
+                            bsdfSample.wi = w;
                             bsdfSample.pdf = dTree->pdf(w);
                             AKARI_CHECK(bsdfSample.pdf >= 0);
                             bsdfSample.f = si->bsdf->Evaluate(bsdfSample.wo, bsdfSample.wi);
@@ -656,8 +656,8 @@ namespace Akari {
                             VisibilityTester tester{};
                             sampledLight->SampleIncidence(sampler->Next2D(), *si, &lightSample, &tester);
                             lightPdf *= lightSample.pdf;
-                            auto wi = si->bsdf->WorldToLocal(lightSample.wi);
-                            auto wo = si->bsdf->WorldToLocal(si->wo);
+                            auto wi = lightSample.wi;
+                            auto wo = si->wo;
                             auto absCos = abs(dot(lightSample.wi, si->Ns));
                             auto f = si->bsdf->Evaluate(wo, wi) * absCos;
                             Spectrum radiance;
@@ -679,7 +679,7 @@ namespace Akari {
                         }
                     }
                     prevScatteringPdf = bsdfSample.pdf;
-                    auto wiW = si->bsdf->LocalToWorld(bsdfSample.wi);
+                    auto wiW = bsdfSample.wi;
                     vertices[nVertices].p = intersection.p;
                     vertices[nVertices].wi = wiW;
                     vertices[nVertices].beta = Spectrum(1 / bsdfSample.pdf);

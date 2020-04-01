@@ -64,7 +64,7 @@ namespace Akari {
             si.bsdf->Sample(bsdfSample);
             pdfFwd = bsdfSample.pdf;
             pdfRev = si.bsdf->EvaluatePdf(bsdfSample.wi, bsdfSample.wo);
-            auto wiW = si.bsdf->LocalToWorld(bsdfSample.wi);
+            auto wiW = bsdfSample.wi;
             beta *= bsdfSample.f * abs(dot(wiW, si.Ns)) / bsdfSample.pdf;
             if (bsdfSample.sampledType & BSDF_SPECULAR) {
                 vertex.delta = true;

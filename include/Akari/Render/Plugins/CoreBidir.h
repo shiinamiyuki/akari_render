@@ -104,9 +104,7 @@ namespace Akari {
             auto wi = normalize(next.p() - p());
             switch (type) {
             case ESurface: {
-                wi = si.bsdf->WorldToLocal(wi);
-                auto wo = si.bsdf->WorldToLocal(si.wo);
-                return si.bsdf->Evaluate(wo, wi);
+                return si.bsdf->Evaluate(si.wo, wi);
             }
             default:
                 AKARI_PANIC("not implemented Vertex::f()");
@@ -232,8 +230,8 @@ namespace Akari {
             }
             Float pdf = 0;
             if (type == ESurface) {
-                auto wo = si.bsdf->WorldToLocal(-wiPrev);
-                auto wi = si.bsdf->WorldToLocal(wiNext);
+                auto wo = -wiPrev;
+                auto wi = wiNext;
                 pdf = si.bsdf->EvaluatePdf(wo, wi);
             } else if (type == ECamera) {
                 auto *camera = dynamic_cast<const Camera *>(ei.ep);
