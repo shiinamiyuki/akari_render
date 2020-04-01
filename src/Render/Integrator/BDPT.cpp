@@ -45,14 +45,18 @@ namespace Akari {
         std::future<void> future;
         int spp;
         int maxDepth;
-        std::vector<SpinLock> pyramidMutex;
         std::vector<std::shared_ptr<Film>> pyramid;
         inline int BufferIndex(int s, int t) { return s * (maxDepth + 2) + t; }
+        bool visualizeMIS = false;
 
       public:
-        BDPTRenderTask(RenderContext ctx, int spp, int maxDepth)
-            : ctx(std::move(ctx)), spp(spp), maxDepth(maxDepth), pyramidMutex((maxDepth + 2) * (maxDepth + 2)),
-              pyramid((maxDepth + 2) * (maxDepth + 2)) {}
+        BDPTRenderTask(RenderContext ctx, int spp, int maxDepth, bool visualizeMIS)
+            : ctx(std::move(ctx)), spp(spp), maxDepth(maxDepth), pyramid((maxDepth + 2) * (maxDepth + 2)),
+              visualizeMIS(visualizeMIS) {
+            if (visualizeMIS) {
+                pyramid.resize((maxDepth + 2) * (maxDepth + 2));
+            }
+        }
         bool HasFilmUpdate() override { return false; }
         std::shared_ptr<const Film> GetFilmUpdate() override { return ctx.camera->GetFilm(); }
         bool IsDone() override { return false; }
@@ -89,10 +93,14 @@ namespace Akari {
                     vec2 pRaster = raster;
                     Spectrum LPath = ConnectPath(scene, *sampler, eyePath, t, lightPath, s, &pRaster);
                     if (t != 1) {
-                        pyramid.at(BufferIndex(s, t))->AddSplat(LPath, raster);
+                        if (visualizeMIS) {
+                            pyramid.at(BufferIndex(s, t))->AddSplat(LPath, raster);
+                        }
                         L += LPath;
                     } else {
-                        pyramid.at(BufferIndex(s, t))->AddSplat(LPath, pRaster);
+                        if (visualizeMIS) {
+                            pyramid.at(BufferIndex(s, t))->AddSplat(LPath, pRaster);
+                        }
                         film->AddSplat(LPath, pRaster);
                     }
                 }
@@ -108,8 +116,10 @@ namespace Akari {
                 auto &_sampler = ctx.sampler;
                 auto film = camera->GetFilm();
                 auto nTiles = ivec2(film->Dimension() + ivec2(TileSize - 1)) / ivec2(TileSize);
-                for (auto &p : pyramid) {
-                    p = std::make_shared<Film>(film->Dimension());
+                if (visualizeMIS) {
+                    for (auto &p : pyramid) {
+                        p = std::make_shared<Film>(film->Dimension());
+                    }
                 }
                 ParallelFor2D(nTiles, [=](ivec2 tilePos, uint32_t tid) {
                     (void)tid;
@@ -135,14 +145,16 @@ namespace Akari {
                 std::chrono::duration<double> elapsed = (endTime - beginTime);
                 Info("Rendering done in {} secs, traced {} rays, {} M rays/sec\n", elapsed.count(),
                      scene->GetRayCounter(), scene->GetRayCounter() / elapsed.count() / 1e6);
-                for (int s = 0; s <= maxDepth; s++) {
-                    for (int t = 1; t <= maxDepth; t++) {
-                        int depth = int(t + s) - 2;
-                        if ((s == 1 && t == 1) || depth < 0 || depth > maxDepth)
-                            continue;
-                        auto &p = pyramid.at(BufferIndex(s, t));
-                        p->splatScale = 1.0 / spp;
-                        p->WriteImage(fmt::format("test/bdpt_{}_s{}_t{}.png", s + t - 2, s, t));
+                if (visualizeMIS) {
+                    for (int s = 0; s <= maxDepth; s++) {
+                        for (int t = 1; t <= maxDepth; t++) {
+                            int depth = int(t + s) - 2;
+                            if ((s == 1 && t == 1) || depth < 0 || depth > maxDepth)
+                                continue;
+                            auto &p = pyramid.at(BufferIndex(s, t));
+                            p->splatScale = 1.0 / spp;
+                            p->WriteImage(fmt::format("bdpt_d{}_s{}_t{}.png", s + t - 2, s, t));
+                        }
                     }
                 }
             });
@@ -151,12 +163,13 @@ namespace Akari {
     class BDPT : public Integrator {
         int spp = 4;
         int maxDepth = 5;
+        bool visualizeMIS = false;
 
       public:
         AKR_DECL_COMP(BDPT, "BDPT")
-        AKR_SER(spp, maxDepth)
+        AKR_SER(spp, maxDepth, visualizeMIS)
         std::shared_ptr<RenderTask> CreateRenderTask(const RenderContext &ctx) override {
-            return std::make_shared<BDPTRenderTask>(ctx, spp, maxDepth);
+            return std::make_shared<BDPTRenderTask>(ctx, spp, maxDepth, visualizeMIS);
         }
     };
     AKR_EXPORT_COMP(BDPT, "Integrator")

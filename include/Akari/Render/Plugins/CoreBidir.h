@@ -145,7 +145,7 @@ namespace Akari {
             Float pdf;
             Float pdfPos = 0, pdfDir = 0;
             light->PdfEmission(Ray(p(), w), &pdfPos, &pdfDir);
-            pdf = pdfDir / invDist2;
+            pdf = pdfDir * invDist2;
             if (next.IsOnSurface()) {
                 pdf *= abs(dot(next.Ng(), w));
             }
