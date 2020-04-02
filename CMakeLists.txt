@@ -93,7 +93,7 @@ endfunction()
 add_subdirectory(src/Render)
 add_subdirectory(src/Tool)
 
-add_executable(Akari src/app/Akari.cpp)
+add_executable(Akari src/App/Akari.cpp)
 target_link_libraries(Akari AkariCore)
 
 if(AKARI_BUILD_GUI)
