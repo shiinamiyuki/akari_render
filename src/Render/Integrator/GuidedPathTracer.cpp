@@ -604,7 +604,7 @@ namespace Akari {
                             addRadiance(light->Li(si->wo, si->uv) * MisWeight(prevScatteringPdf, lightPdf));
                         }
                     }
-                    if (++depth >= maxDepth) {
+                    if (depth++ >= maxDepth) {
                         break;
                     }
                     auto u0 = sampler->Next1D();

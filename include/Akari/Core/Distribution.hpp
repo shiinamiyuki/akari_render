@@ -84,8 +84,10 @@ namespace Akari {
             return ((float)offset + du) / Count();
         }
 
-        size_t Count() const { return func.size(); }
-
+        [[nodiscard]] size_t Count() const { return func.size(); }
+        [[nodiscard]] Float Integral()const{
+            return funcInt;
+        }
       private:
         std::vector<Float> func, cdf;
         Float funcInt;

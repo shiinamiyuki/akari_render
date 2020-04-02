@@ -102,7 +102,7 @@ namespace Akari {
                             Li += beta * (light->Li(si->wo, si->uv) * MisWeight(prevScatteringPdf, lightPdf));
                         }
                     }
-                    if (++depth >= maxDepth) {
+                    if (depth++ >= maxDepth) {
                         break;
                     }
                     BSDFSample bsdfSample(sampler->Next1D(), sampler->Next2D(), *si);
