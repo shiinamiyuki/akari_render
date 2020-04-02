@@ -65,14 +65,7 @@ namespace Akari {
         const MaterialSlot& GetMaterialSlot(const PrimitiveHandle & handle)const;
         const Light * GetLight(const PrimitiveHandle & handle)const;
         const Mesh &GetMesh(const uint32_t id) const { return *meshes[id]; }
-        const Light *SampleOneLight(const Float u0, Float *pdf) const {
-            if (lights.empty()) {
-                return nullptr;
-            }
-            auto idx = lightDistribution->SampleDiscrete(u0, pdf);
-            auto light = lights[idx].get();
-            return light;
-        }
+        const Light *SampleOneLight(const Float u0, Float *pdf) const ;
         Float PdfLight(const Light *light) const {
             auto it = lightPdfMap.find(light);
             if (it == lightPdfMap.end())

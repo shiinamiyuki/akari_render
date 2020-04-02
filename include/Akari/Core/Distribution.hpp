@@ -26,8 +26,8 @@
 
 namespace Akari {
     /*
-     * Return the smallest index i such that
-     * pred(i) is false
+     * Return the largest index i such that
+     * pred(i) is true
      * If no such index i, last is returned
      * */
     template <typename Pred> int UpperBound(int first, int last, Pred &&pred) {
@@ -41,7 +41,7 @@ namespace Akari {
                 hi = mid;
             }
         }
-        return hi;
+        return std::clamp<int>(hi-1,0,(last-first) - 2);
     }
     struct Distribution1D {
         Distribution1D(const Float *f, size_t n) : func(f, f + n), cdf(n + 1) {
@@ -67,7 +67,7 @@ namespace Akari {
             return func[offset / funcInt];
         }
         int SampleDiscrete(Float u, Float *pdf = nullptr) {
-            uint32_t i = UpperBound(0, func.size(), [=](int idx) { return func[idx] <= u; });
+            uint32_t i = UpperBound(0, cdf.size(), [=](int idx) { return cdf[idx] <= u; });
             if (pdf) {
                 *pdf = PdfDiscrete(i);
             }
@@ -75,7 +75,7 @@ namespace Akari {
         }
 
         Float SampleContinuous(Float u, Float *pdf = nullptr) {
-            uint32_t offset = UpperBound(0, func.size(), [=](int idx) { return func[idx] <= u; });
+            uint32_t offset = UpperBound(0, cdf.size(), [=](int idx) { return cdf[idx] <= u; });
             Float du = u - cdf[offset];
             if ((cdf[offset + 1] - cdf[offset]) > 0)
                 du /= (cdf[offset + 1] - cdf[offset]);

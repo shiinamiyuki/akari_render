@@ -50,7 +50,7 @@ namespace Akari {
             sample->weight = 1;
 
             vec2 p = vec2(rasterToCamera.ApplyPoint(vec3(sample->p_film, 0)));
-            Ray ray(vec3(0), normalize(vec3(p, 0) - vec3(0, 0, 1)), GetConfig()->RayBias);
+            Ray ray(vec3(0), normalize(vec3(p, 0) - vec3(0, 0, 1)));
             if (lensRadius > 0 && focalDistance > 0) {
                 Float ft = focalDistance / abs(ray.d.z);
                 vec3 pFocus = ray.At(ft);
@@ -96,7 +96,7 @@ namespace Akari {
                 raster.y > bounds.p_max.y) {
                 return Spectrum(0);
             }
-//            Info("raster {}, {}, A(): {}\n", raster.x,raster.y, A());
+            //            Info("raster {}, {}, A(): {}\n", raster.x,raster.y, A());
             *pRaster = raster;
             Float lensArea = lensRadius == 0 ? 1.0f : lensRadius * lensRadius * Pi;
             return Spectrum(1 / (A() * lensArea * Power<4>(cosTheta)));
@@ -134,7 +134,7 @@ namespace Akari {
             Float dist = length(sample->wi);
             sample->wi /= dist;
             Float lensArea = lensRadius == 0 ? 1.0f : lensRadius * lensRadius * Pi;
-            tester->shadowRay = Ray(pLensWorld, -sample->wi, ShadowEps(), dist * 0.99);
+            tester->shadowRay = Ray(pLensWorld, -sample->wi, Eps(), dist * (1.0 - ShadowEps()));
             sample->pdf = (dist * dist) / (lensArea * abs(dot(sample->normal, sample->wi)));
             sample->I = We(tester->shadowRay, &sample->pos);
         }

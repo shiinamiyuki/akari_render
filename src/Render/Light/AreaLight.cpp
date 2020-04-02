@@ -19,9 +19,9 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+#include <Akari/Core/Math.h>
 #include <Akari/Core/Plugin.h>
 #include <Akari/Core/Spectrum.h>
-#include <Akari/Core/Math.h>
 #include <Akari/Render/Light.h>
 #include <Akari/Render/Material.h>
 #include <Akari/Render/Mesh.h>
@@ -100,12 +100,13 @@ namespace Akari {
 
             sample->pdfPos = surfaceSample.pdf;
             sample->pdfDir = CosineHemispherePDF(wi.y);
-            sample->ray = Ray(surfaceSample.p, localFrame.LocalToWorld(wi), Eps());
+            wi = localFrame.LocalToWorld(wi);
+            sample->ray = Ray(surfaceSample.p, wi, Eps());
             sample->normal = surfaceSample.normal;
             ShadingPoint sp{};
             sp.texCoords = triangle.InterpolatedTexCoord(surfaceSample.uv);
             sample->uv = surfaceSample.uv;
-            sample->E = Li(-wi, sample->uv);
+            sample->E = Li(wi, sample->uv);
         }
     };
     AKR_EXPORT_COMP(AreaLight, "Light");

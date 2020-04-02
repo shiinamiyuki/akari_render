@@ -49,8 +49,8 @@ namespace Akari {
         VisibilityTester(const Interaction &p1, const Interaction &p2) {
             auto w = p2.p - p1.p;
             auto dist = length(w);
-            w /= dist * dist;
-            shadowRay = Ray(p1.p, w, ShadowEps() / abs(dot(w, p1.Ng)), dist * 0.99);
+            w /= dist;
+            shadowRay = Ray(p1.p, w, Eps() / abs(dot(w, p1.Ng)), dist * (1.0 - ShadowEps()));
         }
         [[nodiscard]] bool visible(const Scene &scene) const { return !scene.Occlude(shadowRay); }
         [[nodiscard]] Spectrum Tr(const Scene &scene) const {

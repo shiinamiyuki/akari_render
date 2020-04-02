@@ -66,19 +66,18 @@ namespace Akari {
             return length(cross(e1, e2)) * 0.5f;
         }
         void Sample(vec2 u, SurfaceSample *sample) const {
-            if (u.x + u.y > 1) {
-                u.x = 1 - u.x;
-                u.y = 1 - u.y;
-            }
+            Float su0 = std::sqrt(u[0]);
+            vec2 b = vec2(1 - su0, u[1] * su0);
+
             sample->uv = u;
-            sample->p = Interpolate(v[0], v[1], v[2], u);
+            sample->p = Interpolate(v[0], v[1], v[2], b);
             sample->pdf = 1.0f / Area();
             sample->normal = InterpolatedNormal(u);
         }
 
         bool Intersect(const Ray &ray, Intersection *) const;
     };
-    struct PrimitiveHandle{
+    struct PrimitiveHandle {
         int32_t meshId = -1;
         int32_t primId = -1;
     };
@@ -132,8 +131,6 @@ namespace Akari {
     };
 
     enum TransportMode : uint32_t { EImportance, ERadiance };
-
-
 
 } // namespace Akari
 #endif // AKARIRENDER_GEOMETRY_HPP

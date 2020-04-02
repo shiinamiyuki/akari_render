@@ -33,6 +33,9 @@ namespace Akari {
         Float pdfRev = 0;
         size_t depth = 0;
         while (true) {
+            if (beta.IsBlack()) {
+                break;
+            }
             Intersection intersection(ray);
             bool foundIntersection = scene.Intersect(ray, &intersection);
             if (!foundIntersection) {
@@ -62,6 +65,10 @@ namespace Akari {
             auto &si = vertex.si;
             BSDFSample bsdfSample(sampler.Next1D(), sampler.Next2D(), si);
             si.bsdf->Sample(bsdfSample);
+            AKARI_ASSERT(bsdfSample.pdf >= 0);
+            if (bsdfSample.pdf == 0) {
+                break;
+            }
             pdfFwd = bsdfSample.pdf;
             pdfRev = si.bsdf->EvaluatePdf(bsdfSample.wi, bsdfSample.wo);
             auto wiW = bsdfSample.wi;
@@ -85,6 +92,7 @@ namespace Akari {
         auto beta = Spectrum(1);
         Float pdfPos, pdfDir;
         camera.PdfEmission(cameraSample.primary, &pdfPos, &pdfDir);
+
         if (pdfDir <= 0 || pdfPos <= 0) {
             return 0;
         }
@@ -96,10 +104,11 @@ namespace Akari {
     size_t TraceLightPath(const Scene &scene, MemoryArena &arena, Sampler &sampler, PathVertex *path, size_t maxDepth) {
         if (maxDepth == 0)
             return 0;
-        Float pdfLight;
+        Float pdfLight = 0;
         const auto *light = scene.SampleOneLight(sampler.Next1D(), &pdfLight);
         RayEmissionSample sample;
         light->SampleEmission(sampler.Next2D(), sampler.Next2D(), &sample);
+        //        Info("{} {} {} {}\n",pdfLight,sample.pdfPos,sample.pdfDir,sample.E.Luminance());
         if (pdfLight <= 0 || sample.pdfPos <= 0 || sample.pdfDir <= 0 || sample.E.IsBlack()) {
             return 0;
         }
@@ -272,10 +281,12 @@ namespace Akari {
                     L *= tester.Tr(scene);
             }
         }
+        if (L.IsBlack())
+            return Spectrum(0);
         Float misWeight = 1.0f / (s + t);
         misWeight = MisWeight<1>(scene, sampler, eyePath, t, lightPath, s, sampled);
         AKARI_ASSERT(misWeight >= 0);
         L *= misWeight;
-        return L;
+        return L.RemoveNaN();
     }
 } // namespace Akari

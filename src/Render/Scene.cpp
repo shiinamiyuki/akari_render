@@ -48,6 +48,14 @@ namespace Akari {
             }
         }
     }
+    const Light * Scene::SampleOneLight(const Float u0, Float *pdf) const {
+        if (lights.empty()) {
+            return nullptr;
+        }
+        auto idx = lightDistribution->SampleDiscrete(u0, pdf);
+        auto light = lights[idx].get();
+        return light;
+    }
     void Scene::GetTriangle(const PrimitiveHandle &handle, Triangle *triangle) const {
         meshes[handle.meshId]->GetTriangle(handle.primId, triangle);
     }

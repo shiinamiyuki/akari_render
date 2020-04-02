@@ -24,31 +24,6 @@
 #include <Akari/Render/Sampler.h>
 namespace Akari {
 
-    // https://en.wikipedia.org/wiki/Permuted_congruential_generator
-    class Rng {
-        uint64_t state;
-        static uint64_t const multiplier = 6364136223846793005u;
-        static uint64_t const increment = 1442695040888963407u;
-#pragma warning(disable : 4146)
-        static uint32_t rotr32(uint32_t x, unsigned r) { return x >> r | x << (-r & 31); }
-
-        uint32_t pcg32() {
-            uint64_t x = state;
-            auto count = (unsigned)(x >> 59ULL); // 59 = 64 - 5
-
-            state = x * multiplier + increment;
-            x ^= x >> 18ULL;                              // 18 = (64 - 27)/2
-            return rotr32((uint32_t)(x >> 27ULL), count); // 27 = 32 - 5
-        }
-
-      public:
-        explicit Rng(uint64_t state = 0) : state(state + increment) { pcg32(); }
-
-        uint32_t uniformUint32() { return pcg32(); }
-
-        float uniformFloat() { return float(double(uniformUint32()) / double(std::numeric_limits<uint32_t>::max())); }
-    };
-
     class RandomSampler : public Sampler {
         Rng rng;
 

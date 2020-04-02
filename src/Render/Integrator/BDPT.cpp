@@ -51,8 +51,7 @@ namespace Akari {
 
       public:
         BDPTRenderTask(RenderContext ctx, int spp, int maxDepth, bool visualizeMIS)
-            : ctx(std::move(ctx)), spp(spp), maxDepth(maxDepth), pyramid((maxDepth + 2) * (maxDepth + 2)),
-              visualizeMIS(visualizeMIS) {
+            : ctx(std::move(ctx)), spp(spp), maxDepth(maxDepth), visualizeMIS(visualizeMIS) {
             if (visualizeMIS) {
                 pyramid.resize((maxDepth + 2) * (maxDepth + 2));
             }
