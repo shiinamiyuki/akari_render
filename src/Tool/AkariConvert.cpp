@@ -21,9 +21,9 @@
 // SOFTWARE.
 
 #include <Akari/Core/Serialize.hpp>
-#include <Akari/Render/Plugins/BinaryMesh.h>
-#include <Akari/Render/Plugins/Matte.h>
-#include <Akari/Render/Plugins/RGBTexture.h>
+#include <Akari/Plugins/BinaryMesh.h>
+#include <Akari/Plugins/Matte.h>
+#include <Akari/Plugins/RGBTexture.h>
 #include <Akari/Render/SceneGraph.h>
 #include <memory>
 #define TINYOBJLOADER_IMPLEMENTATION

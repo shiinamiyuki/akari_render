@@ -22,7 +22,7 @@
 
 #include <Akari/Core/Plugin.h>
 #include <Akari/Core/Spectrum.h>
-#include <Akari/Render/Plugins/RGBTexture.h>
+#include <Akari/Plugins/RGBTexture.h>
 #include <Akari/Render/Texture.h>
 
 namespace Akari {

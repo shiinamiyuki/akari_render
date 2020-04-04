@@ -23,9 +23,8 @@
 #include <Akari/Core/Logger.h>
 #include <Akari/Render/Material.h>
 #include <Akari/Render/Mesh.h>
-#include <Akari/Render/Plugins/AreaLight.h>
 #include <Akari/Render/Scene.h>
-
+#include <Akari/Render/Light.h>
 namespace Akari {
     void Scene::Commit() {
         accelerator->Build(*this);

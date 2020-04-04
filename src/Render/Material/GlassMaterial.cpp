@@ -23,7 +23,6 @@
 #include <Akari/Core/Plugin.h>
 #include <Akari/Render/Geometry.hpp>
 #include <Akari/Render/Material.h>
-#include <Akari/Render/Plugins/Matte.h>
 #include <Akari/Render/Reflection.h>
 #include <Akari/Render/Texture.h>
 #include <utility>

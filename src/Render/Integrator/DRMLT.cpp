@@ -22,7 +22,7 @@
 
 #include <Akari/Core/Plugin.h>
 #include <Akari/Render/Integrator.h>
-#include <Akari/Render/Plugins/MLTSampler.h>
+#include <Akari/Plugins/MLTSampler.h>
 
 namespace Akari {
     using namespace MLT;

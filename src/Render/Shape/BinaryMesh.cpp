@@ -22,8 +22,8 @@
 
 #include <Akari/Core/Logger.h>
 #include <Akari/Core/Stream.h>
-#include <Akari/Render/Plugins/AreaLight.h>
-#include <Akari/Render/Plugins/BinaryMesh.h>
+#include <Akari/Plugins/AreaLight.h>
+#include <Akari/Plugins/BinaryMesh.h>
 #include <fstream>
 namespace Akari {
     const MaterialSlot &BinaryMesh::GetMaterialSlot(int group) const { return materials[group]; }

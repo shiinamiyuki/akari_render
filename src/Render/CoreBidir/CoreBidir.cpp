@@ -21,7 +21,7 @@
 // SOFTWARE.
 
 #include <Akari/Core/Logger.h>
-#include <Akari/Render/Plugins/CoreBidir.h>
+#include <Akari/Plugins/CoreBidir.h>
 
 namespace Akari {
     size_t RandomWalk(const Scene &scene, MemoryArena &arena, Sampler &sampler, TransportMode mode, Ray ray,

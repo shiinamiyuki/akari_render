@@ -21,7 +21,7 @@
 // SOFTWARE.
 #include <Akari/Core/Plugin.h>
 #include <Akari/Core/Spectrum.h>
-#include <Akari/Render/Plugins/ComplexTexture.h>
+#include <Akari/Plugins/ComplexTexture.h>
 #include <Akari/Render/Texture.h>
 
 namespace Akari {

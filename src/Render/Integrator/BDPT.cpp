@@ -24,7 +24,7 @@
 #include <Akari/Core/Parallel.h>
 #include <Akari/Core/Plugin.h>
 #include <Akari/Render/Integrator.h>
-#include <Akari/Render/Plugins/CoreBidir.h>
+#include <Akari/Plugins/CoreBidir.h>
 #include <future>
 #include <mutex>
 #include <utility>
