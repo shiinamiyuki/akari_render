@@ -22,8 +22,11 @@
 
 #include <Akari/Core/Image.hpp>
 #include <memory>
-#define STB_IMAGE_WRITE_IMPLEMENTATION
+
 #include <Akari/Core/Parallel.h>
+#include <mutex>
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image.h>
 #include <stb_image_write.h>
 
@@ -75,25 +78,35 @@ namespace Akari {
             std::shared_ptr<RGBAImage> image;
             int x, y, channel;
             const auto *data = stbi_load(path.string().c_str(), &x, &y, &channel, 3);
-            image = std::make_shared<RGBAImage>(ivec2(x,y));
+            image = std::make_shared<RGBAImage>(ivec2(x, y));
             ParallelFor(
                 image->Dimension().y,
-                [&image](uint32_t y, uint32_t) {
-                  for (int x = 0; x < image->Dimension().x; x++){
-
-                  }
-
+                [=, &image](uint32_t y, uint32_t) {
+                    for (int x = 0; x < image->Dimension().x; x++) {
+                        vec3 rgb;
+                        if (channel == 1) {
+                            rgb = vec3((float)data[x + y * image->Dimension().x] / 255.0f);
+                        } else {
+                            rgb[0] = (float)data[3 * (x + y * image->Dimension().x) + 0] / 255.0f;
+                            rgb[1] = (float)data[3 * (x + y * image->Dimension().x) + 1] / 255.0f;
+                            rgb[2] = (float)data[3 * (x + y * image->Dimension().x) + 2] / 255.0f;
+                        }
+                        (*image)(x, y) = vec4(rgb, 1.0f);
+                    }
                 },
                 1024);
-            return nullptr;
+            return image;
         }
     };
+
+    std::shared_ptr<ImageReader> GetDefaultImageReader() { return std::make_shared<DefaultImageReader>(); }
     class ImageLoaderImpl : public ImageLoader {
         struct Record {
             std::shared_ptr<RGBAImage> image;
             //            std::filesystem::file_time_type lwt;
         };
         std::unordered_map<std::string, Record> dict;
+        std::shared_ptr<ImageReader> reader = GetDefaultImageReader();
 
       public:
         std::shared_ptr<RGBAImage> Load(const fs::path &path) override {
@@ -102,8 +115,15 @@ namespace Akari {
             if (it != dict.end()) {
                 return it->second.image;
             }
-            dict[f] = Record{nullptr};
+            dict[f] = Record{reader->Read(path)};
             return dict.at(f).image;
         }
     };
+
+    std::shared_ptr<ImageLoader> GetImageLoader() {
+        static std::shared_ptr<ImageLoader> loader;
+        static std::once_flag flag;
+        std::call_once(flag, [&]() { loader = std::make_shared<ImageLoaderImpl>(); });
+        return loader;
+    }
 } // namespace Akari

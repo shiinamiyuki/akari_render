@@ -30,14 +30,7 @@
 #include <utility>
 
 namespace Akari {
-    struct SpinLock {
-        std::atomic_flag bit = ATOMIC_FLAG_INIT;
-        void lock() {
-            while (bit.test_and_set(std::memory_order_acquire))
-                ;
-        }
-        void unlock() { bit.clear(std::memory_order_release); }
-    };
+
     class BDPTRenderTask : public RenderTask {
         RenderContext ctx;
         std::mutex mutex;
