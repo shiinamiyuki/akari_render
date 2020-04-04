@@ -58,6 +58,11 @@ namespace Akari {
         virtual std::shared_ptr<Sampler> Clone() const = 0;
         virtual void SetSampleIndex(size_t) = 0;
         virtual void StartNextSample() = 0;
+        virtual void RoundToEvenDimension() {
+            if (GetCurrentDimension() & 1u)
+                Next1D();
+        }
+        virtual size_t GetCurrentDimension() = 0;
     };
 } // namespace Akari
 

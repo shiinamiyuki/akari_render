@@ -100,6 +100,7 @@ namespace Akari::MLT {
         int64_t curIteration = 0;
         float largeStepProb = 0.3;
         float imageMutationScale = 0.1;
+        size_t _Xcount[NStream] = {0, 0, 0};
         MLTSampler() = default;
         MLTSampler(uint64_t seed, int depth, float largeStepProb = 0.3)
             : seed(seed), depth(depth), rng(seed), largeStepProb(largeStepProb) {}
@@ -125,6 +126,7 @@ namespace Akari::MLT {
         void EnsureReady(size_t index) {
             if (index >= X.size()) {
                 X.resize(index + 1);
+                _Xcount[streamIndex] = index + 1;
             }
             auto mutateFunc = [=](float x, float u) {
                 if (streamIndex == ECamera && sampleIndex < 2) {
@@ -176,7 +178,13 @@ namespace Akari::MLT {
                 lastLargeStepIteration = curIteration;
             }
         }
-
+        size_t GetCurrentDimension() override {
+            size_t dim = 0;
+            for (uint8_t i = 0; i < sampleIndex; i++) {
+                dim += _Xcount[i];
+            }
+            return dim + streamIndex;
+        }
         int GetNextIndex() { return (sampleIndex++) * NStream + streamIndex; }
     };
     struct RadianceRecord {
@@ -190,6 +198,6 @@ namespace Akari::MLT {
         std::shared_ptr<Distribution1D> depthDist;
     };
 
-} // namespace Akari::MMLT
+} // namespace Akari::MLT
 
 #endif // AKARIRENDER_MLTSAMPLER_H
