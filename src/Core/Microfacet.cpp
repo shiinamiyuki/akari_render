@@ -20,29 +20,4 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <Akari/Core/Plugin.h>
-#include <Akari/Render/Geometry.hpp>
-#include <Akari/Render/Material.h>
-#include <Akari/Render/Reflection.h>
-#include <Akari/Render/Texture.h>
-#include <utility>
-
-namespace Akari {
-    class GlassMaterial final : public Material {
-        std::shared_ptr<Texture> color;
-
-      public:
-        GlassMaterial() = default;
-        explicit GlassMaterial(std::shared_ptr<Texture> color) : color(std::move(color)) {}
-        AKR_SER(color)
-        AKR_DECL_COMP(GlassMaterial, "GlassMaterial")
-        void ComputeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
-                                        Float scale) const override {
-            auto c = color->Evaluate(si->sp);
-            si->bsdf->AddComponent(arena.alloc<SpecularReflection>(c * scale, arena.alloc<FresnelNoOp>()));
-        }
-    };
-
-    AKR_EXPORT_COMP(GlassMaterial, "Material")
-
-} // namespace Akari
+namespace Akari{}

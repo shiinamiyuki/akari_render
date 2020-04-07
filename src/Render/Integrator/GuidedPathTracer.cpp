@@ -592,11 +592,11 @@ namespace Akari {
                     Triangle triangle{};
                     mesh.GetTriangle(intersection.primId, &triangle);
                     const auto &p = intersection.p;
-                    auto *si = arena.alloc<SurfaceInteraction>(&materialSlot,-ray.d, p, triangle, intersection, arena);
+                    auto *si = arena.alloc<SurfaceInteraction>(&materialSlot, -ray.d, p, triangle, intersection, arena);
                     si->ComputeScatteringFunctions(arena, TransportMode::EImportance, 1.0f);
                     auto dTree = sTree->dTree(si->p);
                     auto Le = si->Le(si->wo);
-                    if(!Le.IsBlack()){
+                    if (!Le.IsBlack()) {
                         if (!light || !enableNEE || specular || depth == 0)
                             addRadiance(light->Li(si->wo, si->uv));
                         else {
@@ -620,8 +620,8 @@ namespace Akari {
                             bsdfSample.pdf *= bsdfSamplingFraction;
                             if (!(bsdfSample.sampledType & BSDF_SPECULAR)) {
 
-                                bsdfSample.pdf = bsdfSample.pdf + (1.0f - bsdfSamplingFraction) *
-                                                                      dTree->pdf(bsdfSample.wi);
+                                bsdfSample.pdf =
+                                    bsdfSample.pdf + (1.0f - bsdfSamplingFraction) * dTree->pdf(bsdfSample.wi);
                             }
                         } else {
                             auto w = dTree->sample(u1, u2);
@@ -722,11 +722,13 @@ namespace Akari {
             uint32_t pass = 0;
             uint32_t accumulatedSamples = 0;
             for (pass = 0; accumulatedSamples < (uint32_t)trainingSamples; pass++) {
-                auto samples = 1u << pass; // 2 * std::pow(1.1, pass);//1ull << pass;
+                size_t samples;
+                samples = 1u << pass; // 2 * std::pow(1.1, pass);//1ull << pass;
                 auto nextPassSamples = 2u << pass;
                 if (accumulatedSamples + samples + nextPassSamples > (uint32_t)trainingSamples) {
                     samples = (uint32_t)trainingSamples - accumulatedSamples;
                 }
+
                 Info("Learning pass {}, spp:{}\n", pass + 1, samples);
                 accumulatedSamples += samples;
                 ParallelFor2D(nTiles, [=](ivec2 tilePos, uint32_t tid) {

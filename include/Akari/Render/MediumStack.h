@@ -20,29 +20,31 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <Akari/Core/Plugin.h>
-#include <Akari/Render/Geometry.hpp>
-#include <Akari/Render/Material.h>
-#include <Akari/Render/Reflection.h>
-#include <Akari/Render/Texture.h>
-#include <utility>
+#ifndef AKARIRENDER_MEDIUMSTACK_H
+#define AKARIRENDER_MEDIUMSTACK_H
+
+#include <Akari/Core/Spectrum.h>
 
 namespace Akari {
-    class GlassMaterial final : public Material {
-        std::shared_ptr<Texture> color;
+    class Medium;
+    struct MediumRecord {
+        Float eta = 1.0f;
+        const Medium *medium = nullptr;
+    };
+    template <size_t N> struct TMediumStack {
+        MediumRecord &operator[](size_t i) { return stack[i]; }
+        const MediumRecord &operator[](size_t i) const { return stack[i]; }
+        size_t size() const { return sp; }
+        void push_back(const MediumRecord &record) { stack[sp++] = record; }
+        void pop_back() { sp--; }
+        MediumRecord &back() { return stack[sp - 1]; }
+        const MediumRecord &back() const { return stack[sp - 1]; }
 
-      public:
-        GlassMaterial() = default;
-        explicit GlassMaterial(std::shared_ptr<Texture> color) : color(std::move(color)) {}
-        AKR_SER(color)
-        AKR_DECL_COMP(GlassMaterial, "GlassMaterial")
-        void ComputeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
-                                        Float scale) const override {
-            auto c = color->Evaluate(si->sp);
-            si->bsdf->AddComponent(arena.alloc<SpecularReflection>(c * scale, arena.alloc<FresnelNoOp>()));
-        }
+      private:
+        std::array<MediumRecord, N> stack;
+        size_t sp = 0;
     };
 
-    AKR_EXPORT_COMP(GlassMaterial, "Material")
-
+    using MediumStack = TMediumStack<8>;
 } // namespace Akari
+#endif // AKARIRENDER_MEDIUMSTACK_H

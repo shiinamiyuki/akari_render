@@ -24,6 +24,7 @@
 #ifndef AKARIRENDER_MLTSAMPLER_H
 #define AKARIRENDER_MLTSAMPLER_H
 
+#include <Akari/Core/Distribution.hpp>
 #include <Akari/Render/Sampler.h>
 
 namespace Akari::MLT {
@@ -100,6 +101,8 @@ namespace Akari::MLT {
         int64_t curIteration = 0;
         float largeStepProb = 0.3;
         float imageMutationScale = 0.1;
+        size_t accepts = 0, rejects = 0;
+        size_t consecutiveRejects = 0;
         size_t _Xcount[NStream] = {0, 0, 0};
         MLTSampler() = default;
         MLTSampler(uint64_t seed, int depth, float largeStepProb = 0.3)
@@ -171,12 +174,16 @@ namespace Akari::MLT {
                 }
             }
             --curIteration;
+            consecutiveRejects++;
+            rejects++;
         }
 
         void Accept() {
             if (largeStep) {
                 lastLargeStepIteration = curIteration;
             }
+            accepts++;
+            consecutiveRejects = consecutiveRejects == 0 ? 0 : consecutiveRejects - 1;
         }
         size_t GetCurrentDimension() override {
             size_t dim = 0;

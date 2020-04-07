@@ -23,6 +23,11 @@
 #include <Akari/Render/Reflection.h>
 
 namespace Akari {
+    Spectrum FresnelNoOp::Evaluate(Float cosThetaI) const { return Spectrum(1.0f); }
+    Spectrum FresnelConductor::Evaluate(Float cosThetaI) const { return FrConductor(cosThetaI, etaI, etaT, k); }
+    Spectrum FresnelDielectric::Evaluate(Float cosThetaI) const {
+        return Spectrum(FrDielectric(cosThetaI, etaI, etaT));
+    }
     Spectrum LambertianReflection::Evaluate(const vec3 &wo, const vec3 &wi) const {
         if (!SameHemisphere(wo, wi)) {
             return Spectrum(0);
@@ -32,7 +37,7 @@ namespace Akari {
     Spectrum SpecularReflection::Sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf) const {
         *wi = Reflect(wo, vec3(0, 1, 0));
         *pdf = 1;
-        return R / AbsCosTheta(*wi);
+        return fresnel->Evaluate(CosTheta(*wi)) * R / AbsCosTheta(*wi);
     }
 
 } // namespace Akari

@@ -56,6 +56,19 @@ namespace Akari {
 
     inline vec3 Reflect(const vec3 &w, const vec3 &n) { return -1.0f * w + 2.0f * dot(w, n) * n; }
 
+    inline bool Refract(const vec3 &wi, const vec3 &n, Float eta, vec3 *wt) {
+        Float cosThetaI = dot(n, wi);
+        Float sin2ThetaI = std::fmax(0.0f, 1.0f - cosThetaI * cosThetaI);
+        Float sin2ThetaT = eta * eta * sin2ThetaI;
+        if (sin2ThetaT >= 1)
+            return false;
+
+        Float cosThetaT = std::sqrt(1 - sin2ThetaT);
+
+        *wt = eta * -wi + (eta * cosThetaI - cosThetaT) * n;
+        return true;
+    }
+
     struct BSDFSample {
         const vec3 wo;
         Float u0{};

@@ -23,9 +23,9 @@
 #include <Akari/Core/Logger.h>
 #include <Akari/Core/Parallel.h>
 #include <Akari/Core/Plugin.h>
-#include <Akari/Render/Integrator.h>
 #include <Akari/Plugins/CoreBidir.h>
 #include <Akari/Plugins/MLTSampler.h>
+#include <Akari/Render/Integrator.h>
 #include <Akari/Render/Scene.h>
 #include <future>
 #include <mutex>
@@ -45,12 +45,13 @@ namespace Akari {
         size_t nChains;
         int directSamples = 1;
         float clamp;
+        size_t maxConsecutiveRejects = 51200;
 
       public:
         MMLTRenderTask(RenderContext ctx, int spp, int maxDepth, size_t nBootstrap, size_t nChains, int nDirect,
-                       float clamp)
+                       float clamp, size_t maxConsecutiveRejects)
             : ctx(std::move(ctx)), spp(spp), maxDepth(maxDepth), nBootstrap(nBootstrap), nChains(nChains),
-              directSamples(nDirect), clamp(clamp) {}
+              directSamples(nDirect), clamp(clamp), maxConsecutiveRejects(maxConsecutiveRejects) {}
         bool HasFilmUpdate() override { return false; }
         std::shared_ptr<const Film> GetFilmUpdate() override { return ctx.camera->GetFilm(); }
         bool IsDone() override { return false; }
@@ -184,6 +185,8 @@ namespace Akari {
                     for (int depth = 0; depth < maxDepth + 1; depth++) {
                         markovChains[i].radianceRecords[depth] =
                             Radiance(markovChains[i].samplers[depth], arenas[tid], true);
+                        markovChains[i].samplers[depth].seed = dist(rd);
+                        markovChains[i].samplers[depth].rng = Rng(markovChains[i].samplers[depth].seed);
                         arenas[tid].reset();
                     }
                 });
@@ -224,7 +227,7 @@ namespace Akari {
                         }
                         film->AddSplat(Lold, curRecord.pRaster);
 
-                        if (rng.uniformFloat() < accept) {
+                        if (sampler.consecutiveRejects >= maxConsecutiveRejects || rng.uniformFloat() < accept) {
                             sampler.Accept();
                             curRecord = record;
                         } else {
@@ -283,12 +286,14 @@ namespace Akari {
         size_t nChains = 100;
         int nDirect = 16;
         Float clamp = 1e5;
+        size_t maxConsecutiveRejects = 102400;
 
       public:
         AKR_DECL_COMP(MMLT, "MMLT")
-        AKR_SER(spp, maxDepth, nBootstrap, nChains, nDirect, clamp)
+        AKR_SER(spp, maxDepth, nBootstrap, nChains, nDirect, clamp, maxConsecutiveRejects)
         std::shared_ptr<RenderTask> CreateRenderTask(const RenderContext &ctx) override {
-            return std::make_shared<MMLTRenderTask>(ctx, spp, maxDepth, nBootstrap, nChains, nDirect, clamp);
+            return std::make_shared<MMLTRenderTask>(ctx, spp, maxDepth, nBootstrap, nChains, nDirect, clamp,
+                                                    maxConsecutiveRejects);
         }
     };
     AKR_EXPORT_COMP(MMLT, "Integrator")

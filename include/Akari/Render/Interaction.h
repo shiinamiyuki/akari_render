@@ -24,7 +24,7 @@
 #define AKARIRENDER_INTERACTION_H
 
 #include <Akari/Render/Geometry.hpp>
-
+#include <Akari/Render/MediumStack.h>
 namespace Akari {
     struct Interaction {
         vec3 wo = vec3(0); // world space wo
@@ -51,11 +51,11 @@ namespace Akari {
         vec3 Ns = vec3(0);
         BSDF *bsdf = nullptr;
         PrimitiveHandle handle;
-
+        MediumStack *mediumStack = nullptr;
         const MaterialSlot *materialSlot = nullptr;
         SurfaceInteraction(const MaterialSlot *materialSlot, const vec3 &wo, const vec3 &p, const Triangle &triangle,
                            const Intersection &intersection)
-            : Interaction(wo, p, triangle.Ng),materialSlot(materialSlot) {
+            : Interaction(wo, p, triangle.Ng), materialSlot(materialSlot) {
             sp.texCoords = triangle.InterpolatedTexCoord(intersection.uv);
             uv = intersection.uv;
             Ns = triangle.InterpolatedNormal(intersection.uv);

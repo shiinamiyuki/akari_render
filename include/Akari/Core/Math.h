@@ -212,5 +212,7 @@ namespace Akari {
             return tmp * tmp * x;
         }
     }
+
+    inline vec3 FaceForward(const vec3 &n, const vec3 &w) { return dot(n, w) < 0 ? -w : w; }
 } // namespace Akari
 #endif // AKARIRENDER_MATH_H

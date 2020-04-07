@@ -21,8 +21,8 @@
 // SOFTWARE.
 
 #include <Akari/Core/Plugin.h>
-#include <Akari/Render/Integrator.h>
 #include <Akari/Plugins/MLTSampler.h>
+#include <Akari/Render/Integrator.h>
 
 namespace Akari {
     using namespace MLT;
