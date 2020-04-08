@@ -28,23 +28,21 @@
 #include <utility>
 
 namespace Akari {
-    class GlassMaterial final : public Material {
+    class MirrorMaterial final : public Material {
         std::shared_ptr<Texture> color;
-        std::shared_ptr<Texture> ior;
 
       public:
-        GlassMaterial() = default;
-        explicit GlassMaterial(std::shared_ptr<Texture> color) : color(std::move(color)) {}
-        AKR_SER(color, ior)
-        AKR_DECL_COMP(GlassMaterial, "GlassMaterial")
+        MirrorMaterial() = default;
+        explicit MirrorMaterial(std::shared_ptr<Texture> color) : color(std::move(color)) {}
+        AKR_SER(color)
+        AKR_DECL_COMP(MirrorMaterial, "MirrorMaterial")
         void ComputeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
                                         Float scale) const override {
-            auto c = color->Evaluate(si->sp) * scale;
-            auto eta = ior->Evaluate(si->sp)[0];
-            si->bsdf->AddComponent(arena.alloc<FresnelSpecular>(c, c, 1.0f, eta, mode));
+            auto c = color->Evaluate(si->sp);
+            si->bsdf->AddComponent(arena.alloc<SpecularReflection>(c * scale, arena.alloc<FresnelNoOp>()));
         }
     };
 
-    AKR_EXPORT_COMP(GlassMaterial, "Material")
+    AKR_EXPORT_COMP(MirrorMaterial, "Material")
 
 } // namespace Akari

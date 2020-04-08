@@ -56,7 +56,7 @@ namespace Akari {
         std::array<vec2, 3> texCoords;
         std::array<vec3, 3> Ns;
         vec3 Ng;
-        [[nodiscard]] vec3 InterpolatedNormal(const vec2 &uv) const { return Interpolate(Ns[0], Ns[1], Ns[2], uv); }
+        [[nodiscard]] vec3 InterpolatedNormal(const vec2 &uv) const { return normalize(Interpolate(Ns[0], Ns[1], Ns[2], uv)); }
         [[nodiscard]] vec2 InterpolatedTexCoord(const vec2 &uv) const {
             return Interpolate(texCoords[0], texCoords[1], texCoords[2], uv);
         }

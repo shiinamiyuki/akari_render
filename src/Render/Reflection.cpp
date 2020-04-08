@@ -20,6 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <Akari/Core/Logger.h>
 #include <Akari/Render/Reflection.h>
 
 namespace Akari {
@@ -49,8 +50,9 @@ namespace Akari {
         Float etaI = entering ? etaA : etaB;
         Float etaT = entering ? etaB : etaA;
 
-        if (!Refract(wo, FaceForward(vec3(0, 0, 1), wo), etaI / etaT, wi))
+        if (!Refract(wo, FaceForward(vec3(0, 1, 0), wo), etaI / etaT, wi))
             return Spectrum(0);
+        *wi = -wo;
         *sampledType = type;
         *pdf = 1;
         Spectrum ft = T * (Spectrum(1) - fresnel.Evaluate(CosTheta(*wi)));
@@ -60,21 +62,25 @@ namespace Akari {
     }
     Spectrum FresnelSpecular::Sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const {
         Float F = FrDielectric(CosTheta(wo), etaA, etaB);
+        AKARI_ASSERT(F >= 0 && F <= 1);
         if (u[0] < F) {
             *wi = Reflect(wo, vec3(0, 1, 0));
-            *pdf = 1;
+            *pdf = F;
             *sampledType = BSDFType(BSDF_SPECULAR | BSDF_REFLECTION);
-            return fresnel.Evaluate(CosTheta(*wi)) * R / AbsCosTheta(*wi);
+            return F * R / AbsCosTheta(*wi);
         } else {
             bool entering = CosTheta(wo) > 0;
             Float etaI = entering ? etaA : etaB;
             Float etaT = entering ? etaB : etaA;
-            if (!Refract(wo, FaceForward(vec3(0, 0, 1), wo), etaI / etaT, wi))
+//            Debug("{}\n", etaI / etaT);
+            if (!Refract(wo, FaceForward(vec3(0, 1, 0), wo), etaI / etaT, wi))
                 return Spectrum(0);
             Spectrum ft = T * (1 - F);
-            if (sampledType)
-                *sampledType = BSDFType(BSDF_SPECULAR | BSDF_TRANSMISSION);
+            *sampledType = BSDFType(BSDF_SPECULAR | BSDF_TRANSMISSION);
+            if (mode == TransportMode::ERadiance)
+                ft *= (etaI * etaI) / (etaT * etaT);
             *pdf = 1 - F;
+//            Info("{} {} {} {}\n", ft[0],ft[1],ft[2],  AbsCosTheta(*wi));
             return ft / AbsCosTheta(*wi);
         }
     }

@@ -28,7 +28,14 @@
 #include <Akari/Render/Integrator.h>
 #include <Akari/Render/Light.h>
 namespace Akari {
-
+    inline Float CorrectShadingNormal(const vec3 &Ng, const vec3 &Ns, const vec3 &wo, const vec3 &wi,
+                                      TransportMode mode) {
+        if (mode == EImportance) {
+            return abs(dot(Ns, wo) * dot(Ng, wi)) / abs(dot(Ng, wo) * dot(Ns, wi));
+        } else {
+            return 1;
+        }
+    }
     struct PathVertex {
         enum Type : uint8_t { ENone, ESurface, ELight, ECamera };
         Type type = ENone;
@@ -100,11 +107,11 @@ namespace Akari {
 
         [[nodiscard]] vec3 p() const { return getInteraction()->p; }
 
-        Spectrum f(const PathVertex &next, TransportMode) {
+        Spectrum f(const PathVertex &next, TransportMode mode) {
             auto wi = normalize(next.p() - p());
             switch (type) {
             case ESurface: {
-                return si.bsdf->Evaluate(si.wo, wi);
+                return si.bsdf->Evaluate(si.wo, wi) * CorrectShadingNormal(Ng(), Ns(), wo(), wi, mode);
             }
             default:
                 AKARI_PANIC("not implemented Vertex::f()");

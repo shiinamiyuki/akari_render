@@ -59,6 +59,8 @@ namespace Akari {
         }
         Float sinThetaI = std::sqrt(std::fmax(0.0f, 1 - cosThetaI * cosThetaI));
         Float sinThetaT = etaI / etaT * sinThetaI;
+        if (sinThetaT >= 1)
+            return 1;
         Float cosThetaT = std::sqrt(std::fmax(0.0f, 1 - sinThetaT * sinThetaT));
 
         Float Rpar = ((etaT * cosThetaI) - (etaI * cosThetaT)) / ((etaT * cosThetaI) + (etaI * cosThetaT));
@@ -118,6 +120,8 @@ namespace Akari {
         explicit SpecularTransmission(const Spectrum &T, Float etaA, Float etaB, TransportMode mode)
             : BSDFComponent(BSDFType(BSDF_TRANSMISSION | BSDF_SPECULAR)), T(T), etaA(etaA),
               etaB(etaB), fresnel(etaA, etaB), mode(mode) {}
+        [[nodiscard]] Float EvaluatePdf(const vec3 &wo, const vec3 &wi) const override { return 0; }
+        [[nodiscard]] Spectrum Evaluate(const vec3 &wo, const vec3 &wi) const override { return Spectrum(0); }
         Spectrum Sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType * sampledType) const override;
     };
     class AKR_EXPORT FresnelSpecular : public BSDFComponent {
