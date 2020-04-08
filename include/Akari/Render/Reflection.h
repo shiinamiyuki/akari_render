@@ -36,7 +36,7 @@ namespace Akari {
     };
 
     class AKR_EXPORT FresnelConductor : public Fresnel {
-        Spectrum etaI, etaT, k;
+        const Spectrum etaI, etaT, k;
 
       public:
         FresnelConductor(const Spectrum &etaI, const Spectrum &etaT, const Spectrum &k)
@@ -45,7 +45,7 @@ namespace Akari {
     };
 
     class AKR_EXPORT FresnelDielectric : public Fresnel {
-        Float etaI, etaT;
+        const Float etaI, etaT;
 
       public:
         FresnelDielectric(const Float &etaI, const Float &etaT) : etaI(etaI), etaT(etaT) {}
@@ -90,7 +90,7 @@ namespace Akari {
     }
 
     class AKR_EXPORT LambertianReflection : public BSDFComponent {
-        Spectrum R;
+        const Spectrum R;
 
       public:
         explicit LambertianReflection(const Spectrum &R)
@@ -98,15 +98,41 @@ namespace Akari {
         [[nodiscard]] Spectrum Evaluate(const vec3 &wo, const vec3 &wi) const override;
     };
     class AKR_EXPORT SpecularReflection : public BSDFComponent {
-        Spectrum R;
+        const Spectrum R;
         const Fresnel *fresnel = nullptr;
 
       public:
         explicit SpecularReflection(const Spectrum &R, const Fresnel *fresnel)
-            : BSDFComponent(BSDFType(BSDF_SPECULAR | BSDF_REFLECTION)), R(R), fresnel(fresnel) {}
+            : BSDFComponent(BSDFType(BSDF_SPECULAR | BSDF_TRANSMISSION)), R(R), fresnel(fresnel) {}
         [[nodiscard]] Float EvaluatePdf(const vec3 &wo, const vec3 &wi) const override { return 0; }
         [[nodiscard]] Spectrum Evaluate(const vec3 &wo, const vec3 &wi) const override { return Spectrum(0); }
-        Spectrum Sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf) const override;
+        Spectrum Sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType * sampledType) const override;
+    };
+    class AKR_EXPORT SpecularTransmission : public BSDFComponent {
+        const Spectrum T;
+        const Float etaA, etaB;
+        const FresnelDielectric fresnel;
+        const TransportMode mode;
+
+      public:
+        explicit SpecularTransmission(const Spectrum &T, Float etaA, Float etaB, TransportMode mode)
+            : BSDFComponent(BSDFType(BSDF_TRANSMISSION | BSDF_SPECULAR)), T(T), etaA(etaA),
+              etaB(etaB), fresnel(etaA, etaB), mode(mode) {}
+        Spectrum Sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType * sampledType) const override;
+    };
+    class AKR_EXPORT FresnelSpecular : public BSDFComponent {
+        const Spectrum R, T;
+        const Float etaA, etaB;
+        const FresnelDielectric fresnel;
+        const TransportMode mode;
+
+      public:
+        explicit FresnelSpecular(const Spectrum &R, const Spectrum &T, Float etaA, Float etaB, TransportMode mode)
+            : BSDFComponent(BSDFType(BSDF_REFLECTION | BSDF_TRANSMISSION | BSDF_SPECULAR)), R(R), T(T), etaA(etaA),
+              etaB(etaB), fresnel(etaA, etaB), mode(mode) {}
+        [[nodiscard]] Float EvaluatePdf(const vec3 &wo, const vec3 &wi) const override { return 0; }
+        [[nodiscard]] Spectrum Evaluate(const vec3 &wo, const vec3 &wi) const override { return Spectrum(0); }
+        Spectrum Sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType * sampledType) const override;
     };
 } // namespace Akari
 

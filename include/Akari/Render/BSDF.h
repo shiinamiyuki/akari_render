@@ -88,12 +88,13 @@ namespace Akari {
             return AbsCosTheta(wi) * InvPi;
         }
         [[nodiscard]] virtual Spectrum Evaluate(const vec3 &wo, const vec3 &wi) const = 0;
-        virtual Spectrum Sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf) const {
+        virtual Spectrum Sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const {
             *wi = CosineHemisphereSampling(u);
             if (!SameHemisphere(*wi, wo)) {
                 wi->y *= -1;
             }
             *pdf = AbsCosTheta(*wi) * InvPi;
+            *sampledType = type;
             return Evaluate(wo, *wi);
         }
         [[nodiscard]] bool IsDelta() const { return ((uint32_t)type & (uint32_t)BSDF_SPECULAR) != 0; }
@@ -155,8 +156,7 @@ namespace Akari {
             wo = WorldToLocal(sample.wo);
             {
                 auto *comp = components[selected];
-                sample.f = comp->Sample(sample.u, wo, &wi, &sample.pdf);
-                sample.sampledType = comp->type;
+                sample.f = comp->Sample(sample.u, wo, &wi, &sample.pdf, &sample.sampledType);
                 sample.wi = LocalToWorld(wi);
                 if (comp->IsDelta()) {
                     return;

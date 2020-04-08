@@ -34,10 +34,48 @@ namespace Akari {
         }
         return R * InvPi;
     }
-    Spectrum SpecularReflection::Sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf) const {
+
+    Spectrum SpecularReflection::Sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf,
+                                        BSDFType *sampledType) const {
         *wi = Reflect(wo, vec3(0, 1, 0));
         *pdf = 1;
+        *sampledType = type;
         return fresnel->Evaluate(CosTheta(*wi)) * R / AbsCosTheta(*wi);
     }
 
+    Spectrum SpecularTransmission::Sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf,
+                                          BSDFType *sampledType) const {
+        bool entering = CosTheta(wo) > 0;
+        Float etaI = entering ? etaA : etaB;
+        Float etaT = entering ? etaB : etaA;
+
+        if (!Refract(wo, FaceForward(vec3(0, 0, 1), wo), etaI / etaT, wi))
+            return Spectrum(0);
+        *sampledType = type;
+        *pdf = 1;
+        Spectrum ft = T * (Spectrum(1) - fresnel.Evaluate(CosTheta(*wi)));
+        if (mode == TransportMode::ERadiance)
+            ft *= (etaI * etaI) / (etaT * etaT);
+        return ft / AbsCosTheta(*wi);
+    }
+    Spectrum FresnelSpecular::Sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const {
+        Float F = FrDielectric(CosTheta(wo), etaA, etaB);
+        if (u[0] < F) {
+            *wi = Reflect(wo, vec3(0, 1, 0));
+            *pdf = 1;
+            *sampledType = BSDFType(BSDF_SPECULAR | BSDF_REFLECTION);
+            return fresnel.Evaluate(CosTheta(*wi)) * R / AbsCosTheta(*wi);
+        } else {
+            bool entering = CosTheta(wo) > 0;
+            Float etaI = entering ? etaA : etaB;
+            Float etaT = entering ? etaB : etaA;
+            if (!Refract(wo, FaceForward(vec3(0, 0, 1), wo), etaI / etaT, wi))
+                return Spectrum(0);
+            Spectrum ft = T * (1 - F);
+            if (sampledType)
+                *sampledType = BSDFType(BSDF_SPECULAR | BSDF_TRANSMISSION);
+            *pdf = 1 - F;
+            return ft / AbsCosTheta(*wi);
+        }
+    }
 } // namespace Akari
