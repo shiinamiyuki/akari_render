@@ -22,29 +22,33 @@
 
 #ifndef AKARIRENDER_COMPONENT_H
 #define AKARIRENDER_COMPONENT_H
-
+#include <Akari/Core/Akari.h>
 #include <Akari/Core/Platform.h>
-#include <Akari/Core/Property.hpp>
+#include <Akari/Core/Reflect.hpp>
 #include <Akari/Core/Serialize.hpp>
 #include <list>
 #include <memory>
 namespace Akari {
     class Component;
     class IPlugin;
-    class AKR_EXPORT Component : public Serializable, std::enable_shared_from_this<Component> {
+
+    class AKR_EXPORT Component : public Serializable, Reflect, std::enable_shared_from_this<Component> {
         bool dirty = true;
 
       public:
         Component() : dirty(true) {}
-        virtual void TraverseProperties(PropertyVisitor &visitor) {}
         virtual void Commit() {}
         virtual void ClearDirtyBit() { dirty = false; }
         virtual void SetDirtyBit() { dirty = true; }
         virtual bool IsDirty() const { return dirty; }
     };
-#define AKARI_GET_PLUGIN           AkariGetPlugin
-#define AKARI_PLUGIN_FUNC_NAME     "AkariGetPlugin"
-#define AKR_DECL_COMP(Name, Alias) MYK_TYPE(Name, Alias)
+    template <typename T, typename U> std::shared_ptr<T> Cast(const std::shared_ptr<U> &p) {
+        return std::dynamic_pointer_cast<T>(p);
+    }
+#define AKARI_GET_PLUGIN       AkariGetPlugin
+#define AKARI_PLUGIN_FUNC_NAME "AkariGetPlugin"
+#define AKR_DECL_COMP(Name, Alias)                                                                                     \
+    MYK_TYPE(Name, Alias) Akari::Type GetType() const override { return Akari::Typeof<Name>(); }
 
 #define AKR_EXPORT_COMP(Name, Interface)                                                                               \
     extern "C" AKR_EXPORT IPlugin *AKARI_GET_PLUGIN() {                                                                \

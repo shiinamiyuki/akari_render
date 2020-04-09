@@ -22,6 +22,7 @@
 
 #ifndef AKARIRENDER_SERIALIZE_HPP
 #define AKARIRENDER_SERIALIZE_HPP
+#include <Akari/Core/Akari.h>
 #include <Akari/Core/Platform.h>
 #include <miyuki.serialize/serialize.hpp>
 namespace Akari {
@@ -37,4 +38,12 @@ namespace Akari {
         Serializable::Type *getType(const std::string &s) override;
     };
 }
+
+namespace nlohmann {
+    template <> struct adl_serializer<Akari::fs::path> {
+        static void from_json(const json &j, Akari::fs::path &path) { path = Akari::fs::path(j.get<std::string>()); }
+
+        static void to_json(json &j, const Akari::fs::path &path) { j = path.string(); }
+    };
+} // namespace nlohmann
 #endif // AKARIRENDER_SERIALIZE_HPP

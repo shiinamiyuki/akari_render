@@ -32,14 +32,10 @@ namespace Akari {
         RGBTexture() = default;
         explicit RGBTexture(const vec3 &rgb) : rgb(rgb) {}
         AKR_SER(rgb)
+        AKR_COMP_PROPS(rgb)
         AKR_DECL_COMP(RGBTexture, "RGBTexture")
         Spectrum Evaluate(const ShadingPoint &sp) const override { return rgb; }
         Float AverageLuminance() const override { return rgb.Luminance(); }
-        void TraverseProperties(PropertyVisitor &visitor) override {
-            Component::TraverseProperties(visitor);
-            DefaultTraversal traversal(visitor);
-            traversal.Traverse("color", rgb);
-        }
     };
 
     AKR_EXPORT std::shared_ptr<Texture> CreateRGBTexture(const vec3 &rgb) { return std::make_shared<RGBTexture>(rgb); }

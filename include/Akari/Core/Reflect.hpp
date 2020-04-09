@@ -30,7 +30,7 @@
 
 namespace Akari {
     struct Type {
-        const char *name;
+        const char *name = nullptr;
         bool operator==(const Type &rhs) const { return name == rhs.name || strcmp(name, rhs.name) == 0; }
     };
 
@@ -61,6 +61,7 @@ namespace Akari {
         template <typename T> Any &operator=(const T &value) {
             type = Typeof<T>();
             _ptr = std::make_shared<T>(value);
+            return *this;
         }
 
       private:
@@ -101,6 +102,7 @@ namespace Akari {
         template <typename T> AnyReference &operator=(T &value) {
             type = Typeof<T>();
             _ptr = &value;
+            return *this;
         }
 
       private:
@@ -111,9 +113,9 @@ namespace Akari {
     };
 
     struct Class {
-        virtual Any Create() const = 0;
-        virtual Type GetType() const = 0;
-        const char *name() const { return GetType().name; }
+        [[nodiscard]] virtual Any Create() const = 0;
+        [[nodiscard]] virtual Type GetType() const = 0;
+        [[nodiscard]] const char *name() const { return GetType().name; }
         bool operator==(const Class &rhs) const { return GetType() == rhs.GetType(); }
     };
 
@@ -121,7 +123,7 @@ namespace Akari {
 
     inline Attributes ParseAttributes(const char *s) {
         Attributes attr;
-        int pos = 0;
+        size_t pos = 0;
         auto skip_space = [&]() {
             while (pos < strlen(s) && isspace(s[pos])) {
                 pos++;
@@ -184,23 +186,18 @@ namespace Akari {
         std::string _name;
     };
 
-    class Object {
-      protected:
-        virtual std::vector<Property> _GetProperties() const = 0;
-        virtual std::vector<Property> _GetProperties() = 0;
-
+    class Reflect {
       public:
-        std::vector<Property> GetProperties() const { return std::move(_GetProperties()); }
-
-        std::vector<Property> GetProperties() { return std::move(_GetProperties()); }
+        [[nodiscard]] virtual Type GetType() const = 0;
+        [[nodiscard]] virtual std::vector<Property> GetProperties() const { return {}; }
+        virtual std::vector<Property> GetProperties() { return {}; }
     };
 
-    struct ReflectionVisitor {
-        std::vector<Property> props;
-
+    template<typename Visitor>
+    struct ReflectionAccept {
         // this is slow
         // but easy to implement
-        template <size_t N, typename... Args> void FirstPass(const char (&args_s)[N], Args &&... args) {
+        template <size_t N, typename... Args> static void FirstPass(const char (&args_s)[N], Args &&... args) {
             std::string s = args_s;
             std::array<std::string, sizeof...(Args)> array;
             size_t pos = 0;
@@ -229,12 +226,12 @@ namespace Akari {
             }
             SecondPass<Args...>(a, std::forward<Args>(args)...);
         }
-        template <typename T> void ProcessOne(const char *s, T &&t) {
+        template <typename T> static void ProcessOne(const char *s, T &&t) {
             if (strncmp(s, "AKR_ATTR", strlen("AKR_ATTR")) == 0) {
                 s = s + strlen("AKR_ATTR");
                 std::string inside = s;
                 Attributes attr;
-                int pos = 0;
+                size_t pos = 0;
                 auto skip_space = [&]() {
                     while (pos < inside.length() && isspace(inside[pos])) {
                         pos++;
@@ -263,28 +260,38 @@ namespace Akari {
                         attr = ParseAttributes(s + pos);
                     }
                 }
-                props.emplace_back(name.c_str(), attr, t);
+                Visitor::visit(name.c_str(),  t, attr);
             } else {
-                props.emplace_back(s, Attributes(), t);
+                Visitor::visit(s, t);
             }
         }
-        void SecondPass(const char **args_s) {}
-        template <typename T, typename... Args> void SecondPass(const char **args_s, T &&t, Args &&... args) {
+        void static SecondPass(const char **args_s) {}
+        template <typename T, typename... Args> static void SecondPass(const char **args_s, T &&t, Args &&... args) {
             ProcessOne(*args_s, t);
             SecondPass(args_s + 1, std::forward<Args>(args)...);
         }
     };
-
-#define AKR_REFL(...)                                                                                                  \
-    std::vector<Property> Reflect() {                                                                                  \
+#define AKR_ATTR(var, ...) var // yes it does nothing
+#define AKR_PROPS(...)                                                                                                 \
+    std::vector<Property> GetProperties() {                                                                            \
         ReflectionVisitor visitor;                                                                                     \
         visitor.FirstPass(#__VA_ARGS__, __VA_ARGS__);                                                                  \
         return std::move(visitor.props);                                                                               \
     }                                                                                                                  \
-    std::vector<Property> Reflect() const {                                                                            \
+    std::vector<Property> GetProperties() const {                                                                      \
         ReflectionVisitor visitor;                                                                                     \
         visitor.FirstPass(#__VA_ARGS__, __VA_ARGS__);                                                                  \
         return std::move(visitor.props);                                                                               \
     }
-#define AKR_ATTR(var, ...) var // yes it does nothing
+#define AKR_COMP_PROPS(...)                                                                                                 \
+    std::vector<Property> GetProperties() override{                                                                            \
+        ReflectionVisitor visitor;                                                                                     \
+        visitor.FirstPass(#__VA_ARGS__, __VA_ARGS__);                                                                  \
+        return std::move(visitor.props);                                                                               \
+    }                                                                                                                  \
+    std::vector<Property> GetProperties() const override {                                                                      \
+        ReflectionVisitor visitor;                                                                                     \
+        visitor.FirstPass(#__VA_ARGS__, __VA_ARGS__);                                                                  \
+        return std::move(visitor.props);                                                                               \
+    }
 } // namespace Akari

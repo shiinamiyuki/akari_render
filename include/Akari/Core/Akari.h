@@ -86,5 +86,8 @@ namespace Akari {
             AKARI_PANIC(#expr " not satisfied");                                                                       \
         }                                                                                                              \
     } while (0)
+
+    using Float = float;
+    ;
 } // namespace Akari
 #endif // AKARIRENDER_AKARI_H

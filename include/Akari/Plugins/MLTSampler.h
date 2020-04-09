@@ -26,6 +26,7 @@
 
 #include <Akari/Core/Distribution.hpp>
 #include <Akari/Render/Sampler.h>
+#include <Akari/Core/Spectrum.h>
 
 namespace Akari::MLT {
     /// From LuxCoreRender

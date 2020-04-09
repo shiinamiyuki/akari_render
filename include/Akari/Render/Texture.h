@@ -25,6 +25,7 @@
 
 #include <Akari/Core/Component.h>
 #include <Akari/Render/Geometry.hpp>
+#include <Akari/Core/Spectrum.h>
 namespace Akari {
 
     class Texture : public Component {
