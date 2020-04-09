@@ -46,6 +46,9 @@ include_directories(external/fmt-6.1.2/include)
 add_subdirectory(external/fmt-6.1.2)
 set(AKARI_CORE_EXT_LIBS ${AKARI_CORE_EXT_LIBS} fmt)
 
+include_directories(external/asmjit/src)
+add_subdirectory(external/asmjit)
+
 if(AKARI_BUILD_GUI)
     set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
     set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -57,6 +60,7 @@ endif()
 
 include(cmake/Embree.cmake)
 include(cmake/OIDN.cmake)
+
 ##set(AKARI_CORE_EXT_LIBS ${AKARI_CORE_EXT_LIBS} embree embree_sse42 embree_avx embree_avx2 lexers math simd tasking sys)
 #
 file(GLOB AKARI_API_SRC include/Akari/Core/*.* include/Akari/Render/*.*)
@@ -96,6 +100,10 @@ add_subdirectory(src/Tool)
 add_executable(Akari src/App/Akari.cpp)
 target_link_libraries(Akari AkariCore)
 
+add_executable(AkariExpr src/App/AkariExpr.cpp)
+target_link_libraries(AkariExpr asmjit)
+target_link_libraries(AkariExpr AkariCore)
+target_link_libraries(AkariExpr ComplexTexture)
 if(AKARI_BUILD_GUI)
     file(GLOB AkariGuiSrc src/App/UI/*.*)
     add_executable(AkariGui ${AkariGuiSrc})

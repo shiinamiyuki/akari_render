@@ -23,17 +23,18 @@
 #include <Akari/Core/Spectrum.h>
 #include <Akari/Plugins/ComplexTexture.h>
 #include <Akari/Render/Texture.h>
+#include <asmjit/asmjit.h>
 
 namespace Akari {
     namespace detail {
         enum Opcode : uint8_t {
             OP_NONE,
-            OP_ADD, // ADD A, B, C ; R[C] = R[A] + R[B]
+            OP_ADD, // ADD A, B, C ; R[A] = R[B] + R[C]
             OP_SUB,
             OP_MUL,
             OP_DIV,
-            OP_MOVE, // MOV A B; R[B] = R[A]
-            OP_DOT,  // DOT A,B,C
+            OP_MOVE, // MOV A B; R[A] = R[B]
+            OP_DOT,  // DOT A,B,C; A = B * C
             OP_CROSS,
             OP_CMP_LT,
             OP_CMP_LE,
@@ -43,18 +44,28 @@ namespace Akari {
             OP_CMP_NE,
             OP_BZ, // BZ A, OFFSET;
             OP_JMP,
-            OP_TEXTURE, // TEXTURE A, B, C; R[C] = texture2D(R[A] as Texture, R[B] as TexCoord)
+            OP_TEXTURE, // TEXTURE A, B, C; R[A] = texture2D(R[B] as Texture, R[C] as TexCoord)
+            OP_FLOAT,   // LOAD NEXT 4 BYTES TO A
         };
         using Register = vec4;
         struct Instruction {
-            Opcode op;
-            uint8_t A;
             union {
                 struct {
-                    uint8_t B, C;
+                    Opcode op;
+                    uint8_t A;
+                    union {
+                        struct {
+                            uint8_t B, C;
+                        };
+                        uint16_t offset;
+                    };
                 };
-                uint16_t offset;
+                float asFloat;
             };
+            Instruction(float f) : asFloat(f) {}
+            Instruction() = default;
+            Instruction(Opcode op, uint8_t A, uint8_t B, uint8_t C) : op(op), A(A), B(B), C(C) {}
+            Instruction(Opcode op, uint8_t A) : op(op), A(A), offset(0) {}
         };
         static_assert(sizeof(Instruction) == sizeof(uint8_t) * 4);
         struct ExecutionEngine {
@@ -74,46 +85,52 @@ namespace Akari {
                     auto &R = registers;
                     bool incPc = true;
                     switch (op) {
+                    case OP_FLOAT: {
+                        pc++;
+                        R[A] =
+                            vec4((*reinterpret_cast<const Instruction *>(&program[pc * sizeof(Instruction)])).asFloat);
+                        break;
+                    }
                     case OP_ADD:
-                        R[C] = R[A] + R[B];
+                        R[A] = R[B] + R[C];
                         break;
                     case OP_NONE:
                         break;
                     case OP_SUB:
-                        R[C] = R[A] - R[B];
+                        R[A] = R[B] - R[C];
                         break;
                     case OP_MUL:
-                        R[C] = R[A] * R[B];
+                        R[A] = R[B] * R[C];
                         break;
                     case OP_DIV:
-                        R[C] = R[A] / R[B];
+                        R[A] = R[B] / R[C];
                         break;
                     case OP_MOVE:
-                        R[B] = R[A];
+                        R[A] = R[B];
                         break;
                     case OP_DOT:
-                        R[C] = vec4(dot(vec3(R[A]), vec3(R[B])));
+                        R[A] = vec4(dot(vec3(R[B]), vec3(R[C])));
                         break;
                     case OP_CROSS:
-                        R[C] = vec4(cross(vec3(R[A]), vec3(R[B])), R[C].w);
+                        R[A] = vec4(cross(vec3(R[B]), vec3(R[C])), R[A].w);
                         break;
                     case OP_CMP_LT:
-                        R[C].x = R[A].x < R[B].x;
+                        R[A].x = R[B].x < R[C].x;
                         break;
                     case OP_CMP_LE:
-                        R[C].x = R[A].x <= R[B].x;
+                        R[A].x = R[B].x <= R[C].x;
                         break;
                     case OP_CMP_GT:
-                        R[C].x = R[A].x > R[B].x;
+                        R[A].x = R[B].x > R[C].x;
                         break;
                     case OP_CMP_GE:
-                        R[C].x = R[A].x >= R[B].x;
+                        R[A].x = R[B].x >= R[C].x;
                         break;
                     case OP_CMP_EQ:
-                        R[C].x = R[A].x == R[B].x;
+                        R[A].x = R[B].x == R[C].x;
                         break;
                     case OP_CMP_NE:
-                        R[C].x = R[A].x != R[B].x;
+                        R[A].x = R[B].x != R[C].x;
                         break;
                     case OP_BZ:
                         if (!R[A].x) {
@@ -138,12 +155,49 @@ namespace Akari {
     } // namespace detail
     class ComplexTexture final : public Texture {
         json program;
+        std::vector<detail::Instruction> compiledProgram;
 
       public:
+        ComplexTexture() = default;
+        ComplexTexture(const json &prog) : program(prog) {}
         AKR_SER(program)
         AKR_DECL_COMP(ComplexTexture, "ComplexTexture")
-        void Commit() override {}
-        Spectrum Evaluate(const ShadingPoint &sp) const override { return Spectrum(0); }
+        void Commit() override {
+            using namespace detail;
+            uint8_t id = 0;
+            auto compile = [=, &id](const json &expr, auto &&F) -> uint8_t {
+                auto ret = id++;
+                if (expr.is_number()) {
+                    compiledProgram.emplace_back(OP_FLOAT, ret);
+                    compiledProgram.emplace_back(expr.get<float>());
+                    return ret;
+                }
+                auto op = expr.at(0);
+                if (op == "+") {
+                    compiledProgram.emplace_back(OP_ADD, ret, F(expr.at(1), F), F(expr.at(2), F));
+                } else if (op == "-") {
+                    compiledProgram.emplace_back(OP_SUB, ret, F(expr.at(1), F), F(expr.at(2), F));
+                } else if (op == "*") {
+                    compiledProgram.emplace_back(OP_MUL, ret, F(expr.at(1), F), F(expr.at(2), F));
+                } else if (op == "/") {
+                    compiledProgram.emplace_back(OP_DIV, ret, F(expr.at(1), F), F(expr.at(2), F));
+                }
+                return ret;
+            };
+            compile(program, compile);
+        }
+        Spectrum Evaluate(const ShadingPoint &sp) const override {
+            using namespace detail;
+            ExecutionEngine engine;
+            engine.programSize = compiledProgram.size();
+            engine.program = (const uint8_t *)compiledProgram.data();
+            engine.Run(sp);
+            return vec3(engine.registers[0]);
+        }
     };
     AKR_EXPORT_COMP(ComplexTexture, "Texture")
+
+    std::shared_ptr<Texture> CreateComplexTexture(const json &program) {
+        return std::make_shared<ComplexTexture>(program);
+    }
 } // namespace Akari

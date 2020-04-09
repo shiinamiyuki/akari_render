@@ -10,3 +10,6 @@
 [submodule "external/oidn"]
 	path = external/oidn
 	url = https://github.com/OpenImageDenoise/oidn.git
+[submodule "external/asmjit"]
+	path = external/asmjit
+	url = https://github.com/asmjit/asmjit
