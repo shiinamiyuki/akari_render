@@ -193,11 +193,10 @@ namespace Akari {
         virtual std::vector<Property> GetProperties() { return {}; }
     };
 
-    template<typename Visitor>
-    struct ReflectionAccept {
+    template <typename Visitor> struct ReflectionAccept : Visitor {
         // this is slow
         // but easy to implement
-        template <size_t N, typename... Args> static void FirstPass(const char (&args_s)[N], Args &&... args) {
+        template <size_t N, typename... Args> void FirstPass(const char (&args_s)[N], Args &&... args) {
             std::string s = args_s;
             std::array<std::string, sizeof...(Args)> array;
             size_t pos = 0;
@@ -226,7 +225,7 @@ namespace Akari {
             }
             SecondPass<Args...>(a, std::forward<Args>(args)...);
         }
-        template <typename T> static void ProcessOne(const char *s, T &&t) {
+        template <typename T> void ProcessOne(const char *s, T &&t) {
             if (strncmp(s, "AKR_ATTR", strlen("AKR_ATTR")) == 0) {
                 s = s + strlen("AKR_ATTR");
                 std::string inside = s;
@@ -260,37 +259,46 @@ namespace Akari {
                         attr = ParseAttributes(s + pos);
                     }
                 }
-                Visitor::visit(name.c_str(),  t, attr);
+                Visitor::visit(name.c_str(), t, attr);
             } else {
                 Visitor::visit(s, t);
             }
         }
-        void static SecondPass(const char **args_s) {}
-        template <typename T, typename... Args> static void SecondPass(const char **args_s, T &&t, Args &&... args) {
+        void SecondPass(const char **args_s) {}
+        template <typename T, typename... Args> void SecondPass(const char **args_s, T &&t, Args &&... args) {
             ProcessOne(*args_s, t);
             SecondPass(args_s + 1, std::forward<Args>(args)...);
         }
     };
 #define AKR_ATTR(var, ...) var // yes it does nothing
+
+    struct GetPropertyVisitor {
+        std::vector<Property> props;
+        template <typename T> void visit(const char *name, T &&value) { props.emplace_back(name, Attributes(), value); }
+        template <typename T> void visit(const char *name, T &&value, const Attributes &attr) {
+            props.emplace_back(name, attr, value);
+        }
+    };
+
 #define AKR_PROPS(...)                                                                                                 \
     std::vector<Property> GetProperties() {                                                                            \
-        ReflectionVisitor visitor;                                                                                     \
+        ReflectionAccept<GetPropertyVisitor> visitor;                                                                  \
         visitor.FirstPass(#__VA_ARGS__, __VA_ARGS__);                                                                  \
         return std::move(visitor.props);                                                                               \
     }                                                                                                                  \
     std::vector<Property> GetProperties() const {                                                                      \
-        ReflectionVisitor visitor;                                                                                     \
+        ReflectionAccept<GetPropertyVisitor> visitor;                                                                  \
         visitor.FirstPass(#__VA_ARGS__, __VA_ARGS__);                                                                  \
         return std::move(visitor.props);                                                                               \
     }
-#define AKR_COMP_PROPS(...)                                                                                                 \
-    std::vector<Property> GetProperties() override{                                                                            \
-        ReflectionVisitor visitor;                                                                                     \
+#define AKR_COMP_PROPS(...)                                                                                            \
+    std::vector<Property> GetProperties() override {                                                                   \
+        ReflectionAccept<GetPropertyVisitor> visitor;                                                                  \
         visitor.FirstPass(#__VA_ARGS__, __VA_ARGS__);                                                                  \
         return std::move(visitor.props);                                                                               \
     }                                                                                                                  \
-    std::vector<Property> GetProperties() const override {                                                                      \
-        ReflectionVisitor visitor;                                                                                     \
+    std::vector<Property> GetProperties() const override {                                                             \
+        ReflectionAccept<GetPropertyVisitor> visitor;                                                                  \
         visitor.FirstPass(#__VA_ARGS__, __VA_ARGS__);                                                                  \
         return std::move(visitor.props);                                                                               \
     }
