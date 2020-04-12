@@ -20,7 +20,7 @@ if(MSVC)
     set(CMAKE_STATIC_LINKER_FLAGS  "${CMAKE_STATIC_LINKER_FLAGS} /LTCG:INCREMENTAL")
     set(CMAKE_SHARED_LINKER_FLAGS   "${CMAKE_SHARED_LINKER_FLAGS} /LTCG:INCREMENTAL")
 else()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -mavx2")
     set(AKARI_CORE_EXT_LIBS ${AKARI_CORE_EXT_LIBS} stdc++fs)
 endif()
 
@@ -60,6 +60,7 @@ endif()
 
 include(cmake/Embree.cmake)
 include(cmake/OIDN.cmake)
+include(cmake/LLVM.cmake)
 
 ##set(AKARI_CORE_EXT_LIBS ${AKARI_CORE_EXT_LIBS} embree embree_sse42 embree_avx embree_avx2 lexers math simd tasking sys)
 #

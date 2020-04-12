@@ -1,9 +1,7 @@
-set(LLVM_ROOT "" CACHE STRING "Root to LLVM")
-
-if(LLVM_ROOT STREQUAL "")
-    message(FATAL_ERROR "LLVM_ROOT must be set")
+find_package(LLVM REQUIRED CONFIG)
+if(NOT LLVM_FOUND)
+    message(FATAL_ERROR "LLVM not found")
+else()
+    message(STATUS "Found LLVM ${LLVM_VERSION}")
+    message(STATUS "LLVM_INCLUDE_DIR" ${LLVM_INCLUDE_DIR})
 endif()
-
-
-set(LLVM_LIBRARIES ${LLVM_ROOT}/bin)
-set(LLVM_INCLUDE_DIRS ${LLVM_ROOT}/include)
