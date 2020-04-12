@@ -110,4 +110,4 @@ if(AKARI_BUILD_GUI)
     target_link_libraries(AkariGui ImGui AkariCore)
 endif()
 
-
+add_executable(test-simd src/Test/simd.cpp)
