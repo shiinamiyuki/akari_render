@@ -8,7 +8,7 @@ option(AKARI_BUILD_GUI "Build Gui / Editor" OFF)
 #
 include_directories(external/glm)
 include_directories(external/misc)
-include_directories(external/miyuki.serialize/include)
+include_directories(external/json)
 include_directories(external/cxxopts/include)
 
 include_directories(include)

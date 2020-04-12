@@ -41,21 +41,21 @@ namespace Akari {
         ~SharedLibraryLoader();
     };
 
-    class AKR_EXPORT IPlugin {
+    class AKR_EXPORT Plugin {
       public:
-        virtual TypeInfo *GetTypeInfo() = 0;
-        virtual const char * GetInterface() = 0;
+        [[nodiscard]] virtual Class *GetClass() const = 0;
+        [[nodiscard]] virtual const char *GetInterface() const = 0;
     };
 
-    class AKR_EXPORT IPluginManager {
+    class AKR_EXPORT PluginManager {
       public:
-        virtual void SetPluginPath(const char * path) = 0;
+        virtual void SetPluginPath(const char *path) = 0;
         virtual bool LoadPath(const char *path) = 0;
-        virtual IPlugin * LoadPlugin(const char *name) = 0;
-        virtual void ForeachPlugin(const std::function<void(IPlugin *)> & func) = 0;
+        virtual Plugin *LoadPlugin(const char *name) = 0;
+        virtual void ForeachPlugin(const std::function<void(Plugin *)> &func) = 0;
     };
 
-    AKR_EXPORT IPluginManager *GetPluginManager();
+    AKR_EXPORT PluginManager *GetPluginManager();
 
 } // namespace Akari
 #endif // AKARIRENDER_PLUGIN_H

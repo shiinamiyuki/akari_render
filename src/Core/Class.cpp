@@ -19,22 +19,17 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-#include <Akari/Core/Component.h>
-#include <Akari/Core/Plugin.h>
-#include <Akari/Core/Serialize.hpp>
+
+#include <Akari/Core/Class.h>
 
 namespace Akari {
-    Class *SerializeContext::GetClass(const std::string &s) {
-        try {
-            return Context::GetClass(s);
-        } catch (Serialize::NoSuchTypeError &err) {
-            auto pluginManager = GetPluginManager();
-            auto plugin = pluginManager->LoadPlugin(s.c_str());
-            if (!plugin) {
-                throw err;
-            }
-            Context::registerType(plugin->GetClass());
-            return plugin->GetClass();
-        }
+    using namespace Serialize;
+    Class::Class(const std::string &name, DefaultConstructor constructor, LoadFunction loader, SaveFunction saver)
+        : _name(name), _ctor(std::move(constructor)), _loader(std::move(loader)), _saver(std::move(saver)) {}
+    void Class::Load(Serializable &self, InputArchive &ar) const {
+        _loader(self, ar);
+    }
+    void Class::Save(const Serializable &self, OutputArchive &ar) const {
+        _saver(self, ar);
     }
 } // namespace Akari

@@ -149,13 +149,13 @@ int main(int argc, char **argv) {
     fs::path out = argc >= 3 ? argv[2] : fs::path(in).replace_extension("");
 
     std::shared_ptr<SceneGraph> graph;
-    ReviveContext ctx;
+    SerializeContext ctx;
     CurrentPathGuard _guard;
     auto mesh = Convert(in, out);
     if(out.extension().empty()){
         out.concat(".json");
     }
-    auto data = miyuki::serialize::toJson(ctx, mesh);
+    auto data = Serialize::toJson(ctx, mesh);
     std::ofstream o(out);
     o << data.dump(1) << std::endl;
 

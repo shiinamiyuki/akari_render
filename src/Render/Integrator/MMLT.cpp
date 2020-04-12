@@ -269,8 +269,8 @@ namespace Akari {
 )",
                 directSamples);
             auto setting = json::parse(pathTracerSetting);
-            ReviveContext reviveContext;
-            auto pathTracer = miyuki::serialize::fromJson<std::shared_ptr<Integrator>>(reviveContext, setting);
+            SerializeContext s_ctx;
+            auto pathTracer = Serialize::fromJson<std::shared_ptr<Integrator>>(s_ctx, setting);
             AKARI_ASSERT(pathTracer);
             Info("Render direct samples\n");
             (void)pathTracer;

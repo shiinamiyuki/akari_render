@@ -26,7 +26,7 @@
 #include <Akari/Core/Config.h>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <miyuki.serialize/json/json.hpp>
+#include <json.hpp>
 
 namespace Akari::math {
     using namespace glm;

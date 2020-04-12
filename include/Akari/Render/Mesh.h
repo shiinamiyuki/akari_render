@@ -39,7 +39,7 @@ namespace Akari {
             int group = -1;
         };
 
-        [[nodiscard]] virtual const Vertex * GetVertexBuffer() const = 0;
+        [[nodiscard]] virtual const Vertex *GetVertexBuffer() const = 0;
         [[nodiscard]] virtual const int *GetIndexBuffer() const = 0;
         [[nodiscard]] virtual size_t GetTriangleCount() const = 0;
         [[nodiscard]] virtual int GetPrimitiveGroup(int idx) const = 0;
@@ -117,21 +117,21 @@ namespace Akari {
         std::shared_ptr<Mesh> mesh;
         //        AKR_SER(file, mesh)
         template <class Archive> void save(Archive &ar) const {
-            miyuki::serialize::AutoSaveVisitor v{ar};
-            MYK_REFL(v, file, transform);
+            Akari::Serialize::AutoSaveVisitor v{ar};
+            _AKR_DETAIL_REFL(v, file, transform);
             std::ofstream out(file);
-            auto& ctx = ar.getContext();
-            auto j = miyuki::serialize::toJson(ctx, mesh);
+            auto &ctx = ar.getContext();
+            auto j = Serialize::toJson(ctx, mesh);
             out << j.dump(1) << std::endl;
         }
         template <class Archive> void load(Archive &ar) {
-            miyuki::serialize::AutoLoadVisitor v{ar};
-            MYK_REFL(v, file, transform);
+            Akari::Serialize::AutoLoadVisitor v{ar};
+            _AKR_DETAIL_REFL(v, file, transform);
             std::ifstream in(file);
             std::string str((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
             json data = str.empty() ? json::object() : json::parse(str);
-            auto& ctx = ar.getContext();
-            mesh = miyuki::serialize::fromJson<std::shared_ptr<Mesh>>(ctx, data);
+            auto &ctx = ar.getContext();
+            mesh = Serialize::fromJson<std::shared_ptr<Mesh>>(ctx, data);
         }
     };
 } // namespace Akari

@@ -24,7 +24,7 @@
 #define AKARIRENDER_SPECTRUM_H
 
 #include <Akari/Core/Math.h>
-#include <miyuki.serialize/json/json.hpp>
+#include <json.hpp>
 namespace Akari {
     template <size_t N> struct CoefficientSpectrum : public vec<N, float, defaultp> {
         using vec<N, float, defaultp>::vec;

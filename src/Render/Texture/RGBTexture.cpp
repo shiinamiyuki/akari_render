@@ -32,7 +32,7 @@ namespace Akari {
         RGBTexture() = default;
         explicit RGBTexture(const vec3 &rgb) : rgb(rgb) {}
         AKR_SER(rgb)
-        AKR_COMP_PROPS(rgb)
+//        AKR_COMP_PROPS(rgb)
         AKR_DECL_COMP(RGBTexture, "RGBTexture")
         Spectrum Evaluate(const ShadingPoint &sp) const override { return rgb; }
         Float AverageLuminance() const override { return rgb.Luminance(); }

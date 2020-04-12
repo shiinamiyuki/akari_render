@@ -28,9 +28,10 @@
 #include <Akari/Core/Serialize.hpp>
 #include <list>
 #include <memory>
+#include <mutex>
 namespace Akari {
     class Component;
-    class IPlugin;
+    class Plugin;
 
     class AKR_EXPORT Component : public Serializable, Reflect, std::enable_shared_from_this<Component> {
         bool dirty = true;
@@ -47,20 +48,36 @@ namespace Akari {
     }
 #define AKARI_GET_PLUGIN       AkariGetPlugin
 #define AKARI_PLUGIN_FUNC_NAME "AkariGetPlugin"
+
+#define AKR_STATIC_CLASS(CLASS, ALIAS)                                                                                 \
+    static Akari::Class *StaticClass() {                                                                               \
+        static std::unique_ptr<Class> _class;                                                                          \
+        static std::once_flag flag;                                                                                    \
+        std::call_once(flag, [&]() {                                                                                   \
+            _class = std::make_unique<Class>(                                                                          \
+                ALIAS, []() { return std::make_shared<CLASS>(); },                                                     \
+                [](Serializable &self, Serialize::InputArchive &ar) { dynamic_cast<CLASS &>(self).load(ar); },                    \
+                [](const Serializable &self, Serialize::OutputArchive &ar) { dynamic_cast<const CLASS &>(self).save(ar); });      \
+        });                                                                                                            \
+        return _class.get();                                                                                                \
+    }                                                                                                                  \
+    Akari::Class *GetClass() const override { return StaticClass(); }
+
 #define AKR_DECL_COMP(Name, Alias)                                                                                     \
-    MYK_TYPE(Name, Alias) Akari::Type GetType() const override { return Akari::Typeof<Name>(); }
+    AKR_STATIC_CLASS(Name, Alias)                                                                                              \
+    Akari::Type GetType() const override { return Akari::Typeof<Name>(); }
 
 #define AKR_EXPORT_COMP(Name, Interface)                                                                               \
-    extern "C" AKR_EXPORT IPlugin *AKARI_GET_PLUGIN() {                                                                \
-        struct ThisPlugin : IPlugin {                                                                                  \
-            TypeInfo *GetTypeInfo() override { return Name::staticType(); }                                            \
-            const char *GetInterface() override { return strlen(Interface) == 0 ? "Default" : Interface; }             \
+    extern "C" AKR_EXPORT Plugin *AKARI_GET_PLUGIN() {                                                                 \
+        struct ThisPlugin : Plugin {                                                                                   \
+            Class *GetClass() const override { return Name::StaticClass(); }                                                 \
+            const char *GetInterface() const override { return strlen(Interface) == 0 ? "Default" : Interface; }             \
         };                                                                                                             \
         static ThisPlugin plugin;                                                                                      \
         return &plugin;                                                                                                \
     }
 
-    using GetPluginFunc = IPlugin *(*)();
+    using GetPluginFunc = Akari::Plugin *(*)();
     AKR_EXPORT std::shared_ptr<Component> CreateComponent(const char *type);
 
 } // namespace Akari

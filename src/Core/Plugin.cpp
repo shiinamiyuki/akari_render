@@ -59,8 +59,8 @@ namespace Akari {
 
 namespace Akari {
 
-    class PluginManager : public IPluginManager {
-        std::unordered_map<std::string, IPlugin *> plugins;
+    class PluginManagerImpl : public PluginManager {
+        std::unordered_map<std::string, Plugin *> plugins;
         std::vector<std::unique_ptr<SharedLibraryLoader>> sharedLibraries;
         fs::path prefix = fs::absolute(fs::path("./"));
 
@@ -79,12 +79,12 @@ namespace Akari {
                 return false;
             }
             auto plugin = ((GetPluginFunc)p)();
-            plugins[plugin->GetTypeInfo()->name()] = plugin;
+            plugins[plugin->GetClass()->GetName()] = plugin;
             sharedLibraries.emplace_back(std::move(lib));
             return true;
         }
 
-        IPlugin *LoadPlugin(const char *name) override {
+        Plugin *LoadPlugin(const char *name) override {
             auto it = plugins.find(name);
             if (it != plugins.end()) {
                 return it->second;
@@ -106,15 +106,15 @@ namespace Akari {
             return nullptr;
         }
 
-        void ForeachPlugin(const std::function<void(IPlugin *)> &func) override {
+        void ForeachPlugin(const std::function<void(Plugin *)> &func) override {
             for (auto &el : plugins) {
                 func(el.second);
             }
         }
     };
 
-    AKR_EXPORT IPluginManager *GetPluginManager() {
-        static PluginManager manager;
+    AKR_EXPORT PluginManager *GetPluginManager() {
+        static PluginManagerImpl manager;
         return &manager;
     }
 
@@ -125,8 +125,8 @@ namespace Akari {
             Error("Failed to create component: `{}`\n", type);
             return nullptr;
         }
-        auto obj = std::shared_ptr<Serializable>(plugin->GetTypeInfo()->_create());
-        return Cast<Component>(obj);
+        auto obj = cast<Component>(plugin->GetClass()->Create());
+        return obj;
     }
 
 } // namespace Akari

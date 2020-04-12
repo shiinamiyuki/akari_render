@@ -24,21 +24,14 @@
 #define AKARIRENDER_SERIALIZE_HPP
 #include <Akari/Core/Akari.h>
 #include <Akari/Core/Platform.h>
-#include <miyuki.serialize/serialize.hpp>
+#include <Akari/Core/detail/serialize-impl.hpp>
+#include <json.hpp>
 namespace Akari {
-    using miyuki::serialize::Serializable;
-    using miyuki::serialize::InputArchive;
-    using miyuki::serialize::OutputArchive;
-    using miyuki::serialize::Context;
-    using TypeInfo = Serializable::Type;
-#define AKR_SER(...) MYK_SER(__VA_ARGS__)
-    class AKR_EXPORT ReviveContext : public miyuki::serialize::Context{
+    class AKR_EXPORT SerializeContext : public Serialize::Context {
       public:
-      private:
-        Serializable::Type *getType(const std::string &s) override;
+        Class *GetClass(const std::string &s) override;
     };
-}
-
+} // namespace Akari
 namespace nlohmann {
     template <> struct adl_serializer<Akari::fs::path> {
         static void from_json(const json &j, Akari::fs::path &path) { path = Akari::fs::path(j.get<std::string>()); }

@@ -19,22 +19,30 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-#include <Akari/Core/Component.h>
-#include <Akari/Core/Plugin.h>
-#include <Akari/Core/Serialize.hpp>
 
+#ifndef AKARIRENDER_OBJECT_H
+#define AKARIRENDER_OBJECT_H
+
+#include <Akari/Core/Class.h>
+#include <Akari/Core/Platform.h>
 namespace Akari {
-    Class *SerializeContext::GetClass(const std::string &s) {
-        try {
-            return Context::GetClass(s);
-        } catch (Serialize::NoSuchTypeError &err) {
-            auto pluginManager = GetPluginManager();
-            auto plugin = pluginManager->LoadPlugin(s.c_str());
-            if (!plugin) {
-                throw err;
-            }
-            Context::registerType(plugin->GetClass());
-            return plugin->GetClass();
-        }
+
+    class AKR_EXPORT Object {
+      public:
+        [[nodiscard]] virtual Class *GetClass() const = 0;
+        virtual ~Object()=default;
+    };
+    namespace Serialize {
+        class OutputArchive;
+        class InputArchive;
     }
+    class AKR_EXPORT Serializable : public Object {
+      public:
+        template <class Archive> void save(Archive &) const {}
+
+        template <class Archive> void load(Archive &) {}
+    };
+
 } // namespace Akari
+
+#endif // AKARIRENDER_OBJECT_H
