@@ -1,6 +1,3 @@
-[submodule "external/miyuki.serialize"]
-	path = external/miyuki.serialize
-	url = https://github.com/shiinamiyuki/miyuki.serialize
 [submodule "external/tinyobjloader"]
 	path = external/tinyobjloader
 	url = https://github.com/tinyobjloader/tinyobjloader
