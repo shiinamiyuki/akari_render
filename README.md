@@ -1,7 +1,7 @@
 <center><h1>AkariRender</h1></center>
 <center>Extensible Physically Based Renderer (and More!)</center>
 
-![](gallery/final_bdpt.png)
+![](gallery/final-bdpt.png)
 
 AkariRender is a modular physically based renderer written in C++17.
 ### Status
