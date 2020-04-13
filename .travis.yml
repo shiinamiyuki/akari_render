@@ -7,11 +7,8 @@ notifications:
 addons:
   apt:
     sources:
-    - ubuntu-toolchain-r-test
-    - llvm-toolchain-precise-3.6
-    - kalakris-cmake
     packages:
-    - gcc-5
-    - g++-5
+    - gcc-8
+    - g++-8
     - cmake
 script: mkdir build && cd build && cmake ../ && make -r -j 2
