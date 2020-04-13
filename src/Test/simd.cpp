@@ -23,6 +23,8 @@
 #include <array>
 #include <cstdint>
 #include <cstring>
+#include <glm/detail/type_vec4.hpp>
+#include <glm/vec3.hpp>
 #include <immintrin.h>
 #include <type_traits>
 #include <xmmintrin.h>
@@ -45,13 +47,23 @@ template <size_t N> struct array_padded_size<int32_t, N> {
     constexpr static size_t value = N < 2 ? N : align_to<N, 4>;
 };
 struct simdf32x8 {
-    __m256 m;
+    union {
+        __m256 m;
+        __m256i mi;
+    };
 };
 static_assert(sizeof(simdf32x8) == sizeof(__m256));
 struct simdf32x4 {
-    __m128 m;
+    union {
+        __m128 m;
+        __m128 mi;
+    };
 };
+
 static_assert(sizeof(simdf32x4) == sizeof(__m128));
+using simdi32x4 = simdf32x4;
+using simdi32x8 = simdf32x8;
+
 template <size_t N> struct simd32_storage_type_list;
 
 template <size_t N, typename = void> struct simd32_storage {
@@ -85,8 +97,21 @@ template <size_t N> struct array_storage<float, N> {
         simd32_storage<padded_size> _m;
     };
 };
+template <size_t N> struct array_storage<int32_t, N> {
+    using T = int32_t;
+    constexpr static size_t padded_size = array_padded_size<float, N>::value;
+    union {
+        alignas(array_alignment<float, N>::value) int32_t data[padded_size];
+        simd32_storage<padded_size> _m;
+    };
+};
 template <size_t N> struct array_mask;
-
+template <size_t N> struct array_mask : array_storage<int32_t, N> {
+    array_mask(bool v = true) { std::memset(this, v ? 0xFF : 0, sizeof(*this)); }
+    operator bool() const { return any(*this); }
+    int32_t &operator[](size_t i) { return this->data[i]; }
+    const int32_t &operator[](size_t i) const { return this->data[i]; }
+};
 template <size_t N> bool any(const array_mask<N> &mask) {
     bool result = false;
     for (size_t i = 0; i < N; i++) {
@@ -133,12 +158,17 @@ template <size_t N> struct array_mask_or {
     }
 };
 
-template <size_t N> struct array_mask : std::array<int32_t, array_padded_size<int32_t, N>::value> {
-    array_mask(bool v = true) { std::memset(this, v, sizeof(*this)); }
-    operator bool() const { return any(*this); }
+template <typename T, size_t N> struct simd_array;
+template <typename T, size_t N> struct array_broadcast {
+    static void apply(simd_array<T, N> &arr, const T &v) {
+        for (size_t i = 0; i < N; i++) {
+            arr[i] = v;
+        }
+    }
 };
-
 template <typename T, size_t N> struct simd_array : public array_storage<T, N> {
+    simd_array() = default;
+    simd_array(const T &v) { array_broadcast<T, N>::apply(*this, v); }
     T &operator[](size_t i) { return this->data[i]; }
     const T &operator[](size_t i) const { return this->data[i]; }
 };
@@ -179,12 +209,30 @@ template <typename T, size_t N> struct array_select {
     }
 };
 
+#define AKR_SIMD_DEFAULT_CMP_OPERATOR(delegate, op)                                                                    \
+    template <typename T, size_t N> struct delegate {                                                                  \
+        using A = simd_array<T, N>;                                                                                    \
+        static array_mask<N> apply(const A &a, const A &b) {                                                           \
+            array_mask<N> mask;                                                                                        \
+            for (size_t i = 0; i < N; i++) {                                                                           \
+                mask[i] = (a[i] op b[i]) ? 0xFFFFFFFF : 0;                                                             \
+            }                                                                                                          \
+            return mask;                                                                                               \
+        }                                                                                                              \
+    };
+
 AKR_SIMD_DEFAULT_OPERATOR(array_operator_add, +=)
 AKR_SIMD_DEFAULT_OPERATOR(array_operator_sub, -=)
 AKR_SIMD_DEFAULT_OPERATOR(array_operator_mul, *=)
 AKR_SIMD_DEFAULT_OPERATOR(array_operator_div, /=)
 AKR_SIMD_DEFAULT_SCALAR_OPERATOR(array_operator_scalar_mul, *=)
 AKR_SIMD_DEFAULT_SCALAR_OPERATOR(array_operator_scalar_div, /=)
+AKR_SIMD_DEFAULT_CMP_OPERATOR(array_operator_lt, <)
+AKR_SIMD_DEFAULT_CMP_OPERATOR(array_operator_le, <=)
+AKR_SIMD_DEFAULT_CMP_OPERATOR(array_operator_gt, >)
+AKR_SIMD_DEFAULT_CMP_OPERATOR(array_operator_ge, >=)
+AKR_SIMD_DEFAULT_CMP_OPERATOR(array_operator_eq, ==)
+AKR_SIMD_DEFAULT_CMP_OPERATOR(array_operator_neq, !=)
 
 #define AKR_SIMD_GEN_OPERATOR_(op, delegate)                                                                           \
     template <typename T, typename U, size_t N>                                                                        \
@@ -202,6 +250,11 @@ AKR_SIMD_DEFAULT_SCALAR_OPERATOR(array_operator_scalar_div, /=)
             delegate<T, N>::apply(tmpA, tmpB);                                                                         \
             return tmpA;                                                                                               \
         }                                                                                                              \
+    }
+
+#define AKR_SIMD_GEN_CMP_OPERATOR_(op, delegate)                                                                       \
+    template <typename T, size_t N> inline auto operator op(const simd_array<T, N> &a, const simd_array<T, N> &b) {    \
+        return delegate<T, N>::apply(a, b);                                                                            \
     }
 
 #define AKR_SIMD_GEN_SCALAR_RIGHT_OPERATOR_(op, delegate)                                                              \
@@ -247,64 +300,94 @@ AKR_SIMD_GEN_SCALAR_RIGHT_OPERATOR_(/, array_operator_scalar_div)
 AKR_SIMD_GEN_SCALAR_LEFT_OPERATOR_(*, array_operator_scalar_mul)
 AKR_SIMD_GEN_SCALAR_LEFT_OPERATOR_(/, array_operator_scalar_div)
 
-//#define AKR_SIMD_GEN_VFLOAT_OPERATOR_(assign_op, delegate, intrin_sse, intrin_avx2)                                    \
-//    template <size_t N> void delegate##_simd_float_impl(float *A, const float *B);                                     \
-//    template <size_t N, size_t Shift> void delegate##_simd_float_impl_shift(float *A, const float *B) {                \
-//        return delegate##_simd_float_impl<N - Shift>(A + Shift, B + Shift);                                            \
-//    }                                                                                                                  \
-//    template <size_t N> void delegate##_simd_float_impl(float *A, const float *B) {                                    \
-//        if constexpr (N >= 8 && MaxISA >= AKR_ISA_AVX) {                                                               \
-//            auto a = reinterpret_cast<__m256 *>(A);                                                                    \
-//            auto b = reinterpret_cast<const __m256 *>(B);                                                              \
-//            *a = _mm256_add_ps(*a, *b);                                                                                \
-//            delegate##_simd_float_impl_shift<N, 8>(A, B);                                                              \
-//        } else if constexpr (N >= 4 && MaxISA >= AKR_ISA_SSE) {                                                        \
-//            auto a = reinterpret_cast<__m128 *>(A);                                                                    \
-//            auto b = reinterpret_cast<const __m128 *>(B);                                                              \
-//            *a = _mm_add_ps(*a, *b);                                                                                   \
-//            delegate##_simd_float_impl_shift<N, 4>(A, B);                                                              \
-//        } else {                                                                                                       \
-//            for (int i = 0; i < N; i++) {                                                                              \
-//                A[i] assign_op B[i];                                                                                   \
-//            }                                                                                                          \
-//        }                                                                                                              \
-//    }                                                                                                                  \
-//    template <size_t N> struct delegate<float, N> {                                                                    \
-//        using A = simd_array<float, N>;                                                                                \
-//        static void apply(A &a, const A &b) {                                                                          \
-//            auto *A = reinterpret_cast<float *>(&a);                                                                   \
-//            auto *B = reinterpret_cast<const float *>(&b);                                                             \
-//            delegate##_simd_float_impl<A::padded_size>(A, B);                                                          \
-//        }                                                                                                              \
-//    };
+AKR_SIMD_GEN_CMP_OPERATOR_(<, array_operator_lt)
+AKR_SIMD_GEN_CMP_OPERATOR_(<=, array_operator_le)
+AKR_SIMD_GEN_CMP_OPERATOR_(>, array_operator_gt)
+AKR_SIMD_GEN_CMP_OPERATOR_(>=, array_operator_ge)
+AKR_SIMD_GEN_CMP_OPERATOR_(==, array_operator_eq)
+AKR_SIMD_GEN_CMP_OPERATOR_(!=, array_operator_neq)
 
 #define AKR_SIMD_GEN_VFLOAT_OPERATOR_(assign_op, delegate, intrin_sse, intrin_avx2)                                    \
-    template <size_t N> inline void delegate##_simd_float_impl(simd32_storage<N> &lhs, const simd32_storage<N> &rhs) { \
-        using head = decltype(simd32_storage<N>::head);                                                                \
-        constexpr size_t rest = simd32_storage<N>::n_rest;                                                             \
-        if constexpr (std::is_same_v<head, simdf32x8>) {                                                               \
-            lhs.head.m = intrin_avx2(lhs.head.m, rhs.head.m);                                                          \
-        } else if constexpr (std::is_same_v<head, simdf32x4>) {                                                        \
-            lhs.head.m = intrin_sse(lhs.head.m, rhs.head.m);                                                           \
-        } else {                                                                                                       \
-            for (int i = 0; i < N; i++) {                                                                              \
-                lhs.head.m[i] assign_op rhs.head.m[i];                                                                 \
+    template <size_t N> struct delegate<float, N> {                                                                    \
+        template <size_t M> inline static void simd_float_impl(simd32_storage<M> &lhs, const simd32_storage<M> &rhs) { \
+            using head = decltype(simd32_storage<M>::head);                                                            \
+            constexpr size_t rest = simd32_storage<M>::n_rest;                                                         \
+            if constexpr (std::is_same_v<head, simdf32x8>) {                                                           \
+                lhs.head.m = intrin_avx2(lhs.head.m, rhs.head.m);                                                      \
+            } else if constexpr (std::is_same_v<head, simdf32x4>) {                                                    \
+                lhs.head.m = intrin_sse(lhs.head.m, rhs.head.m);                                                       \
+            } else {                                                                                                   \
+                for (int i = 0; i < N; i++) {                                                                          \
+                    lhs.head.m[i] assign_op rhs.head.m[i];                                                             \
+                }                                                                                                      \
+            }                                                                                                          \
+            if constexpr (rest > 0) {                                                                                  \
+                simd_float_impl(lhs.next, rhs.next);                                                                   \
             }                                                                                                          \
         }                                                                                                              \
-        if constexpr (rest > 0) {                                                                                      \
-            delegate##_simd_float_impl(lhs.next, rhs.next);                                                            \
-        }                                                                                                              \
-    }                                                                                                                  \
-    template <size_t N> struct delegate<float, N> {                                                                    \
         using A = simd_array<float, N>;                                                                                \
-        static void apply(A &a, const A &b) { delegate##_simd_float_impl(a._m, b._m); }                                \
+        static void apply(A &a, const A &b) { simd_float_impl(a._m, b._m); }                                           \
+    };
+#define AKR_SIMD_GEN_VFLOAT_CMP_OPERATOR_(cmp_op, intrin_op, delegate, intrin_sse, intrin_avx2)                        \
+    template <size_t N> struct delegate<float, N> {                                                                    \
+        template <size_t M>                                                                                            \
+        inline static void simd_float_impl(volatile /*wtf gcc ? */ simd32_storage<M> &mask,                            \
+                                           const simd32_storage<M> &lhs, const simd32_storage<M> &rhs) {               \
+            using head = decltype(simd32_storage<M>::head);                                                            \
+            constexpr size_t rest = simd32_storage<M>::n_rest;                                                         \
+            if constexpr (std::is_same_v<head, simdf32x8>) {                                                           \
+                mask.head.m = intrin_avx2(lhs.head.m, rhs.head.m, intrin_op);                                          \
+            } else if constexpr (std::is_same_v<head, simdf32x4>) {                                                    \
+                mask.head.m = intrin_sse(lhs.head.m, rhs.head.m, intrin_op);                                           \
+            } else {                                                                                                   \
+                for (int i = 0; i < N; i++) {                                                                          \
+                    reinterpret_cast<int32_t *>(&mask.head.m[0])[i] =                                                  \
+                        (lhs.head.m[i] cmp_op rhs.head.m[i]) ? 0xFFFFFFFF : 0;                                         \
+                }                                                                                                      \
+            }                                                                                                          \
+            if constexpr (rest > 0) {                                                                                  \
+                simd_float_impl(mask.next, lhs.next, rhs.next);                                                        \
+            }                                                                                                          \
+        }                                                                                                              \
+        using A = simd_array<float, N>;                                                                                \
+        using M = array_mask<N>;                                                                                       \
+        static M apply(const A &a, const A &b) {                                                                       \
+            M m;                                                                                                       \
+            simd_float_impl(m._m, a._m, b._m);                                                                         \
+            return m;                                                                                                  \
+        }                                                                                                              \
     };
 
+AKR_SIMD_GEN_VFLOAT_CMP_OPERATOR_(<, _CMP_LT_OS, array_operator_lt, _mm_cmp_ps, _mm256_cmp_ps)
+AKR_SIMD_GEN_VFLOAT_CMP_OPERATOR_(<=, _CMP_LE_OS, array_operator_le, _mm_cmp_ps, _mm256_cmp_ps)
+AKR_SIMD_GEN_VFLOAT_CMP_OPERATOR_(>, _CMP_GT_OS, array_operator_gt, _mm_cmp_ps, _mm256_cmp_ps)
+AKR_SIMD_GEN_VFLOAT_CMP_OPERATOR_(>=, _CMP_GE_OS, array_operator_ge, _mm_cmp_ps, _mm256_cmp_ps)
+AKR_SIMD_GEN_VFLOAT_CMP_OPERATOR_(==, _CMP_EQ_OS, array_operator_eq, _mm_cmp_ps, _mm256_cmp_ps)
+AKR_SIMD_GEN_VFLOAT_CMP_OPERATOR_(!=, _CMP_NEQ_OS, array_operator_neq, _mm_cmp_ps, _mm256_cmp_ps)
 AKR_SIMD_GEN_VFLOAT_OPERATOR_(+=, array_operator_add, _mm_add_ps, _mm256_add_ps)
 AKR_SIMD_GEN_VFLOAT_OPERATOR_(-=, array_operator_sub, _mm_sub_ps, _mm256_sub_ps)
 AKR_SIMD_GEN_VFLOAT_OPERATOR_(*=, array_operator_mul, _mm_mul_ps, _mm256_mul_ps)
 AKR_SIMD_GEN_VFLOAT_OPERATOR_(/=, array_operator_div, _mm_div_ps, _mm256_div_ps)
 
+template <size_t N> struct array_broadcast<float, N> {
+    template <size_t M> static void apply(simd32_storage<M> &simd, const float &v) {
+        using head = decltype(simd32_storage<M>::head);
+        constexpr size_t rest = simd32_storage<M>::n_rest;
+        if constexpr (std::is_same_v<head, simdf32x8>) {
+            simd.head.m = _mm256_broadcast_ss(&v);
+        } else if constexpr (std::is_same_v<head, simdf32x4>) {
+            simd.head.m = _mm_broadcast_ss(&v);
+        } else {
+            for (int i = 0; i < N; i++) {
+                simd.head.m[i] = v;
+            }
+        }
+        if constexpr (rest > 0) {
+            apply(simd.next, v);
+        }
+    }
+    static void apply(simd_array<float, N> &arr, const float &v) { apply(arr._m, v); }
+};
 template <typename T, size_t N>
 auto select(const array_mask<N> &mask, const simd_array<T, N> &a, const simd_array<T, N> &b) {
     return array_select<T, N>::apply(mask, a, b);
@@ -317,7 +400,11 @@ int main() {
         b[i] = 3 * i + 2;
     }
     a = a + b;
+    auto mask = array_operator_lt<float, 32>::apply(a, b);
     for (int i = 0; i < 32; i++) {
-        printf("%f\n", a[i]);
+        printf("%f %f %d\n", a[i], b[i], mask[i]);
     }
+    //    using namespace glm;
+    //    vec<4, simd_array<float, 32>, defaultp> v1(1), v2(3);
+    //    auto v3 = v1 + v2;
 }

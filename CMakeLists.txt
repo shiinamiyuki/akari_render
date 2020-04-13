@@ -15,7 +15,7 @@ include_directories(include)
 
 set(AKARI_CORE_EXT_LIBS "")
 if(MSVC)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /std:c++17 /MD  /MP /GL ")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /std:c++17 /MD  /MP /GL /arch:AVX2")
     set(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} /LTCG:INCREMENTAL")
     set(CMAKE_STATIC_LINKER_FLAGS  "${CMAKE_STATIC_LINKER_FLAGS} /LTCG:INCREMENTAL")
     set(CMAKE_SHARED_LINKER_FLAGS   "${CMAKE_SHARED_LINKER_FLAGS} /LTCG:INCREMENTAL")
@@ -60,7 +60,7 @@ endif()
 
 include(cmake/Embree.cmake)
 include(cmake/OIDN.cmake)
-include(cmake/LLVM.cmake)
+#include(cmake/LLVM.cmake)
 
 ##set(AKARI_CORE_EXT_LIBS ${AKARI_CORE_EXT_LIBS} embree embree_sse42 embree_avx embree_avx2 lexers math simd tasking sys)
 #
@@ -112,41 +112,3 @@ if(AKARI_BUILD_GUI)
 endif()
 
 add_executable(test-simd src/Test/simd.cpp)
-add_executable(test-jit src/Test/jit.cpp)
-#target_link_libraries(test-jit
-#        ${LLVM_LIBRARY_DIRS}/LLVMCore.lib
-#        ${LLVM_LIBRARY_DIRS}/LLVMExecutionEngine.lib
-#        ${LLVM_LIBRARY_DIRS}/LLVMInterpreter.lib
-#        ${LLVM_LIBRARY_DIRS}/LLVMSupport.lib
-#        ${LLVM_LIBRARY_DIRS}/LLVMX86Codegen.lib
-#        )
-target_include_directories(test-jit PUBLIC ${LLVM_INCLUDE_DIR})
-target_link_directories(test-jit PUBLIC ${LLVM_LIBRARY_DIRS})
-target_link_libraries(test-jit
-        LLVMX86Disassembler
-        LLVMX86AsmParser
-#        LLVMX86AsmPrinter
-        LLVMX86CodeGen
-
-        LLVMSelectionDAG
-
-        LLVMAsmPrinter
-        LLVMMCParser
-        LLVMX86Info
-
-        LLVMMCJIT
-        LLVMInterpreter
-        LLVMExecutionEngine
-
-        LLVMCodeGen
-        LLVMScalarOpts
-        LLVMTransformUtils
-
-        LLVMipo
-        LLVMAnalysis
-        LLVMTarget
-        LLVMMC
-
-        LLVMCore
-        LLVMSupport
-        )
