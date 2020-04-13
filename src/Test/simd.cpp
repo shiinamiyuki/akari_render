@@ -106,12 +106,7 @@ template <size_t N> struct array_storage<int32_t, N> {
     };
 };
 template <size_t N> struct array_mask;
-template <size_t N> struct array_mask : array_storage<int32_t, N> {
-    array_mask(bool v = true) { std::memset(this, v ? 0xFF : 0, sizeof(*this)); }
-    operator bool() const { return any(*this); }
-    int32_t &operator[](size_t i) { return this->data[i]; }
-    const int32_t &operator[](size_t i) const { return this->data[i]; }
-};
+
 template <size_t N> bool any(const array_mask<N> &mask) {
     bool result = false;
     for (size_t i = 0; i < N; i++) {
@@ -128,36 +123,6 @@ template <size_t N> bool all(const array_mask<N> &mask) {
     return result;
 }
 
-template <size_t N> struct array_mask_not {
-    static array_mask<N> apply(const array_mask<N> &a) {
-        array_mask<N> res;
-        for (size_t i = 0; i < N; i++) {
-            res[i] = !a[i];
-        }
-        return res;
-    }
-};
-
-template <size_t N> struct array_mask_and {
-    static array_mask<N> apply(const array_mask<N> &a, const array_mask<N> &b) {
-        array_mask<N> res;
-        for (size_t i = 0; i < N; i++) {
-            res[i] = a[i] && b[i];
-        }
-        return res;
-    }
-};
-
-template <size_t N> struct array_mask_or {
-    static array_mask<N> apply(const array_mask<N> &a, const array_mask<N> &b) {
-        array_mask<N> res;
-        for (size_t i = 0; i < N; i++) {
-            res[i] = a[i] || b[i];
-        }
-        return res;
-    }
-};
-
 template <typename T, size_t N> struct simd_array;
 template <typename T, size_t N> struct array_broadcast {
     static void apply(simd_array<T, N> &arr, const T &v) {
@@ -165,12 +130,6 @@ template <typename T, size_t N> struct array_broadcast {
             arr[i] = v;
         }
     }
-};
-template <typename T, size_t N> struct simd_array : public array_storage<T, N> {
-    simd_array() = default;
-    simd_array(const T &v) { array_broadcast<T, N>::apply(*this, v); }
-    T &operator[](size_t i) { return this->data[i]; }
-    const T &operator[](size_t i) const { return this->data[i]; }
 };
 
 // template <typename T, size_t N> struct masked_simd_array : simd_array<T, N> { array_mask<N> mask; };
@@ -197,15 +156,16 @@ template <typename T, size_t N> struct simd_array : public array_storage<T, N> {
 
 template <typename T, size_t N> struct array_select {
     using A = simd_array<T, N>;
-    static A apply(const array_mask<N> &mask, const A &a, const T &b) {
+    static A apply(const array_mask<N> &mask, const A &a, const A &b) {
         A tmp;
         for (size_t i = 0; i < N; i++) {
             if (mask[i]) {
-                tmp[i] = b[i];
-            } else {
                 tmp[i] = a[i];
+            } else {
+                tmp[i] = b[i];
             }
         }
+        return tmp;
     }
 };
 
@@ -255,6 +215,19 @@ AKR_SIMD_DEFAULT_CMP_OPERATOR(array_operator_neq, !=)
 #define AKR_SIMD_GEN_CMP_OPERATOR_(op, delegate)                                                                       \
     template <typename T, size_t N> inline auto operator op(const simd_array<T, N> &a, const simd_array<T, N> &b) {    \
         return delegate<T, N>::apply(a, b);                                                                            \
+    }                                                                                                                  \
+    template <typename T, size_t N> inline auto operator op(const simd_array<T, N> &a, const T &b) {                   \
+        return delegate<T, N>::apply(a, simd_array<T, N>(b));                                                          \
+    }                                                                                                                  \
+    template <typename T, size_t N> inline auto operator op(const T &a, const simd_array<T, N> &b) {                   \
+        return delegate<T, N>::apply(simd_array<T, N>(a), b);                                                          \
+    }
+
+#define AKR_SIMD_GEN_MASK_OPERATOR_(op, delegate)                                                                      \
+    template <size_t N> inline auto operator op(const array_mask<N> &a, const array_mask<N> &b) {                      \
+        auto tmp = a;                                                                                                  \
+        delegate<N>::apply(tmp, b);                                                                                    \
+        return tmp;                                                                                                    \
     }
 
 #define AKR_SIMD_GEN_SCALAR_RIGHT_OPERATOR_(op, delegate)                                                              \
@@ -331,8 +304,8 @@ AKR_SIMD_GEN_CMP_OPERATOR_(!=, array_operator_neq)
 #define AKR_SIMD_GEN_VFLOAT_CMP_OPERATOR_(cmp_op, intrin_op, delegate, intrin_sse, intrin_avx2)                        \
     template <size_t N> struct delegate<float, N> {                                                                    \
         template <size_t M>                                                                                            \
-        inline static void simd_float_impl(volatile /*wtf gcc ? */ simd32_storage<M> &mask,                            \
-                                           const simd32_storage<M> &lhs, const simd32_storage<M> &rhs) {               \
+        inline static void simd_float_impl(simd32_storage<M> &mask, const simd32_storage<M> &lhs,                      \
+                                           const simd32_storage<M> &rhs) {                                             \
             using head = decltype(simd32_storage<M>::head);                                                            \
             constexpr size_t rest = simd32_storage<M>::n_rest;                                                         \
             if constexpr (std::is_same_v<head, simdf32x8>) {                                                           \
@@ -357,7 +330,35 @@ AKR_SIMD_GEN_CMP_OPERATOR_(!=, array_operator_neq)
             return m;                                                                                                  \
         }                                                                                                              \
     };
+#define AKR_SIMD_GEN_VMASK_OPERATOR_(assign_op, delegate, intrin_sse, intrin_avx2)                                     \
+    template <size_t N> struct delegate {                                                                              \
+        template <size_t M> inline static void simd_float_impl(simd32_storage<M> &lhs, const simd32_storage<M> &rhs) { \
+            using head = decltype(simd32_storage<M>::head);                                                            \
+            constexpr size_t rest = simd32_storage<M>::n_rest;                                                         \
+            if constexpr (std::is_same_v<head, simdf32x8>) {                                                           \
+                lhs.head.m = intrin_avx2(lhs.head.m, rhs.head.m);                                                      \
+            } else if constexpr (std::is_same_v<head, simdf32x4>) {                                                    \
+                lhs.head.m = intrin_sse(lhs.head.m, rhs.head.m);                                                       \
+            } else {                                                                                                   \
+                for (int i = 0; i < N; i++) {                                                                          \
+                    reinterpret_cast<uint32_t *>(lhs.head.m)[i] assign_op reinterpret_cast<const uint32_t *>(          \
+                        rhs.head.m)[i];                                                                                \
+                }                                                                                                      \
+            }                                                                                                          \
+            if constexpr (rest > 0) {                                                                                  \
+                simd_float_impl(lhs.next, rhs.next);                                                                   \
+            }                                                                                                          \
+        }                                                                                                              \
+        using A = array_mask<N>;                                                                                       \
+        static void apply(A &a, const A &b) { simd_float_impl(a._m, b._m); }                                           \
+    };
 
+AKR_SIMD_GEN_VMASK_OPERATOR_(&=, array_mask_and, _mm_and_ps, _mm256_and_ps)
+AKR_SIMD_GEN_VMASK_OPERATOR_(|=, array_mask_or, _mm_or_ps, _mm256_or_ps)
+AKR_SIMD_GEN_VMASK_OPERATOR_(^=, array_mask_xor, _mm_xor_ps, _mm256_xor_ps)
+AKR_SIMD_GEN_MASK_OPERATOR_(&, array_mask_and)
+AKR_SIMD_GEN_MASK_OPERATOR_(|, array_mask_or)
+AKR_SIMD_GEN_MASK_OPERATOR_(^, array_mask_xor)
 AKR_SIMD_GEN_VFLOAT_CMP_OPERATOR_(<, _CMP_LT_OS, array_operator_lt, _mm_cmp_ps, _mm256_cmp_ps)
 AKR_SIMD_GEN_VFLOAT_CMP_OPERATOR_(<=, _CMP_LE_OS, array_operator_le, _mm_cmp_ps, _mm256_cmp_ps)
 AKR_SIMD_GEN_VFLOAT_CMP_OPERATOR_(>, _CMP_GT_OS, array_operator_gt, _mm_cmp_ps, _mm256_cmp_ps)
@@ -368,6 +369,47 @@ AKR_SIMD_GEN_VFLOAT_OPERATOR_(+=, array_operator_add, _mm_add_ps, _mm256_add_ps)
 AKR_SIMD_GEN_VFLOAT_OPERATOR_(-=, array_operator_sub, _mm_sub_ps, _mm256_sub_ps)
 AKR_SIMD_GEN_VFLOAT_OPERATOR_(*=, array_operator_mul, _mm_mul_ps, _mm256_mul_ps)
 AKR_SIMD_GEN_VFLOAT_OPERATOR_(/=, array_operator_div, _mm_div_ps, _mm256_div_ps)
+
+template <typename T, size_t N> struct simd_array : public array_storage<T, N> {
+    simd_array() = default;
+    simd_array(const T &v) { array_broadcast<T, N>::apply(*this, v); }
+    T &operator[](size_t i) { return this->data[i]; }
+    const T &operator[](size_t i) const { return this->data[i]; }
+#define AKR_SIMD_GEN_VFLOAT_ASSIGN_OPERATOR(assign_op, delegate)                                                       \
+    simd_array &operator assign_op(const simd_array &rhs) {                                                            \
+        delegate<T, N>::apply(*this, rhs);                                                                             \
+        return *this;                                                                                                  \
+    }
+    AKR_SIMD_GEN_VFLOAT_ASSIGN_OPERATOR(+=, array_operator_add)
+    AKR_SIMD_GEN_VFLOAT_ASSIGN_OPERATOR(-=, array_operator_sub)
+    AKR_SIMD_GEN_VFLOAT_ASSIGN_OPERATOR(*=, array_operator_mul)
+    AKR_SIMD_GEN_VFLOAT_ASSIGN_OPERATOR(/=, array_operator_div)
+#undef AKR_SIMD_GEN_VFLOAT_ASSIGN_OPERATOR
+};
+
+template <size_t N> struct array_mask : array_storage<int32_t, N> {
+    array_mask(bool v = true) { std::memset(this, v ? 0xFF : 0, sizeof(*this)); }
+    operator bool() const { return any(*this); }
+    int32_t &operator[](size_t i) { return this->data[i]; }
+    const int32_t &operator[](size_t i) const { return this->data[i]; }
+#define AKR_SIMD_GEN_VMASK_ASSIGN_OPERATOR(assign_op, delegate)                                                        \
+    array_mask &operator assign_op(const array_mask &rhs) {                                                            \
+        delegate<N>::apply(*this, rhs);                                                                                \
+        return *this;                                                                                                  \
+    }
+    AKR_SIMD_GEN_VMASK_ASSIGN_OPERATOR(&=, array_mask_and)
+    AKR_SIMD_GEN_VMASK_ASSIGN_OPERATOR(|=, array_mask_or)
+    AKR_SIMD_GEN_VMASK_ASSIGN_OPERATOR(^=, array_mask_xor)
+#undef AKR_SIMD_GEN_VMASK_ASSIGN_OPERATOR
+};
+
+template <size_t N> struct array_mask_not {
+    static array_mask<N> apply(const array_mask<N> &mask) {
+        array_mask<N> res(1);
+        return res ^ mask;
+    }
+};
+template <size_t N> inline auto operator~(const array_mask<N> &mask) { return array_mask_not<N>::apply(mask); }
 
 template <size_t N> struct array_broadcast<float, N> {
     template <size_t M> static void apply(simd32_storage<M> &simd, const float &v) {
@@ -388,6 +430,35 @@ template <size_t N> struct array_broadcast<float, N> {
     }
     static void apply(simd_array<float, N> &arr, const float &v) { apply(arr._m, v); }
 };
+
+template <size_t N> struct array_select<float, N> {
+    using T = float;
+    using A = simd_array<T, N>;
+    template <size_t M>
+    static void impl(simd32_storage<M> &res, const simd32_storage<M> &mask, const simd32_storage<M> &a,
+                     const simd32_storage<M> &b) {
+        using head = decltype(simd32_storage<M>::head);
+        constexpr size_t rest = simd32_storage<M>::n_rest;
+        if constexpr (std::is_same_v<head, simdf32x8>) {
+            res.head.m = _mm256_blendv_ps(b.head.m, a.head.m, mask.head.m);
+        } else if constexpr (std::is_same_v<head, simdf32x4>) {
+            res.head.m = _mm_blendv_ps(b.head.m, a.head.m, mask.head.m);
+        } else {
+            for (int i = 0; i < N; i++) {
+                res.head.m[i] = mask[i] ? a[i] : b[i];
+            }
+        }
+        if constexpr (rest > 0) {
+            impl(res.next, mask.next, a.next, b.next);
+        }
+    }
+    static A apply(const array_mask<N> &mask, const A &a, const A &b) {
+        A tmp;
+        impl<N>(tmp._m, mask._m, a._m, b._m);
+        return tmp;
+    }
+};
+
 template <typename T, size_t N>
 auto select(const array_mask<N> &mask, const simd_array<T, N> &a, const simd_array<T, N> &b) {
     return array_select<T, N>::apply(mask, a, b);
@@ -403,6 +474,10 @@ int main() {
     auto mask = array_operator_lt<float, 32>::apply(a, b);
     for (int i = 0; i < 32; i++) {
         printf("%f %f %d\n", a[i], b[i], mask[i]);
+    }
+    auto c = select(~(a<100.0f & a> 50.0f), a, b);
+    for (int i = 0; i < 32; i++) {
+        printf("%f %f %f %d\n", a[i], b[i], c[i], mask[i]);
     }
     //    using namespace glm;
     //    vec<4, simd_array<float, 32>, defaultp> v1(1), v2(3);
