@@ -1,4 +1,4 @@
-option(AKARI_USE_EMBREE "Use Embree as ray intersection backend" ON)
+option(AKARI_USE_EMBREE "Use Embree as ray intersection backend" OFF)
 option(AKARI_BUILD_EMBREE "Compile embree from source" OFF)
 
 if(AKARI_USE_EMBREE)
