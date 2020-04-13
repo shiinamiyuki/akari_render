@@ -1,0 +1,17 @@
+sudo: required
+dist: trusty
+language: cpp
+compiler: gcc
+notifications:
+  email: false
+addons:
+  apt:
+    sources:
+    - ubuntu-toolchain-r-test
+    - llvm-toolchain-precise-3.6
+    - kalakris-cmake
+    packages:
+    - gcc-5
+    - g++-5
+    - cmake
+script: mkdir build && cd build && cmake ../ && make -r -j 2
