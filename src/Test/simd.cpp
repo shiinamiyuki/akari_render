@@ -44,9 +44,46 @@ template <size_t N> struct array_padded_size<float, N> { constexpr static size_t
 template <size_t N> struct array_padded_size<int32_t, N> {
     constexpr static size_t value = N < 2 ? N : align_to<N, 4>;
 };
+struct simdf32x8 {
+    __m256 m;
+};
+static_assert(sizeof(simdf32x8) == sizeof(__m256));
+struct simdf32x4 {
+    __m128 m;
+};
+static_assert(sizeof(simdf32x4) == sizeof(__m128));
+template <size_t N> struct simd32_storage_type_list;
+
+template <size_t N, typename = void> struct simd32_storage {
+    typename simd32_storage_type_list<N>::type head;
+    constexpr static size_t n_rest = simd32_storage_type_list<N>::n_rest;
+    simd32_storage<n_rest> next;
+};
+
+template <size_t N> struct simd32_storage_type_list {
+    using type = std::conditional_t<N >= 8 && MaxISA >= AKR_ISA_AVX, simdf32x8,
+                                    std::conditional_t<N >= 4 && MaxISA >= AKR_ISA_SSE, simdf32x4, float[N]>>;
+    constexpr static size_t n_rest = N - sizeof(type) / sizeof(float);
+};
+
+template <size_t N>
+struct simd32_storage<N, std::void_t<std::enable_if_t<simd32_storage_type_list<N>::n_rest == 0, void>>> {
+    typename simd32_storage_type_list<N>::type head;
+    constexpr static size_t n_rest = 0;
+};
+
 template <typename T, size_t N> struct array_storage {
     constexpr static size_t padded_size = array_padded_size<T, N>::value;
     alignas(array_alignment<T, N>::value) T data[padded_size];
+};
+
+template <size_t N> struct array_storage<float, N> {
+    using T = float;
+    constexpr static size_t padded_size = array_padded_size<T, N>::value;
+    union {
+        alignas(array_alignment<T, N>::value) T data[padded_size];
+        simd32_storage<padded_size> _m;
+    };
 };
 template <size_t N> struct array_mask;
 
@@ -210,35 +247,57 @@ AKR_SIMD_GEN_SCALAR_RIGHT_OPERATOR_(/, array_operator_scalar_div)
 AKR_SIMD_GEN_SCALAR_LEFT_OPERATOR_(*, array_operator_scalar_mul)
 AKR_SIMD_GEN_SCALAR_LEFT_OPERATOR_(/, array_operator_scalar_div)
 
+//#define AKR_SIMD_GEN_VFLOAT_OPERATOR_(assign_op, delegate, intrin_sse, intrin_avx2)                                    \
+//    template <size_t N> void delegate##_simd_float_impl(float *A, const float *B);                                     \
+//    template <size_t N, size_t Shift> void delegate##_simd_float_impl_shift(float *A, const float *B) {                \
+//        return delegate##_simd_float_impl<N - Shift>(A + Shift, B + Shift);                                            \
+//    }                                                                                                                  \
+//    template <size_t N> void delegate##_simd_float_impl(float *A, const float *B) {                                    \
+//        if constexpr (N >= 8 && MaxISA >= AKR_ISA_AVX) {                                                               \
+//            auto a = reinterpret_cast<__m256 *>(A);                                                                    \
+//            auto b = reinterpret_cast<const __m256 *>(B);                                                              \
+//            *a = _mm256_add_ps(*a, *b);                                                                                \
+//            delegate##_simd_float_impl_shift<N, 8>(A, B);                                                              \
+//        } else if constexpr (N >= 4 && MaxISA >= AKR_ISA_SSE) {                                                        \
+//            auto a = reinterpret_cast<__m128 *>(A);                                                                    \
+//            auto b = reinterpret_cast<const __m128 *>(B);                                                              \
+//            *a = _mm_add_ps(*a, *b);                                                                                   \
+//            delegate##_simd_float_impl_shift<N, 4>(A, B);                                                              \
+//        } else {                                                                                                       \
+//            for (int i = 0; i < N; i++) {                                                                              \
+//                A[i] assign_op B[i];                                                                                   \
+//            }                                                                                                          \
+//        }                                                                                                              \
+//    }                                                                                                                  \
+//    template <size_t N> struct delegate<float, N> {                                                                    \
+//        using A = simd_array<float, N>;                                                                                \
+//        static void apply(A &a, const A &b) {                                                                          \
+//            auto *A = reinterpret_cast<float *>(&a);                                                                   \
+//            auto *B = reinterpret_cast<const float *>(&b);                                                             \
+//            delegate##_simd_float_impl<A::padded_size>(A, B);                                                          \
+//        }                                                                                                              \
+//    };
+
 #define AKR_SIMD_GEN_VFLOAT_OPERATOR_(assign_op, delegate, intrin_sse, intrin_avx2)                                    \
-    template <size_t N> void delegate##_simd_float_impl(float *A, const float *B);                                     \
-    template <size_t N, size_t Shift> void delegate##_simd_float_impl_shift(float *A, const float *B) {                \
-        return delegate##_simd_float_impl<N - Shift>(A + Shift, B + Shift);                                            \
-    }                                                                                                                  \
-    template <size_t N> void delegate##_simd_float_impl(float *A, const float *B) {                                    \
-        if constexpr (N >= 8 && MaxISA >= AKR_ISA_AVX) {                                                               \
-            auto a = reinterpret_cast<__m256 *>(A);                                                                    \
-            auto b = reinterpret_cast<const __m256 *>(B);                                                              \
-            *a = _mm256_add_ps(*a, *b);                                                                                \
-            delegate##_simd_float_impl_shift<N, 8>(A, B);                                                              \
-        } else if constexpr (N >= 4 && MaxISA >= AKR_ISA_SSE) {                                                        \
-            auto a = reinterpret_cast<__m128 *>(A);                                                                    \
-            auto b = reinterpret_cast<const __m128 *>(B);                                                              \
-            *a = _mm_add_ps(*a, *b);                                                                                   \
-            delegate##_simd_float_impl_shift<N, 4>(A, B);                                                              \
+    template <size_t N> inline void delegate##_simd_float_impl(simd32_storage<N> &lhs, const simd32_storage<N> &rhs) { \
+        using head = decltype(simd32_storage<N>::head);                                                                \
+        constexpr size_t rest = simd32_storage<N>::n_rest;                                                             \
+        if constexpr (std::is_same_v<head, simdf32x8>) {                                                               \
+            lhs.head.m = intrin_avx2(lhs.head.m, rhs.head.m);                                                          \
+        } else if constexpr (std::is_same_v<head, simdf32x4>) {                                                        \
+            lhs.head.m = intrin_sse(lhs.head.m, rhs.head.m);                                                           \
         } else {                                                                                                       \
             for (int i = 0; i < N; i++) {                                                                              \
-                A[i] assign_op B[i];                                                                                   \
+                lhs.head.m[i] assign_op rhs.head.m[i];                                                                 \
             }                                                                                                          \
+        }                                                                                                              \
+        if constexpr (rest > 0) {                                                                                      \
+            delegate##_simd_float_impl(lhs.next, rhs.next);                                                            \
         }                                                                                                              \
     }                                                                                                                  \
     template <size_t N> struct delegate<float, N> {                                                                    \
         using A = simd_array<float, N>;                                                                                \
-        static void apply(A &a, const A &b) {                                                                          \
-            auto *A = reinterpret_cast<float *>(&a);                                                                   \
-            auto *B = reinterpret_cast<const float *>(&b);                                                             \
-            delegate##_simd_float_impl<A::padded_size>(A, B);                                                          \
-        }                                                                                                              \
+        static void apply(A &a, const A &b) { delegate##_simd_float_impl(a._m, b._m); }                                \
     };
 
 AKR_SIMD_GEN_VFLOAT_OPERATOR_(+=, array_operator_add, _mm_add_ps, _mm256_add_ps)
@@ -252,7 +311,7 @@ auto select(const array_mask<N> &mask, const simd_array<T, N> &a, const simd_arr
 }
 
 int main() {
-    alignas(16) simd_array<float, 32> a, b;
+    simd_array<float, 32> a, b;
     for (int i = 0; i < 32; i++) {
         a[i] = 2 * i + 1;
         b[i] = 3 * i + 2;

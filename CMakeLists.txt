@@ -112,3 +112,41 @@ if(AKARI_BUILD_GUI)
 endif()
 
 add_executable(test-simd src/Test/simd.cpp)
+add_executable(test-jit src/Test/jit.cpp)
+#target_link_libraries(test-jit
+#        ${LLVM_LIBRARY_DIRS}/LLVMCore.lib
+#        ${LLVM_LIBRARY_DIRS}/LLVMExecutionEngine.lib
+#        ${LLVM_LIBRARY_DIRS}/LLVMInterpreter.lib
+#        ${LLVM_LIBRARY_DIRS}/LLVMSupport.lib
+#        ${LLVM_LIBRARY_DIRS}/LLVMX86Codegen.lib
+#        )
+target_include_directories(test-jit PUBLIC ${LLVM_INCLUDE_DIR})
+target_link_directories(test-jit PUBLIC ${LLVM_LIBRARY_DIRS})
+target_link_libraries(test-jit
+        LLVMX86Disassembler
+        LLVMX86AsmParser
+#        LLVMX86AsmPrinter
+        LLVMX86CodeGen
+
+        LLVMSelectionDAG
+
+        LLVMAsmPrinter
+        LLVMMCParser
+        LLVMX86Info
+
+        LLVMMCJIT
+        LLVMInterpreter
+        LLVMExecutionEngine
+
+        LLVMCodeGen
+        LLVMScalarOpts
+        LLVMTransformUtils
+
+        LLVMipo
+        LLVMAnalysis
+        LLVMTarget
+        LLVMMC
+
+        LLVMCore
+        LLVMSupport
+        )
