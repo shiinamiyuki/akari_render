@@ -20,24 +20,26 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <Akari/Core/SIMD.hpp>
+#ifndef AKARIRENDER_SIMDARRAYMACROS_HPP
+#define AKARIRENDER_SIMDARRAYMACROS_HPP
 
-int main() {
-    using namespace Akari;
-    simd_array<float*, 32>v;
-    simd_array<float, 32> a, b;
-    for (int i = 0; i < 32; i++) {
-        a[i] = 2 * i + 1;
-        b[i] = 3 * i + 2;
-    }
-    a = a + b;
-    auto mask = array_operator_lt<float, 32>::apply(a, b);
-    for (int i = 0; i < 32; i++) {
-        printf("%f %f %d\n", a[i], b[i], mask[i]);
-    }
-    auto c = select(~(a<100.0f & a> 50.0f), a, b);
-    for (int i = 0; i < 32; i++) {
-        printf("%f %f %f %d\n", a[i], b[i], c[i], mask[i]);
-    }
 
+namespace Akari {
+#define _AKR_VECTORIZE_CALL(Ty) \
+template<size_t N>struct Akari::unique_instance_context<Ty*,N>: Akari::unique_instance_context_base<Ty*, N>{\
+    using namespace Akari;\
+
+#define _AKR_VECTROZIE_METHOD(method) \
+    template<typename...Args>inline auto method(Args&...args)const{\
+        using RetT = std::invoke_t<decltype(Ty::method), Args...>;\
+        RetT ret;\
+        for(int i =0 ;i< this->n_unique; i++){\
+            auto tmp = this->_unique_instances[i]->method(std::forward<Args>(args)..., this->active[i]);\
+            ret = select(this->active[i], tmp, ret);\
+        } \
+        return ret;\
+    }
+#define _AKR_VECTORIZE_CALL_DONE() }
 }
+
+#endif // AKARIRENDER_SIMDARRAYMACROS_HPP

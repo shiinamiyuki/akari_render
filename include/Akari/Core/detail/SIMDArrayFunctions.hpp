@@ -23,8 +23,6 @@
 #ifndef AKARIRENDER_SIMDARRAYFUNCTIONS_HPP
 #define AKARIRENDER_SIMDARRAYFUNCTIONS_HPP
 
-#include "SIMDArrayBasic.hpp"
-#include <cmath>
 namespace Akari {
 #ifdef __INTEL_COMPILER
 #define AKR_GEN_SIMD_VFLOAT_FUNCTION(func, intrin_sse, intrin_avx)                                                     \

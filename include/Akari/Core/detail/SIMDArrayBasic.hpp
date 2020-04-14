@@ -23,6 +23,7 @@
 #ifndef AKARIRENDER_SIMDARRAYBASIC_HPP
 #define AKARIRENDER_SIMDARRAYBASIC_HPP
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <immintrin.h>
@@ -30,7 +31,7 @@
 #include <xmmintrin.h>
 
 namespace Akari {
-#define AKR_INLINE __forceline
+#define AKR_INLINE    __forceline
 #define AKR_ISA_NONE  0
 #define AKR_ISA_SSE   1
 #define AKR_ISA_SSE42 2
@@ -78,7 +79,7 @@ namespace Akari {
 
     template <size_t N> struct simd32_storage_type_list {
         using type = std::conditional_t<N >= 8 && MaxISA >= AKR_ISA_AVX, simdf32x8,
-            std::conditional_t<N >= 4 && MaxISA >= AKR_ISA_SSE, simdf32x4, float[N]>>;
+                                        std::conditional_t<N >= 4 && MaxISA >= AKR_ISA_SSE, simdf32x4, float[N]>>;
         constexpr static size_t n_rest = N - sizeof(type) / sizeof(float);
     };
 
@@ -127,7 +128,7 @@ namespace Akari {
         return result;
     }
 
-    template <typename T, size_t N> struct simd_array;
+    template <typename T, size_t N, typename SFINAE = void> struct simd_array;
     template <typename T, size_t N> struct array_broadcast {
         static void apply(simd_array<T, N> &arr, const T &v) {
             for (size_t i = 0; i < N; i++) {
@@ -136,7 +137,39 @@ namespace Akari {
         }
     };
 
+    template <typename T, typename U, size_t N> struct array_from {
+        static void apply(simd_array<T, N> &arr, const simd_array<U, N> &v) {
+            for (size_t i = 0; i < N; i++) {
+                arr[i] = T(v[i]);
+            }
+        }
+    };
+
     // template <typename T, size_t N> struct masked_simd_array : simd_array<T, N> { array_mask<N> mask; };
+#define AKR_SIMD_DEFAULT_FUNCTION_1(delegate, func)                                                                    \
+    template <typename T, size_t N> struct delegate {                                                                  \
+        using A = simd_array<T, N>;                                                                                    \
+        static A apply(const A &x) {                                                                                   \
+            A res;                                                                                                     \
+            for (size_t i = 0; i < N; i++) {                                                                           \
+                res[i] = func(x[i]);                                                                                   \
+            }                                                                                                          \
+        }                                                                                                              \
+    };                                                                                                                 \
+    template <typename T, size_t N> simd_array<T, N> func(const simd_array<T, N> &x) { return delegate<T, N>::func(x); }
+#define AKR_SIMD_DEFAULT_FUNCTION_2(delegate, func)                                                                    \
+    template <typename T, size_t N> struct delegate {                                                                  \
+        using A = simd_array<T, N>;                                                                                    \
+        static A apply(const A &x, const A &y) {                                                                       \
+            A res;                                                                                                     \
+            for (size_t i = 0; i < N; i++) {                                                                           \
+                res[i] = func(x[i], y[i]);                                                                             \
+            }                                                                                                          \
+        }                                                                                                              \
+    };                                                                                                                 \
+    template <typename T, size_t N> simd_array<T, N> func(const simd_array<T, N> &x, const simd_array<T, N> &y) {      \
+        return delegate<T, N>::func(x, y);                                                                             \
+    }
 
 #define AKR_SIMD_DEFAULT_OPERATOR(delegate, assign_op)                                                                 \
     template <typename T, size_t N> struct delegate {                                                                  \
@@ -184,19 +217,6 @@ namespace Akari {
             return mask;                                                                                               \
         }                                                                                                              \
     };
-
-    AKR_SIMD_DEFAULT_OPERATOR(array_operator_add, +=)
-    AKR_SIMD_DEFAULT_OPERATOR(array_operator_sub, -=)
-    AKR_SIMD_DEFAULT_OPERATOR(array_operator_mul, *=)
-    AKR_SIMD_DEFAULT_OPERATOR(array_operator_div, /=)
-    AKR_SIMD_DEFAULT_SCALAR_OPERATOR(array_operator_scalar_mul, *=)
-    AKR_SIMD_DEFAULT_SCALAR_OPERATOR(array_operator_scalar_div, /=)
-    AKR_SIMD_DEFAULT_CMP_OPERATOR(array_operator_lt, <)
-    AKR_SIMD_DEFAULT_CMP_OPERATOR(array_operator_le, <=)
-    AKR_SIMD_DEFAULT_CMP_OPERATOR(array_operator_gt, >)
-    AKR_SIMD_DEFAULT_CMP_OPERATOR(array_operator_ge, >=)
-    AKR_SIMD_DEFAULT_CMP_OPERATOR(array_operator_eq, ==)
-    AKR_SIMD_DEFAULT_CMP_OPERATOR(array_operator_neq, !=)
 
 #define AKR_SIMD_GEN_OPERATOR_(op, delegate)                                                                           \
     template <typename T, typename U, size_t N>                                                                        \
@@ -267,22 +287,6 @@ namespace Akari {
             return tmpA;                                                                                               \
         }                                                                                                              \
     }
-
-    AKR_SIMD_GEN_OPERATOR_(+, array_operator_add)
-    AKR_SIMD_GEN_OPERATOR_(-, array_operator_sub)
-    AKR_SIMD_GEN_OPERATOR_(*, array_operator_mul)
-    AKR_SIMD_GEN_OPERATOR_(/, array_operator_div)
-    AKR_SIMD_GEN_SCALAR_RIGHT_OPERATOR_(*, array_operator_scalar_mul)
-    AKR_SIMD_GEN_SCALAR_RIGHT_OPERATOR_(/, array_operator_scalar_div)
-    AKR_SIMD_GEN_SCALAR_LEFT_OPERATOR_(*, array_operator_scalar_mul)
-    AKR_SIMD_GEN_SCALAR_LEFT_OPERATOR_(/, array_operator_scalar_div)
-
-    AKR_SIMD_GEN_CMP_OPERATOR_(<, array_operator_lt)
-    AKR_SIMD_GEN_CMP_OPERATOR_(<=, array_operator_le)
-    AKR_SIMD_GEN_CMP_OPERATOR_(>, array_operator_gt)
-    AKR_SIMD_GEN_CMP_OPERATOR_(>=, array_operator_ge)
-    AKR_SIMD_GEN_CMP_OPERATOR_(==, array_operator_eq)
-    AKR_SIMD_GEN_CMP_OPERATOR_(!=, array_operator_neq)
 
 #define AKR_SIMD_GEN_VFLOAT_OPERATOR_(assign_op, delegate, intrin_sse, intrin_avx2)                                    \
     template <size_t N> struct delegate<float, N> {                                                                    \
@@ -357,6 +361,60 @@ namespace Akari {
         static void apply(A &a, const A &b) { simd_float_impl(a._m, b._m); }                                           \
     };
 
+    AKR_SIMD_DEFAULT_OPERATOR(array_operator_add, +=)
+    AKR_SIMD_DEFAULT_OPERATOR(array_operator_sub, -=)
+    AKR_SIMD_DEFAULT_OPERATOR(array_operator_mul, *=)
+    AKR_SIMD_DEFAULT_OPERATOR(array_operator_div, /=)
+    AKR_SIMD_DEFAULT_OPERATOR(array_operator_or, |=)
+    AKR_SIMD_DEFAULT_OPERATOR(array_operator_and, &=)
+    AKR_SIMD_DEFAULT_OPERATOR(array_operator_xor, ^=)
+    AKR_SIMD_DEFAULT_SCALAR_OPERATOR(array_operator_scalar_mul, *=)
+    AKR_SIMD_DEFAULT_SCALAR_OPERATOR(array_operator_scalar_div, /=)
+    AKR_SIMD_DEFAULT_CMP_OPERATOR(array_operator_lt, <)
+    AKR_SIMD_DEFAULT_CMP_OPERATOR(array_operator_le, <=)
+    AKR_SIMD_DEFAULT_CMP_OPERATOR(array_operator_gt, >)
+    AKR_SIMD_DEFAULT_CMP_OPERATOR(array_operator_ge, >=)
+    AKR_SIMD_DEFAULT_CMP_OPERATOR(array_operator_eq, ==)
+    AKR_SIMD_DEFAULT_CMP_OPERATOR(array_operator_neq, !=)
+
+    using std::acos;
+    using std::asin;
+    using std::atan;
+    using std::atan2;
+    using std::cos;
+    using std::pow;
+    using std::sin;
+    using std::sqrt;
+    using std::tan;
+    AKR_SIMD_DEFAULT_FUNCTION_1(array_sin, sin)
+    AKR_SIMD_DEFAULT_FUNCTION_1(array_cos, cos)
+    AKR_SIMD_DEFAULT_FUNCTION_1(array_tan, tan)
+    AKR_SIMD_DEFAULT_FUNCTION_1(array_acos, acos)
+    AKR_SIMD_DEFAULT_FUNCTION_1(array_asin, asin)
+    AKR_SIMD_DEFAULT_FUNCTION_1(array_atan, atan)
+    AKR_SIMD_DEFAULT_FUNCTION_2(array_atan2, atan2)
+    AKR_SIMD_DEFAULT_FUNCTION_1(array_sqrt, sqrt)
+    AKR_SIMD_DEFAULT_FUNCTION_2(array_pow, pow)
+
+    AKR_SIMD_GEN_OPERATOR_(+, array_operator_add)
+    AKR_SIMD_GEN_OPERATOR_(-, array_operator_sub)
+    AKR_SIMD_GEN_OPERATOR_(*, array_operator_mul)
+    AKR_SIMD_GEN_OPERATOR_(/, array_operator_div)
+    AKR_SIMD_GEN_OPERATOR_(|, array_operator_or)
+    AKR_SIMD_GEN_OPERATOR_(&, array_operator_and)
+    AKR_SIMD_GEN_OPERATOR_(^, array_operator_xor)
+    AKR_SIMD_GEN_SCALAR_RIGHT_OPERATOR_(*, array_operator_scalar_mul)
+    AKR_SIMD_GEN_SCALAR_RIGHT_OPERATOR_(/, array_operator_scalar_div)
+    AKR_SIMD_GEN_SCALAR_LEFT_OPERATOR_(*, array_operator_scalar_mul)
+    AKR_SIMD_GEN_SCALAR_LEFT_OPERATOR_(/, array_operator_scalar_div)
+
+    AKR_SIMD_GEN_CMP_OPERATOR_(<, array_operator_lt)
+    AKR_SIMD_GEN_CMP_OPERATOR_(<=, array_operator_le)
+    AKR_SIMD_GEN_CMP_OPERATOR_(>, array_operator_gt)
+    AKR_SIMD_GEN_CMP_OPERATOR_(>=, array_operator_ge)
+    AKR_SIMD_GEN_CMP_OPERATOR_(==, array_operator_eq)
+    AKR_SIMD_GEN_CMP_OPERATOR_(!=, array_operator_neq)
+
     AKR_SIMD_GEN_VMASK_OPERATOR_(&=, array_mask_and, _mm_and_ps, _mm256_and_ps)
     AKR_SIMD_GEN_VMASK_OPERATOR_(|=, array_mask_or, _mm_or_ps, _mm256_or_ps)
     AKR_SIMD_GEN_VMASK_OPERATOR_(^=, array_mask_xor, _mm_xor_ps, _mm256_xor_ps)
@@ -374,23 +432,23 @@ namespace Akari {
     AKR_SIMD_GEN_VFLOAT_OPERATOR_(*=, array_operator_mul, _mm_mul_ps, _mm256_mul_ps)
     AKR_SIMD_GEN_VFLOAT_OPERATOR_(/=, array_operator_div, _mm_div_ps, _mm256_div_ps)
 
-    template<typename T>
-    struct _scalar_t{
-        using type = T;
+    template <typename T> struct _scalar_t { using type = T; };
+    template <typename T, size_t N> struct _scalar_t<simd_array<T, N>> { using type = T; };
+    template <typename T> using scalar_t = typename _scalar_t<T>::type;
+
+    template <typename T, size_t N> struct array_operator_arrow {
+        static void *apply(const simd_array<T, N> &v);
+        static void *apply(simd_array<T, N> &v);
     };
-    template<typename T,size_t N>
-    struct _scalar_t<simd_array<T,N>>{
-        using type = T;
-    };
-    template<typename T>
-    using scalar_t = typename _scalar_t<T>::type;
-    template <typename T, size_t N> struct simd_array : public array_storage<T, N> {
-        simd_array() = default;
-        simd_array(const T &v) { array_broadcast<T, N>::apply(*this, v); }
+    template <typename T, size_t N, typename Derived> struct simd_array_base : public array_storage<T, N> {
+        simd_array_base() = default;
+        Derived &derived() { return static_cast<Derived &>(*this); }
+        template <typename U> simd_array_base(const simd_array<U, N> &v) { array_from<T, U, N>::apply(derived(), v); }
+        simd_array_base(const T &v) { array_broadcast<T, N>::apply(derived(), v); }
         T &operator[](size_t i) { return this->data[i]; }
         const T &operator[](size_t i) const { return this->data[i]; }
 #define AKR_SIMD_GEN_VFLOAT_ASSIGN_OPERATOR(assign_op, delegate)                                                       \
-    simd_array &operator assign_op(const simd_array &rhs) {                                                            \
+    Derived &operator assign_op(const Derived &rhs) {                                                                  \
         delegate<T, N>::apply(*this, rhs);                                                                             \
         return *this;                                                                                                  \
     }
@@ -399,13 +457,78 @@ namespace Akari {
         AKR_SIMD_GEN_VFLOAT_ASSIGN_OPERATOR(*=, array_operator_mul)
         AKR_SIMD_GEN_VFLOAT_ASSIGN_OPERATOR(/=, array_operator_div)
 #undef AKR_SIMD_GEN_VFLOAT_ASSIGN_OPERATOR
+#define AKR_SIMD_GEN_ASSCESS(Index, Name)                                                                              \
+    const T &Name() const {                                                                                            \
+        static_assert(N >= Index);                                                                                     \
+        return (*this)[Index];                                                                                         \
+    }                                                                                                                  \
+    T &Name() {                                                                                                        \
+        static_assert(N >= Index);                                                                                     \
+        return (*this)[Index];                                                                                         \
+    }
+        AKR_SIMD_GEN_ASSCESS(0, x)
+        AKR_SIMD_GEN_ASSCESS(1, y)
+        AKR_SIMD_GEN_ASSCESS(2, z)
+        AKR_SIMD_GEN_ASSCESS(3, w)
+#undef AKR_SIMD_GEN_ASSCESS
+        auto operator-> () const { return array_operator_arrow<T, N>::apply(*this); }
+        auto operator-> () { return array_operator_arrow<T, N>::apply(*this); }
     };
+    template <typename T, size_t N, typename SFINAE> struct simd_array : simd_array_base<T, N, simd_array<T, N>> {
+        using simd_array_base<T, N, simd_array<T, N>>::simd_array_base;
+    };
+    template <size_t N> struct array_mask;
+    template <typename T, size_t N> struct unique_instance_context_base {
+        static_assert(std::is_pointer_v<T>);
+        simd_array<T, N> *_array = nullptr;
+        std::array<T, N> _unique_instances;
+        std::array<array_mask<N>, N> _active;
+        int n_unique = 0;
+        unique_instance_context_base() {
+            for (auto &mask : _active) {
+                mask.clear_all();
+            }
+        }
+        void init(simd_array<T, N> *_arr) {
+            if (_array != nullptr)
+                return;
+            _array = _arr;
+            auto find_instance = [=](T ptr) -> int {
+                for (int i = 0; i < n_unique; i++) {
+                    if ((*_array)[i] == ptr) {
+                        return i;
+                    }
+                }
+                return -1;
+            };
+            for (int i = 0; i < N; i++) {
+                auto inst = (*_array)[i];
+                auto idx = find_instance(inst);
+                if (idx == -1) {
+                    _unique_instances[n_unique] = inst;
+                    _active[n_unique].set(i);
+                    n_unique++;
+                } else {
+                    _active[idx].set(i);
+                }
+            }
+        }
+    };
+    template <typename T, size_t N> struct unique_instance_context  {};
 
+    template <typename T, size_t N>
+    struct simd_array<T, N, std::enable_if_t<std::is_pointer_v<T>>> : simd_array_base<T, N, simd_array<T, N>> {
+        using simd_array_base<T, N, simd_array<T, N>>::simd_array_base;
+        unique_instance_context<T, N> _unique_ctx;
+    };
     template <size_t N> struct array_mask : array_storage<int32_t, N> {
         array_mask(bool v = true) { std::memset(this, v ? 0xFF : 0, sizeof(*this)); }
         operator bool() const { return any(*this); }
         int32_t &operator[](size_t i) { return this->data[i]; }
         const int32_t &operator[](size_t i) const { return this->data[i]; }
+        void set(size_t i) { this->data[i] = 0xffffffff; }
+        void clear(size_t i) { this->data[i] = 0; }
+        void clear_all() { std::memset(this, 0, sizeof(*this)); }
 #define AKR_SIMD_GEN_VMASK_ASSIGN_OPERATOR(assign_op, delegate)                                                        \
     array_mask &operator assign_op(const array_mask &rhs) {                                                            \
         delegate<N>::apply(*this, rhs);                                                                                \
