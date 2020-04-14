@@ -113,16 +113,30 @@ namespace Akari {
     Ty *raw() { return reinterpret_cast<Ty *>(this); }                                                                 \
     const Ty &operator[](size_t i) const { return raw()[i]; }                                                          \
     Ty &operator[](size_t i) { return raw()[i]; }
+
+#define AKR_ARRAY_GENERATE_OPERATOR_(assign_op, func)                                                                  \
+    Self &operator assign_op(const Self &rhs) {                                                                        \
+        auto tmp = this->func(rhs);                                                                                    \
+        *this = tmp;                                                                                                   \
+        return *this;                                                                                                  \
+    }
+
     template <typename T, size_t N> struct array_mask;
     template <typename T, size_t N> struct get_array_mask { using type = array_mask<int32_t, N>; };
     template <size_t N> struct get_array_mask<float, N> { using type = array_mask<float, N>; };
     template <size_t N> struct get_array_mask<int32_t, N> { using type = array_mask<int32_t, N>; };
+#define AKR_ARRAY_MASK_GENERATE_OPERATORS()                                                                            \
+    AKR_ARRAY_GENERATE_OPERATOR_(&=, _and)                                                                             \
+    AKR_ARRAY_GENERATE_OPERATOR_(|=, _or)                                                                              \
+    AKR_ARRAY_GENERATE_OPERATOR_(^=, _xor)
+
     template <typename T, size_t N> struct array_mask {
         AKR_STORAGE_ASSERT_ALIGNED();
         AKR_REINTERPRET_ARRAY(T)
         using type1 = array_mask<T, 8>;
         using type2 = array_mask<T, N - 8>;
         using Self = array_mask;
+        AKR_ARRAY_MASK_GENERATE_OPERATORS()
         type1 mask1;
         type2 mask2;
         array_mask() = default;
@@ -139,29 +153,36 @@ namespace Akari {
     template <typename T> struct array_mask<T, 8> : simd_f32x8 {
         using simd_f32x8::simd_f32x8;
         using Self = array_mask;
-        AKR_REINTERPRET_ARRAY(T)
+        AKR_ARRAY_MASK_GENERATE_OPERATORS()
         Self _and(const Self &_other) const { return _mm256_and_ps(m, _other.m); }
         Self _or(const Self &_other) const { return _mm256_or_ps(m, _other.m); }
         Self _xor(const Self &_other) const { return _mm256_xor_ps(m, _other.m); }
-        Self _not(const Self &_other) const { return _mm256_xor_ps(m, _mm256_set1_epi8(0xff)); }
+        Self _not(const Self &_other) const { return _mm256_xor_ps(m, (__m256)_mm256_set1_epi8(0xff)); }
     };
     template <> struct array_mask<int, 4> : simd_i32x4 {
         using simd_i32x4::simd_i32x4;
         using Self = array_mask;
         AKR_REINTERPRET_ARRAY(int)
+        AKR_ARRAY_MASK_GENERATE_OPERATORS()
         Self _and(const Self &_other) const { return (__m128i)_mm_and_ps((__m128)m, (__m128)_other.m); }
         Self _or(const Self &_other) const { return (__m128i)_mm_or_ps((__m128)m, (__m128)_other.m); }
         Self _xor(const Self &_other) const { return (__m128i)_mm_xor_ps((__m128)m, (__m128)_other.m); }
         Self _not() const { return _mm_xor_epi32(m, _mm_set1_epi8(0xff)); }
     };
-    template <> struct array_mask<int, 8>{
+    template <> struct array_mask<int, 8> {
         using type1 = array_mask<int, 4>;
         using type2 = type1;
         type1 mask1;
         type2 mask2;
         using Self = array_mask;
         AKR_REINTERPRET_ARRAY(int)
+        AKR_ARRAY_MASK_GENERATE_OPERATORS()
         array_mask() = default;
+        array_mask(__m256i m) {
+            simd_i32x8 i32X8(m);
+            mask1 = type1(i32X8.lo);
+            mask2 = type1(i32X8.hi);
+        }
         array_mask(const type1 &array1, const type2 &array2) : mask1(array1), mask2(array2) {}
         AKR_ARRAY_MASK_RECURSIVE_FUNC_1(Self, _and)
         AKR_ARRAY_MASK_RECURSIVE_FUNC_1(Self, _or)
@@ -171,18 +192,22 @@ namespace Akari {
     template <> struct array_mask<float, 4> : simd_f32x4 {
         using simd_f32x4::simd_f32x4;
         using Self = array_mask;
+        AKR_REINTERPRET_ARRAY(float)
+        AKR_ARRAY_MASK_GENERATE_OPERATORS()
         Self _and(const Self &_other) const { return _mm_and_ps(m, _other.m); }
         Self _or(const Self &_other) const { return _mm_or_ps(m, _other.m); }
         Self _xor(const Self &_other) const { return _mm_xor_ps(m, _other.m); }
-        Self _not() const { return _mm_xor_ps(m, _mm_set1_epi8(0xff)); }
+        Self _not() const { return _mm_xor_ps(m, (__m128)_mm_set1_epi8(0xff)); }
     };
     template <> struct array_mask<float, 8> : simd_f32x8 {
         using simd_f32x8::simd_f32x8;
         using Self = array_mask;
+        AKR_REINTERPRET_ARRAY(float)
+        AKR_ARRAY_MASK_GENERATE_OPERATORS()
         Self _and(const Self &_other) const { return _mm256_and_ps(m, _other.m); }
         Self _or(const Self &_other) const { return _mm256_or_ps(m, _other.m); }
         Self _xor(const Self &_other) const { return _mm256_xor_ps(m, _other.m); }
-        Self _not() const { return _mm256_xor_ps(m, _mm256_set1_epi8(0xff)); }
+        Self _not() const { return _mm256_xor_ps(m, (__m256)_mm256_set1_epi8(0xff)); }
     };
     template <typename T> struct SIMDLane {
         constexpr static size_t value = (std::is_same_v<T, int32_t> || std::is_same_v<T, float>) ? 8 : 1;
@@ -198,7 +223,7 @@ namespace Akari {
         using type1 = _to_array_storage_t<T, lane>;
         using type2 = _to_array_storage_t<T, N - lane>;
         using Self = array_storage_base;
-        using Mask = typename get_array_mask<T, N>::type;
+        using Mask = array_mask<int32_t, N>;
         using ReturnT = std::conditional_t<std::is_same_v<Derived, void>, Self, Derived>;
         type1 array1;
         type2 array2;
@@ -224,40 +249,40 @@ namespace Akari {
     template <typename Derived> struct array_storage_base<float, 8, Derived> : simd_f32x8 {
         using simd_f32x8::simd_f32x8;
         using Self = array_storage_base;
-        using Mask = array_mask<float, 8>;
+        using Mask = array_mask<int32_t, 8>;
         using ReturnT = std::conditional_t<std::is_same_v<Derived, void>, Self, Derived>;
         ReturnT _add(const Self &_other) const { return ReturnT(_mm256_add_ps(this->m, _other.m)); }
         ReturnT _sub(const Self &_other) const { return ReturnT(_mm256_sub_ps(this->m, _other.m)); }
         ReturnT _mul(const Self &_other) const { return ReturnT(_mm256_mul_ps(this->m, _other.m)); }
         ReturnT _div(const Self &_other) const { return ReturnT(_mm256_div_ps(this->m, _other.m)); }
-        Mask _lt(const Self &_other) const { return Mask(_mm256_cmp_ps(this->m, _other.m, _CMP_LT_OQ)); }
-        Mask _gt(const Self &_other) const { return Mask(_mm256_cmp_ps(this->m, _other.m, _CMP_GT_OQ)); }
-        Mask _le(const Self &_other) const { return Mask(_mm256_cmp_ps(this->m, _other.m, _CMP_LE_OQ)); }
-        Mask _ge(const Self &_other) const { return Mask(_mm256_cmp_ps(this->m, _other.m, _CMP_GE_OQ)); }
-        Mask _eq(const Self &_other) const { return Mask(_mm256_cmp_ps(this->m, _other.m, _CMP_EQ_OQ)); }
-        Mask _ne(const Self &_other) const { return Mask(_mm256_cmp_ps(this->m, _other.m, _CMP_NEQ_OQ)); }
+        Mask _lt(const Self &_other) const { return Mask((__m256i)_mm256_cmp_ps(this->m, _other.m, _CMP_LT_OQ)); }
+        Mask _gt(const Self &_other) const { return Mask((__m256i)_mm256_cmp_ps(this->m, _other.m, _CMP_GT_OQ)); }
+        Mask _le(const Self &_other) const { return Mask((__m256i)_mm256_cmp_ps(this->m, _other.m, _CMP_LE_OQ)); }
+        Mask _ge(const Self &_other) const { return Mask((__m256i)_mm256_cmp_ps(this->m, _other.m, _CMP_GE_OQ)); }
+        Mask _eq(const Self &_other) const { return Mask((__m256i)_mm256_cmp_ps(this->m, _other.m, _CMP_EQ_OQ)); }
+        Mask _ne(const Self &_other) const { return Mask((__m256i)_mm256_cmp_ps(this->m, _other.m, _CMP_NEQ_OQ)); }
     };
     template <typename Derived> struct array_storage_base<float, 4, Derived> : simd_f32x4 {
         using Self = array_storage_base;
-        using Mask = array_mask<float, 4>;
+        using Mask = array_mask<int32_t, 4>;
         using simd_f32x4::simd_f32x4;
         using ReturnT = std::conditional_t<std::is_same_v<Derived, void>, Self, Derived>;
         ReturnT _add(const Self &_other) const { return Self(_mm_add_ps(this->m, _other.m)); }
         ReturnT _sub(const Self &_other) const { return Self(_mm_sub_ps(this->m, _other.m)); }
         ReturnT _mul(const Self &_other) const { return Self(_mm_mul_ps(this->m, _other.m)); }
         ReturnT _div(const Self &_other) const { return Self(_mm_div_ps(this->m, _other.m)); }
-        Mask _lt(const Self &_other) const { return Mask(_mm_cmp_ps(this->m, _other.m, _CMP_LT_OQ)); }
-        Mask _gt(const Self &_other) const { return Mask(_mm_cmp_ps(this->m, _other.m, _CMP_GT_OQ)); }
-        Mask _le(const Self &_other) const { return Mask(_mm_cmp_ps(this->m, _other.m, _CMP_LE_OQ)); }
-        Mask _ge(const Self &_other) const { return Mask(_mm_cmp_ps(this->m, _other.m, _CMP_GE_OQ)); }
-        Mask _eq(const Self &_other) const { return Mask(_mm_cmp_ps(this->m, _other.m, _CMP_EQ_OQ)); }
-        Mask _ne(const Self &_other) const { return Mask(_mm_cmp_ps(this->m, _other.m, _CMP_NEQ_OQ)); }
+        Mask _lt(const Self &_other) const { return Mask((__m128i)_mm_cmp_ps(this->m, _other.m, _CMP_LT_OQ)); }
+        Mask _gt(const Self &_other) const { return Mask((__m128i)_mm_cmp_ps(this->m, _other.m, _CMP_GT_OQ)); }
+        Mask _le(const Self &_other) const { return Mask((__m128i)_mm_cmp_ps(this->m, _other.m, _CMP_LE_OQ)); }
+        Mask _ge(const Self &_other) const { return Mask((__m128i)_mm_cmp_ps(this->m, _other.m, _CMP_GE_OQ)); }
+        Mask _eq(const Self &_other) const { return Mask((__m128i)_mm_cmp_ps(this->m, _other.m, _CMP_EQ_OQ)); }
+        Mask _ne(const Self &_other) const { return Mask((__m128i)_mm_cmp_ps(this->m, _other.m, _CMP_NEQ_OQ)); }
     };
 
     template <typename Derived> struct array_storage_base<int, 8, Derived> : simd_i32x8 {
         using simd_i32x8::simd_i32x8;
         using Self = array_storage_base;
-        using Mask = array_mask<int, 8>;
+        using Mask = array_mask<int32_t, 8>;
         Self _add(const Self &_other) const { return Self(_mm256_add_epi32(this->m, _other.m)); }
         Self _sub(const Self &_other) const { return Self(_mm256_sub_epi32(this->m, _other.m)); }
         Self _mul(const Self &_other) const { return Self(_mm256_mul_epi32(this->m, _other.m)); }
@@ -287,7 +312,7 @@ namespace Akari {
     };
     template <typename Derived> struct array_storage_base<int, 4, Derived> : simd_i32x4 {
         using Self = array_storage_base;
-        using Mask = array_mask<int, 4>;
+        using Mask = array_mask<int32_t, 4>;
         using simd_i32x4::simd_i32x4;
         Self _add(const Self &_other) const { return Self(_mm_add_epi32(this->m, _other.m)); }
         Self _sub(const Self &_other) const { return Self(_mm_sub_epi32(this->m, _other.m)); }
@@ -319,12 +344,6 @@ namespace Akari {
         operator bool() const { return mask; }
         uint32_t mask;
     };
-#define AKR_ARRAY_GENERATE_OPERATOR_(assign_op, func)                                                                  \
-    Self &operator assign_op(const Self &rhs) {                                                                        \
-        auto tmp = func(*this, rhs);                                                                                   \
-        *this = tmp;                                                                                                   \
-        return *this;                                                                                                  \
-    }
 
     template <typename T, size_t N, typename SFINAE = void> struct aligned_array_length {
         constexpr static size_t value = N;
@@ -337,17 +356,30 @@ namespace Akari {
         using array_storage_base<T, N, array<T, N>>::array_storage_base;
         using Self = array;
         AKR_REINTERPRET_ARRAY(T)
-
-        AKR_ARRAY_GENERATE_OPERATOR_(+=, _add)
-        AKR_ARRAY_GENERATE_OPERATOR_(-=, _sub)
-        AKR_ARRAY_GENERATE_OPERATOR_(*=, _mul)
-        AKR_ARRAY_GENERATE_OPERATOR_(/=, _div)
+#define AKR_ARRAY_GENERATE_OPERATORS()                                                                                 \
+    AKR_ARRAY_GENERATE_OPERATOR_(+=, _add)                                                                             \
+    AKR_ARRAY_GENERATE_OPERATOR_(-=, _sub)                                                                             \
+    AKR_ARRAY_GENERATE_OPERATOR_(*=, _mul)                                                                             \
+    AKR_ARRAY_GENERATE_OPERATOR_(/=, _div)
+        AKR_ARRAY_GENERATE_OPERATORS()
     };
     template <typename T1, typename T2> struct expr_t_ { using type = T1; };
     template <> struct expr_t_<int, float> { using type = float; };
     template <> struct expr_t_<float, float> { using type = float; };
     template <> struct expr_t_<float, int> { using type = float; };
     template <typename T1, typename T2> using expr_t = typename expr_t_<T1, T2>::type;
+#define AKR_ARRAY_MASK_GENERATOR_BINOP(op, func)                                                                       \
+    template <typename T, typename U, size_t N>                                                                        \
+    inline decltype(auto) operator op(const array_mask<T, N> &a, const array_mask<U, N> &b) {                          \
+        using ExprT = expr_t<T, U>;                                                                                    \
+        if constexpr (std::is_same_v<ExprT, T>) {                                                                      \
+            auto tmpB = array_mask<T, N>(a);                                                                           \
+            return a.func(b);                                                                                          \
+        } else {                                                                                                       \
+            auto tmpA = array_mask<U, N>(a);                                                                           \
+            return a.func(b);                                                                                          \
+        }                                                                                                              \
+    }
 #define AKR_ARRAY_GENERATOR_BINOP(op, func)                                                                            \
     template <typename T, typename U, size_t N>                                                                        \
     inline decltype(auto) operator op(const array<T, N> &a, const array<U, N> &b) {                                    \
@@ -360,29 +392,38 @@ namespace Akari {
             return a.func(b);                                                                                          \
         }                                                                                                              \
     }
-    AKR_ARRAY_GENERATOR_BINOP(+, _add)
-    AKR_ARRAY_GENERATOR_BINOP(-, _sub)
-    AKR_ARRAY_GENERATOR_BINOP(*, _mul)
-    AKR_ARRAY_GENERATOR_BINOP(/, _div)
-    AKR_ARRAY_GENERATOR_BINOP(<, _lt)
-    AKR_ARRAY_GENERATOR_BINOP(>, _gt)
-    AKR_ARRAY_GENERATOR_BINOP(<=, _le)
-    AKR_ARRAY_GENERATOR_BINOP(>=, _ge)
-    AKR_ARRAY_GENERATOR_BINOP(==, _eq)
+#define AKR_ARRAY_GEN_BINOPS()                                                                                         \
+    AKR_ARRAY_GENERATOR_BINOP(+, _add)                                                                                 \
+    AKR_ARRAY_GENERATOR_BINOP(-, _sub)                                                                                 \
+    AKR_ARRAY_GENERATOR_BINOP(*, _mul)                                                                                 \
+    AKR_ARRAY_GENERATOR_BINOP(/, _div)                                                                                 \
+    AKR_ARRAY_GENERATOR_BINOP(<, _lt)                                                                                  \
+    AKR_ARRAY_GENERATOR_BINOP(>, _gt)                                                                                  \
+    AKR_ARRAY_GENERATOR_BINOP(<=, _le)                                                                                 \
+    AKR_ARRAY_GENERATOR_BINOP(>=, _ge)                                                                                 \
+    AKR_ARRAY_GENERATOR_BINOP(==, _eq)                                                                                 \
     AKR_ARRAY_GENERATOR_BINOP(!=, _ne)
+    AKR_ARRAY_GEN_BINOPS()
+
+    AKR_ARRAY_MASK_GENERATOR_BINOP(&, _and)
+    AKR_ARRAY_MASK_GENERATOR_BINOP(|, _or)
+    AKR_ARRAY_MASK_GENERATOR_BINOP(^, _xor)
+
+    template <typename T, size_t N> array_mask<T, N> operator~(const array_mask<T, N> &mask) { return mask._not(); }
+
 } // namespace Akari
 int main() {
     using namespace Akari;
-    array<int, 32> v1(1);
-    array<int, 32> v2(2);
+    array<float, 32> v1(1);
+    array<float, 32> v2(2);
     for (int i = 0; i < 32; i++) {
         v1[i] = 2 * i + 1;
         v2[i] = 3 * i + 2;
     }
-    auto v3 = v1._add(v2);
-    auto mask = v1 < v2;
+    auto mask = (v1 < 50)
+    mask &= mask;
     for (int i = 0; i < 32; i++) {
-        printf("%d %d\n", v3[i], mask[i]);
+        printf("%f %f %d\n", v3[i], v1[i], mask[i]);
     }
     //    simd_array<float, 32> a, b;
     //    for (int i = 0; i < 32; i++) {
