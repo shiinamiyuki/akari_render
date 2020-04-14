@@ -27,47 +27,63 @@
 #include <Akari/Core/Math.h>
 
 namespace Akari {
-    struct Ray {
-        vec3 o, d;
-        float t_min, t_max;
+    template <typename Value> struct TRay {
+        using Vector3 = vec<3, Value>;
+        Vector3 o, d;
+        Value t_min, t_max;
 
-        Ray() = default;
+        TRay() = default;
 
-        Ray(const vec3 &o, const vec3 &d, float t_min = Eps(), float t_max = std::numeric_limits<float>::infinity())
+        TRay(const Vector3 &o, const Vector3 &d, Value t_min = Eps(),
+             Value t_max = std::numeric_limits<float>::infinity())
             : o(o), d(d), t_min(t_min), t_max(t_max) {}
 
-        [[nodiscard]] vec3 At(Float t) const { return o + t * d; }
+        [[nodiscard]] Vector3 At(Value t) const { return o + t * d; }
     };
 
-    struct Vertex {
-        vec3 pos, Ns;
-        vec2 texCoord;
-        Vertex() = default;
+    using Ray = TRay<float>;
+    using Ray4 = TRay<Array<float, 4>>;
+    using Ray8 = TRay<Array<float, 8>>;
+    using Ray16 = TRay<Array<float, 16>>;
+    template <typename Value> struct TVertex {
+        using Vector3 = vec<3, Value>;
+        using Vector2 = vec<2, Value>;
+        Vector3 pos, Ns;
+        Vector2 texCoord;
+        TVertex() = default;
     };
-    struct SurfaceSample {
-        vec2 uv;
-        Float pdf;
-        vec3 p;
-        vec3 normal;
+    using Vertex = TVertex<float>;
+    template <typename Value> struct TSurfaceSample {
+        using Vector3 = vec<3, Value>;
+        using Vector2 = vec<2, Value>;
+        Vector2 uv;
+        Value pdf;
+        Vector3 p;
+        Vector3 normal;
     };
-    struct Intersection;
-    struct Triangle {
-        std::array<vec3, 3> v;
-        std::array<vec2, 3> texCoords;
-        std::array<vec3, 3> Ns;
+    using SurfaceSample = TSurfaceSample<float>;
+    template <typename Value, typename IValue> struct TIntersection;
+    template <typename Value> struct TTriangle {
+        using Vector3 = vec<3, Value>;
+        using Vector2 = vec<2, Value>;
+        std::array<Vector3, 3> v;
+        std::array<Vector2, 3> texCoords;
+        std::array<Vector3, 3> Ns;
         vec3 Ng;
-        [[nodiscard]] vec3 InterpolatedNormal(const vec2 &uv) const { return normalize(Interpolate(Ns[0], Ns[1], Ns[2], uv)); }
-        [[nodiscard]] vec2 InterpolatedTexCoord(const vec2 &uv) const {
+        [[nodiscard]] Vector3 InterpolatedNormal(const Vector2 &uv) const {
+            return normalize(Interpolate(Ns[0], Ns[1], Ns[2], uv));
+        }
+        [[nodiscard]] Vector2 InterpolatedTexCoord(const Vector2 &uv) const {
             return Interpolate(texCoords[0], texCoords[1], texCoords[2], uv);
         }
-        [[nodiscard]] Float Area() const {
-            vec3 e1 = (v[1] - v[0]);
-            vec3 e2 = (v[2] - v[0]);
+        [[nodiscard]] Value Area() const {
+            Vector3 e1 = (v[1] - v[0]);
+            Vector3 e2 = (v[2] - v[0]);
             return length(cross(e1, e2)) * 0.5f;
         }
-        void Sample(vec2 u, SurfaceSample *sample) const {
-            Float su0 = std::sqrt(u[0]);
-            vec2 b = vec2(1 - su0, u[1] * su0);
+        void Sample(Vector2 u, SurfaceSample *sample) const {
+            Value su0 = std::sqrt(u[0]);
+            Vector2 b = Vector2(1 - su0, u[1] * su0);
 
             sample->uv = u;
             sample->p = Interpolate(v[0], v[1], v[2], b);
@@ -75,30 +91,37 @@ namespace Akari {
             sample->normal = InterpolatedNormal(u);
         }
 
-        bool Intersect(const Ray &ray, Intersection *) const;
+        template <typename IValue> bool Intersect(const TRay<Value> &ray, TIntersection<Value, IValue> *) const;
     };
+    using Triangle = TTriangle<float>;
     struct PrimitiveHandle {
         int32_t meshId = -1;
         int32_t primId = -1;
     };
-    struct Intersection {
-        Float t = Inf;
-        Triangle triangle;
-        int32_t meshId = -1;
-        int32_t primId = -1;
-        vec2 uv;
-        vec3 Ng;
-        vec3 p;
-        vec3 wo;
-        Intersection() = default;
-        explicit Intersection(const Ray &ray) : wo(-ray.d) {}
+
+    template <typename Value, typename IValue> struct TIntersection {
+        Value t = Inf;
+        using Vector3 = vec<3, Value>;
+        using Vector2 = vec<2, Value>;
+        TTriangle<Value> triangle;
+        IValue meshId = -1;
+        IValue primId = -1;
+        Vector2 uv;
+        Vector3 Ng;
+        Vector3 p;
+        Vector3 wo;
+        TIntersection() = default;
+        explicit TIntersection(const TRay<Value> &ray) : wo(-ray.d) {}
     };
-    inline bool Triangle::Intersect(const Ray &ray, Intersection *intersection) const {
+    using Intersection = TIntersection<float, int32_t>;
+    template <typename Value>
+    template <typename IValue>
+    inline bool TTriangle<Value>::Intersect(const TRay<Value> &ray, TIntersection<Value, IValue> *intersection) const {
         auto &v0 = v[0];
         auto &v1 = v[1];
         auto &v2 = v[2];
-        vec3 e1 = (v1 - v0);
-        vec3 e2 = (v2 - v0);
+        Vector3 e1 = (v1 - v0);
+        Vector3 e2 = (v2 - v0);
         float a, f, u, _v;
         auto h = cross(ray.d, e2);
         a = dot(e1, h);
@@ -118,7 +141,7 @@ namespace Akari {
             intersection->t = t;
             intersection->p = ray.o + t * ray.d;
             intersection->Ng = Ng;
-            intersection->uv = vec2(u, _v);
+            intersection->uv = Vector2(u, _v);
             return true;
         } else {
             return false;
@@ -126,10 +149,11 @@ namespace Akari {
     }
     class BSDF;
 
-    struct ShadingPoint {
-        vec2 texCoords;
+    template <typename Value> struct TShadingPoint {
+        using Vector2 = vec<2, Value>;
+        Vector2 texCoords;
     };
-
+    using ShadingPoint = TShadingPoint<float>;
     enum TransportMode : uint32_t { EImportance, ERadiance };
 
 } // namespace Akari

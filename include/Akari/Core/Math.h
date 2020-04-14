@@ -28,6 +28,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <json.hpp>
 
+#include <Akari/Core/SIMD.hpp>
+
 namespace Akari::math {
     using namespace glm;
 
@@ -198,7 +200,7 @@ namespace Akari {
         vec3 T, B;
     };
 
-    template <typename V> inline V Interpolate(const V &v0, const V &v1, const V &v2, const vec2 &uv) {
+    template <typename V, typename V2> inline V Interpolate(const V &v0, const V &v1, const V &v2, const V2 &uv) {
         return (1.0f - uv.x - uv.y) * v0 + uv.x * v1 + uv.y * v2;
     }
     template <int N, typename T> T Power(const T &x) {

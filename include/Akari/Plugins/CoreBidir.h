@@ -37,6 +37,8 @@ namespace Akari {
         }
     }
     struct PathVertex {
+        struct _init_si{};
+        struct _init_ei{};
         enum Type : uint8_t { ENone, ESurface, ELight, ECamera };
         Type type = ENone;
         Float pdfFwd = 0, pdfRev = 0;
@@ -47,6 +49,7 @@ namespace Akari {
         bool delta = false;
         Spectrum beta;
         PathVertex() : si() {}
+        explicit PathVertex(_init_ei) : ei() {}
         static PathVertex CreateSurfaceVertex(const MaterialSlot *materialSlot, const Spectrum beta, const vec3 &wo,
                                               const vec3 &p, const Triangle &triangle, const Intersection &intersection,
                                               Float pdf, MemoryArena &arena) {
@@ -59,7 +62,7 @@ namespace Akari {
         }
         static PathVertex CreateLightVertex(const Spectrum beta, const Light *light, const vec3 &p,
                                             const vec3 &normal) {
-            PathVertex vertex;
+            PathVertex vertex((_init_ei()));
             vertex.beta = beta;
             vertex.type = ELight;
             vertex.ei = EndPointInteraction(light, p, normal);
@@ -67,7 +70,7 @@ namespace Akari {
         }
         static PathVertex CreateLightVertex(const Spectrum beta, const Light *light, const vec3 &p, const vec3 &normal,
                                             Float pdf) {
-            PathVertex vertex;
+            PathVertex vertex((_init_ei()));
             vertex.beta = beta;
             vertex.type = ELight;
             vertex.ei = EndPointInteraction(light, p, normal);
@@ -76,7 +79,7 @@ namespace Akari {
         }
         static PathVertex CreateCameraVertex(const Spectrum beta, const Camera *camera, const vec3 &p,
                                              const vec3 &normal) {
-            PathVertex vertex;
+            PathVertex vertex((_init_ei()));
             vertex.beta = beta;
             vertex.type = ECamera;
             vertex.ei = EndPointInteraction(camera, p, normal);
