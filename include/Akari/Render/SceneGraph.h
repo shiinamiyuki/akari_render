@@ -45,7 +45,8 @@ namespace Akari {
     struct SceneSetting {
         std::vector<MeshWrapper> meshes;
         std::shared_ptr<Accelerator> accelerator;
-        AKR_SER(meshes, accelerator)
+        std::vector<std::shared_ptr<Light>> lights;
+        AKR_SER(meshes, accelerator, lights)
     };
     struct AKR_EXPORT SceneGraph {
         std::vector<RenderSetting> render;

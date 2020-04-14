@@ -48,6 +48,9 @@ namespace Akari {
             mesh.mesh->Commit();
             pScene->AddMesh(mesh.mesh);
         }
+        for(auto & light : scene.lights){
+            pScene->AddLight(light);
+        }
         if (!scene.accelerator) {
 #ifdef AKARI_USE_EMBREE
             scene.accelerator = Cast<Accelerator>(CreateComponent("EmbreeAccelerator"));

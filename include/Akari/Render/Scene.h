@@ -43,6 +43,7 @@ namespace Akari {
         std::unordered_map<const Light *, Float> lightPdfMap;
 
       public:
+        void AddLight(const std::shared_ptr<Light>& light){lights.emplace_back(light);}
         void AddMesh(const std::shared_ptr<const Mesh> &mesh) { meshes.emplace_back(mesh); }
         [[nodiscard]] const std::vector<std::shared_ptr<const Mesh>> &GetMeshes() const { return meshes; }
         void SetAccelerator(std::shared_ptr<Accelerator> p) { accelerator = std::move(p); }

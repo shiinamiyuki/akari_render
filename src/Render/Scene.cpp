@@ -21,10 +21,10 @@
 // SOFTWARE.
 
 #include <Akari/Core/Logger.h>
+#include <Akari/Render/Light.h>
 #include <Akari/Render/Material.h>
 #include <Akari/Render/Mesh.h>
 #include <Akari/Render/Scene.h>
-#include <Akari/Render/Light.h>
 namespace Akari {
     void Scene::Commit() {
         accelerator->Build(*this);
@@ -47,7 +47,7 @@ namespace Akari {
             }
         }
     }
-    const Light * Scene::SampleOneLight(const Float u0, Float *pdf) const {
+    const Light *Scene::SampleOneLight(const Float u0, Float *pdf) const {
         if (lights.empty()) {
             return nullptr;
         }
@@ -62,7 +62,7 @@ namespace Akari {
         auto &mesh = meshes[handle.meshId];
         return mesh->GetMaterialSlot(mesh->GetPrimitiveGroup(handle.primId));
     }
-    const Light * Scene::GetLight(const PrimitiveHandle &handle) const {
+    const Light *Scene::GetLight(const PrimitiveHandle &handle) const {
         return meshes[handle.meshId]->GetLight(handle.primId);
     }
 } // namespace Akari
