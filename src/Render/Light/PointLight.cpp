@@ -47,9 +47,9 @@ namespace Akari {
             auto dist = std::sqrt(dist2);
             wi /= dist;
 
-            sample->I = Li(-wi, vec2(0));
+            sample->I = Li(-wi, vec2(0)) / dist2;
             sample->wi = wi;
-            sample->pdf = dist2;
+            sample->pdf = 1;
             sample->normal = vec3(0);
 
             tester->shadowRay = Ray(position, -1.0f * wi, 0, dist * (1 - ShadowEps()));
@@ -62,7 +62,7 @@ namespace Akari {
             sample->E = Li(sample->ray.d, vec3());
             sample->uv = vec2();
         }
-        Float Power() const override { return Spectrum(color).Luminance() * strength; }
+        Float Power() const override { return Spectrum(color).Luminance() * strength * 4 * Pi; }
         Spectrum Li(const vec3 &wo, const vec2 &uv) const override {
             return Spectrum(Spectrum(color).Luminance() * strength);
         }

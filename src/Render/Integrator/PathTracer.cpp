@@ -125,7 +125,7 @@ namespace Akari {
                             auto wo = si->wo;
                             auto f = si->bsdf->Evaluate(wo, wi) * abs(dot(lightSample.wi, si->Ns));
                             if (lightPdf > 0 && MaxComp(f) > 0 && tester.visible(*scene)) {
-                                if (specular) {
+                                if (specular || Light::IsDelta(sampledLight->GetLightType())) {
                                     Li += beta * f * lightSample.I / lightPdf;
                                 } else {
                                     auto scatteringPdf = si->bsdf->EvaluatePdf(wo, wi);

@@ -43,7 +43,10 @@ namespace Akari {
       public:
         virtual Float Power() const = 0;
         virtual Spectrum Li(const vec3 &wo, const vec2 &uv) const = 0;
-        virtual LightType GetLightType()const = 0;
+        virtual LightType GetLightType() const = 0;
+        static bool IsDelta(LightType type) {
+            return (uint32_t)type & ((uint32_t)LightType ::EDeltaPosition | (uint32_t)LightType::EDeltaDirection);
+        }
         //        virtual void SampleLe(const Point2f &u1, const Point2f &u2, LightRaySample &sample) = 0;
     };
 

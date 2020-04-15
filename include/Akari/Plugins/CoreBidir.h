@@ -193,8 +193,10 @@ namespace Akari {
                 return false;
             case ESurface:
                 return !delta;
-            case ELight:
-                return !IsDeltaLight();
+            case ELight: {
+                auto light = dynamic_cast<const Light *>(ei.ep);
+                return light && !((uint32_t)light->GetLightType() & (uint32_t)LightType::EDeltaDirection);
+            }
             case ECamera:
                 return true;
             }
