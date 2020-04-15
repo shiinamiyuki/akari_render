@@ -201,6 +201,7 @@ namespace Akari {
             int sp = 0;
             stack[sp++] = &nodes[0];
             while (sp > 0) {
+
                 auto p = stack[--sp];
 //                PrintBox(p->box, "p->box");
                 auto t = intersectAABB(p->box, ray, invd);
@@ -223,7 +224,7 @@ namespace Akari {
             }
             return hit;
         }
-        bool occlude(const Ray &ray) const {
+        [[nodiscard]] bool occlude(const Ray &ray) const {
             Hit isct;
             auto invd = vec3(1) / ray.d;
             constexpr int maxDepth = 64;

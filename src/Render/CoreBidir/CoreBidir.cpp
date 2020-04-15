@@ -115,7 +115,10 @@ namespace Akari {
         }
         path[0] =
             PathVertex::CreateLightVertex(sample.E, light, sample.ray.o, sample.normal, sample.pdfDir * sample.pdfPos);
-        Spectrum beta = sample.E * abs(dot(sample.ray.d, sample.normal)) / (pdfLight * sample.pdfPos * sample.pdfDir);
+        Spectrum beta = sample.E / (pdfLight * sample.pdfPos * sample.pdfDir);
+        if(path[0].IsOnSurface()){
+            beta *= abs(dot(sample.ray.d, sample.normal));
+        }
         return 1 + RandomWalk(scene, arena, sampler, TransportMode::EImportance, sample.ray, beta, sample.pdfDir,
                               path + 1, maxDepth - 1);
     }

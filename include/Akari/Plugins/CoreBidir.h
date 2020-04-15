@@ -37,8 +37,8 @@ namespace Akari {
         }
     }
     struct PathVertex {
-        struct _init_si{};
-        struct _init_ei{};
+        struct _init_si {};
+        struct _init_ei {};
         enum Type : uint8_t { ENone, ESurface, ELight, ECamera };
         Type type = ENone;
         Float pdfFwd = 0, pdfRev = 0;
@@ -86,7 +86,15 @@ namespace Akari {
             return vertex;
         }
         [[nodiscard]] bool IsInfiniteLight() const { return false; }
-        [[nodiscard]] bool IsDeltaLight() const { return false; }
+        [[nodiscard]] bool IsDeltaLight() const {
+            if (type == ELight) {
+                auto light = dynamic_cast<const Light *>(ei.ep);
+                return light && ((uint32_t)light->GetLightType() &
+                                 ((uint32_t)LightType::EDeltaDirection | (uint32_t)LightType::EDeltaPosition));
+            } else {
+                return false;
+            }
+        }
         [[nodiscard]] const Interaction *getInteraction() const {
             if (type == ESurface) {
                 return &si;
@@ -186,8 +194,7 @@ namespace Akari {
             case ESurface:
                 return !delta;
             case ELight:
-                return ((uint32_t) dynamic_cast<const Light *>(ei.ep)->GetLightType() &
-                        (uint32_t)LightType::EDeltaDirection) != 0;
+                return !IsDeltaLight();
             case ECamera:
                 return true;
             }

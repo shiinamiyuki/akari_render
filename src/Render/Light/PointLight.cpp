@@ -38,7 +38,7 @@ namespace Akari {
         Float PdfIncidence(const Interaction &ref, const vec3 &wi) const override { return 0; }
         void PdfEmission(const Ray &ray, Float *pdfPos, Float *pdfDir) const override {
             *pdfPos = 0;
-            *pdfDir = 1 / (4 * Pi);
+            *pdfDir = UniformSpherePdf();
         }
         void SampleIncidence(const vec2 &u, const Interaction &ref, RayIncidentSample *sample,
                              VisibilityTester *tester) const override {
@@ -50,11 +50,18 @@ namespace Akari {
             sample->I = Li(-wi, vec2(0));
             sample->wi = wi;
             sample->pdf = dist2;
-            sample->normal = -wi;
+            sample->normal = vec3(0);
 
             tester->shadowRay = Ray(position, -1.0f * wi, 0, dist * (1 - ShadowEps()));
         }
-        void SampleEmission(const vec2 &u1, const vec2 &u2, RayEmissionSample *sample) const override { std::abort(); }
+        void SampleEmission(const vec2 &u1, const vec2 &u2, RayEmissionSample *sample) const override {
+            sample->ray = Ray(position, UniformSampleSphere(u2));
+            sample->pdfDir = UniformSpherePdf();
+            sample->pdfPos = 1;
+            sample->normal = vec3(0);
+            sample->E = Li(sample->ray.d, vec3());
+            sample->uv = vec2();
+        }
         Float Power() const override { return Spectrum(color).Luminance() * strength; }
         Spectrum Li(const vec3 &wo, const vec2 &uv) const override {
             return Spectrum(Spectrum(color).Luminance() * strength);
