@@ -52,7 +52,7 @@ namespace Akari {
                 average = sum.value() / float(image->Dimension().x * image->Dimension().y);
             }
         }
-        Float AverageLuminance() const override { return Texture::AverageLuminance(); }
+        Float AverageLuminance() const override { return average; }
         Spectrum Evaluate(const ShadingPoint &sp) const override {
             auto texCoords = mod(sp.texCoords, vec2(1));
             return (*image)(texCoords);

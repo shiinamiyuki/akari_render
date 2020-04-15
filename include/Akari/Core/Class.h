@@ -30,10 +30,19 @@
 namespace Akari {
     template <typename T> using Ref = std::shared_ptr<T>;
     template <typename U, typename T> Ref<U> cast(const Ref<T> &p) { return std::dynamic_pointer_cast<U>(p); }
+    template <typename U, typename T> std::optional<Ref<U>> safe_cast(const Ref<T> &p) {
+        if (!p)
+            return nullptr;
+        auto q = std::dynamic_pointer_cast<U>(p);
+        if (!q) {
+            return {};
+        }
+        return q;
+    }
     namespace Serialize {
         class OutputArchive;
         class InputArchive;
-    }
+    } // namespace Serialize
     class Object;
     class Serializable;
     class AKR_EXPORT Class {

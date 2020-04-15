@@ -62,8 +62,21 @@ namespace Akari {
             _ptr = std::make_shared<T>(value);
             return *this;
         }
+        template <typename T>[[nodiscard]] bool is_of() const { return Typeof<T>() == type; }
+        template <typename Visitor, typename... Ts> bool accept(Visitor &&vis) const {
+            return _accept<Ts...>(std::forward<Visitor>(vis));
+        }
 
       private:
+        template <typename Visitor> bool _accept(Visitor &&vis) const { return false; }
+        template <typename Visitor, typename T, typename... Ts> bool _accept(Visitor &&vis) const {
+            if (is_of<T>()) {
+                vis(as<T>());
+                return true;
+            }
+            return _accept<Ts...>(std::forward<Visitor>(vis));
+        }
+
         Type type;
         std::shared_ptr<void> _ptr;
     };
@@ -97,14 +110,29 @@ namespace Akari {
         template <typename T> AnyReference(const T &value) : type(Typeof<T>()) {
             is_const = true;
             _c_ptr = &value;
+            _ptr = nullptr;
         }
         template <typename T> AnyReference &operator=(T &value) {
             type = Typeof<T>();
             _ptr = &value;
+            _c_ptr = nullptr;
             return *this;
+        }
+        template <typename T>[[nodiscard]] bool is_of() const { return Typeof<T>() == type; }
+        template <typename Visitor, typename... Ts> bool accept(Visitor &&vis) const {
+            return _accept<Ts...>(std::forward<Visitor>(vis));
         }
 
       private:
+        template <typename Visitor> bool _accept(Visitor &&vis) const { return false; }
+        template <typename Visitor, typename T, typename... Ts> bool _accept(Visitor &&vis) const {
+            if (is_of<T>()) {
+                vis(as<T>());
+                return true;
+            }
+            return _accept<Ts...>(std::forward<Visitor>(vis));
+        }
+
         bool is_const = false;
         Type type;
         void *_ptr = nullptr;

@@ -20,9 +20,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 #include "WindowContext.h"
+
+#include "EditorFunctions.hpp"
 #include <Akari/Core/Logger.h>
 #include <Akari/Render/SceneGraph.h>
-
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
@@ -46,10 +47,10 @@ namespace Akari::Gui {
         ZeroMemory(&ofn, sizeof(ofn));
         ofn.lStructSize = sizeof(ofn);
         ofn.hwndOwner = NULL; // If you have a window to center over, put its HANDLE here
-        ofn.lpstrFilter = "Text Files\0*.txt\0Any File\0*.*\0";
+        ofn.lpstrFilter = "Text Files\0*.txt\0JSON File\0*.json\0Any File\0*.*\0";
         ofn.lpstrFile = filename;
         ofn.nMaxFile = MAX_PATH;
-        ofn.lpstrTitle = "Select a File, yo!";
+        ofn.lpstrTitle = "Select a File";
         ofn.Flags = OFN_DONTADDTORECENT | OFN_FILEMUSTEXIST;
         GetOpenFileNameA(&ofn);
         fs::path result(ofn.lpstrFile);
@@ -84,9 +85,28 @@ namespace Akari::Gui {
         ModalCloseFunc closeFunc = [=]() { modalClosure = _defaultModalClosure; };
         fs::path currentScenePath = fs::current_path();
         fs::path initialWorkingDir = fs::current_path();
+        //        std::weak_ptr<Component> selectComponent;
+        AnyReference selectItem;
 
       public:
-        MainWindow(GLFWContext &ctx) : Window(ctx) {
+        template <typename T> std::pair<bool, bool> _EditItemV(const char *label, const Property &reference) {
+            if (reference.is_of<T>()) {
+                return {true, Edit(label, reference.as<T>())};
+            }
+            return {false, false};
+        }
+
+        static std::pair<bool, bool> EditItemV(const char *label, const Property &reference) { return {false, false}; }
+        template <typename T, typename... Args>
+        std::pair<bool, bool> EditItemV(const char *label, const Property &reference) {
+            auto [taken, modified] = _EditItemV<T>(label, reference);
+            if (!taken) {
+                return EditItemV<Args...>(label, reference);
+            }
+            return {taken, modified};
+        }
+
+        explicit MainWindow(GLFWContext &ctx) : Window(ctx) {
             ImGuiIO &io = ImGui::GetIO();
             (void)io;
             logWindow = std::make_shared<LogWindow>();
@@ -95,12 +115,27 @@ namespace Akari::Gui {
         void DoShowSceneGraph() {
             if (!sceneGraph)
                 return;
-            ;
         }
         void ShowSceneGraph() {
             if (ImGui::Begin("Scene Graph")) {
                 DoShowSceneGraph();
                 ImGui::End();
+            }
+            auto &scene = sceneGraph->scene;
+            if (ImGui::TreeNode("Meshes")) {
+                for (auto &mesh : scene.meshes) {
+                    auto name = fs::relative(mesh.file, currentScenePath);
+                    static ImGuiTreeNodeFlags base_flags = ImGuiTreeNodeFlags_OpenOnArrow |
+                                                           ImGuiTreeNodeFlags_OpenOnDoubleClick |
+                                                           ImGuiTreeNodeFlags_SpanAvailWidth;
+                    if (ImGui::TreeNodeEx(mesh.mesh.get(), base_flags, "%s", name.string().c_str())) {
+                        if (ImGui::IsItemClicked()) {
+                            selectItem = mesh;
+                        }
+                        ImGui::TreePop();
+                    }
+                }
+                ImGui::TreePop();
             }
         }
         void ShowEditor() {
@@ -115,18 +150,23 @@ namespace Akari::Gui {
                         auto path = GetOpenFilePath();
                         if (!path.empty()) {
                             Info("Open {}\n", path.string());
+                            auto _tmp = sceneGraph;
                             std::thread th([=]() {
                                 fs::current_path(fs::absolute(path).parent_path());
                                 currentScenePath = fs::absolute(fs::current_path());
+                                auto npath = path.filename();
                                 SerializeContext ctx;
-                                std::shared_ptr<SceneGraph> graph;
-                                {
+                                try {
                                     Info("Loading {}\n", path.string());
-                                    std::ifstream in(path);
+                                    std::ifstream in(npath);
                                     std::string str((std::istreambuf_iterator<char>(in)),
                                                     std::istreambuf_iterator<char>());
                                     json data = str.empty() ? json::object() : json::parse(str);
-                                    graph = std::make_shared<SceneGraph>(Serialize::fromJson<SceneGraph>(ctx, data));
+                                    sceneGraph =
+                                        std::make_shared<SceneGraph>(Serialize::fromJson<SceneGraph>(ctx, data));
+                                } catch (std::exception &e) {
+                                    Error("Exception while loading: {}\n", e.what());
+                                    sceneGraph = _tmp;
                                 }
                                 closeFunc();
                             });

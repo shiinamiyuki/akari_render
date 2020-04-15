@@ -344,20 +344,40 @@ namespace Akari::Serialize {
                     auto addr = std::stol(_top().at("addr").get<std::string>());
                     auto it = ptrs.find(addr);
                     if (it == ptrs.end()) {
-                        ptr = cast<T>(type->Create());
+                        auto opt = safe_cast<T>(type->Create());
+                        if(opt.has_value()){
+                            ptr = opt.value();
+                        }else{
+                            throw DowncastError("Unable to downcast; Type mismatch");
+                        }
                         ptrs[addr] = ptr;
                     } else {
-                        ptr = std::dynamic_pointer_cast<T>(it->second);
+                        auto opt = safe_cast<T>(it->second);
+                        if(opt.has_value()){
+                            ptr = opt.value();
+                        }else{
+                            throw DowncastError("Unable to downcast; Type mismatch");
+                        }
                     }
                 } else {
-                    ptr = cast<T>(type->Create());
+                    auto opt = safe_cast<T>(type->Create());
+                    if(opt.has_value()){
+                        ptr = opt.value();
+                    }else{
+                        throw DowncastError("Unable to downcast; Type mismatch");
+                    }
                 }
                 _makeNode(_top().at("props"));
                 type->Load(*ptr, *this);
                 _popNode();
             } else {
                 auto addr = std::stol(_top().at("addr").get<std::string>());
-                ptr = std::dynamic_pointer_cast<T>(ptrs.at(addr));
+                auto opt = safe_cast<T>(ptrs.at(addr));
+                if(opt.has_value()){
+                    ptr = opt.value();
+                }else{
+                    throw DowncastError("Unable to downcast; Type mismatch");
+                }
             }
         }
 
