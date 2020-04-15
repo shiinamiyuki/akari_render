@@ -30,8 +30,6 @@
 
 namespace Akari {
     template <class UserData, class Hit, class Intersector, class ShapeHandleConstructor> struct TBVHAccelerator {
-       
-
         struct BVHNode {
             Bounds3f box{};
             uint32_t first = (uint32_t)-1;
@@ -50,7 +48,7 @@ namespace Akari {
 
         Bounds3f boundBox;
         const UserData *user_data;
-         Intersector _intersector;
+        Intersector _intersector;
         ShapeHandleConstructor _ctor;
         std::vector<Index> primitives;
         std::vector<BVHNode> nodes;
@@ -61,7 +59,7 @@ namespace Akari {
             for (auto i = 0; i < (int)N; i++) {
                 primitives.push_back(Index{i});
             }
-            Info("Buiding BVH for {} objects\n", primitives.size());
+            Info("Building BVH for {} objects\n", primitives.size());
             recursiveBuild(0, (int)primitives.size(), 0);
             Info("BVHNodes: {}\n", nodes.size());
         }
@@ -153,7 +151,7 @@ namespace Akari {
                         float cost0 = count0 == 0 ? 0 : count0 * b0.SurfaceArea();
                         float cost1 = count1 == 0 ? 0 : count1 * b1.SurfaceArea();
                         cost[i] = 0.125f + (cost0 + cost1) / box.SurfaceArea();
-                        assert(cost[i]>=0);
+                        assert(cost[i] >= 0);
                     }
                     int splitBuckets = 0;
                     Float minCost = cost[0];
@@ -187,11 +185,9 @@ namespace Akari {
                 return (int)ret;
             }
         }
-        static std::string PrintVec3(const vec3 & v){
-            return fmt::format("{} {} {}",v.x,v.y,v.z);
-        }
-        static void PrintBox(const Bounds3f & box, const char * name){
-            Debug("{}.p_min: {}, {}.p_max: {}\n", name,PrintVec3(box.p_min), name,PrintVec3(box.p_max));
+        static std::string PrintVec3(const vec3 &v) { return fmt::format("{} {} {}", v.x, v.y, v.z); }
+        static void PrintBox(const Bounds3f &box, const char *name) {
+            Debug("{}.p_min: {}, {}.p_max: {}\n", name, PrintVec3(box.p_min), name, PrintVec3(box.p_max));
         }
         bool intersect(const Ray &ray, Hit &isct) const {
             bool hit = false;
@@ -203,7 +199,7 @@ namespace Akari {
             while (sp > 0) {
 
                 auto p = stack[--sp];
-//                PrintBox(p->box, "p->box");
+                //                PrintBox(p->box, "p->box");
                 auto t = intersectAABB(p->box, ray, invd);
 
                 if (t < 0 || t > isct.t) {
@@ -255,7 +251,7 @@ namespace Akari {
         }
     };
 
-    class BVHAccelerator final: public Accelerator {
+    class BVHAccelerator final : public Accelerator {
         struct TriangleHandle {
             const Mesh *mesh = nullptr;
             int idx = -1;
@@ -289,8 +285,7 @@ namespace Akari {
         };
 
         struct BVHHandleConstructor {
-            auto operator()(const MeshBVHes *scene, int idx) const -> BVHHandle {
-                return BVHHandle{scene, idx}; }
+            auto operator()(const MeshBVHes *scene, int idx) const -> BVHHandle { return BVHHandle{scene, idx}; }
         };
 
         struct BVHIntersector {
