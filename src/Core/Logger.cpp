@@ -31,22 +31,54 @@ namespace Akari {
             std::chrono::duration<double> elapsed = std::chrono::system_clock::now() - start;
             return fmt::format("[{}] [{:.3f}] ", level, elapsed.count());
         }
-        void DoLogMessage(const std::string &msg, FILE *fp = stdout) {
+        void DoLogMessage(LogLevel level, const std::string &msg, FILE *fp = stdout) {
             fprintf(fp, "%s", msg.c_str());
             fflush(fp);
+            for (auto it = handlers.begin(); it != handlers.end();) {
+                auto &wp = *it;
+                if (wp.expired()) {
+                    it = handlers.erase(it);
+                } else {
+                    auto sp = wp.lock();
+                    sp->AddMessage(level, msg);
+                    it++;
+                }
+            }
         }
+        std::vector<std::weak_ptr<LogHandler>> handlers;
 
       public:
-        void Warning(const std::string &msg) override { DoLogMessage(GetMessageHeader("WARNING").append(msg), stderr); }
+        void RegisterHandler(const std::shared_ptr<LogHandler> &ptr) override { handlers.emplace_back(ptr); }
+        void RemoveHandler(const std::shared_ptr<LogHandler> &ptr) override {
+            for (auto it = handlers.begin(); it != handlers.end();) {
+                auto &wp = *it;
+                if (wp.expired() || wp.lock() == ptr) {
+                    it = handlers.erase(it);
+                } else {
+                    it++;
+                }
+            }
+        }
+        void Warning(const std::string &msg) override {
+            DoLogMessage(LogLevel::Warning, GetMessageHeader("WARNING").append(msg), stderr);
+        }
 
-        void Error(const std::string &msg) override { DoLogMessage(GetMessageHeader("ERROR").append(msg), stderr); }
+        void Error(const std::string &msg) override {
+            DoLogMessage(LogLevel::Error, GetMessageHeader("ERROR").append(msg), stderr);
+        }
 
-        void Info(const std::string &msg) override { DoLogMessage(GetMessageHeader("INFO").append(msg)); }
+        void Info(const std::string &msg) override {
+            DoLogMessage(LogLevel::Info, GetMessageHeader("INFO").append(msg));
+        }
 
-        void Debug(const std::string &msg) override { DoLogMessage(GetMessageHeader("DEBUG").append(msg)); }
+        void Debug(const std::string &msg) override {
+            DoLogMessage(LogLevel::Debug, GetMessageHeader("DEBUG").append(msg));
+        }
 
-        void Fatal(const std::string &msg) override { DoLogMessage(GetMessageHeader("FATAL").append(msg), stderr); }
-    };
+        void Fatal(const std::string &msg) override {
+            DoLogMessage(LogLevel::Fatal, GetMessageHeader("FATAL").append(msg), stderr);
+        }
+    }; // namespace Akari
 
     Logger *GetDefaultLogger() {
         static std::unique_ptr<DefaultLogger> logger;

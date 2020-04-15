@@ -26,45 +26,53 @@
 #include <Akari/Core/Component.h>
 #include <fmt/format.h>
 namespace Akari {
+    enum class LogLevel {
+        Info,
+        Debug,
+        Warning,
+        Error,
+        Fatal
+    };
+    class LogHandler {
+      public:
+        virtual void AddMessage(LogLevel level, const std::string &msg) = 0;
+    };
     class AKR_EXPORT Logger {
-    public:
+      public:
+        virtual void RegisterHandler(const std::shared_ptr<LogHandler> &) = 0;
+        virtual void RemoveHandler(const std::shared_ptr<LogHandler> &) = 0;
         virtual void Warning(const std::string &msg) = 0;
-        virtual void Error(const std::string & msg) = 0;
-        virtual void Info(const std::string & msg) = 0;
-        virtual void Debug(const std::string & msg) = 0;
-        virtual void Fatal(const std::string & msg) = 0;
+        virtual void Error(const std::string &msg) = 0;
+        virtual void Info(const std::string &msg) = 0;
+        virtual void Debug(const std::string &msg) = 0;
+        virtual void Fatal(const std::string &msg) = 0;
     };
 
-    AKR_EXPORT Logger * GetDefaultLogger();
+    AKR_EXPORT Logger *GetDefaultLogger();
 
-    template<typename... Args>
-    void Warning(const char * fmt, Args&&... args){
+    template <typename... Args> void Warning(const char *fmt, Args &&... args) {
         auto logger = GetDefaultLogger();
         logger->Warning(fmt::format(fmt, std::forward<Args>(args)...));
     }
 
-    template<typename... Args>
-    void Error(const char * fmt, Args&&... args){
+    template <typename... Args> void Error(const char *fmt, Args &&... args) {
         auto logger = GetDefaultLogger();
         logger->Error(fmt::format(fmt, std::forward<Args>(args)...));
     }
 
-    template<typename... Args>
-    void Info(const char * fmt, Args&&... args){
+    template <typename... Args> void Info(const char *fmt, Args &&... args) {
         auto logger = GetDefaultLogger();
         logger->Info(fmt::format(fmt, std::forward<Args>(args)...));
     }
 
-    template<typename... Args>
-    void Debug(const char * fmt, Args&&... args){
+    template <typename... Args> void Debug(const char *fmt, Args &&... args) {
         auto logger = GetDefaultLogger();
         logger->Debug(fmt::format(fmt, std::forward<Args>(args)...));
     }
 
-    template<typename... Args>
-    void Fatal(const char * fmt, Args&&... args){
+    template <typename... Args> void Fatal(const char *fmt, Args &&... args) {
         auto logger = GetDefaultLogger();
         logger->Fatal(fmt::format(fmt, std::forward<Args>(args)...));
     }
-}
+} // namespace Akari
 #endif // AKARIRENDER_LOGGER_H
