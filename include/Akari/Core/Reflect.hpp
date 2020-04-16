@@ -66,6 +66,7 @@ namespace Akari {
         template <typename Visitor, typename... Ts> bool accept(Visitor &&vis) const {
             return _accept<Ts...>(std::forward<Visitor>(vis));
         }
+        [[nodiscard]] bool has_value() const { return _ptr != nullptr; }
 
       private:
         template <typename Visitor> bool _accept(Visitor &&vis) const { return false; }
@@ -86,7 +87,7 @@ namespace Akari {
             if (is_const) {
                 throw std::runtime_error("Reference is const");
             }
-            auto ty = Typeof<T>;
+            auto ty = Typeof<T>();
             if (ty == type) {
                 return *reinterpret_cast<T *>(_ptr);
             } else {
@@ -94,7 +95,7 @@ namespace Akari {
             }
         }
         template <typename T> const T &as() const {
-            auto ty = Typeof<T>;
+            auto ty = Typeof<T>();
             if (ty == type) {
                 if (is_const) {
                     return *reinterpret_cast<const T *>(_c_ptr);
@@ -122,6 +123,7 @@ namespace Akari {
         template <typename Visitor, typename... Ts> bool accept(Visitor &&vis) const {
             return _accept<Ts...>(std::forward<Visitor>(vis));
         }
+        bool has_value() const { return _ptr != nullptr || _c_ptr != nullptr; }
 
       private:
         template <typename Visitor> bool _accept(Visitor &&vis) const { return false; }

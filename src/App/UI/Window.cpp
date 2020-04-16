@@ -36,7 +36,11 @@
 namespace Akari::Gui {
     using ModalCloseFunc = std::function<void(void)>;
     using ModalClosure = std::function<void(const ModalCloseFunc &)>;
-
+    template <> inline bool Edit(const char *label, MeshWrapper &value) {
+        ImGui::PushID(label);
+        ImGui::PopID();
+        return false;
+    }
 #ifdef _WIN32
     fs::path GetOpenFilePath() {
         CurrentPathGuard _;
@@ -89,19 +93,24 @@ namespace Akari::Gui {
         AnyReference selectItem;
 
       public:
-        template <typename T> std::pair<bool, bool> _EditItemV(const char *label, const Property &reference) {
+        template <typename T> std::pair<bool, bool> _EditItemV(const char *label, AnyReference &reference) {
             if (reference.is_of<T>()) {
                 return {true, Edit(label, reference.as<T>())};
             }
             return {false, false};
         }
 
-        static std::pair<bool, bool> EditItemV(const char *label, const Property &reference) { return {false, false}; }
+        std::pair<bool, bool> EditItemV(const char *label, AnyReference &reference) { return {false, false}; }
+
         template <typename T, typename... Args>
-        std::pair<bool, bool> EditItemV(const char *label, const Property &reference) {
+        std::pair<bool, bool> EditItemV(const char *label, AnyReference &reference) {
             auto [taken, modified] = _EditItemV<T>(label, reference);
             if (!taken) {
-                return EditItemV<Args...>(label, reference);
+                if constexpr (sizeof...(Args) > 0) {
+                    return EditItemV<Args...>(label, reference);
+                } else {
+                    return {false, false};
+                }
             }
             return {taken, modified};
         }
@@ -115,12 +124,6 @@ namespace Akari::Gui {
         void DoShowSceneGraph() {
             if (!sceneGraph)
                 return;
-        }
-        void ShowSceneGraph() {
-            if (ImGui::Begin("Scene Graph")) {
-                DoShowSceneGraph();
-                ImGui::End();
-            }
             auto &scene = sceneGraph->scene;
             if (ImGui::TreeNode("Meshes")) {
                 for (auto &mesh : scene.meshes) {
@@ -138,12 +141,59 @@ namespace Akari::Gui {
                 ImGui::TreePop();
             }
         }
+        void ShowSceneGraph() {
+            if (ImGui::Begin("Scene Graph")) {
+                DoShowSceneGraph();
+                ImGui::End();
+            }
+        }
+        template <typename F> void DockSpace(F &&f) {
+            ImGuiViewport *viewport = ImGui::GetMainViewport();
+            ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
+            ImGui::SetNextWindowPos(viewport->GetWorkPos());
+            ImGui::SetNextWindowSize(viewport->GetWorkSize());
+            ImGui::SetNextWindowViewport(viewport->ID);
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+            window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
+                            ImGuiWindowFlags_NoMove;
+            window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+            ImGui::Begin("DockSpace", nullptr, window_flags);
+            ImGui::PopStyleVar();
+
+            ImGui::PopStyleVar(2);
+            ImGuiID dockspace_id = ImGui::GetID("MainDockSpace");
+            static ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_None;
+            ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
+            f();
+            ImGui::End();
+        }
+        bool EditItem(const char *label, AnyReference &ref) {
+            return EditItemV<int, float, ivec2, ivec3, vec2, vec3, Spectrum, Angle<float>, Angle<vec3>,
+                             AffineTransform>(label, ref)
+                .second;
+        }
+        void ShowInspector() {
+            if (ImGui::Begin("Inspector")) {
+                if (selectItem.has_value()) {
+                    EditItem("Selected", selectItem);
+                }
+                ImGui::End();
+            }
+        }
         void ShowEditor() {
-            ShowSceneGraph();
-            logWindow->Show();
+            ImGuiIO &io = ImGui::GetIO();
+
+            DockSpace([=]() {
+                ShowMenu();
+                ShowSceneGraph();
+                ShowInspector();
+                logWindow->Show();
+            });
         }
         void ShowMenu() {
-            if (ImGui::BeginMainMenuBar()) {
+            if (ImGui::BeginMenuBar()) {
                 if (ImGui::BeginMenu("File")) {
                     if (ImGui::MenuItem("Open")) {
                         Info("open\n");
@@ -181,7 +231,7 @@ namespace Akari::Gui {
                     }
                     ImGui::EndMenu();
                 }
-                ImGui::EndMainMenuBar();
+                ImGui::EndMenuBar();
             }
         }
         void Render() {}
@@ -249,7 +299,7 @@ namespace Akari::Gui {
                     ImGui::End();
                 }
                 modalClosure(closeFunc);
-                ShowMenu();
+
                 ShowEditor();
                 // Rendering
                 ImGui::Render();

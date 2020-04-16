@@ -31,6 +31,8 @@ namespace Akari {
         Float average = 0;
 
       public:
+        ImageTexture() = default;
+        ImageTexture(const fs::path &path) : path(path) {}
         AKR_SER(path)
         AKR_DECL_COMP(ImageTexture, "ImageTexture")
         void Commit() override {
@@ -59,4 +61,6 @@ namespace Akari {
         }
     };
     AKR_EXPORT_COMP(ImageTexture, "Texture")
+
+    std::shared_ptr<Texture> CreateImageTexture(const fs::path &path) { return std::make_shared<ImageTexture>(path); }
 } // namespace Akari

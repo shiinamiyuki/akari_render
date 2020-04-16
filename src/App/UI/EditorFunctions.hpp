@@ -26,7 +26,7 @@
 #include <Akari/Core/Spectrum.h>
 #include <imgui.h>
 namespace Akari::Gui {
-    template <typename T> inline bool Edit(const char *label, T &value);
+    template <typename T> inline bool Edit(const char *label, T &value) = delete;
 
     template <> inline bool Edit(const char *label, int &value) {
         return ImGui::InputInt(label, &value, 1, 100, ImGuiInputTextFlags_EnterReturnsTrue);
@@ -76,6 +76,7 @@ namespace Akari::Gui {
         }
         return ret;
     }
+
 } // namespace Akari::Gui
 
 #endif // AKARIRENDER_EDITORFUNCTIONS_HPP
