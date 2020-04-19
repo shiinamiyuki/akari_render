@@ -51,7 +51,7 @@ namespace Akari {
         void Commit() override;
         std::vector<std::shared_ptr<Light>> GetMeshLights() const override;
         const Light *GetLight(int primId) const override;
-        const std::vector<MaterialSlot> &GetMaterials() const override { return materials; }
+        std::vector<MaterialSlot> &GetMaterials() override { return materials; }
     };
 } // namespace Akari
 

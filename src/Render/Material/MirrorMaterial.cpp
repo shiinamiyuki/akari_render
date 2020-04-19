@@ -42,6 +42,7 @@ namespace Akari {
             si->bsdf->AddComponent(arena.alloc<SpecularReflection>(c * scale, arena.alloc<FresnelNoOp>()));
         }
         void Commit() override { color->Commit(); }
+        bool SupportBidirectional() const override { return true; }
     };
 
     AKR_EXPORT_COMP(MirrorMaterial, "Material")

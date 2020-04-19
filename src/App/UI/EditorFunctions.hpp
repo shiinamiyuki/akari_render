@@ -52,8 +52,8 @@ namespace Akari::Gui {
 
     template <> inline bool Edit(const char *label, Spectrum &value) {
         //        ImGui::PushID(&value);
-        int flags = ImGuiColorEditFlags_DisplayHex | ImGuiColorEditFlags_DisplayHSV | ImGuiColorEditFlags_DisplayRGB;
-        bool ret = ImGui::ColorEdit3(label, reinterpret_cast<float *>(&value), flags);
+        int flags = 0;
+        bool ret = ImGui::ColorPicker3(label, reinterpret_cast<float *>(&value), flags);
         //        ImGui::PopID();
         return ret;
     }

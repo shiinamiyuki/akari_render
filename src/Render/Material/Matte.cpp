@@ -43,6 +43,7 @@ namespace Akari {
             si->bsdf->AddComponent(arena.alloc<LambertianReflection>(c * scale));
         }
         void Commit() override { color->Commit(); }
+        bool SupportBidirectional() const override { return true; }
     };
 
     AKR_EXPORT_COMP(MatteMaterial, "Material")

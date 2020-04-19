@@ -26,8 +26,8 @@
 #include <Akari/Core/Component.h>
 #include <Akari/Core/MemoryArena.hpp>
 #include <Akari/Render/BSDF.h>
-#include <Akari/Render/Texture.h>
 #include <Akari/Render/Interaction.h>
+#include <Akari/Render/Texture.h>
 namespace Akari {
     class Material;
     class Light;
@@ -35,7 +35,11 @@ namespace Akari {
 
     class AKR_EXPORT Material : public Component {
       public:
-        virtual void ComputeScatteringFunctions(SurfaceInteraction * si, MemoryArena &arena, TransportMode mode, Float scale) const = 0;
+        virtual void ComputeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
+                                                Float scale) const = 0;
+
+        // Materials like Toon-ish shading would not satisfy this property
+        virtual bool SupportBidirectional() const = 0;
     };
 
     struct Emission {
@@ -53,5 +57,3 @@ namespace Akari {
     };
 } // namespace Akari
 #endif // AKARIRENDER_MATERIAL_H
-
-

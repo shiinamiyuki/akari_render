@@ -49,7 +49,7 @@ namespace Akari::Gui {
         }
         template <> inline bool Edit(EditorState &state, const char *label, std::shared_ptr<Material> &value) {
             bool ret = false;
-            ImGuiIdGuard _(&value);
+            ImGuiIdGuard _(value.get());
             if (ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_DefaultOpen)) {
                 auto props = value->GetProperties();
                 for (auto &prop : props) {
@@ -61,7 +61,7 @@ namespace Akari::Gui {
         }
         template <> inline bool Edit(EditorState &state, const char *label, std::shared_ptr<Texture> &value) {
             bool ret = false;
-            ImGuiIdGuard _(&value);
+            ImGuiIdGuard _(value.get());
             if (ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_DefaultOpen)) {
                 auto props = value->GetProperties();
                 for (auto &prop : props) {
@@ -73,10 +73,10 @@ namespace Akari::Gui {
         }
         template <> inline bool Edit(EditorState &state, const char *label, std::shared_ptr<Mesh> &value) {
             bool ret = false;
-            ImGuiIdGuard _(&value);
+            ImGuiIdGuard _(value.get());
             if (ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_DefaultOpen)) {
                 if (value) {
-                    auto materials = value->GetMaterials();
+                    auto& materials = value->GetMaterials();
                     for (auto &material : materials) {
                         std::string _id =
                             fmt::format("{}##{}", material.name.c_str(), (size_t)(const void *)(&material));

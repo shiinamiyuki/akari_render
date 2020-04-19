@@ -23,9 +23,9 @@
 #ifndef AKARIRENDER_MESH_H
 #define AKARIRENDER_MESH_H
 
+#include <Akari/Core/Logger.h>
 #include <Akari/Core/detail/reflect-macros.h>
 #include <Akari/Render/Geometry.hpp>
-#include <Akari/Core/Logger.h>
 #include <fstream>
 
 namespace Akari {
@@ -47,7 +47,7 @@ namespace Akari {
         [[nodiscard]] virtual int GetPrimitiveGroup(int idx) const = 0;
         virtual bool Load(const char *path) = 0;
         virtual const MaterialSlot &GetMaterialSlot(int group) const = 0;
-        virtual const std::vector<MaterialSlot> &GetMaterials() const = 0;
+        virtual std::vector<MaterialSlot> &GetMaterials() = 0;
         bool Intersect(const Ray &ray, int idx, RayHit *hit) const {
             auto vertices = GetVertexBuffer();
             auto indices = GetIndexBuffer();
