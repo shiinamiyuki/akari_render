@@ -23,41 +23,41 @@
 #ifndef AKARIRENDER_REFLECT_MACROS_H
 #define AKARIRENDER_REFLECT_MACROS_H
 
-
 #include <iostream>
 
 #include <utility>
 #include <vector>
 
-
-namespace Akari{
+namespace Akari {
 
     inline Attributes ParseAttributes(const char *s) {
         Attributes attr;
         size_t pos = 0;
         auto skip_space = [&]() {
-          while (pos < strlen(s) && isspace(s[pos])) {
-              pos++;
-          }
+            while (pos < strlen(s) && isspace(s[pos])) {
+                pos++;
+            }
         };
         auto identifier = [&]() {
-          std::string iden;
-          while (pos < strlen(s) && isalnum(s[pos])) {
-              iden += s[pos];
-              pos++;
-          }
-          return iden;
+            std::string iden;
+            while (pos < strlen(s) && isalnum(s[pos])) {
+                iden += s[pos];
+                pos++;
+            }
+            return iden;
         };
         auto string = [&]() {
-          std::string str;
-          if (s[pos] == '"')
-              pos++;
-          while (pos < strlen(s) && ('"' != s[pos])) {
-              str += s[pos];
-              pos++;
-          }
-          pos++;
-          return str;
+            std::string str;
+            if (s[pos] == '"') {
+                pos++;
+            }
+
+            while (pos < strlen(s) && ('"' != s[pos])) {
+                str += s[pos];
+                pos++;
+            }
+            pos++;
+            return str;
         };
         while (pos < strlen(s)) {
             skip_space();
@@ -87,9 +87,9 @@ namespace Akari{
 
             for (size_t i = 0; i < array.size(); i++) {
                 auto skip_space = [&]() {
-                  while (pos < s.length() && isspace(s[pos])) {
-                      pos++;
-                  }
+                    while (pos < s.length() && isspace(s[pos])) {
+                        pos++;
+                    }
                 };
                 skip_space();
                 while (pos < s.length() && s[pos] != ',') {
@@ -116,9 +116,9 @@ namespace Akari{
                 Attributes attr;
                 size_t pos = 0;
                 auto skip_space = [&]() {
-                  while (pos < inside.length() && isspace(inside[pos])) {
-                      pos++;
-                  }
+                    while (pos < inside.length() && isspace(inside[pos])) {
+                        pos++;
+                    }
                 };
                 skip_space();
                 if (inside[pos] == '(') {
@@ -186,5 +186,5 @@ namespace Akari{
         visitor.FirstPass(#__VA_ARGS__, __VA_ARGS__);                                                                  \
         return std::move(visitor.props);                                                                               \
     }
-}
+} // namespace Akari
 #endif // AKARIRENDER_REFLECT_MACROS_H

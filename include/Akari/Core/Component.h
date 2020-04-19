@@ -33,7 +33,7 @@ namespace Akari {
     class Component;
     class Plugin;
 
-    class AKR_EXPORT Component : public Serializable, Reflect, std::enable_shared_from_this<Component> {
+    class AKR_EXPORT Component : public Serializable, public Reflect, public std::enable_shared_from_this<Component> {
         bool dirty = true;
 
       public:

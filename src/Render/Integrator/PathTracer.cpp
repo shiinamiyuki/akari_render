@@ -34,6 +34,7 @@ namespace Akari {
         pdfB *= pdfB;
         return pdfA / (pdfA + pdfB);
     }
+
     struct PTRenderTask : RenderTask {
         RenderContext ctx;
         std::mutex mutex;

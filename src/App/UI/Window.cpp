@@ -36,10 +36,43 @@
 namespace Akari::Gui {
     using ModalCloseFunc = std::function<void(void)>;
     using ModalClosure = std::function<void(const ModalCloseFunc &)>;
-    template <> inline bool Edit(const char *label, MeshWrapper &value) {
+
+    template <typename T> std::pair<bool, bool> _EditItemV(const char *label, Any &reference) {
+        if (reference.is_of<T>()) {
+            return {true, Edit(label, reference.as<T>())};
+        }
+        return {false, false};
+    }
+
+    std::pair<bool, bool> EditItemV(const char *label, Any &reference) { return {false, false}; }
+
+    template <typename T, typename... Args>
+    std::pair<bool, bool> EditItemV(const char *label, Any &reference) {
+        auto [taken, modified] = _EditItemV<T>(label, reference);
+        if (!taken) {
+            if constexpr (sizeof...(Args) > 0) {
+                return EditItemV<Args...>(label, reference);
+            } else {
+                return {false, false};
+            }
+        }
+        return {taken, modified};
+    }
+    template <>inline bool Edit(const char * label, std::shared_ptr<Mesh> & value){
+        bool ret = false;
         ImGui::PushID(label);
+        auto props = value->GetProperties();
         ImGui::PopID();
-        return false;
+        return ret;
+    }
+
+    template <> inline bool Edit(const char *label, MeshWrapper &value) {
+        bool ret = false;
+        ImGui::PushID(label);
+        ImGui::Text("File: %s", value.file.string().c_str());
+        ret = ret | Edit("transform", value.transform);
+        ImGui::PopID();
+        return ret;
     }
 #ifdef _WIN32
     fs::path GetOpenFilePath() {
@@ -89,31 +122,11 @@ namespace Akari::Gui {
         ModalCloseFunc closeFunc = [=]() { modalClosure = _defaultModalClosure; };
         fs::path currentScenePath = fs::current_path();
         fs::path initialWorkingDir = fs::current_path();
-        //        std::weak_ptr<Component> selectComponent;
-        AnyReference selectItem;
+        // std::weak_ptr<Component> selectComponent;
+        Any selectedItem;
 
       public:
-        template <typename T> std::pair<bool, bool> _EditItemV(const char *label, AnyReference &reference) {
-            if (reference.is_of<T>()) {
-                return {true, Edit(label, reference.as<T>())};
-            }
-            return {false, false};
-        }
 
-        std::pair<bool, bool> EditItemV(const char *label, AnyReference &reference) { return {false, false}; }
-
-        template <typename T, typename... Args>
-        std::pair<bool, bool> EditItemV(const char *label, AnyReference &reference) {
-            auto [taken, modified] = _EditItemV<T>(label, reference);
-            if (!taken) {
-                if constexpr (sizeof...(Args) > 0) {
-                    return EditItemV<Args...>(label, reference);
-                } else {
-                    return {false, false};
-                }
-            }
-            return {taken, modified};
-        }
 
         explicit MainWindow(GLFWContext &ctx) : Window(ctx) {
             ImGuiIO &io = ImGui::GetIO();
@@ -133,8 +146,10 @@ namespace Akari::Gui {
                                                            ImGuiTreeNodeFlags_SpanAvailWidth;
                     if (ImGui::TreeNodeEx(mesh.mesh.get(), base_flags, "%s", name.string().c_str())) {
                         if (ImGui::IsItemClicked()) {
-                            selectItem = mesh;
+                            Debug("selected\n");
+                            selectedItem = make_any_ref(mesh);
                         }
+                      //  auto props = mesh.mesh->GetProperties();
                         ImGui::TreePop();
                     }
                 }
@@ -169,15 +184,15 @@ namespace Akari::Gui {
             f();
             ImGui::End();
         }
-        bool EditItem(const char *label, AnyReference &ref) {
+        bool EditItem(const char *label, Any &ref) {
             return EditItemV<int, float, ivec2, ivec3, vec2, vec3, Spectrum, Angle<float>, Angle<vec3>,
-                             AffineTransform>(label, ref)
+                             AffineTransform, MeshWrapper>(label, ref)
                 .second;
         }
         void ShowInspector() {
             if (ImGui::Begin("Inspector")) {
-                if (selectItem.has_value()) {
-                    EditItem("Selected", selectItem);
+                if (selectedItem.has_value()) {
+                    EditItem("Selected", selectedItem);
                 }
                 ImGui::End();
             }

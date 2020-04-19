@@ -24,6 +24,7 @@
 #define AKARIRENDER_MESH_H
 
 #include <Akari/Render/Geometry.hpp>
+#include <Akari/Core/detail/reflect-macros.h>
 #include <fstream>
 
 namespace Akari {
@@ -116,6 +117,7 @@ namespace Akari {
         AffineTransform transform;
         std::shared_ptr<Mesh> mesh;
         //        AKR_SER(file, mesh)
+        AKR_PROPS(file, transform, mesh)
         template <class Archive> void save(Archive &ar) const {
             Akari::Serialize::AutoSaveVisitor v{ar};
             _AKR_DETAIL_REFL(v, file, transform);
