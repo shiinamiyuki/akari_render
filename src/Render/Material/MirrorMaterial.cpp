@@ -41,6 +41,7 @@ namespace Akari {
             auto c = color->Evaluate(si->sp);
             si->bsdf->AddComponent(arena.alloc<SpecularReflection>(c * scale, arena.alloc<FresnelNoOp>()));
         }
+        void Commit() override { color->Commit(); }
     };
 
     AKR_EXPORT_COMP(MirrorMaterial, "Material")

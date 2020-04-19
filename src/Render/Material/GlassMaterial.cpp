@@ -43,6 +43,7 @@ namespace Akari {
             auto eta = ior->Evaluate(si->sp)[0];
             si->bsdf->AddComponent(arena.alloc<FresnelSpecular>(c, c, 1.0f, eta, mode));
         }
+        void Commit() override { color->Commit();ior->Commit(); }
     };
 
     AKR_EXPORT_COMP(GlassMaterial, "Material")

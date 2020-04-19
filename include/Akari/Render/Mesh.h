@@ -23,8 +23,9 @@
 #ifndef AKARIRENDER_MESH_H
 #define AKARIRENDER_MESH_H
 
-#include <Akari/Render/Geometry.hpp>
 #include <Akari/Core/detail/reflect-macros.h>
+#include <Akari/Render/Geometry.hpp>
+#include <Akari/Core/Logger.h>
 #include <fstream>
 
 namespace Akari {
@@ -46,6 +47,7 @@ namespace Akari {
         [[nodiscard]] virtual int GetPrimitiveGroup(int idx) const = 0;
         virtual bool Load(const char *path) = 0;
         virtual const MaterialSlot &GetMaterialSlot(int group) const = 0;
+        virtual const std::vector<MaterialSlot> &GetMaterials() const = 0;
         bool Intersect(const Ray &ray, int idx, RayHit *hit) const {
             auto vertices = GetVertexBuffer();
             auto indices = GetIndexBuffer();
@@ -129,6 +131,10 @@ namespace Akari {
         template <class Archive> void load(Archive &ar) {
             Akari::Serialize::AutoLoadVisitor v{ar};
             _AKR_DETAIL_REFL(v, file, transform);
+            if (!fs::exists(file)) {
+                Error("{} does not exist\n", file.string());
+                return;
+            }
             std::ifstream in(file);
             std::string str((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
             json data = str.empty() ? json::object() : json::parse(str);

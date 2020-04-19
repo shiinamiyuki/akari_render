@@ -36,44 +36,109 @@
 namespace Akari::Gui {
     using ModalCloseFunc = std::function<void(void)>;
     using ModalClosure = std::function<void(const ModalCloseFunc &)>;
-
-    template <typename T> std::pair<bool, bool> _EditItemV(const char *label, Any &reference) {
-        if (reference.is_of<T>()) {
-            return {true, Edit(label, reference.as<T>())};
+    struct EditorState {};
+    struct ImGuiIdGuard {
+        template <typename T> explicit ImGuiIdGuard(T p) { ImGui::PushID(p); }
+        ~ImGuiIdGuard() { ImGui::PopID(); }
+    };
+    namespace detail {
+        inline bool EditItem(EditorState &state, const char *label, Any &ref);
+        template <typename T> bool Edit(EditorState &, const char *label, T &value) {
+            ImGuiIdGuard _(&value);
+            return Gui::Edit(label, value);
         }
-        return {false, false};
-    }
-
-    std::pair<bool, bool> EditItemV(const char *label, Any &reference) { return {false, false}; }
-
-    template <typename T, typename... Args>
-    std::pair<bool, bool> EditItemV(const char *label, Any &reference) {
-        auto [taken, modified] = _EditItemV<T>(label, reference);
-        if (!taken) {
-            if constexpr (sizeof...(Args) > 0) {
-                return EditItemV<Args...>(label, reference);
-            } else {
-                return {false, false};
+        template <> inline bool Edit(EditorState &state, const char *label, std::shared_ptr<Material> &value) {
+            bool ret = false;
+            ImGuiIdGuard _(&value);
+            if (ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_DefaultOpen)) {
+                auto props = value->GetProperties();
+                for (auto &prop : props) {
+                    ret = ret | EditItem(state, prop.name(), prop);
+                }
+                ImGui::TreePop();
             }
+            return ret;
         }
-        return {taken, modified};
-    }
-    template <>inline bool Edit(const char * label, std::shared_ptr<Mesh> & value){
-        bool ret = false;
-        ImGui::PushID(label);
-        auto props = value->GetProperties();
-        ImGui::PopID();
-        return ret;
-    }
+        template <> inline bool Edit(EditorState &state, const char *label, std::shared_ptr<Texture> &value) {
+            bool ret = false;
+            ImGuiIdGuard _(&value);
+            if (ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_DefaultOpen)) {
+                auto props = value->GetProperties();
+                for (auto &prop : props) {
+                    ret = ret | EditItem(state, prop.name(), prop);
+                }
+                ImGui::TreePop();
+            }
+            return ret;
+        }
+        template <> inline bool Edit(EditorState &state, const char *label, std::shared_ptr<Mesh> &value) {
+            bool ret = false;
+            ImGuiIdGuard _(&value);
+            if (ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_DefaultOpen)) {
+                if (value) {
+                    auto materials = value->GetMaterials();
+                    for (auto &material : materials) {
+                        std::string _id =
+                            fmt::format("{}##{}", material.name.c_str(), (size_t)(const void *)(&material));
+                        if (ImGui::TreeNode(_id.c_str())) {
+                            ret = ret | Edit(state, "material", material.material);
+                            if (ImGui::TreeNodeEx("emission", ImGuiTreeNodeFlags_DefaultOpen)) {
+                                ret = ret | Edit(state, "color", material.emission.color);
+                                ret = ret | Edit(state, "strength", material.emission.strength);
+                                ImGui::TreePop();
+                            }
+                            ImGui::TreePop();
+                        }
+                    }
+                }
+                ImGui::TreePop();
+            }
+            return ret;
+        }
 
-    template <> inline bool Edit(const char *label, MeshWrapper &value) {
-        bool ret = false;
-        ImGui::PushID(label);
-        ImGui::Text("File: %s", value.file.string().c_str());
-        ret = ret | Edit("transform", value.transform);
-        ImGui::PopID();
-        return ret;
-    }
+        template <> inline bool Edit(EditorState &state, const char *label, MeshWrapper &value) {
+            bool ret = false;
+            ImGuiIdGuard _(&value);
+            if (ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_DefaultOpen)) {
+                ImGui::Text("File: %s", value.file.string().c_str());
+                ret = ret | Edit(state, "transform", value.transform);
+                ret = ret | Edit(state, "mesh", value.mesh);
+                ImGui::TreePop();
+            }
+            return ret;
+        }
+
+        template <typename T> std::pair<bool, bool> _EditItemV(EditorState &state, const char *label, Any &reference) {
+            if (reference.is_of<T>()) {
+                return {true, Edit(state, label, reference.as<T>())};
+            }
+            return {false, false};
+        }
+
+        inline std::pair<bool, bool> EditItemV(EditorState &state, const char *label, Any &reference) {
+            return {false, false};
+        }
+
+        template <typename T, typename... Args>
+        inline std::pair<bool, bool> EditItemV(EditorState &state, const char *label, Any &reference) {
+            auto [taken, modified] = _EditItemV<T>(state, label, reference);
+            if (!taken) {
+                if constexpr (sizeof...(Args) > 0) {
+                    return EditItemV<Args...>(state, label, reference);
+                } else {
+                    return {false, false};
+                }
+            }
+            return {taken, modified};
+        }
+
+        inline bool EditItem(EditorState &state, const char *label, Any &ref) {
+            return EditItemV<int, float, ivec2, ivec3, vec2, vec3, Spectrum, Angle<float>, Angle<vec3>, AffineTransform,
+                             MeshWrapper>(state, label, ref)
+                .second;
+        }
+    }; // namespace detail
+
 #ifdef _WIN32
     fs::path GetOpenFilePath() {
         CurrentPathGuard _;
@@ -97,6 +162,7 @@ namespace Akari::Gui {
     fs::path GetOpenFilePath() { return fs::path(); }
 #endif
     class MainWindow : public Window {
+        EditorState editorState;
         using Window::Window;
         std::shared_ptr<SceneGraph> sceneGraph;
         struct LogWindow : LogHandler {
@@ -126,8 +192,6 @@ namespace Akari::Gui {
         Any selectedItem;
 
       public:
-
-
         explicit MainWindow(GLFWContext &ctx) : Window(ctx) {
             ImGuiIO &io = ImGui::GetIO();
             (void)io;
@@ -149,7 +213,7 @@ namespace Akari::Gui {
                             Debug("selected\n");
                             selectedItem = make_any_ref(mesh);
                         }
-                      //  auto props = mesh.mesh->GetProperties();
+                        //  auto props = mesh.mesh->GetProperties();
                         ImGui::TreePop();
                     }
                 }
@@ -184,11 +248,7 @@ namespace Akari::Gui {
             f();
             ImGui::End();
         }
-        bool EditItem(const char *label, Any &ref) {
-            return EditItemV<int, float, ivec2, ivec3, vec2, vec3, Spectrum, Angle<float>, Angle<vec3>,
-                             AffineTransform, MeshWrapper>(label, ref)
-                .second;
-        }
+        bool EditItem(const char *label, Any &ref) { return detail::EditItem(editorState, label, ref); }
         void ShowInspector() {
             if (ImGui::Begin("Inspector")) {
                 if (selectedItem.has_value()) {

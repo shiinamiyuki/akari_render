@@ -42,6 +42,7 @@ namespace Akari {
             auto c = color->Evaluate(si->sp);
             si->bsdf->AddComponent(arena.alloc<LambertianReflection>(c * scale));
         }
+        void Commit() override { color->Commit(); }
     };
 
     AKR_EXPORT_COMP(MatteMaterial, "Material")
