@@ -10,3 +10,6 @@
 [submodule "external/asmjit"]
 	path = external/asmjit
 	url = https://github.com/asmjit/asmjit
+[submodule "external/magic_enum"]
+	path = external/magic_enum
+	url = https://github.com/Neargye/magic_enum

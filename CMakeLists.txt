@@ -8,6 +8,7 @@ include_directories(external/glm)
 include_directories(external/misc)
 include_directories(external/json)
 include_directories(external/cxxopts/include)
+include_directories(external/magic_enum/include)
 
 include_directories(include)
 

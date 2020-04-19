@@ -26,6 +26,7 @@
 #include <Akari/Core/Class.h>
 #include <Akari/Core/Object.h>
 #include <json.hpp>
+#include <magic_enum.hpp>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
@@ -221,6 +222,9 @@ namespace Akari::Serialize {
 
         template <class T> void _save(NVP<T> &&nvp) { _save_nvp(nvp.name, nvp.ref); }
 
+        template <typename T> std::enable_if_t<std::is_enum_v<T>> _save(const T &arg) {
+            _top() = magic_enum::enum_name<T>(arg);
+        }
         template <class T> std::enable_if_t<detail::is_json_seriailzable<T>::value, void> _save(const T &arg) {
             _top() = arg;
         }
@@ -331,7 +335,9 @@ namespace Akari::Serialize {
         }
 
         template <class T> std::enable_if_t<detail::has_member_load<T>::value, void> _load(T &arg) { arg.load(*this); }
-
+        template <typename T> std::enable_if_t<std::is_enum_v<T>> _save(T &arg) {
+            arg = magic_enum::enum_cast<T>(_top().get<std::string>());
+        }
         template <class T> std::enable_if_t<std::is_base_of_v<Serializable, T>, void> _load(std::shared_ptr<T> &ptr) {
             if (_top().is_null()) {
                 ptr = nullptr;
@@ -345,25 +351,25 @@ namespace Akari::Serialize {
                     auto it = ptrs.find(addr);
                     if (it == ptrs.end()) {
                         auto opt = safe_cast<T>(type->Create());
-                        if(opt.has_value()){
+                        if (opt.has_value()) {
                             ptr = opt.value();
-                        }else{
+                        } else {
                             throw DowncastError("Unable to downcast; Type mismatch");
                         }
                         ptrs[addr] = ptr;
                     } else {
                         auto opt = safe_cast<T>(it->second);
-                        if(opt.has_value()){
+                        if (opt.has_value()) {
                             ptr = opt.value();
-                        }else{
+                        } else {
                             throw DowncastError("Unable to downcast; Type mismatch");
                         }
                     }
                 } else {
                     auto opt = safe_cast<T>(type->Create());
-                    if(opt.has_value()){
+                    if (opt.has_value()) {
                         ptr = opt.value();
-                    }else{
+                    } else {
                         throw DowncastError("Unable to downcast; Type mismatch");
                     }
                 }
@@ -373,9 +379,9 @@ namespace Akari::Serialize {
             } else {
                 auto addr = std::stol(_top().at("addr").get<std::string>());
                 auto opt = safe_cast<T>(ptrs.at(addr));
-                if(opt.has_value()){
+                if (opt.has_value()) {
                     ptr = opt.value();
-                }else{
+                } else {
                     throw DowncastError("Unable to downcast; Type mismatch");
                 }
             }
