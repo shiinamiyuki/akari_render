@@ -64,9 +64,12 @@ include(cmake/OIDN.cmake)
 ##set(AKARI_CORE_EXT_LIBS ${AKARI_CORE_EXT_LIBS} embree embree_sse42 embree_avx embree_avx2 lexers math simd tasking sys)
 #
 file(GLOB AKARI_API_SRC include/Akari/Core/*.* include/Akari/Render/*.*)
-file(GLOB AKARI_CORE_SRC src/Core/*.* src/Render/*.*)
+file(GLOB AKARI_CORE_SRC src/Core/*.* )
+file(GLOB AKARI_CORE_RENDER_SRC src/Render/*.*)
 add_library(AkariCore SHARED ${AKARI_CORE_SRC})
 target_link_libraries(AkariCore  ${AKARI_CORE_EXT_LIBS})
+add_library(AkariCoreRender SHARED ${AKARI_CORE_RENDER_SRC})
+target_link_libraries(AkariCoreRender AkariCore)
 #
 #
 set(AKARI_ALL_PLUGINS "")
@@ -81,7 +84,7 @@ function(add_plugin target)
             LIBRARY_OUTPUT_DIRECTORY  "${CMAKE_BINARY_DIR}/"
 #            ARCHIVE_OUTPUT_DIRECTORY  "${CMAKE_BINARY_DIR}/plugins/"
             RUNTIME_OUTPUT_DIRECTORY   "${CMAKE_BINARY_DIR}/")
-    target_link_libraries(${target} AkariCore)
+    target_link_libraries(${target} AkariCoreRender)
 endfunction()
 function(add_tool target)
     list(SUBLIST ARGN 0 -1 FILES)
@@ -91,14 +94,14 @@ function(add_tool target)
     set_target_properties(${target} PROPERTIES
             #            ARCHIVE_OUTPUT_DIRECTORY  "${CMAKE_BINARY_DIR}/plugins/"
             RUNTIME_OUTPUT_DIRECTORY   "${CMAKE_BINARY_DIR}/")
-    target_link_libraries(${target} AkariCore)
+    target_link_libraries(${target} AkariCoreRender)
 endfunction()
 
 add_subdirectory(src/Render)
 add_subdirectory(src/Tool)
 
 add_executable(Akari src/App/Akari.cpp)
-target_link_libraries(Akari AkariCore)
+target_link_libraries(Akari AkariCoreRender)
 
 add_executable(AkariExpr src/App/AkariExpr.cpp)
 target_link_libraries(AkariExpr asmjit)

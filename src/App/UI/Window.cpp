@@ -76,7 +76,7 @@ namespace Akari::Gui {
             ImGuiIdGuard _(value.get());
             if (ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_DefaultOpen)) {
                 if (value) {
-                    auto& materials = value->GetMaterials();
+                    auto &materials = value->GetMaterials();
                     for (auto &material : materials) {
                         std::string _id =
                             fmt::format("{}##{}", material.name.c_str(), (size_t)(const void *)(&material));
@@ -162,6 +162,10 @@ namespace Akari::Gui {
     fs::path GetOpenFilePath() { return fs::path(); }
 #endif
     class MainWindow : public Window {
+        struct WindowFlags {
+            bool showStyleEditor = false;
+        };
+        WindowFlags flags;
         EditorState editorState;
         using Window::Window;
         std::shared_ptr<SceneGraph> sceneGraph;
@@ -175,7 +179,7 @@ namespace Akari::Gui {
                     }
                     ImGui::Separator();
                     for (auto &log : logs) {
-                        ImVec4 color(1, 1, 1, 1);
+                        ImVec4 color = ImGui::GetStyleColorVec4(ImGuiCol_Text);
                         ImGui::TextColored(color, "%s", log.second.c_str());
                     }
                 }
@@ -257,6 +261,12 @@ namespace Akari::Gui {
                 ImGui::End();
             }
         }
+        void ShowStyleEditor() {
+            if(flags.showStyleEditor && ImGui::Begin("Style Editor", &flags.showStyleEditor)) {
+                ImGui::ShowStyleEditor();
+                ImGui::End();
+            }
+        }
         void ShowEditor() {
             ImGuiIO &io = ImGui::GetIO();
 
@@ -264,9 +274,11 @@ namespace Akari::Gui {
                 ShowMenu();
                 ShowSceneGraph();
                 ShowInspector();
+                ShowStyleEditor();
                 logWindow->Show();
             });
         }
+
         void ShowMenu() {
             if (ImGui::BeginMenuBar()) {
                 if (ImGui::BeginMenu("File")) {
@@ -306,6 +318,10 @@ namespace Akari::Gui {
                     }
                     ImGui::EndMenu();
                 }
+                if (ImGui::BeginMenu("Preferences")) {
+                    ImGui::MenuItem("Style", nullptr, &flags.showStyleEditor);
+                    ImGui::EndMenu();
+                }
                 ImGui::EndMenuBar();
             }
         }
@@ -332,47 +348,9 @@ namespace Akari::Gui {
                 ImGui_ImplGlfw_NewFrame();
                 ImGui::NewFrame();
 
-                // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse
-                // its code to learn more about Dear ImGui!).
                 if (show_demo_window)
                     ImGui::ShowDemoWindow(&show_demo_window);
 
-                // 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
-                {
-                    static float f = 0.0f;
-                    static int counter = 0;
-
-                    ImGui::Begin("Hello, world!"); // Create a window called "Hello, world!" and append into it.
-
-                    ImGui::Text("This is some useful text."); // Display some text (you can use a format strings too)
-                    ImGui::Checkbox("Demo Window", &show_demo_window); // Edit bools storing our window open/close state
-                    ImGui::Checkbox("Another Window", &show_another_window);
-
-                    ImGui::SliderFloat("float", &f, 0.0f, 1.0f); // Edit 1 float using a slider from 0.0f to 1.0f
-                    ImGui::ColorEdit3("clear color", (float *)&clear_color); // Edit 3 floats representing a color
-
-                    if (ImGui::Button("Button")) // Buttons return true when clicked (most widgets return true when
-                                                 // edited/activated)
-                        counter++;
-                    ImGui::SameLine();
-                    ImGui::Text("counter = %d", counter);
-
-                    ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
-                                ImGui::GetIO().Framerate);
-                    ImGui::End();
-                }
-
-                // 3. Show another simple window.
-                if (show_another_window) {
-                    ImGui::Begin(
-                        "Another Window",
-                        &show_another_window); // Pass a pointer to our bool variable (the window will have a closing
-                    // button that will clear the bool when clicked)
-                    ImGui::Text("Hello from another window!");
-                    if (ImGui::Button("Close Me"))
-                        show_another_window = false;
-                    ImGui::End();
-                }
                 modalClosure(closeFunc);
 
                 ShowEditor();
