@@ -139,7 +139,7 @@ namespace Akari {
             }
             }
             auto sinTheta = std::sqrt(std::max(0.0f, 1 - cosTheta * cosTheta));
-            return vec3(std::cos(phi) * sinTheta, std::sin(phi) * sinTheta, cosTheta);
+            return vec3(std::cos(phi) * sinTheta, cosTheta, std::sin(phi) * sinTheta);
         }
         [[nodiscard]] Float evaluatePdf(const vec3 &wh) const { return D(wh) * AbsCosTheta(wh); }
 
@@ -148,7 +148,7 @@ namespace Akari {
         Float alpha;
     };
 
-    class MicrofacetReflection : public BSDFComponent {
+    class AKR_EXPORT MicrofacetReflection : public BSDFComponent {
         const Spectrum R;
         const MicrofacetModel microfacet;
         const Fresnel *fresnel;
@@ -160,7 +160,7 @@ namespace Akari {
         [[nodiscard]] Spectrum Evaluate(const vec3 &wo, const vec3 &wi) const override;
         Spectrum Sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const override;
     };
-    class MicrofacetTransmission : public BSDFComponent {
+    class AKR_EXPORT MicrofacetTransmission : public BSDFComponent {
         const Spectrum T;
         const MicrofacetModel microfacet;
         const FresnelDielectric fresnel;

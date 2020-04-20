@@ -96,7 +96,16 @@ function(add_tool target)
             RUNTIME_OUTPUT_DIRECTORY   "${CMAKE_BINARY_DIR}/")
     target_link_libraries(${target} AkariCoreRender)
 endfunction()
-
+function(add_test target)
+    list(SUBLIST ARGN 0 -1 FILES)
+    add_executable(${target} ${FILES})
+    set_property(TARGET ${target} PROPERTY POSITION_INDEPENDENT_CODE ON)
+    set_target_properties(${target} PROPERTIES PREFIX "")
+    set_target_properties(${target} PROPERTIES
+            #            ARCHIVE_OUTPUT_DIRECTORY  "${CMAKE_BINARY_DIR}/plugins/"
+            RUNTIME_OUTPUT_DIRECTORY   "${CMAKE_BINARY_DIR}/")
+    target_link_libraries(${target} AkariCoreRender)
+endfunction()
 add_subdirectory(src/Render)
 add_subdirectory(src/Tool)
 
@@ -114,3 +123,5 @@ if(AKARI_BUILD_GUI)
 endif()
 
 add_executable(test-simd src/Test/simd.cpp)
+
+add_subdirectory(src/Test)

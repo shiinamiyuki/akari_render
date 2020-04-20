@@ -11,4 +11,4 @@ addons:
     - gcc-8
     - g++-8
     - cmake
-script: mkdir build && cd build && cmake ../ -DCMAKE_BUILD_TYPE=Release && make -r -j `nproc`
+script: mkdir build && cd build && cmake ../ -DCMAKE_BUILD_TYPE=Release && make -r -j `nproc` && ./TestBSDF
