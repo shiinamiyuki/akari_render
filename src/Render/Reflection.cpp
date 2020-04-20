@@ -72,7 +72,7 @@ namespace Akari {
             bool entering = CosTheta(wo) > 0;
             Float etaI = entering ? etaA : etaB;
             Float etaT = entering ? etaB : etaA;
-//            Debug("{}\n", etaI / etaT);
+            //            Debug("{}\n", etaI / etaT);
             if (!Refract(wo, FaceForward(vec3(0, 1, 0), wo), etaI / etaT, wi))
                 return Spectrum(0);
             Spectrum ft = T * (1 - F);
@@ -80,8 +80,29 @@ namespace Akari {
             if (mode == TransportMode::ERadiance)
                 ft *= (etaI * etaI) / (etaT * etaT);
             *pdf = 1 - F;
-//            Info("{} {} {} {}\n", ft[0],ft[1],ft[2],  AbsCosTheta(*wi));
+            //            Info("{} {} {} {}\n", ft[0],ft[1],ft[2],  AbsCosTheta(*wi));
             return ft / AbsCosTheta(*wi);
         }
+    }
+
+    Spectrum OrenNayar::Evaluate(const vec3 &wo, const vec3 &wi) const {
+        Float sinThetaI = SinTheta(wi);
+        Float sinThetaO = SinTheta(wo);
+        Float maxCos = 0;
+        if (sinThetaI > 1e-4f && sinThetaO > 1e-4f) {
+            Float sinPhiI = SinPhi(wi), cosPhiI = CosPhi(wi);
+            Float sinPhiO = SinPhi(wo), cosPhiO = CosPhi(wo);
+            Float dCos = cosPhiI * cosPhiO + sinPhiI * sinPhiO;
+            maxCos = std::max((Float)0, dCos);
+        }
+        Float sinAlpha, tanBeta;
+        if (AbsCosTheta(wi) > AbsCosTheta(wo)) {
+            sinAlpha = sinThetaO;
+            tanBeta = sinThetaI / AbsCosTheta(wi);
+        } else {
+            sinAlpha = sinThetaI;
+            tanBeta = sinThetaO / AbsCosTheta(wo);
+        }
+        return R * InvPi * (A + B * maxCos * sinAlpha * tanBeta);
     }
 } // namespace Akari

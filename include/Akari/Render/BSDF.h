@@ -52,6 +52,18 @@ namespace Akari {
 
     inline Float TanTheta(const vec3 &w) { return std::sqrt(std::fmax(0.0f, Tan2Theta(w))); }
 
+    inline Float CosPhi(const vec3 &w) {
+        Float sinTheta = SinTheta(w);
+        return (sinTheta == 0) ? 1 : std::clamp<float>(w.x / sinTheta, -1, 1);
+    }
+    inline Float SinPhi(const vec3 &w) {
+        Float sinTheta = SinTheta(w);
+        return (sinTheta == 0) ? 0 : std::clamp<float>(w.z / sinTheta, -1, 1);
+    }
+
+    inline Float Cos2Phi(const vec3 &w) { return CosPhi(w) * CosPhi(w); }
+    inline Float Sin2Phi(const vec3 &w) { return SinPhi(w) * SinPhi(w); }
+
     inline bool SameHemisphere(const vec3 &wo, const vec3 &wi) { return wo.y * wi.y >= 0; }
 
     inline vec3 Reflect(const vec3 &w, const vec3 &n) { return -1.0f * w + 2.0f * dot(w, n) * n; }
@@ -111,10 +123,10 @@ namespace Akari {
       public:
         BSDF(const vec3 &Ng, const vec3 &Ns) : frame(Ns), Ng(Ng), Ns(Ns) {}
         void AddComponent(const BSDFComponent *comp) { components[nComp++] = comp; }
-        [[nodiscard]] Float EvaluatePdf(const vec3 &woW, const vec3 &wiW) const ;
+        [[nodiscard]] Float EvaluatePdf(const vec3 &woW, const vec3 &wiW) const;
         [[nodiscard]] vec3 LocalToWorld(const vec3 &w) const { return frame.LocalToWorld(w); }
         [[nodiscard]] vec3 WorldToLocal(const vec3 &w) const { return frame.WorldToLocal(w); }
-        [[nodiscard]] Spectrum Evaluate(const vec3 &woW, const vec3 &wiW) const ;
+        [[nodiscard]] Spectrum Evaluate(const vec3 &woW, const vec3 &wiW) const;
         void Sample(BSDFSample &sample) const;
     };
     inline BSDFSample::BSDFSample(Float u0, const vec2 &u, const SurfaceInteraction &si) : wo(si.wo), u0(u0), u(u) {}

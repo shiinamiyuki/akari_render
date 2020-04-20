@@ -108,7 +108,7 @@ namespace Akari {
             : BSDFComponent(BSDFType(BSDF_SPECULAR | BSDF_TRANSMISSION)), R(R), fresnel(fresnel) {}
         [[nodiscard]] Float EvaluatePdf(const vec3 &wo, const vec3 &wi) const override { return 0; }
         [[nodiscard]] Spectrum Evaluate(const vec3 &wo, const vec3 &wi) const override { return Spectrum(0); }
-        Spectrum Sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType * sampledType) const override;
+        Spectrum Sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const override;
     };
     class AKR_EXPORT SpecularTransmission : public BSDFComponent {
         const Spectrum T;
@@ -118,11 +118,11 @@ namespace Akari {
 
       public:
         explicit SpecularTransmission(const Spectrum &T, Float etaA, Float etaB, TransportMode mode)
-            : BSDFComponent(BSDFType(BSDF_TRANSMISSION | BSDF_SPECULAR)), T(T), etaA(etaA),
-              etaB(etaB), fresnel(etaA, etaB), mode(mode) {}
+            : BSDFComponent(BSDFType(BSDF_TRANSMISSION | BSDF_SPECULAR)), T(T), etaA(etaA), etaB(etaB),
+              fresnel(etaA, etaB), mode(mode) {}
         [[nodiscard]] Float EvaluatePdf(const vec3 &wo, const vec3 &wi) const override { return 0; }
         [[nodiscard]] Spectrum Evaluate(const vec3 &wo, const vec3 &wi) const override { return Spectrum(0); }
-        Spectrum Sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType * sampledType) const override;
+        Spectrum Sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const override;
     };
     class AKR_EXPORT FresnelSpecular : public BSDFComponent {
         const Spectrum R, T;
@@ -136,7 +136,20 @@ namespace Akari {
               etaB(etaB), fresnel(etaA, etaB), mode(mode) {}
         [[nodiscard]] Float EvaluatePdf(const vec3 &wo, const vec3 &wi) const override { return 0; }
         [[nodiscard]] Spectrum Evaluate(const vec3 &wo, const vec3 &wi) const override { return Spectrum(0); }
-        Spectrum Sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType * sampledType) const override;
+        Spectrum Sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const override;
+    };
+
+    class AKR_EXPORT OrenNayar : public BSDFComponent {
+        const Spectrum R;
+        Float A, B;
+
+      public:
+        OrenNayar(const Spectrum &R, Float sigma) : BSDFComponent(BSDFType(BSDF_DIFFUSE | BSDF_REFLECTION)), R(R) {
+            Float sigma2 = sigma * sigma;
+            A = 1.f - (sigma2 / (2.f * (sigma2 + 0.33f)));
+            B = 0.45f * sigma2 / (sigma2 + 0.09f);
+        }
+        [[nodiscard]] Spectrum Evaluate(const vec3 &wo, const vec3 &wi) const override;
     };
 } // namespace Akari
 
