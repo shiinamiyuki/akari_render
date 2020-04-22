@@ -25,7 +25,7 @@
 #include <Akari/Render/Microfacet.h>
 #include <Akari/Render/Sampler.h>
 using namespace Akari;
-bool RunTestBSDF_SamplePdf(const vec3 &wo, const BSDFComponent *bsdf, Sampler *sampler, size_t N = 100000u) {
+bool RunTestBSDF_SamplePdf(const vec3 &wo, const BSDFComponent *bsdf, Sampler *sampler, size_t N = 10000000u) {
     double sum = 0;
     size_t good = 0, bad = 0;
     for (size_t i = 0; i < N; i++) {
@@ -48,11 +48,33 @@ bool RunTestBSDF_SamplePdf(const vec3 &wo, const BSDFComponent *bsdf, Sampler *s
          abs((expected - actual) / actual));
     return true;
 }
-
+bool RunTestMicrofacet(const vec3 &wo, const MicrofacetModel* model, Sampler *sampler, size_t N = 10000000u) {
+    double sum = 0;
+    size_t good = 0, bad = 0;
+    for (size_t i = 0; i < N; i++) {
+        vec3 wi;
+        BSDFType sampledType;
+        Float pdf = 0;
+        auto wh = model->sampleWh(wo, sampler->Next2D());(void)wh;
+        pdf = model->evaluatePdf(wh);
+        if (std::isnan(pdf) || pdf <= 0) {
+            bad++;
+        } else {
+            sum += 1.0 / pdf;
+            good++;
+        }
+    }
+    double expected = Pi * 2;
+    auto actual = sum / good;
+    Info("good: {}, bad: {}\n", good, bad);
+    Info("integral = {}, abs_diff = {}, rel_diff = {}\n", actual, abs(expected - actual),
+         abs((expected - actual) / actual));
+    return true;
+}
 int main() {
     Application app;
     try {
-        vec3 wo = normalize(vec3(0.3, 1, 0));
+        vec3 wo = normalize(vec3(0, 1, 0));
         Info("Test BSDFComponent::Sample()\n");
         {
             auto sampler = Cast<Sampler>(CreateComponent("RandomSampler"));
@@ -62,7 +84,9 @@ int main() {
         {
             auto sampler = Cast<Sampler>(CreateComponent("RandomSampler"));
             FresnelDielectric fresnel(1.0, 1.3);
-            MicrofacetReflection bsdf(Spectrum(1), MicrofacetModel(MicrofacetType::EGGX, 0.1), &fresnel);
+            MicrofacetModel model(MicrofacetType::EGGX, 0.3);
+            RunTestMicrofacet(wo,&model, sampler.get());
+            MicrofacetReflection bsdf(Spectrum(1), model, &fresnel);
             RunTestBSDF_SamplePdf(wo, &bsdf, sampler.get());
         }
     } catch (std::exception &e) {

@@ -139,7 +139,10 @@ namespace Akari {
             }
             }
             auto sinTheta = std::sqrt(std::max(0.0f, 1 - cosTheta * cosTheta));
-            return vec3(std::cos(phi) * sinTheta, cosTheta, std::sin(phi) * sinTheta);
+            auto wh = vec3(std::cos(phi) * sinTheta, cosTheta, std::sin(phi) * sinTheta);
+            if (!SameHemisphere(wo, wh))
+                wh = -wh;
+            return wh;
         }
         [[nodiscard]] Float evaluatePdf(const vec3 &wh) const { return D(wh) * AbsCosTheta(wh); }
 

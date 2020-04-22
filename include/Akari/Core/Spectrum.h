@@ -29,7 +29,7 @@ namespace Akari {
     template <size_t N> struct CoefficientSpectrum : public vec<N, float, defaultp> {
         using vec<N, float, defaultp>::vec;
         using Base = vec<N, float, defaultp>;
-        using Self = CoefficientSpectrum<N>;
+        using Self = CoefficientSpectrum<N>;\
 
         using vec<N, float, defaultp>::operator[];
 
