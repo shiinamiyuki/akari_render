@@ -29,7 +29,8 @@ namespace Akari {
     const MaterialSlot &BinaryMesh::GetMaterialSlot(int group) const { return materials[group]; }
     const Vertex *BinaryMesh::GetVertexBuffer() const { return vertexBuffer.data(); }
     const int *BinaryMesh::GetIndexBuffer() const { return indexBuffer.data(); }
-    size_t BinaryMesh::GetTriangleCount() const { return vertexBuffer.size() / 3; }
+    size_t BinaryMesh::GetTriangleCount() const { return indexBuffer.size() / 3; }
+    size_t BinaryMesh::GetVertexCount() const { return vertexBuffer.size(); }
     int BinaryMesh::GetPrimitiveGroup(int idx) const { return groups[idx]; }
     const char *AKR_MESH_MAGIC = "AKARI_BINARY_MESH";
     bool BinaryMesh::Load(const char *path) {
@@ -72,7 +73,6 @@ namespace Akari {
     void BinaryMesh::Commit() {
         if (_loaded) {
             return;
-            ;
         }
         Load(file.string().c_str());
         for (uint32_t id = 0; id < GetTriangleCount(); id++) {

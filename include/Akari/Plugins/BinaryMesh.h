@@ -45,6 +45,7 @@ namespace Akari {
         const Vertex *GetVertexBuffer() const override;
         const int *GetIndexBuffer() const override;
         size_t GetTriangleCount() const override;
+        size_t GetVertexCount() const override;
         int GetPrimitiveGroup(int idx) const override;
         bool Load(const char *path) override;
         void Save(const char *path);

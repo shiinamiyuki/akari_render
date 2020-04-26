@@ -44,6 +44,7 @@ namespace Akari {
         [[nodiscard]] virtual const Vertex *GetVertexBuffer() const = 0;
         [[nodiscard]] virtual const int *GetIndexBuffer() const = 0;
         [[nodiscard]] virtual size_t GetTriangleCount() const = 0;
+        [[nodiscard]] virtual size_t GetVertexCount() const = 0;
         [[nodiscard]] virtual int GetPrimitiveGroup(int idx) const = 0;
         virtual bool Load(const char *path) = 0;
         virtual const MaterialSlot &GetMaterialSlot(int group) const = 0;
