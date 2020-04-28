@@ -130,16 +130,20 @@ namespace Akari {
 
     class DisneyMaterial : public Material {
         std::shared_ptr<Texture> baseColor, subsurface, metallic, specular, specularTint, roughness, anisotropic, sheen,
-            sheenTint, clearcoat, clearcoatGlass;
+            sheenTint, clearcoat, clearcoatGlass, ior, transmission;
 
       public:
         AKR_SER(baseColor, subsurface, metallic, specular, specularTint, roughness, anisotropic, sheen, sheenTint,
-                clearcoat, clearcoatGlass)
+                clearcoat, clearcoatGlass, ior, transmission)
         AKR_COMP_PROPS(baseColor, subsurface, metallic, specular, specularTint, roughness, anisotropic, sheen,
-                       sheenTint, clearcoat, clearcoatGlass)
+                       sheenTint, clearcoat, clearcoatGlass, ior, transmission)
         AKR_DECL_COMP(DisneyMaterial, "DisneyMaterial")
         void ComputeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
                                         Float scale) const override {
+//            si->bsdf = arena.alloc<BSDF>(*si);
+//            Spectrum color = baseColor->Evaluate(si->sp);
+//            Float metallicWeight = metallic->Evaluate(si->sp)[0];
+//            Float eta = ior->Evaluate(si->sp)[0];
 
 
         }
@@ -167,6 +171,10 @@ namespace Akari {
                 clearcoat->Commit();
             if (clearcoatGlass)
                 clearcoatGlass->Commit();
+            if(ior)
+                ior->Commit();
+            if(transmission)
+                transmission->Commit();
         }
     };
     AKR_EXPORT_COMP(DisneyMaterial, "Material")
