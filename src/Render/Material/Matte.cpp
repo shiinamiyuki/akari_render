@@ -39,6 +39,7 @@ namespace Akari {
         AKR_DECL_COMP(MatteMaterial, "MatteMaterial")
         void ComputeScatteringFunctions(SurfaceInteraction * si, MemoryArena &arena, TransportMode mode,
                                         Float scale) const override {
+            si->bsdf = arena.alloc<BSDF>(*si);
             auto c = color->Evaluate(si->sp);
             si->bsdf->AddComponent(arena.alloc<LambertianReflection>(c * scale));
         }

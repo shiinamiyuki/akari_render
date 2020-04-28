@@ -39,9 +39,6 @@ namespace Akari {
         handle.primId = intersection.primId;
     }
     void SurfaceInteraction::ComputeScatteringFunctions(MemoryArena &arena, TransportMode mode, float scale) {
-        if (!bsdf) {
-            bsdf = arena.alloc<BSDF>(Ng, Ns);
-        }
         materialSlot->material->ComputeScatteringFunctions(this, arena, mode, scale);
     }
     Spectrum SurfaceInteraction::Le(const vec3 &wo) {

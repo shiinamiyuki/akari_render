@@ -38,6 +38,7 @@ namespace Akari {
         AKR_DECL_COMP(MirrorMaterial, "MirrorMaterial")
         void ComputeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
                                         Float scale) const override {
+            si->bsdf = arena.alloc<BSDF>(*si);
             auto c = color->Evaluate(si->sp);
             si->bsdf->AddComponent(arena.alloc<SpecularReflection>(c * scale, arena.alloc<FresnelNoOp>()));
         }

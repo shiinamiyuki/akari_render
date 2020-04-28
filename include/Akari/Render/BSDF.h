@@ -122,6 +122,7 @@ namespace Akari {
 
       public:
         BSDF(const vec3 &Ng, const vec3 &Ns) : frame(Ns), Ng(Ng), Ns(Ns) {}
+        explicit BSDF(const SurfaceInteraction &si) : frame(si.Ns), Ng(si.Ng), Ns(si.Ns) {}
         void AddComponent(const BSDFComponent *comp) { components[nComp++] = comp; }
         [[nodiscard]] Float EvaluatePdf(const vec3 &woW, const vec3 &wiW) const;
         [[nodiscard]] vec3 LocalToWorld(const vec3 &w) const { return frame.LocalToWorld(w); }

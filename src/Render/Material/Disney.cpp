@@ -20,7 +20,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <Akari/Core/Plugin.h>
 #include <Akari/Render/Material.h>
+#include <Akari/Render/Reflection.h>
 
 namespace Akari {
     inline Float SchlickWeight(Float cosTheta) { return Power<5>(std::clamp<float>(1 - cosTheta, 0, 1)); }
@@ -92,5 +94,80 @@ namespace Akari {
             Float G = SmithGGX_G1(AbsCosTheta(wi), 0.25) * SmithGGX_G1(AbsCosTheta(wo), 0.25);
             return Spectrum(0.25 * clearcoat * D * F * G);
         }
+        [[nodiscard]] Float EvaluatePdf(const vec3 &wo, const vec3 &wi) const override {
+            if (!SameHemisphere(wo, wi))
+                return 0;
+            auto wh = wi + wo;
+            if (wh.x == 0 && wh.y == 0 && wh.z == 0)
+                return 0;
+            wh = normalize(wh);
+            return D_GTR1(AbsCosTheta(wh), alpha) * AbsCosTheta(wh) / (4.0 * dot(wh, wo));
+        }
+        Spectrum Sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const override {
+            auto a2 = alpha * alpha;
+            auto cosTheta = std::sqrt(std::fmax(0.0f, 1 - (std::pow(a2, 1 - u[0])) / (1 - a2)));
+            auto sinTheta = std::sqrt(std::fmax(0.0f, 1 - cosTheta * cosTheta));
+            auto phi = 2.0f * Pi * u[1];
+            auto wh = vec3(std::cos(phi) * sinTheta, cosTheta, std::sin(phi) * sinTheta);
+            if (!SameHemisphere(wo, wh))
+                wh = -wh;
+            *wi = Reflect(wo, wh);
+            *pdf = EvaluatePdf(wo, *wi);
+            return Evaluate(wo, *wi);
+        }
     };
+
+    class DisneyFresnel : public Fresnel {
+        const Spectrum R0;
+        const Float metallic, eta;
+
+      public:
+        DisneyFresnel(const Spectrum &R0, Float metallic, Float eta) : R0(R0), metallic(metallic), eta(eta) {}
+        [[nodiscard]] Spectrum Evaluate(Float cosThetaI) const override {
+            return lerp(Spectrum(FrDielectric(cosThetaI, 1.0f, eta)), FrSchlick(R0, cosThetaI), Spectrum(metallic));
+        }
+    };
+
+    class DisneyMaterial : public Material {
+        std::shared_ptr<Texture> baseColor, subsurface, metallic, specular, specularTint, roughness, anisotropic, sheen,
+            sheenTint, clearcoat, clearcoatGlass;
+
+      public:
+        AKR_SER(baseColor, subsurface, metallic, specular, specularTint, roughness, anisotropic, sheen, sheenTint,
+                clearcoat, clearcoatGlass)
+        AKR_COMP_PROPS(baseColor, subsurface, metallic, specular, specularTint, roughness, anisotropic, sheen,
+                       sheenTint, clearcoat, clearcoatGlass)
+        AKR_DECL_COMP(DisneyMaterial, "DisneyMaterial")
+        void ComputeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
+                                        Float scale) const override {
+
+
+        }
+        bool SupportBidirectional() const override { return true; }
+        void Commit() override {
+            if (baseColor)
+                baseColor->Commit();
+            if (subsurface)
+                subsurface->Commit();
+            if (metallic)
+                metallic->Commit();
+            if (specular)
+                specular->Commit();
+            if (specularTint)
+                specularTint->Commit();
+            if (roughness)
+                roughness->Commit();
+            if (anisotropic)
+                anisotropic->Commit();
+            if (sheen)
+                sheen->Commit();
+            if (sheenTint)
+                sheenTint->Commit();
+            if (clearcoat)
+                clearcoat->Commit();
+            if (clearcoatGlass)
+                clearcoatGlass->Commit();
+        }
+    };
+    AKR_EXPORT_COMP(DisneyMaterial, "Material")
 } // namespace Akari
