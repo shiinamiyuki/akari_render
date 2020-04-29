@@ -130,22 +130,27 @@ namespace Akari {
 
     class DisneyMaterial : public Material {
         std::shared_ptr<Texture> baseColor, subsurface, metallic, specular, specularTint, roughness, anisotropic, sheen,
-            sheenTint, clearcoat, clearcoatGlass, ior, transmission;
+            sheenTint, clearcoat, clearcoatGlass, ior, specTrans;
 
       public:
         AKR_SER(baseColor, subsurface, metallic, specular, specularTint, roughness, anisotropic, sheen, sheenTint,
-                clearcoat, clearcoatGlass, ior, transmission)
+                clearcoat, clearcoatGlass, ior, specTrans)
         AKR_COMP_PROPS(baseColor, subsurface, metallic, specular, specularTint, roughness, anisotropic, sheen,
-                       sheenTint, clearcoat, clearcoatGlass, ior, transmission)
+                       sheenTint, clearcoat, clearcoatGlass, ior, specTrans)
         AKR_DECL_COMP(DisneyMaterial, "DisneyMaterial")
         void ComputeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
                                         Float scale) const override {
-//            si->bsdf = arena.alloc<BSDF>(*si);
-//            Spectrum color = baseColor->Evaluate(si->sp);
-//            Float metallicWeight = metallic->Evaluate(si->sp)[0];
-//            Float eta = ior->Evaluate(si->sp)[0];
-
-
+            si->bsdf = arena.alloc<BSDF>(*si);
+            Spectrum color = baseColor->Evaluate(si->sp);
+            Float metallicWeight = metallic->Evaluate(si->sp)[0];
+            Float eta = ior->Evaluate(si->sp)[0];
+            Float trans = specTrans->Evaluate(si->sp)[0];
+            Float diffuseWeight = (1.0f - trans) * (1.0f - metallicWeight);
+            Float transWeight = trans * (1.0f - metallicWeight);
+            Float alpha = roughness->Evaluate(si->sp)[0];
+            if(diffuseWeight > 0){
+                
+            }
         }
         bool SupportBidirectional() const override { return true; }
         void Commit() override {
@@ -173,8 +178,8 @@ namespace Akari {
                 clearcoatGlass->Commit();
             if(ior)
                 ior->Commit();
-            if(transmission)
-                transmission->Commit();
+            if(specTrans)
+                specTrans->Commit();
         }
     };
     AKR_EXPORT_COMP(DisneyMaterial, "Material")

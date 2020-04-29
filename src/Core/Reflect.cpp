@@ -19,23 +19,11 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+#include <Akari/Core/Reflect.hpp>
 
-#ifndef AKARIRENDER_GRID_H
-#define AKARIRENDER_GRID_H
-
-#include <Akari/Render/Geometry.hpp>
-
-namespace Akari {
-    class Grid3D : public Component{
-      public:
-        struct RayHit {
-            vec2 uv;
-            vec3 Ng;
-            Float t = Inf;
-            int face = 0; // -1 = -001 -> -x; -4 = -100 -> -z
-            int group = -1;
-        };
-        bool Intersect()
-    };
+namespace Akari{
+    detail::reflection_manager & detail::reflection_manager::instance() {
+        static detail::reflection_manager mgr;
+        return mgr;
+    }
 }
-#endif //AKARIRENDER_GRID_H

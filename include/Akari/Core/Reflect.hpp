@@ -22,6 +22,7 @@
 
 #pragma once
 
+#include <Akari/Core/Platform.h>
 #include <cstring>
 #include <functional>
 #include <memory>
@@ -39,7 +40,9 @@ namespace Akari {
         Type type{typeid(T).name()};
         return type;
     }
+
     struct Any {
+
       private:
         struct Container {
             [[nodiscard]] virtual std::unique_ptr<Container> clone() const = 0;
@@ -120,7 +123,8 @@ namespace Akari {
             }
         }
         template <typename T> const T &as() const { return const_cast<Any *>(this)->as<T>(); }
-        // private:
+
+      private:
         Type type;
         std::unique_ptr<Container> _ptr;
         enum Kind : uint8_t { EVoid, EValue, ERef };
@@ -287,6 +291,7 @@ namespace Akari {
     using Attributes = std::unordered_map<std::string, std::string>;
 
     struct Property : Any {
+        Property() = default;
         template <typename T>
         Property(const char *name, Attributes attr, T &value)
             : Any(Any::from_ref_t{}, value), _attr(std::move(attr)), _name(name) {}
@@ -305,6 +310,16 @@ namespace Akari {
         Attributes _attr;
         std::string _name;
     };
+    struct Variant : Any {
+        using Any::Any;
+        using GetPropertiesFunc = std::function<std::unordered_map<std::string, Property>(Any &)>;
+
+        //      private:
+        GetPropertiesFunc _getProperties = [](Any &) { return std::unordered_map<std::string, Property>(); };
+
+      public:
+        [[nodiscard]] std::unordered_map<std::string, Property> getProperties() { return _getProperties(*this); }
+    };
 
     class Reflect {
       public:
@@ -312,5 +327,66 @@ namespace Akari {
         [[nodiscard]] virtual std::vector<Property> GetProperties() const { return {}; }
         virtual std::vector<Property> GetProperties() { return {}; }
     };
+
+    namespace detail {
+        struct meta_instance {
+            using GetFieldFunc = std::function<Property(Any &)>;
+            std::unordered_map<std::string, GetFieldFunc> getFieldFuncs;
+            std::unordered_map<std::string, Attributes> attributes;
+            Variant::GetPropertiesFunc getGetPropertiesFunc() {
+                auto func = [=](Any &any) {
+                    std::unordered_map<std::string, Property> props;
+                    for (auto &field : getFieldFuncs) {
+                        props[field.first] = field.second(any);
+                    }
+                    return props;
+                };
+                return func;
+            }
+
+            template <typename T, typename U> meta_instance &register_field(const char *name, T U::*p) {
+                GetFieldFunc func = [=](Any &any) -> Property {
+                    auto &object = any.as<U>();
+                    Attributes attr;
+                    auto it = attributes.find(name);
+                    if (it != attributes.end()) {
+                        attr = it->second;
+                    }
+                    Property prop(name, std::move(attr), object.*p);
+                    return prop;
+                };
+                getFieldFuncs[name] = func;
+                return *this;
+            }
+
+            meta_instance &add_attribute(const char *name, const char *key, const char *value) {
+                attributes[name][key] = value;
+                return *this;
+            }
+        };
+        struct AKR_EXPORT reflection_manager {
+            std::unordered_map<std::string, meta_instance> instances;
+            static reflection_manager &instance();
+        };
+
+    } // namespace detail
+
+    template <typename T> detail::meta_instance &register_type() {
+        auto type = Typeof<T>();
+        auto &mgr = detail::reflection_manager::instance();
+        mgr.instances[type.name] = detail::meta_instance();
+        return mgr.instances[type.name];
+    }
+
+    template <typename T> Variant make_variant(T value) {
+        auto v = Variant(Any::from_value_t{}, std::move(value));
+        v._getProperties = detail::reflection_manager::instance().instances.at(Typeof<T>().name).getGetPropertiesFunc();
+        return v;
+    }
+    template <typename T> Variant make_variant_ref(T &&value) {
+        auto v = Variant(Any::from_ref_t{}, std::forward<T>(value));
+        v._getProperties = detail::reflection_manager::instance().instances.at(Typeof<T>().name).getGetPropertiesFunc();
+        return v;
+    }
 
 } // namespace Akari
