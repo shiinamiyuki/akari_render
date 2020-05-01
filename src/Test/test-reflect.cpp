@@ -28,6 +28,7 @@ struct Foo {
     std::vector<Foo> v;
     Foo() = default;
     Foo(int x, float y) : a(x), b(y) {}
+    void hello(int _) const { fmt::print("hello from {}\n", _); }
 };
 namespace Akari {
     using namespace nlohmann;
@@ -80,7 +81,8 @@ int main() {
             .constructor<int, float>()
             .property("a", &Foo::a)
             .property("b", &Foo::b)
-            .property("v", &Foo::v);
+            .property("v", &Foo::v)
+            .method("hello",&Foo::hello);
     // clang-format on
     //    Any v = make_any(Foo());
     //    Type type = Type::get<Foo>();
@@ -99,10 +101,12 @@ int main() {
     //    auto any = make_any_ref(foo);
     fmt::print("{}\n", any.is_pointer());
     prop.set(any, 222);
+    auto hello = type.get_method("hello");
+    hello.invoke(*foo, 23456);
     fmt::print("foo.a={}\n", foo->a);
     {
         Foo foo1;
-        foo1.v = {Foo(),Foo()};
+        foo1.v = {Foo(), Foo()};
         fmt::print("{}\n", save_to_json(foo1).dump(1));
     }
     //    fmt::print("v.a = {}\n", v.get_properties()["a"].as<int>());

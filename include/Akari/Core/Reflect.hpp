@@ -79,7 +79,7 @@ namespace Akari {
             virtual void *get() = 0;
             virtual Any get_underlying() = 0;
             virtual std::optional<SequentialContainerView> get_container_view() = 0;
-//            virtual std::optional<AssociativeContainerView> get_associative_container_view() = 0;
+            //            virtual std::optional<AssociativeContainerView> get_associative_container_view() = 0;
             virtual ~Container() = default;
         };
         template <typename Actual, typename T> struct ContainerImpl : Container {
@@ -97,7 +97,7 @@ namespace Akari {
                 return Any();
             }
             inline std::optional<SequentialContainerView> get_container_view() override;
-//            inline std::optional<AssociativeContainerView> get_associative_container_view() override;
+            //            inline std::optional<AssociativeContainerView> get_associative_container_view() override;
         };
         template <typename A, typename T> std::unique_ptr<Container> make_container(T &&value) {
             return std::make_unique<ContainerImpl<A, T>>(value);
@@ -215,7 +215,7 @@ namespace Akari {
     inline std::optional<SequentialContainerView> Any::ContainerImpl<Actual, T>::get_container_view() {
         if constexpr (!detail::is_sequential_container<Actual>::value) {
             return {};
-        }else {
+        } else {
             // T is a container
             SequentialContainerView view;
             using Iter = typename Actual::iterator;
@@ -229,9 +229,9 @@ namespace Akari {
                 return any_iter;
             };
             using ElemT = typename detail::is_sequential_container<Actual>::type;
-            Actual& vec = value;
-            view.begin = [&](){return make_iter(vec.begin());};
-            view.end =  [&](){return make_iter(vec.end());};
+            Actual &vec = value;
+            view.begin = [&]() { return make_iter(vec.begin()); };
+            view.end = [&]() { return make_iter(vec.end()); };
             view.insert = [&](const AnyIterator &pos, const Any &v) {
                 vec.insert(pos._data.as<Iter>(), v.as<ElemT>());
             };
@@ -261,6 +261,7 @@ namespace Akari {
         std::vector<TypeInfo> signature;
 
       public:
+        Function() = default;
         using FunctionWrapper = std::function<Any(std::vector<Any>)>;
         template <typename... Args> Any invoke(Args &&... args) {
             static_assert(std::conjunction_v<std::is_same<Args, Any>...>);
@@ -434,20 +435,37 @@ namespace Akari {
         std::string_view _name;
         std::reference_wrapper<const Attributes> _attr;
     };
+    struct Method {
+        friend struct detail::meta_instance;
+        template <typename T> friend struct detail::meta_instance_handle;
+        [[nodiscard]] const char *name() const { return _name.data(); }
+        [[nodiscard]] const Attributes &attr() const { return _attr.get(); }
+        Method(const char *name, const Attributes &attr) : _name(name), _attr(attr) {}
+        template <typename T, typename... Args> Any invoke(T &obj, Args &&... args) {
+            return _function.invoke(Any(&const_cast<std::remove_cv_t<T> &>(obj)), Any(std::forward<Args>(args))...);
+        }
+
+      private:
+        std::string_view _name;
+        std::reference_wrapper<const Attributes> _attr;
+        Function _function;
+    };
     namespace detail {
 
         struct meta_instance {
             using GetFieldFunc = std::function<Any(const Any &)>;
             std::unordered_map<std::string, Property> properties;
+            std::unordered_map<std::string, Method> methods;
             std::unordered_map<std::string, Attributes> attributes;
             std::vector<Function> constructors;
             std::vector<Function> shared_constructors;
         };
         template <typename U> struct meta_instance_handle {
             meta_instance_handle(meta_instance &i)
-                : properties(i.properties), attributes(i.attributes), constructors(i.constructors),
+                : properties(i.properties), methods(i.methods), attributes(i.attributes), constructors(i.constructors),
                   shared_constructors(i.shared_constructors) {}
             std::unordered_map<std::string, Property> &properties;
+            std::unordered_map<std::string, Method> &methods;
             std::unordered_map<std::string, Attributes> &attributes;
             std::vector<Function> &constructors;
             std::vector<Function> &shared_constructors;
@@ -460,7 +478,21 @@ namespace Akari {
                 shared_constructors.emplace_back(ctor_shared);
                 return *this;
             }
+            template <typename T, typename... Args>
+            meta_instance_handle &method(const char *name, T (U::*f)(Args...) const) {
+                return method(name, reinterpret_cast<T (U::*)(Args...)>(f));
+            }
 
+            template <typename T, typename... Args> meta_instance_handle &method(const char *name, T (U::*f)(Args...)) {
+                auto it = attributes.find(name);
+                if (it == attributes.end()) {
+                    attributes.insert(std::make_pair(name, Attributes()));
+                }
+                auto &attr = attributes.at(name);
+                methods.emplace(std::make_pair(name, Method(name, attr)));
+                methods.at(name)._function = Function(f);
+                return *this;
+            }
             template <typename T> meta_instance_handle &property(const char *name, T U::*p) {
                 auto it = attributes.find(name);
                 if (it == attributes.end()) {
@@ -522,6 +554,7 @@ namespace Akari {
             return _this_type;
         }
         [[nodiscard]] Property get_property(const char *name) const { return _get().properties.at(name); }
+        [[nodiscard]] Method& get_method(const char *name) const { return _get().methods.at(name); }
         [[nodiscard]] std::vector<Property> get_properties() const {
             std::vector<Property> v;
             for (auto &field : _get().properties) {
