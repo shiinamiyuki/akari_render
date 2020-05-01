@@ -22,8 +22,10 @@
 #include <Akari/Core/Reflect.hpp>
 
 namespace Akari{
+
     detail::reflection_manager & detail::reflection_manager::instance() {
         static detail::reflection_manager mgr;
+
         return mgr;
     }
 }

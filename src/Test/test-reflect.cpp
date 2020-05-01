@@ -21,16 +21,67 @@
 // SOFTWARE.
 #include <Akari/Core/Reflect.hpp>
 #include <fmt/format.h>
-
+#include <json.hpp>
 struct Foo {
     int a = 123;
     float b = 3.14;
+    std::vector<Foo> v;
     Foo() = default;
     Foo(int x, float y) : a(x), b(y) {}
 };
+namespace Akari {
+    using namespace nlohmann;
+    struct to_json_impl {
+        json data;
+        template <typename T> void save(const T &value) {
+            Any any(value);
+            do_save(data, any);
+        }
+#define AKR_SAVE_BASIC(ty)                                                                                             \
+    if (type_info == type_of<ty>()) {                                                                                  \
+        j = any.as<ty>();                                                                                              \
+    }
+        void do_save(json &j, const Any &any) {
+            auto type_info = any.get_type();
+            AKR_SAVE_BASIC(int)
+            else AKR_SAVE_BASIC(float) else AKR_SAVE_BASIC(double) else {
+                if (auto view = any.get_sequential_container_view()) {
+                    j = json::array();
+                    for (auto iter = view->begin(); iter != view->end(); ++iter) {
+                        json tmp;
+                        do_save(tmp, *iter);
+                        j.push_back(tmp);
+                    }
+                } else {
+                    j = json::object();
+                    Type type = any.get_type();
+                    auto props = type.get_properties();
+                    for (auto &prop : props) {
+                        do_save(j[prop.name()], prop.get(any));
+                    }
+                }
+            }
+        }
+
+#undef AKR_SAVE_BASIC
+    };
+
+    template <typename T> json save_to_json(const T &value) {
+        to_json_impl impl;
+        impl.save(value);
+        return std::move(impl.data);
+    }
+} // namespace Akari
 int main() {
     using namespace Akari;
-    register_type<Foo>("Foo").constructor<>().constructor<int, float>().property("a", &Foo::a).property("b", &Foo::b);
+    // clang-format off
+    register_type<Foo>("Foo")
+        .constructor<>()
+            .constructor<int, float>()
+            .property("a", &Foo::a)
+            .property("b", &Foo::b)
+            .property("v", &Foo::v);
+    // clang-format on
     //    Any v = make_any(Foo());
     //    Type type = Type::get<Foo>();
     //    for (auto &prop : v.get_properties()) {
@@ -49,5 +100,10 @@ int main() {
     fmt::print("{}\n", any.is_pointer());
     prop.set(any, 222);
     fmt::print("foo.a={}\n", foo->a);
+    {
+        Foo foo1;
+        foo1.v = {Foo(),Foo()};
+        fmt::print("{}\n", save_to_json(foo1).dump(1));
+    }
     //    fmt::print("v.a = {}\n", v.get_properties()["a"].as<int>());
 }

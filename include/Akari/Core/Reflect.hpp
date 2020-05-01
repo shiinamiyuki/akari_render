@@ -22,12 +22,14 @@
 
 #pragma once
 
+#include <Akari/Core/Akari.h>
 #include <Akari/Core/Platform.h>
 #include <cstring>
 #include <functional>
 #include <memory>
 #include <unordered_map>
 #include <vector>
+//#include <list>
 
 namespace Akari {
     struct TypeInfo {
@@ -53,6 +55,10 @@ namespace Akari {
         template <typename T> struct is_shared_ptr : std::false_type {};
         template <typename T> struct is_shared_ptr<std::shared_ptr<T>> : std::true_type {};
         template <typename T> constexpr bool is_shared_ptr_v = is_shared_ptr<T>::value;
+
+        template <typename T> struct is_sequential_container : std::false_type {};
+        template <typename T> struct is_sequential_container<std::vector<T>> : std::true_type { using type = T; };
+        //        template<typename T>struct is_sequential_container<std::list<T>>: std::true_type {};
         //        template <typename T> struct is_reference_wrapper : std::false_type {};
         //        template <typename T> struct is_reference_wrapper<std::reference_wrapper<T>> : std::true_type {};
         //        template <typename T> constexpr bool is_reference_wrapper_v = is_reference_wrapper<T>::value;
@@ -62,6 +68,8 @@ namespace Akari {
     struct Any;
     template <typename T> Any make_any(T value);
     template <typename T> Any make_any_ref(T &&value);
+    struct SequentialContainerView;
+    struct AssociativeContainerView;
     struct Any {
         friend struct Type;
 
@@ -69,8 +77,9 @@ namespace Akari {
         struct Container {
             [[nodiscard]] virtual std::unique_ptr<Container> clone() const = 0;
             virtual void *get() = 0;
-            virtual bool is_pointer() const = 0;
             virtual Any get_underlying() = 0;
+            virtual std::optional<SequentialContainerView> get_container_view() = 0;
+//            virtual std::optional<AssociativeContainerView> get_associative_container_view() = 0;
             virtual ~Container() = default;
         };
         template <typename Actual, typename T> struct ContainerImpl : Container {
@@ -80,9 +89,6 @@ namespace Akari {
                 return std::make_unique<ContainerImpl>(value);
             }
             void *get() override { return &value; }
-            [[nodiscard]] bool is_pointer() const override {
-                return detail::is_shared_ptr_v<Actual> || std::is_pointer_v<Actual>;
-            }
             [[nodiscard]] Any get_underlying() override {
                 if constexpr (detail::is_shared_ptr_v<Actual> || std::is_pointer_v<Actual>) {
                     Actual &tmp = (value);
@@ -90,6 +96,8 @@ namespace Akari {
                 }
                 return Any();
             }
+            inline std::optional<SequentialContainerView> get_container_view() override;
+//            inline std::optional<AssociativeContainerView> get_associative_container_view() override;
         };
         template <typename A, typename T> std::unique_ptr<Container> make_container(T &&value) {
             return std::make_unique<ContainerImpl<A, T>>(value);
@@ -141,8 +149,9 @@ namespace Akari {
             }
             return type == type_of<T>();
         }
-        [[nodiscard]] bool has_value() const { return _ptr != nullptr; }
-        template <typename T> T &as() {
+        [[nodiscard]] bool has_value() const { return _ptr != nullptr && kind != EVoid; }
+        template <typename T> T &as() const {
+            //            AKARI_ASSERT(has_value());
             if (kind == EVoid) {
                 throw std::runtime_error("Any is of void");
             }
@@ -161,9 +170,11 @@ namespace Akari {
                 return *reinterpret_cast<T *>(raw);
             }
         }
-        template <typename T> const T &as() const { return const_cast<Any *>(this)->as<T>(); }
-        [[nodiscard]] bool is_pointer() const { return _ptr->is_pointer(); }
+        template <typename T> const T &as_const() const { return const_cast<Any *>(this)->as<T>(); }
+        [[nodiscard]] bool is_pointer() const { return _ptr->get_underlying().has_value(); }
         [[nodiscard]] Any get_underlying() const { return _ptr->get_underlying(); }
+        [[nodiscard]] inline std::optional<SequentialContainerView> get_sequential_container_view() const;
+        inline const TypeInfo &get_type() const { return type; }
 
       private:
         TypeInfo type;
@@ -171,9 +182,66 @@ namespace Akari {
         enum Kind : uint8_t { EVoid, EValue, ERef };
         Kind kind = EVoid;
     };
+    template <typename T> struct _AnyIterator {
+        std::function<void(const T &)> inc, dec;
+        std::function<T(const T &)> get;
+        std::function<bool(const T &, const T &)> compare;
+        T _data;
+        T operator*() { return get(_data); }
+        bool operator==(const _AnyIterator &rhs) const { return compare(_data, rhs._data); }
+        bool operator!=(const _AnyIterator &rhs) const { return !compare(_data, rhs._data); }
+        _AnyIterator &operator++() {
+            inc(_data);
+            return *this;
+        }
+        _AnyIterator &operator--() {
+            dec(_data);
+            return *this;
+        }
+    };
+    using AnyIterator = _AnyIterator<Any>;
+    template <typename T> struct _ContainerView {
+        std::function<_AnyIterator<T>()> begin, end;
+        std::function<_AnyIterator<T>(const _AnyIterator<T> &)> erase;
+        std::function<void(const _AnyIterator<T> &, const T &)> insert;
+    };
+    struct SequentialContainerView : _ContainerView<Any> {};
+    struct AssociativeContainerView : _ContainerView<std::pair<Any, Any>> {};
 
     template <typename T> Any make_any(T value) { return Any(Any::from_value_t{}, std::move(value)); }
     template <typename T> Any make_any_ref(T &&value) { return Any(Any::from_ref_t{}, std::forward<T>(value)); }
+
+    template <typename Actual, typename T>
+    inline std::optional<SequentialContainerView> Any::ContainerImpl<Actual, T>::get_container_view() {
+        if constexpr (!detail::is_sequential_container<Actual>::value) {
+            return {};
+        }else {
+            // T is a container
+            SequentialContainerView view;
+            using Iter = typename Actual::iterator;
+            auto make_iter = [](const Iter &iter) -> AnyIterator {
+                AnyIterator any_iter;
+                any_iter._data = make_any(iter);
+                any_iter.get = [](const Any &data) { return make_any_ref(*data.as<Iter>()); };
+                any_iter.inc = [](const Any &data) { ++data.as<Iter>(); };
+                any_iter.dec = [](const Any &data) { --data.as<Iter>(); };
+                any_iter.compare = [](const Any &a, const Any &b) { return a.as<Iter>() == b.as<Iter>(); };
+                return any_iter;
+            };
+            using ElemT = typename detail::is_sequential_container<Actual>::type;
+            Actual& vec = value;
+            view.begin = [&](){return make_iter(vec.begin());};
+            view.end =  [&](){return make_iter(vec.end());};
+            view.insert = [&](const AnyIterator &pos, const Any &v) {
+                vec.insert(pos._data.as<Iter>(), v.as<ElemT>());
+            };
+            view.erase = [&](const AnyIterator &pos) { return make_iter(vec.erase(pos._data.as<Iter>())); };
+            return view;
+        }
+    }
+    inline std::optional<SequentialContainerView> Any::get_sequential_container_view() const {
+        return _ptr->get_container_view();
+    }
 
     template <size_t Idx, typename Tuple> struct get_nth_element {
         using type = typename std::tuple_element<Idx, Tuple>::type;
@@ -343,28 +411,26 @@ namespace Akari {
         [[nodiscard]] const char *name() const { return _name.data(); }
         [[nodiscard]] const Attributes &attr() const { return _attr.get(); }
         Property(const char *name, const Attributes &attr) : _name(name), _attr(attr) {}
-        Any get(Any &any) {
+        Any get(const Any &any) {
             if (any.is_pointer()) {
-                Any tmp = any.get_underlying();
-                return _get(tmp);
+                return _get(any.get_underlying());
             } else {
                 return _get(any);
             }
         }
-        void set(Any &obj, const Any &value) {
+        void set(const Any &obj, const Any &value) {
             if (obj.is_pointer()) {
-                Any tmp = obj.get_underlying();
-                _set(tmp, value);
+                _set(obj.get_underlying(), value);
             } else {
                 _set(obj, value);
             }
         }
 
       private:
-        std::function<void(Any &, const Any &)> _set;
-        std::function<Any(Any &)> _get;
-        std::function<void(Any &, const Any &)> _set_ptr;
-        std::function<Any(Any &)> _get_ptr;
+        std::function<void(const Any &, const Any &)> _set;
+        std::function<Any(const Any &)> _get;
+        std::function<void(const Any &, const Any &)> _set_ptr;
+        std::function<Any(const Any &)> _get_ptr;
         std::string_view _name;
         std::reference_wrapper<const Attributes> _attr;
     };
@@ -401,12 +467,12 @@ namespace Akari {
                     attributes.insert(std::make_pair(name, Attributes()));
                 }
                 auto &attr = attributes.at(name);
-                auto get = [=](Any &any) -> Any {
+                auto get = [=](const Any &any) -> Any {
                     auto &object = any.as<U>();
 
                     return make_any_ref(object.*p);
                 };
-                auto set = [=](Any &any, const Any &value) {
+                auto set = [=](const Any &any, const Any &value) {
                     auto &object = any.as<U>();
                     object.*p = value.as<T>();
                 };
@@ -432,9 +498,11 @@ namespace Akari {
     template <typename T> detail::meta_instance_handle<T> register_type(const char *name = nullptr) {
         auto type = type_of<T>();
         auto &mgr = detail::reflection_manager::instance();
-        mgr.instances[type.name] = detail::meta_instance();
-        if (name) {
-            mgr.name_map.emplace(name, type_of<T>().name);
+        if (mgr.instances.find(type.name) == mgr.instances.end()) {
+            mgr.instances[type.name] = detail::meta_instance();
+            if (name) {
+                mgr.name_map.emplace(name, type_of<T>().name);
+            }
         }
         return detail::meta_instance_handle<T>(mgr.instances[type.name]);
     }
@@ -479,6 +547,7 @@ namespace Akari {
             }
             throw std::runtime_error("no matching constructor");
         }
+        Type(TypeInfo typeInfo) : Type(typeInfo.name) {}
 
       private:
         std::function<detail::meta_instance &(void)> _get;
@@ -491,5 +560,8 @@ namespace Akari {
         }
         template <typename T> explicit Type(_tag<T>) : Type(type_of<T>().name) {}
     };
-
+#define AKR_REG                                                                                                        \
+    static int __invoke_static();                                                                                      \
+    static int ___ = __invoke_static();                                                                                \
+    static int __invoke_static()
 } // namespace Akari
