@@ -56,9 +56,13 @@ namespace Akari {
                 } else {
                     j = json::object();
                     Type type = any.get_type();
-                    auto props = type.get_properties();
-                    for (auto &prop : props) {
-                        do_save(j[prop.name()], prop.get(any));
+                    if (type.has_method("save")) {
+                        type.get_method("save").invoke(any, j);
+                    } else {
+                        auto props = type.get_properties();
+                        for (auto &prop : props) {
+                            do_save(j[prop.name()], prop.get(any));
+                        }
                     }
                 }
             }
@@ -76,7 +80,7 @@ namespace Akari {
 int main() {
     using namespace Akari;
     // clang-format off
-    register_type<Foo>("Foo")
+    class_<Foo>("Foo")
         .constructor<>()
             .constructor<int, float>()
             .property("a", &Foo::a)

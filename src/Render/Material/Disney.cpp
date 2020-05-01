@@ -139,16 +139,16 @@ namespace Akari {
         void ComputeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
                                         Float scale) const override {
             si->bsdf = arena.alloc<BSDF>(*si);
-            Spectrum color = baseColor->Evaluate(si->sp);
-            Float metallicWeight = metallic->Evaluate(si->sp)[0];
-            Float eta = ior->Evaluate(si->sp)[0];
-            Float trans = specTrans->Evaluate(si->sp)[0];
-            Float diffuseWeight = (1.0f - trans) * (1.0f - metallicWeight);
-            Float transWeight = trans * (1.0f - metallicWeight);
-            Float alpha = roughness->Evaluate(si->sp)[0];
-            if(diffuseWeight > 0){
-                
-            }
+//            Spectrum color = baseColor->Evaluate(si->sp);
+//            Float metallicWeight = metallic->Evaluate(si->sp)[0];
+//            Float eta = ior->Evaluate(si->sp)[0];
+//            Float trans = specTrans->Evaluate(si->sp)[0];
+//            Float diffuseWeight = (1.0f - trans) * (1.0f - metallicWeight);
+//            Float transWeight = trans * (1.0f - metallicWeight);
+//            Float alpha = roughness->Evaluate(si->sp)[0];
+//            if(diffuseWeight > 0){
+//
+//            }
         }
         bool SupportBidirectional() const override { return true; }
         void Commit() override {

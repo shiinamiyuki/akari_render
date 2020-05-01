@@ -48,7 +48,7 @@ namespace Akari {
     }
 #define AKARI_GET_PLUGIN       AkariGetPlugin
 #define AKARI_PLUGIN_FUNC_NAME "AkariGetPlugin"
-#define AKR_PLUGIN_ON_LOAD     void AkariPluginOnLoad()
+#define AKR_PLUGIN_ON_LOAD     extern "C" AKR_EXPORT void AkariPluginOnLoad()
 #define AKR_STATIC_CLASS(CLASS, ALIAS)                                                                                 \
     static Akari::Class *StaticClass() {                                                                               \
         static std::unique_ptr<Class> _class;                                                                          \

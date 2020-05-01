@@ -42,7 +42,7 @@ namespace Akari::Gui {
         ~ImGuiIdGuard() { ImGui::PopID(); }
     };
     namespace detail {
-        inline bool EditItem(EditorState &state, const char *label, Any &ref);
+        inline bool EditItem(EditorState &state, const char *label, const Any &ref);
         template <typename T> bool Edit(EditorState &, const char *label, T &value) {
             ImGuiIdGuard _(&value);
             return Gui::Edit(label, value);
@@ -51,9 +51,9 @@ namespace Akari::Gui {
             bool ret = false;
             ImGuiIdGuard _(value.get());
             if (ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_DefaultOpen)) {
-                auto props = value->GetProperties();
+                auto props = Type::get_by_typeid(*value).get_properties();
                 for (auto &prop : props) {
-                    ret = ret | EditItem(state, prop.name(), prop);
+                    ret = ret | EditItem(state, prop.name(), prop.get(make_any_ref(*value)));
                 }
                 ImGui::TreePop();
             }
@@ -63,9 +63,9 @@ namespace Akari::Gui {
             bool ret = false;
             ImGuiIdGuard _(value.get());
             if (ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_DefaultOpen)) {
-                auto props = value->GetProperties();
+                auto props = Type::get_by_typeid(*value).get_properties();
                 for (auto &prop : props) {
-                    ret = ret | EditItem(state, prop.name(), prop);
+                    ret = ret | EditItem(state, prop.name(), prop.get(value));
                 }
                 ImGui::TreePop();
             }
@@ -108,19 +108,20 @@ namespace Akari::Gui {
             return ret;
         }
 
-        template <typename T> std::pair<bool, bool> _EditItemV(EditorState &state, const char *label, Any &reference) {
+        template <typename T>
+        std::pair<bool, bool> _EditItemV(EditorState &state, const char *label, const Any &reference) {
             if (reference.is_of<T>()) {
                 return {true, Edit(state, label, reference.as<T>())};
             }
             return {false, false};
         }
 
-        inline std::pair<bool, bool> EditItemV(EditorState &state, const char *label, Any &reference) {
+        inline std::pair<bool, bool> EditItemV(EditorState &state, const char *label, const Any &reference) {
             return {false, false};
         }
 
         template <typename T, typename... Args>
-        inline std::pair<bool, bool> EditItemV(EditorState &state, const char *label, Any &reference) {
+        inline std::pair<bool, bool> EditItemV(EditorState &state, const char *label, const Any &reference) {
             auto [taken, modified] = _EditItemV<T>(state, label, reference);
             if (!taken) {
                 if constexpr (sizeof...(Args) > 0) {
@@ -132,7 +133,7 @@ namespace Akari::Gui {
             return {taken, modified};
         }
 
-        inline bool EditItem(EditorState &state, const char *label, Any &ref) {
+        inline bool EditItem(EditorState &state, const char *label, const Any &ref) {
             return EditItemV<int, float, ivec2, ivec3, vec2, vec3, Spectrum, Angle<float>, Angle<vec3>, AffineTransform,
                              MeshWrapper>(state, label, ref)
                 .second;
@@ -262,7 +263,7 @@ namespace Akari::Gui {
             }
         }
         void ShowStyleEditor() {
-            if(flags.showStyleEditor && ImGui::Begin("Style Editor", &flags.showStyleEditor)) {
+            if (flags.showStyleEditor && ImGui::Begin("Style Editor", &flags.showStyleEditor)) {
                 ImGui::ShowStyleEditor();
                 ImGui::End();
             }
