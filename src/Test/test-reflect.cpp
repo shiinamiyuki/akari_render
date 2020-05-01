@@ -28,16 +28,22 @@ struct Foo {
 };
 int main() {
     using namespace Akari;
-    register_type<Foo>().field("a", &Foo::a).field("b", &Foo::b);
+    register_type<Foo>().property("a", &Foo::a).property("b", &Foo::b);
     //    Any v = make_any(Foo());
     //    Type type = Type::get<Foo>();
     //    for (auto &prop : v.get_properties()) {
     //        fmt::print("{} \n", prop.second.name());
     //    }
-    Foo foo;
+    std::shared_ptr<Foo> foo(new Foo());
     Type type = Type::get<Foo>();
     for (auto &prop : type.get_properties()) {
         fmt::print("{} \n", prop.name());
     }
+    fmt::print("foo.a={}\n",foo->a);
+    auto prop = type.get_property("a");
+    auto any = make_any_ref(foo);
+    fmt::print("{}\n",any.is_pointer());
+    prop.set(any, make_any(222));
+    fmt::print("foo.a={}\n",foo->a);
     //    fmt::print("v.a = {}\n", v.get_properties()["a"].as<int>());
 }

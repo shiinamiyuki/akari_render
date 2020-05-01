@@ -44,25 +44,55 @@ namespace Akari {
         TypeInfo type{typeid(v).name()};
         return type;
     }
+    namespace detail {
+        template <typename T> struct get_internal { using type = T; };
+        template <typename T> struct get_internal<T *> { using type = T; };
+        template <typename T> struct get_internal<std::shared_ptr<T>> { using type = T; };
+        template <typename T> using get_internal_t = typename get_internal<T>::type;
+
+        template <typename T> struct is_shared_ptr : std::false_type {};
+        template <typename T> struct is_shared_ptr<std::shared_ptr<T>> : std::true_type {};
+        template <typename T> constexpr bool is_shared_ptr_v = is_shared_ptr<T>::value;
+//        template <typename T> struct is_reference_wrapper : std::false_type {};
+//        template <typename T> struct is_reference_wrapper<std::reference_wrapper<T>> : std::true_type {};
+//        template <typename T> constexpr bool is_reference_wrapper_v = is_reference_wrapper<T>::value;
+    } // namespace detail
+
+    struct Type;
+    struct Any;
+    template <typename T> Any make_any(T value) ;
+    template <typename T> Any make_any_ref(T &&value);
     struct Any {
+        friend struct Type;
 
       private:
         struct Container {
             [[nodiscard]] virtual std::unique_ptr<Container> clone() const = 0;
             virtual void *get() = 0;
-
+            virtual bool is_pointer() const = 0;
+            virtual Any get_underlying() const = 0;
             virtual ~Container() = default;
         };
-        template <typename T> struct ContainerImpl : Container {
+        template <typename Actual, typename T> struct ContainerImpl : Container {
             T value;
             explicit ContainerImpl(const T &_value) : value(_value) {}
             [[nodiscard]] std::unique_ptr<Container> clone() const override {
                 return std::make_unique<ContainerImpl>(value);
             }
             void *get() override { return &value; }
+            [[nodiscard]] bool is_pointer() const override {
+                return detail::is_shared_ptr_v<Actual> || std::is_pointer_v<Actual>;
+            }
+            [[nodiscard]] Any get_underlying() const override {
+                if constexpr (detail::is_shared_ptr_v<Actual> || std::is_pointer_v<Actual>) {
+                    Actual& tmp = value;
+                    return make_any_ref(*tmp);
+                }
+                return Any();
+            }
         };
-        template <typename T> std::unique_ptr<Container> make_container(T &&value) {
-            return std::make_unique<ContainerImpl<T>>(value);
+        template <typename A, typename T> std::unique_ptr<Container> make_container(T &&value) {
+            return std::make_unique<ContainerImpl<A, T>>(value);
         }
 
       public:
@@ -70,12 +100,12 @@ namespace Akari {
         struct from_ref_t {};
         Any() = default;
         template <typename T> Any(from_value_t _, T value) : type(type_of<T>()), kind(EValue) {
-            _ptr = make_container<T>(std::move(value));
+            _ptr = make_container<std::decay_t<T>, T>(std::move(value));
         }
         template <typename T, typename U = std::remove_reference_t<T>>
         Any(from_ref_t _, T &&value) : type(type_of<std::decay_t<T>>()), kind(ERef) {
             using R = std::reference_wrapper<U>;
-            _ptr = make_container<R>(R(std::forward<T>(value)));
+            _ptr = make_container<std::decay_t<T>, R>(R(std::forward<T>(value)));
         }
         Any(const Any &rhs) : type(rhs.type), kind(rhs.kind) {
             if (rhs._ptr) {
@@ -126,6 +156,8 @@ namespace Akari {
             }
         }
         template <typename T> const T &as() const { return const_cast<Any *>(this)->as<T>(); }
+        [[nodiscard]] bool is_pointer() const { return _ptr->is_pointer(); }
+        [[nodiscard]] Any get_underlying() const { return _ptr->get_underlying(); }
 
       private:
         TypeInfo type;
@@ -303,12 +335,28 @@ namespace Akari {
         [[nodiscard]] const char *name() const { return _name.data(); }
         [[nodiscard]] const Attributes &attr() const { return _attr.get(); }
         Property(const char *name, const Attributes &attr) : _name(name), _attr(attr) {}
-        Any get(Any &any) { return _get(any); }
-        void set(Any &obj, const Any &value) { _set(obj, value); }
+        Any get(Any &any) {
+            if (any.is_pointer()) {
+                Any tmp = any.get_underlying();
+                return _get(tmp);
+            } else {
+                return _get(any);
+            }
+        }
+        void set(Any &obj, const Any &value) {
+            if (obj.is_pointer()) {
+                Any tmp = obj.get_underlying();
+                _set(tmp, value);
+            } else {
+                _set(obj, value);
+            }
+        }
 
       private:
         std::function<void(Any &, const Any &)> _set;
         std::function<Any(Any &)> _get;
+        std::function<void(Any &, const Any &)> _set_ptr;
+        std::function<Any(Any &)> _get_ptr;
         std::string_view _name;
         std::reference_wrapper<const Attributes> _attr;
     };
@@ -319,7 +367,7 @@ namespace Akari {
             std::unordered_map<std::string, Property> properties;
             std::unordered_map<std::string, Attributes> attributes;
 
-            template <typename T, typename U> meta_instance &field(const char *name, T U::*p) {
+            template <typename T, typename U> meta_instance &property(const char *name, T U::*p) {
                 auto it = attributes.find(name);
                 if (it == attributes.end()) {
                     attributes.insert(std::make_pair(name, Attributes()));
@@ -350,15 +398,6 @@ namespace Akari {
             static reflection_manager &instance();
         };
 
-        template <typename T> struct get_internal { using type = T; };
-        template <typename T> struct get_internal<T *> { using type = T; };
-        template <typename T> struct get_internal<std::shared_ptr<T>> { using type = T; };
-        template <typename T> using get_internal_t = typename get_internal<T>::type;
-
-        template <typename T> struct is_shared_ptr : std::false_type {};
-        template <typename T> struct is_shared_ptr<std::shared_ptr<T>> : std::true_type {};
-        template <typename T> constexpr bool is_shared_ptr_v = is_shared_ptr<T>::value;
-
     } // namespace detail
 
     template <typename T> detail::meta_instance &register_type() {
@@ -373,6 +412,12 @@ namespace Akari {
             static Type _this_type(_tag<T>{});
             return _this_type;
         }
+        static Type get(const Any &any) { return Type(get_by_typeid(any.type.name)); }
+        template <typename T> static Type get_by_typeid(T &&v) {
+            Type _this_type(type_of(v).name);
+            return _this_type;
+        }
+        [[nodiscard]] Property get_property(const char *name) const { return _get(name); }
         [[nodiscard]] std::vector<Property> get_properties() const {
             std::vector<Property> v;
             _foreach([&](auto prop) { v.emplace_back(prop); });
@@ -380,20 +425,21 @@ namespace Akari {
         }
 
       private:
-        template <typename T> explicit Type(_tag<T>) {
-            _get = [](const char *name) {
+        explicit Type(const char *type) {
+            _get = [=](const char *name) {
                 auto &mgr = detail::reflection_manager::instance();
-                auto &instance = mgr.instances.at(type_of<T>().name);
+                auto &instance = mgr.instances.at(type);
                 return instance.properties.at(name);
             };
-            _foreach = [](const std::function<void(Property)> &f) {
+            _foreach = [=](const std::function<void(Property)> &f) {
                 auto &mgr = detail::reflection_manager::instance();
-                auto &instance = mgr.instances.at(type_of<T>().name);
+                auto &instance = mgr.instances.at(type);
                 for (auto &field : instance.properties) {
                     f(field.second);
                 }
             };
         }
+        template <typename T> explicit Type(_tag<T>) : Type(type_of<T>().name) {}
         std::function<Property(const char *name)> _get;
         std::function<void(const std::function<void(Property)> &)> _foreach;
     };
