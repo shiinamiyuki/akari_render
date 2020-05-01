@@ -30,14 +30,14 @@ struct Foo {
 };
 int main() {
     using namespace Akari;
-    register_type<Foo>().constructor<>().constructor<int, float>().property("a", &Foo::a).property("b", &Foo::b);
+    register_type<Foo>("Foo").constructor<>().constructor<int, float>().property("a", &Foo::a).property("b", &Foo::b);
     //    Any v = make_any(Foo());
     //    Type type = Type::get<Foo>();
     //    for (auto &prop : v.get_properties()) {
     //        fmt::print("{} \n", prop.second.name());
     //    }
 
-    Type type = Type::get<Foo>();
+    Type type = Type::get_by_name("Foo");
     auto any = type.create_shared(777, 234.4f);
     for (auto &prop : type.get_properties()) {
         fmt::print("{} \n", prop.name());

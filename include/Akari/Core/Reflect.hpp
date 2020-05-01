@@ -422,22 +422,30 @@ namespace Akari {
             }
         };
         struct AKR_EXPORT reflection_manager {
-            std::unordered_map<std::string, meta_instance> instances;
+            std::unordered_map<std::string_view, meta_instance> instances;
+            std::unordered_map<std::string_view, const char *> name_map;
             static reflection_manager &instance();
         };
 
     } // namespace detail
 
-    template <typename T> detail::meta_instance_handle<T> register_type() {
+    template <typename T> detail::meta_instance_handle<T> register_type(const char *name = nullptr) {
         auto type = type_of<T>();
         auto &mgr = detail::reflection_manager::instance();
         mgr.instances[type.name] = detail::meta_instance();
+        if (name) {
+            mgr.name_map.emplace(name, type_of<T>().name);
+        }
         return detail::meta_instance_handle<T>(mgr.instances[type.name]);
     }
     struct Type {
         template <typename T> struct _tag {};
         template <typename T> static const Type &get() {
             static Type _this_type(_tag<T>{});
+            return _this_type;
+        }
+        static const Type &get_by_name(const char *name) {
+            static Type _this_type(detail::reflection_manager::instance().name_map.at(name));
             return _this_type;
         }
         static Type get(const Any &any) { return Type(get_by_typeid(any.type.name)); }
@@ -453,28 +461,25 @@ namespace Akari {
             }
             return v;
         }
-        template<typename...Args>
-        [[nodiscard]] Any create(Args&&...args) const {
-            for(auto & ctor : _get().constructors){
-                try{
+        template <typename... Args>[[nodiscard]] Any create(Args &&... args) const {
+            for (auto &ctor : _get().constructors) {
+                try {
                     return ctor.invoke(Any(std::forward<Args>(args))...);
-                }catch(std::runtime_error&){
-
+                } catch (std::runtime_error &) {
                 }
             }
             throw std::runtime_error("no matching constructor");
         }
-        template<typename...Args>
-        [[nodiscard]] Any create_shared(Args&&...args) const {
-            for(auto & ctor : _get().shared_constructors){
-                try{
+        template <typename... Args>[[nodiscard]] Any create_shared(Args &&... args) const {
+            for (auto &ctor : _get().shared_constructors) {
+                try {
                     return ctor.invoke(Any(std::forward<Args>(args))...);
-                }catch(std::runtime_error&){
-
+                } catch (std::runtime_error &) {
                 }
             }
             throw std::runtime_error("no matching constructor");
         }
+
       private:
         std::function<detail::meta_instance &(void)> _get;
         explicit Type(const char *type) {
