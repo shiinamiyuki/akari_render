@@ -53,14 +53,14 @@ namespace Akari {
         template <typename T> struct is_shared_ptr : std::false_type {};
         template <typename T> struct is_shared_ptr<std::shared_ptr<T>> : std::true_type {};
         template <typename T> constexpr bool is_shared_ptr_v = is_shared_ptr<T>::value;
-//        template <typename T> struct is_reference_wrapper : std::false_type {};
-//        template <typename T> struct is_reference_wrapper<std::reference_wrapper<T>> : std::true_type {};
-//        template <typename T> constexpr bool is_reference_wrapper_v = is_reference_wrapper<T>::value;
+        //        template <typename T> struct is_reference_wrapper : std::false_type {};
+        //        template <typename T> struct is_reference_wrapper<std::reference_wrapper<T>> : std::true_type {};
+        //        template <typename T> constexpr bool is_reference_wrapper_v = is_reference_wrapper<T>::value;
     } // namespace detail
 
     struct Type;
     struct Any;
-    template <typename T> Any make_any(T value) ;
+    template <typename T> Any make_any(T value);
     template <typename T> Any make_any_ref(T &&value);
     struct Any {
         friend struct Type;
@@ -70,7 +70,7 @@ namespace Akari {
             [[nodiscard]] virtual std::unique_ptr<Container> clone() const = 0;
             virtual void *get() = 0;
             virtual bool is_pointer() const = 0;
-            virtual Any get_underlying() const = 0;
+            virtual Any get_underlying() = 0;
             virtual ~Container() = default;
         };
         template <typename Actual, typename T> struct ContainerImpl : Container {
@@ -83,9 +83,9 @@ namespace Akari {
             [[nodiscard]] bool is_pointer() const override {
                 return detail::is_shared_ptr_v<Actual> || std::is_pointer_v<Actual>;
             }
-            [[nodiscard]] Any get_underlying() const override {
+            [[nodiscard]] Any get_underlying() override {
                 if constexpr (detail::is_shared_ptr_v<Actual> || std::is_pointer_v<Actual>) {
-                    Actual& tmp = value;
+                    Actual &tmp = (value);
                     return make_any_ref(*tmp);
                 }
                 return Any();
@@ -99,6 +99,12 @@ namespace Akari {
         struct from_value_t {};
         struct from_ref_t {};
         Any() = default;
+        template <typename T>
+        Any(T value, std::enable_if_t<std::is_reference_v<T>, std::true_type> _ = {})
+            : Any(from_ref_t{}, std::forward<T>(value)) {}
+        template <typename T>
+        Any(T value, std::enable_if_t<!std::is_reference_v<T>, std::true_type> _ = {})
+            : Any(from_value_t{}, std::forward<T>(value)) {}
         template <typename T> Any(from_value_t _, T value) : type(type_of<T>()), kind(EValue) {
             _ptr = make_container<std::decay_t<T>, T>(std::move(value));
         }
@@ -329,9 +335,11 @@ namespace Akari {
     using Attributes = std::unordered_map<std::string, std::string>;
     namespace detail {
         struct meta_instance;
-    }
+        template <typename T> struct meta_instance_handle;
+    } // namespace detail
     struct Property {
         friend struct detail::meta_instance;
+        template <typename T> friend struct detail::meta_instance_handle;
         [[nodiscard]] const char *name() const { return _name.data(); }
         [[nodiscard]] const Attributes &attr() const { return _attr.get(); }
         Property(const char *name, const Attributes &attr) : _name(name), _attr(attr) {}
@@ -360,14 +368,34 @@ namespace Akari {
         std::string_view _name;
         std::reference_wrapper<const Attributes> _attr;
     };
-
     namespace detail {
+
         struct meta_instance {
             using GetFieldFunc = std::function<Any(const Any &)>;
             std::unordered_map<std::string, Property> properties;
             std::unordered_map<std::string, Attributes> attributes;
+            std::vector<Function> constructors;
+            std::vector<Function> shared_constructors;
+        };
+        template <typename U> struct meta_instance_handle {
+            meta_instance_handle(meta_instance &i)
+                : properties(i.properties), attributes(i.attributes), constructors(i.constructors),
+                  shared_constructors(i.shared_constructors) {}
+            std::unordered_map<std::string, Property> &properties;
+            std::unordered_map<std::string, Attributes> &attributes;
+            std::vector<Function> &constructors;
+            std::vector<Function> &shared_constructors;
+            template <typename... Args> meta_instance_handle &constructor() {
+                std::function<U(Args...)> ctor = [](Args... args) { return U(std::forward<Args>(args)...); };
+                std::function<std::shared_ptr<U>(Args...)> ctor_shared = [](Args... args) {
+                    return std::make_shared<U>(std::forward<Args>(args)...);
+                };
+                constructors.emplace_back(ctor);
+                shared_constructors.emplace_back(ctor_shared);
+                return *this;
+            }
 
-            template <typename T, typename U> meta_instance &property(const char *name, T U::*p) {
+            template <typename T> meta_instance_handle &property(const char *name, T U::*p) {
                 auto it = attributes.find(name);
                 if (it == attributes.end()) {
                     attributes.insert(std::make_pair(name, Attributes()));
@@ -388,7 +416,7 @@ namespace Akari {
                 return *this;
             }
 
-            meta_instance &add_attribute(const char *name, const char *key, const char *value) {
+            meta_instance_handle &add_attribute(const char *name, const char *key, const char *value) {
                 attributes[name][key] = value;
                 return *this;
             }
@@ -400,11 +428,11 @@ namespace Akari {
 
     } // namespace detail
 
-    template <typename T> detail::meta_instance &register_type() {
+    template <typename T> detail::meta_instance_handle<T> register_type() {
         auto type = type_of<T>();
         auto &mgr = detail::reflection_manager::instance();
         mgr.instances[type.name] = detail::meta_instance();
-        return mgr.instances[type.name];
+        return detail::meta_instance_handle<T>(mgr.instances[type.name]);
     }
     struct Type {
         template <typename T> struct _tag {};
@@ -417,31 +445,46 @@ namespace Akari {
             Type _this_type(type_of(v).name);
             return _this_type;
         }
-        [[nodiscard]] Property get_property(const char *name) const { return _get(name); }
+        [[nodiscard]] Property get_property(const char *name) const { return _get().properties.at(name); }
         [[nodiscard]] std::vector<Property> get_properties() const {
             std::vector<Property> v;
-            _foreach([&](auto prop) { v.emplace_back(prop); });
+            for (auto &field : _get().properties) {
+                v.emplace_back(field.second);
+            }
             return v;
         }
+        template<typename...Args>
+        [[nodiscard]] Any create(Args&&...args) const {
+            for(auto & ctor : _get().constructors){
+                try{
+                    return ctor.invoke(Any(std::forward<Args>(args))...);
+                }catch(std::runtime_error&){
 
-      private:
-        explicit Type(const char *type) {
-            _get = [=](const char *name) {
-                auto &mgr = detail::reflection_manager::instance();
-                auto &instance = mgr.instances.at(type);
-                return instance.properties.at(name);
-            };
-            _foreach = [=](const std::function<void(Property)> &f) {
-                auto &mgr = detail::reflection_manager::instance();
-                auto &instance = mgr.instances.at(type);
-                for (auto &field : instance.properties) {
-                    f(field.second);
                 }
+            }
+            throw std::runtime_error("no matching constructor");
+        }
+        template<typename...Args>
+        [[nodiscard]] Any create_shared(Args&&...args) const {
+            for(auto & ctor : _get().shared_constructors){
+                try{
+                    return ctor.invoke(Any(std::forward<Args>(args))...);
+                }catch(std::runtime_error&){
+
+                }
+            }
+            throw std::runtime_error("no matching constructor");
+        }
+      private:
+        std::function<detail::meta_instance &(void)> _get;
+        explicit Type(const char *type) {
+            _get = [=]() -> detail::meta_instance & {
+                auto &mgr = detail::reflection_manager::instance();
+                auto &instance = mgr.instances.at(type);
+                return instance;
             };
         }
         template <typename T> explicit Type(_tag<T>) : Type(type_of<T>().name) {}
-        std::function<Property(const char *name)> _get;
-        std::function<void(const std::function<void(Property)> &)> _foreach;
     };
 
 } // namespace Akari

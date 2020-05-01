@@ -25,25 +25,29 @@
 struct Foo {
     int a = 123;
     float b = 3.14;
+    Foo() = default;
+    Foo(int x, float y) : a(x), b(y) {}
 };
 int main() {
     using namespace Akari;
-    register_type<Foo>().property("a", &Foo::a).property("b", &Foo::b);
+    register_type<Foo>().constructor<>().constructor<int, float>().property("a", &Foo::a).property("b", &Foo::b);
     //    Any v = make_any(Foo());
     //    Type type = Type::get<Foo>();
     //    for (auto &prop : v.get_properties()) {
     //        fmt::print("{} \n", prop.second.name());
     //    }
-    std::shared_ptr<Foo> foo(new Foo());
+
     Type type = Type::get<Foo>();
+    auto any = type.create_shared(777, 234.4f);
     for (auto &prop : type.get_properties()) {
         fmt::print("{} \n", prop.name());
     }
-    fmt::print("foo.a={}\n",foo->a);
+    auto *foo = &any.get_underlying().as<Foo>();
+    fmt::print("foo.a={}\n", foo->a);
     auto prop = type.get_property("a");
-    auto any = make_any_ref(foo);
-    fmt::print("{}\n",any.is_pointer());
-    prop.set(any, make_any(222));
-    fmt::print("foo.a={}\n",foo->a);
+    //    auto any = make_any_ref(foo);
+    fmt::print("{}\n", any.is_pointer());
+    prop.set(any, 222);
+    fmt::print("foo.a={}\n", foo->a);
     //    fmt::print("v.a = {}\n", v.get_properties()["a"].as<int>());
 }
