@@ -73,6 +73,9 @@ namespace Akari {
                 Error("Cannot load {}\n", path);
                 return false;
             }
+            if (auto f = lib->GetFuncPointer("AkariPluginOnLoad")) {
+                f();
+            }
             auto p = lib->GetFuncPointer(AKARI_PLUGIN_FUNC_NAME);
             if (!p) {
                 Error("Cannot resolve symbol {} in {}\n", AKARI_PLUGIN_FUNC_NAME, path);

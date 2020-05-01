@@ -25,7 +25,6 @@
 
 #include <Akari/Core/Akari.h>
 #include <Akari/Core/Component.h>
-#include <Akari/Core/detail/reflect-macros.h>
 #include <memory>
 
 namespace Akari {

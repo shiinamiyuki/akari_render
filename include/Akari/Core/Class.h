@@ -52,7 +52,7 @@ namespace Akari {
         using DefaultConstructor = std::function<Ref<Object>()>;
         void Load(Serializable &, Serialize::InputArchive &ar) const;
         void Save(const Serializable &, Serialize::OutputArchive &ar) const;
-        [[nodiscard]] Type GetType() const { return _type; }
+        [[nodiscard]] TypeInfo GetType() const { return _type; }
         [[nodiscard]] const std::string &GetName() const { return _name; }
         Class(const std::string &name, DefaultConstructor constructor = {}, LoadFunction loader = {},
               SaveFunction saver = {});
@@ -62,7 +62,7 @@ namespace Akari {
 
       private:
         std::string _name;
-        Type _type;
+        TypeInfo _type;
         DefaultConstructor _ctor;
         LoadFunction _loader;
         SaveFunction _saver;

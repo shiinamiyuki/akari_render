@@ -104,7 +104,7 @@ function(add_test target)
     set_target_properties(${target} PROPERTIES
             #            ARCHIVE_OUTPUT_DIRECTORY  "${CMAKE_BINARY_DIR}/plugins/"
             RUNTIME_OUTPUT_DIRECTORY   "${CMAKE_BINARY_DIR}/")
-    target_link_libraries(${target} AkariCoreRender)
+    target_link_libraries(${target} AkariCore)
 endfunction()
 add_subdirectory(src/Render)
 add_subdirectory(src/Tool)

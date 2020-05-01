@@ -19,25 +19,7 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-#include <Akari/Core/Reflect.hpp>
-#include <fmt/format.h>
+#include <regex>
+int main(){
 
-struct Foo {
-    int a = 123;
-    float b = 3.14;
-};
-int main() {
-    using namespace Akari;
-    register_type<Foo>().field("a", &Foo::a).field("b", &Foo::b);
-    //    Any v = make_any(Foo());
-    //    Type type = Type::get<Foo>();
-    //    for (auto &prop : v.get_properties()) {
-    //        fmt::print("{} \n", prop.second.name());
-    //    }
-    Foo foo;
-    Type type = Type::get<Foo>();
-    for (auto &prop : type.get_properties()) {
-        fmt::print("{} \n", prop.name());
-    }
-    //    fmt::print("v.a = {}\n", v.get_properties()["a"].as<int>());
 }

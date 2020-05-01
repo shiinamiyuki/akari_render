@@ -33,7 +33,7 @@ namespace Akari {
     class Component;
     class Plugin;
 
-    class AKR_EXPORT Component : public Serializable, public Reflect, public std::enable_shared_from_this<Component> {
+    class AKR_EXPORT Component : public Serializable, public std::enable_shared_from_this<Component> {
         bool dirty = true;
 
       public:
@@ -48,7 +48,7 @@ namespace Akari {
     }
 #define AKARI_GET_PLUGIN       AkariGetPlugin
 #define AKARI_PLUGIN_FUNC_NAME "AkariGetPlugin"
-
+#define AKR_PLUGIN_ON_LOAD     void AkariPluginOnLoad()
 #define AKR_STATIC_CLASS(CLASS, ALIAS)                                                                                 \
     static Akari::Class *StaticClass() {                                                                               \
         static std::unique_ptr<Class> _class;                                                                          \
@@ -56,22 +56,23 @@ namespace Akari {
         std::call_once(flag, [&]() {                                                                                   \
             _class = std::make_unique<Class>(                                                                          \
                 ALIAS, []() { return std::make_shared<CLASS>(); },                                                     \
-                [](Serializable &self, Serialize::InputArchive &ar) { dynamic_cast<CLASS &>(self).load(ar); },                    \
-                [](const Serializable &self, Serialize::OutputArchive &ar) { dynamic_cast<const CLASS &>(self).save(ar); });      \
+                [](Serializable &self, Serialize::InputArchive &ar) { dynamic_cast<CLASS &>(self).load(ar); },         \
+                [](const Serializable &self, Serialize::OutputArchive &ar) {                                           \
+                    dynamic_cast<const CLASS &>(self).save(ar);                                                        \
+                });                                                                                                    \
         });                                                                                                            \
-        return _class.get();                                                                                                \
+        return _class.get();                                                                                           \
     }                                                                                                                  \
     Akari::Class *GetClass() const override { return StaticClass(); }
 
 #define AKR_DECL_COMP(Name, Alias)                                                                                     \
-    AKR_STATIC_CLASS(Name, Alias)                                                                                              \
-    Akari::Type GetType() const override { return Akari::Typeof<Name>(); }
+    AKR_STATIC_CLASS(Name, Alias)
 
 #define AKR_EXPORT_COMP(Name, Interface)                                                                               \
     extern "C" AKR_EXPORT Plugin *AKARI_GET_PLUGIN() {                                                                 \
         struct ThisPlugin : Plugin {                                                                                   \
-            Class *GetClass() const override { return Name::StaticClass(); }                                                 \
-            const char *GetInterface() const override { return strlen(Interface) == 0 ? "Default" : Interface; }             \
+            Class *GetClass() const override { return Name::StaticClass(); }                                           \
+            const char *GetInterface() const override { return strlen(Interface) == 0 ? "Default" : Interface; }       \
         };                                                                                                             \
         static ThisPlugin plugin;                                                                                      \
         return &plugin;                                                                                                \

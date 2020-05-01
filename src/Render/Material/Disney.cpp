@@ -135,8 +135,6 @@ namespace Akari {
       public:
         AKR_SER(baseColor, subsurface, metallic, specular, specularTint, roughness, anisotropic, sheen, sheenTint,
                 clearcoat, clearcoatGlass, ior, specTrans)
-        AKR_COMP_PROPS(baseColor, subsurface, metallic, specular, specularTint, roughness, anisotropic, sheen,
-                       sheenTint, clearcoat, clearcoatGlass, ior, specTrans)
         AKR_DECL_COMP(DisneyMaterial, "DisneyMaterial")
         void ComputeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
                                         Float scale) const override {
