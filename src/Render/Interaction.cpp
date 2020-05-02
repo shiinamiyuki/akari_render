@@ -39,7 +39,7 @@ namespace Akari {
         handle.primId = intersection.primId;
     }
     void SurfaceInteraction::ComputeScatteringFunctions(MemoryArena &arena, TransportMode mode, float scale) {
-        materialSlot->material->ComputeScatteringFunctions(this, arena, mode, scale);
+        materialSlot->material->compute_scattering_functions(this, arena, mode, scale);
     }
     Spectrum SurfaceInteraction::Le(const vec3 &wo) {
         if (!materialSlot) {
@@ -47,7 +47,7 @@ namespace Akari {
         }
         auto &emission = materialSlot->emission;
         if (dot(wo, Ng) > 0 && emission.color && emission.strength) {
-            return emission.color->Evaluate(sp) * emission.strength->Evaluate(sp);
+            return emission.color->evaluate(sp) * emission.strength->evaluate(sp);
         }
         return Spectrum(0);
     }

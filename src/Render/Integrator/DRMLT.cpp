@@ -29,7 +29,7 @@ namespace Akari {
     class DRMLT : public Integrator {
       public:
         AKR_DECL_COMP(DRMLT, "DRMLT")
-        std::shared_ptr<RenderTask> CreateRenderTask(const RenderContext &ctx) override {
+        std::shared_ptr<RenderTask> create_render_task(const RenderContext &ctx) override {
             return std::shared_ptr<RenderTask>();
         }
     };

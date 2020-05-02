@@ -78,7 +78,7 @@ namespace Akari {
                     SurfaceInteraction si(&materialSlot, -ray.d, p, triangle, intersection, arena);
                     si.ComputeScatteringFunctions(arena, TransportMode::EImportance, 1.0f);
                     BSDFSample bsdfSample(sampler->Next1D(), sampler->Next2D(), si);
-                    si.bsdf->Sample(bsdfSample);
+                    si.bsdf->sample(bsdfSample);
                     //                                    Debug("pdf:{}\n",bsdfSample.pdf);
                     assert(bsdfSample.pdf >= 0);
                     if (bsdfSample.pdf <= 0) {
@@ -140,7 +140,7 @@ namespace Akari {
       public:
         AKR_DECL_COMP(RTDebug, "RTDebug")
         AKR_SER(spp)
-        std::shared_ptr<RenderTask> CreateRenderTask(const RenderContext &ctx) override {
+        std::shared_ptr<RenderTask> create_render_task(const RenderContext &ctx) override {
             return std::make_shared<RTDebugRenderTask>(ctx, spp);
         }
     };

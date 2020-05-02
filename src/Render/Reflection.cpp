@@ -24,56 +24,56 @@
 #include <Akari/Render/Reflection.h>
 
 namespace Akari {
-    Spectrum FresnelNoOp::Evaluate(Float cosThetaI) const { return Spectrum(1.0f); }
-    Spectrum FresnelConductor::Evaluate(Float cosThetaI) const { return FrConductor(cosThetaI, etaI, etaT, k); }
-    Spectrum FresnelDielectric::Evaluate(Float cosThetaI) const {
+    Spectrum FresnelNoOp::evaluate(Float cosThetaI) const { return Spectrum(1.0f); }
+    Spectrum FresnelConductor::evaluate(Float cosThetaI) const { return FrConductor(cosThetaI, etaI, etaT, k); }
+    Spectrum FresnelDielectric::evaluate(Float cosThetaI) const {
         return Spectrum(FrDielectric(cosThetaI, etaI, etaT));
     }
-    Spectrum LambertianReflection::Evaluate(const vec3 &wo, const vec3 &wi) const {
-        if (!SameHemisphere(wo, wi)) {
+    Spectrum LambertianReflection::evaluate(const vec3 &wo, const vec3 &wi) const {
+        if (!same_hemisphere(wo, wi)) {
             return Spectrum(0);
         }
         return R * InvPi;
     }
 
-    Spectrum SpecularReflection::Sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf,
+    Spectrum SpecularReflection::sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf,
                                         BSDFType *sampledType) const {
-        *wi = Reflect(wo, vec3(0, 1, 0));
+        *wi = reflect(wo, vec3(0, 1, 0));
         *pdf = 1;
         *sampledType = type;
-        return fresnel->Evaluate(CosTheta(*wi)) * R / AbsCosTheta(*wi);
+        return fresnel->evaluate(CosTheta(*wi)) * R / abs_cos_theta(*wi);
     }
 
-    Spectrum SpecularTransmission::Sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf,
+    Spectrum SpecularTransmission::sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf,
                                           BSDFType *sampledType) const {
         bool entering = CosTheta(wo) > 0;
         Float etaI = entering ? etaA : etaB;
         Float etaT = entering ? etaB : etaA;
 
-        if (!Refract(wo, FaceForward(vec3(0, 1, 0), wo), etaI / etaT, wi))
+        if (!refract(wo, FaceForward(vec3(0, 1, 0), wo), etaI / etaT, wi))
             return Spectrum(0);
         *wi = -wo;
         *sampledType = type;
         *pdf = 1;
-        Spectrum ft = T * (Spectrum(1) - fresnel.Evaluate(CosTheta(*wi)));
+        Spectrum ft = T * (Spectrum(1) - fresnel.evaluate(CosTheta(*wi)));
         if (mode == TransportMode::ERadiance)
             ft *= (etaI * etaI) / (etaT * etaT);
-        return ft / AbsCosTheta(*wi);
+        return ft / abs_cos_theta(*wi);
     }
-    Spectrum FresnelSpecular::Sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const {
+    Spectrum FresnelSpecular::sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const {
         Float F = FrDielectric(CosTheta(wo), etaA, etaB);
         AKARI_ASSERT(F >= 0 && F <= 1);
         if (u[0] < F) {
-            *wi = Reflect(wo, vec3(0, 1, 0));
+            *wi = reflect(wo, vec3(0, 1, 0));
             *pdf = F;
             *sampledType = BSDFType(BSDF_SPECULAR | BSDF_REFLECTION);
-            return F * R / AbsCosTheta(*wi);
+            return F * R / abs_cos_theta(*wi);
         } else {
             bool entering = CosTheta(wo) > 0;
             Float etaI = entering ? etaA : etaB;
             Float etaT = entering ? etaB : etaA;
             //            Debug("{}\n", etaI / etaT);
-            if (!Refract(wo, FaceForward(vec3(0, 1, 0), wo), etaI / etaT, wi))
+            if (!refract(wo, FaceForward(vec3(0, 1, 0), wo), etaI / etaT, wi))
                 return Spectrum(0);
             Spectrum ft = T * (1 - F);
             *sampledType = BSDFType(BSDF_SPECULAR | BSDF_TRANSMISSION);
@@ -81,11 +81,11 @@ namespace Akari {
                 ft *= (etaI * etaI) / (etaT * etaT);
             *pdf = 1 - F;
             //            Info("{} {} {} {}\n", ft[0],ft[1],ft[2],  AbsCosTheta(*wi));
-            return ft / AbsCosTheta(*wi);
+            return ft / abs_cos_theta(*wi);
         }
     }
 
-    Spectrum OrenNayar::Evaluate(const vec3 &wo, const vec3 &wi) const {
+    Spectrum OrenNayar::evaluate(const vec3 &wo, const vec3 &wi) const {
         Float sinThetaI = SinTheta(wi);
         Float sinThetaO = SinTheta(wo);
         Float maxCos = 0;
@@ -96,12 +96,12 @@ namespace Akari {
             maxCos = std::max((Float)0, dCos);
         }
         Float sinAlpha, tanBeta;
-        if (AbsCosTheta(wi) > AbsCosTheta(wo)) {
+        if (abs_cos_theta(wi) > abs_cos_theta(wo)) {
             sinAlpha = sinThetaO;
-            tanBeta = sinThetaI / AbsCosTheta(wi);
+            tanBeta = sinThetaI / abs_cos_theta(wi);
         } else {
             sinAlpha = sinThetaI;
-            tanBeta = sinThetaO / AbsCosTheta(wo);
+            tanBeta = sinThetaO / abs_cos_theta(wo);
         }
         return R * InvPi * (A + B * maxCos * sinAlpha * tanBeta);
     }

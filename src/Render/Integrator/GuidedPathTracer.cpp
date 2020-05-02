@@ -615,7 +615,7 @@ namespace Akari {
                     {
                         //                    log::log("{}\n", reinterpret_cast<size_t>(dTree));
                         if (u0 < bsdfSamplingFraction) {
-                            si->bsdf->Sample(bsdfSample);
+                            si->bsdf->sample(bsdfSample);
                             AKARI_CHECK(bsdfSample.pdf >= 0);
                             bsdfSample.pdf *= bsdfSamplingFraction;
                             if (!(bsdfSample.sampledType & BSDF_SPECULAR)) {
@@ -628,11 +628,11 @@ namespace Akari {
                             bsdfSample.wi = w;
                             bsdfSample.pdf = dTree->pdf(w);
                             AKARI_CHECK(bsdfSample.pdf >= 0);
-                            bsdfSample.f = si->bsdf->Evaluate(bsdfSample.wo, bsdfSample.wi);
+                            bsdfSample.f = si->bsdf->evaluate(bsdfSample.wo, bsdfSample.wi);
                             bsdfSample.sampledType = static_cast<BSDFType>(BSDF_ALL & ~BSDF_SPECULAR);
                             bsdfSample.pdf *= 1.0f - bsdfSamplingFraction;
                             bsdfSample.pdf = bsdfSample.pdf +
-                                             bsdfSamplingFraction * si->bsdf->EvaluatePdf(bsdfSample.wo, bsdfSample.wi);
+                                             bsdfSamplingFraction * si->bsdf->evaluate_pdf(bsdfSample.wo, bsdfSample.wi);
                         }
 
                         AKARI_CHECK(!std::isnan(bsdfSample.pdf));
@@ -659,14 +659,14 @@ namespace Akari {
                             auto wi = lightSample.wi;
                             auto wo = si->wo;
                             auto absCos = abs(dot(lightSample.wi, si->Ns));
-                            auto f = si->bsdf->Evaluate(wo, wi) * absCos;
+                            auto f = si->bsdf->evaluate(wo, wi) * absCos;
                             Spectrum radiance;
                             if (lightPdf > 0 && MaxComp(f) > 0 && tester.visible(*scene)) {
                                 Float weight = 1;
                                 if (specular) {
                                     radiance = (f * lightSample.I / lightPdf);
                                 } else {
-                                    auto scatteringPdf = si->bsdf->EvaluatePdf(wo, wi);
+                                    auto scatteringPdf = si->bsdf->evaluate_pdf(wo, wi);
                                     weight = MisWeight(lightPdf, scatteringPdf);
                                     radiance = (f * lightSample.I / lightPdf * weight);
                                 }
@@ -815,7 +815,7 @@ namespace Akari {
       public:
         AKR_DECL_COMP(GuidedPathTracer, "GuidedPathTracer")
         AKR_SER(spp, trainingSamples, minDepth, maxDepth, enableRR)
-        std::shared_ptr<RenderTask> CreateRenderTask(const RenderContext &ctx) override {
+        std::shared_ptr<RenderTask> create_render_task(const RenderContext &ctx) override {
             return std::make_shared<GPTRenderTask>(ctx, spp, minDepth, maxDepth, trainingSamples, enableRR);
         }
     };

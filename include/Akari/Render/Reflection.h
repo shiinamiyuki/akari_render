@@ -27,12 +27,12 @@
 namespace Akari {
     class Fresnel {
       public:
-        virtual Spectrum Evaluate(Float cosThetaI) const = 0;
+        virtual Spectrum evaluate(Float cosThetaI) const = 0;
     };
 
     class AKR_EXPORT FresnelNoOp : public Fresnel {
       public:
-        [[nodiscard]] Spectrum Evaluate(Float cosThetaI) const override;
+        [[nodiscard]] Spectrum evaluate(Float cosThetaI) const override;
     };
 
     class AKR_EXPORT FresnelConductor : public Fresnel {
@@ -41,7 +41,7 @@ namespace Akari {
       public:
         FresnelConductor(const Spectrum &etaI, const Spectrum &etaT, const Spectrum &k)
             : etaI(etaI), etaT(etaT), k(k) {}
-        [[nodiscard]] Spectrum Evaluate(Float cosThetaI) const override;
+        [[nodiscard]] Spectrum evaluate(Float cosThetaI) const override;
     };
 
     class AKR_EXPORT FresnelDielectric : public Fresnel {
@@ -49,7 +49,7 @@ namespace Akari {
 
       public:
         FresnelDielectric(const Float &etaI, const Float &etaT) : etaI(etaI), etaT(etaT) {}
-        [[nodiscard]] Spectrum Evaluate(Float cosThetaI) const override;
+        [[nodiscard]] Spectrum evaluate(Float cosThetaI) const override;
     };
     inline Float FrDielectric(Float cosThetaI, Float etaI, Float etaT) {
         bool entering = cosThetaI > 0.f;
@@ -97,7 +97,7 @@ namespace Akari {
       public:
         explicit LambertianReflection(const Spectrum &R)
             : BSDFComponent(BSDFType(BSDF_DIFFUSE | BSDF_REFLECTION)), R(R) {}
-        [[nodiscard]] Spectrum Evaluate(const vec3 &wo, const vec3 &wi) const override;
+        [[nodiscard]] Spectrum evaluate(const vec3 &wo, const vec3 &wi) const override;
     };
     class AKR_EXPORT SpecularReflection : public BSDFComponent {
         const Spectrum R;
@@ -106,9 +106,9 @@ namespace Akari {
       public:
         explicit SpecularReflection(const Spectrum &R, const Fresnel *fresnel)
             : BSDFComponent(BSDFType(BSDF_SPECULAR | BSDF_TRANSMISSION)), R(R), fresnel(fresnel) {}
-        [[nodiscard]] Float EvaluatePdf(const vec3 &wo, const vec3 &wi) const override { return 0; }
-        [[nodiscard]] Spectrum Evaluate(const vec3 &wo, const vec3 &wi) const override { return Spectrum(0); }
-        Spectrum Sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const override;
+        [[nodiscard]] Float evaluate_pdf(const vec3 &wo, const vec3 &wi) const override { return 0; }
+        [[nodiscard]] Spectrum evaluate(const vec3 &wo, const vec3 &wi) const override { return Spectrum(0); }
+        Spectrum sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const override;
     };
     class AKR_EXPORT SpecularTransmission : public BSDFComponent {
         const Spectrum T;
@@ -120,9 +120,9 @@ namespace Akari {
         explicit SpecularTransmission(const Spectrum &T, Float etaA, Float etaB, TransportMode mode)
             : BSDFComponent(BSDFType(BSDF_TRANSMISSION | BSDF_SPECULAR)), T(T), etaA(etaA), etaB(etaB),
               fresnel(etaA, etaB), mode(mode) {}
-        [[nodiscard]] Float EvaluatePdf(const vec3 &wo, const vec3 &wi) const override { return 0; }
-        [[nodiscard]] Spectrum Evaluate(const vec3 &wo, const vec3 &wi) const override { return Spectrum(0); }
-        Spectrum Sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const override;
+        [[nodiscard]] Float evaluate_pdf(const vec3 &wo, const vec3 &wi) const override { return 0; }
+        [[nodiscard]] Spectrum evaluate(const vec3 &wo, const vec3 &wi) const override { return Spectrum(0); }
+        Spectrum sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const override;
     };
     class AKR_EXPORT FresnelSpecular : public BSDFComponent {
         const Spectrum R, T;
@@ -134,9 +134,9 @@ namespace Akari {
         explicit FresnelSpecular(const Spectrum &R, const Spectrum &T, Float etaA, Float etaB, TransportMode mode)
             : BSDFComponent(BSDFType(BSDF_REFLECTION | BSDF_TRANSMISSION | BSDF_SPECULAR)), R(R), T(T), etaA(etaA),
               etaB(etaB), fresnel(etaA, etaB), mode(mode) {}
-        [[nodiscard]] Float EvaluatePdf(const vec3 &wo, const vec3 &wi) const override { return 0; }
-        [[nodiscard]] Spectrum Evaluate(const vec3 &wo, const vec3 &wi) const override { return Spectrum(0); }
-        Spectrum Sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const override;
+        [[nodiscard]] Float evaluate_pdf(const vec3 &wo, const vec3 &wi) const override { return 0; }
+        [[nodiscard]] Spectrum evaluate(const vec3 &wo, const vec3 &wi) const override { return Spectrum(0); }
+        Spectrum sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const override;
     };
 
     class AKR_EXPORT OrenNayar : public BSDFComponent {
@@ -149,7 +149,7 @@ namespace Akari {
             A = 1.f - (sigma2 / (2.f * (sigma2 + 0.33f)));
             B = 0.45f * sigma2 / (sigma2 + 0.09f);
         }
-        [[nodiscard]] Spectrum Evaluate(const vec3 &wo, const vec3 &wi) const override;
+        [[nodiscard]] Spectrum evaluate(const vec3 &wo, const vec3 &wi) const override;
     };
 } // namespace Akari
 

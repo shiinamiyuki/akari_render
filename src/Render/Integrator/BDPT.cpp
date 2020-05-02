@@ -160,7 +160,7 @@ namespace Akari {
       public:
         AKR_DECL_COMP(BDPT, "BDPT")
         AKR_SER(spp, maxDepth, visualizeMIS)
-        std::shared_ptr<RenderTask> CreateRenderTask(const RenderContext &ctx) override {
+        std::shared_ptr<RenderTask> create_render_task(const RenderContext &ctx) override {
             return std::make_shared<BDPTRenderTask>(ctx, spp, maxDepth, visualizeMIS);
         }
     };

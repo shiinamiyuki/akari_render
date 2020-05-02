@@ -140,11 +140,11 @@ namespace Akari {
             }
             auto sinTheta = std::sqrt(std::max(0.0f, 1 - cosTheta * cosTheta));
             auto wh = vec3(std::cos(phi) * sinTheta, cosTheta, std::sin(phi) * sinTheta);
-            if (!SameHemisphere(wo, wh))
+            if (!same_hemisphere(wo, wh))
                 wh = -wh;
             return wh;
         }
-        [[nodiscard]] Float evaluatePdf(const vec3 &wh) const { return D(wh) * AbsCosTheta(wh); }
+        [[nodiscard]] Float evaluate_pdf(const vec3 &wh) const { return D(wh) * abs_cos_theta(wh); }
 
       private:
         MicrofacetType type;
@@ -159,9 +159,9 @@ namespace Akari {
       public:
         MicrofacetReflection(const vec3 &R, MicrofacetModel microfacet, const Fresnel *fresnel)
             : BSDFComponent(BSDFType(BSDF_REFLECTION | BSDF_GLOSSY)), R(R), microfacet(microfacet), fresnel(fresnel) {}
-        [[nodiscard]] Float EvaluatePdf(const vec3 &wo, const vec3 &wi) const override;
-        [[nodiscard]] Spectrum Evaluate(const vec3 &wo, const vec3 &wi) const override;
-        Spectrum Sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const override;
+        [[nodiscard]] Float evaluate_pdf(const vec3 &wo, const vec3 &wi) const override;
+        [[nodiscard]] Spectrum evaluate(const vec3 &wo, const vec3 &wi) const override;
+        Spectrum sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const override;
     };
     class AKR_EXPORT MicrofacetTransmission : public BSDFComponent {
         const Spectrum T;
@@ -174,9 +174,9 @@ namespace Akari {
         MicrofacetTransmission(const vec3 &T, MicrofacetModel microfacet, Float etaA, Float etaB, TransportMode mode)
             : BSDFComponent(BSDFType(BSDF_TRANSMISSION | BSDF_GLOSSY)), T(T), microfacet(microfacet),
               fresnel(etaA, etaB), etaA(etaA), etaB(etaB), mode(mode) {}
-        [[nodiscard]] Float EvaluatePdf(const vec3 &wo, const vec3 &wi) const override;
-        [[nodiscard]] Spectrum Evaluate(const vec3 &wo, const vec3 &wi) const override;
-        Spectrum Sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const override;
+        [[nodiscard]] Float evaluate_pdf(const vec3 &wo, const vec3 &wi) const override;
+        [[nodiscard]] Spectrum evaluate(const vec3 &wo, const vec3 &wi) const override;
+        Spectrum sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const override;
     };
 
 } // namespace Akari

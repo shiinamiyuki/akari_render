@@ -28,10 +28,10 @@ namespace Akari {
     class Scene;
     class AKR_EXPORT Accelerator : public Component {
       public:
-        virtual void Build(const Scene &scene) = 0;
-        virtual bool Intersect(const Ray &ray, Intersection *intersection) const = 0;
-        [[nodiscard]] virtual bool Occlude(const Ray &ray) const = 0;
-        virtual Bounds3f GetBounds()const =0 ;
+        virtual void buil(const Scene &scene) = 0;
+        virtual bool intersect(const Ray &ray, Intersection *intersection) const = 0;
+        [[nodiscard]] virtual bool occlude(const Ray &ray) const = 0;
+        virtual Bounds3f get_bounds()const =0 ;
     };
 } // namespace Akari
 #endif // AKARIRENDER_ACCELERATOR_H

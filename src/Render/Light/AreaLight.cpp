@@ -53,7 +53,7 @@ namespace Akari {
                 return Spectrum(0);
             }
             if (emission.strength && emission.color) {
-                return emission.color->Evaluate(sp) * emission.strength->Evaluate(sp);
+                return emission.color->evaluate(sp) * emission.strength->evaluate(sp);
             }
             return Spectrum(0);
         }
@@ -96,11 +96,11 @@ namespace Akari {
         void SampleEmission(const vec2 &u1, const vec2 &u2, RayEmissionSample *sample) const override {
             SurfaceSample surfaceSample{};
             triangle.Sample(u1, &surfaceSample);
-            auto wi = CosineHemisphereSampling(u2);
+            auto wi = cosine_hemisphere_sampling(u2);
 
             sample->pdfPos = surfaceSample.pdf;
             sample->pdfDir = CosineHemispherePDF(wi.y);
-            wi = localFrame.LocalToWorld(wi);
+            wi = localFrame.local_to_world(wi);
             sample->ray = Ray(surfaceSample.p, wi, Eps());
             sample->normal = surfaceSample.normal;
             ShadingPoint sp{};

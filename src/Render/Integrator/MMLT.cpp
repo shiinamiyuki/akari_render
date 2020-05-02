@@ -274,7 +274,7 @@ namespace Akari {
             AKARI_ASSERT(pathTracer);
             Info("Render direct samples\n");
             (void)pathTracer;
-            auto task = pathTracer->CreateRenderTask(ctx);
+            auto task = pathTracer->create_render_task(ctx);
             task->Start();
             task->Wait();
         }
@@ -291,7 +291,7 @@ namespace Akari {
       public:
         AKR_DECL_COMP(MMLT, "MMLT")
         AKR_SER(spp, maxDepth, nBootstrap, nChains, nDirect, clamp, maxConsecutiveRejects)
-        std::shared_ptr<RenderTask> CreateRenderTask(const RenderContext &ctx) override {
+        std::shared_ptr<RenderTask> create_render_task(const RenderContext &ctx) override {
             return std::make_shared<MMLTRenderTask>(ctx, spp, maxDepth, nBootstrap, nChains, nDirect, clamp,
                                                     maxConsecutiveRejects);
         }

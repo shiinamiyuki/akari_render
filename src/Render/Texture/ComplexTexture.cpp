@@ -186,7 +186,7 @@ namespace Akari {
             };
             compile(program, compile);
         }
-        Spectrum Evaluate(const ShadingPoint &sp) const override {
+        Spectrum evaluate(const ShadingPoint &sp) const override {
             using namespace detail;
             ExecutionEngine engine;
             engine.programSize = compiledProgram.size();

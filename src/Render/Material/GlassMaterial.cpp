@@ -37,17 +37,22 @@ namespace Akari {
         explicit GlassMaterial(std::shared_ptr<Texture> color) : color(std::move(color)) {}
         AKR_SER(color, ior)
         AKR_DECL_COMP(GlassMaterial, "GlassMaterial")
-        void ComputeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
-                                        Float scale) const override {
+        void compute_scattering_functions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
+                                          Float scale) const override {
             si->bsdf = arena.alloc<BSDF>(*si);
-            auto c = color->Evaluate(si->sp) * scale;
-            auto eta = ior->Evaluate(si->sp)[0];
-            si->bsdf->AddComponent(arena.alloc<FresnelSpecular>(c, c, 1.0f, eta, mode));
+            auto c = color->evaluate(si->sp) * scale;
+            auto eta = ior->evaluate(si->sp)[0];
+            si->bsdf->add_component(arena.alloc<FresnelSpecular>(c, c, 1.0f, eta, mode));
         }
-        bool SupportBidirectional() const override { return true; }
+        bool support_bidirectional() const override { return true; }
         void Commit() override { color->Commit();ior->Commit(); }
     };
-
+    AKR_PLUGIN_ON_LOAD {
+        // clang-format off
+        class_<GlassMaterial,Material>("GlassMaterial")
+            .property("color",&GlassMaterial::color);
+        //clang-format on
+    }
     AKR_EXPORT_COMP(GlassMaterial, "Material")
 
 } // namespace Akari

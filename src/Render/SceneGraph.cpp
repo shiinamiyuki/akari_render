@@ -69,6 +69,6 @@ namespace Akari {
         ctx.sampler = render.at(settingId).sampler;
         ctx.camera = render.at(settingId).camera;
         pScene->ClearRayCounter();
-        return render.at(settingId).integrator->CreateRenderTask(ctx);
+        return render.at(settingId).integrator->create_render_task(ctx);
     }
 } // namespace Akari

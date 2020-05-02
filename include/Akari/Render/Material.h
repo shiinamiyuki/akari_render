@@ -35,11 +35,11 @@ namespace Akari {
 
     class AKR_EXPORT Material : public Component {
       public:
-        virtual void ComputeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
-                                                Float scale) const = 0;
+        virtual void compute_scattering_functions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
+                                                  Float scale) const = 0;
 
         // Materials like Toon-ish shading would not satisfy this property
-        virtual bool SupportBidirectional() const = 0;
+        virtual bool support_bidirectional() const = 0;
     };
 
     struct Emission {
@@ -52,8 +52,8 @@ namespace Akari {
         std::string name;
         std::shared_ptr<Material> material;
         Emission emission;
-        bool markedAsLight = false;
-        AKR_SER(material, name, markedAsLight, emission)
+        bool marked_as_light = false;
+        AKR_SER(material, name, marked_as_light, emission)
     };
 } // namespace Akari
 #endif // AKARIRENDER_MATERIAL_H

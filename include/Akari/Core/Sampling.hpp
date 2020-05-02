@@ -42,7 +42,7 @@ namespace Akari {
         return r * vec2(std::cos(theta), std::sin(theta));
     }
 
-    inline vec3 CosineHemisphereSampling(const vec2 &u) {
+    inline vec3 cosine_hemisphere_sampling(const vec2 &u) {
         auto uv = ConcentricSampleDisk(u);
         auto r = dot(uv, uv);
         auto h = std::sqrt(std::max(0.0f, 1 - r));

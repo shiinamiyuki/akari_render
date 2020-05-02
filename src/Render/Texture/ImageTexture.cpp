@@ -55,7 +55,7 @@ namespace Akari {
             }
         }
         Float AverageLuminance() const override { return average; }
-        Spectrum Evaluate(const ShadingPoint &sp) const override {
+        Spectrum evaluate(const ShadingPoint &sp) const override {
             auto texCoords = mod(sp.texCoords, vec2(1));
             return (*image)(texCoords);
         }

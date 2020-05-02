@@ -32,7 +32,7 @@ bool RunTestBSDF_SamplePdf(const vec3 &wo, const BSDFComponent *bsdf, Sampler *s
         vec3 wi;
         BSDFType sampledType;
         Float pdf = 0;
-        auto f = bsdf->Sample(sampler->Next2D(), wo, &wi, &pdf, &sampledType);
+        auto f = bsdf->sample(sampler->Next2D(), wo, &wi, &pdf, &sampledType);
         (void)f;
         if (std::isnan(pdf) || pdf <= 0) {
             bad++;
@@ -56,7 +56,7 @@ bool RunTestMicrofacet(const vec3 &wo, const MicrofacetModel* model, Sampler *sa
         BSDFType sampledType;
         Float pdf = 0;
         auto wh = model->sampleWh(wo, sampler->Next2D());(void)wh;
-        pdf = model->evaluatePdf(wh);
+        pdf = model->evaluate_pdf(wh);
         if (std::isnan(pdf) || pdf <= 0) {
             bad++;
         } else {

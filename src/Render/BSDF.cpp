@@ -22,16 +22,16 @@
 #include <Akari/Render/BSDF.h>
 
 namespace Akari {
-    Float BSDF::EvaluatePdf(const vec3 &woW, const vec3 &wiW) const {
-        auto wo = WorldToLocal(woW);
-        auto wi = WorldToLocal(wiW);
+    Float BSDF::evaluate_pdf(const vec3 &woW, const vec3 &wiW) const {
+        auto wo = world_to_local(woW);
+        auto wi = world_to_local(wiW);
         Float pdf = 0;
         int cnt = 0;
         for (int i = 0; i < nComp; i++) {
             auto *comp = components[i];
-            if (!comp->IsDelta()) {
+            if (!comp->is_delta()) {
 
-                pdf += comp->EvaluatePdf(wo, wi);
+                pdf += comp->evaluate_pdf(wo, wi);
             }
             cnt++;
         }
@@ -40,50 +40,50 @@ namespace Akari {
         }
         return pdf;
     }
-    Spectrum BSDF::Evaluate(const vec3 &woW, const vec3 &wiW) const {
-        auto wo = WorldToLocal(woW);
-        auto wi = WorldToLocal(wiW);
+    Spectrum BSDF::evaluate(const vec3 &woW, const vec3 &wiW) const {
+        auto wo = world_to_local(woW);
+        auto wi = world_to_local(wiW);
         Spectrum f(0);
         for (int i = 0; i < nComp; i++) {
             auto *comp = components[i];
-            if (!comp->IsDelta()) {
+            if (!comp->is_delta()) {
                 auto reflect = (dot(woW, Ns) * dot(wiW, Ns) > 0);
-                if ((reflect && comp->MatchFlag(BSDF_REFLECTION)) || (!reflect && comp->MatchFlag(BSDF_TRANSMISSION))) {
-                    f += comp->Evaluate(wo, wi);
+                if ((reflect && comp->match_flags(BSDF_REFLECTION)) || (!reflect && comp->match_flags(BSDF_TRANSMISSION))) {
+                    f += comp->evaluate(wo, wi);
                 }
             }
         }
         return f;
     }
-    void BSDF::Sample(BSDFSample &sample) const {
+    void BSDF::sample(BSDFSample &sample) const {
         if (nComp == 0) {
             return;
         }
         int selected = std::clamp(int(sample.u0 * (float)nComp), 0, nComp - 1);
         sample.u0 = std::min(sample.u0 * (float)nComp - (float)selected, 1.0f - 1e-7f);
         vec3 wo, wi;
-        wo = WorldToLocal(sample.wo);
+        wo = world_to_local(sample.wo);
         {
             auto *comp = components[selected];
-            sample.f = comp->Sample(sample.u, wo, &wi, &sample.pdf, &sample.sampledType);
-            sample.wi = LocalToWorld(wi);
-            if (comp->IsDelta()) {
+            sample.f = comp->sample(sample.u, wo, &wi, &sample.pdf, &sample.sampledType);
+            sample.wi = local_to_world(wi);
+            if (comp->is_delta()) {
                 return;
             }
         }
         auto &f = sample.f;
-        auto woW = LocalToWorld(wo);
-        auto wiW = LocalToWorld(wi);
+        auto woW = local_to_world(wo);
+        auto wiW = local_to_world(wi);
         for (int i = 0; i < nComp; i++) {
             if (i == selected)
                 continue;
             auto *comp = components[i];
 
             auto reflect = (dot(woW, Ns) * dot(wiW, Ns) > 0);
-            if ((reflect && comp->MatchFlag(BSDF_REFLECTION)) || (!reflect && comp->MatchFlag(BSDF_TRANSMISSION))) {
-                f += comp->Evaluate(wo, wi);
+            if ((reflect && comp->match_flags(BSDF_REFLECTION)) || (!reflect && comp->match_flags(BSDF_TRANSMISSION))) {
+                f += comp->evaluate(wo, wi);
             }
-            sample.pdf += comp->EvaluatePdf(wo, wi);
+            sample.pdf += comp->evaluate_pdf(wo, wi);
         }
         if (nComp > 1) {
             sample.pdf /= nComp;

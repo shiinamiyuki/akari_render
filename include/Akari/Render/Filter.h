@@ -28,7 +28,7 @@
 namespace Akari {
     class Filter : public Component{
       public:
-        virtual Float Evaluate(const vec2& p)const = 0;
+        virtual Float evaluate(const vec2& p)const = 0;
     };
 
 }

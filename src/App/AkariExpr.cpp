@@ -68,6 +68,6 @@ int main() {
 )";
     auto texture = CreateComplexTexture(json::parse(source));
     texture->Commit();
-    auto res = texture->Evaluate(ShadingPoint());
+    auto res = texture->evaluate(ShadingPoint());
     Info("{} {} {}\n",res[0],res[1],res[2]);
 }

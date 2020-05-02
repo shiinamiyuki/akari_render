@@ -35,9 +35,9 @@ namespace Akari {
 
       public:
         DisneyDiffuse(const Spectrum &R) : BSDFComponent(BSDFType(BSDF_DIFFUSE | BSDF_REFLECTION)), R(R) {}
-        [[nodiscard]] Spectrum Evaluate(const vec3 &wo, const vec3 &wi) const override {
-            Float Fo = SchlickWeight(AbsCosTheta(wo));
-            Float Fi = SchlickWeight(AbsCosTheta(wi));
+        [[nodiscard]] Spectrum evaluate(const vec3 &wo, const vec3 &wi) const override {
+            Float Fo = SchlickWeight(abs_cos_theta(wo));
+            Float Fi = SchlickWeight(abs_cos_theta(wi));
             return R * InvPi * (1 - Fo * 0.5) * (1 - Fi * 0.5);
         }
     };
@@ -55,7 +55,7 @@ namespace Akari {
       public:
         DisneySheen(const Spectrum &R, const Spectrum &sheen, const Spectrum &sheenTint)
             : BSDFComponent(BSDFType(BSDF_GLOSSY | BSDF_REFLECTION)), R(R), sheen(sheen), sheenTint(sheenTint) {}
-        [[nodiscard]] Spectrum Evaluate(const vec3 &wo, const vec3 &wi) const override {
+        [[nodiscard]] Spectrum evaluate(const vec3 &wo, const vec3 &wi) const override {
             auto wh = wi + wo;
             if (all(equal(wh, vec3(0)))) {
                 return Spectrum(0);
@@ -83,37 +83,37 @@ namespace Akari {
       public:
         DisneyClearCoat(Float clearcoat, Float alpha)
             : BSDFComponent(BSDFType(BSDF_GLOSSY | BSDF_REFLECTION)), clearcoat(clearcoat), alpha(alpha) {}
-        [[nodiscard]] Spectrum Evaluate(const vec3 &wo, const vec3 &wi) const override {
+        [[nodiscard]] Spectrum evaluate(const vec3 &wo, const vec3 &wi) const override {
             auto wh = wi + wo;
             if (all(equal(wh, vec3(0)))) {
                 return Spectrum(0);
             }
             wh = normalize(wh);
-            Float D = D_GTR1(AbsCosTheta(wh), alpha);
+            Float D = D_GTR1(abs_cos_theta(wh), alpha);
             Float F = FrSchlick(0.04, dot(wo, wh));
-            Float G = SmithGGX_G1(AbsCosTheta(wi), 0.25) * SmithGGX_G1(AbsCosTheta(wo), 0.25);
+            Float G = SmithGGX_G1(abs_cos_theta(wi), 0.25) * SmithGGX_G1(abs_cos_theta(wo), 0.25);
             return Spectrum(0.25 * clearcoat * D * F * G);
         }
-        [[nodiscard]] Float EvaluatePdf(const vec3 &wo, const vec3 &wi) const override {
-            if (!SameHemisphere(wo, wi))
+        [[nodiscard]] Float evaluate_pdf(const vec3 &wo, const vec3 &wi) const override {
+            if (!same_hemisphere(wo, wi))
                 return 0;
             auto wh = wi + wo;
             if (wh.x == 0 && wh.y == 0 && wh.z == 0)
                 return 0;
             wh = normalize(wh);
-            return D_GTR1(AbsCosTheta(wh), alpha) * AbsCosTheta(wh) / (4.0 * dot(wh, wo));
+            return D_GTR1(abs_cos_theta(wh), alpha) * abs_cos_theta(wh) / (4.0 * dot(wh, wo));
         }
-        Spectrum Sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const override {
+        Spectrum sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const override {
             auto a2 = alpha * alpha;
             auto cosTheta = std::sqrt(std::fmax(0.0f, 1 - (std::pow(a2, 1 - u[0])) / (1 - a2)));
             auto sinTheta = std::sqrt(std::fmax(0.0f, 1 - cosTheta * cosTheta));
             auto phi = 2.0f * Pi * u[1];
             auto wh = vec3(std::cos(phi) * sinTheta, cosTheta, std::sin(phi) * sinTheta);
-            if (!SameHemisphere(wo, wh))
+            if (!same_hemisphere(wo, wh))
                 wh = -wh;
-            *wi = Reflect(wo, wh);
-            *pdf = EvaluatePdf(wo, *wi);
-            return Evaluate(wo, *wi);
+            *wi = reflect(wo, wh);
+            *pdf = evaluate_pdf(wo, *wi);
+            return evaluate(wo, *wi);
         }
     };
 
@@ -123,7 +123,7 @@ namespace Akari {
 
       public:
         DisneyFresnel(const Spectrum &R0, Float metallic, Float eta) : R0(R0), metallic(metallic), eta(eta) {}
-        [[nodiscard]] Spectrum Evaluate(Float cosThetaI) const override {
+        [[nodiscard]] Spectrum evaluate(Float cosThetaI) const override {
             return lerp(Spectrum(FrDielectric(cosThetaI, 1.0f, eta)), FrSchlick(R0, cosThetaI), Spectrum(metallic));
         }
     };
@@ -136,21 +136,21 @@ namespace Akari {
         AKR_SER(baseColor, subsurface, metallic, specular, specularTint, roughness, anisotropic, sheen, sheenTint,
                 clearcoat, clearcoatGlass, ior, specTrans)
         AKR_DECL_COMP(DisneyMaterial, "DisneyMaterial")
-        void ComputeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
-                                        Float scale) const override {
+        void compute_scattering_functions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
+                                          Float scale) const override {
             si->bsdf = arena.alloc<BSDF>(*si);
-//            Spectrum color = baseColor->Evaluate(si->sp);
-//            Float metallicWeight = metallic->Evaluate(si->sp)[0];
-//            Float eta = ior->Evaluate(si->sp)[0];
-//            Float trans = specTrans->Evaluate(si->sp)[0];
+//            Spectrum color = baseColor->evaluate(si->sp);
+//            Float metallicWeight = metallic->evaluate(si->sp)[0];
+//            Float eta = ior->evaluate(si->sp)[0];
+//            Float trans = specTrans->evaluate(si->sp)[0];
 //            Float diffuseWeight = (1.0f - trans) * (1.0f - metallicWeight);
 //            Float transWeight = trans * (1.0f - metallicWeight);
-//            Float alpha = roughness->Evaluate(si->sp)[0];
+//            Float alpha = roughness->evaluate(si->sp)[0];
 //            if(diffuseWeight > 0){
 //
 //            }
         }
-        bool SupportBidirectional() const override { return true; }
+        bool support_bidirectional() const override { return true; }
         void Commit() override {
             if (baseColor)
                 baseColor->Commit();

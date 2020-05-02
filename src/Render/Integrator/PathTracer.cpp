@@ -107,7 +107,7 @@ namespace Akari {
                         break;
                     }
                     BSDFSample bsdfSample(sampler->Next1D(), sampler->Next2D(), *si);
-                    si->bsdf->Sample(bsdfSample);
+                    si->bsdf->sample(bsdfSample);
 
                     assert(bsdfSample.pdf >= 0);
                     if (bsdfSample.pdf <= 0) {
@@ -124,12 +124,12 @@ namespace Akari {
                             lightPdf *= lightSample.pdf;
                             auto wi = lightSample.wi;
                             auto wo = si->wo;
-                            auto f = si->bsdf->Evaluate(wo, wi) * abs(dot(lightSample.wi, si->Ns));
+                            auto f = si->bsdf->evaluate(wo, wi) * abs(dot(lightSample.wi, si->Ns));
                             if (lightPdf > 0 && MaxComp(f) > 0 && tester.visible(*scene)) {
-                                if (specular || Light::IsDelta(sampledLight->GetLightType())) {
+                                if (specular || Light::is_delta(sampledLight->GetLightType())) {
                                     Li += beta * f * lightSample.I / lightPdf;
                                 } else {
-                                    auto scatteringPdf = si->bsdf->EvaluatePdf(wo, wi);
+                                    auto scatteringPdf = si->bsdf->evaluate_pdf(wo, wi);
                                     Li += beta * f * lightSample.I / lightPdf * MisWeight(lightPdf, scatteringPdf);
                                 }
                             }
@@ -212,7 +212,7 @@ namespace Akari {
       public:
         AKR_DECL_COMP(PathTracer, "PathTracer")
         AKR_SER(spp, minDepth, maxDepth, enableRR)
-        std::shared_ptr<RenderTask> CreateRenderTask(const RenderContext &ctx) override {
+        std::shared_ptr<RenderTask> create_render_task(const RenderContext &ctx) override {
             return std::make_shared<PTRenderTask>(ctx, spp, minDepth, maxDepth, enableRR);
         }
     };

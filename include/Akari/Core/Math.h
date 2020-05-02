@@ -192,9 +192,9 @@ namespace Akari {
 
         explicit CoordinateSystem(const vec3 &v) : normal(v) { ComputeLocalFrame(v, &T, &B); }
 
-        [[nodiscard]] vec3 WorldToLocal(const vec3 &v) const { return vec3(dot(T, v), dot(normal, v), dot(B, v)); }
+        [[nodiscard]] vec3 world_to_local(const vec3 &v) const { return vec3(dot(T, v), dot(normal, v), dot(B, v)); }
 
-        [[nodiscard]] vec3 LocalToWorld(const vec3 &v) const { return vec3(v.x * T + v.y * normal + v.z * B); }
+        [[nodiscard]] vec3 local_to_world(const vec3 &v) const { return vec3(v.x * T + v.y * normal + v.z * B); }
 
         vec3 normal;
         vec3 T, B;

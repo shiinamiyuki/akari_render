@@ -64,13 +64,13 @@ namespace Akari {
             }
             auto &si = vertex.si;
             BSDFSample bsdfSample(sampler.Next1D(), sampler.Next2D(), si);
-            si.bsdf->Sample(bsdfSample);
+            si.bsdf->sample(bsdfSample);
             AKARI_ASSERT(bsdfSample.pdf >= 0);
             if (bsdfSample.pdf == 0) {
                 break;
             }
             pdfFwd = bsdfSample.pdf;
-            pdfRev = si.bsdf->EvaluatePdf(bsdfSample.wi, bsdfSample.wo);
+            pdfRev = si.bsdf->evaluate_pdf(bsdfSample.wi, bsdfSample.wo);
             auto wiW = bsdfSample.wi;
             beta *= bsdfSample.f * abs(dot(wiW, si.Ns)) / bsdfSample.pdf;
             beta *= CorrectShadingNormal(si.Ng, si.Ns, bsdfSample.wo, bsdfSample.wi, mode);

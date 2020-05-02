@@ -51,7 +51,7 @@ namespace Akari {
 
     class Integrator : public Component {
       public:
-        virtual std::shared_ptr<RenderTask> CreateRenderTask(const RenderContext &ctx) = 0;
+        virtual std::shared_ptr<RenderTask> create_render_task(const RenderContext &ctx) = 0;
 
     };
 } // namespace Akari

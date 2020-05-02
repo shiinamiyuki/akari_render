@@ -78,7 +78,7 @@ namespace Akari {
         for (uint32_t id = 0; id < GetTriangleCount(); id++) {
             int group = GetPrimitiveGroup(id);
             const auto &mat = GetMaterialSlot(group);
-            if (!mat.markedAsLight) {
+            if (!mat.marked_as_light) {
                 continue;
             }
             if (!mat.emission.color || !mat.emission.strength) {

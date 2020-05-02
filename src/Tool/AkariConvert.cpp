@@ -78,9 +78,9 @@ namespace Akari {
                                 ke /= strength;
                             }
                             if (MinComp(ke) > 0.01) {
-                                cvtMaterial.markedAsLight = true;
+                                cvtMaterial.marked_as_light = true;
                             } else {
-                                cvtMaterial.markedAsLight = false;
+                                cvtMaterial.marked_as_light = false;
                             }
                             cvtMaterial.material = CreateMatteMaterial(CreateRGBTexture(kd));
                             cvtMaterial.name = name;
