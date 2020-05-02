@@ -50,6 +50,7 @@ namespace Akari {
         template <typename T> struct get_internal { using type = T; };
         template <typename T> struct get_internal<T *> { using type = T; };
         template <typename T> struct get_internal<std::shared_ptr<T>> { using type = T; };
+        template <typename T> struct get_internal<std::reference_wrapper<T>> { using type = T; };
         template <typename T> using get_internal_t = typename get_internal<T>::type;
 
         template <typename T> struct is_shared_ptr : std::false_type {};
@@ -59,9 +60,9 @@ namespace Akari {
         template <typename T> struct is_sequential_container : std::false_type {};
         template <typename T> struct is_sequential_container<std::vector<T>> : std::true_type { using type = T; };
         //        template<typename T>struct is_sequential_container<std::list<T>>: std::true_type {};
-        //        template <typename T> struct is_reference_wrapper : std::false_type {};
-        //        template <typename T> struct is_reference_wrapper<std::reference_wrapper<T>> : std::true_type {};
-        //        template <typename T> constexpr bool is_reference_wrapper_v = is_reference_wrapper<T>::value;
+                template <typename T> struct is_reference_wrapper : std::false_type {};
+                template <typename T> struct is_reference_wrapper<std::reference_wrapper<T>> : std::true_type {};
+                template <typename T> constexpr bool is_reference_wrapper_v = is_reference_wrapper<T>::value;
     } // namespace detail
 
     struct Type;
@@ -101,8 +102,12 @@ namespace Akari {
             }
             [[nodiscard]] std::optional<std::shared_ptr<void>> get_shared() const override {
                 if constexpr (detail::is_shared_ptr_v<Actual>) {
-                    auto &tmp = const_cast<Actual &>(value);
-                    return tmp;
+                    if constexpr(detail::is_reference_wrapper_v<T>) {
+                        auto &tmp = const_cast<Actual &>(static_cast<detail::get_internal_t<T> &>(value));
+                        return tmp;
+                    }else{
+                        return value;
+                    }
                 } else {
                     return {};
                 }
