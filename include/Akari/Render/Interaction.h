@@ -34,10 +34,10 @@ namespace Akari {
         Interaction() = default;
         Interaction(const vec3 &wo, const vec3 &p, const vec3 &Ng) : wo(wo), p(p), Ng(Ng) {}
 
-        [[nodiscard]] Ray SpawnRay(const vec3 &w, Float rayBias = Eps()) const {
+        [[nodiscard]] Ray spawn_dir(const vec3 &w, Float rayBias = Eps()) const {
             return Ray(p, w, rayBias / abs(dot(w, Ng)), Inf);
         }
-        [[nodiscard]] Ray SpawnTo(const vec3 &q, Float rayBias = Eps()) const {
+        [[nodiscard]] Ray spawn_to(const vec3 &q, Float rayBias = Eps()) const {
             auto w = (q - p);
             return Ray(p, w, rayBias / abs(dot(w, Ng)) / length(w), 1 - ShadowEps());
         }
@@ -56,15 +56,15 @@ namespace Akari {
         SurfaceInteraction(const MaterialSlot *materialSlot, const vec3 &wo, const vec3 &p, const Triangle &triangle,
                            const Intersection &intersection)
             : Interaction(wo, p, triangle.Ng), materialSlot(materialSlot) {
-            sp.texCoords = triangle.InterpolatedTexCoord(intersection.uv);
+            sp.texCoords = triangle.interpolated_tex_coord(intersection.uv);
             uv = intersection.uv;
-            Ns = triangle.InterpolatedNormal(intersection.uv);
+            Ns = triangle.interpolated_normal(intersection.uv);
             handle.meshId = intersection.meshId;
             handle.primId = intersection.primId;
         }
         SurfaceInteraction(const MaterialSlot *materialSlot, const vec3 &wo, const vec3 &p, const Triangle &triangle,
                            const Intersection &intersection, MemoryArena &arena);
-        void ComputeScatteringFunctions(MemoryArena &, TransportMode mode, float scale);
+        void compute_scattering_functions(MemoryArena &, TransportMode mode, float scale);
         Spectrum Le(const vec3 &wo);
     };
     class EndPoint;

@@ -83,17 +83,17 @@ namespace Akari {
                     if ((s == 1 && t == 1) || depth < 0 || depth > maxDepth)
                         continue;
                     vec2 pRaster = raster;
-                    Spectrum LPath = ConnectPath(scene, *sampler, eyePath, t, lightPath, s, &pRaster);
+                    Spectrum LPath = connect_path(scene, *sampler, eyePath, t, lightPath, s, &pRaster);
                     if (t != 1) {
                         if (visualizeMIS) {
-                            pyramid.at(BufferIndex(s, t))->AddSplat(LPath, raster);
+                            pyramid.at(BufferIndex(s, t))->add_splat(LPath, raster);
                         }
                         L += LPath;
                     } else {
                         if (visualizeMIS) {
-                            pyramid.at(BufferIndex(s, t))->AddSplat(LPath, pRaster);
+                            pyramid.at(BufferIndex(s, t))->add_splat(LPath, pRaster);
                         }
-                        film->AddSplat(LPath, pRaster);
+                        film->add_splat(LPath, pRaster);
                     }
                 }
             }
@@ -118,12 +118,12 @@ namespace Akari {
                     MemoryArena arena;
                     Bounds2i tileBounds = Bounds2i{tilePos * (int)TileSize, (tilePos + ivec2(1)) * (int)TileSize};
                     auto tile = film->GetTile(tileBounds);
-                    auto sampler = _sampler->Clone();
+                    auto sampler = _sampler->clone();
                     for (int y = tile.bounds.p_min.y; y < tile.bounds.p_max.y; y++) {
                         for (int x = tile.bounds.p_min.x; x < tile.bounds.p_max.x; x++) {
-                            sampler->SetSampleIndex(x + y * film->Dimension().x);
+                            sampler->set_sample_index(x + y * film->Dimension().x);
                             for (int s = 0; s < spp; s++) {
-                                sampler->StartNextSample();
+                                sampler->start_next_sample();
                                 auto Li = this->Li(film.get(), *scene, *camera, ivec2(x, y), sampler.get(), arena);
                                 arena.reset();
                                 tile.AddSample(ivec2(x, y), Li, 1.0f);
@@ -131,7 +131,7 @@ namespace Akari {
                         }
                     }
                     std::lock_guard<std::mutex> lock(mutex);
-                    film->MergeTile(tile);
+                    film->merge_tile(tile);
                 });
                 auto endTime = std::chrono::high_resolution_clock::now();
                 std::chrono::duration<double> elapsed = (endTime - beginTime);
@@ -145,7 +145,7 @@ namespace Akari {
                                 continue;
                             auto &p = pyramid.at(BufferIndex(s, t));
                             p->splatScale = 1.0 / spp;
-                            p->WriteImage(fmt::format("bdpt_d{}_s{}_t{}.png", s + t - 2, s, t));
+                            p->write_image(fmt::format("bdpt_d{}_s{}_t{}.png", s + t - 2, s, t));
                         }
                     }
                 }

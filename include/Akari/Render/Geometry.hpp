@@ -70,10 +70,10 @@ namespace Akari {
         std::array<Vector2, 3> texCoords;
         std::array<Vector3, 3> Ns;
         vec3 Ng;
-        [[nodiscard]] Vector3 InterpolatedNormal(const Vector2 &uv) const {
+        [[nodiscard]] Vector3 interpolated_normal(const Vector2 &uv) const {
             return normalize(Interpolate(Ns[0], Ns[1], Ns[2], uv));
         }
-        [[nodiscard]] Vector2 InterpolatedTexCoord(const Vector2 &uv) const {
+        [[nodiscard]] Vector2 interpolated_tex_coord(const Vector2 &uv) const {
             return Interpolate(texCoords[0], texCoords[1], texCoords[2], uv);
         }
         [[nodiscard]] Value Area() const {
@@ -81,14 +81,14 @@ namespace Akari {
             Vector3 e2 = (v[2] - v[0]);
             return length(cross(e1, e2)) * 0.5f;
         }
-        void Sample(Vector2 u, SurfaceSample *sample) const {
+        void sample_surface(Vector2 u, SurfaceSample *sample) const {
             Value su0 = std::sqrt(u[0]);
             Vector2 b = Vector2(1 - su0, u[1] * su0);
 
             sample->uv = u;
             sample->p = Interpolate(v[0], v[1], v[2], b);
             sample->pdf = 1.0f / Area();
-            sample->normal = InterpolatedNormal(u);
+            sample->normal = interpolated_normal(u);
         }
 
         template <typename IValue> bool Intersect(const TRay<Value> &ray, TIntersection<Value, IValue> *) const;

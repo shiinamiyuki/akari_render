@@ -60,11 +60,11 @@ namespace Akari {
 
     class EndPoint : public Component {
       public:
-        virtual Float PdfIncidence(const Interaction &ref, const vec3 &wi) const = 0;
-        virtual void PdfEmission(const Ray &ray, Float *pdfPos, Float *pdfDir) const = 0;
-        virtual void SampleIncidence(const vec2 &u, const Interaction &ref, RayIncidentSample *sample,
-                                     VisibilityTester *tester) const = 0;
-        virtual void SampleEmission(const vec2 &u1, const vec2 &u2, RayEmissionSample *sample) const = 0;
+        virtual Float pdf_incidence(const Interaction &ref, const vec3 &wi) const = 0;
+        virtual void pdf_emission(const Ray &ray, Float *pdfPos, Float *pdfDir) const = 0;
+        virtual void sample_incidence(const vec2 &u, const Interaction &ref, RayIncidentSample *sample,
+                                      VisibilityTester *tester) const = 0;
+        virtual void sample_emission(const vec2 &u1, const vec2 &u2, RayEmissionSample *sample) const = 0;
     };
 } // namespace Akari
 #endif // AKARIRENDER_ENDPOINT_H

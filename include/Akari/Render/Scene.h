@@ -50,7 +50,7 @@ namespace Akari {
         void Commit();
         void ClearRayCounter() const { rayCounter = 0; }
         size_t GetRayCounter() const { return rayCounter.load(); }
-        bool Intersect(const Ray &ray, Intersection *intersection) const {
+        bool intersect(const Ray &ray, Intersection *intersection) const {
             rayCounter++;
             if (!accelerator->Intersect(ray, intersection)) {
                 return false;
@@ -62,11 +62,11 @@ namespace Akari {
             rayCounter++;
             return accelerator->Occlude(ray);
         }
-        void GetTriangle(const PrimitiveHandle & handle, Triangle * triangle)const;
+        void get_triangle(const PrimitiveHandle & handle, Triangle * triangle)const;
         const MaterialSlot& GetMaterialSlot(const PrimitiveHandle & handle)const;
         const Light * GetLight(const PrimitiveHandle & handle)const;
-        const Mesh &GetMesh(const uint32_t id) const { return *meshes[id]; }
-        const Light *SampleOneLight(const Float u0, Float *pdf) const ;
+        const Mesh &get_mesh(const uint32_t id) const { return *meshes[id]; }
+        const Light *sample_one_light(const Float u0, Float *pdf) const ;
         Float PdfLight(const Light *light) const {
             auto it = lightPdfMap.find(light);
             if (it == lightPdfMap.end())

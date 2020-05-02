@@ -720,6 +720,17 @@ namespace Akari {
         }
         throw std::runtime_error(std::string("no matching function when calling ") + name);
     }
+    template<typename... Args>
+    inline std::optional<Any> dynamic_invoke_noexcept(const char * name, Args&&... args){
+        auto &mgr = detail::reflection_manager::instance();
+        auto & funcs = mgr.functions.at(name);
+        for(auto & func : funcs){
+            try{
+                return func.invoke(Any(std::forward<Args>(args))...);
+            }catch(std::runtime_error&e){}
+        }
+        return {};
+    }
     struct Type {
         template <typename T> struct _tag {};
         template <typename T> static const Type &get() {

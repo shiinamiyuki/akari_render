@@ -78,11 +78,11 @@ namespace Akari {
             int depth = 0;
             while (true) {
                 Intersection intersection(ray);
-                if (scene->Intersect(ray, &intersection)) {
-                    auto &mesh = scene->GetMesh(intersection.meshId);
-                    int group = mesh.GetPrimitiveGroup(intersection.primId);
-                    const auto &materialSlot = mesh.GetMaterialSlot(group);
-                    const auto *light = mesh.GetLight(intersection.primId);
+                if (scene->intersect(ray, &intersection)) {
+                    auto &mesh = scene->get_mesh(intersection.meshId);
+                    int group = mesh.get_primitive_group(intersection.primId);
+                    const auto &materialSlot = mesh.get_material_slot(group);
+                    const auto *light = mesh.get_light(intersection.primId);
 
                     auto material = materialSlot.material;
                     if (!material) {
@@ -90,23 +90,23 @@ namespace Akari {
                         break;
                     }
                     Triangle triangle{};
-                    mesh.GetTriangle(intersection.primId, &triangle);
+                    mesh.get_triangle(intersection.primId, &triangle);
                     const auto &p = intersection.p;
                     auto *si = arena.alloc<SurfaceInteraction>(&materialSlot, -ray.d, p, triangle, intersection, arena);
-                    si->ComputeScatteringFunctions(arena, TransportMode::EImportance, 1.0f);
+                    si->compute_scattering_functions(arena, TransportMode::EImportance, 1.0f);
                     auto Le = si->Le(si->wo);
                     if (!Le.IsBlack()) {
                         if (!light || specular || depth == 0)
                             Li += beta * (light->Li(si->wo, si->uv));
                         else {
-                            auto lightPdf = light->PdfIncidence(*prevInteraction, ray.d) * scene->PdfLight(light);
+                            auto lightPdf = light->pdf_incidence(*prevInteraction, ray.d) * scene->PdfLight(light);
                             Li += beta * (light->Li(si->wo, si->uv) * MisWeight(prevScatteringPdf, lightPdf));
                         }
                     }
                     if (depth++ >= maxDepth) {
                         break;
                     }
-                    BSDFSample bsdfSample(sampler->Next1D(), sampler->Next2D(), *si);
+                    BSDFSample bsdfSample(sampler->next1d(), sampler->next2d(), *si);
                     si->bsdf->sample(bsdfSample);
 
                     assert(bsdfSample.pdf >= 0);
@@ -116,17 +116,17 @@ namespace Akari {
                     specular = bsdfSample.sampledType & BSDF_SPECULAR;
                     {
                         Float lightPdf = 0;
-                        auto sampledLight = scene->SampleOneLight(sampler->Next1D(), &lightPdf);
+                        auto sampledLight = scene->sample_one_light(sampler->next1d(), &lightPdf);
                         if (sampledLight && lightPdf > 0) {
                             LightSample lightSample{};
                             VisibilityTester tester{};
-                            sampledLight->SampleIncidence(sampler->Next2D(), *si, &lightSample, &tester);
+                            sampledLight->sample_incidence(sampler->next2d(), *si, &lightSample, &tester);
                             lightPdf *= lightSample.pdf;
                             auto wi = lightSample.wi;
                             auto wo = si->wo;
                             auto f = si->bsdf->evaluate(wo, wi) * abs(dot(lightSample.wi, si->Ns));
                             if (lightPdf > 0 && MaxComp(f) > 0 && tester.visible(*scene)) {
-                                if (specular || Light::is_delta(sampledLight->GetLightType())) {
+                                if (specular || Light::is_delta(sampledLight->get_light_type())) {
                                     Li += beta * f * lightSample.I / lightPdf;
                                 } else {
                                     auto scatteringPdf = si->bsdf->evaluate_pdf(wo, wi);
@@ -140,13 +140,13 @@ namespace Akari {
                     beta *= bsdfSample.f * abs(dot(wiW, si->Ns)) / bsdfSample.pdf;
                     if (enableRR && depth > minDepth) {
                         Float continueProb = std::min(0.95f, MaxComp(beta));
-                        if (sampler->Next1D() < continueProb) {
+                        if (sampler->next1d() < continueProb) {
                             beta /= continueProb;
                         } else {
                             break;
                         }
                     }
-                    ray = si->SpawnRay(wiW);
+                    ray = si->spawn_dir(wiW);
                     prevInteraction = si;
                 } else {
                     Li += beta * Spectrum(0);
@@ -178,14 +178,14 @@ namespace Akari {
                     MemoryArena arena;
                     Bounds2i tileBounds = Bounds2i{tilePos * (int)TileSize, (tilePos + ivec2(1)) * (int)TileSize};
                     auto tile = film->GetTile(tileBounds);
-                    auto sampler = _sampler->Clone();
+                    auto sampler = _sampler->clone();
                     for (int y = tile.bounds.p_min.y; y < tile.bounds.p_max.y; y++) {
                         for (int x = tile.bounds.p_min.x; x < tile.bounds.p_max.x; x++) {
-                            sampler->SetSampleIndex(x + y * film->Dimension().x);
+                            sampler->set_sample_index(x + y * film->Dimension().x);
                             for (int s = 0; s < spp; s++) {
-                                sampler->StartNextSample();
+                                sampler->start_next_sample();
                                 CameraSample sample;
-                                camera->GenerateRay(sampler->Next2D(), sampler->Next2D(), ivec2(x, y), &sample);
+                                camera->generate_ray(sampler->next2d(), sampler->next2d(), ivec2(x, y), &sample);
                                 auto Li = this->Li(sample.primary, sampler.get(), arena);
                                 arena.reset();
                                 tile.AddSample(ivec2(x, y), Li, 1.0f);
@@ -193,7 +193,7 @@ namespace Akari {
                         }
                     }
                     std::lock_guard<std::mutex> lock(mutex);
-                    film->MergeTile(tile);
+                    film->merge_tile(tile);
                     progressReporter.Update();
                 });
                 auto endTime = std::chrono::high_resolution_clock::now();

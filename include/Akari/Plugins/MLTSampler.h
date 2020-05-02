@@ -109,14 +109,14 @@ namespace Akari::MLT {
         MLTSampler(uint64_t seed, int depth, float largeStepProb = 0.3)
             : seed(seed), depth(depth), rng(seed), largeStepProb(largeStepProb) {}
         std::vector<PrimarySample> X;
-        Float Next1D() override {
+        Float next1d() override {
             auto idx = GetNextIndex();
             EnsureReady(idx);
             return X[idx].value;
         }
-        std::shared_ptr<Sampler> Clone() const override { return std::shared_ptr<Sampler>(); }
-        void SetSampleIndex(size_t size) override {}
-        void StartNextSample() override {}
+        std::shared_ptr<Sampler> clone() const override { return std::shared_ptr<Sampler>(); }
+        void set_sample_index(size_t size) override {}
+        void start_next_sample() override {}
         void StartIteration() {
             curIteration++;
             sampleIndex = 0;
@@ -186,7 +186,7 @@ namespace Akari::MLT {
             accepts++;
             consecutiveRejects = consecutiveRejects == 0 ? 0 : consecutiveRejects - 1;
         }
-        size_t GetCurrentDimension() override {
+        size_t current_dimension() override {
             size_t dim = 0;
             for (uint8_t i = 0; i < sampleIndex; i++) {
                 dim += _Xcount[i];

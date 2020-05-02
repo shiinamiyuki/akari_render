@@ -35,7 +35,7 @@ namespace Akari {
         ImageTexture(const fs::path &path) : path(path) {}
         AKR_SER(path)
         AKR_DECL_COMP(ImageTexture, "ImageTexture")
-        void Commit() override {
+        void commit() override {
             auto loader = GetImageLoader();
             auto tmp = loader->Load(path);
             if (tmp != image) {
@@ -54,7 +54,7 @@ namespace Akari {
                 average = sum.value() / float(image->Dimension().x * image->Dimension().y);
             }
         }
-        Float AverageLuminance() const override { return average; }
+        Float average_luminance() const override { return average; }
         Spectrum evaluate(const ShadingPoint &sp) const override {
             auto texCoords = mod(sp.texCoords, vec2(1));
             return (*image)(texCoords);

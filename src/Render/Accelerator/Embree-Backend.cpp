@@ -43,9 +43,9 @@ namespace Akari {
             for (auto &mesh : scene.GetMeshes()) {
                 auto geometry = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);
                 rtcSetSharedGeometryBuffer(geometry, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3,
-                                           mesh->GetVertexBuffer(), 0, sizeof(Vertex), mesh->GetVertexCount());
-                rtcSetSharedGeometryBuffer(geometry, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, mesh->GetIndexBuffer(),
-                                           0, sizeof(ivec3), mesh->GetTriangleCount());
+                                           mesh->get_vertex_buffer(), 0, sizeof(Vertex), mesh->vertex_count());
+                rtcSetSharedGeometryBuffer(geometry, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, mesh->get_index_buffer(),
+                                           0, sizeof(ivec3), mesh->triangle_count());
                 rtcCommitGeometry(geometry);
                 rtcAttachGeometry(rtcScene, geometry);
                 rtcReleaseGeometry(geometry);

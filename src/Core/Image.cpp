@@ -33,10 +33,10 @@
 namespace Akari {
     class DefaultImageWriter : public ImageWriter {
       public:
-        bool Write(const RGBAImage &_image, const fs::path &path, const PostProcessor &postProcessor) override {
+        bool write(const RGBAImage &_image, const fs::path &path, const PostProcessor &postProcessor) override {
             const auto ext = path.extension().string();
             RGBAImage image;
-            postProcessor.Process(_image, image);
+            postProcessor.process(_image, image);
             auto &texels = image.texels();
             auto dimension = image.Dimension();
             std::vector<uint8_t> buffer(texels.size() * 3);
@@ -59,7 +59,7 @@ namespace Akari {
         }
     };
 
-    void GammaCorrection::Process(const RGBAImage &in, RGBAImage &out) const {
+    void GammaCorrection::process(const RGBAImage &in, RGBAImage &out) const {
         out.Resize(in.Dimension());
         ParallelFor(
             in.Dimension().y,
@@ -70,11 +70,11 @@ namespace Akari {
             1024);
     }
 
-    std::shared_ptr<ImageWriter> GetDefaultImageWriter() { return std::make_shared<DefaultImageWriter>(); }
+    std::shared_ptr<ImageWriter> default_image_writer() { return std::make_shared<DefaultImageWriter>(); }
 
     class DefaultImageReader : public ImageReader {
       public:
-        std::shared_ptr<RGBAImage> Read(const fs::path &path) override {
+        std::shared_ptr<RGBAImage> read(const fs::path &path) override {
             std::shared_ptr<RGBAImage> image;
             int x, y, channel;
             const auto *data = stbi_load(path.string().c_str(), &x, &y, &channel, 3);
@@ -99,14 +99,14 @@ namespace Akari {
         }
     };
 
-    std::shared_ptr<ImageReader> GetDefaultImageReader() { return std::make_shared<DefaultImageReader>(); }
+    std::shared_ptr<ImageReader> default_image_reader() { return std::make_shared<DefaultImageReader>(); }
     class ImageLoaderImpl : public ImageLoader {
         struct Record {
             std::shared_ptr<RGBAImage> image;
             //            std::filesystem::file_time_type lwt;
         };
         std::unordered_map<std::string, Record> dict;
-        std::shared_ptr<ImageReader> reader = GetDefaultImageReader();
+        std::shared_ptr<ImageReader> reader = default_image_reader();
 
       public:
         std::shared_ptr<RGBAImage> Load(const fs::path &path) override {
@@ -115,7 +115,7 @@ namespace Akari {
             if (it != dict.end()) {
                 return it->second.image;
             }
-            dict[f] = Record{reader->Read(path)};
+            dict[f] = Record{reader->read(path)};
             return dict.at(f).image;
         }
     };

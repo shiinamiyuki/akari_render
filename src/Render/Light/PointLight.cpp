@@ -35,13 +35,13 @@ namespace Akari {
       public:
         AKR_SER(position, color, strength)
         AKR_DECL_COMP(PointLight, "PointLight")
-        Float PdfIncidence(const Interaction &ref, const vec3 &wi) const override { return 0; }
-        void PdfEmission(const Ray &ray, Float *pdfPos, Float *pdfDir) const override {
+        Float pdf_incidence(const Interaction &ref, const vec3 &wi) const override { return 0; }
+        void pdf_emission(const Ray &ray, Float *pdfPos, Float *pdfDir) const override {
             *pdfPos = 0;
-            *pdfDir = UniformSpherePdf();
+            *pdfDir = uniform_sphere_pdf();
         }
-        void SampleIncidence(const vec2 &u, const Interaction &ref, RayIncidentSample *sample,
-                             VisibilityTester *tester) const override {
+        void sample_incidence(const vec2 &u, const Interaction &ref, RayIncidentSample *sample,
+                              VisibilityTester *tester) const override {
             auto wi = position - ref.p;
             auto dist2 = dot(wi, wi);
             auto dist = std::sqrt(dist2);
@@ -54,19 +54,19 @@ namespace Akari {
 
             tester->shadowRay = Ray(position, -1.0f * wi, 0, dist * (1 - ShadowEps()));
         }
-        void SampleEmission(const vec2 &u1, const vec2 &u2, RayEmissionSample *sample) const override {
-            sample->ray = Ray(position, UniformSampleSphere(u2));
-            sample->pdfDir = UniformSpherePdf();
+        void sample_emission(const vec2 &u1, const vec2 &u2, RayEmissionSample *sample) const override {
+            sample->ray = Ray(position, uniform_sphere_sampling(u2));
+            sample->pdfDir = uniform_sphere_pdf();
             sample->pdfPos = 1;
             sample->normal = vec3(0);
             sample->E = Li(sample->ray.d, vec3());
             sample->uv = vec2();
         }
-        Float Power() const override { return Spectrum(color).Luminance() * strength * 4 * Pi; }
+        Float power() const override { return Spectrum(color).Luminance() * strength * 4 * Pi; }
         Spectrum Li(const vec3 &wo, const vec2 &uv) const override {
             return Spectrum(Spectrum(color).Luminance() * strength);
         }
-        LightType GetLightType() const override { return LightType::EDeltaPosition; }
+        LightType get_light_type() const override { return LightType::EDeltaPosition; }
     };
     AKR_EXPORT_COMP(PointLight, "Light")
 } // namespace Akari

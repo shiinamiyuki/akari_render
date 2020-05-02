@@ -36,19 +36,19 @@ namespace Akari {
         CoordinateSystem localFrame;
 
       public:
-        LightType GetLightType() const override { return LightType::ENone; }
+        LightType get_light_type() const override { return LightType::ENone; }
         AreaLight() = default;
         AreaLight(const Mesh *mesh, int primId) : mesh(mesh), primId(primId) {
-            mesh->GetTriangle(primId, &triangle);
+            mesh->get_triangle(primId, &triangle);
             area = triangle.Area();
-            auto mat = mesh->GetMaterialSlot(mesh->GetPrimitiveGroup(primId));
+            auto mat = mesh->get_material_slot(mesh->get_primitive_group(primId));
             emission = mat.emission;
             localFrame = CoordinateSystem(triangle.Ng);
         }
         AKR_DECL_COMP(AreaLight, "AreaLight")
         Spectrum Li(const vec3 &wo, const vec2 &uv) const override {
             ShadingPoint sp;
-            sp.texCoords = triangle.InterpolatedTexCoord(uv);
+            sp.texCoords = triangle.interpolated_tex_coord(uv);
             if (dot(wo, triangle.Ng) < 0) {
                 return Spectrum(0);
             }
@@ -57,10 +57,10 @@ namespace Akari {
             }
             return Spectrum(0);
         }
-        void SampleIncidence(const vec2 &u, const Interaction &ref, RayIncidentSample *sample,
-                             VisibilityTester *tester) const override {
+        void sample_incidence(const vec2 &u, const Interaction &ref, RayIncidentSample *sample,
+                              VisibilityTester *tester) const override {
             SurfaceSample surfaceSample{};
-            triangle.Sample(u, &surfaceSample);
+            triangle.sample_surface(u, &surfaceSample);
             auto wi = surfaceSample.p - ref.p;
             auto dist2 = dot(wi, wi);
             auto dist = std::sqrt(dist2);
@@ -74,7 +74,7 @@ namespace Akari {
             tester->shadowRay =
                 Ray(surfaceSample.p, -1.0f * wi, Eps() / abs(dot(sample->wi, surfaceSample.normal)), dist * 0.99);
         }
-        Float PdfIncidence(const Interaction &ref, const vec3 &wi) const override {
+        Float pdf_incidence(const Interaction &ref, const vec3 &wi) const override {
             Intersection _isct;
             Ray ray(ref.p, wi);
             if (!triangle.Intersect(ray, &_isct)) {
@@ -83,28 +83,28 @@ namespace Akari {
             Float SA = area * (-dot(wi, _isct.Ng)) / (_isct.t * _isct.t);
             return 1.0f / SA;
         }
-        Float Power() const override {
+        Float power() const override {
             if (emission.strength && emission.color) {
-                return area * emission.strength->AverageLuminance() * emission.color->AverageLuminance();
+                return area * emission.strength->average_luminance() * emission.color->average_luminance();
             }
             return 0.0f;
         }
-        void PdfEmission(const Ray &ray, Float *pdfPos, Float *pdfDir) const override {
+        void pdf_emission(const Ray &ray, Float *pdfPos, Float *pdfDir) const override {
             *pdfPos = 1 / area;
-            *pdfDir = std::fmax(0.0f, CosineHemispherePDF(dot(triangle.Ng, ray.d)));
+            *pdfDir = std::fmax(0.0f, cosine_hemisphere_pdf(dot(triangle.Ng, ray.d)));
         }
-        void SampleEmission(const vec2 &u1, const vec2 &u2, RayEmissionSample *sample) const override {
+        void sample_emission(const vec2 &u1, const vec2 &u2, RayEmissionSample *sample) const override {
             SurfaceSample surfaceSample{};
-            triangle.Sample(u1, &surfaceSample);
+            triangle.sample_surface(u1, &surfaceSample);
             auto wi = cosine_hemisphere_sampling(u2);
 
             sample->pdfPos = surfaceSample.pdf;
-            sample->pdfDir = CosineHemispherePDF(wi.y);
+            sample->pdfDir = cosine_hemisphere_pdf(wi.y);
             wi = localFrame.local_to_world(wi);
             sample->ray = Ray(surfaceSample.p, wi, Eps());
             sample->normal = surfaceSample.normal;
             ShadingPoint sp{};
-            sp.texCoords = triangle.InterpolatedTexCoord(surfaceSample.uv);
+            sp.texCoords = triangle.interpolated_tex_coord(surfaceSample.uv);
             sample->uv = surfaceSample.uv;
             sample->E = Li(wi, sample->uv);
         }

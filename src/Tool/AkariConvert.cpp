@@ -82,10 +82,10 @@ namespace Akari {
                             } else {
                                 cvtMaterial.marked_as_light = false;
                             }
-                            cvtMaterial.material = CreateMatteMaterial(CreateRGBTexture(kd));
+                            cvtMaterial.material = CreateMatteMaterial(create_rgb_texture(kd));
                             cvtMaterial.name = name;
-                            cvtMaterial.emission.strength = CreateRGBTexture(vec3(strength));
-                            cvtMaterial.emission.color = CreateRGBTexture(ke);
+                            cvtMaterial.emission.strength = create_rgb_texture(vec3(strength));
+                            cvtMaterial.emission.color = create_rgb_texture(ke);
                             cvtMaterials.emplace_back(std::move(cvtMaterial));
                         }
                     }
@@ -134,7 +134,7 @@ namespace Akari {
             mesh->groups = std::move(group);
             mesh->materials = std::move(cvtMaterials);
         }
-        mesh->Save(output.string().c_str());
+        mesh->save(output.string().c_str());
         return mesh;
     }
 } // namespace Akari

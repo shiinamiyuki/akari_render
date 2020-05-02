@@ -61,20 +61,20 @@ namespace Akari {
         // y = F^{-1}(u)
         // P(Y <= y) = P(F^{-1}(U) <= u) = P(U <= F(u)) = F(u)
         // Assume: 0 <= i < n
-        [[nodiscard]] Float PdfDiscrete(int i) const { return func[i] / (funcInt * Count()); }
-        [[nodiscard]] Float PdfContinuous(Float x) const {
+        [[nodiscard]] Float pdf_discrete(int i) const { return func[i] / (funcInt * Count()); }
+        [[nodiscard]] Float pdf_continuous(Float x) const {
             uint32_t offset = static_cast<uint32_t>(x * Count());
             return func[offset / funcInt];
         }
-        int SampleDiscrete(Float u, Float *pdf = nullptr) {
+        int sample_discrete(Float u, Float *pdf = nullptr) {
             uint32_t i = UpperBound(0, cdf.size(), [=](int idx) { return cdf[idx] <= u; });
             if (pdf) {
-                *pdf = PdfDiscrete(i);
+                *pdf = pdf_discrete(i);
             }
             return i;
         }
 
-        Float SampleContinuous(Float u, Float *pdf = nullptr) {
+        Float sample_continuous(Float u, Float *pdf = nullptr) {
             uint32_t offset = UpperBound(0, cdf.size(), [=](int idx) { return cdf[idx] <= u; });
             Float du = u - cdf[offset];
             if ((cdf[offset + 1] - cdf[offset]) > 0)

@@ -38,7 +38,7 @@ namespace Akari {
 
       public:
         Component() : dirty(true) {}
-        virtual void Commit() {}
+        virtual void commit() {}
         virtual void ClearDirtyBit() { dirty = false; }
         virtual void SetDirtyBit() { dirty = true; }
         virtual bool IsDirty() const { return dirty; }

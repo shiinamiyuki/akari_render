@@ -37,13 +37,13 @@ namespace Akari {
                 break;
             }
             Intersection intersection(ray);
-            bool foundIntersection = scene.Intersect(ray, &intersection);
+            bool foundIntersection = scene.intersect(ray, &intersection);
             if (!foundIntersection) {
                 break;
             }
-            auto &mesh = scene.GetMesh(intersection.meshId);
-            int group = mesh.GetPrimitiveGroup(intersection.primId);
-            const auto &materialSlot = mesh.GetMaterialSlot(group);
+            auto &mesh = scene.get_mesh(intersection.meshId);
+            int group = mesh.get_primitive_group(intersection.primId);
+            const auto &materialSlot = mesh.get_material_slot(group);
 
             auto material = materialSlot.material;
             if (!material) {
@@ -51,19 +51,19 @@ namespace Akari {
                 break;
             }
             Triangle triangle{};
-            mesh.GetTriangle(intersection.primId, &triangle);
+            mesh.get_triangle(intersection.primId, &triangle);
             const auto &p = intersection.p;
             auto &vertex = path[depth];
             auto &prev = path[depth - 1];
             vertex =
                 PathVertex::CreateSurfaceVertex(&materialSlot, beta, -ray.d, p, triangle, intersection, pdfFwd, arena);
-            vertex.pdfFwd = prev.PdfSAToArea(vertex.pdfFwd, vertex);
-            vertex.si.ComputeScatteringFunctions(arena, mode, 1.0f);
+            vertex.pdfFwd = prev.pdf_SA_to_area(vertex.pdfFwd, vertex);
+            vertex.si.compute_scattering_functions(arena, mode, 1.0f);
             if (++depth >= maxDepth) {
                 break;
             }
             auto &si = vertex.si;
-            BSDFSample bsdfSample(sampler.Next1D(), sampler.Next2D(), si);
+            BSDFSample bsdfSample(sampler.next1d(), sampler.next2d(), si);
             si.bsdf->sample(bsdfSample);
             AKARI_ASSERT(bsdfSample.pdf >= 0);
             if (bsdfSample.pdf == 0) {
@@ -73,13 +73,13 @@ namespace Akari {
             pdfRev = si.bsdf->evaluate_pdf(bsdfSample.wi, bsdfSample.wo);
             auto wiW = bsdfSample.wi;
             beta *= bsdfSample.f * abs(dot(wiW, si.Ns)) / bsdfSample.pdf;
-            beta *= CorrectShadingNormal(si.Ng, si.Ns, bsdfSample.wo, bsdfSample.wi, mode);
+            beta *= correct_shading_normal(si.Ng, si.Ns, bsdfSample.wo, bsdfSample.wi, mode);
             if (bsdfSample.sampledType & BSDF_SPECULAR) {
                 vertex.delta = true;
                 pdfFwd = pdfRev = 0;
             }
-            ray = si.SpawnRay(wiW);
-            prev.pdfRev = vertex.PdfSAToArea(pdfRev, prev);
+            ray = si.spawn_dir(wiW);
+            prev.pdfRev = vertex.pdf_SA_to_area(pdfRev, prev);
         }
         return depth;
     }
@@ -89,10 +89,10 @@ namespace Akari {
         if (maxDepth == 0)
             return 0;
         CameraSample cameraSample;
-        camera.GenerateRay(sampler.Next2D(), sampler.Next2D(), raster, &cameraSample);
+        camera.generate_ray(sampler.next2d(), sampler.next2d(), raster, &cameraSample);
         auto beta = Spectrum(1);
         Float pdfPos, pdfDir;
-        camera.PdfEmission(cameraSample.primary, &pdfPos, &pdfDir);
+        camera.pdf_emission(cameraSample.primary, &pdfPos, &pdfDir);
 
         if (pdfDir <= 0 || pdfPos <= 0) {
             return 0;
@@ -106,9 +106,9 @@ namespace Akari {
         if (maxDepth == 0)
             return 0;
         Float pdfLight = 0;
-        const auto *light = scene.SampleOneLight(sampler.Next1D(), &pdfLight);
+        const auto *light = scene.sample_one_light(sampler.next1d(), &pdfLight);
         RayEmissionSample sample;
-        light->SampleEmission(sampler.Next2D(), sampler.Next2D(), &sample);
+        light->sample_emission(sampler.next2d(), sampler.next2d(), &sample);
         //        Info("{} {} {} {}\n",pdfLight,sample.pdfPos,sample.pdfDir,sample.E.Luminance());
         if (pdfLight <= 0 || sample.pdfPos <= 0 || sample.pdfDir <= 0 || sample.E.IsBlack()) {
             return 0;
@@ -116,15 +116,15 @@ namespace Akari {
         path[0] =
             PathVertex::CreateLightVertex(sample.E, light, sample.ray.o, sample.normal, sample.pdfDir * sample.pdfPos);
         Spectrum beta = sample.E / (pdfLight * sample.pdfPos * sample.pdfDir);
-        if(path[0].IsOnSurface()){
+        if(path[0].on_surface()){
             beta *= abs(dot(sample.ray.d, sample.normal));
         }
         return 1 + RandomWalk(scene, arena, sampler, TransportMode::EImportance, sample.ray, beta, sample.pdfDir,
                               path + 1, maxDepth - 1);
     }
     template <int Power>
-    Float MisWeight(const Scene &scene, Sampler &sampler, PathVertex *eyePath, size_t t, PathVertex *lightPath,
-                    size_t s, PathVertex &sampled) {
+    Float mis_weight(const Scene &scene, Sampler &sampler, PathVertex *eyePath, size_t t, PathVertex *lightPath,
+                     size_t s, PathVertex &sampled) {
 
         if (s + t == 2)
             return 1;
@@ -215,8 +215,8 @@ namespace Akari {
         }
         return 1.0 / (1.0 + sumRi);
     }
-    Spectrum ConnectPath(const Scene &scene, Sampler &sampler, PathVertex *eyePath, size_t t, PathVertex *lightPath,
-                         size_t s, vec2 *pRaster) {
+    Spectrum connect_path(const Scene &scene, Sampler &sampler, PathVertex *eyePath, size_t t, PathVertex *lightPath,
+                          size_t s, vec2 *pRaster) {
         if (t > 1 && s != 0 && eyePath[t - 1].type == PathVertex::ELight)
             return Spectrum(0.f);
         Spectrum L(0);
@@ -235,14 +235,14 @@ namespace Akari {
                 RayIncidentSample sample;
                 VisibilityTester tester;
                 AKARI_ASSERT(qs.getInteraction());
-                camera->SampleIncidence(sampler.Next2D(), *qs.getInteraction(), &sample, &tester);
+                camera->sample_incidence(sampler.next2d(), *qs.getInteraction(), &sample, &tester);
                 *pRaster = sample.pos;
                 sampled =
                     PathVertex::CreateCameraVertex(sample.I / sample.pdf, camera, tester.shadowRay.o, sample.normal);
                 if (sample.pdf > 0 && !sample.I.IsBlack()) {
 
                     L = qs.beta * qs.f(sampled, TransportMode::EImportance) * sampled.beta;
-                    if (qs.IsOnSurface()) {
+                    if (qs.on_surface()) {
                         L *= abs(dot(sample.wi, qs.Ns()));
                     }
                     if (!L.IsBlack()) {
@@ -260,13 +260,13 @@ namespace Akari {
                 VisibilityTester tester;
                 AKARI_ASSERT(light);
                 AKARI_ASSERT(pt.getInteraction());
-                light->SampleIncidence(sampler.Next2D(), *pt.getInteraction(), &sample, &tester);
+                light->sample_incidence(sampler.next2d(), *pt.getInteraction(), &sample, &tester);
                 sampled = PathVertex::CreateLightVertex(sample.I / (scene.PdfLight(light) * sample.pdf), light,
                                                         tester.shadowRay.o, sample.normal);
                 sampled.pdfFwd = sampled.PdfLightOrigin(scene, pt);
                 if (sample.pdf > 0 && !sample.I.IsBlack()) {
                     L = pt.beta * pt.f(sampled, TransportMode::ERadiance) * sampled.beta;
-                    if (pt.IsOnSurface()) {
+                    if (pt.on_surface()) {
                         L *= abs(dot(sample.wi, pt.Ns()));
                     }
                     if (!L.IsBlack()) {
@@ -288,7 +288,7 @@ namespace Akari {
         if (L.IsBlack())
             return Spectrum(0);
         Float misWeight = 1.0f / (s + t);
-        misWeight = MisWeight<1>(scene, sampler, eyePath, t, lightPath, s, sampled);
+        misWeight = mis_weight<1>(scene, sampler, eyePath, t, lightPath, s, sampled);
         AKARI_ASSERT(misWeight >= 0);
         L *= misWeight;
         return L.RemoveNaN();

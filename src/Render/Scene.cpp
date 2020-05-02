@@ -30,7 +30,7 @@ namespace Akari {
         accelerator->Build(*this);
 
         for (auto &mesh : meshes) {
-            auto meshLights = mesh->GetMeshLights();
+            auto meshLights = mesh->get_mesh_lights();
             for (auto &light : meshLights)
                 lights.emplace_back(light);
         }
@@ -39,30 +39,30 @@ namespace Akari {
         {
             std::vector<Float> func;
             for (auto &light : lights) {
-                func.emplace_back(light->Power());
+                func.emplace_back(light->power());
             }
             lightDistribution = std::make_unique<Distribution1D>(func.data(), func.size());
             for (size_t i = 0; i < lights.size(); i++) {
-                lightPdfMap[lights[i].get()] = lightDistribution->PdfDiscrete(i);
+                lightPdfMap[lights[i].get()] = lightDistribution->pdf_discrete(i);
             }
         }
     }
-    const Light *Scene::SampleOneLight(const Float u0, Float *pdf) const {
+    const Light *Scene::sample_one_light(const Float u0, Float *pdf) const {
         if (lights.empty()) {
             return nullptr;
         }
-        auto idx = lightDistribution->SampleDiscrete(u0, pdf);
+        auto idx = lightDistribution->sample_discrete(u0, pdf);
         auto light = lights[idx].get();
         return light;
     }
-    void Scene::GetTriangle(const PrimitiveHandle &handle, Triangle *triangle) const {
-        meshes[handle.meshId]->GetTriangle(handle.primId, triangle);
+    void Scene::get_triangle(const PrimitiveHandle &handle, Triangle *triangle) const {
+        meshes[handle.meshId]->get_triangle(handle.primId, triangle);
     }
     const MaterialSlot &Scene::GetMaterialSlot(const PrimitiveHandle &handle) const {
         auto &mesh = meshes[handle.meshId];
-        return mesh->GetMaterialSlot(mesh->GetPrimitiveGroup(handle.primId));
+        return mesh->get_material_slot(mesh->get_primitive_group(handle.primId));
     }
     const Light *Scene::GetLight(const PrimitiveHandle &handle) const {
-        return meshes[handle.meshId]->GetLight(handle.primId);
+        return meshes[handle.meshId]->get_light(handle.primId);
     }
 } // namespace Akari

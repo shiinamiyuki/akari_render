@@ -76,8 +76,8 @@ namespace Akari {
 
         [[nodiscard]] ivec2 Dimension() const { return radiance.Dimension(); }
 
-        [[nodiscard]] Bounds2i Bounds() const { return Bounds2i{ivec2(0), Dimension()}; }
-        void MergeTile(const Tile &tile) {
+        [[nodiscard]] Bounds2i bounds() const { return Bounds2i{ivec2(0), Dimension()}; }
+        void merge_tile(const Tile &tile) {
             const auto lo = max(tile.bounds.p_min - ivec2(1, 1), ivec2(0, 0));
             const auto hi = min(tile.bounds.p_max + ivec2(1, 1), radiance.Dimension());
             for (int y = lo.y; y < hi.y; y++) {
@@ -89,7 +89,7 @@ namespace Akari {
             }
         }
 
-        void WriteImage(const fs::path &path, const PostProcessor &postProcessor = GammaCorrection()) const {
+        void write_image(const fs::path &path, const PostProcessor &postProcessor = GammaCorrection()) const {
             RGBAImage image(Dimension());
             ParallelFor(
                 radiance.Dimension().y,
@@ -106,10 +106,10 @@ namespace Akari {
                     }
                 },
                 1024);
-            GetDefaultImageWriter()->Write(image, path, postProcessor);
+            default_image_writer()->write(image, path, postProcessor);
         }
 
-        void AddSplat(const Spectrum &L, const vec2 &p) {
+        void add_splat(const Spectrum &L, const vec2 &p) {
             ivec2 ip = ivec2(p);
             splat(ip).color[0].add(L[0]);
             splat(ip).color[1].add(L[1]);

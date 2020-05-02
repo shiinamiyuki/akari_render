@@ -162,7 +162,7 @@ namespace Akari {
         ComplexTexture(const json &prog) : program(prog) {}
         AKR_SER(program)
         AKR_DECL_COMP(ComplexTexture, "ComplexTexture")
-        void Commit() override {
+        void commit() override {
             using namespace detail;
             uint8_t id = 0;
             auto compile = [=, &id](const json &expr, auto &&F) -> uint8_t {

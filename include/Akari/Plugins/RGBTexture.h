@@ -27,6 +27,6 @@
 #include <Akari/Render/Texture.h>
 
 namespace Akari {
-    AKR_EXPORT std::shared_ptr<Texture> CreateRGBTexture(const vec3 & rgb);
+    AKR_EXPORT std::shared_ptr<Texture> create_rgb_texture(const vec3 & rgb);
 } // namespace Akari
 #endif // AKARIRENDER_RGBTEXTURE_H

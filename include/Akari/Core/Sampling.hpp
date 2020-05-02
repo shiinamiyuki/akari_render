@@ -26,7 +26,7 @@
 #include <algorithm>
 
 namespace Akari {
-    inline vec2 ConcentricSampleDisk(const vec2 &u) {
+    inline vec2 concentric_disk_sampling(const vec2 &u) {
         vec2 uOffset = 2.f * u - vec2(1, 1);
         if (uOffset.x == 0 && uOffset.y == 0)
             return vec2(0, 0);
@@ -43,14 +43,14 @@ namespace Akari {
     }
 
     inline vec3 cosine_hemisphere_sampling(const vec2 &u) {
-        auto uv = ConcentricSampleDisk(u);
+        auto uv = concentric_disk_sampling(u);
         auto r = dot(uv, uv);
         auto h = std::sqrt(std::max(0.0f, 1 - r));
         return vec3(uv.x, h, uv.y);
     }
-    inline Float CosineHemispherePDF(Float cosTheta) { return cosTheta * InvPi; }
-    inline Float UniformSpherePdf() { return 1.0f / (4 * Pi); }
-    inline vec3 UniformSampleSphere(const vec2 &u) {
+    inline Float cosine_hemisphere_pdf(Float cosTheta) { return cosTheta * InvPi; }
+    inline Float uniform_sphere_pdf() { return 1.0f / (4 * Pi); }
+    inline vec3 uniform_sphere_sampling(const vec2 &u) {
         Float z = 1 - 2 * u[0];
         Float r = std::sqrt(std::max((Float)0, (Float)1 - z * z));
         Float phi = 2 * Pi * u[1];

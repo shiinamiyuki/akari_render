@@ -45,7 +45,9 @@ namespace Akari {
             si->bsdf->add_component(arena.alloc<FresnelSpecular>(c, c, 1.0f, eta, mode));
         }
         bool support_bidirectional() const override { return true; }
-        void Commit() override { color->Commit();ior->Commit(); }
+        void commit() override {
+            color->commit();
+            ior->commit(); }
     };
     AKR_PLUGIN_ON_LOAD {
         // clang-format off

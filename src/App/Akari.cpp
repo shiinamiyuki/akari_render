@@ -79,7 +79,7 @@ int main(int argc, char **argv) {
             task->Start();
             task->Wait();
             auto film = task->GetFilmUpdate();
-            film->WriteImage(graph->render[i].output);
+            film->write_image(graph->render[i].output);
         }
     } catch (std::exception &e) {
         Fatal("Exception: {}", e.what());

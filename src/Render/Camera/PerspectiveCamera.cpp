@@ -44,8 +44,8 @@ namespace Akari {
         PerspectiveCamera() : cameraToWorld(identity<mat4>()), worldToCamera(identity<mat4>()) {}
         [[nodiscard]] bool IsProjective() const override { return true; }
 
-        void GenerateRay(const vec2 &u1, const vec2 &u2, const ivec2 &raster, CameraSample *sample) const override {
-            sample->p_lens = ConcentricSampleDisk(u1) * lensRadius;
+        void generate_ray(const vec2 &u1, const vec2 &u2, const ivec2 &raster, CameraSample *sample) const override {
+            sample->p_lens = concentric_disk_sampling(u1) * lensRadius;
             sample->p_film = vec2(raster) + (u2 - 0.5f);
             sample->weight = 1;
 
@@ -64,7 +64,7 @@ namespace Akari {
             sample->primary = ray;
         }
 
-        void Commit() override {
+        void commit() override {
             film = std::make_shared<Film>(filmDimension);
             cameraToWorld = Transform(transform.ToMatrix4());
             worldToCamera = cameraToWorld.Inverse();
@@ -91,7 +91,7 @@ namespace Akari {
             if (cosTheta <= 0) {
                 return Spectrum(0);
             }
-            auto bounds = film->Bounds();
+            auto bounds = film->bounds();
             if (raster.x < bounds.p_min.x || raster.x > bounds.p_max.x || raster.y < bounds.p_min.y ||
                 raster.y > bounds.p_max.y) {
                 return Spectrum(0);
@@ -108,7 +108,7 @@ namespace Akari {
             pMax = rasterToCamera.ApplyPoint(pMax);
             return std::abs((pMax.y - pMin.y) * (pMax.x - pMin.x));
         }
-        void PdfEmission(const Ray &ray, Float *pdfPos, Float *pdfDir) const override {
+        void pdf_emission(const Ray &ray, Float *pdfPos, Float *pdfDir) const override {
             Float cosTheta = dot(cameraToWorld.ApplyVector(vec3(0, 0, -1)), ray.d);
             vec3 pFocus = ray.At((lensRadius == 0 ? 1 : focalDistance) / cosTheta);
             vec2 raster = cameraToRaster.ApplyPoint(worldToCamera.ApplyPoint(pFocus));
@@ -124,9 +124,9 @@ namespace Akari {
             *pdfDir = 1 / A() * d * d / cosTheta;
         }
 
-        void SampleIncidence(const vec2 &u, const Interaction &ref, RayIncidentSample *sample,
-                             VisibilityTester *tester) const override {
-            vec2 pLens = lensRadius * ConcentricSampleDisk(u);
+        void sample_incidence(const vec2 &u, const Interaction &ref, RayIncidentSample *sample,
+                              VisibilityTester *tester) const override {
+            vec2 pLens = lensRadius * concentric_disk_sampling(u);
 
             vec3 pLensWorld = cameraToWorld.ApplyPoint(vec3(pLens, 0));
             sample->normal = cameraToWorld.ApplyNormal(vec3(0, 0, -1));

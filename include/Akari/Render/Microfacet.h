@@ -119,7 +119,7 @@ namespace Akari {
             return 0.0f;
         }
         [[nodiscard]] Float G(const vec3 &i, const vec3 &o, const vec3 &m) const { return G1(i, m) * G1(o, m); }
-        [[nodiscard]] vec3 sampleWh(const vec3 &wo, const vec2 &u) const {
+        [[nodiscard]] vec3 sample_wh(const vec3 &wo, const vec2 &u) const {
             Float phi = 2 * Pi * u[1];
             Float cosTheta = 0;
             switch (type) {

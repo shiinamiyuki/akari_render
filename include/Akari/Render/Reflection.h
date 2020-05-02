@@ -51,7 +51,7 @@ namespace Akari {
         FresnelDielectric(const Float &etaI, const Float &etaT) : etaI(etaI), etaT(etaT) {}
         [[nodiscard]] Spectrum evaluate(Float cosThetaI) const override;
     };
-    inline Float FrDielectric(Float cosThetaI, Float etaI, Float etaT) {
+    inline Float fr_dielectric(Float cosThetaI, Float etaI, Float etaT) {
         bool entering = cosThetaI > 0.f;
         if (!entering) {
             std::swap(etaI, etaT);

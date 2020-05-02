@@ -43,7 +43,7 @@ namespace Akari {
             auto c = color->evaluate(si->sp);
             si->bsdf->add_component(arena.alloc<LambertianReflection>(c * scale));
         }
-        void Commit() override { color->Commit(); }
+        void commit() override { color->commit(); }
         bool support_bidirectional() const override { return true; }
     };
 

@@ -85,12 +85,12 @@ namespace Akari {
 
     class AKR_EXPORT PostProcessor : public Component {
       public:
-        virtual void Process(const RGBAImage &in, RGBAImage &out) const = 0;
+        virtual void process(const RGBAImage &in, RGBAImage &out) const = 0;
     };
     class IdentityProcessor : public PostProcessor {
       public:
         AKR_DECL_COMP(IdentityProcessor, "IdentityProcessor")
-        void Process(const RGBAImage &in, RGBAImage &out) const override { out = in; }
+        void process(const RGBAImage &in, RGBAImage &out) const override { out = in; }
     };
     class AKR_EXPORT GammaCorrection : public PostProcessor {
         Float gamma;
@@ -98,7 +98,7 @@ namespace Akari {
       public:
         AKR_DECL_COMP(GammaCorrection, "GammaCorrection")
         explicit GammaCorrection(Float gamma = 1.0 / 2.2f) : gamma(gamma) {}
-        void Process(const RGBAImage &in, RGBAImage &out) const override;
+        void process(const RGBAImage &in, RGBAImage &out) const override;
     };
 
     class PostProcessingPipeline : public PostProcessor {
@@ -107,7 +107,7 @@ namespace Akari {
       public:
         AKR_DECL_COMP(PostProcessingPipeline, "PostProcessingPipeline")
         void Add(const std::shared_ptr<PostProcessor> &p) { pipeline.emplace_back(p); }
-        void Process(const RGBAImage &in, RGBAImage &out) const override {
+        void process(const RGBAImage &in, RGBAImage &out) const override {
             RGBAImage tmp;
             for (auto it = pipeline.begin(); it != pipeline.end(); it++) {
                 if (it == pipeline.begin()) {
@@ -115,24 +115,24 @@ namespace Akari {
                 } else {
                     tmp = out;
                 }
-                (*it)->Process(tmp, out);
+                (*it)->process(tmp, out);
             }
         }
     };
 
     class AKR_EXPORT ImageWriter {
       public:
-        virtual bool Write(const RGBAImage &image, const fs::path &,
+        virtual bool write(const RGBAImage &image, const fs::path &,
                            const PostProcessor &postProcessor) = 0;
     };
 
     class AKR_EXPORT ImageReader {
       public:
-        virtual std::shared_ptr<RGBAImage> Read(const fs::path &) = 0;
+        virtual std::shared_ptr<RGBAImage> read(const fs::path &) = 0;
     };
 
-    AKR_EXPORT std::shared_ptr<ImageWriter> GetDefaultImageWriter();
-    AKR_EXPORT std::shared_ptr<ImageReader> GetDefaultImageReader();
+    AKR_EXPORT std::shared_ptr<ImageWriter> default_image_writer();
+    AKR_EXPORT std::shared_ptr<ImageReader> default_image_reader();
     class AKR_EXPORT ImageLoader {
       public:
         virtual std::shared_ptr<RGBAImage> Load(const fs::path &) = 0;

@@ -54,16 +54,16 @@ namespace Akari {
 
     class Sampler : public Component {
       public:
-        virtual Float Next1D() = 0;
-        vec2 Next2D() { return vec2(Next1D(), Next1D()); }
-        virtual std::shared_ptr<Sampler> Clone() const = 0;
-        virtual void SetSampleIndex(size_t) = 0;
-        virtual void StartNextSample() = 0;
+        virtual Float next1d() = 0;
+        vec2 next2d() { return vec2(next1d(), next1d()); }
+        virtual std::shared_ptr<Sampler> clone() const = 0;
+        virtual void set_sample_index(size_t) = 0;
+        virtual void start_next_sample() = 0;
         virtual void RoundToEvenDimension() {
-            if (GetCurrentDimension() & 1u)
-                Next1D();
+            if (current_dimension() & 1u)
+                next1d();
         }
-        virtual size_t GetCurrentDimension() = 0;
+        virtual size_t current_dimension() = 0;
     };
 } // namespace Akari
 

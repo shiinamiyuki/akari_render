@@ -124,7 +124,7 @@ namespace Akari {
       public:
         DisneyFresnel(const Spectrum &R0, Float metallic, Float eta) : R0(R0), metallic(metallic), eta(eta) {}
         [[nodiscard]] Spectrum evaluate(Float cosThetaI) const override {
-            return lerp(Spectrum(FrDielectric(cosThetaI, 1.0f, eta)), FrSchlick(R0, cosThetaI), Spectrum(metallic));
+            return lerp(Spectrum(fr_dielectric(cosThetaI, 1.0f, eta)), FrSchlick(R0, cosThetaI), Spectrum(metallic));
         }
     };
 
@@ -151,33 +151,33 @@ namespace Akari {
 //            }
         }
         bool support_bidirectional() const override { return true; }
-        void Commit() override {
+        void commit() override {
             if (baseColor)
-                baseColor->Commit();
+                baseColor->commit();
             if (subsurface)
-                subsurface->Commit();
+                subsurface->commit();
             if (metallic)
-                metallic->Commit();
+                metallic->commit();
             if (specular)
-                specular->Commit();
+                specular->commit();
             if (specularTint)
-                specularTint->Commit();
+                specularTint->commit();
             if (roughness)
-                roughness->Commit();
+                roughness->commit();
             if (anisotropic)
-                anisotropic->Commit();
+                anisotropic->commit();
             if (sheen)
-                sheen->Commit();
+                sheen->commit();
             if (sheenTint)
-                sheenTint->Commit();
+                sheenTint->commit();
             if (clearcoat)
-                clearcoat->Commit();
+                clearcoat->commit();
             if (clearcoatGlass)
-                clearcoatGlass->Commit();
+                clearcoatGlass->commit();
             if(ior)
-                ior->Commit();
+                ior->commit();
             if(specTrans)
-                specTrans->Commit();
+                specTrans->commit();
         }
     };
     AKR_EXPORT_COMP(DisneyMaterial, "Material")

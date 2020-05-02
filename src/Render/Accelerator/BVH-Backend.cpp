@@ -256,8 +256,8 @@ namespace Akari {
             const Mesh *mesh = nullptr;
             int idx = -1;
             [[nodiscard]] Bounds3f getBoundingBox() const {
-                auto v = mesh->GetVertexBuffer();
-                auto i = mesh->GetIndexBuffer();
+                auto v = mesh->get_vertex_buffer();
+                auto i = mesh->get_index_buffer();
                 Bounds3f box{{MaxFloat, MaxFloat, MaxFloat}, {MinFloat, MinFloat, MinFloat}};
                 box = box.UnionOf(v[i[idx * 3 + 0]].pos);
                 box = box.UnionOf(v[i[idx * 3 + 1]].pos);
@@ -311,17 +311,17 @@ namespace Akari {
 
       public:
         AKR_DECL_COMP(BVHAccelerator, "BVHAccelerator")
-        void Build(const Scene &scene) override {
+        void build(const Scene &scene) override {
             for (auto &mesh : scene.GetMeshes()) {
-                meshBVHs.emplace_back(mesh.get(), mesh->GetTriangleCount());
+                meshBVHs.emplace_back(mesh.get(), mesh->triangle_count());
             }
             topLevelBVH.emplace(&meshBVHs, meshBVHs.size());
         }
-        Bounds3f GetBounds() const override { return topLevelBVH->boundBox; }
-        bool Intersect(const Ray &ray, Intersection *intersection) const override {
+        Bounds3f bounds() const override { return topLevelBVH->boundBox; }
+        bool intersect(const Ray &ray, Intersection *intersection) const override {
             return topLevelBVH->intersect(ray, *intersection);
         }
-        [[nodiscard]] bool Occlude(const Ray &ray) const override { return topLevelBVH->occlude(ray); }
+        [[nodiscard]] bool occlude(const Ray &ray) const override { return topLevelBVH->occlude(ray); }
     };
     AKR_EXPORT_COMP(BVHAccelerator, "Accelerator")
 } // namespace Akari

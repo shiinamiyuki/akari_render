@@ -28,8 +28,8 @@
 #include <Akari/Render/Integrator.h>
 #include <Akari/Render/Light.h>
 namespace Akari {
-    inline Float CorrectShadingNormal(const vec3 &Ng, const vec3 &Ns, const vec3 &wo, const vec3 &wi,
-                                      TransportMode mode) {
+    inline Float correct_shading_normal(const vec3 &Ng, const vec3 &Ns, const vec3 &wo, const vec3 &wi,
+                                        TransportMode mode) {
         if (mode == EImportance) {
             return abs(dot(Ns, wo) * dot(Ng, wi)) / abs(dot(Ng, wo) * dot(Ns, wi));
         } else {
@@ -89,7 +89,7 @@ namespace Akari {
         [[nodiscard]] bool IsDeltaLight() const {
             if (type == ELight) {
                 auto light = dynamic_cast<const Light *>(ei.ep);
-                return light && ((uint32_t)light->GetLightType() &
+                return light && ((uint32_t)light->get_light_type() &
                                  ((uint32_t)LightType::EDeltaDirection | (uint32_t)LightType::EDeltaPosition));
             } else {
                 return false;
@@ -122,21 +122,21 @@ namespace Akari {
             auto wi = normalize(next.p() - p());
             switch (type) {
             case ESurface: {
-                return si.bsdf->evaluate(si.wo, wi) * CorrectShadingNormal(Ng(), Ns(), wo(), wi, mode);
+                return si.bsdf->evaluate(si.wo, wi) * correct_shading_normal(Ng(), Ns(), wo(), wi, mode);
             }
             default:
                 AKARI_PANIC("not implemented Vertex::f()");
             }
         }
 
-        [[nodiscard]] bool IsOnSurface() const { return !all(equal(Ng(), vec3(0))); }
+        [[nodiscard]] bool on_surface() const { return !all(equal(Ng(), vec3(0))); }
 
-        Float PdfSAToArea(Float pdf, const PathVertex &next) {
+        Float pdf_SA_to_area(Float pdf, const PathVertex &next) {
             if (next.IsInfiniteLight())
                 return pdf;
             auto w = next.p() - p();
             auto invDistSqr = 1.0f / dot(w, w);
-            if (next.IsOnSurface()) {
+            if (next.on_surface()) {
                 // dw = dA cos(t) / r^2
                 // p(w) dw/dA = p(A)
                 // p(A) = p(w) * cos(t)/r^2
@@ -162,9 +162,9 @@ namespace Akari {
             w *= std::sqrt(invDist2);
             Float pdf;
             Float pdfPos = 0, pdfDir = 0;
-            light->PdfEmission(Ray(p(), w), &pdfPos, &pdfDir);
+            light->pdf_emission(Ray(p(), w), &pdfPos, &pdfDir);
             pdf = pdfDir * invDist2;
-            if (next.IsOnSurface()) {
+            if (next.on_surface()) {
                 pdf *= abs(dot(next.Ng(), w));
             }
             return pdf;
@@ -184,7 +184,7 @@ namespace Akari {
             auto w = next.p() - p();
             w = normalize(w);
             Float pdfPos = 0, pdfDir = 0;
-            light->PdfEmission(Ray(p(), w), &pdfPos, &pdfDir);
+            light->pdf_emission(Ray(p(), w), &pdfPos, &pdfDir);
             return scene.PdfLight(light) * pdfPos;
         }
         [[nodiscard]] bool IsConnectible() const {
@@ -195,7 +195,7 @@ namespace Akari {
                 return !delta;
             case ELight: {
                 auto light = dynamic_cast<const Light *>(ei.ep);
-                return light && !((uint32_t)light->GetLightType() & (uint32_t)LightType::EDeltaDirection);
+                return light && !((uint32_t)light->get_light_type() & (uint32_t)LightType::EDeltaDirection);
             }
             case ECamera:
                 return true;
@@ -207,10 +207,10 @@ namespace Akari {
             auto invDist2 = 1.0f / dot(w, w);
             w *= std::sqrt(invDist2);
             Float g = invDist2;
-            if (v1.IsOnSurface()) {
+            if (v1.on_surface()) {
                 g *= abs(dot(v1.Ng(), w));
             }
-            if (v2.IsOnSurface()) {
+            if (v2.on_surface()) {
                 g *= abs(dot(v2.Ng(), w));
             }
             VisibilityTester tester(*v1.getInteraction(), *v2.getInteraction());
@@ -255,11 +255,11 @@ namespace Akari {
             } else if (type == ECamera) {
                 auto *camera = dynamic_cast<const Camera *>(ei.ep);
                 Float _;
-                camera->PdfEmission(ei.SpawnRay(wiNext), &_, &pdf);
+                camera->pdf_emission(ei.spawn_dir(wiNext), &_, &pdf);
             } else {
                 AKARI_PANIC("???");
             }
-            return PdfSAToArea(pdf, next);
+            return pdf_SA_to_area(pdf, next);
         }
     };
 
@@ -272,8 +272,8 @@ namespace Akari {
     AKR_EXPORT size_t TraceLightPath(const Scene &scene, MemoryArena &arena, Sampler &sampler, PathVertex *path,
                                      size_t maxDepth);
 
-    AKR_EXPORT Spectrum ConnectPath(const Scene &scene, Sampler &sampler, PathVertex *eyePath, size_t t,
-                                    PathVertex *lightPath, size_t s, vec2 *pRaster);
+    AKR_EXPORT Spectrum connect_path(const Scene &scene, Sampler &sampler, PathVertex *eyePath, size_t t,
+                                     PathVertex *lightPath, size_t s, vec2 *pRaster);
 
     template <typename T> class ScopedAssignment {
         T *target = nullptr;

@@ -78,8 +78,8 @@ namespace Akari {
                 sampler.StartIteration();
             }
             sampler.StartStream(MLTSampler::ECamera);
-            float pFilmX = sampler.Next1D();
-            float pFilmY = sampler.Next1D();
+            float pFilmX = sampler.next1d();
+            float pFilmY = sampler.next1d();
             auto dim = ctx.camera->GetFilm()->Dimension();
             ivec2 pRaster = round(vec2(pFilmX, pFilmY) * vec2(dim));
             pRaster.x = std::clamp(pRaster.x, 0, dim.x - 1);
@@ -98,7 +98,7 @@ namespace Akari {
                     t = 2;
                 } else {
                     nStrategies = depth + 2;
-                    s = std::min((int)(sampler.Next1D() * nStrategies), nStrategies - 1);
+                    s = std::min((int)(sampler.next1d() * nStrategies), nStrategies - 1);
                     t = nStrategies - s;
                 }
             } else {
@@ -106,7 +106,7 @@ namespace Akari {
                     return radianceRecord;
                 } else {
                     nStrategies = depth + 2;
-                    s = std::min((int)(sampler.Next1D() * nStrategies), nStrategies - 1);
+                    s = std::min((int)(sampler.next1d() * nStrategies), nStrategies - 1);
                     t = nStrategies - s;
                 }
             }
@@ -123,7 +123,7 @@ namespace Akari {
             }
             sampler.StartStream(MLTSampler::EConnect);
             radianceRecord.radiance =
-                ConnectPath(scene, sampler, eyePath, t, lightPath, s, &radianceRecord.pRaster) * nStrategies;
+                    connect_path(scene, sampler, eyePath, t, lightPath, s, &radianceRecord.pRaster) * nStrategies;
             return radianceRecord;
         }
         static Float ScalarContributionFunction(const Spectrum &L) { return std::max(0.0f, L.Luminance()); }
@@ -168,7 +168,7 @@ namespace Akari {
                     Distribution1D distribution(weights.data(), weights.size());
                     depthWeight[depth] = distribution.Integral();
                     for (auto &chain : markovChains) {
-                        auto seedIdx = distribution.SampleDiscrete(distF(rd));
+                        auto seedIdx = distribution.sample_discrete(distF(rd));
                         auto seed = bootstrapSeeds[seedIdx];
                         chain.samplers[depth] = MLTSampler(seed, depth);
                     }
@@ -202,7 +202,7 @@ namespace Akari {
                                               i * nTotalMutations / nChains;
                     for (int64_t iter = 0; iter < nChainMutations; iter++) {
                         Float depthPdf = 0;
-                        int depth = chain.depthDist->SampleDiscrete(rng.uniformFloat(), &depthPdf);
+                        int depth = chain.depthDist->sample_discrete(rng.uniformFloat(), &depthPdf);
                         depth = std::min(maxDepth + 1, depth);
                         AKARI_ASSERT(depthPdf > 0);
                         auto &sampler = chain.samplers[depth];
@@ -223,9 +223,9 @@ namespace Akari {
                         Lnew = glm::clamp(Lnew, vec3(0), vec3(clamp));
                         Lold = glm::clamp(Lold, vec3(0), vec3(clamp));
                         if (accept > 0) {
-                            film->AddSplat(Lnew, record.pRaster);
+                            film->add_splat(Lnew, record.pRaster);
                         }
-                        film->AddSplat(Lold, curRecord.pRaster);
+                        film->add_splat(Lold, curRecord.pRaster);
 
                         if (sampler.consecutiveRejects >= maxConsecutiveRejects || rng.uniformFloat() < accept) {
                             sampler.Accept();

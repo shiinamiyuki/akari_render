@@ -31,14 +31,14 @@ namespace Akari {
                                            const Akari::Triangle &triangle, const Akari::Intersection &intersection,
                                            Akari::MemoryArena &arena)
         : Interaction(wo, p, triangle.Ng), materialSlot(materialSlot) {
-        sp.texCoords = triangle.InterpolatedTexCoord(intersection.uv);
-        Ns = triangle.InterpolatedNormal(intersection.uv);
+        sp.texCoords = triangle.interpolated_tex_coord(intersection.uv);
+        Ns = triangle.interpolated_normal(intersection.uv);
         Ng = triangle.Ng;
         bsdf = arena.alloc<BSDF>(Ng, Ns);
         handle.meshId = intersection.meshId;
         handle.primId = intersection.primId;
     }
-    void SurfaceInteraction::ComputeScatteringFunctions(MemoryArena &arena, TransportMode mode, float scale) {
+    void SurfaceInteraction::compute_scattering_functions(MemoryArena &arena, TransportMode mode, float scale) {
         materialSlot->material->compute_scattering_functions(this, arena, mode, scale);
     }
     Spectrum SurfaceInteraction::Le(const vec3 &wo) {

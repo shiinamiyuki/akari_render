@@ -40,17 +40,17 @@ namespace Akari {
             int group = -1;
         };
 
-        [[nodiscard]] virtual const Vertex *GetVertexBuffer() const = 0;
-        [[nodiscard]] virtual const int *GetIndexBuffer() const = 0;
-        [[nodiscard]] virtual size_t GetTriangleCount() const = 0;
-        [[nodiscard]] virtual size_t GetVertexCount() const = 0;
-        [[nodiscard]] virtual int GetPrimitiveGroup(int idx) const = 0;
-        virtual bool Load(const char *path) = 0;
-        virtual const MaterialSlot &GetMaterialSlot(int group) const = 0;
+        [[nodiscard]] virtual const Vertex *get_vertex_buffer() const = 0;
+        [[nodiscard]] virtual const int *get_index_buffer() const = 0;
+        [[nodiscard]] virtual size_t triangle_count() const = 0;
+        [[nodiscard]] virtual size_t vertex_count() const = 0;
+        [[nodiscard]] virtual int get_primitive_group(int idx) const = 0;
+        virtual bool load(const char *path) = 0;
+        virtual const MaterialSlot &get_material_slot(int group) const = 0;
         virtual std::vector<MaterialSlot> &GetMaterials() = 0;
         bool Intersect(const Ray &ray, int idx, RayHit *hit) const {
-            auto vertices = GetVertexBuffer();
-            auto indices = GetIndexBuffer();
+            auto vertices = get_vertex_buffer();
+            auto indices = get_index_buffer();
             auto v0 = vertices[indices[idx * 3 + 0]].pos;
             auto v1 = vertices[indices[idx * 3 + 1]].pos;
             auto v2 = vertices[indices[idx * 3 + 2]].pos;
@@ -78,7 +78,7 @@ namespace Akari {
                         hit->Ng = Ng;
                         hit->uv = vec2(u, v);
                         hit->face = idx;
-                        hit->group = GetPrimitiveGroup(idx);
+                        hit->group = get_primitive_group(idx);
                         hit->t = t;
                         return true;
                     }
@@ -89,9 +89,9 @@ namespace Akari {
                 return false;
             }
         }
-        void GetTriangle(uint32_t primId, Triangle *triangle) const {
-            auto vertices = GetVertexBuffer();
-            auto indices = GetIndexBuffer();
+        void get_triangle(uint32_t primId, Triangle *triangle) const {
+            auto vertices = get_vertex_buffer();
+            auto indices = get_index_buffer();
             auto v0 = vertices[indices[primId * 3 + 0]].pos;
             auto v1 = vertices[indices[primId * 3 + 1]].pos;
             auto v2 = vertices[indices[primId * 3 + 2]].pos;
@@ -110,8 +110,8 @@ namespace Akari {
             triangle->texCoords[2] = vertices[indices[primId * 3 + 2]].texCoord;
         }
 
-        [[nodiscard]] virtual std::vector<std::shared_ptr<Light>> GetMeshLights() const { return {}; }
-        virtual const Light *GetLight(int primId) const { return nullptr; }
+        [[nodiscard]] virtual std::vector<std::shared_ptr<Light>> get_mesh_lights() const { return {}; }
+        virtual const Light *get_light(int primId) const { return nullptr; }
     };
 
     struct MeshWrapper {

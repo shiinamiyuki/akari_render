@@ -27,7 +27,7 @@ namespace Akari {
     Spectrum FresnelNoOp::evaluate(Float cosThetaI) const { return Spectrum(1.0f); }
     Spectrum FresnelConductor::evaluate(Float cosThetaI) const { return FrConductor(cosThetaI, etaI, etaT, k); }
     Spectrum FresnelDielectric::evaluate(Float cosThetaI) const {
-        return Spectrum(FrDielectric(cosThetaI, etaI, etaT));
+        return Spectrum(fr_dielectric(cosThetaI, etaI, etaT));
     }
     Spectrum LambertianReflection::evaluate(const vec3 &wo, const vec3 &wi) const {
         if (!same_hemisphere(wo, wi)) {
@@ -41,27 +41,27 @@ namespace Akari {
         *wi = reflect(wo, vec3(0, 1, 0));
         *pdf = 1;
         *sampledType = type;
-        return fresnel->evaluate(CosTheta(*wi)) * R / abs_cos_theta(*wi);
+        return fresnel->evaluate(cos_theta(*wi)) * R / abs_cos_theta(*wi);
     }
 
     Spectrum SpecularTransmission::sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf,
                                           BSDFType *sampledType) const {
-        bool entering = CosTheta(wo) > 0;
+        bool entering = cos_theta(wo) > 0;
         Float etaI = entering ? etaA : etaB;
         Float etaT = entering ? etaB : etaA;
 
-        if (!refract(wo, FaceForward(vec3(0, 1, 0), wo), etaI / etaT, wi))
+        if (!refract(wo, face_forward(vec3(0, 1, 0), wo), etaI / etaT, wi))
             return Spectrum(0);
         *wi = -wo;
         *sampledType = type;
         *pdf = 1;
-        Spectrum ft = T * (Spectrum(1) - fresnel.evaluate(CosTheta(*wi)));
+        Spectrum ft = T * (Spectrum(1) - fresnel.evaluate(cos_theta(*wi)));
         if (mode == TransportMode::ERadiance)
             ft *= (etaI * etaI) / (etaT * etaT);
         return ft / abs_cos_theta(*wi);
     }
     Spectrum FresnelSpecular::sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const {
-        Float F = FrDielectric(CosTheta(wo), etaA, etaB);
+        Float F = fr_dielectric(cos_theta(wo), etaA, etaB);
         AKARI_ASSERT(F >= 0 && F <= 1);
         if (u[0] < F) {
             *wi = reflect(wo, vec3(0, 1, 0));
@@ -69,11 +69,11 @@ namespace Akari {
             *sampledType = BSDFType(BSDF_SPECULAR | BSDF_REFLECTION);
             return F * R / abs_cos_theta(*wi);
         } else {
-            bool entering = CosTheta(wo) > 0;
+            bool entering = cos_theta(wo) > 0;
             Float etaI = entering ? etaA : etaB;
             Float etaT = entering ? etaB : etaA;
             //            Debug("{}\n", etaI / etaT);
-            if (!refract(wo, FaceForward(vec3(0, 1, 0), wo), etaI / etaT, wi))
+            if (!refract(wo, face_forward(vec3(0, 1, 0), wo), etaI / etaT, wi))
                 return Spectrum(0);
             Spectrum ft = T * (1 - F);
             *sampledType = BSDFType(BSDF_SPECULAR | BSDF_TRANSMISSION);
@@ -86,12 +86,12 @@ namespace Akari {
     }
 
     Spectrum OrenNayar::evaluate(const vec3 &wo, const vec3 &wi) const {
-        Float sinThetaI = SinTheta(wi);
-        Float sinThetaO = SinTheta(wo);
+        Float sinThetaI = sin_theta(wi);
+        Float sinThetaO = sin_theta(wo);
         Float maxCos = 0;
         if (sinThetaI > 1e-4f && sinThetaO > 1e-4f) {
-            Float sinPhiI = SinPhi(wi), cosPhiI = CosPhi(wi);
-            Float sinPhiO = SinPhi(wo), cosPhiO = CosPhi(wo);
+            Float sinPhiI = sin_phi(wi), cosPhiI = cos_phi(wi);
+            Float sinPhiO = sin_phi(wo), cosPhiO = cos_phi(wo);
             Float dCos = cosPhiI * cosPhiO + sinPhiI * sinPhiO;
             maxCos = std::max((Float)0, dCos);
         }

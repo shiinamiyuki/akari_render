@@ -42,7 +42,7 @@ namespace Akari {
             auto c = color->evaluate(si->sp);
             si->bsdf->add_component(arena.alloc<SpecularReflection>(c * scale, arena.alloc<FresnelNoOp>()));
         }
-        void Commit() override { color->Commit(); }
+        void commit() override { color->commit(); }
         bool support_bidirectional() const override { return true; }
     };
     AKR_PLUGIN_ON_LOAD {

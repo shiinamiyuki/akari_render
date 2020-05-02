@@ -30,14 +30,14 @@ namespace Akari {
 
       public:
         RandomSampler() = default;
-        Float Next1D() override {
+        Float next1d() override {
             dim++;
             return rng.uniformFloat();
         }
-        std::shared_ptr<Sampler> Clone() const override { return std::make_shared<RandomSampler>(*this); }
-        void SetSampleIndex(size_t index) override { rng = Rng(index); }
-        void StartNextSample() override { dim = 0; }
-        size_t GetCurrentDimension() override { return dim; }
+        std::shared_ptr<Sampler> clone() const override { return std::make_shared<RandomSampler>(*this); }
+        void set_sample_index(size_t index) override { rng = Rng(index); }
+        void start_next_sample() override { dim = 0; }
+        size_t current_dimension() override { return dim; }
         AKR_DECL_COMP(RandomSampler, "RandomSampler")
     };
     AKR_EXPORT_COMP(RandomSampler, "Sampler")

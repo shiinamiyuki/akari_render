@@ -63,21 +63,21 @@ namespace Akari {
             Spectrum Li(0), beta(1);
             for (int depth = 0; depth < 5; depth++) {
                 Intersection intersection(ray);
-                if (scene->Intersect(ray, &intersection)) {
-                    auto &mesh = scene->GetMesh(intersection.meshId);
-                    int group = mesh.GetPrimitiveGroup(intersection.primId);
-                    const auto &materialSlot = mesh.GetMaterialSlot(group);
+                if (scene->intersect(ray, &intersection)) {
+                    auto &mesh = scene->get_mesh(intersection.meshId);
+                    int group = mesh.get_primitive_group(intersection.primId);
+                    const auto &materialSlot = mesh.get_material_slot(group);
                     auto material = materialSlot.material;
                     if (!material) {
                         Debug("no material!!\n");
                         break;
                     }
                     Triangle triangle{};
-                    mesh.GetTriangle(intersection.primId, &triangle);
+                    mesh.get_triangle(intersection.primId, &triangle);
                     vec3 p = ray.At(intersection.t);
                     SurfaceInteraction si(&materialSlot, -ray.d, p, triangle, intersection, arena);
-                    si.ComputeScatteringFunctions(arena, TransportMode::EImportance, 1.0f);
-                    BSDFSample bsdfSample(sampler->Next1D(), sampler->Next2D(), si);
+                    si.compute_scattering_functions(arena, TransportMode::EImportance, 1.0f);
+                    BSDFSample bsdfSample(sampler->next1d(), sampler->next2d(), si);
                     si.bsdf->sample(bsdfSample);
                     //                                    Debug("pdf:{}\n",bsdfSample.pdf);
                     assert(bsdfSample.pdf >= 0);
@@ -87,7 +87,7 @@ namespace Akari {
                     //                                    Debug("wi: {}\n",PrintVec3(bsdfSample.wi));
                     auto wiW =bsdfSample.wi;
                     beta *= bsdfSample.f * abs(dot(wiW, si.Ns)) / bsdfSample.pdf;
-                    ray = si.SpawnRay(wiW);
+                    ray = si.spawn_dir(wiW);
                 } else {
                     Li += beta * Spectrum(1);
                     break;
@@ -109,14 +109,14 @@ namespace Akari {
                     MemoryArena arena;
                     Bounds2i tileBounds = Bounds2i{tilePos * (int)TileSize, (tilePos + ivec2(1)) * (int)TileSize};
                     auto tile = film->GetTile(tileBounds);
-                    auto sampler = _sampler->Clone();
+                    auto sampler = _sampler->clone();
                     for (int y = tile.bounds.p_min.y; y < tile.bounds.p_max.y; y++) {
                         for (int x = tile.bounds.p_min.x; x < tile.bounds.p_max.x; x++) {
-                            sampler->SetSampleIndex(x + y * film->Dimension().x);
+                            sampler->set_sample_index(x + y * film->Dimension().x);
                             for (int s = 0; s < spp; s++) {
-                                sampler->StartNextSample();
+                                sampler->start_next_sample();
                                 CameraSample sample;
-                                camera->GenerateRay(sampler->Next2D(), sampler->Next2D(), ivec2(x, y), &sample);
+                                camera->generate_ray(sampler->next2d(), sampler->next2d(), ivec2(x, y), &sample);
                                 auto Li = this->Li(sample.primary, sampler.get(), arena);
                                 arena.reset();
                                 tile.AddSample(ivec2(x, y), Li, 1.0f);
@@ -124,7 +124,7 @@ namespace Akari {
                         }
                     }
                     std::lock_guard<std::mutex> lock(mutex);
-                    film->MergeTile(tile);
+                    film->merge_tile(tile);
                 });
                 auto endTime = std::chrono::high_resolution_clock::now();
                 std::chrono::duration<double> elapsed = (endTime - beginTime);

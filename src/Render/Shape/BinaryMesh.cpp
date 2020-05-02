@@ -26,14 +26,14 @@
 #include <Akari/Plugins/BinaryMesh.h>
 #include <fstream>
 namespace Akari {
-    const MaterialSlot &BinaryMesh::GetMaterialSlot(int group) const { return materials[group]; }
-    const Vertex *BinaryMesh::GetVertexBuffer() const { return vertexBuffer.data(); }
-    const int *BinaryMesh::GetIndexBuffer() const { return indexBuffer.data(); }
-    size_t BinaryMesh::GetTriangleCount() const { return indexBuffer.size() / 3; }
-    size_t BinaryMesh::GetVertexCount() const { return vertexBuffer.size(); }
-    int BinaryMesh::GetPrimitiveGroup(int idx) const { return groups[idx]; }
+    const MaterialSlot &BinaryMesh::get_material_slot(int group) const { return materials[group]; }
+    const Vertex *BinaryMesh::get_vertex_buffer() const { return vertexBuffer.data(); }
+    const int *BinaryMesh::get_index_buffer() const { return indexBuffer.data(); }
+    size_t BinaryMesh::triangle_count() const { return indexBuffer.size() / 3; }
+    size_t BinaryMesh::vertex_count() const { return vertexBuffer.size(); }
+    int BinaryMesh::get_primitive_group(int idx) const { return groups[idx]; }
     const char *AKR_MESH_MAGIC = "AKARI_BINARY_MESH";
-    bool BinaryMesh::Load(const char *path) {
+    bool BinaryMesh::load(const char *path) {
         Info("Loading {}\n", path);
         std::ifstream in(path, std::ios::binary | std::ios::in);
         char buffer[128] = {0};
@@ -60,7 +60,7 @@ namespace Akari {
         Info("Loaded {} triangles\n", groups.size());
         return true;
     }
-    void BinaryMesh::Save(const char *path) {
+    void BinaryMesh::save(const char *path) {
         std::ofstream out(path, std::ios::binary | std::ios::out);
         out.write(AKR_MESH_MAGIC, strlen(AKR_MESH_MAGIC));
         size_t vertexCount = vertexBuffer.size();
@@ -70,14 +70,14 @@ namespace Akari {
         out.write(reinterpret_cast<char *>(groups.data()), sizeof(int) * groups.size());
         out.write(AKR_MESH_MAGIC, strlen(AKR_MESH_MAGIC));
     }
-    void BinaryMesh::Commit() {
+    void BinaryMesh::commit() {
         if (_loaded) {
             return;
         }
-        Load(file.string().c_str());
-        for (uint32_t id = 0; id < GetTriangleCount(); id++) {
-            int group = GetPrimitiveGroup(id);
-            const auto &mat = GetMaterialSlot(group);
+        load(file.string().c_str());
+        for (uint32_t id = 0; id < triangle_count(); id++) {
+            int group = get_primitive_group(id);
+            const auto &mat = get_material_slot(group);
             if (!mat.marked_as_light) {
                 continue;
             }
@@ -89,8 +89,8 @@ namespace Akari {
             lightMap[id] = lights.back().get();
         }
     }
-    std::vector<std::shared_ptr<Light>> BinaryMesh::GetMeshLights() const { return lights; }
-    const Light *BinaryMesh::GetLight(int primId) const {
+    std::vector<std::shared_ptr<Light>> BinaryMesh::get_mesh_lights() const { return lights; }
+    const Light *BinaryMesh::get_light(int primId) const {
         auto it = lightMap.find(primId);
         if (it == lightMap.end()) {
             return nullptr;

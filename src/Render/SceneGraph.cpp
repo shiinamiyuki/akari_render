@@ -37,15 +37,15 @@ namespace Akari {
         if (!integrator) {
             integrator = Cast<Integrator>(CreateComponent("PathTracer"));
         }
-        camera->Commit();
-        sampler->Commit();
-        integrator->Commit();
+        camera->commit();
+        sampler->commit();
+        integrator->commit();
     }
     void SceneGraph::Commit() {
 
         pScene = std::make_shared<Scene>();
         for (auto &mesh : scene.meshes) {
-            mesh.mesh->Commit();
+            mesh.mesh->commit();
             pScene->AddMesh(mesh.mesh);
         }
         for(auto & light : scene.lights){
