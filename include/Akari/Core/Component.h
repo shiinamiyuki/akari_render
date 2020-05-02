@@ -48,7 +48,10 @@ namespace Akari {
     }
 #define AKARI_GET_PLUGIN       AkariGetPlugin
 #define AKARI_PLUGIN_FUNC_NAME "AkariGetPlugin"
-#define AKR_PLUGIN_ON_LOAD     extern "C" AKR_EXPORT void AkariPluginOnLoad()
+#define AKR_PLUGIN_ON_LOAD                                                                                             \
+    void _AkariPluginOnLoad();                                                                                         \
+    extern "C" AKR_EXPORT void AkariPluginOnLoad() { _AkariPluginOnLoad(); }                                           \
+    void _AkariPluginOnLoad()
 #define AKR_STATIC_CLASS(CLASS, ALIAS)                                                                                 \
     static Akari::Class *StaticClass() {                                                                               \
         static std::unique_ptr<Class> _class;                                                                          \
@@ -66,7 +69,8 @@ namespace Akari {
     Akari::Class *GetClass() const override { return StaticClass(); }
 
 #define AKR_DECL_COMP(Name, Alias)                                                                                     \
-    AKR_STATIC_CLASS(Name, Alias)
+    AKR_STATIC_CLASS(Name, Alias)                                                                                      \
+    friend void _AkariPluginOnLoad();
 
 #define AKR_EXPORT_COMP(Name, Interface)                                                                               \
     extern "C" AKR_EXPORT Plugin *AKARI_GET_PLUGIN() {                                                                 \

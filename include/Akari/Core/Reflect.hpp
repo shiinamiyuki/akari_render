@@ -101,7 +101,7 @@ namespace Akari {
             }
             [[nodiscard]] std::optional<std::shared_ptr<void>> get_shared() const override {
                 if constexpr (detail::is_shared_ptr_v<Actual>) {
-                    auto &tmp = const_cast<Actual&>(value);
+                    auto &tmp = const_cast<Actual &>(value);
                     return tmp;
                 } else {
                     return {};
@@ -568,6 +568,7 @@ namespace Akari {
         struct AKR_EXPORT reflection_manager {
             std::unordered_map<std::string_view, meta_instance> instances;
             std::unordered_map<std::string_view, const char *> name_map;
+            std::unordered_map<std::string_view, std::vector<Function>> functions;
             static reflection_manager &instance();
         };
 
@@ -698,6 +699,21 @@ namespace Akari {
             detail::register_cast_func<T>::template do_it<Base...>();
         }
         return detail::meta_instance_handle<T>(mgr.instances[type.name]);
+    }
+    template <typename F, typename... Args> void function(const char *name, F &&f) {
+        auto &mgr = detail::reflection_manager::instance();
+        mgr.functions[name].emplace_back(f);
+    }
+    template<typename... Args>
+    inline Any dynamic_invoke(const char * name, Args&&... args){
+        auto &mgr = detail::reflection_manager::instance();
+        auto & funcs = mgr.functions.at(name);
+        for(auto & func : funcs){
+            try{
+                return func.invoke(Any(std::forward<Args>(args))...);
+            }catch(std::runtime_error&e){}
+        }
+        throw std::runtime_error(std::string("no matching function when calling ") + name);
     }
     struct Type {
         template <typename T> struct _tag {};

@@ -21,9 +21,9 @@
 // SOFTWARE.
 
 #include <Akari/Core/Plugin.h>
+#include <Akari/Plugins/Matte.h>
 #include <Akari/Render/Geometry.hpp>
 #include <Akari/Render/Material.h>
-#include <Akari/Plugins/Matte.h>
 #include <Akari/Render/Reflection.h>
 #include <Akari/Render/Texture.h>
 #include <utility>
@@ -37,7 +37,7 @@ namespace Akari {
         explicit MatteMaterial(std::shared_ptr<Texture> color) : color(std::move(color)) {}
         AKR_SER(color)
         AKR_DECL_COMP(MatteMaterial, "MatteMaterial")
-        void ComputeScatteringFunctions(SurfaceInteraction * si, MemoryArena &arena, TransportMode mode,
+        void ComputeScatteringFunctions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
                                         Float scale) const override {
             si->bsdf = arena.alloc<BSDF>(*si);
             auto c = color->Evaluate(si->sp);
@@ -48,7 +48,12 @@ namespace Akari {
     };
 
     AKR_EXPORT_COMP(MatteMaterial, "Material")
-
+    AKR_PLUGIN_ON_LOAD {
+        // clang-format off
+        class_<MatteMaterial,Material>("MatteMaterial")
+            .property("color",&MatteMaterial::color);
+        //clang-format on
+    }
     std::shared_ptr<Material> CreateMatteMaterial(const std::shared_ptr<Texture> &color) {
         return std::make_shared<MatteMaterial>(color);
     }
