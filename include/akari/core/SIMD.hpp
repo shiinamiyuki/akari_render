@@ -23,7 +23,7 @@
 #ifndef AKARIRENDER_SIMD_HPP
 #define AKARIRENDER_SIMD_HPP
 
-#include "detail/SIMDArrayBasic.hpp"
-#include "detail/SIMDArrayFunctions.hpp"
-#include "detail/SIMDArrayMacros.hpp"
+#include "detail/simdarray_basic.hpp"
+#include "detail/simdarray_functions.hpp"
+#include "detail/simdarray_macros.hpp"
 #endif // AKARIRENDER_SIMD_HPP

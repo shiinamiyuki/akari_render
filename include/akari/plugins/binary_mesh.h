@@ -23,9 +23,9 @@
 #ifndef AKARIRENDER_BINARYMESH_H
 #define AKARIRENDER_BINARYMESH_H
 
-#include <akari/Core/Plugin.h>
-#include <akari/Render/Material.h>
-#include <akari/Render/Mesh.h>
+#include <akari/core/plugin.h>
+#include <akari/render/material.h>
+#include <akari/render/mesh.h>
 
 namespace akari {
     class AKR_EXPORT BinaryMesh : public Mesh {

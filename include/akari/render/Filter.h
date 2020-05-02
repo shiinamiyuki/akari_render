@@ -23,7 +23,7 @@
 #ifndef AKARIRENDER_FILTER_H
 #define AKARIRENDER_FILTER_H
 
-#include <akari/Core/Component.h>
+#include <akari/core/component.h>
 
 namespace akari {
     class Filter : public Component{

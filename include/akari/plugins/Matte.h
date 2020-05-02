@@ -23,8 +23,8 @@
 #ifndef AKARIRENDER_MATTE_H
 #define AKARIRENDER_MATTE_H
 
-#include <akari/Render/Material.h>
-#include <akari/Render/Texture.h>
+#include <akari/render/material.h>
+#include <akari/render/texture.h>
 
 namespace akari {
     AKR_EXPORT std::shared_ptr<Material> CreateMatteMaterial(const std::shared_ptr<Texture> & color);

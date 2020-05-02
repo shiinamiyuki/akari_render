@@ -20,9 +20,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/Plugin.h>
-#include <akari/Render/Material.h>
-#include <akari/Render/Reflection.h>
+#include <akari/core/plugin.h>
+#include <akari/render/material.h>
+#include <akari/render/reflection.h>
 
 namespace akari {
     inline Float SchlickWeight(Float cosTheta) { return Power<5>(std::clamp<float>(1 - cosTheta, 0, 1)); }

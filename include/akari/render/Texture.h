@@ -23,9 +23,9 @@
 #ifndef AKARIRENDER_TEXTURE_H
 #define AKARIRENDER_TEXTURE_H
 
-#include <akari/Core/Component.h>
-#include <akari/Render/Geometry.hpp>
-#include <akari/Core/Spectrum.h>
+#include <akari/core/component.h>
+#include <akari/render/geometry.hpp>
+#include <akari/core/spectrum.h>
 namespace akari {
 
     class Texture : public Component {

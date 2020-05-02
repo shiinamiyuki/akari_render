@@ -22,7 +22,7 @@
 
 #ifndef AKARIRENDER_SYNC_HPP
 #define AKARIRENDER_SYNC_HPP
-#include <akari/Core/akari.h>
+#include <akari/core/akari.h>
 #include <atomic>
 namespace akari {
     struct SpinLock {

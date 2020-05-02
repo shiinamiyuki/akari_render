@@ -20,13 +20,30 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef AKARIRENDER_COMPLEXTEXTURE_H
-#define AKARIRENDER_COMPLEXTEXTURE_H
-#include <akari/Core/Plugin.h>
-#include <akari/Core/Spectrum.h>
-#include <akari/Render/Texture.h>
+#ifndef AKARIRENDER_MEDIUMSTACK_H
+#define AKARIRENDER_MEDIUMSTACK_H
+
+#include <akari/core/spectrum.h>
 
 namespace akari {
-    AKR_EXPORT std::shared_ptr<Texture> CreateComplexTexture(const json & program);
+    class Medium;
+    struct MediumRecord {
+        const Medium *medium = nullptr;
+    };
+    template <size_t N> struct TMediumStack {
+        MediumRecord &operator[](size_t i) { return stack[i]; }
+        const MediumRecord &operator[](size_t i) const { return stack[i]; }
+        [[nodiscard]] size_t size() const { return sp; }
+        void push_back(const MediumRecord &record) { stack[sp++] = record; }
+        void pop_back() { sp--; }
+        MediumRecord &back() { return stack[sp - 1]; }
+        [[nodiscard]] const MediumRecord &back() const { return stack[sp - 1]; }
+
+      private:
+        std::array<MediumRecord, N> stack;
+        size_t sp = 0;
+    };
+
+    using MediumStack = TMediumStack<8>;
 } // namespace akari
-#endif // AKARIRENDER_COMPLEXTEXTURE_H
+#endif // AKARIRENDER_MEDIUMSTACK_H

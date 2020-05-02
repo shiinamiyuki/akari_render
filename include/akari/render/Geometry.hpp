@@ -23,8 +23,8 @@
 #ifndef AKARIRENDER_GEOMETRY_HPP
 #define AKARIRENDER_GEOMETRY_HPP
 
-#include <akari/Core/Component.h>
-#include <akari/Core/Math.h>
+#include <akari/core/component.h>
+#include <akari/core/math.h>
 
 namespace akari {
     template <typename Value> struct TRay {

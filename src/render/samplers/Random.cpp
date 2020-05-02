@@ -20,8 +20,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/Plugin.h>
-#include <akari/Render/Sampler.h>
+#include <akari/core/plugin.h>
+#include <akari/render/sampler.h>
 namespace akari {
 
     class RandomSampler : public Sampler {

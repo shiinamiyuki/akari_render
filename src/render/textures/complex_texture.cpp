@@ -19,10 +19,10 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-#include <akari/Core/Plugin.h>
-#include <akari/Core/Spectrum.h>
-#include <akari/Plugins/ComplexTexture.h>
-#include <akari/Render/Texture.h>
+#include <akari/core/plugin.h>
+#include <akari/core/spectrum.h>
+#include <akari/plugins/complex_texture.h>
+#include <akari/render/texture.h>
 #include <asmjit/asmjit.h>
 
 namespace akari {

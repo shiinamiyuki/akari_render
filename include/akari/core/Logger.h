@@ -23,7 +23,7 @@
 #ifndef AKARIRENDER_LOGGER_H
 #define AKARIRENDER_LOGGER_H
 
-#include <akari/Core/Component.h>
+#include <akari/core/component.h>
 #include <fmt/format.h>
 namespace akari {
     enum class LogLevel {

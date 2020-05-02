@@ -23,9 +23,9 @@
 #ifndef AKARIRENDER_FILM_H
 #define AKARIRENDER_FILM_H
 
-#include "Spectrum.h"
-#include <akari/Core/Image.hpp>
-#include <akari/Core/Parallel.h>
+#include "spectrum.h"
+#include <akari/core/image.hpp>
+#include <akari/core/parallel.h>
 
 namespace akari {
     struct Pixel {

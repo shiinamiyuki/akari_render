@@ -23,11 +23,11 @@
 #ifndef AKARIRENDER_CAMERA_H
 #define AKARIRENDER_CAMERA_H
 
-#include "Light.h"
-#include <akari/Core/Component.h>
-#include <akari/Core/Film.h>
-#include <akari/Render/Geometry.hpp>
-#include <akari/Render/EndPoint.h>
+#include "light.h"
+#include <akari/core/component.h>
+#include <akari/core/film.h>
+#include <akari/render/geometry.hpp>
+#include <akari/render/end_point.h>
 
 namespace akari {
     struct CameraSample {

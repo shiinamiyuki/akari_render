@@ -20,8 +20,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/Logger.h>
-#include <akari/Plugins/ComplexTexture.h>
+#include <akari/core/logger.h>
+#include <akari/plugins/complex_texture.h>
 #include <asmjit/asmjit.h>
 #include <memory>
 #if 0

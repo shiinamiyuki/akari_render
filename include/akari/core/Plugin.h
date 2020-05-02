@@ -23,8 +23,8 @@
 #ifndef AKARIRENDER_PLUGIN_H
 #define AKARIRENDER_PLUGIN_H
 
-#include <akari/Core/akari.h>
-#include <akari/Core/Component.h>
+#include <akari/core/akari.h>
+#include <akari/core/component.h>
 #include <memory>
 
 namespace akari {

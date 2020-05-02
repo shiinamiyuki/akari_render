@@ -23,7 +23,7 @@
 #ifndef AKARIRENDER_GRID_H
 #define AKARIRENDER_GRID_H
 
-#include <akari/Render/Geometry.hpp>
+#include <akari/render/geometry.hpp>
 
 namespace akari {
     class Grid3D : public Component{

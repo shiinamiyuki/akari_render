@@ -20,8 +20,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/Logger.h>
-#include <akari/Plugins/CoreBidir.h>
+#include <akari/core/logger.h>
+#include <akari/plugins/core_bidir.h>
 
 namespace akari {
     size_t RandomWalk(const Scene &scene, MemoryArena &arena, Sampler &sampler, TransportMode mode, Ray ray,

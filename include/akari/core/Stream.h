@@ -23,7 +23,7 @@
 #ifndef AKARIRENDER_STREAM_H
 #define AKARIRENDER_STREAM_H
 
-#include <akari/Core/Component.h>
+#include <akari/core/component.h>
 
 namespace akari {
     class Stream;

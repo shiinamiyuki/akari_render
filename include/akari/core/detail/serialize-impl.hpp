@@ -23,8 +23,8 @@
 #ifndef AKARIRENDER_SERIALIZE_IMPL_HPP
 #define AKARIRENDER_SERIALIZE_IMPL_HPP
 
-#include <akari/Core/Class.h>
-#include <akari/Core/Object.h>
+#include <akari/core/class.h>
+#include <akari/core/object.h>
 #include <json.hpp>
 #include <magic_enum.hpp>
 #include <stdexcept>

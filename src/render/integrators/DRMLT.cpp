@@ -20,9 +20,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/Plugin.h>
-#include <akari/Plugins/MLTSampler.h>
-#include <akari/Render/Integrator.h>
+#include <akari/core/plugin.h>
+#include <akari/plugins/mltsampler.h>
+#include <akari/render/integrator.h>
 
 namespace akari {
     using namespace MLT;

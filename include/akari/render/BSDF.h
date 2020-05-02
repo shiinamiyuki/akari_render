@@ -23,10 +23,10 @@
 #ifndef AKARIRENDER_BSDF_H
 #define AKARIRENDER_BSDF_H
 
-#include "Interaction.h"
-#include <akari/Core/Sampling.hpp>
-#include <akari/Core/Spectrum.h>
-#include <akari/Render/Geometry.hpp>
+#include "interaction.h"
+#include <akari/core/sampling.hpp>
+#include <akari/core/spectrum.h>
+#include <akari/render/geometry.hpp>
 namespace akari {
     enum BSDFType : int {
         BSDF_NONE = 0u,

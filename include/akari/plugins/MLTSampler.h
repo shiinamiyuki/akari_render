@@ -24,9 +24,9 @@
 #ifndef AKARIRENDER_MLTSAMPLER_H
 #define AKARIRENDER_MLTSAMPLER_H
 
-#include <akari/Core/Distribution.hpp>
-#include <akari/Render/Sampler.h>
-#include <akari/Core/Spectrum.h>
+#include <akari/core/distribution.hpp>
+#include <akari/render/sampler.h>
+#include <akari/core/spectrum.h>
 
 namespace akari::MLT {
     /// From LuxCoreRender

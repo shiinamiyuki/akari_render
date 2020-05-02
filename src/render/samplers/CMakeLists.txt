@@ -1,1 +1,1 @@
-add_plugin(RandomSampler Random.cpp)
+add_plugin(RandomSampler random.cpp)

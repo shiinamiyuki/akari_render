@@ -20,10 +20,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/Image.hpp>
-#include <akari/Core/Parallel.h>
-#include <akari/Core/Plugin.h>
-#include <akari/Plugins/ImageTexture.h>
+#include <akari/core/image.hpp>
+#include <akari/core/parallel.h>
+#include <akari/core/plugin.h>
+#include <akari/plugins/image_texture.h>
 namespace akari {
     class ImageTexture : public Texture {
         std::shared_ptr<RGBAImage> image;

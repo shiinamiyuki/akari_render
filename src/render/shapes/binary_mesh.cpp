@@ -20,10 +20,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/Logger.h>
-#include <akari/Core/Stream.h>
-#include <akari/Plugins/AreaLight.h>
-#include <akari/Plugins/BinaryMesh.h>
+#include <akari/core/logger.h>
+#include <akari/core/stream.h>
+#include <akari/plugins/area_light.h>
+#include <akari/plugins/binary_mesh.h>
 #include <fstream>
 namespace akari {
     const MaterialSlot &BinaryMesh::get_material_slot(int group) const { return materials[group]; }

@@ -1,2 +1,2 @@
-add_plugin(AreaLight AreaLight.cpp)
-add_plugin(PointLight PointLight.cpp)
+add_plugin(AreaLight area_light.cpp)
+add_plugin(PointLight point_light.cpp)

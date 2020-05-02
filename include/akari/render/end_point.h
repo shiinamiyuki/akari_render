@@ -23,11 +23,11 @@
 #ifndef AKARIRENDER_ENDPOINT_H
 #define AKARIRENDER_ENDPOINT_H
 
-#include <akari/Core/Component.h>
-#include <akari/Core/Spectrum.h>
-#include <akari/Render/Geometry.hpp>
-#include <akari/Render/Interaction.h>
-#include <akari/Render/Scene.h>
+#include <akari/core/component.h>
+#include <akari/core/spectrum.h>
+#include <akari/render/geometry.hpp>
+#include <akari/render/interaction.h>
+#include <akari/render/scene.h>
 namespace akari {
     struct RayIncidentSample {
         vec3 wi;

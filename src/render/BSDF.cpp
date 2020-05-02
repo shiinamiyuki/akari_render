@@ -19,7 +19,7 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-#include <akari/Render/BSDF.h>
+#include <akari/render/bsdf.h>
 
 namespace akari {
     Float BSDF::evaluate_pdf(const vec3 &woW, const vec3 &wiW) const {

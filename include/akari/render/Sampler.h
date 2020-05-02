@@ -23,8 +23,8 @@
 #ifndef AKARIRENDER_SAMPLER_H
 #define AKARIRENDER_SAMPLER_H
 
-#include <akari/Core/Component.h>
-#include <akari/Core/Math.h>
+#include <akari/core/component.h>
+#include <akari/core/math.h>
 
 namespace akari {
     // https://en.wikipedia.org/wiki/Permuted_congruential_generator

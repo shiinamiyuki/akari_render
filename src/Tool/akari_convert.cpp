@@ -20,11 +20,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/Serialize.hpp>
-#include <akari/Plugins/BinaryMesh.h>
-#include <akari/Plugins/Matte.h>
-#include <akari/Plugins/RGBTexture.h>
-#include <akari/Render/SceneGraph.h>
+#include <akari/core/serialize.hpp>
+#include <akari/plugins/binary_mesh.h>
+#include <akari/plugins/matte.h>
+#include <akari/plugins/rgbtexture.h>
+#include <akari/render/scene_graph.h>
 #include <memory>
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>

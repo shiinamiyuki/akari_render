@@ -19,12 +19,12 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-#include <akari/Core/Math.h>
-#include <akari/Core/Plugin.h>
-#include <akari/Core/Spectrum.h>
-#include <akari/Render/Light.h>
-#include <akari/Render/Material.h>
-#include <akari/Render/Mesh.h>
+#include <akari/core/math.h>
+#include <akari/core/plugin.h>
+#include <akari/core/spectrum.h>
+#include <akari/render/light.h>
+#include <akari/render/material.h>
+#include <akari/render/mesh.h>
 
 namespace akari {
     class AreaLight final : public Light {

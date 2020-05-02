@@ -22,9 +22,9 @@
 
 #ifndef AKARIRENDER_RGBTEXTURE_H
 #define AKARIRENDER_RGBTEXTURE_H
-#include <akari/Core/Plugin.h>
-#include <akari/Core/Spectrum.h>
-#include <akari/Render/Texture.h>
+#include <akari/core/plugin.h>
+#include <akari/core/spectrum.h>
+#include <akari/render/texture.h>
 
 namespace akari {
     AKR_EXPORT std::shared_ptr<Texture> create_rgb_texture(const vec3 & rgb);

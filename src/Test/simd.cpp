@@ -20,7 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/SIMD.hpp>
+#include <akari/core/simd.hpp>
 
 int main() {
     using namespace akari;

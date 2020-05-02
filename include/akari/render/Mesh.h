@@ -23,8 +23,8 @@
 #ifndef AKARIRENDER_MESH_H
 #define AKARIRENDER_MESH_H
 
-#include <akari/Core/Logger.h>
-#include <akari/Render/Geometry.hpp>
+#include <akari/core/logger.h>
+#include <akari/render/geometry.hpp>
 #include <fstream>
 
 namespace akari {

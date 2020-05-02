@@ -23,7 +23,7 @@
 #ifndef AKARIRENDER_REFLECTION_H
 #define AKARIRENDER_REFLECTION_H
 
-#include <akari/Render/BSDF.h>
+#include <akari/render/bsdf.h>
 namespace akari {
     class Fresnel {
       public:

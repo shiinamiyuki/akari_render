@@ -23,15 +23,15 @@
 #ifndef AKARIRENDER_INTEGRATOR_H
 #define AKARIRENDER_INTEGRATOR_H
 
-#include <akari/Core/Component.h>
-#include <akari/Render/Accelerator.h>
-#include <akari/Render/Camera.h>
-#include <akari/Render/Light.h>
-#include <akari/Render/Material.h>
-#include <akari/Render/Mesh.h>
-#include <akari/Render/Sampler.h>
-#include <akari/Render/Scene.h>
-#include <akari/Render/Task.h>
+#include <akari/core/component.h>
+#include <akari/render/accelerator.h>
+#include <akari/render/camera.h>
+#include <akari/render/light.h>
+#include <akari/render/material.h>
+#include <akari/render/mesh.h>
+#include <akari/render/sampler.h>
+#include <akari/render/scene.h>
+#include <akari/render/task.h>
 
 namespace akari {
     class RenderTask : public Task {

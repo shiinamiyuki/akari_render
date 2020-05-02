@@ -22,10 +22,10 @@
 
 #ifndef AKARIRENDER_COMPONENT_H
 #define AKARIRENDER_COMPONENT_H
-#include <akari/Core/akari.h>
-#include <akari/Core/Platform.h>
-#include <akari/Core/Reflect.hpp>
-#include <akari/Core/Serialize.hpp>
+#include <akari/core/akari.h>
+#include <akari/core/platform.h>
+#include <akari/core/reflect.hpp>
+#include <akari/core/serialize.hpp>
 #include <list>
 #include <memory>
 #include <mutex>

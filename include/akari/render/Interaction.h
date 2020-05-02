@@ -23,8 +23,8 @@
 #ifndef AKARIRENDER_INTERACTION_H
 #define AKARIRENDER_INTERACTION_H
 
-#include <akari/Render/Geometry.hpp>
-#include <akari/Render/MediumStack.h>
+#include <akari/render/geometry.hpp>
+#include <akari/render/medium_stack.h>
 namespace akari {
     struct Interaction {
         vec3 wo = vec3(0); // world space wo

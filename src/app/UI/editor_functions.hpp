@@ -22,8 +22,8 @@
 
 #ifndef AKARIRENDER_EDITORFUNCTIONS_HPP
 #define AKARIRENDER_EDITORFUNCTIONS_HPP
-#include <akari/Core/Math.h>
-#include <akari/Core/Spectrum.h>
+#include <akari/core/math.h>
+#include <akari/core/spectrum.h>
 #include <imgui.h>
 namespace akari::Gui {
     template <typename T> inline bool Edit(const char *label, T &value) = delete;

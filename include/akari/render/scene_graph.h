@@ -23,14 +23,14 @@
 #ifndef AKARIRENDER_SCENEGRAPH_H
 #define AKARIRENDER_SCENEGRAPH_H
 
-#include <akari/Core/Component.h>
-#include <akari/Render/Accelerator.h>
-#include <akari/Render/Camera.h>
-#include <akari/Render/Integrator.h>
-#include <akari/Render/Light.h>
-#include <akari/Render/Material.h>
-#include <akari/Render/Mesh.h>
-#include <akari/Render/Sampler.h>
+#include <akari/core/component.h>
+#include <akari/render/accelerator.h>
+#include <akari/render/camera.h>
+#include <akari/render/integrator.h>
+#include <akari/render/light.h>
+#include <akari/render/material.h>
+#include <akari/render/mesh.h>
+#include <akari/render/sampler.h>
 #include <fstream>
 
 namespace akari {

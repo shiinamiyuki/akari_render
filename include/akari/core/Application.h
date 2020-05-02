@@ -23,7 +23,7 @@
 #ifndef AKARIRENDER_APPLICATION_H
 #define AKARIRENDER_APPLICATION_H
 
-#include <akari/Core/Platform.h>
+#include <akari/core/platform.h>
 namespace akari {
     class AKR_EXPORT Application {
       public:

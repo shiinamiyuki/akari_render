@@ -1,1 +1,1 @@
-add_plugin(PerspectiveCamera PerspectiveCamera.cpp)
+add_plugin(PerspectiveCamera perspective_camera.cpp)

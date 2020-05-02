@@ -20,12 +20,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/Logger.h>
-#include <akari/Core/Parallel.h>
-#include <akari/Core/Plugin.h>
-#include <akari/Render/Integrator.h>
+#include <akari/core/logger.h>
+#include <akari/core/parallel.h>
+#include <akari/core/plugin.h>
+#include <akari/render/integrator.h>
 
-#include <akari/Core/Progress.hpp>
+#include <akari/core/progress.hpp>
 #include <future>
 #include <mutex>
 #include <stack>

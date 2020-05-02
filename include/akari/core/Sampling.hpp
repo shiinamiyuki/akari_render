@@ -22,7 +22,7 @@
 
 #ifndef AKARIRENDER_SAMPLING_HPP
 #define AKARIRENDER_SAMPLING_HPP
-#include <akari/Core/Math.h>
+#include <akari/core/math.h>
 #include <algorithm>
 
 namespace akari {

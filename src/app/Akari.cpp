@@ -20,9 +20,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/Application.h>
-#include <akari/Core/Logger.h>
-#include <akari/Render/SceneGraph.h>
+#include <akari/core/application.h>
+#include <akari/core/logger.h>
+#include <akari/render/scene_graph.h>
 #include <cxxopts.hpp>
 #include <fstream>
 using namespace akari;

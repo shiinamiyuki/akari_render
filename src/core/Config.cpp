@@ -20,7 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/Config.h>
+#include <akari/core/config.h>
 #include <mutex>
 #include <thread>
 namespace akari {

@@ -20,10 +20,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/akari.h>
-#include <akari/Core/Application.h>
-#include <akari/Core/Parallel.h>
-#include <akari/Core/Plugin.h>
+#include <akari/core/akari.h>
+#include <akari/core/application.h>
+#include <akari/core/parallel.h>
+#include <akari/core/plugin.h>
 
 namespace akari {
     Application::Application() { GetPluginManager();}

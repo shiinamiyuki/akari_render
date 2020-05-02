@@ -20,11 +20,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/MemoryArena.hpp>
-#include <akari/Render/BSDF.h>
-#include <akari/Render/Interaction.h>
-#include <akari/Render/Material.h>
-#include <akari/Render/Scene.h>
+#include <akari/core/memory_arena.hpp>
+#include <akari/render/bsdf.h>
+#include <akari/render/interaction.h>
+#include <akari/render/material.h>
+#include <akari/render/scene.h>
 
 namespace akari {
     SurfaceInteraction::SurfaceInteraction(const MaterialSlot *materialSlot, const glm::vec3 &wo, const glm::vec3 &p,

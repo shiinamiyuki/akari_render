@@ -20,12 +20,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/Config.h>
-#include <akari/Core/Logger.h>
-#include <akari/Core/Math.h>
-#include <akari/Core/Plugin.h>
-#include <akari/Core/Sampling.hpp>
-#include <akari/Render/Camera.h>
+#include <akari/core/config.h>
+#include <akari/core/logger.h>
+#include <akari/core/math.h>
+#include <akari/core/plugin.h>
+#include <akari/core/sampling.hpp>
+#include <akari/render/camera.h>
 namespace akari {
     class PerspectiveCamera final : public Camera {
         std::shared_ptr<Film> film;

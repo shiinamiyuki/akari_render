@@ -23,9 +23,9 @@
 #ifndef AKARIRENDER_IMAGE_HPP
 #define AKARIRENDER_IMAGE_HPP
 
-#include <akari/Core/akari.h>
-#include <akari/Core/Component.h>
-#include <akari/Core/Math.h>
+#include <akari/core/akari.h>
+#include <akari/core/component.h>
+#include <akari/core/math.h>
 #include <vector>
 
 namespace akari {

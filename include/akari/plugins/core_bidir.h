@@ -23,10 +23,10 @@
 #ifndef AKARIRENDER_COREBIDIR_H
 #define AKARIRENDER_COREBIDIR_H
 
-#include <akari/Render/Camera.h>
-#include <akari/Render/EndPoint.h>
-#include <akari/Render/Integrator.h>
-#include <akari/Render/Light.h>
+#include <akari/render/camera.h>
+#include <akari/render/end_point.h>
+#include <akari/render/integrator.h>
+#include <akari/render/light.h>
 namespace akari {
     inline Float correct_shading_normal(const vec3 &Ng, const vec3 &Ns, const vec3 &wo, const vec3 &wi,
                                         TransportMode mode) {

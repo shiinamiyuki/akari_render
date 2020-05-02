@@ -20,7 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/Class.h>
+#include <akari/core/class.h>
 
 namespace akari {
     using namespace Serialize;

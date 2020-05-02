@@ -1,6 +1,6 @@
-add_plugin(BVHAccelerator BVH-Backend.cpp)
+add_plugin(BVHAccelerator bvh-_backend.cpp)
 
 if(AKARI_USE_EMBREE)
-    add_plugin(EmbreeAccelerator Embree-Backend.cpp)
+    add_plugin(EmbreeAccelerator embree-_backend.cpp)
     target_link_libraries(EmbreeAccelerator  ${EMBREE_LIBRARY})
 endif()

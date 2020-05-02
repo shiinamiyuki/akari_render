@@ -1,4 +1,4 @@
-add_plugin(MatteMaterial Matte.cpp)
-add_plugin(GlassMaterial GlassMaterial.cpp)
-add_plugin(MirrorMaterial MirrorMaterial.cpp)
-add_plugin(DisneyMaterial Disney.cpp)
+add_plugin(MatteMaterial matte.cpp)
+add_plugin(GlassMaterial glass_material.cpp)
+add_plugin(MirrorMaterial mirror_material.cpp)
+add_plugin(DisneyMaterial disney.cpp)

@@ -23,8 +23,8 @@
 #ifndef AKARIRENDER_OBJECT_H
 #define AKARIRENDER_OBJECT_H
 
-#include <akari/Core/Class.h>
-#include <akari/Core/Platform.h>
+#include <akari/core/class.h>
+#include <akari/core/platform.h>
 namespace akari {
 
     class AKR_EXPORT Object {

@@ -22,7 +22,7 @@
 
 #ifndef AKARIRENDER_DISTRIBUTION_HPP
 #define AKARIRENDER_DISTRIBUTION_HPP
-#include <akari/Core/Math.h>
+#include <akari/core/math.h>
 
 namespace akari {
     /*

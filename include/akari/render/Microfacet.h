@@ -22,8 +22,8 @@
 
 #ifndef AKARIRENDER_MICROFACET_H
 #define AKARIRENDER_MICROFACET_H
-#include "Reflection.h"
-#include <akari/Render/BSDF.h>
+#include "reflection.h"
+#include <akari/render/bsdf.h>
 namespace akari {
     enum MicrofacetType {
         EGGX,

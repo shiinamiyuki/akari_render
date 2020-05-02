@@ -23,7 +23,7 @@
 #ifndef AKARIRENDER_SPECTRUM_H
 #define AKARIRENDER_SPECTRUM_H
 
-#include <akari/Core/Math.h>
+#include <akari/core/math.h>
 #include <json.hpp>
 namespace akari {
     template <size_t N> struct CoefficientSpectrum : public vec<N, float, defaultp> {

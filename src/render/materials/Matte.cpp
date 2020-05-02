@@ -20,12 +20,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/Plugin.h>
-#include <akari/Plugins/Matte.h>
-#include <akari/Render/Geometry.hpp>
-#include <akari/Render/Material.h>
-#include <akari/Render/Reflection.h>
-#include <akari/Render/Texture.h>
+#include <akari/core/plugin.h>
+#include <akari/plugins/matte.h>
+#include <akari/render/geometry.hpp>
+#include <akari/render/material.h>
+#include <akari/render/reflection.h>
+#include <akari/render/texture.h>
 #include <utility>
 
 namespace akari {

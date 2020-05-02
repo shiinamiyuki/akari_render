@@ -22,9 +22,9 @@
 
 #ifndef AKARIRENDER_SERIALIZE_HPP
 #define AKARIRENDER_SERIALIZE_HPP
-#include <akari/Core/akari.h>
-#include <akari/Core/Platform.h>
-#include <akari/Core/detail/serialize-impl.hpp>
+#include <akari/core/akari.h>
+#include <akari/core/platform.h>
+#include <akari/core/detail/serialize-impl.hpp>
 #include <json.hpp>
 namespace akari {
     class AKR_EXPORT SerializeContext : public Serialize::Context {

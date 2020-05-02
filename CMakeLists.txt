@@ -63,7 +63,7 @@ include(cmake/OIDN.cmake)
 
 ##set(AKARI_CORE_EXT_LIBS ${AKARI_CORE_EXT_LIBS} embree embree_sse42 embree_avx embree_avx2 lexers math simd tasking sys)
 #
-file(GLOB AKARI_API_SRC include/akari/Core/*.* include/akari/Render/*.*)
+file(GLOB AKARI_API_SRC include/akari/core/*.* include/akari/render/*.*)
 file(GLOB AKARI_CORE_SRC src/Core/*.* )
 file(GLOB AKARI_CORE_RENDER_SRC src/Render/*.*)
 add_library(AkariCore SHARED ${AKARI_CORE_SRC})
@@ -112,7 +112,7 @@ add_subdirectory(src/Tool)
 add_executable(akari src/app/akari.cpp)
 target_link_libraries(akari AkariCoreRender)
 
-add_executable(AkariExpr src/app/AkariExpr.cpp)
+add_executable(AkariExpr src/app/akari_expr.cpp)
 target_link_libraries(AkariExpr asmjit)
 target_link_libraries(AkariExpr AkariCore)
 target_link_libraries(AkariExpr ComplexTexture)

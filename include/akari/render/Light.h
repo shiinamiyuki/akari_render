@@ -23,11 +23,11 @@
 #ifndef AKARIRENDER_LIGHT_H
 #define AKARIRENDER_LIGHT_H
 
-#include <akari/Core/Component.h>
-#include <akari/Core/Spectrum.h>
-#include <akari/Render/EndPoint.h>
-#include <akari/Render/Geometry.hpp>
-#include <akari/Render/Scene.h>
+#include <akari/core/component.h>
+#include <akari/core/spectrum.h>
+#include <akari/render/end_point.h>
+#include <akari/render/geometry.hpp>
+#include <akari/render/scene.h>
 
 namespace akari {
     struct LightSample : RayIncidentSample {};

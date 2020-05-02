@@ -23,8 +23,8 @@
 #ifndef AKARIRENDER_CLASS_H
 #define AKARIRENDER_CLASS_H
 
-#include <akari/Core/Platform.h>
-#include <akari/Core/Reflect.hpp>
+#include <akari/core/platform.h>
+#include <akari/core/reflect.hpp>
 #include <functional>
 #include <string>
 namespace akari {

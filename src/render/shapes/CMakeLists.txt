@@ -1,2 +1,2 @@
-add_plugin(BinaryMesh BinaryMesh.cpp)
+add_plugin(BinaryMesh binary_mesh.cpp)
 target_link_libraries(BinaryMesh AreaLight)

@@ -19,11 +19,11 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-#include "WindowContext.h"
+#include "window_context.h"
 
-#include "EditorFunctions.hpp"
-#include <akari/Core/Logger.h>
-#include <akari/Render/SceneGraph.h>
+#include "editor_functions.hpp"
+#include <akari/core/logger.h>
+#include <akari/render/scene_graph.h>
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif

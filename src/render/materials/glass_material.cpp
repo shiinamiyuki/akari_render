@@ -20,37 +20,41 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/Plugin.h>
-#include <akari/Render/Geometry.hpp>
-#include <akari/Render/Material.h>
-#include <akari/Render/Reflection.h>
-#include <akari/Render/Texture.h>
+#include <akari/core/plugin.h>
+#include <akari/render/geometry.hpp>
+#include <akari/render/material.h>
+#include <akari/render/reflection.h>
+#include <akari/render/texture.h>
 #include <utility>
 
 namespace akari {
-    class MirrorMaterial final : public Material {
+    class GlassMaterial final : public Material {
         std::shared_ptr<Texture> color;
+        std::shared_ptr<Texture> ior;
 
       public:
-        MirrorMaterial() = default;
-        explicit MirrorMaterial(std::shared_ptr<Texture> color) : color(std::move(color)) {}
-        AKR_SER(color)
-        AKR_DECL_COMP(MirrorMaterial, "MirrorMaterial")
+        GlassMaterial() = default;
+        explicit GlassMaterial(std::shared_ptr<Texture> color) : color(std::move(color)) {}
+        AKR_SER(color, ior)
+        AKR_DECL_COMP(GlassMaterial, "GlassMaterial")
         void compute_scattering_functions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
                                           Float scale) const override {
             si->bsdf = arena.alloc<BSDF>(*si);
-            auto c = color->evaluate(si->sp);
-            si->bsdf->add_component(arena.alloc<SpecularReflection>(c * scale, arena.alloc<FresnelNoOp>()));
+            auto c = color->evaluate(si->sp) * scale;
+            auto eta = ior->evaluate(si->sp)[0];
+            si->bsdf->add_component(arena.alloc<FresnelSpecular>(c, c, 1.0f, eta, mode));
         }
-        void commit() override { color->commit(); }
         bool support_bidirectional() const override { return true; }
+        void commit() override {
+            color->commit();
+            ior->commit(); }
     };
     AKR_PLUGIN_ON_LOAD {
         // clang-format off
-        class_<MirrorMaterial,Material>("MirrorMaterial")
-            .property("color",&MirrorMaterial::color);
+        class_<GlassMaterial,Material>("GlassMaterial")
+            .property("color",&GlassMaterial::color);
         //clang-format on
     }
-    AKR_EXPORT_COMP(MirrorMaterial, "Material")
+    AKR_EXPORT_COMP(GlassMaterial, "Material")
 
 } // namespace akari

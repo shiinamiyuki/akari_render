@@ -23,11 +23,11 @@
 #ifndef AKARIRENDER_MATERIAL_H
 #define AKARIRENDER_MATERIAL_H
 
-#include <akari/Core/Component.h>
-#include <akari/Core/MemoryArena.hpp>
-#include <akari/Render/BSDF.h>
-#include <akari/Render/Interaction.h>
-#include <akari/Render/Texture.h>
+#include <akari/core/component.h>
+#include <akari/core/memory_arena.hpp>
+#include <akari/render/bsdf.h>
+#include <akari/render/interaction.h>
+#include <akari/render/texture.h>
 namespace akari {
     class Material;
     class Light;

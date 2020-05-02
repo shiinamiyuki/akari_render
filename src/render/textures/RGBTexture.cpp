@@ -20,10 +20,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/Plugin.h>
-#include <akari/Core/Spectrum.h>
-#include <akari/Plugins/RGBTexture.h>
-#include <akari/Render/Texture.h>
+#include <akari/core/plugin.h>
+#include <akari/core/spectrum.h>
+#include <akari/plugins/rgbtexture.h>
+#include <akari/render/texture.h>
 
 namespace akari {
     class RGBTexture final : public Texture {

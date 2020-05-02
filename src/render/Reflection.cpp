@@ -20,8 +20,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/Logger.h>
-#include <akari/Render/Reflection.h>
+#include <akari/core/logger.h>
+#include <akari/render/reflection.h>
 
 namespace akari {
     Spectrum FresnelNoOp::evaluate(Float cosThetaI) const { return Spectrum(1.0f); }

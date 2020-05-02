@@ -23,10 +23,10 @@
 #ifndef AKARIRENDER_SCENE_H
 #define AKARIRENDER_SCENE_H
 
-#include "Material.h"
-#include <akari/Core/Distribution.hpp>
-#include <akari/Render/Accelerator.h>
-#include <akari/Render/Geometry.hpp>
+#include "material.h"
+#include <akari/core/distribution.hpp>
+#include <akari/render/accelerator.h>
+#include <akari/render/geometry.hpp>
 #include <atomic>
 namespace akari {
     class Mesh;

@@ -20,8 +20,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Render/Integrator.h>
-#include <akari/Plugins/CoreBidir.h>
+#include <akari/render/integrator.h>
+#include <akari/plugins/core_bidir.h>
 
 namespace akari{
     class Unified : public Integrator{

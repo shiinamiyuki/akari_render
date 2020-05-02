@@ -20,17 +20,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef AKARIRENDER_IMAGETEXTURE_H
-#define AKARIRENDER_IMAGETEXTURE_H
-
-#include <akari/Render/Texture.h>
+#ifndef AKARIRENDER_AREALIGHT_H
+#define AKARIRENDER_AREALIGHT_H
+#include <akari/render/light.h>
 
 namespace akari{
-    enum class ImageTextureFilter : uint8_t {
-        ENEAREST,
-        ETRILINEAR
-    };
-    AKR_EXPORT std::shared_ptr<Texture> CreateImageTexture(const fs::path & );
+    AKR_EXPORT std::shared_ptr<Light> CreateAreaLight(const Mesh & mesh, int primId);
 }
 
-#endif // AKARIRENDER_IMAGETEXTURE_H
+#endif // AKARIRENDER_AREALIGHT_H

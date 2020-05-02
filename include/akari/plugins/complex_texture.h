@@ -20,12 +20,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef AKARIRENDER_AREALIGHT_H
-#define AKARIRENDER_AREALIGHT_H
-#include <akari/Render/Light.h>
+#ifndef AKARIRENDER_COMPLEXTEXTURE_H
+#define AKARIRENDER_COMPLEXTEXTURE_H
+#include <akari/core/plugin.h>
+#include <akari/core/spectrum.h>
+#include <akari/render/texture.h>
 
-namespace akari{
-    AKR_EXPORT std::shared_ptr<Light> CreateAreaLight(const Mesh & mesh, int primId);
-}
-
-#endif // AKARIRENDER_AREALIGHT_H
+namespace akari {
+    AKR_EXPORT std::shared_ptr<Texture> CreateComplexTexture(const json & program);
+} // namespace akari
+#endif // AKARIRENDER_COMPLEXTEXTURE_H

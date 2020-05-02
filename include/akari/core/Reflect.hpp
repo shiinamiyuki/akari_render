@@ -22,8 +22,8 @@
 
 #pragma once
 
-#include <akari/Core/akari.h>
-#include <akari/Core/Platform.h>
+#include <akari/core/akari.h>
+#include <akari/core/platform.h>
 #include <cstring>
 #include <functional>
 #include <memory>

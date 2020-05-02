@@ -20,11 +20,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/Logger.h>
-#include <akari/Render/Light.h>
-#include <akari/Render/Material.h>
-#include <akari/Render/Mesh.h>
-#include <akari/Render/Scene.h>
+#include <akari/core/logger.h>
+#include <akari/render/light.h>
+#include <akari/render/material.h>
+#include <akari/render/mesh.h>
+#include <akari/render/scene.h>
 namespace akari {
     void Scene::Commit() {
         accelerator->build(*this);

@@ -22,8 +22,8 @@
 
 #ifndef AKARIRENDER_ACCELERATOR_H
 #define AKARIRENDER_ACCELERATOR_H
-#include <akari/Core/Component.h>
-#include <akari/Render/Geometry.hpp>
+#include <akari/core/component.h>
+#include <akari/render/geometry.hpp>
 namespace akari {
     class Scene;
     class AKR_EXPORT Accelerator : public Component {

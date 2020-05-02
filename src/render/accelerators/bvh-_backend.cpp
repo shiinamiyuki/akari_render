@@ -20,11 +20,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/Logger.h>
-#include <akari/Core/Plugin.h>
-#include <akari/Render/Accelerator.h>
-#include <akari/Render/Mesh.h>
-#include <akari/Render/Scene.h>
+#include <akari/core/logger.h>
+#include <akari/core/plugin.h>
+#include <akari/render/accelerator.h>
+#include <akari/render/mesh.h>
+#include <akari/render/scene.h>
 #include <fmt/format.h>
 #include <optional>
 
