@@ -22,26 +22,37 @@
 #include <akari/core/reflect.hpp>
 #include <fmt/format.h>
 #include <json.hpp>
+#include <akari/core/math.h>
+
 struct Foo {
     int a = 123;
     float b = 3.14;
+    glm::vec3 u;
     std::vector<Foo> v;
+
     Foo() = default;
+
     Foo(int x, float y) : a(x), b(y) {}
+
     void hello(int _) const { fmt::print("hello from {}\n", _); }
 };
 namespace akari {
     using namespace nlohmann;
+
     struct to_json_impl {
         json data;
-        template <typename T> void save(const T &value) {
+
+        template<typename T>
+        void save(const T &value) {
             Any any(value);
             do_save(data, any);
         }
+
 #define AKR_SAVE_BASIC(ty)                                                                                             \
     if (type_info == type_of<ty>()) {                                                                                  \
         j = any.as<ty>();                                                                                              \
     }
+
         void do_save(json &j, const Any &any) {
             auto type_info = any.get_type();
             AKR_SAVE_BASIC(int)
@@ -53,6 +64,8 @@ namespace akari {
                         do_save(tmp, *iter);
                         j.push_back(tmp);
                     }
+                } else if (auto opt = dynamic_invoke_noexcept("to_json", make_any_ref(j), any)) {
+                    (void) opt;
                 } else {
                     j = json::object();
                     Type type = any.get_type();
@@ -71,22 +84,34 @@ namespace akari {
 #undef AKR_SAVE_BASIC
     };
 
-    template <typename T> json save_to_json(const T &value) {
+    template<typename T>
+    json save_to_json(const T &value) {
         to_json_impl impl;
         impl.save(value);
         return std::move(impl.data);
     }
+
+    template<typename T>
+    struct json_serializer {
+        static void save(json &j, const T &value) {
+            printf("called to_json %p\n", &j);
+            to_json(j, value);
+        }
+    };
 } // namespace akari
+
 int main() {
     using namespace akari;
     // clang-format off
     class_<Foo>("Foo")
-        .constructor<>()
+            .constructor<>()
             .constructor<int, float>()
             .property("a", &Foo::a)
             .property("b", &Foo::b)
             .property("v", &Foo::v)
-            .method("hello",&Foo::hello);
+            .property("u", &Foo::u)
+            .method("hello", &Foo::hello);
+    function("to_json", &json_serializer<vec3>::save);
     // clang-format on
     //    Any v = make_any(Foo());
     //    Type type = Type::get<Foo>();
@@ -109,7 +134,11 @@ int main() {
     hello.invoke(*foo, 23456);
     fmt::print("foo.a={}\n", foo->a);
     {
+        json _j;
+
         Foo foo1;
+        printf("%p\n", &_j);
+        foo1.u = vec3(1,2,3); dynamic_invoke("to_json", _j, foo1.u);
         foo1.v = {Foo(), Foo()};
         fmt::print("{}\n", save_to_json(foo1).dump(1));
     }

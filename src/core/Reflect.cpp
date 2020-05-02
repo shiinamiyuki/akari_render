@@ -28,4 +28,8 @@ namespace akari{
 
         return mgr;
     }
+    static int _ = [](){
+        printf("called\n");
+        return 0;
+    }();
 }

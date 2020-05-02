@@ -39,9 +39,9 @@ namespace akari {
       public:
         Component() : dirty(true) {}
         virtual void commit() {}
-        virtual void ClearDirtyBit() { dirty = false; }
-        virtual void SetDirtyBit() { dirty = true; }
-        virtual bool IsDirty() const { return dirty; }
+        virtual void clear_dirty_bit() { dirty = false; }
+        virtual void set_dirty_Bit() { dirty = true; }
+        virtual bool is_dirty() const { return dirty; }
     };
     template <typename T, typename U> std::shared_ptr<T> Cast(const std::shared_ptr<U> &p) {
         return std::dynamic_pointer_cast<T>(p);

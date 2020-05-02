@@ -1,7 +1,9 @@
 sudo: required
 dist: bionic
 language: cpp
-compiler: gcc
+compiler:
+  - gcc
+  - clang
 notifications:
   email: false
 addons:
@@ -10,5 +12,6 @@ addons:
     packages:
     - gcc-8
     - g++-8
+    - clang-5
     - cmake
 script: mkdir build && cd build && cmake ../ -DCMAKE_BUILD_TYPE=Release && make -r -j `nproc` && ./TestBSDF
