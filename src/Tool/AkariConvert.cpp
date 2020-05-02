@@ -20,16 +20,16 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <Akari/Core/Serialize.hpp>
-#include <Akari/Plugins/BinaryMesh.h>
-#include <Akari/Plugins/Matte.h>
-#include <Akari/Plugins/RGBTexture.h>
-#include <Akari/Render/SceneGraph.h>
+#include <akari/Core/Serialize.hpp>
+#include <akari/Plugins/BinaryMesh.h>
+#include <akari/Plugins/Matte.h>
+#include <akari/Plugins/RGBTexture.h>
+#include <akari/Render/SceneGraph.h>
 #include <memory>
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
-namespace Akari {
+namespace akari {
     std::shared_ptr<BinaryMesh> Convert(const fs::path &obj, fs::path output) {
         std::shared_ptr<BinaryMesh> mesh;
         if (output.extension().empty()) {
@@ -137,10 +137,10 @@ namespace Akari {
         mesh->save(output.string().c_str());
         return mesh;
     }
-} // namespace Akari
+} // namespace akari
 
 int main(int argc, char **argv) {
-    using namespace Akari;
+    using namespace akari;
     if (argc < 2) {
         fprintf(stderr, "Usage: AkariConvert input-filename output-filename ");
         exit(-1);

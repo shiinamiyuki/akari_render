@@ -20,24 +20,30 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/SIMD.hpp>
+#include <akari/Core/Plugin.h>
+#include <akari/Core/Spectrum.h>
+#include <akari/Plugins/RGBTexture.h>
+#include <akari/Render/Texture.h>
 
-int main() {
-    using namespace akari;
-    simd_array<float*, 32>v;
-    simd_array<float, 32> a, b;
-    for (int i = 0; i < 32; i++) {
-        a[i] = 2 * i + 1;
-        b[i] = 3 * i + 2;
-    }
-    a = a + b;
-    auto mask = array_operator_lt<float, 32>::apply(a, b);
-    for (int i = 0; i < 32; i++) {
-        printf("%f %f %d\n", a[i], b[i], mask[i]);
-    }
-    auto c = select(~(a<100.0f & a> 50.0f), a, b);
-    for (int i = 0; i < 32; i++) {
-        printf("%f %f %f %d\n", a[i], b[i], c[i], mask[i]);
-    }
+namespace akari {
+    class RGBTexture final : public Texture {
+      public:
+        Spectrum rgb{};
+        RGBTexture() = default;
+        explicit RGBTexture(const vec3 &rgb) : rgb(rgb) {}
+        AKR_SER(rgb)
+        AKR_DECL_COMP(RGBTexture, "RGBTexture")
+        Spectrum evaluate(const ShadingPoint &sp) const override { return rgb; }
+        Float average_luminance() const override { return rgb.luminance(); }
+    };
 
-}
+    AKR_EXPORT std::shared_ptr<Texture> create_rgb_texture(const vec3 &rgb) { return std::make_shared<RGBTexture>(rgb); }
+    AKR_EXPORT_COMP(RGBTexture, "Texture")
+    AKR_PLUGIN_ON_LOAD {
+        printf("loaded\n");
+        // clang-format off
+        class_<RGBTexture, Texture>()
+            .property("rgb", &RGBTexture::rgb);
+        // clang-format on
+    }
+} // namespace akari

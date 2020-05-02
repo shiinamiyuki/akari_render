@@ -20,24 +20,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/SIMD.hpp>
+#ifndef AKARIRENDER_MATTE_H
+#define AKARIRENDER_MATTE_H
 
-int main() {
-    using namespace akari;
-    simd_array<float*, 32>v;
-    simd_array<float, 32> a, b;
-    for (int i = 0; i < 32; i++) {
-        a[i] = 2 * i + 1;
-        b[i] = 3 * i + 2;
-    }
-    a = a + b;
-    auto mask = array_operator_lt<float, 32>::apply(a, b);
-    for (int i = 0; i < 32; i++) {
-        printf("%f %f %d\n", a[i], b[i], mask[i]);
-    }
-    auto c = select(~(a<100.0f & a> 50.0f), a, b);
-    for (int i = 0; i < 32; i++) {
-        printf("%f %f %f %d\n", a[i], b[i], c[i], mask[i]);
-    }
+#include <akari/Render/Material.h>
+#include <akari/Render/Texture.h>
 
-}
+namespace akari {
+    AKR_EXPORT std::shared_ptr<Material> CreateMatteMaterial(const std::shared_ptr<Texture> & color);
+} // namespace akari
+#endif // AKARIRENDER_MATTE_H

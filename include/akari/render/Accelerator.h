@@ -20,24 +20,18 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/SIMD.hpp>
-
-int main() {
-    using namespace akari;
-    simd_array<float*, 32>v;
-    simd_array<float, 32> a, b;
-    for (int i = 0; i < 32; i++) {
-        a[i] = 2 * i + 1;
-        b[i] = 3 * i + 2;
-    }
-    a = a + b;
-    auto mask = array_operator_lt<float, 32>::apply(a, b);
-    for (int i = 0; i < 32; i++) {
-        printf("%f %f %d\n", a[i], b[i], mask[i]);
-    }
-    auto c = select(~(a<100.0f & a> 50.0f), a, b);
-    for (int i = 0; i < 32; i++) {
-        printf("%f %f %f %d\n", a[i], b[i], c[i], mask[i]);
-    }
-
-}
+#ifndef AKARIRENDER_ACCELERATOR_H
+#define AKARIRENDER_ACCELERATOR_H
+#include <akari/Core/Component.h>
+#include <akari/Render/Geometry.hpp>
+namespace akari {
+    class Scene;
+    class AKR_EXPORT Accelerator : public Component {
+      public:
+        virtual void build(const Scene &scene) = 0;
+        virtual bool intersect(const Ray &ray, Intersection *intersection) const = 0;
+        [[nodiscard]] virtual bool occlude(const Ray &ray) const = 0;
+        virtual Bounds3f bounds()const =0 ;
+    };
+} // namespace akari
+#endif // AKARIRENDER_ACCELERATOR_H

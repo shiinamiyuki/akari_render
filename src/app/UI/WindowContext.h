@@ -20,24 +20,31 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/SIMD.hpp>
+#ifndef AKARIRENDER_WINDOWCONTEXT_H
+#define AKARIRENDER_WINDOWCONTEXT_H
+#include <GL/gl3w.h>
+#include <GLFW/glfw3.h>
+#include <imgui.h>
+#include <examples/imgui_impl_glfw.h>
+#include <examples/imgui_impl_opengl3.h>
+#include <memory>
 
-int main() {
-    using namespace akari;
-    simd_array<float*, 32>v;
-    simd_array<float, 32> a, b;
-    for (int i = 0; i < 32; i++) {
-        a[i] = 2 * i + 1;
-        b[i] = 3 * i + 2;
-    }
-    a = a + b;
-    auto mask = array_operator_lt<float, 32>::apply(a, b);
-    for (int i = 0; i < 32; i++) {
-        printf("%f %f %d\n", a[i], b[i], mask[i]);
-    }
-    auto c = select(~(a<100.0f & a> 50.0f), a, b);
-    for (int i = 0; i < 32; i++) {
-        printf("%f %f %f %d\n", a[i], b[i], c[i], mask[i]);
-    }
+namespace akari::Gui {
+    class GLFWContext {
+      public:
+        GLFWContext();
+        ~GLFWContext();
+    };
 
-}
+    class Window {
+      protected:
+        GLFWwindow *window = nullptr;
+
+      public:
+        Window(GLFWContext &context);
+        virtual void Show() = 0;
+        ~Window();
+    };
+    std::shared_ptr<Window> CreateAppWindow(GLFWContext &context);
+} // namespace akari::Gui
+#endif // AKARIRENDER_WINDOWCONTEXT_H

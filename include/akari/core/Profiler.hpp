@@ -20,24 +20,20 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/SIMD.hpp>
+#ifndef AKARIRENDER_PROFILER_HPP
+#define AKARIRENDER_PROFILER_HPP
+#include <chrono>
 
-int main() {
-    using namespace akari;
-    simd_array<float*, 32>v;
-    simd_array<float, 32> a, b;
-    for (int i = 0; i < 32; i++) {
-        a[i] = 2 * i + 1;
-        b[i] = 3 * i + 2;
-    }
-    a = a + b;
-    auto mask = array_operator_lt<float, 32>::apply(a, b);
-    for (int i = 0; i < 32; i++) {
-        printf("%f %f %d\n", a[i], b[i], mask[i]);
-    }
-    auto c = select(~(a<100.0f & a> 50.0f), a, b);
-    for (int i = 0; i < 32; i++) {
-        printf("%f %f %f %d\n", a[i], b[i], c[i], mask[i]);
-    }
+namespace akari{
+    class Profiler {
+        decltype(std::chrono::system_clock::now()) start = std::chrono::system_clock::now();
+      public:
+        [[nodiscard]] double ElapsedSeconds()const{
+            auto now = std::chrono::system_clock::now();
+            std::chrono::duration<double> elapsed = now - start;
+            return elapsed.count();
+        }
+    };
 
 }
+#endif // AKARIRENDER_PROFILER_HPP

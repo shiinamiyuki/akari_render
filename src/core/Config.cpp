@@ -20,24 +20,16 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/SIMD.hpp>
-
-int main() {
-    using namespace akari;
-    simd_array<float*, 32>v;
-    simd_array<float, 32> a, b;
-    for (int i = 0; i < 32; i++) {
-        a[i] = 2 * i + 1;
-        b[i] = 3 * i + 2;
+#include <akari/Core/Config.h>
+#include <mutex>
+#include <thread>
+namespace akari {
+    AKR_EXPORT Config *GetConfig() {
+        static Config config;
+        static std::once_flag flag;
+        std::call_once(flag, [&]() { config.NumCore = std::thread::hardware_concurrency(); });
+        return &config;
     }
-    a = a + b;
-    auto mask = array_operator_lt<float, 32>::apply(a, b);
-    for (int i = 0; i < 32; i++) {
-        printf("%f %f %d\n", a[i], b[i], mask[i]);
-    }
-    auto c = select(~(a<100.0f & a> 50.0f), a, b);
-    for (int i = 0; i < 32; i++) {
-        printf("%f %f %f %d\n", a[i], b[i], c[i], mask[i]);
-    }
-
-}
+    AKR_EXPORT Float Eps() { return 1e-4f; }
+    AKR_EXPORT  Float ShadowEps() { return 1e-4f; }
+} // namespace akari

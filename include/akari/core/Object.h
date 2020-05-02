@@ -20,24 +20,29 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/SIMD.hpp>
+#ifndef AKARIRENDER_OBJECT_H
+#define AKARIRENDER_OBJECT_H
 
-int main() {
-    using namespace akari;
-    simd_array<float*, 32>v;
-    simd_array<float, 32> a, b;
-    for (int i = 0; i < 32; i++) {
-        a[i] = 2 * i + 1;
-        b[i] = 3 * i + 2;
-    }
-    a = a + b;
-    auto mask = array_operator_lt<float, 32>::apply(a, b);
-    for (int i = 0; i < 32; i++) {
-        printf("%f %f %d\n", a[i], b[i], mask[i]);
-    }
-    auto c = select(~(a<100.0f & a> 50.0f), a, b);
-    for (int i = 0; i < 32; i++) {
-        printf("%f %f %f %d\n", a[i], b[i], c[i], mask[i]);
-    }
+#include <akari/Core/Class.h>
+#include <akari/Core/Platform.h>
+namespace akari {
 
-}
+    class AKR_EXPORT Object {
+      public:
+        [[nodiscard]] virtual Class *GetClass() const = 0;
+        virtual ~Object()=default;
+    };
+    namespace Serialize {
+        class OutputArchive;
+        class InputArchive;
+    }
+    class AKR_EXPORT Serializable : public Object {
+      public:
+        template <class Archive> void save(Archive &) const {}
+
+        template <class Archive> void load(Archive &) {}
+    };
+
+} // namespace akari
+
+#endif // AKARIRENDER_OBJECT_H

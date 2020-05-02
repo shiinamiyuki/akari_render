@@ -20,24 +20,36 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/SIMD.hpp>
+#ifndef AKARIRENDER_LIGHT_H
+#define AKARIRENDER_LIGHT_H
 
-int main() {
-    using namespace akari;
-    simd_array<float*, 32>v;
-    simd_array<float, 32> a, b;
-    for (int i = 0; i < 32; i++) {
-        a[i] = 2 * i + 1;
-        b[i] = 3 * i + 2;
-    }
-    a = a + b;
-    auto mask = array_operator_lt<float, 32>::apply(a, b);
-    for (int i = 0; i < 32; i++) {
-        printf("%f %f %d\n", a[i], b[i], mask[i]);
-    }
-    auto c = select(~(a<100.0f & a> 50.0f), a, b);
-    for (int i = 0; i < 32; i++) {
-        printf("%f %f %f %d\n", a[i], b[i], c[i], mask[i]);
-    }
+#include <akari/Core/Component.h>
+#include <akari/Core/Spectrum.h>
+#include <akari/Render/EndPoint.h>
+#include <akari/Render/Geometry.hpp>
+#include <akari/Render/Scene.h>
 
-}
+namespace akari {
+    struct LightSample : RayIncidentSample {};
+
+    struct LightRaySample : RayEmissionSample {};
+
+    enum class LightType : uint32_t {
+        ENone = 1u,
+        EDeltaPosition = 1u << 1u,
+        EDeltaDirection = 1u << 2u,
+    };
+    class Light : public EndPoint {
+      public:
+        virtual Float power() const = 0;
+        virtual Spectrum Li(const vec3 &wo, const vec2 &uv) const = 0;
+        virtual LightType get_light_type() const = 0;
+        static bool is_delta(LightType type) {
+            return (uint32_t)type & ((uint32_t)LightType ::EDeltaPosition | (uint32_t)LightType::EDeltaDirection);
+        }
+        //        virtual void SampleLe(const Point2f &u1, const Point2f &u2, LightRaySample &sample) = 0;
+    };
+
+} // namespace akari
+
+#endif // AKARIRENDER_LIGHT_H

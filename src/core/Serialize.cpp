@@ -19,25 +19,22 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+#include <akari/Core/Component.h>
+#include <akari/Core/Plugin.h>
+#include <akari/Core/Serialize.hpp>
 
-#include <akari/Core/SIMD.hpp>
-
-int main() {
-    using namespace akari;
-    simd_array<float*, 32>v;
-    simd_array<float, 32> a, b;
-    for (int i = 0; i < 32; i++) {
-        a[i] = 2 * i + 1;
-        b[i] = 3 * i + 2;
+namespace akari {
+    Class *SerializeContext::GetClass(const std::string &s) {
+        try {
+            return Context::GetClass(s);
+        } catch (Serialize::NoSuchTypeError &err) {
+            auto pluginManager = GetPluginManager();
+            auto plugin = pluginManager->LoadPlugin(s.c_str());
+            if (!plugin) {
+                throw err;
+            }
+            Context::registerType(plugin->GetClass());
+            return plugin->GetClass();
+        }
     }
-    a = a + b;
-    auto mask = array_operator_lt<float, 32>::apply(a, b);
-    for (int i = 0; i < 32; i++) {
-        printf("%f %f %d\n", a[i], b[i], mask[i]);
-    }
-    auto c = select(~(a<100.0f & a> 50.0f), a, b);
-    for (int i = 0; i < 32; i++) {
-        printf("%f %f %f %d\n", a[i], b[i], c[i], mask[i]);
-    }
-
-}
+} // namespace akari

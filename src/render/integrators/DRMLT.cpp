@@ -20,24 +20,18 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/SIMD.hpp>
+#include <akari/Core/Plugin.h>
+#include <akari/Plugins/MLTSampler.h>
+#include <akari/Render/Integrator.h>
 
-int main() {
-    using namespace akari;
-    simd_array<float*, 32>v;
-    simd_array<float, 32> a, b;
-    for (int i = 0; i < 32; i++) {
-        a[i] = 2 * i + 1;
-        b[i] = 3 * i + 2;
-    }
-    a = a + b;
-    auto mask = array_operator_lt<float, 32>::apply(a, b);
-    for (int i = 0; i < 32; i++) {
-        printf("%f %f %d\n", a[i], b[i], mask[i]);
-    }
-    auto c = select(~(a<100.0f & a> 50.0f), a, b);
-    for (int i = 0; i < 32; i++) {
-        printf("%f %f %f %d\n", a[i], b[i], c[i], mask[i]);
-    }
-
-}
+namespace akari {
+    using namespace MLT;
+    class DRMLT : public Integrator {
+      public:
+        AKR_DECL_COMP(DRMLT, "DRMLT")
+        std::shared_ptr<RenderTask> create_render_task(const RenderContext &ctx) override {
+            return std::shared_ptr<RenderTask>();
+        }
+    };
+    AKR_EXPORT_COMP(DRMLT, "DRMLT")
+} // namespace akari

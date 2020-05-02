@@ -20,24 +20,25 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/SIMD.hpp>
+#include <akari/Core/Plugin.h>
+#include <akari/Render/Sampler.h>
+namespace akari {
 
-int main() {
-    using namespace akari;
-    simd_array<float*, 32>v;
-    simd_array<float, 32> a, b;
-    for (int i = 0; i < 32; i++) {
-        a[i] = 2 * i + 1;
-        b[i] = 3 * i + 2;
-    }
-    a = a + b;
-    auto mask = array_operator_lt<float, 32>::apply(a, b);
-    for (int i = 0; i < 32; i++) {
-        printf("%f %f %d\n", a[i], b[i], mask[i]);
-    }
-    auto c = select(~(a<100.0f & a> 50.0f), a, b);
-    for (int i = 0; i < 32; i++) {
-        printf("%f %f %f %d\n", a[i], b[i], c[i], mask[i]);
-    }
+    class RandomSampler : public Sampler {
+        Rng rng;
+        size_t dim = 0;
 
-}
+      public:
+        RandomSampler() = default;
+        Float next1d() override {
+            dim++;
+            return rng.uniformFloat();
+        }
+        std::shared_ptr<Sampler> clone() const override { return std::make_shared<RandomSampler>(*this); }
+        void set_sample_index(size_t index) override { rng = Rng(index); }
+        void start_next_sample() override { dim = 0; }
+        size_t current_dimension() override { return dim; }
+        AKR_DECL_COMP(RandomSampler, "RandomSampler")
+    };
+    AKR_EXPORT_COMP(RandomSampler, "Sampler")
+} // namespace akari

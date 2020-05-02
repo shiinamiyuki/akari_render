@@ -20,11 +20,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <Akari/Core/Application.h>
-#include <Akari/Core/Logger.h>
-#include <Akari/Render/Microfacet.h>
-#include <Akari/Render/Sampler.h>
-using namespace Akari;
+#include <akari/Core/Application.h>
+#include <akari/Core/Logger.h>
+#include <akari/Render/Microfacet.h>
+#include <akari/Render/Sampler.h>
+using namespace akari;
 bool RunTestBSDF_SamplePdf(const vec3 &wo, const BSDFComponent *bsdf, Sampler *sampler, size_t N = 10000000u) {
     double sum = 0;
     size_t good = 0, bad = 0;

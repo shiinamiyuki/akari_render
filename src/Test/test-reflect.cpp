@@ -19,7 +19,7 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-#include <Akari/Core/Reflect.hpp>
+#include <akari/Core/Reflect.hpp>
 #include <fmt/format.h>
 #include <json.hpp>
 struct Foo {
@@ -30,7 +30,7 @@ struct Foo {
     Foo(int x, float y) : a(x), b(y) {}
     void hello(int _) const { fmt::print("hello from {}\n", _); }
 };
-namespace Akari {
+namespace akari {
     using namespace nlohmann;
     struct to_json_impl {
         json data;
@@ -76,9 +76,9 @@ namespace Akari {
         impl.save(value);
         return std::move(impl.data);
     }
-} // namespace Akari
+} // namespace akari
 int main() {
-    using namespace Akari;
+    using namespace akari;
     // clang-format off
     class_<Foo>("Foo")
         .constructor<>()

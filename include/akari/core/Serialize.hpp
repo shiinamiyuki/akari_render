@@ -20,24 +20,23 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/SIMD.hpp>
+#ifndef AKARIRENDER_SERIALIZE_HPP
+#define AKARIRENDER_SERIALIZE_HPP
+#include <akari/Core/akari.h>
+#include <akari/Core/Platform.h>
+#include <akari/Core/detail/serialize-impl.hpp>
+#include <json.hpp>
+namespace akari {
+    class AKR_EXPORT SerializeContext : public Serialize::Context {
+      public:
+        Class *GetClass(const std::string &s) override;
+    };
+} // namespace akari
+namespace nlohmann {
+    template <> struct adl_serializer<akari::fs::path> {
+        static void from_json(const json &j, akari::fs::path &path) { path = akari::fs::path(j.get<std::string>()); }
 
-int main() {
-    using namespace akari;
-    simd_array<float*, 32>v;
-    simd_array<float, 32> a, b;
-    for (int i = 0; i < 32; i++) {
-        a[i] = 2 * i + 1;
-        b[i] = 3 * i + 2;
-    }
-    a = a + b;
-    auto mask = array_operator_lt<float, 32>::apply(a, b);
-    for (int i = 0; i < 32; i++) {
-        printf("%f %f %d\n", a[i], b[i], mask[i]);
-    }
-    auto c = select(~(a<100.0f & a> 50.0f), a, b);
-    for (int i = 0; i < 32; i++) {
-        printf("%f %f %f %d\n", a[i], b[i], c[i], mask[i]);
-    }
-
-}
+        static void to_json(json &j, const akari::fs::path &path) { j = path.string(); }
+    };
+} // namespace nlohmann
+#endif // AKARIRENDER_SERIALIZE_HPP

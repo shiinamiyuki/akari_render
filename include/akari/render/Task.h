@@ -20,24 +20,20 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/Core/SIMD.hpp>
+#ifndef AKARIRENDER_TASK_H
+#define AKARIRENDER_TASK_H
 
-int main() {
-    using namespace akari;
-    simd_array<float*, 32>v;
-    simd_array<float, 32> a, b;
-    for (int i = 0; i < 32; i++) {
-        a[i] = 2 * i + 1;
-        b[i] = 3 * i + 2;
-    }
-    a = a + b;
-    auto mask = array_operator_lt<float, 32>::apply(a, b);
-    for (int i = 0; i < 32; i++) {
-        printf("%f %f %d\n", a[i], b[i], mask[i]);
-    }
-    auto c = select(~(a<100.0f & a> 50.0f), a, b);
-    for (int i = 0; i < 32; i++) {
-        printf("%f %f %f %d\n", a[i], b[i], c[i], mask[i]);
-    }
+namespace akari {
+    class Task {
+      public:
+        virtual bool CanPause() const { return false; }
+        // Try to pause the task, might not work at all!
+        virtual void Pause() {}
+        virtual void Start() = 0;
+        virtual void Stop() {}
+        virtual void Resume() {}
+        virtual void Wait() = 0;
+    };
 
-}
+} // namespace akari
+#endif // AKARIRENDER_TASK_H
