@@ -105,8 +105,10 @@ struct Base{
 };
 
 struct Derived : Base{
+    int i = 0;
     void f()override {
-        printf("derived\n");
+        i++;
+        printf("derived %d\n", i);
     }
 };
 int main() {
@@ -146,7 +148,6 @@ int main() {
     fmt::print("foo.a={}\n", foo->a);
     {
         json _j;
-
         Foo foo1;
         printf("%p\n", &_j);
         foo1.u = vec3(1,2,3); dynamic_invoke("to_json", _j, foo1.u);
@@ -154,8 +155,12 @@ int main() {
         fmt::print("{}\n", save_to_json(foo1).dump(1));
     }
     //    fmt::print("v.a = {}\n", v.get_properties()["a"].as<int>());
-    auto derived_t = Type::get_by_name("Derived");
-    auto d =  derived_t.create_shared();
-    auto derived = d.shared_cast<Base>();
-    derived->f();
+    {
+        auto derived_t = Type::get_by_name("Derived");
+        auto d = derived_t.create_shared();
+        auto derived = d.shared_cast<Base>();
+        derived->f();
+        auto base =  make_any_ref(derived).shared_cast<Derived>();
+        base->f();
+    }
 }

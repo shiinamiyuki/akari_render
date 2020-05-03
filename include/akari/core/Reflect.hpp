@@ -97,6 +97,8 @@ namespace akari {
 
             virtual Any get_underlying() = 0;
 
+            virtual std::optional<TypeInfo> get_underlying_type() = 0;
+
             virtual std::optional<SequentialContainerView> get_container_view() = 0;
 
             //            virtual std::optional<AssociativeContainerView> get_associative_container_view() = 0;
@@ -121,7 +123,12 @@ namespace akari {
                 }
                 return Any();
             }
-
+            [[nodiscard]] inline std::optional<TypeInfo> get_underlying_type() override {
+                if constexpr (detail::is_shared_ptr_v<Actual> || std::is_pointer_v<Actual>) {
+                    return type_of<detail::get_internal_t<Actual>>();
+                }
+                return {};
+            }
             [[nodiscard]] std::optional<std::shared_ptr<void>> get_shared() const override {
                 if constexpr (detail::is_shared_ptr_v<Actual>) {
                     if constexpr (detail::is_reference_wrapper_v<T>) {
@@ -211,7 +218,7 @@ namespace akari {
             }
 
             std::shared_ptr<void> p = _ptr->get_shared().value();
-            if (auto opt = any_shared_pointer_cast(type_of<T>(), get_underlying().get_type(), p)) {
+            if (auto opt = any_shared_pointer_cast(type_of<T>(), _ptr->get_underlying_type().value(), p)) {
                 return std::reinterpret_pointer_cast<T>(opt.value());
             } else {
                 throw std::runtime_error("bad Any::shared_cast<T>()");

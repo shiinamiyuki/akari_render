@@ -107,7 +107,7 @@ function(add_test target)
     target_link_libraries(${target} AkariCore)
 endfunction()
 add_subdirectory(src/render)
-add_subdirectory(src/Tool)
+add_subdirectory(src/tool)
 
 add_executable(akari src/app/akari.cpp)
 target_link_libraries(akari AkariCoreRender)
@@ -122,6 +122,6 @@ if(AKARI_BUILD_GUI)
     target_link_libraries(AkariGui ImGui AkariCore)
 endif()
 
-add_executable(test-simd src/Test/simd.cpp)
+add_executable(test-simd src/test/simd.cpp)
 
 add_subdirectory(src/Test)
