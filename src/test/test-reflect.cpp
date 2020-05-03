@@ -100,6 +100,15 @@ namespace akari {
     };
 } // namespace akari
 
+struct Base{
+    virtual void f() =0 ;
+};
+
+struct Derived : Base{
+    void f()override {
+        printf("derived\n");
+    }
+};
 int main() {
     using namespace akari;
     // clang-format off
@@ -112,6 +121,8 @@ int main() {
             .property("u", &Foo::u)
             .method("hello", &Foo::hello);
     function("to_json", &json_serializer<vec3>::save);
+    class_<Derived,Base>("Derived")
+            .constructor<>();
     // clang-format on
     //    Any v = make_any(Foo());
     //    Type type = Type::get<Foo>();
@@ -143,4 +154,8 @@ int main() {
         fmt::print("{}\n", save_to_json(foo1).dump(1));
     }
     //    fmt::print("v.a = {}\n", v.get_properties()["a"].as<int>());
+    auto derived_t = Type::get_by_name("Derived");
+    auto d =  derived_t.create_shared();
+    auto derived = d.shared_cast<Base>();
+    derived->f();
 }

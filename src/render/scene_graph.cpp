@@ -24,7 +24,7 @@
 #include <akari/render/scene_graph.h>
 
 namespace akari {
-    void SceneGraph::CommitSetting(RenderSetting &setting) {
+    void SceneGraph::commit_settings(RenderSetting &setting) {
         auto &camera = setting.camera;
         auto &sampler = setting.sampler;
         auto &integrator = setting.integrator;
@@ -41,7 +41,7 @@ namespace akari {
         sampler->commit();
         integrator->commit();
     }
-    void SceneGraph::Commit() {
+    void SceneGraph::commit() {
 
         pScene = std::make_shared<Scene>();
         for (auto &mesh : scene.meshes) {
@@ -62,8 +62,8 @@ namespace akari {
         Info("Building Accelerator\n");
         pScene->Commit();
     }
-    std::shared_ptr<RenderTask> SceneGraph::CreateRenderTask(int settingId) {
-        CommitSetting(render.at(settingId));
+    std::shared_ptr<RenderTask> SceneGraph::create_render_task(int settingId) {
+        commit_settings(render.at(settingId));
         RenderContext ctx;
         ctx.scene = pScene;
         ctx.sampler = render.at(settingId).sampler;

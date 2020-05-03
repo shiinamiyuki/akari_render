@@ -33,89 +33,61 @@
 
 namespace akari {
     struct TypeInfo {
-        const char *name = nullptr;
+        std::string_view name;
 
-        bool operator==(const TypeInfo &rhs) const { return name == rhs.name || strcmp(name, rhs.name) == 0; }
+        bool operator==(const TypeInfo &rhs) const { return name == rhs.name; }
 
         bool operator!=(const TypeInfo &rhs) const { return !(rhs == *this); }
     };
 
-    template<typename T>
-    TypeInfo type_of() {
+    template <typename T> TypeInfo type_of() {
         TypeInfo type{typeid(T).name()};
         return type;
     }
 
-    template<typename T>
-    TypeInfo type_of(T &&v) {
+    template <typename T> TypeInfo type_of(T &&v) {
         TypeInfo type{typeid(v).name()};
         return type;
     }
 
     namespace detail {
-        template<typename T>
-        struct get_internal {
-            using type = T;
-        };
-        template<typename T>
-        struct get_internal<T *> {
-            using type = T;
-        };
-        template<typename T>
-        struct get_internal<std::shared_ptr<T>> {
-            using type = T;
-        };
-        template<typename T>
-        struct get_internal<std::reference_wrapper<T>> {
-            using type = T;
-        };
-        template<typename T> using get_internal_t = typename get_internal<T>::type;
+        template <typename T> struct get_internal { using type = T; };
+        template <typename T> struct get_internal<T *> { using type = T; };
+        template <typename T> struct get_internal<std::shared_ptr<T>> { using type = T; };
+        template <typename T> struct get_internal<std::reference_wrapper<T>> { using type = T; };
+        template <typename T> using get_internal_t = typename get_internal<T>::type;
 
-        template<typename T>
-        struct is_shared_ptr : std::false_type {
-        };
-        template<typename T>
-        struct is_shared_ptr<std::shared_ptr<T>> : std::true_type {
-        };
-        template<typename T> constexpr bool is_shared_ptr_v = is_shared_ptr<T>::value;
+        template <typename T> struct is_shared_ptr : std::false_type {};
+        template <typename T> struct is_shared_ptr<std::shared_ptr<T>> : std::true_type {};
+        template <typename T> constexpr bool is_shared_ptr_v = is_shared_ptr<T>::value;
 
-        template<typename T>
-        struct is_sequential_container : std::false_type {
-        };
-        template<typename T>
-        struct is_sequential_container<std::vector<T>> : std::true_type {
-            using type = T;
-        };
+        template <typename T> struct is_sequential_container : std::false_type {};
+        template <typename T> struct is_sequential_container<std::vector<T>> : std::true_type { using type = T; };
         //        template<typename T>struct is_sequential_container<std::list<T>>: std::true_type {};
-        template<typename T>
-        struct is_reference_wrapper : std::false_type {
-        };
-        template<typename T>
-        struct is_reference_wrapper<std::reference_wrapper<T>> : std::true_type {
-        };
-        template<typename T> constexpr bool is_reference_wrapper_v = is_reference_wrapper<T>::value;
+        template <typename T> struct is_reference_wrapper : std::false_type {};
+        template <typename T> struct is_reference_wrapper<std::reference_wrapper<T>> : std::true_type {};
+        template <typename T> constexpr bool is_reference_wrapper_v = is_reference_wrapper<T>::value;
     } // namespace detail
 
     struct Type;
     struct Any;
 
-    template<typename T>
-    Any make_any(T value);
+    template <typename T> Any make_any(T value);
 
-    template<typename T>
-    Any make_any_ref(T &&value);
+    template <typename T> Any make_any_ref(T &&value);
 
     struct SequentialContainerView;
     struct AssociativeContainerView;
 
     inline std::optional<void *> any_pointer_cast(TypeInfo to, TypeInfo from, void *p);
 
-    inline std::optional<void *> any_shared_pointer_cast(TypeInfo to, TypeInfo from, void *p);
+    inline std::optional<std::shared_ptr<void>> any_shared_pointer_cast(TypeInfo to, TypeInfo from,
+                                                                        std::shared_ptr<void> p);
 
     struct Any {
         friend struct Type;
 
-    private:
+      private:
         struct Container {
             [[nodiscard]] virtual std::unique_ptr<Container> clone() const = 0;
 
@@ -131,8 +103,7 @@ namespace akari {
             virtual ~Container() = default;
         };
 
-        template<typename Actual, typename T>
-        struct ContainerImpl : Container {
+        template <typename Actual, typename T> struct ContainerImpl : Container {
             T value;
 
             explicit ContainerImpl(const T &_value) : value(_value) {}
@@ -153,7 +124,7 @@ namespace akari {
 
             [[nodiscard]] std::optional<std::shared_ptr<void>> get_shared() const override {
                 if constexpr (detail::is_shared_ptr_v<Actual>) {
-                    if constexpr(detail::is_reference_wrapper_v<T>) {
+                    if constexpr (detail::is_reference_wrapper_v<T>) {
                         auto &tmp = const_cast<Actual &>(static_cast<detail::get_internal_t<T> &>(value));
                         return tmp;
                     } else {
@@ -168,33 +139,29 @@ namespace akari {
             //            inline std::optional<AssociativeContainerView> get_associative_container_view() override;
         };
 
-        template<typename A, typename T>
-        std::unique_ptr<Container> make_container(T &&value) {
+        template <typename A, typename T> std::unique_ptr<Container> make_container(T &&value) {
             return std::make_unique<ContainerImpl<A, T>>(value);
         }
 
-    public:
-        struct from_value_t {
-        };
-        struct from_ref_t {
-        };
+      public:
+        struct from_value_t {};
+        struct from_ref_t {};
 
         Any() = default;
 
-        template<typename T>
+        template <typename T>
         Any(T value, std::enable_if_t<std::is_reference_v<T>, std::true_type> _ = {})
-                : Any(from_ref_t{}, std::forward<T>(value)) {}
+            : Any(from_ref_t{}, std::forward<T>(value)) {}
 
-        template<typename T>
+        template <typename T>
         Any(T value, std::enable_if_t<!std::is_reference_v<T>, std::true_type> _ = {})
-                : Any(from_value_t{}, std::forward<T>(value)) {}
+            : Any(from_value_t{}, std::forward<T>(value)) {}
 
-        template<typename T>
-        Any(from_value_t _, T value) : type(type_of<T>()), kind(EValue) {
+        template <typename T> Any(from_value_t _, T value) : type(type_of<T>()), kind(EValue) {
             _ptr = make_container<std::decay_t<T>, T>(std::move(value));
         }
 
-        template<typename T, typename U = std::remove_reference_t<T>>
+        template <typename T, typename U = std::remove_reference_t<T>>
         Any(from_ref_t _, T &&value) : type(type_of<std::decay_t<T>>()), kind(ERef) {
             using R = std::reference_wrapper<U>;
             _ptr = make_container<std::decay_t<T>, R>(R(std::forward<T>(value)));
@@ -226,8 +193,7 @@ namespace akari {
             return *this;
         }
 
-        template<typename T>
-        [[nodiscard]] bool is_of() const {
+        template <typename T>[[nodiscard]] bool is_of() const {
             if (kind == EVoid) {
                 return std::is_same_v<T, void>;
             }
@@ -236,8 +202,7 @@ namespace akari {
 
         [[nodiscard]] bool has_value() const { return _ptr != nullptr && kind != EVoid; }
 
-        template<typename T>
-        std::shared_ptr<T> shared_cast() const {
+        template <typename T> std::shared_ptr<T> shared_cast() const {
             if (!is_shared_pointer()) {
                 throw std::runtime_error("Any is not of std::shared_ptr");
             }
@@ -246,15 +211,14 @@ namespace akari {
             }
 
             std::shared_ptr<void> p = _ptr->get_shared().value();
-            if (auto opt = any_shared_pointer_cast(type_of<T>(), type, p)) {
+            if (auto opt = any_shared_pointer_cast(type_of<T>(), get_underlying().get_type(), p)) {
                 return std::reinterpret_pointer_cast<T>(opt.value());
             } else {
                 throw std::runtime_error("bad Any::shared_cast<T>()");
             }
         }
 
-        template<typename U, typename T = std::remove_reference_t<U>>
-        T &as() const {
+        template <typename U, typename T = std::remove_reference_t<U>> T &as() const {
             //            AKARI_ASSERT(has_value());
             using P = std::conditional_t<std::is_const_v<T>, const void *, void *>;
             if (kind == EVoid) {
@@ -264,14 +228,15 @@ namespace akari {
 
                 P p;
                 if (kind == ERef) {
-                    using result_t = std::conditional_t<std::is_const_v<T>, std::reference_wrapper<const T>, std::reference_wrapper<T>>;
+                    using result_t = std::conditional_t<std::is_const_v<T>, std::reference_wrapper<const T>,
+                                                        std::reference_wrapper<T>>;
                     auto raw = _ptr->get();
                     auto ref_wrapper = *reinterpret_cast<result_t *>(raw);
                     p = &ref_wrapper.get();
                 } else {
                     p = _ptr->get();
                 }
-                if (auto opt = any_pointer_cast(type_of<T>(), type, const_cast<void*>(p))) {
+                if (auto opt = any_pointer_cast(type_of<T>(), type, const_cast<void *>(p))) {
                     return *reinterpret_cast<T *>(const_cast<P>(opt.value()));
                 } else {
                     throw std::runtime_error("bad Any::as<T>()");
@@ -279,7 +244,8 @@ namespace akari {
 
             } else {
                 if (kind == ERef) {
-                    using result_t = std::conditional_t<std::is_const_v<T>, std::reference_wrapper<const T>, std::reference_wrapper<T>>;
+                    using result_t = std::conditional_t<std::is_const_v<T>, std::reference_wrapper<const T>,
+                                                        std::reference_wrapper<T>>;
                     auto raw = _ptr->get();
                     auto ref_wrapper = *reinterpret_cast<result_t *>(raw);
                     return ref_wrapper.get();
@@ -291,8 +257,7 @@ namespace akari {
             }
         }
 
-        template<typename T>
-        const T &as_const() const { return const_cast<Any *>(this)->as<T>(); }
+        template <typename T> const T &as_const() const { return const_cast<Any *>(this)->as<T>(); }
 
         [[nodiscard]] bool is_pointer() const { return _ptr->get_underlying().has_value(); }
 
@@ -304,17 +269,14 @@ namespace akari {
 
         inline const TypeInfo &get_type() const { return type; }
 
-    private:
+      private:
         TypeInfo type;
         std::unique_ptr<Container> _ptr;
-        enum Kind : uint8_t {
-            EVoid, EValue, ERef
-        };
+        enum Kind : uint8_t { EVoid, EValue, ERef };
         Kind kind = EVoid;
     };
 
-    template<typename T>
-    struct _AnyIterator {
+    template <typename T> struct _AnyIterator {
         std::function<void(const T &)> inc, dec;
         std::function<T(const T &)> get;
         std::function<bool(const T &, const T &)> compare;
@@ -338,24 +300,19 @@ namespace akari {
     };
 
     using AnyIterator = _AnyIterator<Any>;
-    template<typename T>
-    struct _ContainerView {
+    template <typename T> struct _ContainerView {
         std::function<_AnyIterator<T>()> begin, end;
         std::function<_AnyIterator<T>(const _AnyIterator<T> &)> erase;
         std::function<void(const _AnyIterator<T> &, const T &)> insert;
     };
-    struct SequentialContainerView : _ContainerView<Any> {
-    };
-    struct AssociativeContainerView : _ContainerView<std::pair<Any, Any>> {
-    };
+    struct SequentialContainerView : _ContainerView<Any> {};
+    struct AssociativeContainerView : _ContainerView<std::pair<Any, Any>> {};
 
-    template<typename T>
-    Any make_any(T value) { return Any(Any::from_value_t{}, std::move(value)); }
+    template <typename T> Any make_any(T value) { return Any(Any::from_value_t{}, std::move(value)); }
 
-    template<typename T>
-    Any make_any_ref(T &&value) { return Any(Any::from_ref_t{}, std::forward<T>(value)); }
+    template <typename T> Any make_any_ref(T &&value) { return Any(Any::from_ref_t{}, std::forward<T>(value)); }
 
-    template<typename Actual, typename T>
+    template <typename Actual, typename T>
     inline std::optional<SequentialContainerView> Any::ContainerImpl<Actual, T>::get_container_view() {
         if constexpr (!detail::is_sequential_container<Actual>::value) {
             return {};
@@ -388,17 +345,15 @@ namespace akari {
         return _ptr->get_container_view();
     }
 
-    template<size_t Idx, typename Tuple>
-    struct get_nth_element {
+    template <size_t Idx, typename Tuple> struct get_nth_element {
         using type = typename std::tuple_element<Idx, Tuple>::type;
     };
 
-    template<size_t Idx, typename Tuple> using nth_element_t = typename get_nth_element<Idx, Tuple>::type;
+    template <size_t Idx, typename Tuple> using nth_element_t = typename get_nth_element<Idx, Tuple>::type;
 
     struct Function {
-    private:
-        template<typename R, typename T>
-        static Any _make_any_(T &&value) {
+      private:
+        template <typename R, typename T> static Any _make_any_(T &&value) {
             if constexpr (std::is_reference_v<R>) {
                 return make_any_ref(value);
             } else {
@@ -408,50 +363,43 @@ namespace akari {
 
         std::vector<TypeInfo> signature;
 
-    public:
+      public:
         Function() = default;
 
         using FunctionWrapper = std::function<Any(std::vector<Any>)>;
 
-        template<typename... Args>
-        Any invoke(Args &&... args) {
+        template <typename... Args> Any invoke(Args &&... args) {
             static_assert(std::conjunction_v<std::is_same<Args, Any>...>);
             std::vector<Any> v{args...};
             return wrapper(std::move(v));
         }
 
-        template<typename F, typename = std::enable_if_t<std::is_class_v<F>>>
-        explicit Function(F &&f) {
+        template <typename F, typename = std::enable_if_t<std::is_class_v<F>>> explicit Function(F &&f) {
             std::function _f = f;
             _from_lambda(std::move(_f));
         }
 
-        template<typename T, typename R, typename... Args>
-        explicit Function(R (T::*f)(Args...)) {
+        template <typename T, typename R, typename... Args> explicit Function(R (T::*f)(Args...)) {
             std::function _method = [=](T &obj, Args... args) -> R { return (obj.*f)(args...); };
             _from<decltype(_method), R, T, Args...>(std::move(_method));
         }
 
-        template<typename R, typename... Args>
-        explicit Function(const std::function<R(Args...)> &f) {
+        template <typename R, typename... Args> explicit Function(const std::function<R(Args...)> &f) {
             _from<decltype(f), R, Args...>(f);
         }
 
-        template<typename R, typename... Args>
-        explicit Function(R (*f)(Args...)) {
+        template <typename R, typename... Args> explicit Function(R (*f)(Args...)) {
             _from<decltype(f), R, Args...>(f);
         }
 
         [[nodiscard]] const std::vector<TypeInfo> &get_signature() const { return signature; }
 
-    private:
-        template<typename R, typename... Args>
-        void _from_lambda(std::function<R(Args...)> &&f) {
+      private:
+        template <typename R, typename... Args> void _from_lambda(std::function<R(Args...)> &&f) {
             _from<std::function<R(Args...)>, R, Args...>(std::move(f));
         }
 
-        template<typename F, typename R, typename... Args>
-        void _from(F f) {
+        template <typename F, typename R, typename... Args> void _from(F f) {
             signature = {type_of<Args>()...};
             wrapper = [=](std::vector<Any> arg) -> Any {
                 using arg_list_t = std::tuple<Args...>;
@@ -577,13 +525,11 @@ namespace akari {
     using Attributes = std::unordered_map<std::string, std::string>;
     namespace detail {
         struct meta_instance;
-        template<typename T>
-        struct meta_instance_handle;
+        template <typename T> struct meta_instance_handle;
     } // namespace detail
     struct Property {
         friend struct detail::meta_instance;
-        template<typename T> friend
-        struct detail::meta_instance_handle;
+        template <typename T> friend struct detail::meta_instance_handle;
 
         [[nodiscard]] const char *name() const { return _name.data(); }
 
@@ -607,7 +553,7 @@ namespace akari {
             }
         }
 
-    private:
+      private:
         std::function<void(const Any &, const Any &)> _set;
         std::function<Any(const Any &)> _get;
         std::function<void(const Any &, const Any &)> _set_ptr;
@@ -618,8 +564,7 @@ namespace akari {
 
     struct Method {
         friend struct detail::meta_instance;
-        template<typename T> friend
-        struct detail::meta_instance_handle;
+        template <typename T> friend struct detail::meta_instance_handle;
 
         [[nodiscard]] const char *name() const { return _name.data(); }
 
@@ -627,12 +572,11 @@ namespace akari {
 
         Method(const char *name, const Attributes &attr) : _name(name), _attr(attr) {}
 
-        template<typename T, typename... Args>
-        Any invoke(T &obj, Args &&... args) {
+        template <typename T, typename... Args> Any invoke(T &obj, Args &&... args) {
             return _function.invoke(Any(const_cast<std::remove_cv_t<T> &>(obj)), Any(std::forward<Args>(args))...);
         }
 
-    private:
+      private:
         std::string_view _name;
         std::reference_wrapper<const Attributes> _attr;
         Function _function;
@@ -646,17 +590,12 @@ namespace akari {
             std::unordered_map<std::string, Attributes> attributes;
             std::vector<Function> constructors;
             std::vector<Function> shared_constructors;
-            std::vector<std::function<std::optional<void *>(TypeInfo, TypeInfo, void *)>> cast_funcs;
-            std::vector<std::function<std::optional<std::shared_ptr<void>>(TypeInfo, TypeInfo, std::shared_ptr<void>)>>
-                    shared_cast_funcs;
         };
 
-        template<typename U>
-        struct meta_instance_handle {
+        template <typename U> struct meta_instance_handle {
             meta_instance_handle(meta_instance &i)
-                    : properties(i.properties), methods(i.methods), attributes(i.attributes),
-                      constructors(i.constructors),
-                      shared_constructors(i.shared_constructors) {}
+                : properties(i.properties), methods(i.methods), attributes(i.attributes), constructors(i.constructors),
+                  shared_constructors(i.shared_constructors) {}
 
             std::unordered_map<std::string, Property> &properties;
             std::unordered_map<std::string, Method> &methods;
@@ -665,8 +604,7 @@ namespace akari {
             std::vector<Function> &constructors;
             std::vector<Function> &shared_constructors;
 
-            template<typename... Args>
-            meta_instance_handle &constructor() {
+            template <typename... Args> meta_instance_handle &constructor() {
                 std::function<U(Args...)> ctor = [](Args... args) { return U(std::forward<Args>(args)...); };
                 std::function<std::shared_ptr<U>(Args...)> ctor_shared = [](Args... args) {
                     return std::make_shared<U>(std::forward<Args>(args)...);
@@ -676,13 +614,12 @@ namespace akari {
                 return *this;
             }
 
-            template<typename T, typename... Args>
+            template <typename T, typename... Args>
             meta_instance_handle &method(const char *name, T (U::*f)(Args...) const) {
                 return method(name, reinterpret_cast<T (U::*)(Args...)>(f));
             }
 
-            template<typename T, typename... Args>
-            meta_instance_handle &method(const char *name, T (U::*f)(Args...)) {
+            template <typename T, typename... Args> meta_instance_handle &method(const char *name, T (U::*f)(Args...)) {
                 auto it = attributes.find(name);
                 if (it == attributes.end()) {
                     attributes.insert(std::make_pair(name, Attributes()));
@@ -693,8 +630,7 @@ namespace akari {
                 return *this;
             }
 
-            template<typename T>
-            meta_instance_handle &property(const char *name, T U::*p) {
+            template <typename T> meta_instance_handle &property(const char *name, T U::*p) {
                 auto it = attributes.find(name);
                 if (it == attributes.end()) {
                     attributes.insert(std::make_pair(name, Attributes()));
@@ -720,137 +656,98 @@ namespace akari {
                 return *this;
             }
         };
-
+        struct hash_pair {
+            template <class T1, class T2> size_t operator()(const std::pair<T1, T2> &p) const {
+                auto hash1 = std::hash<T1>{}(p.first);
+                auto hash2 = std::hash<T2>{}(p.second);
+                return hash1 ^ hash2;
+            }
+        };
         struct AKR_EXPORT reflection_manager {
-            std::unordered_map<std::string_view, meta_instance> instances;
-            std::unordered_map<std::string_view, const char *> name_map;
-            std::unordered_map<std::string_view, std::vector<Function>> functions;
 
+            std::unordered_map<std::string_view, meta_instance> instances;
+            std::unordered_map<std::string_view, std::string_view> name_map;
+            std::unordered_map<std::string_view, std::vector<Function>> functions;
+            std::unordered_map<std::pair<std::string_view, std::string_view>,
+                               std::function<std::optional<void *>(TypeInfo, TypeInfo, void *)>, hash_pair>
+                cast_funcs;
+            std::unordered_map<
+                std::pair<std::string_view, std::string_view>,
+                std::function<std::optional<std::shared_ptr<void>>(TypeInfo, TypeInfo, std::shared_ptr<void>)>,
+                hash_pair>
+                shared_cast_funcs;
             static reflection_manager &instance();
         };
 
     } // namespace detail
     inline std::optional<void *> any_pointer_cast(TypeInfo to, TypeInfo from, void *p) {
         auto &mgr = detail::reflection_manager::instance();
-        {
-            auto it = mgr.instances.find(from.name);
-            if (it != mgr.instances.end()) {
-                auto &instance = it->second;
-                for (auto &f : instance.cast_funcs) {
-                    if (auto r = f(to, from, p)) {
-                        return r;
-                    }
-                }
-            }
+
+        auto it = mgr.cast_funcs.find(std::make_pair(to.name, from.name));
+        if (it != mgr.cast_funcs.end()) {
+            return it->second(to, from, p);
         }
-        {
-            auto it = mgr.instances.find(to.name);
-            if (it != mgr.instances.end()) {
-                auto &instance = it->second;
-                for (auto &f : instance.cast_funcs) {
-                    if (auto r = f(to, from, p)) {
-                        return r;
-                    }
-                }
-            }
-        }
+
         return {};
     }
 
     inline std::optional<std::shared_ptr<void>> any_shared_pointer_cast(TypeInfo to, TypeInfo from,
                                                                         std::shared_ptr<void> p) {
         auto &mgr = detail::reflection_manager::instance();
-        {
-            auto it = mgr.instances.find(from.name);
-            if (it != mgr.instances.end()) {
-                auto &instance = it->second;
-                for (auto &f : instance.shared_cast_funcs) {
-                    if (auto r = f(to, from, p)) {
-                        return r;
-                    }
-                }
-            }
-        }
-        {
-            auto it = mgr.instances.find(to.name);
-            if (it != mgr.instances.end()) {
-                auto &instance = it->second;
-                for (auto &f : instance.shared_cast_funcs) {
-                    if (auto r = f(to, from, p)) {
-                        return r;
-                    }
-                }
-            }
+        auto it = mgr.shared_cast_funcs.find(std::make_pair(to.name, from.name));
+        if (it != mgr.shared_cast_funcs.end()) {
+            return it->second(to, from, p);
         }
         return {};
     }
 
     namespace detail {
-        template<typename T>
-        struct register_cast_func {
-            template<typename U, typename... Rest>
-            static void do_it() {
+        template <typename T> struct register_cast_func {
+            template <typename To, typename From> static void do_it1() {
                 auto &mgr = detail::reflection_manager::instance();
                 std::function<std::optional<void *>(TypeInfo, TypeInfo, void *)> f =
-                        [](TypeInfo to, TypeInfo from, void *p) -> std::optional<void *> {
-                            auto q = dynamic_cast<T *>(reinterpret_cast<U *>(p));
-                            return q;
-                        };
+                    [](TypeInfo to, TypeInfo from, void *p) -> std::optional<void *> {
+                    if (to == type_of<To>() && from == type_of<From>()) {
+                        auto q = dynamic_cast<To *>(reinterpret_cast<From *>(p));
+                        return q;
+                    }
+                    return {};
+                };
 
-                {
-                    auto type = type_of<U>();
-                    if (mgr.instances.find(type.name) == mgr.instances.end()) {
-                        mgr.instances[type.name] = detail::meta_instance();
+                mgr.cast_funcs.emplace(std::make_pair(type_of<To>().name, type_of<From>().name), f);
+            }
+
+            template <typename To, typename From> static void do_it_shared1() {
+                auto &mgr = detail::reflection_manager::instance();
+                std::function<std::optional<std::shared_ptr<void>>(TypeInfo, TypeInfo, std::shared_ptr<void>)> f =
+                    [](TypeInfo to, TypeInfo from, std::shared_ptr<void> p) -> std::optional<std::shared_ptr<void>> {
+                    if (to == type_of<To>() && from == type_of<From>()) {
+                        auto q = std::dynamic_pointer_cast<To>(std::reinterpret_pointer_cast<From>(p));
+                        return q;
+                    } else {
+                        return {};
                     }
-                    auto &instance = mgr.instances[type.name];
-                    instance.cast_funcs.push_back(f);
-                }
-                {
-                    auto type = type_of<T>();
-                    if (mgr.instances.find(type.name) == mgr.instances.end()) {
-                        mgr.instances[type.name] = detail::meta_instance();
-                    }
-                    auto &instance = mgr.instances[type.name];
-                    instance.cast_funcs.push_back(f);
-                }
+                };
+
+                mgr.shared_cast_funcs.emplace(std::make_pair(type_of<To>().name, type_of<From>().name), f);
+            }
+            template <typename U, typename... Rest> static void do_it_shared() {
+                do_it1<T, U>();
+                do_it1<U, T>();
                 if constexpr (sizeof...(Rest) > 0) {
                     do_it<Rest...>();
                 }
             }
-
-            template<typename U, typename... Rest>
-            static void do_it_shared() {
-                auto &mgr = detail::reflection_manager::instance();
-                std::function<std::optional<std::shared_ptr<void>>(TypeInfo, TypeInfo, std::shared_ptr<void>)> f =
-                        [](TypeInfo to, TypeInfo from, void *p) -> std::optional<void *> {
-                            auto q = std::dynamic_pointer_cast<T>(std::reinterpret_pointer_cast<U>(p));
-                            return q;
-                        };
-
-                {
-                    auto type = type_of<U>();
-                    if (mgr.instances.find(type.name) == mgr.instances.end()) {
-                        mgr.instances[type.name] = detail::meta_instance();
-                    }
-                    auto &instance = mgr.instances[type.name];
-                    instance.shared_constructors.push_back(f);
-                }
-                {
-                    auto type = type_of<T>();
-                    if (mgr.instances.find(type.name) == mgr.instances.end()) {
-                        mgr.instances[type.name] = detail::meta_instance();
-                    }
-                    auto &instance = mgr.instances[type.name];
-                    instance.shared_constructors.push_back(f);
-                }
+            template <typename U, typename... Rest> static void do_it() {
+                do_it_shared1<T, U>();
+                do_it_shared1<U, T>();
                 if constexpr (sizeof...(Rest) > 0) {
                     do_it_shared<Rest...>();
                 }
             }
         };
     } // namespace detail
-    template<typename T, typename... Base>
-    detail::meta_instance_handle<T> class_(const char *name = nullptr) {
+    template <typename T, typename... Base> detail::meta_instance_handle<T> class_(const char *name = nullptr) {
         auto type = type_of<T>();
         auto &mgr = detail::reflection_manager::instance();
         if (mgr.instances.find(type.name) == mgr.instances.end()) {
@@ -861,60 +758,56 @@ namespace akari {
         }
         if constexpr (sizeof...(Base) > 0) {
             detail::register_cast_func<T>::template do_it<Base...>();
+            detail::register_cast_func<T>::template do_it_shared<Base...>();
         }
         return detail::meta_instance_handle<T>(mgr.instances[type.name]);
     }
 
-    template<typename F>
-    void function(const char *name, F &&f) {
+    template <typename F> void function(const char *name, F &&f) {
         auto &mgr = detail::reflection_manager::instance();
         mgr.functions[name].emplace_back(f);
     }
 
-    template<typename... Args>
-    inline Any dynamic_invoke(const char *name, Args &&... args) {
+    template <typename... Args> inline Any dynamic_invoke(const char *name, Args &&... args) {
         auto &mgr = detail::reflection_manager::instance();
         auto &funcs = mgr.functions.at(name);
         for (auto &func : funcs) {
             try {
                 return func.invoke(Any(std::forward<Args>(args))...);
-            } catch (std::runtime_error &e) {}
+            } catch (std::runtime_error &e) {
+            }
         }
         throw std::runtime_error(std::string("no matching function when calling ") + name);
     }
 
-    template<typename... Args>
-    inline std::optional<Any> dynamic_invoke_noexcept(const char *name, Args &&... args) {
+    template <typename... Args> inline std::optional<Any> dynamic_invoke_noexcept(const char *name, Args &&... args) {
         auto &mgr = detail::reflection_manager::instance();
         auto &funcs = mgr.functions.at(name);
         for (auto &func : funcs) {
             try {
                 return func.invoke(Any(std::forward<Args>(args))...);
-            } catch (std::runtime_error &e) {}
+            } catch (std::runtime_error &e) {
+            }
         }
         return {};
     }
 
     struct Type {
-        template<typename T>
-        struct _tag {
-        };
+        template <typename T> struct _tag {};
 
-        template<typename T>
-        static const Type &get() {
+        template <typename T> static const Type &get() {
             static Type _this_type(_tag<T>{});
             return _this_type;
         }
 
-        static const Type &get_by_name(const char *name) {
-            static Type _this_type(detail::reflection_manager::instance().name_map.at(name));
+        static Type get_by_name(const char *name) {
+            Type _this_type(detail::reflection_manager::instance().name_map.at(name));
             return _this_type;
         }
 
         static Type get(const Any &any) { return Type(get_by_typeid(any.type.name)); }
 
-        template<typename T>
-        static Type get_by_typeid(T &&v) {
+        template <typename T> static Type get_by_typeid(T &&v) {
             Type _this_type(type_of(v).name);
             return _this_type;
         }
@@ -939,8 +832,7 @@ namespace akari {
             return v;
         }
 
-        template<typename... Args>
-        [[nodiscard]] Any create(Args &&... args) const {
+        template <typename... Args>[[nodiscard]] Any create(Args &&... args) const {
             for (auto &ctor : _get().constructors) {
                 try {
                     return ctor.invoke(Any(std::forward<Args>(args))...);
@@ -950,8 +842,7 @@ namespace akari {
             throw std::runtime_error("no matching constructor");
         }
 
-        template<typename... Args>
-        [[nodiscard]] Any create_shared(Args &&... args) const {
+        template <typename... Args>[[nodiscard]] Any create_shared(Args &&... args) const {
             for (auto &ctor : _get().shared_constructors) {
                 try {
                     return ctor.invoke(Any(std::forward<Args>(args))...);
@@ -963,10 +854,10 @@ namespace akari {
 
         Type(TypeInfo typeInfo) : Type(typeInfo.name) {}
 
-    private:
+      private:
         std::function<detail::meta_instance &(void)> _get;
 
-        explicit Type(const char *type) {
+        Type(std::string_view type) {
             _get = [=]() -> detail::meta_instance & {
                 auto &mgr = detail::reflection_manager::instance();
                 // possible thread-safety issue
@@ -975,8 +866,7 @@ namespace akari {
             };
         }
 
-        template<typename T>
-        explicit Type(_tag<T>) : Type(type_of<T>().name) {}
+        template <typename T> explicit Type(_tag<T>) : Type(type_of<T>().name) {}
     };
 
 } // namespace akari

@@ -24,7 +24,7 @@
 #define AKARIRENDER_COREBIDIR_H
 
 #include <akari/render/camera.h>
-#include <akari/render/end_point.h>
+#include <akari/render/endpoint.h>
 #include <akari/render/integrator.h>
 #include <akari/render/light.h>
 namespace akari {

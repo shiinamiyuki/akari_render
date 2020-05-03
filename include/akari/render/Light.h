@@ -25,7 +25,7 @@
 
 #include <akari/core/component.h>
 #include <akari/core/spectrum.h>
-#include <akari/render/end_point.h>
+#include <akari/render/endpoint.h>
 #include <akari/render/geometry.hpp>
 #include <akari/render/scene.h>
 

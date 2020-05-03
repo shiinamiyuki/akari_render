@@ -52,11 +52,11 @@ namespace akari {
         std::vector<RenderSetting> render;
         SceneSetting scene;
         AKR_SER(render, scene)
-        std::shared_ptr<RenderTask> CreateRenderTask(int settingId);
-        void Commit();
+        std::shared_ptr<RenderTask> create_render_task(int settingId);
+        void commit();
 
       private:
-        void CommitSetting(RenderSetting &setting);
+        void commit_settings(RenderSetting &setting);
         std::shared_ptr<Scene> pScene;
     };
 } // namespace akari

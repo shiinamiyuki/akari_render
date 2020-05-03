@@ -72,10 +72,10 @@ int main(int argc, char **argv) {
 
             graph = std::make_shared<SceneGraph>(Serialize::fromJson<SceneGraph>(ctx, data));
         }
-        graph->Commit();
+        graph->commit();
         Info("Start Rendering ...\n");
         for (size_t i = 0; i < graph->render.size(); i++) {
-            auto task = graph->CreateRenderTask(i);
+            auto task = graph->create_render_task(i);
             task->Start();
             task->Wait();
             auto film = task->GetFilmUpdate();
