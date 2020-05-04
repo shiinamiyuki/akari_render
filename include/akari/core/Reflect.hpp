@@ -435,8 +435,15 @@ namespace akari {
         return _ptr->get_container_view();
     }
 
+    template <typename... Args> struct TypeList {};
+    template <size_t Idx, typename... Args> struct get_nth_type {};
+    template <typename T> struct get_nth_type<0, TypeList<T>> { using type = T; };
+    template <typename T, typename... Args> struct get_nth_type<0, TypeList<T, Args...>> { using type = T; };
+    template <size_t Idx, typename T, typename... Args> struct get_nth_type<Idx, TypeList<T, Args...>> {
+        using type = typename get_nth_type<Idx - 1, TypeList<Args...>>::type;
+    };
     template <size_t Idx, typename Tuple> struct get_nth_element {
-        using type = typename std::tuple_element<Idx, Tuple>::type;
+        using type = typename get_nth_type<Idx, Tuple>::type;
     };
 
     template <size_t Idx, typename Tuple> using nth_element_t = typename get_nth_element<Idx, Tuple>::type;
@@ -489,10 +496,69 @@ namespace akari {
             _from<std::function<R(Args...)>, R, Args...>(std::move(f));
         }
 
+        template <typename T>
+        struct get_arg_type{
+            using type = std::conditional_t<
+                detail::is_shared_ptr_v<std::decay_t<T>>,
+                  std::conditional_t<std::is_reference_v<T> && !std::is_const_v<std::remove_reference_t<T>>,
+                        T&,
+                                    std::shared_ptr<detail::get_internal_t<std::remove_reference_t<T>>>> ,
+                T&>;
+        };
+        template <typename T> static typename get_arg_type<T>::type get_arg(const Any &any) {
+            if constexpr (detail::is_shared_ptr_v<std::decay_t<T>>) {
+                if constexpr (std::is_reference_v<T> && !std::is_const_v<std::remove_reference_t<T>>) {
+                    // is not const reference
+                    return any.as<T>();
+                } else {
+                    return any.shared_cast<detail::get_internal_t<std::remove_reference_t<T>>>();
+                }
+            } else {
+                // not shared_ptr
+                return any.as<T>();
+            }
+        }
+#define BIG_BIG_SWITCH(BEFORE, AFTER)                                                                                  \
+    if constexpr (nArgs == 0) {                                                                                        \
+        BEFORE(f()) AFTER                                                                                              \
+    } else if constexpr (nArgs == 1) {                                                                                 \
+        BEFORE(f(get_arg<nth_element_t<0, arg_list_t>>(arg[0]))) AFTER                                                 \
+    } else if constexpr (nArgs == 2) {                                                                                 \
+        BEFORE(f(get_arg<nth_element_t<0, arg_list_t>>(arg[0]), get_arg<nth_element_t<1, arg_list_t>>(arg[1]))) AFTER  \
+    } else if constexpr (nArgs == 3) {                                                                                 \
+        BEFORE(f(get_arg<nth_element_t<0, arg_list_t>>(arg[0]), get_arg<nth_element_t<1, arg_list_t>>(arg[1]),         \
+                 get_arg<nth_element_t<2, arg_list_t>>(arg[2])));                                                      \
+    } else if constexpr (nArgs == 4) {                                                                                 \
+        BEFORE(f(get_arg<nth_element_t<0, arg_list_t>>(arg[0]), get_arg<nth_element_t<1, arg_list_t>>(arg[1]),         \
+                 get_arg<nth_element_t<2, arg_list_t>>(arg[2]), get_arg<nth_element_t<3, arg_list_t>>(arg[3])))        \
+        AFTER                                                                                                          \
+    } else if constexpr (nArgs == 5) {                                                                                 \
+        BEFORE(f(get_arg<nth_element_t<0, arg_list_t>>(arg[0]), get_arg<nth_element_t<1, arg_list_t>>(arg[1]),         \
+                 get_arg<nth_element_t<2, arg_list_t>>(arg[2]), get_arg<nth_element_t<3, arg_list_t>>(arg[3]),         \
+                 get_arg<nth_element_t<4, arg_list_t>>(arg[4])))                                                       \
+        AFTER                                                                                                          \
+    } else if constexpr (nArgs == 6) {                                                                                 \
+        BEFORE(f(get_arg<nth_element_t<0, arg_list_t>>(arg[0]), get_arg<nth_element_t<1, arg_list_t>>(arg[1]),         \
+                 get_arg<nth_element_t<2, arg_list_t>>(arg[2]), get_arg<nth_element_t<3, arg_list_t>>(arg[3]),         \
+                 get_arg<nth_element_t<4, arg_list_t>>(arg[4]), get_arg<nth_element_t<5, arg_list_t>>(arg[5])))        \
+        AFTER                                                                                                          \
+    } else if constexpr (nArgs == 7) {                                                                                 \
+        BEFORE(f(get_arg<nth_element_t<0, arg_list_t>>(arg[0]), get_arg<nth_element_t<1, arg_list_t>>(arg[1]),         \
+                 get_arg<nth_element_t<2, arg_list_t>>(arg[2]), get_arg<nth_element_t<3, arg_list_t>>(arg[3]),         \
+                 get_arg<nth_element_t<4, arg_list_t>>(arg[4]), get_arg<nth_element_t<5, arg_list_t>>(arg[5]),         \
+                 get_arg<nth_element_t<6, arg_list_t>>(arg[6])))                                                       \
+        AFTER                                                                                                          \
+    } else {                                                                                                           \
+        BEFORE(f(get_arg<nth_element_t<0, arg_list_t>>(arg[0]), get_arg<nth_element_t<1, arg_list_t>>(arg[1]),         \
+                 get_arg<nth_element_t<2, arg_list_t>>(arg[2]), get_arg<nth_element_t<3, arg_list_t>>(arg[3]),         \
+                 get_arg<nth_element_t<4, arg_list_t>>(arg[4]), get_arg<nth_element_t<5, arg_list_t>>(arg[5]),         \
+                 get_arg<nth_element_t<6, arg_list_t>>(arg[6]), get_arg<nth_element_t<7, arg_list_t>>(arg[7])))        \
+        AFTER                                                                                                          \
+    }
         template <typename F, typename R, typename... Args> void _from(F f) {
             signature = {type_of<Args>()...};
             wrapper = [=](std::vector<Any> arg) -> Any {
-                using arg_list_t = std::tuple<Args...>;
+                using arg_list_t = TypeList<Args...>;
                 // clang-format off
                 constexpr auto nArgs = sizeof...(Args);
                 if (arg.size() != nArgs) {
@@ -500,115 +566,14 @@ namespace akari {
                 }
                 static_assert(nArgs <= 8, "at most 8 args are supported");
                 if constexpr (!std::is_same_v<R, void>) {
-                    if constexpr (nArgs == 0) {
-                        return _make_any_<R>(f());
-                    } else if constexpr (nArgs == 1) {
-                        return _make_any_<R>(f(arg[0].as<nth_element_t<0, arg_list_t>>()));
-                    } else if constexpr (nArgs == 2) {
-                        return _make_any_<R>(f(arg[0].as<nth_element_t<0, arg_list_t>>(),
-                                               arg[1].as<nth_element_t<1, arg_list_t>>()));
-                    } else if constexpr (nArgs == 3) {
-                        return _make_any_<R>(f(arg[0].as<nth_element_t<0, arg_list_t>>(),
-                                               arg[1].as<nth_element_t<1, arg_list_t>>(),
-                                               arg[2].as<nth_element_t<2, arg_list_t>>()));
-                    } else if constexpr (nArgs == 4) {
-                        return _make_any_<R>(f(arg[0].as<nth_element_t<0, arg_list_t>>(),
-                                               arg[1].as<nth_element_t<1, arg_list_t>>(),
-                                               arg[2].as<nth_element_t<2, arg_list_t>>(),
-                                               arg[3].as<nth_element_t<3, arg_list_t>>()));
-                    } else if constexpr (nArgs == 5) {
-                        return _make_any_<R>(f(arg[0].as<nth_element_t<0, arg_list_t>>(),
-                                               arg[1].as<nth_element_t<1, arg_list_t>>(),
-                                               arg[2].as<nth_element_t<2, arg_list_t>>(),
-                                               arg[3].as<nth_element_t<3, arg_list_t>>(),
-                                               arg[4].as<nth_element_t<4, arg_list_t>>()));
-                    } else if constexpr (nArgs == 6) {
-                        return _make_any_<R>(f(arg[0].as<nth_element_t<0, arg_list_t>>(),
-                                               arg[1].as<nth_element_t<1, arg_list_t>>(),
-                                               arg[2].as<nth_element_t<2, arg_list_t>>(),
-                                               arg[3].as<nth_element_t<3, arg_list_t>>(),
-                                               arg[4].as<nth_element_t<4, arg_list_t>>(),
-                                               arg[5].as<nth_element_t<5, arg_list_t>>()));
-                    } else if constexpr (nArgs == 7) {
-                        return _make_any_<R>(f(arg[0].as<nth_element_t<0, arg_list_t>>(),
-                                               arg[1].as<nth_element_t<1, arg_list_t>>(),
-                                               arg[2].as<nth_element_t<2, arg_list_t>>(),
-                                               arg[3].as<nth_element_t<3, arg_list_t>>(),
-                                               arg[4].as<nth_element_t<4, arg_list_t>>(),
-                                               arg[5].as<nth_element_t<5, arg_list_t>>(),
-                                               arg[6].as<nth_element_t<6, arg_list_t>>()));
-                    } else {
-                        return _make_any_<R>(f(arg[0].as<nth_element_t<0, arg_list_t>>(),
-                                               arg[1].as<nth_element_t<1, arg_list_t>>(),
-                                               arg[2].as<nth_element_t<2, arg_list_t>>(),
-                                               arg[3].as<nth_element_t<3, arg_list_t>>(),
-                                               arg[4].as<nth_element_t<4, arg_list_t>>(),
-                                               arg[5].as<nth_element_t<5, arg_list_t>>(),
-                                               arg[6].as<nth_element_t<6, arg_list_t>>(),
-                                               arg[7].as<nth_element_t<7, arg_list_t>>()));
-                    }
+                    BIG_BIG_SWITCH(return _make_any_<R>, ;)
                 } else {
-                    if constexpr (nArgs == 0) {
-                        (f());
-                        return Any();
-                    } else if constexpr (nArgs == 1) {
-                        (f(arg[0].as<nth_element_t<0, arg_list_t>>()));
-                        return Any();
-                    } else if constexpr (nArgs == 2) {
-                        (f(arg[0].as<nth_element_t<0, arg_list_t>>(),
-                           arg[1].as<nth_element_t<1, arg_list_t>>()));
-                        return Any();
-                    } else if constexpr (nArgs == 3) {
-                        (f(arg[0].as<nth_element_t<0, arg_list_t>>(),
-                           arg[1].as<nth_element_t<1, arg_list_t>>(),
-                           arg[2].as<nth_element_t<2, arg_list_t>>()));
-                        return Any();
-                    } else if constexpr (nArgs == 4) {
-                        (f(arg[0].as<nth_element_t<0, arg_list_t>>(),
-                           arg[1].as<nth_element_t<1, arg_list_t>>(),
-                           arg[2].as<nth_element_t<2, arg_list_t>>(),
-                           arg[3].as<nth_element_t<3, arg_list_t>>()));
-                        return Any();
-                    } else if constexpr (nArgs == 5) {
-                        (f(arg[0].as<nth_element_t<0, arg_list_t>>(),
-                           arg[1].as<nth_element_t<1, arg_list_t>>(),
-                           arg[2].as<nth_element_t<2, arg_list_t>>(),
-                           arg[3].as<nth_element_t<3, arg_list_t>>(),
-                           arg[4].as<nth_element_t<4, arg_list_t>>()));
-                        return Any();
-                    } else if constexpr (nArgs == 6) {
-                        (f(arg[0].as<nth_element_t<0, arg_list_t>>(),
-                           arg[1].as<nth_element_t<1, arg_list_t>>(),
-                           arg[2].as<nth_element_t<2, arg_list_t>>(),
-                           arg[3].as<nth_element_t<3, arg_list_t>>(),
-                           arg[4].as<nth_element_t<4, arg_list_t>>(),
-                           arg[5].as<nth_element_t<5, arg_list_t>>()));
-                        return Any();
-                    } else if constexpr (nArgs == 7) {
-                        (f(arg[0].as<nth_element_t<0, arg_list_t>>(),
-                           arg[1].as<nth_element_t<1, arg_list_t>>(),
-                           arg[2].as<nth_element_t<2, arg_list_t>>(),
-                           arg[3].as<nth_element_t<3, arg_list_t>>(),
-                           arg[4].as<nth_element_t<4, arg_list_t>>(),
-                           arg[5].as<nth_element_t<5, arg_list_t>>(),
-                           arg[6].as<nth_element_t<6, arg_list_t>>()));
-                        return Any();
-                    } else {
-                        (f(arg[0].as<nth_element_t<0, arg_list_t>>(),
-                           arg[1].as<nth_element_t<1, arg_list_t>>(),
-                           arg[2].as<nth_element_t<2, arg_list_t>>(),
-                           arg[3].as<nth_element_t<3, arg_list_t>>(),
-                           arg[4].as<nth_element_t<4, arg_list_t>>(),
-                           arg[5].as<nth_element_t<5, arg_list_t>>(),
-                           arg[6].as<nth_element_t<6, arg_list_t>>(),
-                           arg[7].as<nth_element_t<7, arg_list_t>>()));
-                        return Any();
-                    }
+                    BIG_BIG_SWITCH(;,;return Any();)
                 }
                 // clang-format on
             };
         }
-
+#undef BIG_BIG_SWITCH
         FunctionWrapper wrapper;
     };
 

@@ -116,6 +116,9 @@ struct Derived : Base {
         printf("derived %d\n", i);
     }
 };
+void good(std::shared_ptr<Base> p){
+    p->f();
+}
 int main() {
 
     // clang-format off
@@ -177,5 +180,9 @@ int main() {
         OutputArchive ar;
         ar(foo);
         fmt::print("{}\n",ar.getData().dump(1));
+    }
+    {
+        Function f(&good);
+        f.invoke(Any(std::make_shared<Derived>()));
     }
 }
