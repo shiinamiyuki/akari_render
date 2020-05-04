@@ -91,9 +91,15 @@ namespace akari {
         struct Container {
             [[nodiscard]] virtual std::unique_ptr<Container> clone() const = 0;
 
+            virtual void assign(void *) = 0;
+
+            virtual void assign_underlying(void *) = 0;
+
             virtual void *get() = 0;
 
             virtual std::optional<std::shared_ptr<void>> get_shared() const = 0;
+
+            virtual void assign_shared(std::shared_ptr<void>) = 0;
 
             virtual Any get_underlying() = 0;
 
@@ -115,11 +121,42 @@ namespace akari {
             }
 
             void *get() override { return &value; }
+            void assign(void *p) override { value = *reinterpret_cast<T *>(p); }
+            void assign_underlying(void *p) override {
+                if constexpr (detail::is_shared_ptr_v<Actual> || std::is_pointer_v<Actual>) {
+                    if constexpr (detail::is_reference_wrapper_v<T>) {
+                        auto &tmp = const_cast<Actual &>(static_cast<detail::get_internal_t<T> &>(value));
+                        *tmp = *reinterpret_cast<detail::get_internal_t<Actual> *>(p);
+                    } else {
+                        *value = *reinterpret_cast<detail::get_internal_t<Actual> *>(p);
+                    }
 
+                } else {
+                    throw std::runtime_error("assigning to underlying value of non-pointer");
+                }
+            }
+            void assign_shared(std::shared_ptr<void> p) {
+                if constexpr (detail::is_shared_ptr_v<Actual>) {
+                    if constexpr (detail::is_reference_wrapper_v<T>) {
+                        auto &tmp = const_cast<Actual &>(static_cast<detail::get_internal_t<T> &>(value));
+                        tmp = std::reinterpret_pointer_cast<detail::get_internal_t<Actual>>(p);
+                    } else {
+                        value = std::reinterpret_pointer_cast<detail::get_internal_t<Actual>>(p);
+                    }
+
+                } else {
+                    throw std::runtime_error("assigning to non-shared_ptr");
+                }
+            }
             [[nodiscard]] Any get_underlying() override {
                 if constexpr (detail::is_shared_ptr_v<Actual> || std::is_pointer_v<Actual>) {
-                    Actual &tmp = (value);
-                    return make_any_ref(*tmp);
+                    if constexpr (detail::is_reference_wrapper_v<T>) {
+                        auto &tmp = const_cast<Actual &>(static_cast<detail::get_internal_t<T> &>(value));
+                        return make_any_ref(*tmp);
+                    } else {
+                        Actual &tmp = (value);
+                        return make_any_ref(*tmp);
+                    }
                 }
                 return Any();
             }
@@ -224,7 +261,13 @@ namespace akari {
                 throw std::runtime_error("bad Any::shared_cast<T>()");
             }
         }
-
+        template <typename U, typename = std::enable_if<!std::is_reference_v<U>>> U as_value() const {
+            if constexpr (detail::is_shared_ptr_v<U>) {
+                return shared_cast<detail::get_internal_t<U>>();
+            } else {
+                return as<U>();
+            }
+        }
         template <typename U, typename T = std::remove_reference_t<U>> T &as() const {
             //            AKARI_ASSERT(has_value());
             using P = std::conditional_t<std::is_const_v<T>, const void *, void *>;
@@ -270,11 +313,47 @@ namespace akari {
 
         [[nodiscard]] bool is_shared_pointer() const { return _ptr->get_shared().has_value(); }
 
+        [[nodiscard]] std::shared_ptr<void> __get_internal_shared_pointer() const { return _ptr->get_shared().value(); }
+
+        [[nodiscard]] void *__get_internal_pointer() const { return _ptr.get(); }
+
         [[nodiscard]] Any get_underlying() const { return _ptr->get_underlying(); }
+
+        [[nodiscard]] TypeInfo get_underlying_type() const { return _ptr->get_underlying_type().value(); }
 
         [[nodiscard]] inline std::optional<SequentialContainerView> get_sequential_container_view() const;
 
         inline const TypeInfo &get_type() const { return type; }
+
+        void set_value(const Any &value) const {
+            if (is_shared_pointer()) {
+                if (!value.is_shared_pointer()) {
+                    throw std::runtime_error("assigning shared_ptr to non shared_ptr");
+                }
+                if (auto p = any_shared_pointer_cast(get_underlying_type(), value.get_underlying_type(),
+                                                     value.__get_internal_shared_pointer())) {
+                    _ptr->assign_shared(p.value());
+                }
+            }
+            if (type == value.type) {
+                _ptr->assign(value.__get_internal_pointer());
+            } else {
+                throw std::runtime_error("Bad Any::set_value");
+            }
+        }
+
+        void set_underlying(const Any &value) const {
+            if (get_underlying_type() == value.get_underlying_type()) {
+                if (value.is_shared_pointer()) {
+                    _ptr->assign_underlying(value.__get_internal_pointer());
+                } else {
+                    _ptr->assign_underlying(value.__get_internal_pointer());
+                }
+
+            } else {
+                throw std::runtime_error("Bad Any::set_value");
+            }
+        }
 
       private:
         TypeInfo type;
@@ -316,9 +395,13 @@ namespace akari {
     struct AssociativeContainerView : _ContainerView<std::pair<Any, Any>> {};
 
     template <typename T> Any make_any(T value) { return Any(Any::from_value_t{}, std::move(value)); }
-
+    template <> inline Any make_any(const Any &value) { return Any(value); }
+    template <> inline Any make_any(Any &value) { return Any(static_cast<const Any &>(value)); }
+    template <> inline Any make_any(Any &&value) { return Any(value); }
     template <typename T> Any make_any_ref(T &&value) { return Any(Any::from_ref_t{}, std::forward<T>(value)); }
-
+    template <> inline Any make_any_ref(const Any &value) { return Any(value); }
+    template <> inline Any make_any_ref(Any &value) { return Any(static_cast<const Any &>(value)); }
+    template <> inline Any make_any_ref(Any &&value) { return Any(value); }
     template <typename Actual, typename T>
     inline std::optional<SequentialContainerView> Any::ContainerImpl<Actual, T>::get_container_view() {
         if constexpr (!detail::is_sequential_container<Actual>::value) {
@@ -579,8 +662,8 @@ namespace akari {
 
         Method(const char *name, const Attributes &attr) : _name(name), _attr(attr) {}
 
-        template <typename T, typename... Args> Any invoke(T &obj, Args &&... args) {
-            return _function.invoke(Any(const_cast<std::remove_cv_t<T> &>(obj)), Any(std::forward<Args>(args))...);
+        template <typename T, typename... Args> Any invoke(T &&obj, Args &&... args) {
+            return _function.invoke(make_any_ref(obj), Any(std::forward<Args>(args))...);
         }
 
       private:
@@ -674,6 +757,7 @@ namespace akari {
 
             std::unordered_map<std::string_view, meta_instance> instances;
             std::unordered_map<std::string_view, std::string_view> name_map;
+            std::unordered_map<std::string_view, std::string_view> inv_name_map;
             std::unordered_map<std::string_view, std::vector<Function>> functions;
             std::unordered_map<std::pair<std::string_view, std::string_view>,
                                std::function<std::optional<void *>(TypeInfo, TypeInfo, void *)>, hash_pair>
@@ -761,6 +845,7 @@ namespace akari {
             mgr.instances[type.name] = detail::meta_instance();
             if (name) {
                 mgr.name_map.emplace(name, type_of<T>().name);
+                mgr.inv_name_map.emplace(type_of<T>().name, name);
             }
         }
         if constexpr (sizeof...(Base) > 0) {

@@ -23,15 +23,14 @@
 #ifndef AKARIRENDER_SERIALIZE_IMPL_HPP
 #define AKARIRENDER_SERIALIZE_IMPL_HPP
 
-#include <akari/core/class.h>
-#include <akari/core/object.h>
+#include <akari/core/reflect.hpp>
 #include <json.hpp>
 #include <magic_enum.hpp>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
 
-namespace akari::Serialize {
+namespace akari::serialize {
     using namespace nlohmann;
     class NoSuchKeyError : public std::runtime_error {
       public:
@@ -52,17 +51,9 @@ namespace akari::Serialize {
       public:
         using std::runtime_error::runtime_error;
     };
-
+    class InputArchive;
+    class OutputArchive;
     namespace detail {
-        template <class T> struct check_serializable_static_type {
-            struct No {};
-
-            template <class U> static auto test(int) -> decltype(U::StaticClass());
-
-            template <class U> static auto test(...) -> No;
-
-            static const bool value = std::is_same_v<Class *, decltype(test<T>(0))>;
-        };
 
         template <class T, typename = void> struct has_member_save : std::false_type {};
 
@@ -116,24 +107,7 @@ namespace akari::Serialize {
 
     } // namespace detail
     class Context {
-        std::unordered_map<std::string, Class *> types;
-
       public:
-        template <class T> void registerType() {
-            static_assert(std::is_base_of_v<Serializable, T>, "T must implement Serializable");
-            static_assert(detail::check_serializable_static_type<T>::value, "T must have static Class * StaticClass()");
-            types[T::StaticClass()->GetName()] = T::staticType();
-        }
-
-        void registerType(Class *type) { types[type->GetName()] = type; }
-
-        virtual Class *GetClass(const std::string &s) {
-            auto it = types.find(s);
-            if (it == types.end()) {
-                throw NoSuchTypeError(std::string("No such type named ").append(s));
-            }
-            return it->second;
-        }
     };
 
     template <class T> struct NVP {
@@ -178,14 +152,12 @@ namespace akari::Serialize {
     };
 
     class OutputArchive : public ArchiveBase {
-        Context &context;
         std::vector<std::reference_wrapper<json>> stack;
-        std::unordered_map<Serializable *, std::reference_wrapper<json>> ptrs;
+        std::unordered_map<void *, std::reference_wrapper<json>> ptrs;
         std::vector<int> counter;
         json data;
 
       public:
-        Context &getContext() { return context; }
         [[nodiscard]] json getData() const { return data; }
 
         json &_top() { return stack.back(); }
@@ -200,7 +172,7 @@ namespace akari::Serialize {
             counter.pop_back();
         }
 
-        explicit OutputArchive(Context &context) : context(context) { _makeNode(data); }
+        explicit OutputArchive(){ _makeNode(data); }
 
         template <class T> void _save_nvp(const char *name, const T &value) {
             _top()[name] = json();
@@ -233,27 +205,34 @@ namespace akari::Serialize {
             arg.save(*this);
         }
 
-        template <class T>
-        std::enable_if_t<std::is_base_of_v<Serializable, T> && detail::has_member_save<T>::value, void>
-        _save(const std::shared_ptr<T> &ptr) {
+        void _save(const Any &any) {
+            if (any.is_shared_pointer()) {
+                auto &mgr = akari::detail::reflection_manager::instance();
+                auto p = any.__get_internal_shared_pointer();
+                auto *raw = p.get();
+                if (!raw)
+                    return;
+                auto it = ptrs.find(raw);
+                if (it == ptrs.end()) {
+                    _top() = json{{"type", mgr.inv_name_map.at(any.get_underlying_type().name)}};
+                    _top()["props"] = json();
+                    _makeNode(_top()["props"]);
+                    Type type = any.get_underlying_type();
+                    type.get_method("save").invoke(any.get_underlying(), make_any_ref(*this));
+                    _popNode();
+                    ptrs.emplace(raw, _top());
+                } else {
+                    Type type = any.get_type();
+                    type.get_method("save").invoke(any, make_any_ref(*this));
+                }
+            }
+        }
+        template <class T> void _save(const std::shared_ptr<T> &ptr) {
             // static_assert(detail::check_serializable_static_type<T>::value, "T must have static Type *
             // staticType()");
             if (!ptr)
                 return;
-            auto *raw = static_cast<Serializable *>(ptr.get());
-            auto it = ptrs.find(raw);
-            if (it == ptrs.end()) {
-                _top() = json{{"type", ptr->GetClass()->GetName()}};
-                _top()["props"] = json();
-                _makeNode(_top()["props"]);
-                ptr->GetClass()->Save(*ptr, *this);
-                _popNode();
-                ptrs.emplace(raw, _top());
-            } else {
-                auto addr = reinterpret_cast<size_t>(raw);
-                ptrs.at(raw).get()["addr"] = std::to_string(addr);
-                _top() = json{{"addr", std::to_string(addr)}, {"type", ptr->GetClass()->GetName()}};
-            }
+            _save(make_any_ref(ptr));
         }
 
         template <class T> void _save(const std::vector<T> &vec) {
@@ -309,7 +288,7 @@ namespace akari::Serialize {
         Context &context;
         const json &data;
         std::vector<std::reference_wrapper<const json>> stack;
-        std::unordered_map<size_t, std::shared_ptr<Serializable>> ptrs;
+        std::unordered_map<size_t, Any> ptrs;
         std::vector<int> counter;
 
       public:
@@ -338,53 +317,41 @@ namespace akari::Serialize {
         template <typename T> std::enable_if_t<std::is_enum_v<T>> _save(T &arg) {
             arg = magic_enum::enum_cast<T>(_top().get<std::string>());
         }
-        template <class T> std::enable_if_t<std::is_base_of_v<Serializable, T>, void> _load(std::shared_ptr<T> &ptr) {
+        void _load(const Any &any) {
+            if (any.is_shared_pointer()) {
+                auto type_s = _top().at("type").get<std::string>();
+                auto type = Type::get_by_name(type_s.c_str());
+                if (_top().contains("props")) {
+                    if (_top().contains("addr")) {
+                        auto addr = std::stol(_top().at("addr").get<std::string>());
+                        auto it = ptrs.find(addr);
+                        if (it == ptrs.end()) {
+                            any.set_value(type.create_shared());
+                            ptrs[addr] = any;
+                        } else {
+                            any.set_value(it->second);
+                        }
+                    } else {
+                        any.set_value(type.create_shared());
+                    }
+                    _makeNode(_top().at("props"));
+                    type.get_method("load").invoke(any.get_underlying(), make_any_ref(*this));
+                    _popNode();
+                } else {
+                    auto addr = std::stol(_top().at("addr").get<std::string>());
+                    any.set_value(ptrs.at(addr));
+                }
+            } else {
+                Type type = any.get_type();
+                type.get_method("load").invoke(any, make_any_ref(*this));
+            }
+        }
+        template <class T> void _load(std::shared_ptr<T> &ptr) {
             if (_top().is_null()) {
                 ptr = nullptr;
                 return;
             }
-            auto type_s = _top().at("type").get<std::string>();
-            auto type = context.GetClass(type_s);
-            if (_top().contains("props")) {
-                if (_top().contains("addr")) {
-                    auto addr = std::stol(_top().at("addr").get<std::string>());
-                    auto it = ptrs.find(addr);
-                    if (it == ptrs.end()) {
-                        auto opt = safe_cast<T>(type->Create());
-                        if (opt.has_value()) {
-                            ptr = opt.value();
-                        } else {
-                            throw DowncastError("Unable to downcast; Type mismatch");
-                        }
-                        ptrs[addr] = ptr;
-                    } else {
-                        auto opt = safe_cast<T>(it->second);
-                        if (opt.has_value()) {
-                            ptr = opt.value();
-                        } else {
-                            throw DowncastError("Unable to downcast; Type mismatch");
-                        }
-                    }
-                } else {
-                    auto opt = safe_cast<T>(type->Create());
-                    if (opt.has_value()) {
-                        ptr = opt.value();
-                    } else {
-                        throw DowncastError("Unable to downcast; Type mismatch");
-                    }
-                }
-                _makeNode(_top().at("props"));
-                type->Load(*ptr, *this);
-                _popNode();
-            } else {
-                auto addr = std::stol(_top().at("addr").get<std::string>());
-                auto opt = safe_cast<T>(ptrs.at(addr));
-                if (opt.has_value()) {
-                    ptr = opt.value();
-                } else {
-                    throw DowncastError("Unable to downcast; Type mismatch");
-                }
-            }
+            _load(make_any_ref(ptr));
         }
 
         template <class T> void _load(std::vector<T> &vec) {

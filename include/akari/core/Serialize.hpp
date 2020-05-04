@@ -27,10 +27,7 @@
 #include <akari/core/detail/serialize-impl.hpp>
 #include <json.hpp>
 namespace akari {
-    class AKR_EXPORT SerializeContext : public Serialize::Context {
-      public:
-        Class *GetClass(const std::string &s) override;
-    };
+
 } // namespace akari
 namespace nlohmann {
     template <> struct adl_serializer<akari::fs::path> {

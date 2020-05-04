@@ -19,12 +19,18 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+#include <akari/core/math.h>
 #include <akari/core/reflect.hpp>
+#include <akari/core/serialize.hpp>
 #include <fmt/format.h>
 #include <json.hpp>
-#include <akari/core/math.h>
 
-struct Foo {
+using namespace akari;
+using namespace akari::serialize;
+struct Object {
+    virtual ~Object()=default;
+};
+struct Foo : Object {
     int a = 123;
     float b = 3.14;
     glm::vec3 u;
@@ -35,6 +41,8 @@ struct Foo {
     Foo(int x, float y) : a(x), b(y) {}
 
     void hello(int _) const { fmt::print("hello from {}\n", _); }
+
+    void save(OutputArchive &ar) { ar(a, b, u, v); }
 };
 namespace akari {
     using namespace nlohmann;
@@ -42,8 +50,7 @@ namespace akari {
     struct to_json_impl {
         json data;
 
-        template<typename T>
-        void save(const T &value) {
+        template <typename T> void save(const T &value) {
             Any any(value);
             do_save(data, any);
         }
@@ -65,12 +72,12 @@ namespace akari {
                         j.push_back(tmp);
                     }
                 } else if (auto opt = dynamic_invoke_noexcept("to_json", make_any_ref(j), any)) {
-                    (void) opt;
+                    (void)opt;
                 } else {
                     j = json::object();
                     Type type = any.get_type();
                     if (type.has_method("save")) {
-                        type.get_method("save").invoke(any, j);
+                        type.get_method("save").invoke(any, make_any_ref(j));
                     } else {
                         auto props = type.get_properties();
                         for (auto &prop : props) {
@@ -84,15 +91,13 @@ namespace akari {
 #undef AKR_SAVE_BASIC
     };
 
-    template<typename T>
-    json save_to_json(const T &value) {
+    template <typename T> json save_to_json(const T &value) {
         to_json_impl impl;
         impl.save(value);
         return std::move(impl.data);
     }
 
-    template<typename T>
-    struct json_serializer {
+    template <typename T> struct json_serializer {
         static void save(json &j, const T &value) {
             printf("called to_json %p\n", &j);
             to_json(j, value);
@@ -100,28 +105,29 @@ namespace akari {
     };
 } // namespace akari
 
-struct Base{
-    virtual void f() =0 ;
+struct Base {
+    virtual void f() = 0;
 };
 
-struct Derived : Base{
+struct Derived : Base {
     int i = 0;
-    void f()override {
+    void f() override {
         i++;
         printf("derived %d\n", i);
     }
 };
 int main() {
-    using namespace akari;
+
     // clang-format off
-    class_<Foo>("Foo")
+    class_<Foo, Object>("Foo")
             .constructor<>()
             .constructor<int, float>()
             .property("a", &Foo::a)
             .property("b", &Foo::b)
             .property("v", &Foo::v)
             .property("u", &Foo::u)
-            .method("hello", &Foo::hello);
+            .method("hello", &Foo::hello)
+            .method("save",&Foo::save);
     function("to_json", &json_serializer<vec3>::save);
     class_<Derived,Base>("Derived")
             .constructor<>();
@@ -131,36 +137,45 @@ int main() {
     //    for (auto &prop : v.get_properties()) {
     //        fmt::print("{} \n", prop.second.name());
     //    }
-
-    Type type = Type::get_by_name("Foo");
-    auto any = type.create_shared(777, 234.4f);
-    for (auto &prop : type.get_properties()) {
-        fmt::print("{} \n", prop.name());
-    }
-    auto *foo = &any.get_underlying().as<Foo>();
-    fmt::print("foo.a={}\n", foo->a);
-    auto prop = type.get_property("a");
-    //    auto any = make_any_ref(foo);
-    fmt::print("{}\n", any.is_pointer());
-    prop.set(any, 222);
-    auto hello = type.get_method("hello");
-    hello.invoke(*foo, 23456);
-    fmt::print("foo.a={}\n", foo->a);
-    {
-        json _j;
-        Foo foo1;
-        printf("%p\n", &_j);
-        foo1.u = vec3(1,2,3); dynamic_invoke("to_json", _j, foo1.u);
-        foo1.v = {Foo(), Foo()};
-        fmt::print("{}\n", save_to_json(foo1).dump(1));
-    }
+//    {
+//        Type type = Type::get_by_name("Foo");
+//        auto any = type.create_shared(777, 234.4f);
+//        for (auto &prop : type.get_properties()) {
+//            fmt::print("{} \n", prop.name());
+//        }
+//        auto *foo = &any.get_underlying().as<Foo>();
+//        fmt::print("foo.a={}\n", foo->a);
+//        auto prop = type.get_property("a");
+//        //    auto any = make_any_ref(foo);
+//        fmt::print("{}\n", any.is_pointer());
+//        prop.set(any, 222);
+//        auto hello = type.get_method("hello");
+//        hello.invoke(*foo, 23456);
+//        fmt::print("foo.a={}\n", foo->a);
+//        {
+//            json _j;
+//            Foo foo1;
+//            printf("%p\n", &_j);
+//            foo1.u = vec3(1, 2, 3);
+//            dynamic_invoke("to_json", _j, foo1.u);
+//            foo1.v = {Foo(), Foo()};
+//            fmt::print("{}\n", save_to_json(foo1).dump(1));
+//        }
+//    }
     //    fmt::print("v.a = {}\n", v.get_properties()["a"].as<int>());
     {
         auto derived_t = Type::get_by_name("Derived");
         auto d = derived_t.create_shared();
         auto derived = d.shared_cast<Base>();
         derived->f();
-        auto base =  make_any_ref(derived).shared_cast<Derived>();
+        auto base = make_any_ref(derived).shared_cast<Derived>();
         base->f();
+    }
+    {
+        std::shared_ptr<Foo> foo(new Foo());
+        foo->a = 8888;
+        OutputArchive ar;
+        ar(foo);
+        fmt::print("{}\n",ar.getData().dump(1));
     }
 }
