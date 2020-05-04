@@ -480,7 +480,8 @@ namespace akari {
             std::function _method = [=](T &obj, Args... args) -> R { return (obj.*f)(args...); };
             _from<decltype(_method), R, T, Args...>(std::move(_method));
         }
-
+        template <typename T, typename R, typename... Args>
+        explicit Function(R (T::*f)(Args...) const) : Function((R(T::*)(Args...))f) {}
         template <typename R, typename... Args> explicit Function(const std::function<R(Args...)> &f) {
             _from<decltype(f), R, Args...>(f);
         }
@@ -496,14 +497,12 @@ namespace akari {
             _from<std::function<R(Args...)>, R, Args...>(std::move(f));
         }
 
-        template <typename T>
-        struct get_arg_type{
+        template <typename T> struct get_arg_type {
             using type = std::conditional_t<
                 detail::is_shared_ptr_v<std::decay_t<T>>,
-                  std::conditional_t<std::is_reference_v<T> && !std::is_const_v<std::remove_reference_t<T>>,
-                        T&,
-                                    std::shared_ptr<detail::get_internal_t<std::remove_reference_t<T>>>> ,
-                T&>;
+                std::conditional_t<std::is_reference_v<T> && !std::is_const_v<std::remove_reference_t<T>>, T &,
+                                   std::shared_ptr<detail::get_internal_t<std::remove_reference_t<T>>>>,
+                T &>;
         };
         template <typename T> static typename get_arg_type<T>::type get_arg(const Any &any) {
             if constexpr (detail::is_shared_ptr_v<std::decay_t<T>>) {
@@ -669,12 +668,12 @@ namespace akari {
                 return *this;
             }
 
-            template <typename T, typename... Args>
-            meta_instance_handle &method(const char *name, T (U::*f)(Args...) const) {
-                return method(name, reinterpret_cast<T (U::*)(Args...)>(f));
-            }
+            //            template <typename F>
+            //            meta_instance_handle &method(const char *name, F&& f) {
+            //                return method(name, reinterpret_cast<T (U::*)(Args...)>(f));
+            //            }
 
-            template <typename T, typename... Args> meta_instance_handle &method(const char *name, T (U::*f)(Args...)) {
+            template <typename F> meta_instance_handle &method(const char *name, F &&f) {
                 auto it = attributes.find(name);
                 if (it == attributes.end()) {
                     attributes.insert(std::make_pair(name, Attributes()));

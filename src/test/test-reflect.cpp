@@ -185,4 +185,15 @@ int main() {
         Function f(&good);
         f.invoke(Any(std::make_shared<Derived>()));
     }
+    {
+        struct Object{};
+        class_<Object>("Object")
+            .constructor<>()
+            .method("foo",std::function<void(Object&)>([](Object&){printf("hello\n");}));
+    }
+    {
+        auto t = Type::get_by_name("Object");
+        auto object = t.create();
+        t.get_method("foo").invoke(object);
+    }
 }
