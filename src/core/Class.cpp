@@ -23,7 +23,7 @@
 #include <akari/core/class.h>
 
 namespace akari {
-    using namespace Serialize;
+    using namespace serialize;
     Class::Class(const std::string &name, DefaultConstructor constructor, LoadFunction loader, SaveFunction saver)
         : _name(name), _ctor(std::move(constructor)), _loader(std::move(loader)), _saver(std::move(saver)) {}
     void Class::Load(Serializable &self, InputArchive &ar) const {

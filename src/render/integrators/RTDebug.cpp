@@ -69,7 +69,7 @@ namespace akari {
                     const auto &materialSlot = mesh.get_material_slot(group);
                     auto material = materialSlot.material;
                     if (!material) {
-                        Debug("no material!!\n");
+                        debug("no material!!\n");
                         break;
                     }
                     Triangle triangle{};

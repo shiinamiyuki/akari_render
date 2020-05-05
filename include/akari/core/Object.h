@@ -32,7 +32,7 @@ namespace akari {
         [[nodiscard]] virtual Class *GetClass() const = 0;
         virtual ~Object()=default;
     };
-    namespace Serialize {
+    namespace serialize {
         class OutputArchive;
         class InputArchive;
     }

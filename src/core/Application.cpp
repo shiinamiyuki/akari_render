@@ -26,6 +26,6 @@
 #include <akari/core/plugin.h>
 
 namespace akari {
-    Application::Application() { GetPluginManager();}
+    Application::Application() { get_plugin_manager();}
     Application::~Application() { ThreadPoolFinalize(); }
 } // namespace akari

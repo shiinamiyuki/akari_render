@@ -155,7 +155,7 @@ int main(int argc, char **argv) {
     if(out.extension().empty()){
         out.concat(".json");
     }
-    auto data = Serialize::toJson(ctx, mesh);
+    auto data = serialize::save_to_json(ctx, mesh);
     std::ofstream o(out);
     o << data.dump(1) << std::endl;
 

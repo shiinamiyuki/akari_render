@@ -40,15 +40,15 @@ namespace akari {
         std::vector<MaterialSlot> materials;
         fs::path file;
         AKR_SER(materials, file);
-        AKR_DECL_COMP(BinaryMesh, "BinaryMesh")
+        AKR_DECL_COMP()
         const MaterialSlot &get_material_slot(int group) const override;
         const Vertex *get_vertex_buffer() const override;
         const int *get_index_buffer() const override;
         size_t triangle_count() const override;
         size_t vertex_count() const override;
         int get_primitive_group(int idx) const override;
-        bool load(const char *path) override;
-        void save(const char *path);
+        bool load_path(const char *path);
+        void save_path(const char *path);
         void commit() override;
         std::vector<std::shared_ptr<Light>> get_mesh_lights() const override;
         const Light *get_light(int primId) const override;

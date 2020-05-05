@@ -43,6 +43,8 @@ struct Foo : Object {
     void hello(int _) const { fmt::print("hello from {}\n", _); }
 
     void save(OutputArchive &ar) { ar(a, b, u, v); }
+    template<typename T>
+    void foo(){};
 };
 namespace akari {
     using namespace nlohmann;
@@ -130,6 +132,7 @@ int main() {
             .property("v", &Foo::v)
             .property("u", &Foo::u)
             .method("hello", &Foo::hello)
+            .method("foo",&Foo::foo<int>)
             .method("save",&Foo::save);
     function("to_json", &json_serializer<vec3>::save);
     class_<Derived,Base>("Derived")

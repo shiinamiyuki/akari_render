@@ -24,17 +24,5 @@
 #include <akari/core/serialize.hpp>
 
 namespace akari {
-    Class *SerializeContext::GetClass(const std::string &s) {
-        try {
-            return Context::GetClass(s);
-        } catch (Serialize::NoSuchTypeError &err) {
-            auto pluginManager = GetPluginManager();
-            auto plugin = pluginManager->LoadPlugin(s.c_str());
-            if (!plugin) {
-                throw err;
-            }
-            Context::registerType(plugin->GetClass());
-            return plugin->GetClass();
-        }
-    }
+
 } // namespace akari

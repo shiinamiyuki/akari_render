@@ -26,6 +26,7 @@
 #include <akari/core/logger.h>
 #include <akari/render/geometry.hpp>
 #include <fstream>
+#include <akari/core/detail/serialize-impl.hpp>
 
 namespace akari {
     struct MaterialSlot;
@@ -45,7 +46,6 @@ namespace akari {
         [[nodiscard]] virtual size_t triangle_count() const = 0;
         [[nodiscard]] virtual size_t vertex_count() const = 0;
         [[nodiscard]] virtual int get_primitive_group(int idx) const = 0;
-        virtual bool load(const char *path) = 0;
         virtual const MaterialSlot &get_material_slot(int group) const = 0;
         virtual std::vector<MaterialSlot> &GetMaterials() = 0;
         bool Intersect(const Ray &ray, int idx, RayHit *hit) const {
@@ -120,25 +120,23 @@ namespace akari {
         std::shared_ptr<Mesh> mesh;
         //        AKR_SER(file, mesh)
         template <class Archive> void save(Archive &ar) const {
-            akari::Serialize::AutoSaveVisitor v{ar};
+            akari::serialize::AutoSaveVisitor v{ar};
             _AKR_DETAIL_REFL(v, file, transform);
             std::ofstream out(file);
-            auto &ctx = ar.getContext();
-            auto j = Serialize::toJson(ctx, mesh);
+            auto j = serialize::save_to_json(mesh);
             out << j.dump(1) << std::endl;
         }
         template <class Archive> void load(Archive &ar) {
-            akari::Serialize::AutoLoadVisitor v{ar};
+            akari::serialize::AutoLoadVisitor v{ar};
             _AKR_DETAIL_REFL(v, file, transform);
             if (!fs::exists(file)) {
-                Error("{} does not exist\n", file.string());
+                error("{} does not exist\n", file.string());
                 return;
             }
             std::ifstream in(file);
             std::string str((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
             json data = str.empty() ? json::object() : json::parse(str);
-            auto &ctx = ar.getContext();
-            mesh = Serialize::fromJson<std::shared_ptr<Mesh>>(ctx, data);
+            mesh = serialize::load_from_json<std::shared_ptr<Mesh>>(data);
         }
     };
 } // namespace akari

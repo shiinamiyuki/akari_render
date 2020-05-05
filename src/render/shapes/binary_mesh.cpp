@@ -39,7 +39,7 @@ namespace akari {
         char buffer[128] = {0};
         in.read(buffer, strlen(AKR_MESH_MAGIC));
         if (strcmp(buffer, AKR_MESH_MAGIC) != 0) {
-            Error("Failed to load mesh: invalid format\n");
+            error("Failed to load mesh: invalid format\n");
             return false;
         }
         size_t vertexCount;
@@ -53,14 +53,14 @@ namespace akari {
         memset(buffer, 0, sizeof(buffer));
         in.read(buffer, strlen(AKR_MESH_MAGIC));
         if (strcmp(buffer, AKR_MESH_MAGIC) != 0) {
-            Error("Failed to load mesh: invalid format\n");
+            error("Failed to load mesh: invalid format\n");
             return false;
         }
         _loaded = true;
         Info("Loaded {} triangles\n", groups.size());
         return true;
     }
-    void BinaryMesh::save(const char *path) {
+    void BinaryMesh::save_path(const char *path) {
         std::ofstream out(path, std::ios::binary | std::ios::out);
         out.write(AKR_MESH_MAGIC, strlen(AKR_MESH_MAGIC));
         size_t vertexCount = vertexBuffer.size();
@@ -74,7 +74,7 @@ namespace akari {
         if (_loaded) {
             return;
         }
-        load(file.string().c_str());
+        load_path(file.string().c_str());
         for (uint32_t id = 0; id < triangle_count(); id++) {
             int group = get_primitive_group(id);
             const auto &mat = get_material_slot(group);

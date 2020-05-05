@@ -22,8 +22,7 @@
 
 #pragma once
 
-#include <akari/core/akari.h>
-#include <akari/core/platform.h>
+
 #include <cstring>
 #include <functional>
 #include <memory>
@@ -31,24 +30,11 @@
 #include <vector>
 //#include <list>
 
+#include <akari/core/akari.h>
+#include <akari/core/platform.h>
+#include <akari/core/detail/typeinfo.hpp>
+
 namespace akari {
-    struct TypeInfo {
-        std::string_view name;
-
-        bool operator==(const TypeInfo &rhs) const { return name == rhs.name; }
-
-        bool operator!=(const TypeInfo &rhs) const { return !(rhs == *this); }
-    };
-
-    template <typename T> TypeInfo type_of() {
-        TypeInfo type{typeid(T).name()};
-        return type;
-    }
-
-    template <typename T> TypeInfo type_of(T &&v) {
-        TypeInfo type{typeid(v).name()};
-        return type;
-    }
 
     namespace detail {
         template <typename T> struct get_internal { using type = T; };
@@ -658,6 +644,7 @@ namespace akari {
             std::vector<Function> &constructors;
             std::vector<Function> &shared_constructors;
 
+            using class_type = U;
             template <typename... Args> meta_instance_handle &constructor() {
                 std::function<U(Args...)> ctor = [](Args... args) { return U(std::forward<Args>(args)...); };
                 std::function<std::shared_ptr<U>(Args...)> ctor_shared = [](Args... args) {

@@ -27,7 +27,7 @@
 #include <akari/core/component.h>
 #include <akari/core/math.h>
 #include <vector>
-
+#include <list>
 namespace akari {
     template <class T> class TImage {
         std::vector<T> _texels;
@@ -89,14 +89,14 @@ namespace akari {
     };
     class IdentityProcessor : public PostProcessor {
       public:
-        AKR_DECL_COMP(IdentityProcessor, "IdentityProcessor")
+        AKR_DECL_COMP()
         void process(const RGBAImage &in, RGBAImage &out) const override { out = in; }
     };
     class AKR_EXPORT GammaCorrection : public PostProcessor {
         Float gamma;
 
       public:
-        AKR_DECL_COMP(GammaCorrection, "GammaCorrection")
+        AKR_DECL_COMP()
         explicit GammaCorrection(Float gamma = 1.0 / 2.2f) : gamma(gamma) {}
         void process(const RGBAImage &in, RGBAImage &out) const override;
     };
@@ -105,7 +105,7 @@ namespace akari {
         std::list<std::shared_ptr<PostProcessor>> pipeline;
 
       public:
-        AKR_DECL_COMP(PostProcessingPipeline, "PostProcessingPipeline")
+        AKR_DECL_COMP()
         void Add(const std::shared_ptr<PostProcessor> &p) { pipeline.emplace_back(p); }
         void process(const RGBAImage &in, RGBAImage &out) const override {
             RGBAImage tmp;

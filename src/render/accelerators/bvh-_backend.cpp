@@ -187,7 +187,7 @@ namespace akari {
         }
         static std::string PrintVec3(const vec3 &v) { return fmt::format("{} {} {}", v.x, v.y, v.z); }
         static void PrintBox(const Bounds3f &box, const char *name) {
-            Debug("{}.p_min: {}, {}.p_max: {}\n", name, PrintVec3(box.p_min), name, PrintVec3(box.p_max));
+            debug("{}.p_min: {}, {}.p_max: {}\n", name, PrintVec3(box.p_min), name, PrintVec3(box.p_max));
         }
         bool intersect(const Ray &ray, Hit &isct) const {
             bool hit = false;

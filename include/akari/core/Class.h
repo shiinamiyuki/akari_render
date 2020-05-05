@@ -39,19 +39,19 @@ namespace akari {
         }
         return q;
     }
-    namespace Serialize {
+    namespace serialize {
         class OutputArchive;
         class InputArchive;
-    } // namespace Serialize
+    } // namespace serialize
     class Object;
     class Serializable;
     class AKR_EXPORT Class {
       public:
-        using LoadFunction = std::function<void(Serializable &, Serialize::InputArchive &ar)>;
-        using SaveFunction = std::function<void(const Serializable &, Serialize::OutputArchive &ar)>;
+        using LoadFunction = std::function<void(Serializable &, serialize::InputArchive &ar)>;
+        using SaveFunction = std::function<void(const Serializable &, serialize::OutputArchive &ar)>;
         using DefaultConstructor = std::function<Ref<Object>()>;
-        void Load(Serializable &, Serialize::InputArchive &ar) const;
-        void Save(const Serializable &, Serialize::OutputArchive &ar) const;
+        void Load(Serializable &, serialize::InputArchive &ar) const;
+        void Save(const Serializable &, serialize::OutputArchive &ar) const;
         [[nodiscard]] TypeInfo GetType() const { return _type; }
         [[nodiscard]] const std::string &GetName() const { return _name; }
         Class(const std::string &name, DefaultConstructor constructor = {}, LoadFunction loader = {},

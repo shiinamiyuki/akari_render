@@ -77,12 +77,12 @@ int main() {
         vec3 wo = normalize(vec3(0, 1, 0));
         Info("Test BSDFComponent::Sample()\n");
         {
-            auto sampler = Cast<Sampler>(CreateComponent("RandomSampler"));
+            auto sampler = Cast<Sampler>(create_component("RandomSampler"));
             LambertianReflection bsdf(Spectrum(1));
             RunTestBSDF_SamplePdf(wo, &bsdf, sampler.get());
         }
         {
-            auto sampler = Cast<Sampler>(CreateComponent("RandomSampler"));
+            auto sampler = Cast<Sampler>(create_component("RandomSampler"));
             FresnelDielectric fresnel(1.0, 1.3);
             MicrofacetModel model(MicrofacetType::EGGX, 0.3);
             RunTestMicrofacet(wo,&model, sampler.get());
@@ -90,7 +90,7 @@ int main() {
             RunTestBSDF_SamplePdf(wo, &bsdf, sampler.get());
         }
     } catch (std::exception &e) {
-        Fatal("Exception: {}", e.what());
+        fatal("Exception: {}", e.what());
         exit(1);
     }
 }

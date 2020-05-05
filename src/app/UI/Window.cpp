@@ -301,7 +301,7 @@ namespace akari::Gui {
                                                     std::istreambuf_iterator<char>());
                                     json data = str.empty() ? json::object() : json::parse(str);
                                     sceneGraph =
-                                        std::make_shared<SceneGraph>(Serialize::fromJson<SceneGraph>(ctx, data));
+                                        std::make_shared<SceneGraph>(serialize::fromJson<SceneGraph>(ctx, data));
                                 } catch (std::exception &e) {
                                     Error("Exception while loading: {}\n", e.what());
                                     sceneGraph = _tmp;

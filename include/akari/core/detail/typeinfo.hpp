@@ -20,22 +20,28 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef AKARIRENDER_SERIALIZE_HPP
-#define AKARIRENDER_SERIALIZE_HPP
-#include <akari/core/akari.h>
-#include <akari/core/platform.h>
-#include <json.hpp>
-namespace akari::serialize {
-        class InputArchive;
-        class OutputArchive;
-        struct AutoSaveVisitor;
-        struct AutoSaveVisitor;
-    } // namespace akari
-namespace nlohmann {
-    template <> struct adl_serializer<akari::fs::path> {
-        static void from_json(const json &j, akari::fs::path &path) { path = akari::fs::path(j.get<std::string>()); }
+#ifndef AKARIRENDER_TYPEINFO_HPP
+#define AKARIRENDER_TYPEINFO_HPP
+#include <string_view>
+#include <typeinfo>
+namespace akari {
+    struct TypeInfo {
+        std::string_view name;
 
-        static void to_json(json &j, const akari::fs::path &path) { j = path.string(); }
+        bool operator==(const TypeInfo &rhs) const { return name == rhs.name; }
+
+        bool operator!=(const TypeInfo &rhs) const { return !(rhs == *this); }
     };
-} // namespace nlohmann
-#endif // AKARIRENDER_SERIALIZE_HPP
+
+    template <typename T> TypeInfo type_of() {
+        TypeInfo type{typeid(T).name()};
+        return type;
+    }
+
+    template <typename T> TypeInfo type_of(T &&v) {
+        TypeInfo type{typeid(v).name()};
+        return type;
+    }
+
+} // namespace akari
+#endif // AKARIRENDER_TYPEINFO_HPP

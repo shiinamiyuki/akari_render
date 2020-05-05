@@ -86,7 +86,7 @@ namespace akari {
 
                     auto material = materialSlot.material;
                     if (!material) {
-                        Debug("no material!!\n");
+                        debug("no material!!\n");
                         break;
                     }
                     Triangle triangle{};

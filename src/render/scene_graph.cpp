@@ -29,13 +29,13 @@ namespace akari {
         auto &sampler = setting.sampler;
         auto &integrator = setting.integrator;
         if (!sampler) {
-            sampler = Cast<Sampler>(CreateComponent("RandomSampler"));
+            sampler = Cast<Sampler>(create_component("RandomSampler"));
         }
         if (!camera) {
-            camera = Cast<Camera>(CreateComponent("PerspectiveCamera"));
+            camera = Cast<Camera>(create_component("PerspectiveCamera"));
         }
         if (!integrator) {
-            integrator = Cast<Integrator>(CreateComponent("PathTracer"));
+            integrator = Cast<Integrator>(create_component("PathTracer"));
         }
         camera->commit();
         sampler->commit();
@@ -53,9 +53,9 @@ namespace akari {
         }
         if (!scene.accelerator) {
 #ifdef AKARI_USE_EMBREE
-            scene.accelerator = Cast<Accelerator>(CreateComponent("EmbreeAccelerator"));
+            scene.accelerator = Cast<Accelerator>(create_component("EmbreeAccelerator"));
 #else
-            scene.accelerator = Cast<Accelerator>(CreateComponent("BVHAccelerator"));
+            scene.accelerator = Cast<Accelerator>(create_component("BVHAccelerator"));
 #endif
         }
         pScene->SetAccelerator(scene.accelerator);

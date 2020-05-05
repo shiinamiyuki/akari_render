@@ -24,38 +24,74 @@
 #define AKARIRENDER_PLUGIN_H
 
 #include <akari/core/akari.h>
-#include <akari/core/component.h>
+#include <akari/core/detail/serialize-impl.hpp>
 #include <memory>
+#include <mutex>
 
 namespace akari {
 
     typedef void (*SharedLibraryFunc)();
     class AKR_EXPORT SharedLibraryLoader {
         void *handle = nullptr;
-        void Load(const char *path);
+        void load(const char *path);
 
       public:
-        explicit SharedLibraryLoader(const char *path) { Load(path); }
-        SharedLibraryFunc GetFuncPointer(const char *name);
+        explicit SharedLibraryLoader(const char *path) { load(path); }
+        SharedLibraryFunc load_function(const char *name);
 
         ~SharedLibraryLoader();
     };
-
-    class AKR_EXPORT Plugin {
-      public:
-        [[nodiscard]] virtual Class *GetClass() const = 0;
-        [[nodiscard]] virtual const char *GetInterface() const = 0;
+    struct CompilerInfo {
+        const char *name;
+        const char *version;
+    };
+    struct BuildInfo {
+        const char *date;
+        const char *time;
+    };
+    struct Plugin {
+        const char *name{};
+        CompilerInfo compiler_info{};
+        BuildInfo build_info{};
     };
 
     class AKR_EXPORT PluginManager {
       public:
-        virtual void SetPluginPath(const char *path) = 0;
-        virtual bool LoadPath(const char *path) = 0;
-        virtual Plugin *LoadPlugin(const char *name) = 0;
-        virtual void ForeachPlugin(const std::function<void(Plugin *)> &func) = 0;
+        virtual void set_plugin_path(const char *path) = 0;
+        virtual bool load_path(const char *path) = 0;
+        virtual bool load_plugin(const char *name) = 0;
     };
 
-    AKR_EXPORT PluginManager *GetPluginManager();
+#define AKR_EXPORT_PLUGIN(_name, _p)                                                                                   \
+    void _AkariPluginOnLoad(Plugin &);                                                                                 \
+    extern "C" AKR_EXPORT Plugin *akari_plugin_onload() {                                                              \
+        static Plugin plugin;                                                                                          \
+        static std::once_flag flag;                                                                                    \
+        std::call_once(flag, [&]() {                                                                                   \
+            plugin.name = #_name;                                                                                      \
+            get_compiler_info(&plugin.compiler_info);                                                                  \
+            get_build_info(&plugin.build_info);                                                                        \
+            _AkariPluginOnLoad(plugin);                                                                                \
+        });                                                                                                            \
+        return &plugin;                                                                                                \
+    }                                                                                                                  \
+    void _AkariPluginOnLoad(Plugin &_p)
+
+    AKR_EXPORT PluginManager *get_plugin_manager();
+
+    static inline void get_compiler_info(CompilerInfo *compiler_info) {
+#ifdef __GNUG__
+        compiler_info->name = "g++";
+        compiler_info->version = __VERSION__;
+#else
+        compiler_info->name = "unknown";
+        compiler_info->version = "unknown";
+#endif
+    }
+    static inline void get_build_info(BuildInfo *build_info) {
+        build_info->date = __DATE__;
+        build_info->time = __TIME__;
+    }
 
 } // namespace akari
 #endif // AKARIRENDER_PLUGIN_H

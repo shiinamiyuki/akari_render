@@ -28,6 +28,8 @@
 #include <akari/render/bsdf.h>
 #include <akari/render/interaction.h>
 #include <akari/render/texture.h>
+#include <akari/core/serialize.hpp>
+#include <akari/core/detail/serialize-impl.hpp>
 namespace akari {
     class Material;
     class Light;

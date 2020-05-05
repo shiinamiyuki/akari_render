@@ -41,7 +41,7 @@ void parse(int argc, char **argv) {
         options.parse_positional({"input"});
         auto result = options.parse(argc, argv);
         if (!result.count("input")) {
-            Fatal("Input file must be provided\n");
+            fatal("Input file must be provided\n");
             std::cout << options.help() << std::endl;
             exit(0);
         }
@@ -70,7 +70,7 @@ int main(int argc, char **argv) {
             std::string str((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
             json data = str.empty() ? json::object() : json::parse(str);
 
-            graph = std::make_shared<SceneGraph>(Serialize::fromJson<SceneGraph>(ctx, data));
+            graph = std::make_shared<SceneGraph>(serialize::load_from_json<SceneGraph>(ctx, data));
         }
         graph->commit();
         Info("Start Rendering ...\n");
@@ -82,7 +82,7 @@ int main(int argc, char **argv) {
             film->write_image(graph->render[i].output);
         }
     } catch (std::exception &e) {
-        Fatal("Exception: {}", e.what());
+        fatal("Exception: {}", e.what());
         exit(1);
     }
 }

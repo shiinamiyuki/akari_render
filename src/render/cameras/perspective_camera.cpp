@@ -38,7 +38,7 @@ namespace akari {
         Transform rasterToCamera{}, cameraToRaster{};
 
       public:
-        AKR_DECL_COMP(PerspectiveCamera, "PerspectiveCamera")
+        AKR_DECL_COMP()
 
         AKR_SER(filmDimension, lensRadius, fov, transform, focalDistance)
         PerspectiveCamera() : cameraToWorld(identity<mat4>()), worldToCamera(identity<mat4>()) {}
@@ -139,5 +139,12 @@ namespace akari {
             sample->I = We(tester->shadowRay, &sample->pos);
         }
     };
-    AKR_EXPORT_COMP(PerspectiveCamera, "Camera")
+    AKR_EXPORT_PLUGIN(PerspectiveCamera, p) {
+        auto c = class_<PerspectiveCamera, Camera, Component>("PerspectiveCamera");
+        c.constructor<>();
+        c.method("save", &PerspectiveCamera::save);
+        c.method("load", &PerspectiveCamera::load);
+        c.property("fov", &PerspectiveCamera::fov);
+    }
+
 } // namespace akari

@@ -177,8 +177,8 @@ namespace akari {
                 Float avgLuminance = std::accumulate(depthWeight.begin(), depthWeight.end(), 0.0f);
                 Info("Average luminance: {}\n", avgLuminance);
                 if (avgLuminance == 0.0f) {
-                    Error("Average luminance is ZERO; Improper scene setup?\n");
-                    Error("Aborting...\n");
+                    error("Average luminance is ZERO; Improper scene setup?\n");
+                    error("Aborting...\n");
                     return;
                 }
                 parallel_for(nChains, [&, this](uint32_t i, uint32_t tid) {
@@ -270,7 +270,7 @@ namespace akari {
                 directSamples);
             auto setting = json::parse(pathTracerSetting);
             SerializeContext s_ctx;
-            auto pathTracer = Serialize::fromJson<std::shared_ptr<Integrator>>(s_ctx, setting);
+            auto pathTracer = serialize::load_from_json<std::shared_ptr<Integrator>>(s_ctx, setting);
             AKARI_ASSERT(pathTracer);
             Info("Render direct samples\n");
             (void)pathTracer;

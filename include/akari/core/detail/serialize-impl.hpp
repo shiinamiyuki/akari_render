@@ -285,14 +285,12 @@ namespace akari::serialize {
     };
 
     class InputArchive : public ArchiveBase {
-        Context &context;
         const json &data;
         std::vector<std::reference_wrapper<const json>> stack;
         std::unordered_map<size_t, Any> ptrs;
         std::vector<int> counter;
 
       public:
-        Context &getContext() { return context; }
         const json &_top() { return stack.back(); }
 
         void _makeNode(const json &ref) {
@@ -305,7 +303,7 @@ namespace akari::serialize {
             counter.pop_back();
         }
 
-        explicit InputArchive(Context &context, const json &data) : context(context), data(data) {
+        explicit InputArchive(const json &data) : data(data) {
             stack.emplace_back(data);
         }
 
@@ -429,14 +427,14 @@ namespace akari::serialize {
         template <class T> void visit(T &&arg, const char *name) { ar._load_nvp(name, arg); }
     };
 
-    template <class T> json toJson(Context &context, const T &data) {
-        OutputArchive ar(context);
+    template <class T> json save_to_json(const T &data) {
+        OutputArchive ar;
         ar.tryInvoke([&]() { ar._save(data); });
         return ar.getData();
     }
 
-    template <class T> T fromJson(Context &context, const json &j) {
-        InputArchive ar(context, j);
+    template <class T> T load_from_json(const json &j) {
+        InputArchive ar(j);
         T data;
         ar.tryInvoke([&]() { ar._load(data); });
         return data;
@@ -504,15 +502,15 @@ namespace akari::serialize {
             accept<Visitor, Args...>(visitor, a, args...);
         }
     } // namespace detail
-#define _AKR_DETAIL_REFL(Visitor, ...) akari::Serialize::detail::accept(Visitor, #__VA_ARGS__, __VA_ARGS__)
+#define _AKR_DETAIL_REFL(Visitor, ...) akari::serialize::detail::accept(Visitor, #__VA_ARGS__, __VA_ARGS__)
 
 #define AKR_SER(...)                                                                                                   \
-    template <class Archive> void save(Archive &ar) const {                                                            \
-        akari::Serialize::AutoSaveVisitor v{ar};                                                                       \
+     void save(serialize::OutputArchive &ar) const {                                                            \
+        akari::serialize::AutoSaveVisitor v{ar};                                                                       \
         _AKR_DETAIL_REFL(v, __VA_ARGS__);                                                                              \
     }                                                                                                                  \
-    template <class Archive> void load(Archive &ar) {                                                                  \
-        akari::Serialize::AutoLoadVisitor v{ar};                                                                       \
+    void load(serialize::InputArchive &ar) {                                                                  \
+        akari::serialize::AutoLoadVisitor v{ar};                                                                       \
         _AKR_DETAIL_REFL(v, __VA_ARGS__);                                                                              \
     }
 } // namespace akari::Serialize

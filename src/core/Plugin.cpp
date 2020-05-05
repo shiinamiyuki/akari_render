@@ -22,14 +22,15 @@
 
 #include <akari/core/logger.h>
 #include <akari/core/plugin.h>
+#include <akari/core/reflect.hpp>
 #ifdef _WIN32
 
 #include <Windows.h>
 
 namespace akari {
-    void SharedLibraryLoader::Load(const char *path) { handle = LoadLibraryA(path); }
+    void SharedLibraryLoader::load(const char *path) { handle = LoadLibraryA(path); }
 
-    SharedLibraryFunc SharedLibraryLoader::GetFuncPointer(const char *name) {
+    SharedLibraryFunc SharedLibraryLoader::load_function(const char *name) {
         auto func = (SharedLibraryFunc)GetProcAddress((HMODULE)handle, name);
         return func;
     }
@@ -43,9 +44,9 @@ namespace akari {
 #else
 #include <dlfcn.h>
 namespace akari {
-    void SharedLibraryLoader::Load(const char *path) { handle = dlopen(path, RTLD_LAZY); }
+    void SharedLibraryLoader::load(const char *path) { handle = dlopen(path, RTLD_LAZY); }
 
-    SharedLibraryFunc SharedLibraryLoader::GetFuncPointer(const char *name) {
+    SharedLibraryFunc SharedLibraryLoader::load_function(const char *name) {
         return (SharedLibraryFunc)dlsym(handle, name);
     }
 
@@ -65,32 +66,29 @@ namespace akari {
         fs::path prefix = fs::absolute(fs::path("./"));
 
       public:
-        void SetPluginPath(const char *path) override { prefix = path; }
-        bool LoadPath(const char *path) override {
+        void set_plugin_path(const char *path) override { prefix = path; }
+        bool load_path(const char *path) override {
             Info("Loading {}\n", path);
             auto lib = std::make_unique<SharedLibraryLoader>(path);
             if (!lib) {
-                Error("Cannot load {}\n", path);
+                error("Cannot load {}\n", path);
                 return false;
             }
-            if (auto f = lib->GetFuncPointer("AkariPluginOnLoad")) {
-                f();
-            }
-            auto p = lib->GetFuncPointer(AKARI_PLUGIN_FUNC_NAME);
+            auto p = (Plugin* (*)())lib->load_function("akari_plugin_onload");
             if (!p) {
-                Error("Cannot resolve symbol {} in {}\n", AKARI_PLUGIN_FUNC_NAME, path);
+                error("Cannot resolve symbol {} in {}\n", "akari_plugin_onload", path);
                 return false;
             }
-            auto plugin = ((GetPluginFunc)p)();
-            plugins[plugin->GetClass()->GetName()] = plugin;
+            Plugin *info = p();
+            plugins.emplace(info->name, info);
             sharedLibraries.emplace_back(std::move(lib));
             return true;
         }
 
-        Plugin *LoadPlugin(const char *name) override {
+        bool load_plugin(const char *name) override {
             auto it = plugins.find(name);
             if (it != plugins.end()) {
-                return it->second;
+                return true;
             }
             auto path = prefix / fs::path(name);
 #ifdef _WIN32
@@ -98,38 +96,32 @@ namespace akari {
 #else
             path = path.concat(".so");
 #endif
-            if (LoadPath(path.string().c_str())) {
+            if (load_path(path.string().c_str())) {
                 it = plugins.find(name);
                 if (it != plugins.end()) {
-                    return it->second;
+                    return true;
                 }
-                Fatal("Unknown plugin: `{}`\n", name);
-                return nullptr;
+                fatal("Unknown plugin: `{}`\n", name);
+                return false;
             }
-            return nullptr;
-        }
-
-        void ForeachPlugin(const std::function<void(Plugin *)> &func) override {
-            for (auto &el : plugins) {
-                func(el.second);
-            }
+            return false;
         }
     };
 
-    AKR_EXPORT PluginManager *GetPluginManager() {
+    AKR_EXPORT PluginManager *get_plugin_manager() {
         static PluginManagerImpl manager;
         return &manager;
     }
 
-    std::shared_ptr<Component> CreateComponent(const char *type) {
-        auto manager = GetPluginManager();
-        auto plugin = manager->LoadPlugin(type);
+    std::shared_ptr<Component> create_component(const char *type) {
+        auto manager = get_plugin_manager();
+        auto plugin = manager->load_plugin(type);
         if (!plugin) {
-            Error("Failed to create component: `{}`\n", type);
+            error("Failed to create component: `{}`\n", type);
             return nullptr;
         }
-        auto obj = cast<Component>(plugin->GetClass()->Create());
-        return obj;
+        auto ty = Type::get_by_name(type);
+        return ty.create_shared().shared_cast<Component>();
     }
 
 } // namespace akari

@@ -50,12 +50,12 @@ namespace akari {
 
     AKR_EXPORT Logger *GetDefaultLogger();
 
-    template <typename... Args> void Warning(const char *fmt, Args &&... args) {
+    template <typename... Args> void warning(const char *fmt, Args &&... args) {
         auto logger = GetDefaultLogger();
         logger->Warning(fmt::format(fmt, std::forward<Args>(args)...));
     }
 
-    template <typename... Args> void Error(const char *fmt, Args &&... args) {
+    template <typename... Args> void error(const char *fmt, Args &&... args) {
         auto logger = GetDefaultLogger();
         logger->Error(fmt::format(fmt, std::forward<Args>(args)...));
     }
@@ -65,12 +65,12 @@ namespace akari {
         logger->Info(fmt::format(fmt, std::forward<Args>(args)...));
     }
 
-    template <typename... Args> void Debug(const char *fmt, Args &&... args) {
+    template <typename... Args> void debug(const char *fmt, Args &&... args) {
         auto logger = GetDefaultLogger();
         logger->Debug(fmt::format(fmt, std::forward<Args>(args)...));
     }
 
-    template <typename... Args> void Fatal(const char *fmt, Args &&... args) {
+    template <typename... Args> void fatal(const char *fmt, Args &&... args) {
         auto logger = GetDefaultLogger();
         logger->Fatal(fmt::format(fmt, std::forward<Args>(args)...));
     }
