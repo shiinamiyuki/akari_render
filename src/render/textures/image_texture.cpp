@@ -34,7 +34,7 @@ namespace akari {
         ImageTexture() = default;
         ImageTexture(const fs::path &path) : path(path) {}
         AKR_SER(path)
-        AKR_DECL_COMP(ImageTexture, "ImageTexture")
+        AKR_DECL_COMP()
         void commit() override {
             auto loader = GetImageLoader();
             auto tmp = loader->Load(path);
@@ -42,15 +42,15 @@ namespace akari {
                 image = tmp;
                 AtomicFloat sum(0);
                 parallel_for(
-                        image->Dimension().y,
-                        [=, &sum](uint32_t y, uint32_t) {
-                            for (int x = 0; x < image->Dimension().x; x++) {
-                                auto color = (*image)(x, y);
-                                Spectrum rgb = Spectrum(color.x, color.y, color.z);
-                                sum.add(rgb.luminance());
-                            }
-                        },
-                        32);
+                    image->Dimension().y,
+                    [=, &sum](uint32_t y, uint32_t) {
+                        for (int x = 0; x < image->Dimension().x; x++) {
+                            auto color = (*image)(x, y);
+                            Spectrum rgb = Spectrum(color.x, color.y, color.z);
+                            sum.add(rgb.luminance());
+                        }
+                    },
+                    32);
                 average = sum.value() / float(image->Dimension().x * image->Dimension().y);
             }
         }
@@ -60,7 +60,13 @@ namespace akari {
             return (*image)(texCoords);
         }
     };
-    AKR_EXPORT_COMP(ImageTexture, "Texture")
+    AKR_EXPORT_PLUGIN(ImageTexture, p) {
+        auto c = class_<ImageTexture, Texture, Component>("ImageTexture");
+        c.constructor<>();
+        c.property("rgb", &ImageTexture::path);
+        c.method("save", &ImageTexture::save);
+        c.method("load", &ImageTexture::load);
+    }
 
     std::shared_ptr<Texture> CreateImageTexture(const fs::path &path) { return std::make_shared<ImageTexture>(path); }
 } // namespace akari

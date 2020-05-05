@@ -22,7 +22,6 @@
 
 #pragma once
 
-
 #include <cstring>
 #include <functional>
 #include <memory>
@@ -31,8 +30,8 @@
 //#include <list>
 
 #include <akari/core/akari.h>
-#include <akari/core/platform.h>
 #include <akari/core/detail/typeinfo.hpp>
+#include <akari/core/platform.h>
 
 namespace akari {
 
@@ -297,11 +296,13 @@ namespace akari {
 
         [[nodiscard]] bool is_pointer() const { return _ptr->get_underlying().has_value(); }
 
+        [[nodiscard]] bool is_null() const { return _ptr->get_shared().value() == nullptr; }
+
         [[nodiscard]] bool is_shared_pointer() const { return _ptr->get_shared().has_value(); }
 
-        [[nodiscard]] std::shared_ptr<void> __get_internal_shared_pointer() const { return _ptr->get_shared().value(); }
+        [[nodiscard]] std::shared_ptr<void> _get_internal_shared_pointer() const { return _ptr->get_shared().value(); }
 
-        [[nodiscard]] void *__get_internal_pointer() const { return _ptr.get(); }
+        [[nodiscard]] void *_get_internal_pointer() const { return _ptr.get(); }
 
         [[nodiscard]] Any get_underlying() const { return _ptr->get_underlying(); }
 
@@ -309,20 +310,26 @@ namespace akari {
 
         [[nodiscard]] inline std::optional<SequentialContainerView> get_sequential_container_view() const;
 
-        inline const TypeInfo &get_type() const { return type; }
-
+        [[nodiscard]] inline const TypeInfo &_get_type() const { return type; }
+        [[nodiscard]] inline TypeInfo get_type() const {
+            if(auto r = _ptr->get_underlying_type()){
+                return r.value();
+            }else{
+                return type;
+            }
+        }
         void set_value(const Any &value) const {
             if (is_shared_pointer()) {
                 if (!value.is_shared_pointer()) {
                     throw std::runtime_error("assigning shared_ptr to non shared_ptr");
                 }
                 if (auto p = any_shared_pointer_cast(get_underlying_type(), value.get_underlying_type(),
-                                                     value.__get_internal_shared_pointer())) {
+                                                     value._get_internal_shared_pointer())) {
                     _ptr->assign_shared(p.value());
                 }
             }
             if (type == value.type) {
-                _ptr->assign(value.__get_internal_pointer());
+                _ptr->assign(value._get_internal_pointer());
             } else {
                 throw std::runtime_error("Bad Any::set_value");
             }
@@ -331,9 +338,9 @@ namespace akari {
         void set_underlying(const Any &value) const {
             if (get_underlying_type() == value.get_underlying_type()) {
                 if (value.is_shared_pointer()) {
-                    _ptr->assign_underlying(value.__get_internal_pointer());
+                    _ptr->assign_underlying(value._get_internal_shared_pointer().get());
                 } else {
-                    _ptr->assign_underlying(value.__get_internal_pointer());
+                    _ptr->assign_underlying(value._get_internal_pointer());
                 }
 
             } else {
@@ -705,7 +712,7 @@ namespace akari {
             }
         };
         struct AKR_EXPORT reflection_manager {
-
+            using NameNotFoundCallback = std::function<meta_instance &(reflection_manager &, const char *)>;
             std::unordered_map<std::string_view, meta_instance> instances;
             std::unordered_map<std::string_view, std::string_view> name_map;
             std::unordered_map<std::string_view, std::string_view> inv_name_map;
@@ -718,7 +725,18 @@ namespace akari {
                 std::function<std::optional<std::shared_ptr<void>>(TypeInfo, TypeInfo, std::shared_ptr<void>)>,
                 hash_pair>
                 shared_cast_funcs;
+
+            meta_instance &instance_by_name(const char *name) {
+                auto it = name_map.find(name);
+                if (it == name_map.end()) {
+                    return name_not_found_callback(*this, name);
+                } else {
+                    return instances.at(it->second);
+                }
+            }
+            meta_instance &instance_by_type(TypeInfo t) { return instances.at(t.name); }
             static reflection_manager &instance();
+            NameNotFoundCallback name_not_found_callback;
         };
 
     } // namespace detail
@@ -844,7 +862,7 @@ namespace akari {
         }
 
         static Type get_by_name(const char *name) {
-            Type _this_type(detail::reflection_manager::instance().name_map.at(name));
+            Type _this_type(detail::reflection_manager::instance().instance_by_name(name));
             return _this_type;
         }
 
@@ -899,7 +917,9 @@ namespace akari {
 
       private:
         std::function<detail::meta_instance &(void)> _get;
-
+        Type(detail::meta_instance &instance) {
+            _get = [&]() -> detail::meta_instance & { return instance; };
+        }
         Type(std::string_view type) {
             _get = [=]() -> detail::meta_instance & {
                 auto &mgr = detail::reflection_manager::instance();

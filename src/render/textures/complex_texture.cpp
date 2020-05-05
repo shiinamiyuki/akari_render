@@ -161,7 +161,7 @@ namespace akari {
         ComplexTexture() = default;
         ComplexTexture(const json &prog) : program(prog) {}
         AKR_SER(program)
-        AKR_DECL_COMP(ComplexTexture, "ComplexTexture")
+        AKR_DECL_COMP()
         void commit() override {
             using namespace detail;
             uint8_t id = 0;
@@ -195,8 +195,7 @@ namespace akari {
             return vec3(engine.registers[0]);
         }
     };
-    AKR_EXPORT_COMP(ComplexTexture, "Texture")
-
+    AKR_EXPORT_PLUGIN(ComplexTexture, p) {}
     std::shared_ptr<Texture> CreateComplexTexture(const json &program) {
         return std::make_shared<ComplexTexture>(program);
     }

@@ -134,7 +134,7 @@ namespace akari {
             mesh->groups = std::move(group);
             mesh->materials = std::move(cvtMaterials);
         }
-        mesh->save(output.string().c_str());
+        mesh->save_path(output.string().c_str());
         return mesh;
     }
 } // namespace akari
@@ -149,13 +149,12 @@ int main(int argc, char **argv) {
     fs::path out = argc >= 3 ? argv[2] : fs::path(in).replace_extension("");
 
     std::shared_ptr<SceneGraph> graph;
-    SerializeContext ctx;
     CurrentPathGuard _guard;
     auto mesh = Convert(in, out);
     if(out.extension().empty()){
         out.concat(".json");
     }
-    auto data = serialize::save_to_json(ctx, mesh);
+    auto data = serialize::save_to_json(mesh);
     std::ofstream o(out);
     o << data.dump(1) << std::endl;
 

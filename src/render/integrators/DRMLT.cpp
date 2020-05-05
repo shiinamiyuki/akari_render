@@ -28,10 +28,10 @@ namespace akari {
     using namespace MLT;
     class DRMLT : public Integrator {
       public:
-        AKR_DECL_COMP(DRMLT, "DRMLT")
+        AKR_DECL_COMP()
         std::shared_ptr<RenderTask> create_render_task(const RenderContext &ctx) override {
             return std::shared_ptr<RenderTask>();
         }
     };
-    AKR_EXPORT_COMP(DRMLT, "DRMLT")
+    AKR_EXPORT_PLUGIN(DRMLT, p){}
 } // namespace akari

@@ -73,7 +73,7 @@ namespace akari::MLT {
         return mutatedX;
     }
     struct MLTSampler : public Sampler {
-        AKR_DECL_COMP(MLTSampler, "MLTSampler")
+        AKR_DECL_COMP()
         struct PrimarySample {
             Float value = 0;
 

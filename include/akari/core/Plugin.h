@@ -24,6 +24,7 @@
 #define AKARIRENDER_PLUGIN_H
 
 #include <akari/core/akari.h>
+#include <akari/core/serialize.hpp>
 #include <akari/core/detail/serialize-impl.hpp>
 #include <memory>
 #include <mutex>

@@ -34,7 +34,7 @@ namespace akari {
 
       public:
         AKR_SER(position, color, strength)
-        AKR_DECL_COMP(PointLight, "PointLight")
+        AKR_DECL_COMP()
         Float pdf_incidence(const Interaction &ref, const vec3 &wi) const override { return 0; }
         void pdf_emission(const Ray &ray, Float *pdfPos, Float *pdfDir) const override {
             *pdfPos = 0;
@@ -68,5 +68,10 @@ namespace akari {
         }
         LightType get_light_type() const override { return LightType::EDeltaPosition; }
     };
-    AKR_EXPORT_COMP(PointLight, "Light")
+    AKR_EXPORT_PLUGIN(PointLight, p){
+        auto c = class_<PointLight,Light, EndPoint, Component>("PointLight");
+        c.constructor<>();
+        c.method("load", &PointLight::load);
+        c.method("save", &PointLight::save);
+    }
 } // namespace akari

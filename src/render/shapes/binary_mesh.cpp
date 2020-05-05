@@ -33,7 +33,7 @@ namespace akari {
     size_t BinaryMesh::vertex_count() const { return vertexBuffer.size(); }
     int BinaryMesh::get_primitive_group(int idx) const { return groups[idx]; }
     const char *AKR_MESH_MAGIC = "AKARI_BINARY_MESH";
-    bool BinaryMesh::load(const char *path) {
+    bool BinaryMesh::load_path(const char *path) {
         Info("Loading {}\n", path);
         std::ifstream in(path, std::ios::binary | std::ios::in);
         char buffer[128] = {0};
@@ -97,5 +97,8 @@ namespace akari {
         }
         return it->second;
     }
-    AKR_EXPORT_COMP(BinaryMesh, "Mesh");
+    AKR_EXPORT_PLUGIN(BinaryMesh, p){
+        auto c = class_<BinaryMesh, Mesh, Component>("BinaryMesh");
+        c.method("commit", &BinaryMesh::commit);
+    }
 } // namespace akari

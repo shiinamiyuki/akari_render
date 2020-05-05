@@ -138,11 +138,11 @@ namespace akari {
         int spp = 16;
 
       public:
-        AKR_DECL_COMP(RTDebug, "RTDebug")
+        AKR_DECL_COMP()
         AKR_SER(spp)
         std::shared_ptr<RenderTask> create_render_task(const RenderContext &ctx) override {
             return std::make_shared<RTDebugRenderTask>(ctx, spp);
         }
     };
-    AKR_EXPORT_COMP(RTDebug, "Integrator");
+    AKR_EXPORT_PLUGIN(RTDebug, p){}
 } // namespace akari

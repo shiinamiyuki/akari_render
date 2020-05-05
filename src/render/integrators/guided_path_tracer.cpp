@@ -808,16 +808,22 @@ namespace akari {
 
     class GuidedPathTracer : public Integrator {
         int spp = 16;
-        int minDepth = 5, maxDepth = 16;
+        int min_depth = 5, max_depth = 16;
         int trainingSamples = 16;
-        bool enableRR = false;
+        bool enable_rr = false;
 
       public:
-        AKR_DECL_COMP(GuidedPathTracer, "GuidedPathTracer")
-        AKR_SER(spp, trainingSamples, minDepth, maxDepth, enableRR)
+        AKR_DECL_COMP()
+        AKR_SER(spp, trainingSamples, min_depth, max_depth, enable_rr)
         std::shared_ptr<RenderTask> create_render_task(const RenderContext &ctx) override {
-            return std::make_shared<GPTRenderTask>(ctx, spp, minDepth, maxDepth, trainingSamples, enableRR);
+            return std::make_shared<GPTRenderTask>(ctx, spp, min_depth, max_depth, trainingSamples, enable_rr);
         }
     };
-    AKR_EXPORT_COMP(GuidedPathTracer, "Integrator");
+    AKR_EXPORT_PLUGIN(GuidedPathTracer, p){
+        auto c = class_<GuidedPathTracer, Integrator, Component>("GuidedPathTracer");
+        c.constructor<>();
+        c.method("save", &GuidedPathTracer::save);
+        c.method("load", &GuidedPathTracer::load);
+    }
+
 } // namespace akari

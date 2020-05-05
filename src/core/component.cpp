@@ -19,30 +19,21 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-
-#include <akari/core/plugin.h>
-#include <akari/core/spectrum.h>
-#include <akari/plugins/rgbtexture.h>
-#include <akari/render/texture.h>
-
-namespace akari {
-    class RGBTexture final : public Texture {
-      public:
-        Spectrum rgb{};
-        RGBTexture() = default;
-        explicit RGBTexture(const vec3 &rgb) : rgb(rgb) {}
-        AKR_SER(rgb)
-        AKR_DECL_COMP()
-        Spectrum evaluate(const ShadingPoint &sp) const override { return rgb; }
-        Float average_luminance() const override { return rgb.luminance(); }
-    };
-
-    AKR_EXPORT std::shared_ptr<Texture> create_rgb_texture(const vec3 &rgb) { return std::make_shared<RGBTexture>(rgb); }
-    AKR_EXPORT_PLUGIN(RGBTexture, p) {
-        auto c = class_<RGBTexture, Texture, Component>("RGBTexture");
-        c.constructor<>();
-        c.property("rgb", &RGBTexture::rgb);
-        c.method("save", &RGBTexture::save);
-        c.method("load", &RGBTexture::load);
+#include <akari/core/component.h>
+#include <akari/core/reflect.hpp>
+namespace akari{
+    void Component::commit() {
+        Type Self = type_of(*this);
+        for(auto& prop : Self.get_properties()){
+            auto value = prop.get(make_any_ref(*this));
+            Type ty = value.get_type();
+            if(ty.has_method("commit")){
+                if(value.is_shared_pointer()){
+                    ty.get_method("commit").invoke(value.get_underlying());
+                }else {
+                    ty.get_method("commit").invoke(value);
+                }
+            }
+        }
     }
-} // namespace akari
+}

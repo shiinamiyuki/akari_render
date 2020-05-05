@@ -19,17 +19,29 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+#include <akari/core/plugin.h>
 #include <akari/core/reflect.hpp>
+#include <fmt/format.h>
+namespace akari {
 
-namespace akari{
-
-    detail::reflection_manager & detail::reflection_manager::instance() {
+    detail::reflection_manager &detail::reflection_manager::instance() {
         static detail::reflection_manager mgr;
-
+        mgr.name_not_found_callback = [](detail::reflection_manager &mgr, const char *name) -> meta_instance & {
+            if (get_plugin_manager()->load_plugin(name)) {
+                try {
+                    return mgr.instances.at(mgr.name_map.at(name));
+                } catch (std::out_of_range &e) {
+                    throw std::runtime_error(
+                        fmt::format("type named: `{}` not found after trying loading plugins", name));
+                }
+            } else {
+                throw std::runtime_error(fmt::format("type named: `{}` not found", name));
+            }
+        };
         return mgr;
     }
-    static int _ = [](){
+    static int _ = []() {
         printf("called\n");
         return 0;
     }();
-}
+} // namespace akari

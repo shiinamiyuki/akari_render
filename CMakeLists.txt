@@ -127,5 +127,5 @@ add_executable(test-simd src/test/simd.cpp)
 add_subdirectory(src/Test)
 
 
-add_executable(test-reflect src/test/test-reflect.cpp src/core/reflect.cpp include/akari/core/reflect.hpp)
-target_link_libraries(test-reflect fmt)
+#add_executable(test-reflect src/test/test-reflect.cpp src/core/reflect.cpp include/akari/core/reflect.hpp)
+#target_link_libraries(test-reflect fmt)

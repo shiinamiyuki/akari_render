@@ -123,7 +123,7 @@ namespace akari {
             }
             sampler.StartStream(MLTSampler::EConnect);
             radianceRecord.radiance =
-                    connect_path(scene, sampler, eyePath, t, lightPath, s, &radianceRecord.pRaster) * nStrategies;
+                connect_path(scene, sampler, eyePath, t, lightPath, s, &radianceRecord.pRaster) * nStrategies;
             return radianceRecord;
         }
         static Float ScalarContributionFunction(const Spectrum &L) { return std::max(0.0f, L.luminance()); }
@@ -184,7 +184,7 @@ namespace akari {
                 parallel_for(nChains, [&, this](uint32_t i, uint32_t tid) {
                     for (int depth = 0; depth < maxDepth + 1; depth++) {
                         markovChains[i].radianceRecords[depth] =
-                                Radiance(markovChains[i].samplers[depth], arenas[tid], true);
+                            Radiance(markovChains[i].samplers[depth], arenas[tid], true);
                         markovChains[i].samplers[depth].seed = dist(rd);
                         markovChains[i].samplers[depth].rng = Rng(markovChains[i].samplers[depth].seed);
                         arenas[tid].reset();
@@ -216,7 +216,7 @@ namespace akari {
                         auto accept = std::min<float>(1.0f, FProposed / FCurrent);
                         Float b = depthWeight[depth];
                         float newWeight =
-                                (accept + (sampler.largeStep ? 1.0f : 0.0f)) / (FProposed / b + sampler.largeStepProb);
+                            (accept + (sampler.largeStep ? 1.0f : 0.0f)) / (FProposed / b + sampler.largeStepProb);
                         float oldWeight = (1 - accept) / (FCurrent / b + sampler.largeStepProb);
                         Spectrum Lnew = LProposed * newWeight / depthPdf;
                         Spectrum Lold = LCurrent * oldWeight / depthPdf;
@@ -269,8 +269,7 @@ namespace akari {
 )",
                 directSamples);
             auto setting = json::parse(pathTracerSetting);
-            SerializeContext s_ctx;
-            auto pathTracer = serialize::load_from_json<std::shared_ptr<Integrator>>(s_ctx, setting);
+            auto pathTracer = serialize::load_from_json<std::shared_ptr<Integrator>>(setting);
             AKARI_ASSERT(pathTracer);
             Info("Render direct samples\n");
             (void)pathTracer;
@@ -281,20 +280,25 @@ namespace akari {
     };
     class MMLT : public Integrator {
         int spp = 16;
-        int maxDepth = 7;
-        size_t nBootstrap = 100000u;
-        size_t nChains = 100;
-        int nDirect = 16;
+        int max_depth = 7;
+        size_t n_bootstrap = 100000u;
+        size_t n_chains = 100;
+        int n_direct = 16;
         Float clamp = 1e5;
-        size_t maxConsecutiveRejects = 102400;
+        size_t max_consecutive_rejects = 102400;
 
       public:
-        AKR_DECL_COMP(MMLT, "MMLT")
-        AKR_SER(spp, maxDepth, nBootstrap, nChains, nDirect, clamp, maxConsecutiveRejects)
+        AKR_DECL_COMP()
+        AKR_SER(spp, max_depth, n_bootstrap, n_chains, n_direct, clamp, max_consecutive_rejects)
         std::shared_ptr<RenderTask> create_render_task(const RenderContext &ctx) override {
-            return std::make_shared<MMLTRenderTask>(ctx, spp, maxDepth, nBootstrap, nChains, nDirect, clamp,
-                                                    maxConsecutiveRejects);
+            return std::make_shared<MMLTRenderTask>(ctx, spp, max_depth, n_bootstrap, n_chains, n_direct, clamp,
+                                                    max_consecutive_rejects);
         }
     };
-    AKR_EXPORT_COMP(MMLT, "Integrator")
+    AKR_EXPORT_PLUGIN(MMLT, p) {
+        auto c = class_<MMLT, Integrator, Component>("MMLT");
+        c.constructor<>();
+        c.method("save", &MMLT::save);
+        c.method("load", &MMLT::load);
+    }
 } // namespace akari

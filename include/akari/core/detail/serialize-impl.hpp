@@ -208,7 +208,7 @@ namespace akari::serialize {
         void _save(const Any &any) {
             if (any.is_shared_pointer()) {
                 auto &mgr = akari::detail::reflection_manager::instance();
-                auto p = any.__get_internal_shared_pointer();
+                auto p = any._get_internal_shared_pointer();
                 auto *raw = p.get();
                 if (!raw)
                     return;
@@ -218,12 +218,16 @@ namespace akari::serialize {
                     _top()["props"] = json();
                     _makeNode(_top()["props"]);
                     Type type = any.get_underlying_type();
-                    type.get_method("save").invoke(any.get_underlying(), make_any_ref(*this));
+                    if(type.has_method("save")) {
+                        type.get_method("save").invoke(any.get_underlying(), make_any_ref(*this));
+                    }
                     _popNode();
                     ptrs.emplace(raw, _top());
                 } else {
-                    Type type = any.get_type();
-                    type.get_method("save").invoke(any, make_any_ref(*this));
+                    Type type = any._get_type();
+                    if(type.has_method("save")) {
+                        type.get_method("save").invoke(any, make_any_ref(*this));
+                    }
                 }
             }
         }
@@ -333,15 +337,19 @@ namespace akari::serialize {
                         any.set_value(type.create_shared());
                     }
                     _makeNode(_top().at("props"));
-                    type.get_method("load").invoke(any.get_underlying(), make_any_ref(*this));
+                    if(type.has_method("load")) {
+                        type.get_method("load").invoke(any.get_underlying(), make_any_ref(*this));
+                    }
                     _popNode();
                 } else {
                     auto addr = std::stol(_top().at("addr").get<std::string>());
                     any.set_value(ptrs.at(addr));
                 }
             } else {
-                Type type = any.get_type();
-                type.get_method("load").invoke(any, make_any_ref(*this));
+                Type type = any._get_type();
+                if(type.has_method("load")) {
+                    type.get_method("load").invoke(any, make_any_ref(*this));
+                }
             }
         }
         template <class T> void _load(std::shared_ptr<T> &ptr) {

@@ -36,7 +36,7 @@ namespace akari {
         MatteMaterial() = default;
         explicit MatteMaterial(std::shared_ptr<Texture> color) : color(std::move(color)) {}
         AKR_SER(color)
-        AKR_DECL_COMP(MatteMaterial, "MatteMaterial")
+        AKR_DECL_COMP()
         void compute_scattering_functions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
                                           Float scale) const override {
             si->bsdf = arena.alloc<BSDF>(*si);
@@ -47,12 +47,13 @@ namespace akari {
         bool support_bidirectional() const override { return true; }
     };
 
-    AKR_EXPORT_COMP(MatteMaterial, "Material")
-    AKR_PLUGIN_ON_LOAD {
-        // clang-format off
-        class_<MatteMaterial,Material>("MatteMaterial")
-            .property("color",&MatteMaterial::color);
-        //clang-format on
+    AKR_EXPORT_PLUGIN(MatteMaterial, p) {
+        auto c = class_<MatteMaterial, Material, Component>("MatteMaterial");
+        c.constructor<>();
+        c.property("color", &MatteMaterial::color);
+        c.method("save", &MatteMaterial::save);
+        c.method("load", &MatteMaterial::load);
+        c.method("support_bidirectional", &MatteMaterial::support_bidirectional);
     }
     std::shared_ptr<Material> CreateMatteMaterial(const std::shared_ptr<Texture> &color) {
         return std::make_shared<MatteMaterial>(color);

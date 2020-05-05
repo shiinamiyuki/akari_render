@@ -129,56 +129,38 @@ namespace akari {
     };
 
     class DisneyMaterial : public Material {
-        std::shared_ptr<Texture> baseColor, subsurface, metallic, specular, specularTint, roughness, anisotropic, sheen,
-            sheenTint, clearcoat, clearcoatGlass, ior, specTrans;
+        std::shared_ptr<Texture> base_color, subsurface, metallic, specular, specularTint, roughness, anisotropic,
+            sheen, sheen_tint, clearcoat, clearcoat_gloss, ior, specTrans;
 
       public:
-        AKR_SER(baseColor, subsurface, metallic, specular, specularTint, roughness, anisotropic, sheen, sheenTint,
-                clearcoat, clearcoatGlass, ior, specTrans)
-        AKR_DECL_COMP(DisneyMaterial, "DisneyMaterial")
+        AKR_SER(base_color, subsurface, metallic, specular, specularTint, roughness, anisotropic, sheen, sheen_tint,
+                clearcoat, clearcoat_gloss, ior, specTrans)
+        AKR_DECL_COMP()
         void compute_scattering_functions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
                                           Float scale) const override {
             si->bsdf = arena.alloc<BSDF>(*si);
-//            Spectrum color = baseColor->evaluate(si->sp);
-//            Float metallicWeight = metallic->evaluate(si->sp)[0];
-//            Float eta = ior->evaluate(si->sp)[0];
-//            Float trans = specTrans->evaluate(si->sp)[0];
-//            Float diffuseWeight = (1.0f - trans) * (1.0f - metallicWeight);
-//            Float transWeight = trans * (1.0f - metallicWeight);
-//            Float alpha = roughness->evaluate(si->sp)[0];
-//            if(diffuseWeight > 0){
-//
-//            }
+            //            Spectrum color = baseColor->evaluate(si->sp);
+            //            Float metallicWeight = metallic->evaluate(si->sp)[0];
+            //            Float eta = ior->evaluate(si->sp)[0];
+            //            Float trans = specTrans->evaluate(si->sp)[0];
+            //            Float diffuseWeight = (1.0f - trans) * (1.0f - metallicWeight);
+            //            Float transWeight = trans * (1.0f - metallicWeight);
+            //            Float alpha = roughness->evaluate(si->sp)[0];
+            //            if(diffuseWeight > 0){
+            //
+            //            }
         }
         bool support_bidirectional() const override { return true; }
-        void commit() override {
-            if (baseColor)
-                baseColor->commit();
-            if (subsurface)
-                subsurface->commit();
-            if (metallic)
-                metallic->commit();
-            if (specular)
-                specular->commit();
-            if (specularTint)
-                specularTint->commit();
-            if (roughness)
-                roughness->commit();
-            if (anisotropic)
-                anisotropic->commit();
-            if (sheen)
-                sheen->commit();
-            if (sheenTint)
-                sheenTint->commit();
-            if (clearcoat)
-                clearcoat->commit();
-            if (clearcoatGlass)
-                clearcoatGlass->commit();
-            if(ior)
-                ior->commit();
-            if(specTrans)
-                specTrans->commit();
-        }
     };
-    AKR_EXPORT_COMP(DisneyMaterial, "Material")
+    AKR_EXPORT_PLUGIN(DisneyMaterial, p) {
+        auto c = class_<DisneyMaterial, Material, Component>();
+        using S = DisneyMaterial;
+        c.constructor<>();
+        c.method("save", &S::save);
+        c.method("load", &S::load);
+        c.method("commit", &S::commit);
+        c.property("ior", &S::ior);
+        c.property("clearcoat", &S::clearcoat);
+        c.property("clearcoat_gloss", &S::clearcoat_gloss);
+    }
 } // namespace akari

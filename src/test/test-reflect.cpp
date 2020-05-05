@@ -19,6 +19,7 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+#include <akari/core/detail/serialize-impl.hpp>
 #include <akari/core/math.h>
 #include <akari/core/reflect.hpp>
 #include <akari/core/serialize.hpp>
@@ -63,7 +64,7 @@ namespace akari {
     }
 
         void do_save(json &j, const Any &any) {
-            auto type_info = any.get_type();
+            auto type_info = any._get_type();
             AKR_SAVE_BASIC(int)
             else AKR_SAVE_BASIC(float) else AKR_SAVE_BASIC(double) else {
                 if (auto view = any.get_sequential_container_view()) {
@@ -77,7 +78,7 @@ namespace akari {
                     (void)opt;
                 } else {
                     j = json::object();
-                    Type type = any.get_type();
+                    Type type = any._get_type();
                     if (type.has_method("save")) {
                         type.get_method("save").invoke(any, make_any_ref(j));
                     } else {

@@ -206,15 +206,20 @@ namespace akari {
 
     class PathTracer : public Integrator {
         int spp = 16;
-        int minDepth = 5, maxDepth = 16;
-        bool enableRR = true;
+        int min_depth = 5, max_depth = 16;
+        bool enable_rr = true;
 
       public:
-        AKR_DECL_COMP(PathTracer, "PathTracer")
-        AKR_SER(spp, minDepth, maxDepth, enableRR)
+        AKR_DECL_COMP()
+        AKR_SER(spp, min_depth, max_depth, enable_rr)
         std::shared_ptr<RenderTask> create_render_task(const RenderContext &ctx) override {
-            return std::make_shared<PTRenderTask>(ctx, spp, minDepth, maxDepth, enableRR);
+            return std::make_shared<PTRenderTask>(ctx, spp, min_depth, max_depth, enable_rr);
         }
     };
-    AKR_EXPORT_COMP(PathTracer, "Integrator");
+    AKR_EXPORT_PLUGIN(PathTracer, p){
+        auto c = class_<PathTracer, Integrator, Component>("PathTracer");
+        c.constructor<>();
+        c.method("save", &PathTracer::save);
+        c.method("load", &PathTracer::load);
+    }
 } // namespace akari

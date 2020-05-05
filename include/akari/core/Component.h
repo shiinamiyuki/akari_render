@@ -39,7 +39,7 @@ namespace akari {
 
       public:
         Component() : dirty(true) {}
-        virtual void commit() {}
+        virtual void commit();
         virtual void clear_dirty_bit() { dirty = false; }
         virtual void set_dirty_Bit() { dirty = true; }
         virtual bool is_dirty() const { return dirty; }
@@ -51,10 +51,9 @@ namespace akari {
         return std::dynamic_pointer_cast<T>(p);
     }
 
-#define AKR_DECL_COMP()                                                                                     \
-    TypeInfo type_info() const override{ return type_of<std::decay_t<decltype(*this)>>(); }                                    \
+#define AKR_DECL_COMP()                                                                                                \
+    TypeInfo type_info() const override { return type_of<std::decay_t<decltype(*this)>>(); }                           \
     friend void _AkariPluginOnLoad(Plugin &);
-
 
     using GetPluginFunc = akari::Plugin *(*)();
     AKR_EXPORT std::shared_ptr<Component> create_component(const char *type);

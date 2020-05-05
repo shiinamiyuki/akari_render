@@ -62,7 +62,6 @@ int main(int argc, char **argv) {
         CurrentPathGuard _guard;
         fs::current_path(fs::absolute(fs::path(inputFilename)).parent_path());
         inputFilename = fs::path(inputFilename).filename().string();
-        SerializeContext ctx;
         std::shared_ptr<SceneGraph> graph;
         {
             Info("Loading {}\n", inputFilename);
@@ -70,7 +69,7 @@ int main(int argc, char **argv) {
             std::string str((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
             json data = str.empty() ? json::object() : json::parse(str);
 
-            graph = std::make_shared<SceneGraph>(serialize::load_from_json<SceneGraph>(ctx, data));
+            graph = std::make_shared<SceneGraph>(serialize::load_from_json<SceneGraph>(data));
         }
         graph->commit();
         Info("Start Rendering ...\n");
