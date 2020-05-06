@@ -32,7 +32,7 @@ namespace akari {
         RTCDevice device = nullptr;
 
       public:
-        AKR_DECL_COMP(EmbreeAccelerator, "EmbreeAccelerator")
+        AKR_DECL_COMP()
         void build(const Scene &scene) override {
             if (!device) {
                 device = rtcNewDevice(nullptr);
@@ -106,7 +106,7 @@ namespace akari {
             box.p_max[2] = bounds.upper_z;
             return box;
         }
-        ~EmbreeAccelerator() override {
+        ~EmbreeAccelerator()  {
             if (rtcScene) {
                 rtcReleaseScene(rtcScene);
             }
@@ -115,5 +115,8 @@ namespace akari {
             }
         }
     };
-    AKR_EXPORT_COMP(EmbreeAccelerator, "Accelerator")
+    AKR_EXPORT_PLUGIN(EmbreeAccelerator, p){
+        auto c = class_<EmbreeAccelerator, Accelerator, Component>();
+        c.constructor<>();
+    }
 } // namespace akari

@@ -215,7 +215,7 @@ namespace akari::Gui {
                                                            ImGuiTreeNodeFlags_SpanAvailWidth;
                     if (ImGui::TreeNodeEx(mesh.mesh.get(), base_flags, "%s", name.string().c_str())) {
                         if (ImGui::IsItemClicked()) {
-                            Debug("selected\n");
+                            debug("selected\n");
                             selectedItem = make_any_ref(mesh);
                         }
                         //  auto props = mesh.mesh->GetProperties();
@@ -293,7 +293,6 @@ namespace akari::Gui {
                                 fs::current_path(fs::absolute(path).parent_path());
                                 currentScenePath = fs::absolute(fs::current_path());
                                 auto npath = path.filename();
-                                SerializeContext ctx;
                                 try {
                                     Info("Loading {}\n", path.string());
                                     std::ifstream in(npath);
@@ -301,9 +300,9 @@ namespace akari::Gui {
                                                     std::istreambuf_iterator<char>());
                                     json data = str.empty() ? json::object() : json::parse(str);
                                     sceneGraph =
-                                        std::make_shared<SceneGraph>(serialize::fromJson<SceneGraph>(ctx, data));
+                                        std::make_shared<SceneGraph>(serialize::load_from_json<SceneGraph>(data));
                                 } catch (std::exception &e) {
-                                    Error("Exception while loading: {}\n", e.what());
+                                    error("Exception while loading: {}\n", e.what());
                                     sceneGraph = _tmp;
                                 }
                                 closeFunc();

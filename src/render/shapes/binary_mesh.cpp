@@ -99,6 +99,9 @@ namespace akari {
     }
     AKR_EXPORT_PLUGIN(BinaryMesh, p){
         auto c = class_<BinaryMesh, Mesh, Component>("BinaryMesh");
+        c.constructor<>();
         c.method("commit", &BinaryMesh::commit);
+        c.method("save", &BinaryMesh::save);
+        c.method("load", &BinaryMesh::load);
     }
 } // namespace akari

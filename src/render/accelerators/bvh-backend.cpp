@@ -323,8 +323,8 @@ namespace akari {
         }
         [[nodiscard]] bool occlude(const Ray &ray) const override { return topLevelBVH->occlude(ray); }
     };
-    AKR_EXPORT_PLUGIN(BVHAccelearator, p){
-        auto c = class_<BVHAccelerator, Accelerator, Component>();
+    AKR_EXPORT_PLUGIN(BVHAccelerator, p){
+        auto c = class_<BVHAccelerator, Accelerator, Component>("BVHAccelerator");
         c.constructor<>();
         c.method("build", &BVHAccelerator::build);
         c.method("intersect", &BVHAccelerator::intersect);

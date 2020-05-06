@@ -29,30 +29,30 @@
 namespace akari {
     class PerspectiveCamera final : public Camera {
         std::shared_ptr<Film> film;
-        ivec2 filmDimension = ivec2(500, 500);
-        float lensRadius = 0;
+        ivec2 resolution = ivec2(500, 500);
+        float lens_radius = 0;
         Angle<float> fov = {DegreesToRadians(80.0f)};
         Transform cameraToWorld, worldToCamera;
         AffineTransform transform;
-        Float focalDistance = 1;
+        Float focal_distance = 1;
         Transform rasterToCamera{}, cameraToRaster{};
 
       public:
         AKR_DECL_COMP()
 
-        AKR_SER(filmDimension, lensRadius, fov, transform, focalDistance)
+        AKR_SER(resolution, lens_radius, fov, transform, focal_distance)
         PerspectiveCamera() : cameraToWorld(identity<mat4>()), worldToCamera(identity<mat4>()) {}
         [[nodiscard]] bool IsProjective() const override { return true; }
 
         void generate_ray(const vec2 &u1, const vec2 &u2, const ivec2 &raster, CameraSample *sample) const override {
-            sample->p_lens = concentric_disk_sampling(u1) * lensRadius;
+            sample->p_lens = concentric_disk_sampling(u1) * lens_radius;
             sample->p_film = vec2(raster) + (u2 - 0.5f);
             sample->weight = 1;
 
             vec2 p = vec2(rasterToCamera.ApplyPoint(vec3(sample->p_film, 0)));
             Ray ray(vec3(0), normalize(vec3(p, 0) - vec3(0, 0, 1)));
-            if (lensRadius > 0 && focalDistance > 0) {
-                Float ft = focalDistance / abs(ray.d.z);
+            if (lens_radius > 0 && focal_distance > 0) {
+                Float ft = focal_distance / abs(ray.d.z);
                 vec3 pFocus = ray.At(ft);
                 ray.o = vec3(sample->p_lens, 0);
                 ray.d = normalize(pFocus - ray.o);
@@ -65,19 +65,19 @@ namespace akari {
         }
 
         void commit() override {
-            film = std::make_shared<Film>(filmDimension);
+            film = std::make_shared<Film>(resolution);
             cameraToWorld = Transform(transform.ToMatrix4());
             worldToCamera = cameraToWorld.Inverse();
             mat4 m = identity<mat4>();
-            m = scale(mat4(1.0), vec3(1.0f / filmDimension.x, 1.0f / filmDimension.y, 1)) * m;
+            m = scale(mat4(1.0), vec3(1.0f / resolution.x, 1.0f / resolution.y, 1)) * m;
             m = scale(mat4(1.0), vec3(2, 2, 1)) * m;
             m = translate(mat4(1.0), vec3(-1, -1, 0)) * m;
             m = scale(mat4(1.0), vec3(1, -1, 1)) * m;
             auto s = std::atan(fov.value / 2);
-            if (filmDimension.x > filmDimension.y) {
-                m = scale(mat4(1.0), vec3(s, s * float(filmDimension.y) / filmDimension.x, 1)) * m;
+            if (resolution.x > resolution.y) {
+                m = scale(mat4(1.0), vec3(s, s * float(resolution.y) / resolution.x, 1)) * m;
             } else {
-                m = scale(mat4(1.0), vec3(s * float(filmDimension.x) / filmDimension.y, s, 1)) * m;
+                m = scale(mat4(1.0), vec3(s * float(resolution.x) / resolution.y, s, 1)) * m;
             }
             rasterToCamera = Transform(m);
             cameraToRaster = rasterToCamera.Inverse();
@@ -85,7 +85,7 @@ namespace akari {
         [[nodiscard]] std::shared_ptr<Film> GetFilm() const override { return film; }
         Spectrum We(const Ray &ray, vec2 *pRaster) const override {
             Float cosTheta = dot(cameraToWorld.ApplyVector(vec3(0, 0, -1)), ray.d);
-            vec3 pFocus = ray.At((lensRadius == 0 ? 1 : focalDistance) / cosTheta);
+            vec3 pFocus = ray.At((lens_radius == 0 ? 1 : focal_distance) / cosTheta);
             vec2 raster = cameraToRaster.ApplyPoint(worldToCamera.ApplyPoint(pFocus));
             (void)raster;
             if (cosTheta <= 0) {
@@ -98,7 +98,7 @@ namespace akari {
             }
             //            Info("raster {}, {}, A(): {}\n", raster.x,raster.y, A());
             *pRaster = raster;
-            Float lensArea = lensRadius == 0 ? 1.0f : lensRadius * lensRadius * Pi;
+            Float lensArea = lens_radius == 0 ? 1.0f : lens_radius * lens_radius * Pi;
             return Spectrum(1 / (A() * lensArea * Power<4>(cosTheta)));
         }
         Float A() const {
@@ -110,7 +110,7 @@ namespace akari {
         }
         void pdf_emission(const Ray &ray, Float *pdfPos, Float *pdfDir) const override {
             Float cosTheta = dot(cameraToWorld.ApplyVector(vec3(0, 0, -1)), ray.d);
-            vec3 pFocus = ray.At((lensRadius == 0 ? 1 : focalDistance) / cosTheta);
+            vec3 pFocus = ray.At((lens_radius == 0 ? 1 : focal_distance) / cosTheta);
             vec2 raster = cameraToRaster.ApplyPoint(worldToCamera.ApplyPoint(pFocus));
             (void)raster;
             if (cosTheta <= 0) {
@@ -119,21 +119,21 @@ namespace akari {
 
             Float d = 1 / cosTheta;
             // pw = pa(p) * da/dw = 1 / filmArea * d^2 / cosTheta
-            Float lensArea = lensRadius == 0 ? 1.0f : lensRadius * lensRadius * Pi;
+            Float lensArea = lens_radius == 0 ? 1.0f : lens_radius * lens_radius * Pi;
             *pdfPos = 1 / lensArea;
             *pdfDir = 1 / A() * d * d / cosTheta;
         }
 
         void sample_incidence(const vec2 &u, const Interaction &ref, RayIncidentSample *sample,
                               VisibilityTester *tester) const override {
-            vec2 pLens = lensRadius * concentric_disk_sampling(u);
+            vec2 pLens = lens_radius * concentric_disk_sampling(u);
 
             vec3 pLensWorld = cameraToWorld.ApplyPoint(vec3(pLens, 0));
             sample->normal = cameraToWorld.ApplyNormal(vec3(0, 0, -1));
             sample->wi = pLensWorld - ref.p;
             Float dist = length(sample->wi);
             sample->wi /= dist;
-            Float lensArea = lensRadius == 0 ? 1.0f : lensRadius * lensRadius * Pi;
+            Float lensArea = lens_radius == 0 ? 1.0f : lens_radius * lens_radius * Pi;
             tester->shadowRay = Ray(pLensWorld, -sample->wi, Eps(), dist * (1.0 - ShadowEps()));
             sample->pdf = (dist * dist) / (lensArea * abs(dot(sample->normal, sample->wi)));
             sample->I = We(tester->shadowRay, &sample->pos);

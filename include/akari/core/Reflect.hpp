@@ -327,11 +327,12 @@ namespace akari {
                                                      value._get_internal_shared_pointer())) {
                     _ptr->assign_shared(p.value());
                 }
-            }
-            if (type == value.type) {
-                _ptr->assign(value._get_internal_pointer());
-            } else {
-                throw std::runtime_error("Bad Any::set_value");
+            }else {
+                if (type == value.type) {
+                    _ptr->assign(value._get_internal_pointer());
+                } else {
+                    throw std::runtime_error("Bad Any::set_value");
+                }
             }
         }
 
