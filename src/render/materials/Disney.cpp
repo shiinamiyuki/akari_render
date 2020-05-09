@@ -48,13 +48,13 @@ namespace akari {
     }
 
     class DisneySheen : public BSDFComponent {
-        const Spectrum R;
+        const Spectrum base_color;
         const Spectrum sheen;
         const Spectrum sheenTint;
 
       public:
-        DisneySheen(const Spectrum &R, const Spectrum &sheen, const Spectrum &sheenTint)
-            : BSDFComponent(BSDFType(BSDF_GLOSSY | BSDF_REFLECTION)), R(R), sheen(sheen), sheenTint(sheenTint) {}
+        DisneySheen(const Spectrum &base_color, const Spectrum &sheen, const Spectrum &sheenTint)
+            : BSDFComponent(BSDFType(BSDF_GLOSSY | BSDF_REFLECTION)), base_color(base_color), sheen(sheen), sheenTint(sheenTint) {}
         [[nodiscard]] Spectrum evaluate(const vec3 &wo, const vec3 &wi) const override {
             auto wh = wi + wo;
             if (all(equal(wh, vec3(0)))) {
@@ -62,7 +62,7 @@ namespace akari {
             }
             wh = normalize(wh);
             Float d = dot(wh, wi);
-            return sheen * lerp(Spectrum(1), CalculateTint(R), sheenTint) * SchlickWeight(d);
+            return sheen * lerp(Spectrum(1), CalculateTint(base_color), sheenTint) * SchlickWeight(d);
         }
     };
 
@@ -138,17 +138,19 @@ namespace akari {
         AKR_DECL_COMP()
         void compute_scattering_functions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
                                           Float scale) const override {
-            si->bsdf = arena.alloc<BSDF>(*si);
-            //            Spectrum color = baseColor->evaluate(si->sp);
-            //            Float metallicWeight = metallic->evaluate(si->sp)[0];
-            //            Float eta = ior->evaluate(si->sp)[0];
-            //            Float trans = specTrans->evaluate(si->sp)[0];
-            //            Float diffuseWeight = (1.0f - trans) * (1.0f - metallicWeight);
-            //            Float transWeight = trans * (1.0f - metallicWeight);
-            //            Float alpha = roughness->evaluate(si->sp)[0];
-            //            if(diffuseWeight > 0){
-            //
-            //            }
+//            si->bsdf = arena.alloc<BSDF>(*si);
+//            Spectrum color = base_color->evaluate(si->sp);
+//            Float metallicWeight = metallic->evaluate(si->sp)[0];
+//            Float eta = ior->evaluate(si->sp)[0];
+//            Float trans = specTrans->evaluate(si->sp)[0];
+//            Float diffuseWeight = (1.0f - trans) * (1.0f - metallicWeight);
+//            Float transWeight = trans * (1.0f - metallicWeight);
+//            Float alpha = roughness->evaluate(si->sp)[0];
+//            if (diffuseWeight > 0) {
+//                si->bsdf->add_component(arena.alloc<DisneyDiffuse>(color * diffuseWeight));
+//                //TODO: subsurface
+//            }
+
         }
         bool support_bidirectional() const override { return true; }
     };

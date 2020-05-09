@@ -111,13 +111,13 @@ namespace akari {
                 }
             }
             auto eyePath = arena.allocN<PathVertex>(t + 1);
-            size_t nCamera = TraceEyePath(scene, arena, camera, pRaster, sampler, eyePath, t);
+            size_t nCamera = trace_eye_path(scene, arena, camera, pRaster, sampler, eyePath, t);
             if ((int)nCamera != t) {
                 return radianceRecord;
             }
             sampler.StartStream(MLTSampler::ELight);
             auto lightPath = arena.allocN<PathVertex>(s + 1);
-            size_t nLight = TraceLightPath(scene, arena, sampler, lightPath, s);
+            size_t nLight = trace_light_path(scene, arena, sampler, lightPath, s);
             if ((int)nLight != s) {
                 return radianceRecord;
             }

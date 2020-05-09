@@ -153,10 +153,10 @@ namespace akari {
             A res;                                                                                                     \
             for (size_t i = 0; i < N; i++) {                                                                           \
                 res[i] = func(x[i]);                                                                                   \
-            }                                                                                                          \
+            }      return res;                                                                                                   \
         }                                                                                                              \
     };                                                                                                                 \
-    template <typename T, size_t N> simd_array<T, N> func(const simd_array<T, N> &x) { return delegate<T, N>::func(x); }
+    template <typename T, size_t N> simd_array<T, N> func(const simd_array<T, N> &x) { return delegate<T, N>::apply(x); }
 #define AKR_SIMD_DEFAULT_FUNCTION_2(delegate, func)                                                                    \
     template <typename T, size_t N> struct delegate {                                                                  \
         using A = simd_array<T, N>;                                                                                    \
@@ -164,11 +164,11 @@ namespace akari {
             A res;                                                                                                     \
             for (size_t i = 0; i < N; i++) {                                                                           \
                 res[i] = func(x[i], y[i]);                                                                             \
-            }                                                                                                          \
+            }    return res;/**/                                                                                                      \
         }                                                                                                              \
     };                                                                                                                 \
     template <typename T, size_t N> simd_array<T, N> func(const simd_array<T, N> &x, const simd_array<T, N> &y) {      \
-        return delegate<T, N>::func(x, y);                                                                             \
+        return delegate<T, N>::apply(x, y);                                                                             \
     }
 
 #define AKR_SIMD_DEFAULT_OPERATOR(delegate, assign_op)                                                                 \
@@ -386,6 +386,8 @@ namespace akari {
     using std::sin;
     using std::sqrt;
     using std::tan;
+    AKR_SIMD_DEFAULT_FUNCTION_1(array_floor, floor)
+    AKR_SIMD_DEFAULT_FUNCTION_1(array_ceil, ceil)
     AKR_SIMD_DEFAULT_FUNCTION_1(array_sin, sin)
     AKR_SIMD_DEFAULT_FUNCTION_1(array_cos, cos)
     AKR_SIMD_DEFAULT_FUNCTION_1(array_tan, tan)
@@ -449,8 +451,8 @@ namespace akari {
         const T &operator[](size_t i) const { return this->data[i]; }
 #define AKR_SIMD_GEN_VFLOAT_ASSIGN_OPERATOR(assign_op, delegate)                                                       \
     Derived &operator assign_op(const Derived &rhs) {                                                                  \
-        delegate<T, N>::apply(*this, rhs);                                                                             \
-        return *this;                                                                                                  \
+        delegate<T, N>::apply(static_cast<Derived&>(*this), rhs);                                                                             \
+        return static_cast<Derived&>(*this);                                                                                                  \
     }
         AKR_SIMD_GEN_VFLOAT_ASSIGN_OPERATOR(+=, array_operator_add)
         AKR_SIMD_GEN_VFLOAT_ASSIGN_OPERATOR(-=, array_operator_sub)

@@ -24,7 +24,7 @@
 #include <akari/plugins/core_bidir.h>
 
 namespace akari {
-    size_t RandomWalk(const Scene &scene, MemoryArena &arena, Sampler &sampler, TransportMode mode, Ray ray,
+    size_t random_walk(const Scene &scene, MemoryArena &arena, Sampler &sampler, TransportMode mode, Ray ray,
                       Spectrum beta, Float pdf, PathVertex *path, size_t maxDepth) {
         if (maxDepth == 0) {
             return 0;
@@ -84,7 +84,7 @@ namespace akari {
         return depth;
     }
 
-    size_t TraceEyePath(const Scene &scene, MemoryArena &arena, const Camera &camera, const ivec2 &raster,
+    size_t trace_eye_path(const Scene &scene, MemoryArena &arena, const Camera &camera, const ivec2 &raster,
                         Sampler &sampler, PathVertex *path, size_t maxDepth) {
         if (maxDepth == 0)
             return 0;
@@ -98,11 +98,11 @@ namespace akari {
             return 0;
         }
         path[0] = PathVertex::CreateCameraVertex(beta, &camera, cameraSample.primary.o, cameraSample.normal);
-        return 1 + RandomWalk(scene, arena, sampler, TransportMode ::ERadiance, cameraSample.primary, beta, pdfDir,
-                              path + 1, maxDepth - 1);
+        return 1 + random_walk(scene, arena, sampler, TransportMode ::ERadiance, cameraSample.primary, beta, pdfDir,
+                               path + 1, maxDepth - 1);
     }
 
-    size_t TraceLightPath(const Scene &scene, MemoryArena &arena, Sampler &sampler, PathVertex *path, size_t maxDepth) {
+    size_t trace_light_path(const Scene &scene, MemoryArena &arena, Sampler &sampler, PathVertex *path, size_t maxDepth) {
         if (maxDepth == 0)
             return 0;
         Float pdfLight = 0;
@@ -119,8 +119,8 @@ namespace akari {
         if(path[0].on_surface()){
             beta *= abs(dot(sample.ray.d, sample.normal));
         }
-        return 1 + RandomWalk(scene, arena, sampler, TransportMode::EImportance, sample.ray, beta, sample.pdfDir,
-                              path + 1, maxDepth - 1);
+        return 1 + random_walk(scene, arena, sampler, TransportMode::EImportance, sample.ray, beta, sample.pdfDir,
+                               path + 1, maxDepth - 1);
     }
     template <int Power>
     Float mis_weight(const Scene &scene, Sampler &sampler, PathVertex *eyePath, size_t t, PathVertex *lightPath,

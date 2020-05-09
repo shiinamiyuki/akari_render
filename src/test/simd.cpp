@@ -39,5 +39,14 @@ int main() {
     for (int i = 0; i < 32; i++) {
         printf("%f %f %f %d\n", a[i], b[i], c[i], mask[i]);
     }
+    simd_array<float, 128> x(2.3);
+    for(int i = 0;i<128;i++){
+        x[i] = 3.1415 * i / 128.0;
+    }
+    auto y = sin(x);
+    auto z = cos(x);
+    for(int i = 0;i<128;i++) {
+        printf("%lf %lf %lf %lf\n", sin(x[i]), y[i], cos(x[i]), z[i]);
+    }
 
 }

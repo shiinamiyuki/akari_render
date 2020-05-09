@@ -263,13 +263,13 @@ namespace akari {
         }
     };
 
-    AKR_EXPORT size_t RandomWalk(const Scene &scene, MemoryArena &arena, Sampler &sampler, TransportMode mode, Ray ray,
+    AKR_EXPORT size_t random_walk(const Scene &scene, MemoryArena &arena, Sampler &sampler, TransportMode mode, Ray ray,
                                  Spectrum beta, Float pdf, PathVertex *path, size_t maxDepth);
 
-    AKR_EXPORT size_t TraceEyePath(const Scene &scene, MemoryArena &arena, const Camera &camera, const ivec2 &raster,
+    AKR_EXPORT size_t trace_eye_path(const Scene &scene, MemoryArena &arena, const Camera &camera, const ivec2 &raster,
                                    Sampler &sampler, PathVertex *path, size_t maxDepth);
 
-    AKR_EXPORT size_t TraceLightPath(const Scene &scene, MemoryArena &arena, Sampler &sampler, PathVertex *path,
+    AKR_EXPORT size_t trace_light_path(const Scene &scene, MemoryArena &arena, Sampler &sampler, PathVertex *path,
                                      size_t maxDepth);
 
     AKR_EXPORT Spectrum connect_path(const Scene &scene, Sampler &sampler, PathVertex *eyePath, size_t t,

@@ -128,6 +128,102 @@ namespace akari {
         auto x4 = x2 * x2;
         return x4 * (fma(x, T(c5), T(c4)) + x2 * c6) + fma(x2, fma(x, T(c3), T(c2)), fma(x, T(c1), T(c0)));
     }
+
+    // from https://github.com/ispc/ispc/blob/master/stdlib.ispc
+    template <typename F, typename I> inline F _sin(const F &x_full) {
+        static const auto pi_over_two_vec = F(1.57079637050628662109375f);
+        static const auto two_over_pi_vec = F(0.636619746685028076171875f);
+        F scaled = x_full * two_over_pi_vec;
+        F k_real = floor(scaled);
+        I k = I(k_real);
+        F x = x_full - k_real * pi_over_two_vec;
+        I k_mod4 = I(k) & I(3);
+        auto sin_usecos = (k_mod4 == 1 | k_mod4 == 3);
+        auto flip_sign = (k_mod4 > 1);
+
+        static const F sin_c2 = -0.16666667163372039794921875;
+        static const F sin_c4 = 8.333347737789154052734375e-3;
+        static const F sin_c6 = -1.9842604524455964565277099609375e-4;
+        static const F sin_c8 = 2.760012648650445044040679931640625e-6;
+        static const F sin_c10 = -2.50293279435709337121807038784027099609375e-8;
+
+        static const F cos_c2 = -0.5;
+        static const F cos_c4 = 4.166664183139801025390625e-2;
+        static const F cos_c6 = -1.388833043165504932403564453125e-3;
+        static const F cos_c8 = 2.47562347794882953166961669921875e-5;
+        static const F cos_c10 = -2.59630184018533327616751194000244140625e-7;
+
+        auto outside = select(sin_usecos, F(1.0f), x);
+        auto c2 = select(sin_usecos, cos_c2, sin_c2);
+        auto c4 = select(sin_usecos, cos_c4, sin_c4);
+        auto c6 = select(sin_usecos, cos_c6, sin_c6);
+        auto c8 = select(sin_usecos, cos_c8, sin_c8);
+        auto c10 = select(sin_usecos, cos_c10, sin_c10);
+
+        auto x2 = x * x;
+        auto formula = x2 * c10 + c8;
+        formula = x2 * formula + c6;
+        formula = x2 * formula + c4;
+        formula = x2 * formula + c2;
+        formula = x2 * formula + F(1.0f);
+        formula *= outside;
+        formula = select(flip_sign, F(-1.0f) * formula, formula);
+        return formula;
+    }
+
+// from https://github.com/ispc/ispc/blob/master/stdlib.ispc
+    template <typename F, typename I> inline F _cos(const F &x_full) {
+        static const auto pi_over_two_vec = F(1.57079637050628662109375f);
+        static const auto two_over_pi_vec = F(0.636619746685028076171875f);
+        F scaled = x_full * two_over_pi_vec;
+        F k_real = floor(scaled);
+        I k = I(k_real);
+        F x = x_full - k_real * pi_over_two_vec;
+        I k_mod4 = I(k) & I(3);
+        auto cos_usecos  = (k_mod4 == 0 | k_mod4 == 3);
+        auto flip_sign = (k_mod4 == 1 | k_mod4 == 2);
+
+        static const F sin_c2 = -0.16666667163372039794921875;
+        static const F sin_c4 = 8.333347737789154052734375e-3;
+        static const F sin_c6 = -1.9842604524455964565277099609375e-4;
+        static const F sin_c8 = 2.760012648650445044040679931640625e-6;
+        static const F sin_c10 = -2.50293279435709337121807038784027099609375e-8;
+
+        static const F cos_c2 = -0.5;
+        static const F cos_c4 = 4.166664183139801025390625e-2;
+        static const F cos_c6 = -1.388833043165504932403564453125e-3;
+        static const F cos_c8 = 2.47562347794882953166961669921875e-5;
+        static const F cos_c10 = -2.59630184018533327616751194000244140625e-7;
+
+        auto outside = select(cos_usecos , F(1.0f), x);
+        auto c2 = select(cos_usecos , cos_c2, sin_c2);
+        auto c4 = select(cos_usecos , cos_c4, sin_c4);
+        auto c6 = select(cos_usecos , cos_c6, sin_c6);
+        auto c8 = select(cos_usecos , cos_c8, sin_c8);
+        auto c10 = select(cos_usecos , cos_c10, sin_c10);
+
+        auto x2 = x * x;
+        auto formula = x2 * c10 + c8;
+        formula = x2 * formula + c6;
+        formula = x2 * formula + c4;
+        formula = x2 * formula + c2;
+        formula = x2 * formula + F(1.0f);
+        formula *= outside;
+        formula = select(flip_sign, F(-1.0f) * formula, formula);
+        return formula;
+    }
+    template <size_t N> struct array_sin<float, N> {
+        using A = simd_array<float, N>;
+        static A apply(const A &x) {
+            return _sin<simd_array<float, N>, simd_array<int, N>>(x);
+        }
+    };
+    template <size_t N> struct array_cos<float, N> {
+        using A = simd_array<float, N>;
+        static A apply(const A &x) {
+            return _cos<simd_array<float, N>, simd_array<int, N>>(x);
+        }
+    };
 #endif
 } // namespace akari
 #endif // AKARIRENDER_SIMDARRAYFUNCTIONS_HPP

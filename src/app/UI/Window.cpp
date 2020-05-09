@@ -51,8 +51,10 @@ namespace akari::Gui {
             bool ret = false;
             ImGuiIdGuard _(value.get());
             if (ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_DefaultOpen)) {
+                debug("type {}\n", type_of(*value).name.data());
                 auto props = Type::get_by_typeid(*value).get_properties();
                 for (auto &prop : props) {
+                    debug("prop {}\n", prop.name());
                     ret = ret | EditItem(state, prop.name(), prop.get(make_any_ref(*value)));
                 }
                 ImGui::TreePop();
@@ -135,7 +137,7 @@ namespace akari::Gui {
 
         inline bool EditItem(EditorState &state, const char *label, const Any &ref) {
             return EditItemV<int, float, ivec2, ivec3, vec2, vec3, Spectrum, Angle<float>, Angle<vec3>, AffineTransform,
-                             MeshWrapper>(state, label, ref)
+                             std::shared_ptr<Texture>, std::shared_ptr<Material>, MeshWrapper>(state, label, ref)
                 .second;
         }
     }; // namespace detail

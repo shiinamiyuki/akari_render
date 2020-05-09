@@ -3,6 +3,7 @@ project(AkariRender)
 
 set(CMAKE_CXX_STANDARD 17)
 option(AKARI_BUILD_GUI "Build Gui / Editor" OFF)
+option(AKARI_PYTHON_SUPPORT "Enable Python Support" OFF)
 
 include_directories(external/glm)
 include_directories(external/misc)

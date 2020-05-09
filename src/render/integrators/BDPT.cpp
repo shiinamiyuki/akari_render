@@ -74,8 +74,8 @@ namespace akari {
                     MemoryArena &arena) {
             auto lightPath = arena.allocN<PathVertex>(maxDepth + 1);
             auto eyePath = arena.allocN<PathVertex>(maxDepth + 1);
-            size_t nCamera = TraceEyePath(scene, arena, camera, raster, *sampler, eyePath, maxDepth);
-            size_t nLight = TraceLightPath(scene, arena, *sampler, lightPath, maxDepth);
+            size_t nCamera = trace_eye_path(scene, arena, camera, raster, *sampler, eyePath, maxDepth);
+            size_t nLight = trace_light_path(scene, arena, *sampler, lightPath, maxDepth);
             Spectrum L(0);
             for (size_t t = 1; t <= nCamera; ++t) {
                 for (size_t s = 0; s <= nLight; ++s) {
