@@ -27,7 +27,7 @@
 #include <akari/render/scene.h>
 
 namespace akari {
-    SurfaceInteraction::SurfaceInteraction(const MaterialSlot *materialSlot, const glm::vec3 &wo, const glm::vec3 &p,
+    SurfaceInteraction::SurfaceInteraction(const MaterialSlot *materialSlot, const glm::Vector3f &wo, const glm::Vector3f &p,
                                            const akari::Triangle &triangle, const akari::Intersection &intersection,
                                            akari::MemoryArena &arena)
         : Interaction(wo, p, triangle.Ng), materialSlot(materialSlot) {
@@ -41,7 +41,7 @@ namespace akari {
     void SurfaceInteraction::compute_scattering_functions(MemoryArena &arena, TransportMode mode, float scale) {
         materialSlot->material->compute_scattering_functions(this, arena, mode, scale);
     }
-    Spectrum SurfaceInteraction::Le(const vec3 &wo) {
+    Spectrum SurfaceInteraction::Le(const Vector3f &wo) {
         if (!materialSlot) {
             return Spectrum(0);
         }

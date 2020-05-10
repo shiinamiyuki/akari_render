@@ -40,30 +40,30 @@ namespace akari {
             *pdfPos = 0;
             *pdfDir = uniform_sphere_pdf();
         }
-        void sample_incidence(const vec2 &u, const Interaction &ref, RayIncidentSample *sample,
+        void sample_incidence(const Vector2f &u, const Interaction &ref, RayIncidentSample *sample,
                               VisibilityTester *tester) const override {
             auto wi = position - ref.p;
             auto dist2 = dot(wi, wi);
             auto dist = std::sqrt(dist2);
             wi /= dist;
 
-            sample->I = Li(-wi, vec2(0)) / dist2;
+            sample->I = Li(-wi, Vector2f(0)) / dist2;
             sample->wi = wi;
             sample->pdf = 1;
             sample->normal = vec3(0);
 
             tester->shadowRay = Ray(position, -1.0f * wi, 0, dist * (1 - ShadowEps()));
         }
-        void sample_emission(const vec2 &u1, const vec2 &u2, RayEmissionSample *sample) const override {
+        void sample_emission(const Vector2f &u1, const Vector2f &u2, RayEmissionSample *sample) const override {
             sample->ray = Ray(position, uniform_sphere_sampling(u2));
             sample->pdfDir = uniform_sphere_pdf();
             sample->pdfPos = 1;
             sample->normal = vec3(0);
             sample->E = Li(sample->ray.d, vec3());
-            sample->uv = vec2();
+            sample->uv = Vector2f();
         }
         Float power() const override { return Spectrum(color).luminance() * strength * 4 * Pi; }
-        Spectrum Li(const vec3 &wo, const vec2 &uv) const override {
+        Spectrum Li(const vec3 &wo, const Vector2f &uv) const override {
             return Spectrum(Spectrum(color).luminance() * strength);
         }
         LightType get_light_type() const override { return LightType::EDeltaPosition; }

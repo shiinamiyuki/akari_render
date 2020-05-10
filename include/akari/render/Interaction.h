@@ -26,34 +26,41 @@
 #include <akari/render/geometry.hpp>
 #include <akari/render/medium_stack.h>
 namespace akari {
+    template<typename Float, typename Spectrum>
     struct Interaction {
-        vec3 wo = vec3(0); // world space wo
-        vec3 p = vec3(0);
-        vec3 Ng = vec3(0);
-        vec2 uv{};
+        AKR_BASIC_TYPES()
+        AKR_USE_TYPES(Ray)
+        Vector3f wo = Vector3f(0); // world space wo
+        Vector3f p = Vector3f(0);
+        Vector3f Ng = Vector3f(0);
+        Vector2f uv{};
         Interaction() = default;
-        Interaction(const vec3 &wo, const vec3 &p, const vec3 &Ng) : wo(wo), p(p), Ng(Ng) {}
+        Interaction(const Vector3f &wo, const Vector3f &p, const Vector3f &Ng) : wo(wo), p(p), Ng(Ng) {}
 
-        [[nodiscard]] Ray spawn_dir(const vec3 &w, Float rayBias = Eps()) const {
+        [[nodiscard]] Ray spawn_dir(const Vector3f &w, Float rayBias = Eps()) const {
             return Ray(p, w, rayBias / abs(dot(w, Ng)), Inf);
         }
-        [[nodiscard]] Ray spawn_to(const vec3 &q, Float rayBias = Eps()) const {
+        [[nodiscard]] Ray spawn_to(const Vector3f &q, Float rayBias = Eps()) const {
             auto w = (q - p);
             return Ray(p, w, rayBias / abs(dot(w, Ng)) / length(w), 1 - ShadowEps());
         }
     };
     class MemoryArena;
     class Scene;
+    template<typename Float, typename Spectrum>
     struct MaterialSlot;
-    struct AKR_EXPORT SurfaceInteraction : Interaction {
+    template<typename Float, typename Spectrum>
+    struct AKR_EXPORT SurfaceInteraction : Interaction<Float, Spectrum> {
+        AKR_BASIC_TYPES()
+        AKR_USE_TYPES(Interaction, ShadingPoint)
         using Interaction::Interaction;
         ShadingPoint sp{};
-        vec3 Ns = vec3(0);
+        Vector3f Ns = Vector3f(0);
         BSDF *bsdf = nullptr;
         PrimitiveHandle handle;
         MediumStack *mediumStack = nullptr;
         const MaterialSlot *materialSlot = nullptr;
-        SurfaceInteraction(const MaterialSlot *materialSlot, const vec3 &wo, const vec3 &p, const Triangle &triangle,
+        SurfaceInteraction(const MaterialSlot *materialSlot, const Vector3f &wo, const Vector3f &p, const Triangle &triangle,
                            const Intersection &intersection)
             : Interaction(wo, p, triangle.Ng), materialSlot(materialSlot) {
             sp.texCoords = triangle.interpolated_tex_coord(intersection.uv);
@@ -62,16 +69,16 @@ namespace akari {
             handle.meshId = intersection.meshId;
             handle.primId = intersection.primId;
         }
-        SurfaceInteraction(const MaterialSlot *materialSlot, const vec3 &wo, const vec3 &p, const Triangle &triangle,
+        SurfaceInteraction(const MaterialSlot *materialSlot, const Vector3f &wo, const Vector3f &p, const Triangle &triangle,
                            const Intersection &intersection, MemoryArena &arena);
         void compute_scattering_functions(MemoryArena &, TransportMode mode, float scale);
-        Spectrum Le(const vec3 &wo);
+        Spectrum Le(const Vector3f &wo);
     };
     class EndPoint;
     struct AKR_EXPORT EndPointInteraction : Interaction {
         using Interaction::Interaction;
         const EndPoint *ep = nullptr;
-        EndPointInteraction(const EndPoint *ep, const vec3 &p, const vec3 &Ng) : Interaction(vec3(0), p, Ng), ep(ep) {}
+        EndPointInteraction(const EndPoint *ep, const Vector3f &p, const Vector3f &Ng) : Interaction(Vector3f(0), p, Ng), ep(ep) {}
     };
 } // namespace akari
 

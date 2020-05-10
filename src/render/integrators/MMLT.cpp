@@ -81,7 +81,7 @@ namespace akari {
             float pFilmX = sampler.next1d();
             float pFilmY = sampler.next1d();
             auto dim = ctx.camera->GetFilm()->Dimension();
-            ivec2 pRaster = round(vec2(pFilmX, pFilmY) * vec2(dim));
+            ivec2 pRaster = round(Vector2f(pFilmX, pFilmY) * Vector2f(dim));
             pRaster.x = std::clamp(pRaster.x, 0, dim.x - 1);
             pRaster.y = std::clamp(pRaster.y, 0, dim.y - 1);
             RadianceRecord radianceRecord;

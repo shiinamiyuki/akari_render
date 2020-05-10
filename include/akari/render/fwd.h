@@ -22,16 +22,24 @@
 
 #ifndef AKARIRENDER_FWD_H
 #define AKARIRENDER_FWD_H
-namespace akari::generic{
-        template <typename Float, typename Spectrum> struct _null_t;
-        template <typename Float, typename Spectrum> struct Ray;
-        template <typename Float, typename Spectrum> struct Intersection;
-        template <typename Float, typename Spectrum> struct Triangle;
-        template <typename Float, typename Spectrum> struct ShadingPoint;
-        template <typename Float, typename Spectrum> class BSDF;
-        template <typename Float, typename Spectrum> class BSDFComponent;
-        template <typename Float, typename Spectrum> class Material;
-        template <typename Float, typename Spectrum> class Integrator;
-        template <typename Float, typename Spectrum> struct SurfaceSample;
-    }
+namespace akari {
+    template <typename Float, typename Spectrum> struct Ray;
+    template <typename Float, typename Spectrum> struct Intersection;
+    template <typename Float, typename Spectrum> struct Triangle;
+    template <typename Float, typename Spectrum> struct ShadingPoint;
+    template <typename Float, typename Spectrum> class BSDF;
+    template <typename Float, typename Spectrum> class BSDFComponent;
+    template <typename Float, typename Spectrum> class Material;
+    template <typename Float, typename Spectrum> class EndPoint;
+    template <typename Float, typename Spectrum> class Camera;
+    template <typename Float, typename Spectrum> class Texture;
+    template <typename Float, typename Spectrum> class Integrator;
+    template <typename Float, typename Spectrum> struct SurfaceSample;
+    template <typename Float, typename Spectrum> struct Interaction;
+    template <typename Float, typename Spectrum> struct SurfaceInteraction;
+    template <typename Float, typename Spectrum> struct EndPointInteraction;
+    template <typename Float, typename Spectrum> struct VolumeInteraction;
+    template <typename Float, typename Spectrum> struct MaterialSlot;
+    template <typename Float, typename Spectrum> class Light;
+} // namespace akari
 #endif // AKARIRENDER_FWD_H

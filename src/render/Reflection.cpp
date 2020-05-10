@@ -36,7 +36,7 @@ namespace akari {
         return R * InvPi;
     }
 
-    Spectrum SpecularReflection::sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf,
+    Spectrum SpecularReflection::sample(const Vector2f &u, const vec3 &wo, vec3 *wi, Float *pdf,
                                         BSDFType *sampledType) const {
         *wi = reflect(wo, vec3(0, 1, 0));
         *pdf = 1;
@@ -44,7 +44,7 @@ namespace akari {
         return fresnel->evaluate(cos_theta(*wi)) * R / abs_cos_theta(*wi);
     }
 
-    Spectrum SpecularTransmission::sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf,
+    Spectrum SpecularTransmission::sample(const Vector2f &u, const vec3 &wo, vec3 *wi, Float *pdf,
                                           BSDFType *sampledType) const {
         bool entering = cos_theta(wo) > 0;
         Float etaI = entering ? etaA : etaB;
@@ -60,7 +60,7 @@ namespace akari {
             ft *= (etaI * etaI) / (etaT * etaT);
         return ft / abs_cos_theta(*wi);
     }
-    Spectrum FresnelSpecular::sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const {
+    Spectrum FresnelSpecular::sample(const Vector2f &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const {
         Float F = fr_dielectric(cos_theta(wo), etaA, etaB);
         AKARI_ASSERT(F >= 0 && F <= 1);
         if (u[0] < F) {

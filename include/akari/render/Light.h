@@ -42,7 +42,7 @@ namespace akari {
     class Light : public EndPoint {
       public:
         virtual Float power() const = 0;
-        virtual Spectrum Li(const vec3 &wo, const vec2 &uv) const = 0;
+        virtual Spectrum Li(const Vector3f &wo, const Vector2f &uv) const = 0;
         virtual LightType get_light_type() const = 0;
         static bool is_delta(LightType type) {
             return (uint32_t)type & ((uint32_t)LightType ::EDeltaPosition | (uint32_t)LightType::EDeltaDirection);

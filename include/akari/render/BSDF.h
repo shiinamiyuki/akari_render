@@ -38,35 +38,35 @@ namespace akari {
         BSDF_ALL = BSDF_DIFFUSE | BSDF_GLOSSY | BSDF_SPECULAR | BSDF_REFLECTION | BSDF_TRANSMISSION,
     };
 
-    inline Float cos_theta(const vec3 &w) { return w.y; }
+    inline Float cos_theta(const Vector3f &w) { return w.y; }
 
-    inline Float abs_cos_theta(const vec3 &w) { return std::abs(cos_theta(w)); }
+    inline Float abs_cos_theta(const Vector3f &w) { return std::abs(cos_theta(w)); }
 
-    inline Float Cos2Theta(const vec3 &w) { return w.y * w.y; }
+    inline Float Cos2Theta(const Vector3f &w) { return w.y * w.y; }
 
-    inline Float Sin2Theta(const vec3 &w) { return 1 - Cos2Theta(w); }
+    inline Float Sin2Theta(const Vector3f &w) { return 1 - Cos2Theta(w); }
 
-    inline Float sin_theta(const vec3 &w) { return std::sqrt(std::fmax(0.0f, Sin2Theta(w))); }
+    inline Float sin_theta(const Vector3f &w) { return std::sqrt(std::fmax(0.0f, Sin2Theta(w))); }
 
-    inline Float Tan2Theta(const vec3 &w) { return Sin2Theta(w) / Cos2Theta(w); }
+    inline Float Tan2Theta(const Vector3f &w) { return Sin2Theta(w) / Cos2Theta(w); }
 
-    inline Float TanTheta(const vec3 &w) { return std::sqrt(std::fmax(0.0f, Tan2Theta(w))); }
+    inline Float TanTheta(const Vector3f &w) { return std::sqrt(std::fmax(0.0f, Tan2Theta(w))); }
 
-    inline Float cos_phi(const vec3 &w) {
+    inline Float cos_phi(const Vector3f &w) {
         Float sinTheta = sin_theta(w);
         return (sinTheta == 0) ? 1 : std::clamp<float>(w.x / sinTheta, -1, 1);
     }
-    inline Float sin_phi(const vec3 &w) {
+    inline Float sin_phi(const Vector3f &w) {
         Float sinTheta = sin_theta(w);
         return (sinTheta == 0) ? 0 : std::clamp<float>(w.z / sinTheta, -1, 1);
     }
 
-    inline Float Cos2Phi(const vec3 &w) { return cos_phi(w) * cos_phi(w); }
-    inline Float Sin2Phi(const vec3 &w) { return sin_phi(w) * sin_phi(w); }
+    inline Float Cos2Phi(const Vector3f &w) { return cos_phi(w) * cos_phi(w); }
+    inline Float Sin2Phi(const Vector3f &w) { return sin_phi(w) * sin_phi(w); }
 
-    inline bool same_hemisphere(const vec3 &wo, const vec3 &wi) { return wo.y * wi.y >= 0; }
+    inline bool same_hemisphere(const Vector3f &wo, const Vector3f &wi) { return wo.y * wi.y >= 0; }
 
-    inline vec3 reflect(const vec3 &w, const vec3 &n) { return -1.0f * w + 2.0f * dot(w, n) * n; }
+    inline Vector3f reflect(const Vector3f &w, const vec3 &n) { return -1.0f * w + 2.0f * dot(w, n) * n; }
 
     inline bool refract(const vec3 &wi, const vec3 &n, Float eta, vec3 *wt) {
         Float cosThetaI = dot(n, wi);
@@ -84,12 +84,12 @@ namespace akari {
     struct BSDFSample {
         const vec3 wo;
         Float u0{};
-        vec2 u{};
+        Vector2f u{};
         vec3 wi{};
         Spectrum f{};
         Float pdf = 0;
         BSDFType sampledType = BSDF_NONE;
-        inline BSDFSample(Float u0, const vec2 &u, const SurfaceInteraction &si);
+        inline BSDFSample(Float u0, const Vector2f &u, const SurfaceInteraction &si);
     };
 
     class BSDFComponent {
@@ -100,7 +100,7 @@ namespace akari {
             return abs_cos_theta(wi) * InvPi;
         }
         [[nodiscard]] virtual Spectrum evaluate(const vec3 &wo, const vec3 &wi) const = 0;
-        virtual Spectrum sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const {
+        virtual Spectrum sample(const Vector2f &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const {
             *wi = cosine_hemisphere_sampling(u);
             if (!same_hemisphere(*wi, wo)) {
                 wi->y *= -1;
@@ -130,7 +130,7 @@ namespace akari {
         [[nodiscard]] Spectrum evaluate(const vec3 &woW, const vec3 &wiW) const;
         void sample(BSDFSample &sample) const;
     };
-    inline BSDFSample::BSDFSample(Float u0, const vec2 &u, const SurfaceInteraction &si) : wo(si.wo), u0(u0), u(u) {}
+    inline BSDFSample::BSDFSample(Float u0, const Vector2f &u, const SurfaceInteraction &si) : wo(si.wo), u0(u0), u(u) {}
 
 } // namespace akari
 #endif // AKARIRENDER_BSDF_H

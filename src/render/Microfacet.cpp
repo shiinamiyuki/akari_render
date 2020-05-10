@@ -42,7 +42,7 @@ namespace akari {
         auto F = fresnel->evaluate(dot(wi, wh));
         return R * F * (microfacet.D(wh) * microfacet.G(wo, wi, wh) * F / (4.0f * cosThetaI * cosThetaO));
     }
-    Spectrum MicrofacetReflection::sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf,
+    Spectrum MicrofacetReflection::sample(const Vector2f &u, const vec3 &wo, vec3 *wi, Float *pdf,
                                           BSDFType *sampledType) const {
         *sampledType = type;
         auto wh = microfacet.sample_wh(wo, u);
@@ -84,7 +84,7 @@ namespace akari {
         Float dwh_dwi = std::abs((eta * eta * dot(wi, wh)) / (sqrtDenom * sqrtDenom));
         return microfacet.evaluate_pdf(wh) * dwh_dwi;
     }
-    Spectrum MicrofacetTransmission::sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf,
+    Spectrum MicrofacetTransmission::sample(const Vector2f &u, const vec3 &wo, vec3 *wi, Float *pdf,
                                             BSDFType *sampledType) const {
         *sampledType = type;
         if (wo.y == 0) {

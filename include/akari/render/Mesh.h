@@ -29,12 +29,11 @@
 #include <akari/core/detail/serialize-impl.hpp>
 
 namespace akari {
-    struct MaterialSlot;
-    class Light;
+
     class AKR_EXPORT Mesh : public Component {
       public:
         struct RayHit {
-            vec2 uv;
+            Vector2f uv;
             vec3 Ng;
             Float t = Inf;
             int face = -1;
@@ -76,7 +75,7 @@ namespace akari {
                 if (hit) {
                     if (t < hit->t) {
                         hit->Ng = Ng;
-                        hit->uv = vec2(u, v);
+                        hit->uv = Vector2f(u, v);
                         hit->face = idx;
                         hit->group = get_primitive_group(idx);
                         hit->t = t;
