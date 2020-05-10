@@ -23,33 +23,30 @@
 #ifndef AKARIRENDER_TYPES_HPP
 #define AKARIRENDER_TYPES_HPP
 #include <akari/core/math.h>
+#include <akari/render/fwd.h>
+#include <boost/preprocessor/seq/for_each.hpp>
+#include <boost/preprocessor/variadic/to_seq.hpp>
 namespace akari {
-    template <typename T, typename U> struct convert_to { using type = U; };
+    template <typename T, typename U> struct replace_ { using type = U; };
 
-    template <typename T, size_t N, typename U> struct convert_to<simd_array<T, N>, U> {
+    template <typename T, size_t N, typename U> struct replace_<simd_array<T, N>, U> {
         using type = simd_array<U, N>;
     };
-    template <typename T, typename U> using convert_t = typename convert_to<T, U>::type;
+    template <typename T, typename U> using replace_scalar_t = typename replace_<T, U>::type;
 
-
-    template <typename Float> struct Ray;
-    template <typename Float> struct TIntersection;
-    template <typename Float> struct TTriangle;
-    template <typename Float> struct TShadingPoint;
-    template <typename Float, typename Spectrum> class BSDF;
-    template <typename Float, typename Spectrum> class BSDFComponent;
-    template <typename Float, typename Spectrum> class Material;
-    template <typename Float, typename Spectrum> class Integrator;
-#define AKR_BASIC_TYPES()                                                                                              \
+#define __AKR_USING_TYPE(_r, _data, type) using type = generic::type<Float, Spectrum>;
+#define AKR_USE_TYPES(...) BOOST_PP_SEQ_FOR_EACH(__AKR_USING_TYPE, _,  BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
+#define AKR_BASIC_TYPES(...)                                                                                              \
     using Scalar = scalar_t<Float>;                                                                                    \
     using Vector3f = vec<3, Float>;                                                                                    \
     using Vector2f = vec<2, Float>;                                                                                    \
-    using Int = convert_t<Float, int>;                                                                                 \
-    using Vector2i = vec<2, Int>;                                                                                      \
-    using Ray = TRay<Float>;                                                                                           \
-    using Intersection = TIntersection<Float>;                                                                         \
-    using Triangle = TTriangle<Float>;
-    using ShadingPoint = TShadingPoint<float>;
+    using Int = replace_scalar_t<Float, int>;                                                                                 \
+    using Vector2i = vec<2, Int>;
+
+#define AKR_GEOMETRY_TYPES() \
+    __AKR_USE_TYPES(Ray, Triangle, SurfaceSample, Intersection)
+#define AKR_COMPONENT_TYPES() \
+    __AKR_USE_TYPES(BSDF, BSDFComponent, Material, Integrator)
 
 } // namespace akari
 

@@ -27,42 +27,38 @@
 #include <akari/render/types.hpp>
 
 namespace akari {
-    template <typename Float> struct TRay {
+    template <typename Float, typename Spectrum> struct Ray {
         AKR_BASIC_TYPES()
         Vector3f o, d;
         Float t_min, t_max;
 
-        TRay() = default;
+        Ray() = default;
 
-        TRay(const Vector3f &o, const Vector3f &d, Float t_min = Eps(),
-             Float t_max = std::numeric_limits<float>::infinity())
+        Ray(const Vector3f &o, const Vector3f &d, Float t_min = Eps(),
+            Float t_max = std::numeric_limits<float>::infinity())
             : o(o), d(d), t_min(t_min), t_max(t_max) {}
 
         [[nodiscard]] Vector3f At(Float t) const { return o + t * d; }
     };
 
-#define AKR_IMPORT_TYPES() \
-    using Ray = TRay<Float>;
+#define AKR_IMPORT_TYPES() using Ray = Ray<Float>;
 
-    template <typename Value> struct TVertex {
-        using Vector3f = vec<3, Value>;
-        using Vector2f = vec<2, Value>;
+    template <typename Float, typename Spectrum> struct Vertex {
+        AKR_BASIC_TYPES()
         Vector3f pos, Ns;
         Vector2f texCoord;
-        TVertex() = default;
+        Vertex() = default;
     };
-    using Vertex = TVertex<float>;
-    template <typename Float> struct TSurfaceSample {
+    template <typename Float, typename Spectrum> struct SurfaceSample {
         AKR_BASIC_TYPES()
         Vector2f uv;
         Float pdf;
         Vector3f p;
         Vector3f normal;
     };
-    using SurfaceSample = TSurfaceSample<float>;
-    template <typename Float> struct TIntersection;
-    template <typename Float> struct TTriangle {
+    template <typename Float, typename Spectrum> struct Triangle {
         AKR_BASIC_TYPES()
+        AKR_USE_TYPES(Ray, Intersection, SurfaceSample)
         std::array<Vector3f, 3> v;
         std::array<Vector2f, 3> texCoords;
         std::array<Vector3f, 3> Ns;
@@ -90,28 +86,28 @@ namespace akari {
 
         bool Intersect(const Ray &ray, Intersection *) const;
     };
-    using Triangle = TTriangle<float>;
     struct PrimitiveHandle {
         int32_t meshId = -1;
         int32_t primId = -1;
     };
 
-    template <typename Float> struct TIntersection {
+    template <typename Float, typename Spectrum> struct Intersection {
         Float t = Inf;
         AKR_BASIC_TYPES()
-        TTriangle<Float> triangle;
+        AKR_USE_TYPES(Triangle, Ray)
+        Triangle triangle;
         Int meshId = -1;
         Int primId = -1;
         Vector2f uv;
         Vector3f Ng;
         Vector3f p;
         Vector3f wo;
-        TIntersection() = default;
-        explicit TIntersection(const Ray &ray) : wo(-ray.d) {}
+        Intersection() = default;
+        explicit Intersection(const Ray &ray) : wo(-ray.d) {}
     };
 
-    template <typename Float>
-    inline bool TTriangle<Float>::Intersect(const Ray &ray, Intersection *intersection) const {
+    template <typename Float, typename Spectrum>
+    inline bool Triangle<Float, Spectrum>::Intersect(const Ray &ray, Intersection *intersection) const {
         auto &v0 = v[0];
         auto &v1 = v[1];
         auto &v2 = v[2];
@@ -143,8 +139,7 @@ namespace akari {
         }
     }
 
-
-    template <typename Float> struct TShadingPoint {
+    template <typename Float, typename Spectrum> struct ShadingPoint {
         AKR_BASIC_TYPES()
         Vector2f texCoords;
     };
