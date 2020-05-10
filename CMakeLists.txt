@@ -124,8 +124,9 @@ if(AKARI_BUILD_GUI)
 endif()
 
 add_executable(test-simd src/test/simd.cpp)
+target_link_libraries(test-simd AkariCore)
 
-add_subdirectory(src/Test)
+add_subdirectory(src/test)
 
 
 #add_executable(test-reflect src/test/test-reflect.cpp src/core/reflect.cpp include/akari/core/reflect.hpp)

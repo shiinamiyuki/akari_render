@@ -129,6 +129,17 @@ namespace akari {
         return x4 * (fma(x, T(c5), T(c4)) + x2 * c6) + fma(x2, fma(x, T(c3), T(c2)), fma(x, T(c1), T(c0)));
     }
 
+    template <size_t N> simd_array<float, N> floatbits(const simd_array<int, N> &x) {
+        simd_array<float, N> y;
+        static_assert(sizeof(x) == sizeof(y));
+        std::memcpy(y.data, x.data, sizeof(x));
+    }
+
+    template <size_t N> simd_array<int, N> intbits(const simd_array<float, N> &x) {
+        simd_array<int, N> y;
+        static_assert(sizeof(x) == sizeof(y));
+        std::memcpy(y.data, x.data, sizeof(x));
+    }
     // from https://github.com/ispc/ispc/blob/master/stdlib.ispc
     template <typename F, typename I> inline F _sin(const F &x_full) {
         static const auto pi_over_two_vec = F(1.57079637050628662109375f);
@@ -138,7 +149,7 @@ namespace akari {
         I k = I(k_real);
         F x = x_full - k_real * pi_over_two_vec;
         I k_mod4 = I(k) & I(3);
-        auto sin_usecos = (k_mod4 == 1 | k_mod4 == 3);
+        auto sin_usecos = ((k_mod4 == 1) | (k_mod4 == 3));
         auto flip_sign = (k_mod4 > 1);
 
         static const F sin_c2 = -0.16666667163372039794921875;
@@ -171,7 +182,6 @@ namespace akari {
         return formula;
     }
 
-// from https://github.com/ispc/ispc/blob/master/stdlib.ispc
     template <typename F, typename I> inline F _cos(const F &x_full) {
         static const auto pi_over_two_vec = F(1.57079637050628662109375f);
         static const auto two_over_pi_vec = F(0.636619746685028076171875f);
@@ -180,8 +190,8 @@ namespace akari {
         I k = I(k_real);
         F x = x_full - k_real * pi_over_two_vec;
         I k_mod4 = I(k) & I(3);
-        auto cos_usecos  = (k_mod4 == 0 | k_mod4 == 3);
-        auto flip_sign = (k_mod4 == 1 | k_mod4 == 2);
+        auto cos_usecos = ((k_mod4 == 0) || (k_mod4 == 3));
+        auto flip_sign = ((k_mod4 == 1) || (k_mod4 == 2));
 
         static const F sin_c2 = -0.16666667163372039794921875;
         static const F sin_c4 = 8.333347737789154052734375e-3;
@@ -195,12 +205,12 @@ namespace akari {
         static const F cos_c8 = 2.47562347794882953166961669921875e-5;
         static const F cos_c10 = -2.59630184018533327616751194000244140625e-7;
 
-        auto outside = select(cos_usecos , F(1.0f), x);
-        auto c2 = select(cos_usecos , cos_c2, sin_c2);
-        auto c4 = select(cos_usecos , cos_c4, sin_c4);
-        auto c6 = select(cos_usecos , cos_c6, sin_c6);
-        auto c8 = select(cos_usecos , cos_c8, sin_c8);
-        auto c10 = select(cos_usecos , cos_c10, sin_c10);
+        auto outside = select(cos_usecos, F(1.0f), x);
+        auto c2 = select(cos_usecos, cos_c2, sin_c2);
+        auto c4 = select(cos_usecos, cos_c4, sin_c4);
+        auto c6 = select(cos_usecos, cos_c6, sin_c6);
+        auto c8 = select(cos_usecos, cos_c8, sin_c8);
+        auto c10 = select(cos_usecos, cos_c10, sin_c10);
 
         auto x2 = x * x;
         auto formula = x2 * c10 + c8;
@@ -212,18 +222,106 @@ namespace akari {
         formula = select(flip_sign, F(-1.0f) * formula, formula);
         return formula;
     }
+    template <typename F, typename I> inline F ldexp(const F &x, const I &n) {
+        I ex = 0x7F800000u;
+        I ix = intbits(x);
+        ex &= ix;               // extract old exponent;
+        ix = ix & ~0x7F800000u; // clear exponent
+        n = (n << 23) + ex;
+        ix |= n; // insert new exponent
+        return floatbits(ix);
+    }
+
+    template <typename F, typename I> inline F _fastexp(const F &x_full) {
+        F z = floor(1.44269504088896341f * x_full + 0.5f);
+        I n;
+        x_full -= z * 0.693359375f;
+        x_full -= z * -2.12194440e-4f;
+        n = I(z);
+
+        z = x_full * x_full;
+        z = (((((1.9875691500E-4f * x_full + 1.3981999507E-3f) * x_full + 8.3334519073E-3f) * x_full +
+               4.1665795894E-2f) *
+                  x_full +
+              1.6666665459E-1f) *
+                 x_full +
+             5.0000001201E-1f) *
+                z +
+            x_full + 1.f;
+        x_full = ldexp(z, n);
+        return x_full;
+    }
+
+    template <typename F, typename I> inline F _exp(const F &x_full) {
+        const F ln2_part1 = 0.6931457519;
+        const F ln2_part2 = 1.4286067653e-6;
+        const F one_over_ln2 = 1.44269502162933349609375;
+
+        const F scaled = x_full * one_over_ln2;
+        const F k_real = floor(scaled);
+        const I k = I(k_real);
+
+        // Reduced range version of x
+        F x = x_full - k_real * ln2_part1;
+        x -= k_real * ln2_part2;
+
+        // These coefficients are for e^x in [0, ln(2)]
+        const F one = 1.;
+        const F c2 = 0.4999999105930328369140625;
+        const F c3 = 0.166668415069580078125;
+        const F c4 = 4.16539050638675689697265625e-2;
+        const F c5 = 8.378830738365650177001953125e-3;
+        const F c6 = 1.304379315115511417388916015625e-3;
+        const F c7 = 2.7555381529964506626129150390625e-4;
+
+        F result = x * c7 + c6;
+        result = x * result + c5;
+        result = x * result + c4;
+        result = x * result + c3;
+        result = x * result + c2;
+        result = x * result + one;
+        result = x * result + one;
+
+        // Compute 2^k (should differ for uniform float and double, but I'll avoid
+        // it for now and just do uniform floats)
+        const F fpbias = 127;
+        I biased_n = k + fpbias;
+        auto overflow = k > fpbias;
+        // Minimum exponent is -126, so if k is <= -127 (k + 127 <= 0)
+        // we've got underflow. -127 * ln(2) -> -88.02. So the most
+        // negative uniform float input that doesn't result in zero is like -88.
+        auto underflow = (biased_n <= 0);
+        const I InfBits = 0x7f800000;
+        biased_n <<= 23;
+        // Reuniform interpret this thing as uniform float
+        F two_to_the_n = floatbits(biased_n);
+        // Handle both doubles and uniform floats (hopefully eliding the copy for uniform float)
+        F elemtype_2n = two_to_the_n;
+        result *= elemtype_2n;
+        result = select(overflow, floatbits(InfBits), result);
+        result = select(underflow, 0.0, result);
+        return result;
+    }
+
     template <size_t N> struct array_sin<float, N> {
         using A = simd_array<float, N>;
-        static A apply(const A &x) {
-            return _sin<simd_array<float, N>, simd_array<int, N>>(x);
-        }
+        static A apply(const A &x) { return _sin<simd_array<float, N>, simd_array<int, N>>(x); }
     };
     template <size_t N> struct array_cos<float, N> {
         using A = simd_array<float, N>;
-        static A apply(const A &x) {
-            return _cos<simd_array<float, N>, simd_array<int, N>>(x);
-        }
+        static A apply(const A &x) { return _cos<simd_array<float, N>, simd_array<int, N>>(x); }
     };
+    template <size_t N> struct array_exp<float, N> {
+        using A = simd_array<float, N>;
+        static A apply(const A &x) { return _exp<simd_array<float, N>, simd_array<int, N>>(x); }
+    };
+
+    template <size_t N> simd_array<float, N> fastexp(const simd_array<float, N> &x) {
+        return _fastexp<simd_array<float, N>, simd_array<int, N>>(x);
+    }
+
+
+
 #endif
 } // namespace akari
 #endif // AKARIRENDER_SIMDARRAYFUNCTIONS_HPP

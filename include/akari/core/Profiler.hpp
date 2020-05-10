@@ -28,7 +28,7 @@ namespace akari{
     class Profiler {
         decltype(std::chrono::system_clock::now()) start = std::chrono::system_clock::now();
       public:
-        [[nodiscard]] double ElapsedSeconds()const{
+        [[nodiscard]] double elapsed_seconds()const{
             auto now = std::chrono::system_clock::now();
             std::chrono::duration<double> elapsed = now - start;
             return elapsed.count();
