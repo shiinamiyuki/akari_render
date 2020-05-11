@@ -27,8 +27,10 @@ namespace akari {
     detail::reflection_manager &detail::reflection_manager::instance() {
         static detail::reflection_manager mgr;
         mgr.name_not_found_callback = [](detail::reflection_manager &mgr, const char *name) -> meta_instance & {
+          printf("good?\n");
             if (get_plugin_manager()->load_plugin(name)) {
                 try {
+
                     return mgr.instances.at(mgr.name_map.at(name));
                 } catch (std::out_of_range &e) {
                     throw std::runtime_error(
@@ -40,8 +42,4 @@ namespace akari {
         };
         return mgr;
     }
-    static int _ = []() {
-        printf("called\n");
-        return 0;
-    }();
 } // namespace akari

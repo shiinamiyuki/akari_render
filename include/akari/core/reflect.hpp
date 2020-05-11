@@ -802,16 +802,20 @@ namespace akari {
                 mgr.shared_cast_funcs.emplace(std::make_pair(type_of<To>().name, type_of<From>().name), f);
             }
             template <typename U, typename... Rest> static void do_it_shared() {
-                do_it1<T, U>();
-                do_it1<U, T>();
+                do_it_shared1<T, U>();
+                do_it_shared1<U, T>();
+
                 if constexpr (sizeof...(Rest) > 0) {
                     do_it<Rest...>();
                 }
             }
             template <typename U, typename... Rest> static void do_it() {
-                do_it_shared1<T, U>();
-                do_it_shared1<U, T>();
+                do_it1<T, U>();
+                do_it1<U, T>();
                 auto &mgr = detail::reflection_manager::instance();
+                if(mgr.instances.count(type_of<U>().name) == 0){
+                    mgr.instances[type_of<U>().name] = {};
+                }
                 {
                     auto &derived = mgr.instances.at(type_of<T>().name);
                     auto &parent = mgr.instances.at(type_of<U>().name);
