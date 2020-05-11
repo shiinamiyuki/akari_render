@@ -52,23 +52,19 @@ namespace glm {
 namespace akari {
     using namespace math;
     using namespace nlohmann;
-
-    // clang-format off
-    template <typename Float> struct constants {
-        using Scalar = scalar_t<Float>;
-        static constexpr Float Pi             = Float(3.1415926535897932f);
-        static constexpr Float Pi2            = Float(Pi * 0.5f);
-        static constexpr Float Pi4            = Float(Pi * 0.25f);
-        static constexpr Float InvPi          = Float(1.0f / Pi);
-        static constexpr Float Inv4Pi         = Float(1.0f / (4.0f * Pi));
-        static constexpr Float Inf            = Float(std::numeric_limits<Scalar>::infinity());
-        static constexpr Float MaxFloat       = Float(std::numeric_limits<Scalar>::max());
-        static constexpr Float MinFloat       = Float(std::numeric_limits<Scalar>::min());
-        static constexpr Float MachineEpsilon = Float(std::numeric_limits<Scalar>::epsilon());
-    };
-    // clang-format on
-    template <typename T> inline T RadiansToDegrees(const T &rad) { return rad * (180.0f / constants<T>::Pi); }
-    template <typename T> inline T DegreesToRadians(const T &rad) { return rad * (constants<T>::Pi / 180.0f); }
+    AKR_EXPORT Float Eps();
+    AKR_EXPORT Float ShadowEps();
+    constexpr Float Pi = 3.1415926535897932f;
+    constexpr Float Pi2 = Pi * 0.5f;
+    constexpr Float Pi4 = Pi * 0.25f;
+    constexpr Float InvPi = 1.0f / Pi;
+    constexpr Float Inv4Pi = 1.0f / (4.0f * Pi);
+    constexpr Float Inf = std::numeric_limits<Float>::infinity();
+    constexpr Float MaxFloat = std::numeric_limits<Float>::max();
+    constexpr Float MinFloat = std::numeric_limits<Float>::min();
+    constexpr Float MachineEpsilon = std::numeric_limits<Float>::epsilon();
+    template <typename T> inline T RadiansToDegrees(const T &rad) { return rad * (180.0f / Pi); }
+    template <typename T> inline T DegreesToRadians(const T &rad) { return rad * (Pi / 180.0f); }
     template <typename T> struct Angle { T value; };
 
     using EulerAngle = Angle<vec3>;
@@ -84,8 +80,8 @@ namespace akari {
     template <typename T> void to_json(json &j, const Angle<T> &angle) { j["deg"] = RadiansToDegrees(angle.value); }
     struct AffineTransform {
         EulerAngle rotation;
-        vec3       translation;
-        vec3       scale = vec3(1);
+        vec3 translation;
+        vec3 scale = vec3(1);
 
         [[nodiscard]] mat4 ToMatrix4() const {
             auto m = identity<mat4>();
@@ -207,7 +203,10 @@ namespace akari {
     template <typename V, typename V2> inline V Interpolate(const V &v0, const V &v1, const V &v2, const V2 &uv) {
         return (1.0f - uv.x - uv.y) * v0 + uv.x * v1 + uv.y * v2;
     }
-    template <typename V> inline V lerp(const V &a, const V &b, const V &t) { return (V(1.0f) - t) * a + t * b; }
+    template<typename V>
+    inline V lerp(const V& a, const V & b, const V& t){
+        return (V(1.0f) - t) * a + t * b;
+    }
     template <int N, typename T> T Power(const T &x) {
         if constexpr (N == 0) {
             return T(1);

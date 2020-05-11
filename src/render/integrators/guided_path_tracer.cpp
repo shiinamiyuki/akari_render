@@ -65,7 +65,7 @@ namespace akari {
             return _children[i] > 0 ? &nodes[_children[i]] : nullptr;
         }
 
-        static int childIndex(const Vector2f &p) {
+        static int childIndex(const vec2 &p) {
             int x, y;
             if (p.x < 0.5f) {
                 x = 0;
@@ -82,7 +82,7 @@ namespace akari {
 
         [[nodiscard]] bool isLeaf(int i) const { return _children[i] <= 0; }
 
-        [[nodiscard]] static Vector2f offset(size_t i) { return Vector2f(i & 1u, i >> 1u) * 0.5f; }
+        [[nodiscard]] static vec2 offset(size_t i) { return vec2(i & 1u, i >> 1u) * 0.5f; }
 
         [[nodiscard]] Float sum() const {
             Float v = 0;
@@ -92,7 +92,7 @@ namespace akari {
             return v;
         }
 
-        float eval(const Vector2f &p, std::vector<QTreeNode> &nodes) const {
+        float eval(const vec2 &p, std::vector<QTreeNode> &nodes) const {
             auto idx = childIndex(p);
             if (child(idx, nodes)) {
                 return 4.0f * child(idx, nodes)->eval((p - offset(idx)) * 2.0f, nodes);
@@ -102,7 +102,7 @@ namespace akari {
             }
         }
 
-        float pdf(const Vector2f &p, std::vector<QTreeNode> &nodes) const {
+        float pdf(const vec2 &p, std::vector<QTreeNode> &nodes) const {
             auto idx = childIndex(p);
             //            if (!(_sum[idx].value() > 0)) {
             //                return 0.0f;
@@ -122,7 +122,7 @@ namespace akari {
             }
         }
 
-        Vector2f sample(Vector2f u, Vector2f u2, std::vector<QTreeNode> &nodes) const {
+        vec2 sample(vec2 u, vec2 u2, std::vector<QTreeNode> &nodes) const {
             std::array<float, 4> m = {float(_sum[0]), float(_sum[1]), float(_sum[2]), float(_sum[3])};
             auto left = m[0] + m[2];
             auto right = m[1] + m[3];
@@ -155,16 +155,16 @@ namespace akari {
                 u[1] = (u[1] - up / total) / (down / total);
             }
             int child = x + 2 * y;
-            Vector2f sampled;
+            vec2 sampled;
             if (this->child(child, nodes)) {
                 sampled = this->child(child, nodes)->sample(u, u2, nodes);
             } else {
                 sampled = u2;
             }
-            return Vector2f(x, y) * 0.5f + sampled * 0.5f;
+            return vec2(x, y) * 0.5f + sampled * 0.5f;
         }
 
-        void deposit(const Vector2f &p, Float e, std::vector<QTreeNode> &nodes) {
+        void deposit(const vec2 &p, Float e, std::vector<QTreeNode> &nodes) {
             int idx = childIndex(p);
             _sum[idx].add(e);
             auto c = child(idx, nodes);
@@ -176,7 +176,7 @@ namespace akari {
         }
     };
 
-    static vec3 canonicalToDir(const Vector2f &p) {
+    static vec3 canonicalToDir(const vec2 &p) {
         const Float cosTheta = 2 * p.y - 1;
         const Float phi = 2 * Pi * p.x;
 
@@ -188,9 +188,9 @@ namespace akari {
         return vec3(sinTheta * cosPhi, cosTheta, sinTheta * sinPhi);
     }
 
-    static Vector2f dirToCanonical(const vec3 &d) {
+    static vec2 dirToCanonical(const vec3 &d) {
         if (!std::isfinite(d.x) || !std::isfinite(d.y) || !std::isfinite(d.z)) {
-            return Vector2f(0, 0);
+            return vec2(0, 0);
         }
 
         const Float cosTheta = std::min(std::max(d.y, -1.0f), 1.0f);
@@ -198,7 +198,7 @@ namespace akari {
         while (phi < 0)
             phi += 2.0 * Pi;
 
-        return Vector2f(phi / (2 * Pi), (cosTheta + 1) / 2);
+        return vec2(phi / (2 * Pi), (cosTheta + 1) / 2);
     }
 
     class DTree {
@@ -228,11 +228,11 @@ namespace akari {
             return *this;
         }
 
-        Vector2f sample(const Vector2f &u, const Vector2f &u2) { return nodes[0].sample(u, u2, nodes); }
+        vec2 sample(const vec2 &u, const vec2 &u2) { return nodes[0].sample(u, u2, nodes); }
 
-        Float pdf(const Vector2f &p) { return nodes[0].pdf(p, nodes); }
+        Float pdf(const vec2 &p) { return nodes[0].pdf(p, nodes); }
 
-        Float eval(const Vector2f &u) {
+        Float eval(const vec2 &u) {
             return nodes[0].eval(u, nodes); /// weight.value();
         }
 
@@ -302,7 +302,7 @@ namespace akari {
             reset();
         }
 
-        void deposit(const Vector2f &p, Float e) {
+        void deposit(const vec2 &p, Float e) {
             if (e <= 0)
                 return;
             sum.add(e);
@@ -319,7 +319,7 @@ namespace akari {
         //            sampling.nodes[0].setSum(0.25);
         //        }
 
-        vec3 sample(const Vector2f &u, const Vector2f &u2) { return canonicalToDir(sampling.sample(u, u2)); }
+        vec3 sample(const vec2 &u, const vec2 &u2) { return canonicalToDir(sampling.sample(u, u2)); }
 
         Float pdf(const vec3 &w) { return sampling.pdf(dirToCanonical(w)) * Inv4Pi; }
 
@@ -357,7 +357,7 @@ namespace akari {
 
         [[nodiscard]] bool isLeaf() const { return _isLeaf; }
 
-        vec3 sample(vec3 p, const Vector2f &u, const Vector2f &u2, std::vector<STreeNode> &nodes) {
+        vec3 sample(vec3 p, const vec2 &u, const vec2 &u2, std::vector<STreeNode> &nodes) {
             if (isLeaf()) {
                 return dTree.sample(u, u2);
             } else {
@@ -443,7 +443,7 @@ namespace akari {
 
         Bounds3f box;
 
-        vec3 sample(const vec3 &p, const Vector2f &u, const Vector2f &u2) {
+        vec3 sample(const vec3 &p, const vec2 &u, const vec2 &u2) {
             return nodes.at(0).sample(box.offset(p), u, u2, nodes);
         }
 

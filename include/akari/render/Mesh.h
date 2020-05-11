@@ -29,21 +29,16 @@
 #include <akari/core/detail/serialize-impl.hpp>
 
 namespace akari {
-
-    template<typename Float, typename Spectrum>
+    struct MaterialSlot;
+    class Light;
     class AKR_EXPORT Mesh : public Component {
       public:
-        AKR_BASIC_TYPES()
-        AKR_GEOMETRY_TYPES()
-        AKR_COMPONENT_TYPES()
-        AKR_UTIL_TYPES()
-        AKR_USE_TYPES(Light)
         struct RayHit {
-            Vector2f uv;
-            Vector3f Ng;
+            vec2 uv;
+            vec3 Ng;
             Float t = Inf;
-            Int face = -1;
-            Int group = -1;
+            int face = -1;
+            int group = -1;
         };
 
         [[nodiscard]] virtual const Vertex *get_vertex_buffer() const = 0;
@@ -59,7 +54,7 @@ namespace akari {
             auto v0 = vertices[indices[idx * 3 + 0]].pos;
             auto v1 = vertices[indices[idx * 3 + 1]].pos;
             auto v2 = vertices[indices[idx * 3 + 2]].pos;
-            Vector3f e1 = (v1 - v0);
+            vec3 e1 = (v1 - v0);
             vec3 e2 = (v2 - v0);
             auto Ng = normalize(cross(e1, e2));
             float a, f, u, v;
@@ -81,7 +76,7 @@ namespace akari {
                 if (hit) {
                     if (t < hit->t) {
                         hit->Ng = Ng;
-                        hit->uv = Vector2f(u, v);
+                        hit->uv = vec2(u, v);
                         hit->face = idx;
                         hit->group = get_primitive_group(idx);
                         hit->t = t;
@@ -119,9 +114,7 @@ namespace akari {
         virtual const Light *get_light(int primId) const { return nullptr; }
     };
 
-    template<typename Float, typename Spectrum>
     struct MeshWrapper {
-        AKR_USE_TYPES(Mesh)
         fs::path file; // path to json file
         AffineTransform transform;
         std::shared_ptr<Mesh> mesh;

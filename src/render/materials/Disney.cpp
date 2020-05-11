@@ -35,7 +35,7 @@ namespace akari {
 
       public:
         DisneyDiffuse(const Spectrum &R) : BSDFComponent(BSDFType(BSDF_DIFFUSE | BSDF_REFLECTION)), R(R) {}
-        [[nodiscard]] Spectrum evaluate(const Vector3f &wo, const Vector3f &wi) const override {
+        [[nodiscard]] Spectrum evaluate(const vec3 &wo, const vec3 &wi) const override {
             Float Fo = SchlickWeight(abs_cos_theta(wo));
             Float Fi = SchlickWeight(abs_cos_theta(wi));
             return R * InvPi * (1 - Fo * 0.5) * (1 - Fi * 0.5);
@@ -55,9 +55,9 @@ namespace akari {
       public:
         DisneySheen(const Spectrum &base_color, const Spectrum &sheen, const Spectrum &sheenTint)
             : BSDFComponent(BSDFType(BSDF_GLOSSY | BSDF_REFLECTION)), base_color(base_color), sheen(sheen), sheenTint(sheenTint) {}
-        [[nodiscard]] Spectrum evaluate(const Vector3f &wo, const Vector3f &wi) const override {
+        [[nodiscard]] Spectrum evaluate(const vec3 &wo, const vec3 &wi) const override {
             auto wh = wi + wo;
-            if (all(equal(wh, Vector3f(0)))) {
+            if (all(equal(wh, vec3(0)))) {
                 return Spectrum(0);
             }
             wh = normalize(wh);
@@ -83,9 +83,9 @@ namespace akari {
       public:
         DisneyClearCoat(Float clearcoat, Float alpha)
             : BSDFComponent(BSDFType(BSDF_GLOSSY | BSDF_REFLECTION)), clearcoat(clearcoat), alpha(alpha) {}
-        [[nodiscard]] Spectrum evaluate(const Vector3f &wo, const Vector3f &wi) const override {
+        [[nodiscard]] Spectrum evaluate(const vec3 &wo, const vec3 &wi) const override {
             auto wh = wi + wo;
-            if (all(equal(wh, Vector3f(0)))) {
+            if (all(equal(wh, vec3(0)))) {
                 return Spectrum(0);
             }
             wh = normalize(wh);
@@ -94,7 +94,7 @@ namespace akari {
             Float G = SmithGGX_G1(abs_cos_theta(wi), 0.25) * SmithGGX_G1(abs_cos_theta(wo), 0.25);
             return Spectrum(0.25 * clearcoat * D * F * G);
         }
-        [[nodiscard]] Float evaluate_pdf(const Vector3f &wo, const Vector3f &wi) const override {
+        [[nodiscard]] Float evaluate_pdf(const vec3 &wo, const vec3 &wi) const override {
             if (!same_hemisphere(wo, wi))
                 return 0;
             auto wh = wi + wo;
@@ -103,12 +103,12 @@ namespace akari {
             wh = normalize(wh);
             return D_GTR1(abs_cos_theta(wh), alpha) * abs_cos_theta(wh) / (4.0 * dot(wh, wo));
         }
-        Spectrum sample(const Vector2f &u, const Vector3f &wo, Vector3f *wi, Float *pdf, BSDFType *sampledType) const override {
+        Spectrum sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const override {
             auto a2 = alpha * alpha;
             auto cosTheta = std::sqrt(std::fmax(0.0f, 1 - (std::pow(a2, 1 - u[0])) / (1 - a2)));
             auto sinTheta = std::sqrt(std::fmax(0.0f, 1 - cosTheta * cosTheta));
             auto phi = 2.0f * Pi * u[1];
-            auto wh = Vector3f(std::cos(phi) * sinTheta, cosTheta, std::sin(phi) * sinTheta);
+            auto wh = vec3(std::cos(phi) * sinTheta, cosTheta, std::sin(phi) * sinTheta);
             if (!same_hemisphere(wo, wh))
                 wh = -wh;
             *wi = reflect(wo, wh);

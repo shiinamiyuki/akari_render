@@ -24,20 +24,19 @@
 #define AKARIRENDER_MATERIAL_H
 
 #include <akari/core/component.h>
-#include <akari/core/detail/serialize-impl.hpp>
 #include <akari/core/memory_arena.hpp>
-#include <akari/core/serialize.hpp>
 #include <akari/render/bsdf.h>
 #include <akari/render/interaction.h>
 #include <akari/render/texture.h>
+#include <akari/core/serialize.hpp>
+#include <akari/core/detail/serialize-impl.hpp>
 namespace akari {
-
+    class Material;
+    class Light;
     struct ScatteringEvent;
 
-    template <typename Float, typename Spectrum> class AKR_EXPORT Material : public Component {
+    class AKR_EXPORT Material : public Component {
       public:
-        AKR_BASIC_TYPES()
-        AKR_GEOMETRY_TYPES()
         virtual void compute_scattering_functions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
                                                   Float scale) const = 0;
 
@@ -45,18 +44,13 @@ namespace akari {
         virtual bool support_bidirectional() const = 0;
     };
 
-    template <typename Float, typename Spectrum> struct Emission {
-        AKR_BASIC_TYPES()
-        AKR_COMPONENT_TYPES()
+    struct Emission {
         std::shared_ptr<Texture> color;
         std::shared_ptr<Texture> strength;
         AKR_SER(color, strength)
     };
 
-    template <typename Float, typename Spectrum> struct MaterialSlot {
-        AKR_BASIC_TYPES()
-        AKR_COMPONENT_TYPES()
-        AKR_USE_TYPES(Emission)
+    struct MaterialSlot {
         std::string name;
         std::shared_ptr<Material> material;
         Emission emission;

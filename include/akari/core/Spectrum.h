@@ -111,7 +111,7 @@ namespace akari {
             tmp /= rhs;
             return tmp;
         }
-        [[nodiscard]] float luminance() const {
+        [[nodiscard]] Float luminance() const {
             return 0.2126 * (*this)[0] + 0.7152 * (*this)[1] + 0.0722 * (*this)[2];
         }
         [[nodiscard]] Self remove_nans() const {
@@ -126,18 +126,19 @@ namespace akari {
             }
             return tmp;
         }
-        [[nodiscard]] float is_black() const { return MaxComp(*this) <= 0; }
+        [[nodiscard]] Float is_black() const { return MaxComp(*this) <= 0; }
     };
 
     using RGBSpectrum = CoefficientSpectrum<3>;
+    using Spectrum = RGBSpectrum;
 
-    inline void from_json(const nlohmann::json &j, RGBSpectrum &s) {
-        for (int i = 0; i < RGBSpectrum::nChannel; i++) {
+    inline void from_json(const nlohmann::json &j, Spectrum &s) {
+        for (int i = 0; i < Spectrum::nChannel; i++) {
             s[i] = j[i].get<float>();
         }
     }
-    inline void to_json(nlohmann::json &j, const RGBSpectrum &s) {
-        for (int i = 0; i < RGBSpectrum::nChannel; i++) {
+    inline void to_json(nlohmann::json &j, const Spectrum &s) {
+        for (int i = 0; i < Spectrum::nChannel; i++) {
             j[i] = s[i];
         }
     }

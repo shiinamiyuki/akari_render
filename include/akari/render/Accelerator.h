@@ -25,12 +25,9 @@
 #include <akari/core/component.h>
 #include <akari/render/geometry.hpp>
 namespace akari {
-    template<typename Float, typename Spectrum>
+    class Scene;
     class AKR_EXPORT Accelerator : public Component {
       public:
-        AKR_BASIC_TYPES()
-        AKR_GEOMETRY_TYPES()
-        AKR_USE_TYPES(Scene)
         virtual void build(const Scene &scene) = 0;
         virtual bool intersect(const Ray &ray, Intersection *intersection) const = 0;
         [[nodiscard]] virtual bool occlude(const Ray &ray) const = 0;

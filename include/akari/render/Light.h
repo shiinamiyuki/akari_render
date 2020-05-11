@@ -30,23 +30,20 @@
 #include <akari/render/scene.h>
 
 namespace akari {
-    template <typename Float, typename Spectrum> struct LightSample : RayIncidentSample<Float, Spectrum> {};
+    struct LightSample : RayIncidentSample {};
 
-    template <typename Float, typename Spectrum> struct LightRaySample : RayEmissionSample<Float, Spectrum> {};
+    struct LightRaySample : RayEmissionSample {};
 
     enum class LightType : uint32_t {
         ENone = 1u,
         EDeltaPosition = 1u << 1u,
         EDeltaDirection = 1u << 2u,
     };
-    template <typename Float, typename Spectrum> class Light : public EndPoint<Float, Spectrum> {
+    class Light : public EndPoint {
       public:
-        AKR_BASIC_TYPES()
-        AKR_USE_TYPES(Ray, Interaction, VisibilityTester, RayEmissionSample, RayIncidentSample)
-        using LightTypeV = replace_scalar_t<Float, LightType>;
         virtual Float power() const = 0;
-        virtual Spectrum Li(const Vector3f &wo, const Vector2f &uv) const = 0;
-        [[nodiscard]] virtual LightTypeV get_light_type() const = 0;
+        virtual Spectrum Li(const vec3 &wo, const vec2 &uv) const = 0;
+        virtual LightType get_light_type() const = 0;
         static bool is_delta(LightType type) {
             return (uint32_t)type & ((uint32_t)LightType ::EDeltaPosition | (uint32_t)LightType::EDeltaDirection);
         }

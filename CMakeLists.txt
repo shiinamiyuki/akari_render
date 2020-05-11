@@ -65,20 +65,11 @@ include(cmake/OIDN.cmake)
 ##set(AKARI_CORE_EXT_LIBS ${AKARI_CORE_EXT_LIBS} embree embree_sse42 embree_avx embree_avx2 lexers math simd tasking sys)
 #
 file(GLOB AKARI_API_SRC include/akari/core/*.* include/akari/render/*.*)
-file(GLOB AKARI_CORE_SRC src/core/*.* )
-file(GLOB AKARI_CORE_RENDER_SRC src/render/*.*)
+file(GLOB AKARI_CORE_SRC src/Core/*.* )
+file(GLOB AKARI_CORE_RENDER_SRC src/Render/*.*)
 add_library(AkariCore SHARED ${AKARI_CORE_SRC})
 target_link_libraries(AkariCore  ${AKARI_CORE_EXT_LIBS})
-
-set(PYTHON_INTERPRETER python3)
-
-add_custom_command(
-        OUTPUT include/akari/generated/fwd.h
-        COMMAND ${PYTHON_INTERPRETER} src/config.py include/akari/generated/fwd.h
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-)
-
-add_library(AkariCoreRender SHARED ${AKARI_CORE_RENDER_SRC} include/akari/generated/fwd.h)
+add_library(AkariCoreRender SHARED ${AKARI_CORE_RENDER_SRC})
 target_link_libraries(AkariCoreRender AkariCore)
 #
 #

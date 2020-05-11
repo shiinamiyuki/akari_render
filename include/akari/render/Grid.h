@@ -29,8 +29,8 @@ namespace akari {
     class Grid3D : public Component{
       public:
         struct RayHit {
-            Vector2f uv;
-            Vector3f Ng;
+            vec2 uv;
+            vec3 Ng;
             Float t = Inf;
             int face = 0; // -1 = -001 -> -x; -4 = -100 -> -z
             int group = -1;

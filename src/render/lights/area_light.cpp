@@ -46,7 +46,7 @@ namespace akari {
             localFrame = CoordinateSystem(triangle.Ng);
         }
         AKR_DECL_COMP()
-        Spectrum Li(const vec3 &wo, const Vector2f &uv) const override {
+        Spectrum Li(const vec3 &wo, const vec2 &uv) const override {
             ShadingPoint sp;
             sp.texCoords = triangle.interpolated_tex_coord(uv);
             if (dot(wo, triangle.Ng) < 0) {
@@ -57,7 +57,7 @@ namespace akari {
             }
             return Spectrum(0);
         }
-        void sample_incidence(const Vector2f &u, const Interaction &ref, RayIncidentSample *sample,
+        void sample_incidence(const vec2 &u, const Interaction &ref, RayIncidentSample *sample,
                               VisibilityTester *tester) const override {
             SurfaceSample surfaceSample{};
             triangle.sample_surface(u, &surfaceSample);
@@ -93,7 +93,7 @@ namespace akari {
             *pdfPos = 1 / area;
             *pdfDir = std::fmax(0.0f, cosine_hemisphere_pdf(dot(triangle.Ng, ray.d)));
         }
-        void sample_emission(const Vector2f &u1, const Vector2f &u2, RayEmissionSample *sample) const override {
+        void sample_emission(const vec2 &u1, const vec2 &u2, RayEmissionSample *sample) const override {
             SurfaceSample surfaceSample{};
             triangle.sample_surface(u1, &surfaceSample);
             auto wi = cosine_hemisphere_sampling(u2);

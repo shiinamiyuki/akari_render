@@ -29,26 +29,21 @@
 #include <akari/render/interaction.h>
 #include <akari/render/scene.h>
 namespace akari {
-    template <typename Float, typename Spectrum> struct RayIncidentSample {
-        AKR_BASIC_TYPES()
-        Vector3f wi;
+    struct RayIncidentSample {
+        vec3 wi;
         Spectrum I;
-        Vector3f normal;
-        Vector2i pos; // the uv coordinate of the sampled position or the raster position (0,0) to (bound.x, boubd.y)
-        Float pdf;
+        vec3 normal;
+        vec2 pos; // the uv coordinate of the sampled position or the raster position (0,0) to (bound.x, boubd.y)
+        float pdf;
     };
-    template <typename Float, typename Spectrum> struct RayEmissionSample {
-        AKR_BASIC_TYPES()
-        AKR_USE_TYPES(Ray)
+    struct RayEmissionSample {
         Ray ray;
         Spectrum E;
-        Vector3f normal;
-        Vector2f uv; // 2D parameterized position
-        Float pdfPos, pdfDir;
+        vec3 normal;
+        vec2 uv; // 2D parameterized position
+        float pdfPos, pdfDir;
     };
-    template <typename Float, typename Spectrum> struct VisibilityTester {
-        AKR_BASIC_TYPES()
-        AKR_USE_TYPES(Ray, Interaction)
+    struct VisibilityTester {
         Ray shadowRay{};
         VisibilityTester() = default;
         VisibilityTester(const Interaction &p1, const Interaction &p2) {
@@ -57,18 +52,17 @@ namespace akari {
             w /= dist;
             shadowRay = Ray(p1.p, w, Eps() / abs(dot(w, p1.Ng)), dist * (1.0 - ShadowEps()));
         }
-        [[nodiscard]] Bool visible(const Scene &scene) const { return !scene.Occlude(shadowRay); }
+        [[nodiscard]] bool visible(const Scene &scene) const { return !scene.Occlude(shadowRay); }
         [[nodiscard]] Spectrum Tr(const Scene &scene) const {
             return scene.Occlude(shadowRay) ? Spectrum(0) : Spectrum(1);
         }
     };
-    template <typename Float, typename Spectrum> class EndPoint : public Component {
+
+    class EndPoint : public Component {
       public:
-        AKR_BASIC_TYPES()
-        AKR_USE_TYPES(Ray, Interaction, VisibilityTester, RayEmissionSample, RayIncidentSample)
-        virtual Float pdf_incidence(const Interaction &ref, const Vector3f &wi) const = 0;
+        virtual Float pdf_incidence(const Interaction &ref, const vec3 &wi) const = 0;
         virtual void pdf_emission(const Ray &ray, Float *pdfPos, Float *pdfDir) const = 0;
-        virtual void sample_incidence(const Vector2i &u, const Interaction &ref, RayIncidentSample *sample,
+        virtual void sample_incidence(const vec2 &u, const Interaction &ref, RayIncidentSample *sample,
                                       VisibilityTester *tester) const = 0;
         virtual void sample_emission(const vec2 &u1, const vec2 &u2, RayEmissionSample *sample) const = 0;
     };

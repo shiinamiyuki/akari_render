@@ -22,8 +22,7 @@
 #include <akari/render/bsdf.h>
 
 namespace akari {
-    template<typename Float, typename Spectrum>
-    Float BSDF<Float, Spectrum>::evaluate_pdf(const Vector3f &woW, const Vector3f &wiW) const {
+    Float BSDF::evaluate_pdf(const vec3 &woW, const vec3 &wiW) const {
         auto wo = world_to_local(woW);
         auto wi = world_to_local(wiW);
         Float pdf = 0;
@@ -41,8 +40,7 @@ namespace akari {
         }
         return pdf;
     }
-    template<typename Float, typename Spectrum>
-    Spectrum BSDF<Float, Spectrum>::evaluate(const Vector3f &woW, const Vector3f &wiW) const {
+    Spectrum BSDF::evaluate(const vec3 &woW, const vec3 &wiW) const {
         auto wo = world_to_local(woW);
         auto wi = world_to_local(wiW);
         Spectrum f(0);
@@ -57,14 +55,13 @@ namespace akari {
         }
         return f;
     }
-    template<typename Float, typename Spectrum>
-    void BSDF<Float, Spectrum>::sample(BSDFSample &sample) const {
+    void BSDF::sample(BSDFSample &sample) const {
         if (nComp == 0) {
             return;
         }
         int selected = std::clamp(int(sample.u0 * (float)nComp), 0, nComp - 1);
         sample.u0 = std::min(sample.u0 * (float)nComp - (float)selected, 1.0f - 1e-7f);
-        Vector3f wo, wi;
+        vec3 wo, wi;
         wo = world_to_local(sample.wo);
         {
             auto *comp = components[selected];

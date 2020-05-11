@@ -70,7 +70,7 @@ namespace akari {
             future.wait();
             done.notify_all();
         }
-        Spectrum Li(Film *film, const Scene &scene, const Camera &camera, const Vector2f &raster, Sampler *sampler,
+        Spectrum Li(Film *film, const Scene &scene, const Camera &camera, const vec2 &raster, Sampler *sampler,
                     MemoryArena &arena) {
             auto lightPath = arena.allocN<PathVertex>(maxDepth + 1);
             auto eyePath = arena.allocN<PathVertex>(maxDepth + 1);
@@ -82,7 +82,7 @@ namespace akari {
                     int depth = int(t + s) - 2;
                     if ((s == 1 && t == 1) || depth < 0 || depth > maxDepth)
                         continue;
-                    Vector2f pRaster = raster;
+                    vec2 pRaster = raster;
                     Spectrum LPath = connect_path(scene, *sampler, eyePath, t, lightPath, s, &pRaster);
                     if (t != 1) {
                         if (visualizeMIS) {

@@ -32,11 +32,11 @@ namespace akari {
     class AtomicFloat {
         std::atomic<float> val;
       public:
-        explicit AtomicFloat(float v = 0) : val(v) {}
+        explicit AtomicFloat(Float v = 0) : val(v) {}
 
         AtomicFloat(const AtomicFloat &rhs) : val((float)rhs.val) {}
 
-        void add(float v) {
+        void add(Float v) {
             auto current = val.load();
             while (!val.compare_exchange_weak(current, current + v)){}
         }
@@ -49,7 +49,7 @@ namespace akari {
             return value();
         }
 
-        void set(float v){
+        void set(Float v){
             val = v;
         }
     };

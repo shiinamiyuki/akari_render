@@ -20,40 +20,5 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef AKARIRENDER_INTEGRATOR_H
-#define AKARIRENDER_INTEGRATOR_H
-
-#include <akari/core/component.h>
-#include <akari/render/accelerator.h>
-#include <akari/render/camera.h>
-#include <akari/render/light.h>
-#include <akari/render/material.h>
-#include <akari/render/mesh.h>
-#include <akari/render/sampler.h>
-#include <akari/render/scene.h>
-#include <akari/render/task.h>
-
-namespace akari {
-    class RenderTask : public Task {
-      public:
-        enum class Event { ERENDER_DONE, EFILM_AVAILABLE };
-        virtual bool HasFilmUpdate() = 0;
-        virtual std::shared_ptr<const Film> GetFilmUpdate() = 0;
-        virtual bool IsDone() = 0;
-        virtual bool WaitEvent(Event event) = 0;
-    };
-
-    struct RenderContext {
-        std::shared_ptr<const Scene> scene;
-        std::shared_ptr<const Camera> camera;
-        std::shared_ptr<const Sampler> sampler;
-    };
-
-    class Integrator : public Component {
-      public:
-        virtual std::shared_ptr<RenderTask> create_render_task(const RenderContext &ctx) = 0;
-
-    };
-} // namespace akari
-
-#endif // AKARIRENDER_INTEGRATOR_H
+#include <akari/render/endpoint.h>
+namespace akari {}

@@ -216,7 +216,7 @@ namespace akari {
         return 1.0 / (1.0 + sumRi);
     }
     Spectrum connect_path(const Scene &scene, Sampler &sampler, PathVertex *eyePath, size_t t, PathVertex *lightPath,
-                          size_t s, Vector2f *pRaster) {
+                          size_t s, vec2 *pRaster) {
         if (t > 1 && s != 0 && eyePath[t - 1].type == PathVertex::ELight)
             return Spectrum(0.f);
         Spectrum L(0);
