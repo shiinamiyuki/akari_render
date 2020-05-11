@@ -28,32 +28,9 @@
 #include <akari/render/mesh.h>
 
 namespace akari {
-    class AKR_EXPORT BinaryMesh : public Mesh {
-        bool _loaded = false;
-        std::vector<std::shared_ptr<Light>> lights;
-        std::unordered_map<int, const Light *> lightMap;
-
-      public:
-        std::vector<Vertex> vertexBuffer;
-        std::vector<int> indexBuffer;
-        std::vector<int> groups;
-        std::vector<MaterialSlot> materials;
-        fs::path file;
-        AKR_SER(materials, file);
-        AKR_DECL_COMP()
-        const MaterialSlot &get_material_slot(int group) const override;
-        const Vertex *get_vertex_buffer() const override;
-        const int *get_index_buffer() const override;
-        size_t triangle_count() const override;
-        size_t vertex_count() const override;
-        int get_primitive_group(int idx) const override;
-        bool load_path(const char *path);
-        void save_path(const char *path);
-        void commit() override;
-        std::vector<std::shared_ptr<Light>> get_mesh_lights() const override;
-        const Light *get_light(int primId) const override;
-        std::vector<MaterialSlot> &GetMaterials() override { return materials; }
-    };
+    AKR_EXPORT std::shared_ptr<Mesh> create_binary_mesh(const fs::path& file, std::vector<Vertex> vertex,
+                                             std::vector<int> index, std::vector<int> groups,
+                                             std::vector<MaterialSlot> materials);
 } // namespace akari
 
 #endif // AKARIRENDER_BINARYMESH_H

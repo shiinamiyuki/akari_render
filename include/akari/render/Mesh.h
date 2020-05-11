@@ -46,6 +46,8 @@ namespace akari {
         [[nodiscard]] virtual size_t triangle_count() const = 0;
         [[nodiscard]] virtual size_t vertex_count() const = 0;
         [[nodiscard]] virtual int get_primitive_group(int idx) const = 0;
+        virtual bool load_path(const char *path) = 0;
+        virtual void save_path(const char *path) = 0;
         virtual const MaterialSlot &get_material_slot(int group) const = 0;
         virtual std::vector<MaterialSlot> &GetMaterials() = 0;
         bool Intersect(const Ray &ray, int idx, RayHit *hit) const {

@@ -29,18 +29,16 @@
 namespace akari {
     class PerspectiveCamera final : public Camera {
         std::shared_ptr<Film> film;
-        ivec2 resolution = ivec2(500, 500);
-        float lens_radius = 0;
-        Angle<float> fov = {DegreesToRadians(80.0f)};
+        [[refl]]ivec2 resolution = ivec2(500, 500);
+        [[refl]]float lens_radius = 0;
+        [[refl]]Angle<float> fov = {DegreesToRadians(80.0f)};
         Transform cameraToWorld, worldToCamera;
-        AffineTransform transform;
-        Float focal_distance = 1;
+        [[refl]] AffineTransform transform;
+        [[refl]] Float focal_distance = 1;
         Transform rasterToCamera{}, cameraToRaster{};
 
       public:
-        AKR_DECL_COMP()
-
-        AKR_SER(resolution, lens_radius, fov, transform, focal_distance)
+        AKR_IMPLS(Camera, EndPoint)
         PerspectiveCamera() : cameraToWorld(identity<mat4>()), worldToCamera(identity<mat4>()) {}
         [[nodiscard]] bool IsProjective() const override { return true; }
 
@@ -139,12 +137,7 @@ namespace akari {
             sample->I = We(tester->shadowRay, &sample->pos);
         }
     };
-    AKR_EXPORT_PLUGIN(PerspectiveCamera, p) {
-        auto c = class_<PerspectiveCamera, Camera, Component>("PerspectiveCamera");
-        c.constructor<>();
-        c.method("save", &PerspectiveCamera::save);
-        c.method("load", &PerspectiveCamera::load);
-        c.property("fov", &PerspectiveCamera::fov);
-    }
+#include "generated/PerspectiveCamera.hpp"
+    AKR_EXPORT_PLUGIN(p){}
 
 } // namespace akari

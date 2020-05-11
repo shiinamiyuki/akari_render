@@ -45,7 +45,7 @@ namespace akari {
             emission = mat.emission;
             localFrame = CoordinateSystem(triangle.Ng);
         }
-        AKR_DECL_COMP()
+        AKR_IMPLS(Light)
         Spectrum Li(const vec3 &wo, const vec2 &uv) const override {
             ShadingPoint sp;
             sp.texCoords = triangle.interpolated_tex_coord(uv);
@@ -109,9 +109,9 @@ namespace akari {
             sample->E = Li(wi, sample->uv);
         }
     };
-    AKR_EXPORT_PLUGIN(AreaLight, p){
-        auto c = class_<AreaLight, Light, EndPoint, Component>();
-        c.constructor<const Mesh *, int>();
+#include "generated/AreaLight.hpp"
+    AKR_EXPORT_PLUGIN(p){
+
     }
 
     AKR_EXPORT std::shared_ptr<Light> CreateAreaLight(const Mesh &mesh, int primId) {

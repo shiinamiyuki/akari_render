@@ -30,8 +30,8 @@
 #include <tiny_obj_loader.h>
 
 namespace akari {
-    std::shared_ptr<BinaryMesh> Convert(const fs::path &obj, fs::path output) {
-        std::shared_ptr<BinaryMesh> mesh;
+    std::shared_ptr<Mesh> Convert(const fs::path &obj, fs::path output) {
+        std::shared_ptr<Mesh> mesh;
         if (output.extension().empty()) {
             output.concat(".mesh");
         }
@@ -127,12 +127,7 @@ namespace akari {
                     // shapes[s].mesh.material_ids[f];
                 }
             }
-            mesh = std::make_shared<BinaryMesh>();
-            mesh->file = output.string();
-            mesh->vertexBuffer = std::move(vertices);
-            mesh->indexBuffer = std::move(indices);
-            mesh->groups = std::move(group);
-            mesh->materials = std::move(cvtMaterials);
+            mesh = create_binary_mesh(file,std::move(vertices),std::move(indices),std::move(group),std::move(cvtMaterials));
         }
         mesh->save_path(output.string().c_str());
         return mesh;

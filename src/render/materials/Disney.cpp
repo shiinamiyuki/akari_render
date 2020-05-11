@@ -168,6 +168,6 @@ namespace akari {
 
 #include "generated/DisneyMaterial.hpp"
 
-    AKR_EXPORT_PLUGIN(DisneyMaterial, p) {}
+    AKR_EXPORT_PLUGIN(p) {}
 
 } // namespace akari

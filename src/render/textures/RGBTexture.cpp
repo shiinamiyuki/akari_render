@@ -28,21 +28,17 @@
 namespace akari {
     class RGBTexture final : public Texture {
       public:
-        Spectrum rgb{};
+        [[refl]] Spectrum rgb = Spectrum(0);
         RGBTexture() = default;
         explicit RGBTexture(const vec3 &rgb) : rgb(rgb) {}
-        AKR_SER(rgb)
-        AKR_DECL_COMP()
+        AKR_IMPLS(Texture)
         Spectrum evaluate(const ShadingPoint &sp) const override { return rgb; }
         Float average_luminance() const override { return rgb.luminance(); }
     };
 
     AKR_EXPORT std::shared_ptr<Texture> create_rgb_texture(const vec3 &rgb) { return std::make_shared<RGBTexture>(rgb); }
-    AKR_EXPORT_PLUGIN(RGBTexture, p) {
-        auto c = class_<RGBTexture, Texture, Component>("RGBTexture");
-        c.constructor<>();
-        c.property("rgb", &RGBTexture::rgb);
-        c.method("save", &RGBTexture::save);
-        c.method("load", &RGBTexture::load);
+#include "generated/RGBTexture.hpp"
+    AKR_EXPORT_PLUGIN(p) {
+
     }
 } // namespace akari

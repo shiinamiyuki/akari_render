@@ -38,11 +38,11 @@ namespace akari {
         void set_sample_index(size_t index) override { rng = Rng(index); }
         void start_next_sample() override { dim = 0; }
         size_t current_dimension() override { return dim; }
-        AKR_DECL_COMP()
+        AKR_IMPLS(Sampler)
     };
-    AKR_EXPORT_PLUGIN(RandomSampler, p){
-        auto c = class_<RandomSampler, Sampler, Component>("RandomSampler");
-        c.constructor<>();
+#include "generated/RandomSampler.hpp"
+    AKR_EXPORT_PLUGIN(p){
+        auto c = class_<RandomSampler>();
         c.method("next1d", &RandomSampler::next1d);
         c.method("next2d", &RandomSampler::next2d);
         c.method("clone", &RandomSampler::clone);

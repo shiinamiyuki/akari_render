@@ -174,9 +174,9 @@ namespace akari {
                     }
                 });
                 parallel_for_2d(nTiles, [=, &progressReporter](ivec2 tilePos, uint32_t tid) {
-                    (void) tid;
+                    (void)tid;
                     MemoryArena arena;
-                    Bounds2i tileBounds = Bounds2i{tilePos * (int) TileSize, (tilePos + ivec2(1)) * (int) TileSize};
+                    Bounds2i tileBounds = Bounds2i{tilePos * (int)TileSize, (tilePos + ivec2(1)) * (int)TileSize};
                     auto tile = film->GetTile(tileBounds);
                     auto sampler = _sampler->clone();
                     for (int y = tile.bounds.p_min.y; y < tile.bounds.p_max.y; y++) {
@@ -205,21 +205,17 @@ namespace akari {
     };
 
     class PathTracer : public Integrator {
-        int spp = 16;
-        int min_depth = 5, max_depth = 16;
-        bool enable_rr = true;
+        [[refl]] int spp = 16;
+        [[refl]] int min_depth = 5;
+        [[refl]] int max_depth = 16;
+        [[refl]] bool enable_rr = true;
 
       public:
-        AKR_DECL_COMP()
-        AKR_SER(spp, min_depth, max_depth, enable_rr)
+        AKR_IMPLS(Integrator)
         std::shared_ptr<RenderTask> create_render_task(const RenderContext &ctx) override {
             return std::make_shared<PTRenderTask>(ctx, spp, min_depth, max_depth, enable_rr);
         }
     };
-    AKR_EXPORT_PLUGIN(PathTracer, p){
-        auto c = class_<PathTracer, Integrator, Component>("PathTracer");
-        c.constructor<>();
-        c.method("save", &PathTracer::save);
-        c.method("load", &PathTracer::load);
-    }
+#include "generated/PathTracer.hpp"
+    AKR_EXPORT_PLUGIN(p) {}
 } // namespace akari

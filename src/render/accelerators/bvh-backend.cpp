@@ -310,7 +310,7 @@ namespace akari {
         std::optional<TopLevelBVH> topLevelBVH;
 
       public:
-        AKR_DECL_COMP()
+        AKR_IMPLS(Accelerator)
         void build(const Scene &scene) override {
             for (auto &mesh : scene.GetMeshes()) {
                 meshBVHs.emplace_back(mesh.get(), mesh->triangle_count());
@@ -323,10 +323,8 @@ namespace akari {
         }
         [[nodiscard]] bool occlude(const Ray &ray) const override { return topLevelBVH->occlude(ray); }
     };
-    AKR_EXPORT_PLUGIN(BVHAccelerator, p){
-        auto c = class_<BVHAccelerator, Accelerator, Component>("BVHAccelerator");
-        c.constructor<>();
-        c.method("build", &BVHAccelerator::build);
-        c.method("intersect", &BVHAccelerator::intersect);
+#include "generated/BVHAccelerator.hpp"
+    AKR_EXPORT_PLUGIN(p){
+
     }
 } // namespace akari

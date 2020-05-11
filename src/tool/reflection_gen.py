@@ -31,6 +31,7 @@ def find_close_bracket(src: str, start: int):
 def remove_comments(src: str):
     src = re.sub('//.*(\r\n?|\n)', '', src)
     src = re.sub('/\*(.|\r\n?|\n)\*/', '', src)
+    src = src.replace('final', '')
     return src
 
 
@@ -57,7 +58,7 @@ def parse(src: str, options: dict):
             classname = [x for x in class_decl.split() if x][-1]
         else:
             classname = [x for x in class_decl.split() if x][-2]
-        print('detected ' + classname)
+        # print('detected ' + classname)
         attribute_refl = re.compile(r'\[\[\s*(akari::refl|refl)\s*\]\]')
         field_refl = re.compile(r'\[\[\s*(akari::refl|refl)\s*\]\]((.|\r\n?|\n)*?)\s+((.|\r\n?|\n)*?);')
         if classname == plugin_name or attribute_refl.search(class_decl):
@@ -84,6 +85,8 @@ def parse(src: str, options: dict):
                 field = class_body[match.span()[0]: match.span()[1] - 1].strip()
                 # print(match.group(1))
                 # print('field: ' + field)
+                if '=' in field:
+                    field = field.split('=')[0]
                 field_sep = [x for x in field.split(' ') if x]
                 field_name = field_sep[-1]
                 # print(field_name)
@@ -118,13 +121,20 @@ def parse(src: str, options: dict):
 
         generated_src += ' }\n'
     generated_src += '}\n'
-    fields = ','.join(meta['fields'])
-    generated_src += 'void {}::save(serialize::OutputArchive &ar)const{{\n'.format(classname)
-    generated_src += '''  akari::serialize::AutoSaveVisitor v{{ar}};
-          _AKR_DETAIL_REFL(v, {});\n }}'''.format(fields)
-    generated_src += 'void {}::load(serialize::InputArchive &ar){{\n'.format(classname)
-    generated_src += '''  akari::serialize::AutoLoadVisitor v{{ar}};
-          _AKR_DETAIL_REFL(v, {});\n }}'''.format(fields)
+    for classname in generated:
+        meta = generated[classname]
+        fields = ','.join(meta['fields'])
+        generated_src += 'void {}::save(serialize::OutputArchive &ar)const{{\n'.format(classname)
+        if meta['fields']:
+            generated_src += '''  akari::serialize::AutoSaveVisitor v{{ar}};
+                  _AKR_DETAIL_REFL(v, {});\n'''.format(fields)
+        generated_src += '}\n'
+        generated_src += 'void {}::load(serialize::InputArchive &ar){{\n'.format(classname)
+        if meta['fields']:
+            generated_src += '''  akari::serialize::AutoLoadVisitor v{{ar}};
+                  _AKR_DETAIL_REFL(v, {});\n'''.format(fields)
+        generated_src += '}\n'
+    generated_src += '#define __AKR_PLUGIN_NAME__ "{}"'.format(plugin_name)
     # print(generated_src)
     return generated_src
 

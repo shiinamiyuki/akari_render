@@ -63,14 +63,14 @@ namespace akari {
         virtual bool load_plugin(const char *name) = 0;
     };
 
-#define AKR_EXPORT_PLUGIN(_name, _p)                                                                                   \
+#define AKR_EXPORT_PLUGIN(_p)                                                                                   \
     void _AkariPluginOnLoad(Plugin &);                                                                                 \
     void _AkariGeneratedMeta(Plugin &);                                                                                \
     extern "C" AKR_EXPORT Plugin *akari_plugin_onload() {                                                              \
         static Plugin plugin;                                                                                          \
         static std::once_flag flag;                                                                                    \
         std::call_once(flag, [&]() {                                                                                   \
-            plugin.name = #_name;                                                                                      \
+            plugin.name = __AKR_PLUGIN_NAME__;                                                                         \
             get_compiler_info(&plugin.compiler_info);                                                                  \
             get_build_info(&plugin.build_info);                                                                        \
             _AkariGeneratedMeta(plugin);                                                                               \

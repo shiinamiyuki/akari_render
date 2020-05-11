@@ -32,7 +32,7 @@ namespace akari {
         RTCDevice device = nullptr;
 
       public:
-        AKR_DECL_COMP()
+        AKR_IMPLS(Accelerator)
         void build(const Scene &scene) override {
             if (!device) {
                 device = rtcNewDevice(nullptr);
@@ -44,8 +44,8 @@ namespace akari {
                 auto geometry = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);
                 rtcSetSharedGeometryBuffer(geometry, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3,
                                            mesh->get_vertex_buffer(), 0, sizeof(Vertex), mesh->vertex_count());
-                rtcSetSharedGeometryBuffer(geometry, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, mesh->get_index_buffer(),
-                                           0, sizeof(ivec3), mesh->triangle_count());
+                rtcSetSharedGeometryBuffer(geometry, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3,
+                                           mesh->get_index_buffer(), 0, sizeof(ivec3), mesh->triangle_count());
                 rtcCommitGeometry(geometry);
                 rtcAttachGeometry(rtcScene, geometry);
                 rtcReleaseGeometry(geometry);
@@ -106,7 +106,7 @@ namespace akari {
             box.p_max[2] = bounds.upper_z;
             return box;
         }
-        ~EmbreeAccelerator()  {
+        ~EmbreeAccelerator() {
             if (rtcScene) {
                 rtcReleaseScene(rtcScene);
             }
@@ -115,8 +115,6 @@ namespace akari {
             }
         }
     };
-    AKR_EXPORT_PLUGIN(EmbreeAccelerator, p){
-        auto c = class_<EmbreeAccelerator, Accelerator, Component>();
-        c.constructor<>();
-    }
+#include "generated/EmbreeAccelerator.hpp"
+    AKR_EXPORT_PLUGIN(p) {}
 } // namespace akari

@@ -27,14 +27,13 @@
 namespace akari {
     class ImageTexture : public Texture {
         std::shared_ptr<RGBAImage> image;
-        fs::path path;
+        [[refl]] fs::path path;
         Float average = 0;
 
       public:
         ImageTexture() = default;
         ImageTexture(const fs::path &path) : path(path) {}
-        AKR_SER(path)
-        AKR_DECL_COMP()
+        AKR_IMPLS(Texture)
         void commit() override {
             auto loader = GetImageLoader();
             auto tmp = loader->Load(path);
@@ -60,12 +59,8 @@ namespace akari {
             return (*image)(texCoords);
         }
     };
-    AKR_EXPORT_PLUGIN(ImageTexture, p) {
-        auto c = class_<ImageTexture, Texture, Component>("ImageTexture");
-        c.constructor<>();
-        c.property("rgb", &ImageTexture::path);
-        c.method("save", &ImageTexture::save);
-        c.method("load", &ImageTexture::load);
+#include "generated/ImageTexture.hpp"
+    AKR_EXPORT_PLUGIN(p) {
     }
 
     std::shared_ptr<Texture> CreateImageTexture(const fs::path &path) { return std::make_shared<ImageTexture>(path); }

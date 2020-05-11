@@ -153,22 +153,16 @@ namespace akari {
         }
     };
     class BDPT : public Integrator {
-        int spp = 4;
-        int maxDepth = 5;
-        bool visualize_mis = false;
+        [[refl]] int spp = 4;
+        [[refl]] int maxDepth = 5;
+        [[refl]] bool visualize_mis = false;
 
       public:
-        AKR_DECL_COMP()
-        AKR_SER(spp, maxDepth, visualize_mis)
+        AKR_IMPLS(Integrator)
         std::shared_ptr<RenderTask> create_render_task(const RenderContext &ctx) override {
             return std::make_shared<BDPTRenderTask>(ctx, spp, maxDepth, visualize_mis);
         }
     };
-    AKR_EXPORT_PLUGIN(BDPT, p){
-        auto c = class_<BDPT, Integrator, Component>("BDPT");
-        c.constructor<>();
-        c.method("save", &BDPT::save);
-        c.method("load", &BDPT::load);
-        c.method("create_render_task", &BDPT::create_render_task);
-    }
+#include "generated/BDPT.hpp"
+    AKR_EXPORT_PLUGIN(p){}
 } // namespace akari

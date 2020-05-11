@@ -28,13 +28,12 @@
 
 namespace akari {
     class PointLight : public Light {
-        vec3 color;
-        float strength = 1;
-        vec3 position;
+        [[refl]] vec3 color;
+        [[refl]] float strength = 1;
+        [[refl]] vec3 position;
 
       public:
-        AKR_SER(position, color, strength)
-        AKR_DECL_COMP()
+        AKR_IMPLS(Light)
         Float pdf_incidence(const Interaction &ref, const vec3 &wi) const override { return 0; }
         void pdf_emission(const Ray &ray, Float *pdfPos, Float *pdfDir) const override {
             *pdfPos = 0;
@@ -68,10 +67,8 @@ namespace akari {
         }
         LightType get_light_type() const override { return LightType::EDeltaPosition; }
     };
-    AKR_EXPORT_PLUGIN(PointLight, p){
-        auto c = class_<PointLight,Light, EndPoint, Component>("PointLight");
-        c.constructor<>();
-        c.method("load", &PointLight::load);
-        c.method("save", &PointLight::save);
+#include "generated/PointLight.hpp"
+    AKR_EXPORT_PLUGIN(p){
+
     }
 } // namespace akari

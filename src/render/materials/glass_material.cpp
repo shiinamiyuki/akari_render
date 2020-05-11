@@ -29,14 +29,14 @@
 
 namespace akari {
     class GlassMaterial final : public Material {
-        std::shared_ptr<Texture> color;
-        std::shared_ptr<Texture> ior;
+
+        [[refl]] std::shared_ptr<Texture> color;
+        [[refl]] std::shared_ptr<Texture> ior;
 
       public:
         GlassMaterial() = default;
         explicit GlassMaterial(std::shared_ptr<Texture> color) : color(std::move(color)) {}
-        AKR_SER(color, ior)
-        AKR_DECL_COMP()
+        AKR_IMPLS(Material, Component)
         void compute_scattering_functions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
                                           Float scale) const override {
             si->bsdf = arena.alloc<BSDF>(*si);
@@ -46,14 +46,10 @@ namespace akari {
         }
         bool support_bidirectional() const override { return true; }
     };
-    AKR_EXPORT_PLUGIN(GlassMaterial, p) {
-        auto c = class_<GlassMaterial, Material, Component>("GlassMaterial");
-        c.constructor<>();
-        c.property("color", &GlassMaterial::color);
-        c.property("ior", &GlassMaterial::ior);
-        c.method("save", &GlassMaterial::save);
-        c.method("load", &GlassMaterial::load);
-        c.method("support_bidirectional", &GlassMaterial::support_bidirectional);
+
+#include "generated/GlassMaterial.hpp"
+
+    AKR_EXPORT_PLUGIN(p) {
     }
 
 } // namespace akari

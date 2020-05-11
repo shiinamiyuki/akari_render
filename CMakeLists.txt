@@ -86,7 +86,7 @@ function(add_plugin target)
             OUTPUT ${GEN_SRC}
             COMMAND ${PYTHON_INTERPRETER} ${CMAKE_SOURCE_DIR}/src/tool/reflection_gen.py ${target} ${MAIN_FILE} ${GEN_SRC}
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-            DEPENDS ${FILES}
+            DEPENDS ${FILES} ${CMAKE_SOURCE_DIR}/src/tool/reflection_gen.py
     )
     add_library(${target} SHARED ${FILES} ${GEN_SRC})
     set_property(TARGET ${target} PROPERTY POSITION_INDEPENDENT_CODE ON)
@@ -123,10 +123,10 @@ add_subdirectory(src/tool)
 add_executable(akari src/app/akari.cpp)
 target_link_libraries(akari AkariCoreRender)
 
-add_executable(AkariExpr src/app/akari_expr.cpp)
-target_link_libraries(AkariExpr asmjit)
-target_link_libraries(AkariExpr AkariCore)
-target_link_libraries(AkariExpr ComplexTexture)
+#add_executable(AkariExpr src/app/akari_expr.cpp)
+#target_link_libraries(AkariExpr asmjit)
+#target_link_libraries(AkariExpr AkariCore)
+#target_link_libraries(AkariExpr ComplexTexture)
 if(AKARI_BUILD_GUI)
     file(GLOB AkariGuiSrc src/app/ui/*.*)
     add_executable(AkariGui ${AkariGuiSrc})

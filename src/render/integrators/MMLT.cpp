@@ -279,26 +279,21 @@ namespace akari {
         }
     };
     class MMLT : public Integrator {
-        int spp = 16;
-        int max_depth = 7;
-        size_t n_bootstrap = 100000u;
-        size_t n_chains = 100;
-        int n_direct = 16;
-        Float clamp = 1e5;
-        size_t max_consecutive_rejects = 102400;
+        [[refl]] int spp = 16;
+        [[refl]] int max_depth = 7;
+        [[refl]] size_t n_bootstrap = 100000u;
+        [[refl]] size_t n_chains = 100;
+        [[refl]] int n_direct = 16;
+        [[refl]] Float clamp = 1e5;
+        [[refl]] size_t max_consecutive_rejects = 102400;
 
       public:
-        AKR_DECL_COMP()
-        AKR_SER(spp, max_depth, n_bootstrap, n_chains, n_direct, clamp, max_consecutive_rejects)
+        AKR_IMPLS(Integrator)
         std::shared_ptr<RenderTask> create_render_task(const RenderContext &ctx) override {
             return std::make_shared<MMLTRenderTask>(ctx, spp, max_depth, n_bootstrap, n_chains, n_direct, clamp,
                                                     max_consecutive_rejects);
         }
     };
-    AKR_EXPORT_PLUGIN(MMLT, p) {
-        auto c = class_<MMLT, Integrator, Component>("MMLT");
-        c.constructor<>();
-        c.method("save", &MMLT::save);
-        c.method("load", &MMLT::load);
-    }
+#include "generated/MMLT.hpp"
+    AKR_EXPORT_PLUGIN(p){}
 } // namespace akari

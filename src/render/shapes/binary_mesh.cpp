@@ -21,11 +21,40 @@
 // SOFTWARE.
 
 #include <akari/core/logger.h>
+#include <akari/core/plugin.h>
 #include <akari/core/stream.h>
 #include <akari/plugins/area_light.h>
 #include <akari/plugins/binary_mesh.h>
+#include <akari/render/material.h>
+#include <akari/render/mesh.h>
 #include <fstream>
 namespace akari {
+    class AKR_EXPORT BinaryMesh : public Mesh {
+        bool _loaded = false;
+        std::vector<std::shared_ptr<Light>> lights;
+        std::unordered_map<int, const Light *> lightMap;
+
+      public:
+        std::vector<Vertex> vertexBuffer;
+        std::vector<int> indexBuffer;
+        std::vector<int> groups;
+        [[refl]] std::vector<MaterialSlot> materials;
+        [[refl]] fs::path file;
+        AKR_IMPLS(Mesh)
+        const MaterialSlot &get_material_slot(int group) const override;
+        const Vertex *get_vertex_buffer() const override;
+        const int *get_index_buffer() const override;
+        size_t triangle_count() const override;
+        size_t vertex_count() const override;
+        int get_primitive_group(int idx) const override;
+        bool load_path(const char *path) override;
+        void save_path(const char *path) override;
+        void commit() override;
+        std::vector<std::shared_ptr<Light>> get_mesh_lights() const override;
+        const Light *get_light(int primId) const override;
+        std::vector<MaterialSlot> &GetMaterials() override { return materials; }
+    };
+
     const MaterialSlot &BinaryMesh::get_material_slot(int group) const { return materials[group]; }
     const Vertex *BinaryMesh::get_vertex_buffer() const { return vertexBuffer.data(); }
     const int *BinaryMesh::get_index_buffer() const { return indexBuffer.data(); }
@@ -97,11 +126,16 @@ namespace akari {
         }
         return it->second;
     }
-    AKR_EXPORT_PLUGIN(BinaryMesh, p){
-        auto c = class_<BinaryMesh, Mesh, Component>("BinaryMesh");
-        c.constructor<>();
-        c.method("commit", &BinaryMesh::commit);
-        c.method("save", &BinaryMesh::save);
-        c.method("load", &BinaryMesh::load);
+    std::shared_ptr<Mesh> create_binary_mesh(const fs::path &file, std::vector<Vertex> vertex, std::vector<int> index,
+                                             std::vector<int> groups, std::vector<MaterialSlot> materials) {
+        auto mesh = std::make_shared<BinaryMesh>();
+        mesh->file = file;
+        mesh->vertexBuffer = std::move(vertex);
+        mesh->indexBuffer = std::move(index);
+        mesh->groups = std::move(groups);
+        mesh->materials = std::move(materials);
+        return mesh;
     }
+#include "generated/BinaryMesh.hpp"
+    AKR_EXPORT_PLUGIN(p) {}
 } // namespace akari

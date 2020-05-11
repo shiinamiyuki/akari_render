@@ -29,13 +29,12 @@
 
 namespace akari {
     class MirrorMaterial final : public Material {
-        std::shared_ptr<Texture> color;
+        [[refl]] std::shared_ptr<Texture> color;
 
       public:
         MirrorMaterial() = default;
         explicit MirrorMaterial(std::shared_ptr<Texture> color) : color(std::move(color)) {}
-        AKR_SER(color)
-        AKR_DECL_COMP()
+        AKR_IMPLS(Material)
         void compute_scattering_functions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
                                           Float scale) const override {
             si->bsdf = arena.alloc<BSDF>(*si);
@@ -45,12 +44,9 @@ namespace akari {
         void commit() override { color->commit(); }
         bool support_bidirectional() const override { return true; }
     };
-    AKR_EXPORT_PLUGIN(MirrorMaterial, p) {
-        auto c = class_<MirrorMaterial, Material, Component>("MirrorMaterial");
-        c.constructor<>();
-        c.property("color", &MirrorMaterial::color);
-        c.method("save", &MirrorMaterial::save);
-        c.method("load", &MirrorMaterial::load);
+#include "generated/MirrorMaterial.hpp"
+    AKR_EXPORT_PLUGIN(p) {
+        auto c = class_<MirrorMaterial>();
         c.method("support_bidirectional", &MirrorMaterial::support_bidirectional);
     }
 

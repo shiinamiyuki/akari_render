@@ -30,13 +30,12 @@
 
 namespace akari {
     class MatteMaterial final : public Material {
-        std::shared_ptr<Texture> color;
+        [[refl]] std::shared_ptr<Texture> color;
 
       public:
         MatteMaterial() = default;
         explicit MatteMaterial(std::shared_ptr<Texture> color) : color(std::move(color)) {}
-        AKR_SER(color)
-        AKR_DECL_COMP()
+        AKR_IMPLS(Material)
         void compute_scattering_functions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
                                           Float scale) const override {
             si->bsdf = arena.alloc<BSDF>(*si);
@@ -46,13 +45,9 @@ namespace akari {
         void commit() override { color->commit(); }
         bool support_bidirectional() const override { return true; }
     };
-
-    AKR_EXPORT_PLUGIN(MatteMaterial, p) {
-        auto c = class_<MatteMaterial, Material, Component>("MatteMaterial");
-        c.constructor<>();
-        c.property("color", &MatteMaterial::color);
-        c.method("save", &MatteMaterial::save);
-        c.method("load", &MatteMaterial::load);
+#include "generated/MatteMaterial.hpp"
+    AKR_EXPORT_PLUGIN(p) {
+        auto c = class_<MatteMaterial>();
         c.method("support_bidirectional", &MatteMaterial::support_bidirectional);
     }
     std::shared_ptr<Material> CreateMatteMaterial(const std::shared_ptr<Texture> &color) {
