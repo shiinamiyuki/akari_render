@@ -43,16 +43,20 @@ namespace akari {
         virtual bool WaitEvent(Event event) = 0;
     };
 
-    struct RenderContext {
+    template <typename Float, typename Spectrum> struct RenderContext {
+        AKR_BASIC_TYPES()
+        AKR_COMPONENT_TYPES()
         std::shared_ptr<const Scene> scene;
         std::shared_ptr<const Camera> camera;
         std::shared_ptr<const Sampler> sampler;
     };
 
-    class Integrator : public Component {
+    template <typename Float, typename Spectrum> class Integrator : public Component {
       public:
+        AKR_BASIC_TYPES()
+        AKR_GEOMETRY_TYPES()
+        AKR_USE_TYPES(RenderContext)
         virtual std::shared_ptr<RenderTask> create_render_task(const RenderContext &ctx) = 0;
-
     };
 } // namespace akari
 

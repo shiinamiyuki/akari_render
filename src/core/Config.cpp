@@ -30,6 +30,7 @@ namespace akari {
         std::call_once(flag, [&]() { config.NumCore = std::thread::hardware_concurrency(); });
         return &config;
     }
-    AKR_EXPORT Float Eps() { return 1e-4f; }
-    AKR_EXPORT  Float ShadowEps() { return 1e-4f; }
+    template <typename Float> Float Eps() { return 1e-4f; }
+
+    template <typename Float> Float ShadowEps() { return 1e-4f; }
 } // namespace akari

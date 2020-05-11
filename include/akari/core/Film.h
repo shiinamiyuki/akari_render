@@ -29,8 +29,8 @@
 
 namespace akari {
     struct Pixel {
-        Spectrum radiance = Spectrum(0);
-        Float weight = 0;
+        RGBSpectrum radiance = RGBSpectrum(0);
+        float weight = 0;
     };
     struct SplatPixel {
         std::array<AtomicFloat, 3> color;
@@ -57,7 +57,7 @@ namespace akari {
             return pixels[q.x + q.y * _size.x];
         }
 
-        void AddSample(const vec2 &p, const Spectrum &radiance, Float weight) {
+        void AddSample(const vec2 &p, const RGBSpectrum &radiance, float weight) {
             auto &pix = (*this)(p);
             pix.weight += weight;
             pix.radiance += radiance;
@@ -65,12 +65,12 @@ namespace akari {
     };
 
     class Film {
-        TImage<Spectrum> radiance;
+        TImage<RGBSpectrum> radiance;
         TImage<float> weight;
         TImage<SplatPixel> splat;
 
       public:
-        Float splatScale = 1.0f;
+        float splatScale = 1.0f;
         explicit Film(const ivec2 &dimension) : radiance(dimension), weight(dimension), splat(dimension) {}
         Tile GetTile(const Bounds2i &bounds) { return Tile(bounds); }
 
@@ -95,8 +95,8 @@ namespace akari {
                     radiance.Dimension().y,
                     [&](uint32_t y, uint32_t) {
                         for (int x = 0; x < radiance.Dimension().x; x++) {
-                            Spectrum s =
-                                    Spectrum(splat(x, y).color[0], splat(x, y).color[1], splat(x, y).color[2]) *
+                            RGBSpectrum s =
+                                RGBSpectrum(splat(x, y).color[0], splat(x, y).color[1], splat(x, y).color[2]) *
                                     splatScale;
                             if (weight(x, y) != 0) {
                                 vec3 color = (radiance(x, y) + s) / weight(x, y);
@@ -110,7 +110,7 @@ namespace akari {
             default_image_writer()->write(image, path, postProcessor);
         }
 
-        void add_splat(const Spectrum &L, const vec2 &p) {
+        void add_splat(const RGBSpectrum &L, const vec2 &p) {
             ivec2 ip = ivec2(p);
             splat(ip).color[0].add(L[0]);
             splat(ip).color[1].add(L[1]);

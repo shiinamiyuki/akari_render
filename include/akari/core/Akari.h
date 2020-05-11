@@ -87,7 +87,6 @@ namespace akari {
         }                                                                                                              \
     } while (0)
 
-    using Float = float;
     ;
 } // namespace akari
 #endif // AKARIRENDER_AKARI_H

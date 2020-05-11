@@ -35,7 +35,7 @@ namespace akari {
         Spectrum I;
         Vector3f normal;
         Vector2i pos; // the uv coordinate of the sampled position or the raster position (0,0) to (bound.x, boubd.y)
-        float pdf;
+        Float pdf;
     };
     template <typename Float, typename Spectrum> struct RayEmissionSample {
         AKR_BASIC_TYPES()
@@ -44,7 +44,7 @@ namespace akari {
         Spectrum E;
         Vector3f normal;
         Vector2f uv; // 2D parameterized position
-        float pdfPos, pdfDir;
+        Float pdfPos, pdfDir;
     };
     template <typename Float, typename Spectrum> struct VisibilityTester {
         AKR_BASIC_TYPES()
@@ -57,7 +57,7 @@ namespace akari {
             w /= dist;
             shadowRay = Ray(p1.p, w, Eps() / abs(dot(w, p1.Ng)), dist * (1.0 - ShadowEps()));
         }
-        [[nodiscard]] bool visible(const Scene &scene) const { return !scene.Occlude(shadowRay); }
+        [[nodiscard]] Bool visible(const Scene &scene) const { return !scene.Occlude(shadowRay); }
         [[nodiscard]] Spectrum Tr(const Scene &scene) const {
             return scene.Occlude(shadowRay) ? Spectrum(0) : Spectrum(1);
         }

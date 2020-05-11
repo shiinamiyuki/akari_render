@@ -93,11 +93,11 @@ namespace akari {
         void process(const RGBAImage &in, RGBAImage &out) const override { out = in; }
     };
     class AKR_EXPORT GammaCorrection : public PostProcessor {
-        Float gamma;
+        float gamma;
 
       public:
         AKR_DECL_COMP()
-        explicit GammaCorrection(Float gamma = 1.0 / 2.2f) : gamma(gamma) {}
+        explicit GammaCorrection(float gamma = 1.0 / 2.2f) : gamma(gamma) {}
         void process(const RGBAImage &in, RGBAImage &out) const override;
     };
 

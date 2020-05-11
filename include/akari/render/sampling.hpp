@@ -26,7 +26,9 @@
 #include <algorithm>
 
 namespace akari {
-    inline Vector2f concentric_disk_sampling(const Vector2f &u) {
+    template <typename Vector2f, typename Float = scalar_t<Vector2f>, typename Vector3f = tvec2<Float>>
+    static inline Vector2f concentric_disk_sampling(const Vector2f &u) {
+        AKR_USE_MATH_CONSTANTS()
         Vector2f uOffset = 2.f * u - Vector2f(1, 1);
         if (uOffset.x == 0 && uOffset.y == 0)
             return Vector2f(0, 0);
@@ -41,16 +43,27 @@ namespace akari {
         }
         return r * Vector2f(std::cos(theta), std::sin(theta));
     }
-
-    inline Vector3f cosine_hemisphere_sampling(const Vector2f &u) {
+    template <typename Vector2f, typename Float = scalar_t<Vector2f>, typename Vector3f = tvec2<Float>>
+    static inline Vector3f cosine_hemisphere_sampling(const Vector2f &u) {
         auto uv = concentric_disk_sampling(u);
         auto r = dot(uv, uv);
         auto h = std::sqrt(std::max(0.0f, 1 - r));
         return Vector3f(uv.x, h, uv.y);
     }
-    inline Float cosine_hemisphere_pdf(Float cosTheta) { return cosTheta * InvPi; }
-    inline Float uniform_sphere_pdf() { return 1.0f / (4 * Pi); }
-    inline Vector3f uniform_sphere_sampling(const Vector2f &u) {
+
+    template <typename Float, typename Vector2f = tvec2<Float>, typename Vector3f = tvec2<Float>>
+    static inline Float cosine_hemisphere_pdf(Float cosTheta) {
+        AKR_USE_MATH_CONSTANTS()
+        return cosTheta * InvPi;
+    }
+
+    template <typename Float> static inline Float uniform_sphere_pdf() {
+        AKR_USE_MATH_CONSTANTS()
+        return 1.0f / (4 * Pi); }
+
+    template <typename Float, typename Vector2f = tvec2<Float>, typename Vector3f = tvec2<Float>>
+    static inline Vector3f uniform_sphere_sampling(const Vector2f &u) {
+        AKR_USE_MATH_CONSTANTS()
         Float z = 1 - 2 * u[0];
         Float r = std::sqrt(std::max((Float)0, (Float)1 - z * z));
         Float phi = 2 * Pi * u[1];

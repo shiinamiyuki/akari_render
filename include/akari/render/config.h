@@ -20,5 +20,15 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/render/endpoint.h>
-namespace akari {}
+#ifndef AKARIRENDER_CONFIG_H
+#define AKARIRENDER_CONFIG_H
+
+#include <akari/core/spectrum.h>
+namespace akari{
+     #define AKR_ENABLE_FLOAT_RGB
+    // #define AKR_ENABLE_FLOAT_MONOCHROME
+    // #define AKR_ENABLE_FLOAT_SPECTRUM
+}
+
+
+#endif // AKARIRENDER_CONFIG_H

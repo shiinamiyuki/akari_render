@@ -24,8 +24,8 @@
 #include <akari/core/logger.h>
 #include <akari/core/math.h>
 #include <akari/core/plugin.h>
-#include <akari/core/sampling.hpp>
 #include <akari/render/camera.h>
+#include <akari/render/sampling.hpp>
 namespace akari {
     class PerspectiveCamera final : public Camera {
         std::shared_ptr<Film> film;

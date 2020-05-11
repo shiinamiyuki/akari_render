@@ -28,7 +28,6 @@
 #define AKR_USE_SIMD
 
 namespace akari {
-    using Float = float;
 
     struct Config {
         size_t NumCore;
