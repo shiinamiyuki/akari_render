@@ -120,7 +120,7 @@ namespace akari {
         }
     };
 
-    std::shared_ptr<ImageLoader> GetImageLoader() {
+    std::shared_ptr<ImageLoader> image_loader() {
         static std::shared_ptr<ImageLoader> loader;
         static std::once_flag flag;
         std::call_once(flag, [&]() { loader = std::make_shared<ImageLoaderImpl>(); });

@@ -35,7 +35,7 @@ namespace akari {
         ImageTexture(const fs::path &path) : path(path) {}
         AKR_IMPLS(Texture)
         void commit() override {
-            auto loader = GetImageLoader();
+            auto loader = image_loader();
             auto tmp = loader->Load(path);
             if (tmp != image) {
                 image = tmp;

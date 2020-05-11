@@ -123,6 +123,7 @@ namespace akari {
     class AKR_EXPORT ImageWriter {
       public:
         virtual bool write(const RGBAImage &image, const fs::path &, const PostProcessor &postProcessor) = 0;
+        virtual ~ImageWriter() = default;
     };
 
     class AKR_EXPORT ImageReader {
@@ -138,7 +139,7 @@ namespace akari {
         virtual std::shared_ptr<RGBAImage> Load(const fs::path &) = 0;
         virtual ~ImageLoader() = default;
     };
-    AKR_EXPORT std::shared_ptr<ImageLoader> GetImageLoader();
+    AKR_EXPORT std::shared_ptr<ImageLoader> image_loader();
 } // namespace akari
 
 #endif // AKARIRENDER_IMAGE_HPP
