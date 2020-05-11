@@ -308,7 +308,7 @@ namespace akari::serialize {
         }
 
         explicit InputArchive(const json &data) : data(data) {
-            stack.emplace_back(data);
+            stack.emplace_back(this->data);
         }
 
         template <class T> std::enable_if_t<detail::is_json_deseriailzable<T>::value, void> _load(T &arg) {

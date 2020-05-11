@@ -120,7 +120,7 @@ namespace akari {
                     throw std::runtime_error("assigning to underlying value of non-pointer");
                 }
             }
-            void assign_shared(std::shared_ptr<void> p) {
+            void assign_shared(std::shared_ptr<void> p) override {
                 if constexpr (detail::is_shared_ptr_v<Actual>) {
                     if constexpr (detail::is_reference_wrapper_v<T>) {
                         auto &tmp = const_cast<Actual &>(static_cast<detail::get_internal_t<T> &>(value));
@@ -813,7 +813,7 @@ namespace akari {
                 do_it1<T, U>();
                 do_it1<U, T>();
                 auto &mgr = detail::reflection_manager::instance();
-                if(mgr.instances.count(type_of<U>().name) == 0){
+                if (mgr.instances.count(type_of<U>().name) == 0) {
                     mgr.instances[type_of<U>().name] = {};
                 }
                 {
@@ -843,7 +843,7 @@ namespace akari {
             detail::register_cast_func<T>::template do_it_shared<Base...>();
         }
         auto c = detail::meta_instance_handle<T>(mgr.instances.at(type.name));
-        if constexpr (std::is_default_constructible_v<T>){
+        if constexpr (std::is_default_constructible_v<T>) {
             c.template constructor<>();
         }
         return c;
