@@ -74,11 +74,21 @@ target_link_libraries(AkariCoreRender AkariCore)
 #
 #
 set(AKARI_ALL_PLUGINS "")
-
+set(PYTHON_INTERPRETER "python3")
 
 function(add_plugin target)
     list(SUBLIST ARGN 0 -1 FILES)
-    add_library(${target} SHARED ${FILES})
+    list(GET FILES 0 MAIN_FILE)
+#    list(TRANSFORM FILES PREPEND "${CMAKE_CURRENT_BINARY_DIR}/generated-" OUTPUT_VARIABLE GEN_SRC)
+#    list(TRANSFORM GEN_SRC APPEND ".hpp")
+    set(GEN_SRC "${CMAKE_CURRENT_SOURCE_DIR}/generated/${target}.hpp")
+    add_custom_command(
+            OUTPUT ${GEN_SRC}
+            COMMAND ${PYTHON_INTERPRETER} ${CMAKE_SOURCE_DIR}/src/tool/reflection_gen.py ${target} ${MAIN_FILE} ${GEN_SRC}
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+            DEPENDS ${FILES}
+    )
+    add_library(${target} SHARED ${FILES} ${GEN_SRC})
     set_property(TARGET ${target} PROPERTY POSITION_INDEPENDENT_CODE ON)
     set_target_properties(${target} PROPERTIES PREFIX "")
     set_target_properties(${target} PROPERTIES

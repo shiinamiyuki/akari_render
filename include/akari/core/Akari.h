@@ -33,6 +33,8 @@
 #pragma clang diagnostic ignored "-Wc++11-compat"
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma clang diagnostic ignored "-Wunused-variable"
+#pragma GCC diagnostic ignored "-Wattributes"
+#pragma clang diagnostic ignored "-Wattributes"
 #endif
 
 #ifdef __GNUC__
@@ -87,7 +89,6 @@ namespace akari {
         }                                                                                                              \
     } while (0)
 
-    using Float = float;
-    ;
+//    using Float = float;
 } // namespace akari
 #endif // AKARIRENDER_AKARI_H

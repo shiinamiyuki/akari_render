@@ -53,7 +53,12 @@ namespace akari {
 
 #define AKR_DECL_COMP()                                                                                                \
     TypeInfo type_info() const override { return type_of<std::decay_t<decltype(*this)>>(); }                           \
-    friend void _AkariPluginOnLoad(Plugin &);
+    friend void _AkariPluginOnLoad(Plugin &); \
+    friend void _AkariGeneratedMeta(Plugin &);
+
+#define AKR_IMPLS(...) AKR_DECL_COMP() \
+    void save(serialize::OutputArchive &ar)const;\
+    void load(serialize::InputArchive &ar);
 
     using GetPluginFunc = akari::Plugin *(*)();
     AKR_EXPORT std::shared_ptr<Component> create_component(const char *type);

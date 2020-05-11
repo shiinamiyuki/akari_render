@@ -312,9 +312,9 @@ namespace akari {
 
         [[nodiscard]] inline const TypeInfo &_get_type() const { return type; }
         [[nodiscard]] inline TypeInfo get_type() const {
-            if(auto r = _ptr->get_underlying_type()){
+            if (auto r = _ptr->get_underlying_type()) {
                 return r.value();
-            }else{
+            } else {
                 return type;
             }
         }
@@ -327,7 +327,7 @@ namespace akari {
                                                      value._get_internal_shared_pointer())) {
                     _ptr->assign_shared(p.value());
                 }
-            }else {
+            } else {
                 if (type == value.type) {
                     _ptr->assign(value._get_internal_pointer());
                 } else {
@@ -638,6 +638,8 @@ namespace akari {
             std::unordered_map<std::string, Attributes> attributes;
             std::vector<Function> constructors;
             std::vector<Function> shared_constructors;
+            std::vector<std::string_view> base_classes;
+            std::vector<std::string_view> derived_classes;
         };
 
         template <typename U> struct meta_instance_handle {
@@ -669,10 +671,14 @@ namespace akari {
             //            }
 
             template <typename F> meta_instance_handle &method(const char *name, F &&f) {
+                if (methods.count(name) > 0) {
+                    throw std::runtime_error(std::string("method ") + name + " has already been defined");
+                }
                 auto it = attributes.find(name);
                 if (it == attributes.end()) {
                     attributes.insert(std::make_pair(name, Attributes()));
                 }
+
                 auto &attr = attributes.at(name);
                 methods.emplace(std::make_pair(name, Method(name, attr)));
                 methods.at(name)._function = Function(f);
@@ -680,6 +686,9 @@ namespace akari {
             }
 
             template <typename T> meta_instance_handle &property(const char *name, T U::*p) {
+                if (properties.count(name) > 0) {
+                    throw std::runtime_error(std::string("property ") + name + " has already been defined");
+                }
                 auto it = attributes.find(name);
                 if (it == attributes.end()) {
                     attributes.insert(std::make_pair(name, Attributes()));
@@ -802,6 +811,13 @@ namespace akari {
             template <typename U, typename... Rest> static void do_it() {
                 do_it_shared1<T, U>();
                 do_it_shared1<U, T>();
+                auto &mgr = detail::reflection_manager::instance();
+                {
+                    auto &derived = mgr.instances.at(type_of<T>().name);
+                    auto &parent = mgr.instances.at(type_of<U>().name);
+                    derived.base_classes.emplace_back(type_of<U>().name);
+                    parent.derived_classes.emplace_back(type_of<T>().name);
+                }
                 if constexpr (sizeof...(Rest) > 0) {
                     do_it_shared<Rest...>();
                 }
@@ -822,7 +838,11 @@ namespace akari {
             detail::register_cast_func<T>::template do_it<Base...>();
             detail::register_cast_func<T>::template do_it_shared<Base...>();
         }
-        return detail::meta_instance_handle<T>(mgr.instances[type.name]);
+        auto c = detail::meta_instance_handle<T>(mgr.instances.at(type.name));
+        if constexpr (std::is_default_constructible_v<T>){
+            c.template constructor<>();
+        }
+        return c;
     }
 
     template <typename F> void function(const char *name, F &&f) {

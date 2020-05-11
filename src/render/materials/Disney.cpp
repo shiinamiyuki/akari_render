@@ -54,7 +54,8 @@ namespace akari {
 
       public:
         DisneySheen(const Spectrum &base_color, const Spectrum &sheen, const Spectrum &sheenTint)
-            : BSDFComponent(BSDFType(BSDF_GLOSSY | BSDF_REFLECTION)), base_color(base_color), sheen(sheen), sheenTint(sheenTint) {}
+            : BSDFComponent(BSDFType(BSDF_GLOSSY | BSDF_REFLECTION)), base_color(base_color), sheen(sheen),
+              sheenTint(sheenTint) {}
         [[nodiscard]] Spectrum evaluate(const vec3 &wo, const vec3 &wi) const override {
             auto wh = wi + wo;
             if (all(equal(wh, vec3(0)))) {
@@ -129,40 +130,44 @@ namespace akari {
     };
 
     class DisneyMaterial : public Material {
-        std::shared_ptr<Texture> base_color, subsurface, metallic, specular, specularTint, roughness, anisotropic,
-            sheen, sheen_tint, clearcoat, clearcoat_gloss, ior, specTrans;
+        [[refl]] std::shared_ptr<Texture> base_color;
+        [[refl]] std::shared_ptr<Texture> subsurface;
+        [[refl]] std::shared_ptr<Texture> metallic;
+        [[refl]] std::shared_ptr<Texture> specular;
+        [[refl]] std::shared_ptr<Texture> specularTint;
+        [[refl]] std::shared_ptr<Texture> roughness;
+        [[refl]] std::shared_ptr<Texture> anisotropic;
+        [[refl]] std::shared_ptr<Texture> sheen;
+        [[refl]] std::shared_ptr<Texture> sheen_tint;
+        [[refl]] std::shared_ptr<Texture> clearcoat;
+        [[refl]] std::shared_ptr<Texture> clearcoat_gloss;
+        [[refl]] std::shared_ptr<Texture> ior;
+        [[refl]] std::shared_ptr<Texture> spec_trans;
 
       public:
-        AKR_SER(base_color, subsurface, metallic, specular, specularTint, roughness, anisotropic, sheen, sheen_tint,
-                clearcoat, clearcoat_gloss, ior, specTrans)
-        AKR_DECL_COMP()
+//        AKR_SER(base_color, subsurface, metallic, specular, specularTint, roughness, anisotropic, sheen, sheen_tint,
+//                clearcoat, clearcoat_gloss, ior, spec_trans)
+        AKR_IMPLS(Material)
         void compute_scattering_functions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
                                           Float scale) const override {
-//            si->bsdf = arena.alloc<BSDF>(*si);
-//            Spectrum color = base_color->evaluate(si->sp);
-//            Float metallicWeight = metallic->evaluate(si->sp)[0];
-//            Float eta = ior->evaluate(si->sp)[0];
-//            Float trans = specTrans->evaluate(si->sp)[0];
-//            Float diffuseWeight = (1.0f - trans) * (1.0f - metallicWeight);
-//            Float transWeight = trans * (1.0f - metallicWeight);
-//            Float alpha = roughness->evaluate(si->sp)[0];
-//            if (diffuseWeight > 0) {
-//                si->bsdf->add_component(arena.alloc<DisneyDiffuse>(color * diffuseWeight));
-//                //TODO: subsurface
-//            }
-
+            //            si->bsdf = arena.alloc<BSDF>(*si);
+            //            Spectrum color = base_color->evaluate(si->sp);
+            //            Float metallicWeight = metallic->evaluate(si->sp)[0];
+            //            Float eta = ior->evaluate(si->sp)[0];
+            //            Float trans = specTrans->evaluate(si->sp)[0];
+            //            Float diffuseWeight = (1.0f - trans) * (1.0f - metallicWeight);
+            //            Float transWeight = trans * (1.0f - metallicWeight);
+            //            Float alpha = roughness->evaluate(si->sp)[0];
+            //            if (diffuseWeight > 0) {
+            //                si->bsdf->add_component(arena.alloc<DisneyDiffuse>(color * diffuseWeight));
+            //                //TODO: subsurface
+            //            }
         }
         bool support_bidirectional() const override { return true; }
     };
-    AKR_EXPORT_PLUGIN(DisneyMaterial, p) {
-        auto c = class_<DisneyMaterial, Material, Component>();
-        using S = DisneyMaterial;
-        c.constructor<>();
-        c.method("save", &S::save);
-        c.method("load", &S::load);
-        c.method("commit", &S::commit);
-        c.property("ior", &S::ior);
-        c.property("clearcoat", &S::clearcoat);
-        c.property("clearcoat_gloss", &S::clearcoat_gloss);
-    }
+
+#include "generated/DisneyMaterial.hpp"
+
+    AKR_EXPORT_PLUGIN(DisneyMaterial, p) {}
+
 } // namespace akari

@@ -24,8 +24,8 @@
 #define AKARIRENDER_PLUGIN_H
 
 #include <akari/core/akari.h>
-#include <akari/core/serialize.hpp>
 #include <akari/core/detail/serialize-impl.hpp>
+#include <akari/core/serialize.hpp>
 #include <memory>
 #include <mutex>
 
@@ -65,6 +65,7 @@ namespace akari {
 
 #define AKR_EXPORT_PLUGIN(_name, _p)                                                                                   \
     void _AkariPluginOnLoad(Plugin &);                                                                                 \
+    void _AkariGeneratedMeta(Plugin &);                                                                                \
     extern "C" AKR_EXPORT Plugin *akari_plugin_onload() {                                                              \
         static Plugin plugin;                                                                                          \
         static std::once_flag flag;                                                                                    \
@@ -72,6 +73,7 @@ namespace akari {
             plugin.name = #_name;                                                                                      \
             get_compiler_info(&plugin.compiler_info);                                                                  \
             get_build_info(&plugin.build_info);                                                                        \
+            _AkariGeneratedMeta(plugin);                                                                               \
             _AkariPluginOnLoad(plugin);                                                                                \
         });                                                                                                            \
         return &plugin;                                                                                                \

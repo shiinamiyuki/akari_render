@@ -29,6 +29,8 @@
 #include <json.hpp>
 
 #include <akari/core/simd.hpp>
+#include <akari/core/config.h>
+#include <akari/core/platform.h>
 
 namespace akari::math {
     using namespace glm;
