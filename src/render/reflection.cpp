@@ -62,7 +62,7 @@ namespace akari {
     }
     Spectrum FresnelSpecular::sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const {
         Float F = fr_dielectric(cos_theta(wo), etaA, etaB);
-        AKARI_ASSERT(F >= 0 && F <= 1);
+        AKR_ASSERT(F >= 0 && F <= 1);
         if (u[0] < F) {
             *wi = reflect(wo, vec3(0, 1, 0));
             *pdf = F;

@@ -23,11 +23,13 @@
 #ifndef AKARIRENDER_SCENE_H
 #define AKARIRENDER_SCENE_H
 
-#include "material.h"
+
 #include <akari/core/distribution.hpp>
 #include <akari/render/accelerator.h>
 #include <akari/render/geometry.hpp>
+#include "material.h"
 #include <atomic>
+#include <memory>
 namespace akari {
     class Mesh;
     class Material;
@@ -58,7 +60,7 @@ namespace akari {
             intersection->p = ray.o + intersection->t * ray.d;
             return true;
         }
-        bool Occlude(const Ray &ray) const {
+        bool occlude(const Ray &ray) const {
             rayCounter++;
             return accelerator->occlude(ray);
         }
@@ -74,7 +76,7 @@ namespace akari {
             return it->second;
         }
 
-        Bounds3f GetBounds() const { return accelerator->bounds(); }
+        Bounds3f bounds() const { return accelerator->bounds(); }
     };
 } // namespace akari
 #endif // AKARIRENDER_SCENE_H

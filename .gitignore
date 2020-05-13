@@ -5,3 +5,4 @@ build/
 data/
 scenes/
 **/generated
+out/

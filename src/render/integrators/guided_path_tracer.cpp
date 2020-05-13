@@ -517,7 +517,7 @@ namespace akari {
         GPTRenderTask(const RenderContext &ctx, int spp, int minDepth, int maxDepth, int trainingSamples, bool enableRR)
             : ctx(ctx), spp(spp), minDepth(minDepth), maxDepth(maxDepth), trainingSamples(trainingSamples),
               enableRR(enableRR) {
-            sTree.reset(new STree(ctx.scene->GetBounds()));
+            sTree.reset(new STree(ctx.scene->bounds()));
         }
         bool HasFilmUpdate() override { return false; }
         std::shared_ptr<const Film> GetFilmUpdate() override { return ctx.camera->GetFilm(); }

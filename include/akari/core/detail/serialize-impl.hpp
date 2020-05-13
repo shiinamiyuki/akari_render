@@ -23,8 +23,8 @@
 #ifndef AKARIRENDER_SERIALIZE_IMPL_HPP
 #define AKARIRENDER_SERIALIZE_IMPL_HPP
 
-#include <akari/core/reflect.hpp>
 #include <json.hpp>
+#include <akari/core/reflect.hpp>
 #include <magic_enum.hpp>
 #include <stdexcept>
 #include <type_traits>

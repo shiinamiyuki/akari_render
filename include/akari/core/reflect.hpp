@@ -27,6 +27,7 @@
 #include <memory>
 #include <unordered_map>
 #include <vector>
+#include <optional>
 //#include <list>
 
 #include <akari/core/akari.h>
@@ -254,7 +255,7 @@ namespace akari {
             }
         }
         template <typename U, typename T = std::remove_reference_t<U>> T &as() const {
-            //            AKARI_ASSERT(has_value());
+            //            AKR_ASSERT(has_value());
             using P = std::conditional_t<std::is_const_v<T>, const void *, void *>;
             if (kind == EVoid) {
                 throw std::runtime_error("Any is of void");
@@ -520,7 +521,8 @@ namespace akari {
         BEFORE(f(get_arg<nth_element_t<0, arg_list_t>>(arg[0]), get_arg<nth_element_t<1, arg_list_t>>(arg[1]))) AFTER  \
     } else if constexpr (nArgs == 3) {                                                                                 \
         BEFORE(f(get_arg<nth_element_t<0, arg_list_t>>(arg[0]), get_arg<nth_element_t<1, arg_list_t>>(arg[1]),         \
-                 get_arg<nth_element_t<2, arg_list_t>>(arg[2])));                                                      \
+                 get_arg<nth_element_t<2, arg_list_t>>(arg[2])))                                                       \
+        AFTER                                                                                                          \
     } else if constexpr (nArgs == 4) {                                                                                 \
         BEFORE(f(get_arg<nth_element_t<0, arg_list_t>>(arg[0]), get_arg<nth_element_t<1, arg_list_t>>(arg[1]),         \
                  get_arg<nth_element_t<2, arg_list_t>>(arg[2]), get_arg<nth_element_t<3, arg_list_t>>(arg[3])))        \

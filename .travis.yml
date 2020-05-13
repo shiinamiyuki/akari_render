@@ -10,7 +10,10 @@ addons:
   apt:
     sources:
     packages:
-    - gcc-8
-    - g++-8
+    - gcc-10
+    - g++-10
     - cmake
+before_install:
+  - sudo add-apt-repository ppa:nicola-onorata/gcc
+  - sudo apt-get update
 script: mkdir build && cd build && cmake ../ -DCMAKE_BUILD_TYPE=Release && make -r -j `nproc` && ./TestBSDF

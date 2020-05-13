@@ -204,7 +204,7 @@ namespace akari {
                         Float depthPdf = 0;
                         int depth = chain.depthDist->sample_discrete(rng.uniformFloat(), &depthPdf);
                         depth = std::min(maxDepth + 1, depth);
-                        AKARI_ASSERT(depthPdf > 0);
+                        AKR_ASSERT(depthPdf > 0);
                         auto &sampler = chain.samplers[depth];
                         auto record = Radiance(sampler, arenas[tid], false);
                         arenas[tid].reset();
@@ -270,7 +270,7 @@ namespace akari {
                 directSamples);
             auto setting = json::parse(pathTracerSetting);
             auto pathTracer = serialize::load_from_json<std::shared_ptr<Integrator>>(setting);
-            AKARI_ASSERT(pathTracer);
+            AKR_ASSERT(pathTracer);
             Info("Render direct samples\n");
             (void)pathTracer;
             auto task = pathTracer->create_render_task(ctx);

@@ -747,7 +747,7 @@ namespace akari {
     }
     template <size_t N> struct simd_tag_t { constexpr static size_t lanes = N; };
 
-    template <size_t N> static constexpr simd_tag_t<N> simd_tag;
+    template <size_t N> static constexpr simd_tag_t<N> simd_tag{};
 
     inline bool any(bool x) { return x; }
     inline bool all(bool x) { return x; }

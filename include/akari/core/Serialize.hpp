@@ -22,9 +22,11 @@
 
 #ifndef AKARIRENDER_SERIALIZE_HPP
 #define AKARIRENDER_SERIALIZE_HPP
+
+#include <json.hpp>
 #include <akari/core/akari.h>
 #include <akari/core/platform.h>
-#include <json.hpp>
+
 namespace akari::serialize {
         class InputArchive;
         class OutputArchive;

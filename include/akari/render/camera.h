@@ -48,16 +48,16 @@ namespace akari {
         [[nodiscard]] virtual std::shared_ptr<Film> GetFilm() const = 0;
 
         virtual Spectrum We(const Ray &ray, vec2 *pRaster) const {
-            AKARI_PANIC("Camera::We(const Ray &, vec2 &) is not implemented");
+            AKR_PANIC("Camera::We(const Ray &, vec2 &) is not implemented");
         }
         void pdf_emission(const Ray &ray, Float *pdfPos, Float *pdfDir) const override{
-            AKARI_PANIC("Camera::PdfWe(const Ray &ray, Float *pdfPos, Float *pdfDir) is not implemented");
+            AKR_PANIC("Camera::PdfWe(const Ray &ray, Float *pdfPos, Float *pdfDir) is not implemented");
         }
         Float pdf_incidence(const Interaction& ref, const vec3& wi) const override{
             return 0;
         }
         void sample_emission(const vec2& u1, const vec2& u2, RayEmissionSample* sample) const override{
-            AKARI_PANIC("void Camera::SampleEmission(const vec2& u1, const vec2& u2, RayEmissionSample* sample)  is not implemented");
+            AKR_PANIC("void Camera::SampleEmission(const vec2& u1, const vec2& u2, RayEmissionSample* sample)  is not implemented");
         }
 
     };

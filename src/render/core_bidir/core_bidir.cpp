@@ -65,7 +65,7 @@ namespace akari {
             auto &si = vertex.si;
             BSDFSample bsdfSample(sampler.next1d(), sampler.next2d(), si);
             si.bsdf->sample(bsdfSample);
-            AKARI_ASSERT(bsdfSample.pdf >= 0);
+            AKR_ASSERT(bsdfSample.pdf >= 0);
             if (bsdfSample.pdf == 0) {
                 break;
             }
@@ -176,10 +176,10 @@ namespace akari {
         if (ptMinus) {
             Float pdfRev;
             if (s > 0) {
-                AKARI_ASSERT(qs);
+                AKR_ASSERT(qs);
                 pdfRev = pt->Pdf(scene, qs, *ptMinus);
             } else {
-                AKARI_ASSERT(pt);
+                AKR_ASSERT(pt);
                 pdfRev = pt->PdfLight(scene, *ptMinus);
             }
             _a5 = {&ptMinus->pdfRev, pdfRev};
@@ -188,14 +188,14 @@ namespace akari {
         // now qs
         ScopedAssignment<float> _a6;
         if (qs) {
-            AKARI_ASSERT(pt);
+            AKR_ASSERT(pt);
             _a6 = {&qs->pdfRev, pt->Pdf(scene, ptMinus, *qs)};
         }
         //        printf("%f\n",sampled.pdfFwd);
         // now qsMinus
         ScopedAssignment<float> _a7;
         if (qsMinus) {
-            AKARI_ASSERT(pt);
+            AKR_ASSERT(pt);
             _a7 = {&qsMinus->pdfRev, qs->Pdf(scene, pt, *qsMinus)};
         }
         Float ri = 1;
@@ -226,15 +226,15 @@ namespace akari {
             auto &pt = eyePath[t - 1];
             L = pt.Le(scene, eyePath[t - 2]) * pt.beta;
         } else if (t == 1) {
-            AKARI_ASSERT(s >= 1);
+            AKR_ASSERT(s >= 1);
             auto &cameraVertex = eyePath[0];
             auto *camera = dynamic_cast<const Camera *>(cameraVertex.ei.ep);
-            AKARI_ASSERT(camera);
+            AKR_ASSERT(camera);
             auto &qs = lightPath[s - 1];
             if (qs.IsConnectible()) {
                 RayIncidentSample sample;
                 VisibilityTester tester;
-                AKARI_ASSERT(qs.getInteraction());
+                AKR_ASSERT(qs.getInteraction());
                 camera->sample_incidence(sampler.next2d(), *qs.getInteraction(), &sample, &tester);
                 *pRaster = sample.pos;
                 sampled =
@@ -254,12 +254,12 @@ namespace akari {
             auto &lightVertex = lightPath[0];
             auto &pt = eyePath[t - 1];
             if (pt.IsConnectible()) {
-                AKARI_ASSERT(t >= 1);
+                AKR_ASSERT(t >= 1);
                 auto *light = dynamic_cast<const Light *>(lightVertex.ei.ep);
                 RayIncidentSample sample;
                 VisibilityTester tester;
-                AKARI_ASSERT(light);
-                AKARI_ASSERT(pt.getInteraction());
+                AKR_ASSERT(light);
+                AKR_ASSERT(pt.getInteraction());
                 light->sample_incidence(sampler.next2d(), *pt.getInteraction(), &sample, &tester);
                 sampled = PathVertex::CreateLightVertex(sample.I / (scene.PdfLight(light) * sample.pdf), light,
                                                         tester.shadowRay.o, sample.normal);
@@ -289,7 +289,7 @@ namespace akari {
             return Spectrum(0);
         Float misWeight = 1.0f / (s + t);
         misWeight = mis_weight<1>(scene, sampler, eyePath, t, lightPath, s, sampled);
-        AKARI_ASSERT(misWeight >= 0);
+        AKR_ASSERT(misWeight >= 0);
         L *= misWeight;
         return L.remove_nans();
     }

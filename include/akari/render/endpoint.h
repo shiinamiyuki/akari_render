@@ -52,9 +52,9 @@ namespace akari {
             w /= dist;
             shadowRay = Ray(p1.p, w, Eps() / abs(dot(w, p1.Ng)), dist * (1.0 - ShadowEps()));
         }
-        [[nodiscard]] bool visible(const Scene &scene) const { return !scene.Occlude(shadowRay); }
+        [[nodiscard]] bool visible(const Scene &scene) const { return !scene.occlude(shadowRay); }
         [[nodiscard]] Spectrum Tr(const Scene &scene) const {
-            return scene.Occlude(shadowRay) ? Spectrum(0) : Spectrum(1);
+            return scene.occlude(shadowRay) ? Spectrum(0) : Spectrum(1);
         }
     };
 

@@ -125,7 +125,7 @@ namespace akari {
                 return si.bsdf->evaluate(si.wo, wi) * correct_shading_normal(Ng(), Ns(), wo(), wi, mode);
             }
             default:
-                AKARI_PANIC("not implemented Vertex::f()");
+                AKR_PANIC("not implemented Vertex::f()");
             }
         }
 
@@ -245,7 +245,7 @@ namespace akari {
             if (prev) {
                 wiPrev = normalize(prev->p() - p());
             } else {
-                AKARI_ASSERT(type == ECamera);
+                AKR_ASSERT(type == ECamera);
             }
             Float pdf = 0;
             if (type == ESurface) {
@@ -257,7 +257,7 @@ namespace akari {
                 Float _;
                 camera->pdf_emission(ei.spawn_dir(wiNext), &_, &pdf);
             } else {
-                AKARI_PANIC("???");
+                AKR_PANIC("???");
             }
             return pdf_SA_to_area(pdf, next);
         }

@@ -23,10 +23,11 @@
 #ifndef AKARIRENDER_MATH_H
 #define AKARIRENDER_MATH_H
 
+#include <json.hpp>
 #include <akari/core/config.h>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <json.hpp>
+
 
 #include <akari/core/simd.hpp>
 #include <akari/core/config.h>
