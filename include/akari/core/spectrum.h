@@ -118,11 +118,11 @@ namespace akari {
         [[nodiscard]] Self remove_nans() const {
             Self tmp;
             for (size_t i = 0; i < N; i++) {
-                auto x = (*this)[i];
-                if (std::isnan(x)) {
+                auto _x = (*this)[i];
+                if (std::isnan(_x)) {
                     tmp[i] = 0;
                 } else {
-                    tmp[i] = x;
+                    tmp[i] = _x;
                 }
             }
             return tmp;

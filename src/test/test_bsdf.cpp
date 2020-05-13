@@ -53,7 +53,9 @@ bool RunTestMicrofacet(const vec3 &wo, const MicrofacetModel* model, Sampler *sa
     size_t good = 0, bad = 0;
     for (size_t i = 0; i < N; i++) {
         vec3 wi;
+        (void)wi;
         BSDFType sampledType;
+        (void)sampledType;
         Float pdf = 0;
         auto wh = model->sample_wh(wo, sampler->next2d());(void)wh;
         pdf = model->evaluate_pdf(wh);

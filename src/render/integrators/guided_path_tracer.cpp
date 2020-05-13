@@ -260,7 +260,7 @@ namespace akari {
 
         void refine(const DTree &prev, Float threshold) {
             struct StackNode {
-                size_t node = -1, otherNode = -1;
+                size_t node = (size_t)-1, otherNode = (size_t)-1;
                 const DTree *tree = nullptr;
                 int depth;
             };

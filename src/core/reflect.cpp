@@ -27,12 +27,12 @@ namespace akari {
     detail::reflection_manager &detail::reflection_manager::instance() {
         static detail::reflection_manager mgr;
         mgr.name_not_found_callback = [](detail::reflection_manager &mgr, const char *name) -> meta_instance & {
-          printf("good?\n");
             if (get_plugin_manager()->load_plugin(name)) {
                 try {
 
                     return mgr.instances.at(mgr.name_map.at(name));
                 } catch (std::out_of_range &e) {
+                    (void)e;
                     throw std::runtime_error(
                         fmt::format("type named: `{}` not found after trying loading plugins", name));
                 }

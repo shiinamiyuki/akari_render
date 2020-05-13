@@ -20,11 +20,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <embree3/rtcore.h>
 #include <akari/core/plugin.h>
 #include <akari/render/accelerator.h>
 #include <akari/render/mesh.h>
 #include <akari/render/scene.h>
-#include <embree3/rtcore.h>
 
 namespace akari {
     class EmbreeAccelerator : public Accelerator {

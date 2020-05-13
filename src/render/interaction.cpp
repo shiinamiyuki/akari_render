@@ -41,12 +41,12 @@ namespace akari {
     void SurfaceInteraction::compute_scattering_functions(MemoryArena &arena, TransportMode mode, float scale) {
         materialSlot->material->compute_scattering_functions(this, arena, mode, scale);
     }
-    Spectrum SurfaceInteraction::Le(const vec3 &wo) {
+    Spectrum SurfaceInteraction::Le(const vec3 &w) {
         if (!materialSlot) {
             return Spectrum(0);
         }
         auto &emission = materialSlot->emission;
-        if (dot(wo, Ng) > 0 && emission.color && emission.strength) {
+        if (dot(w, Ng) > 0 && emission.color && emission.strength) {
             return emission.color->evaluate(sp) * emission.strength->evaluate(sp);
         }
         return Spectrum(0);

@@ -22,6 +22,7 @@
 
 #ifndef AKARIRENDER_EDITORFUNCTIONS_HPP
 #define AKARIRENDER_EDITORFUNCTIONS_HPP
+#include <akari/core/akari.h>
 #include <akari/core/math.h>
 #include <akari/core/spectrum.h>
 #include <imgui.h>

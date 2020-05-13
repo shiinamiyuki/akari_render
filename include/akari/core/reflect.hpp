@@ -227,6 +227,14 @@ namespace akari {
             if (kind == EVoid) {
                 return std::is_same_v<T, void>;
             }
+            if constexpr (detail::is_shared_ptr_v<T>) {
+                if(is_shared_pointer()){
+                    std::shared_ptr<void> p = _ptr->get_shared().value();
+                    if (auto opt = any_shared_pointer_cast(type_of<T>(), _ptr->get_underlying_type().value(), p)) {
+                        return true;
+                    }
+                }
+            }
             return type == type_of<T>();
         }
 

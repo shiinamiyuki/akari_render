@@ -47,30 +47,27 @@ namespace akari::Gui {
             ImGuiIdGuard _(&value);
             return Gui::Edit(label, value);
         }
-        template <> inline bool Edit(EditorState &state, const char *label, std::shared_ptr<Material> &value) {
-            bool ret = false;
-            ImGuiIdGuard _(value.get());
-            if (ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_DefaultOpen)) {
-                debug("type {}\n", type_of(*value).name.data());
-                auto props = Type::get_by_typeid(*value).get_properties();
+        inline bool display_props(EditorState &state,const char * label, const std::shared_ptr<Component>& comp){
+             bool ret = false;
+             if (ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_DefaultOpen)) {
+                auto props = Type::get_by_typeid(*comp).get_properties();
                 for (auto &prop : props) {
-                    debug("prop {}\n", prop.name());
-                    ret = ret | EditItem(state, prop.name(), prop.get(make_any_ref(*value)));
+                    ret = ret | EditItem(state, prop.name(), prop.get(make_any_ref(*comp)));
                 }
                 ImGui::TreePop();
             }
             return ret;
         }
+        template <> inline bool Edit(EditorState &state, const char *label, std::shared_ptr<Material> &value) {
+            bool ret = false;
+            ImGuiIdGuard _(value.get());
+            ret = display_props(state, label, value);
+            return ret;
+        }
         template <> inline bool Edit(EditorState &state, const char *label, std::shared_ptr<Texture> &value) {
             bool ret = false;
             ImGuiIdGuard _(value.get());
-            if (ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_DefaultOpen)) {
-                auto props = Type::get_by_typeid(*value).get_properties();
-                for (auto &prop : props) {
-                    ret = ret | EditItem(state, prop.name(), prop.get(value));
-                }
-                ImGui::TreePop();
-            }
+            ret = display_props(state, label, value);
             return ret;
         }
         template <> inline bool Edit(EditorState &state, const char *label, std::shared_ptr<Mesh> &value) {
@@ -272,7 +269,7 @@ namespace akari::Gui {
         }
         void ShowEditor() {
             ImGuiIO &io = ImGui::GetIO();
-
+            (void)io;
             DockSpace([=]() {
                 ShowMenu();
                 ShowSceneGraph();

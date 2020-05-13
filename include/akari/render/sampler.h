@@ -33,7 +33,7 @@ namespace akari {
         static uint64_t const multiplier = 6364136223846793005u;
         static uint64_t const increment = 1442695040888963407u;
 
-        static uint32_t rotr32(uint32_t x, unsigned r) { return x >> r | x << (-r & 31u); }
+        static uint32_t rotr32(uint32_t x, unsigned r) { return x >> r | x << ((uint32_t)-r & 31u); }
 
         uint32_t pcg32() {
             uint64_t x = state;
