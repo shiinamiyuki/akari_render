@@ -133,14 +133,14 @@ namespace akari {
                 auto beginTime = std::chrono::high_resolution_clock::now();
                 auto &scene = ctx.scene;
                 auto &camera = ctx.camera;
-                auto &_sampler = ctx.sampler;
+                // auto &_sampler = ctx.sampler;
                 auto film = camera->GetFilm();
                 scene->ClearRayCounter();
                 Info("Start bootstrapping\n");
                 std::random_device rd;
                 std::uniform_int_distribution<uint64_t> dist;
                 std::uniform_real_distribution<float> distF;
-                size_t nBootstrapSamples = nBootstrap * (maxDepth + 1);
+                // size_t nBootstrapSamples = nBootstrap * (maxDepth + 1);
                 auto nCores = (int)GetConfig()->NumCore;
                 std::vector<MemoryArena> arenas(nCores);
                 std::vector<MarkovChain> markovChains(nChains);

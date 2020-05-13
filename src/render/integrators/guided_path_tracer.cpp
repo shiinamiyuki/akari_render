@@ -723,7 +723,7 @@ namespace akari {
             uint32_t accumulatedSamples = 0;
             for (pass = 0; accumulatedSamples < (uint32_t)trainingSamples; pass++) {
                 size_t samples;
-                samples = 1u << pass; // 2 * std::pow(1.1, pass);//1ull << pass;
+                samples = 1ull << pass; // 2 * std::pow(1.1, pass);//1ull << pass;
                 auto nextPassSamples = 2u << pass;
                 if (accumulatedSamples + samples + nextPassSamples > (uint32_t)trainingSamples) {
                     samples = (uint32_t)trainingSamples - accumulatedSamples;

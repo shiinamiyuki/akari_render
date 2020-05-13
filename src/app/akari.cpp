@@ -20,11 +20,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#pragma warning(disable : 4819)
+#include <cxxopts.hpp>
+#include <fstream>
 #include <akari/core/application.h>
 #include <akari/core/logger.h>
 #include <akari/render/scene_graph.h>
-#include <cxxopts.hpp>
-#include <fstream>
+
 using namespace akari;
 
 static std::string inputFilename;

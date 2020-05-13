@@ -53,8 +53,15 @@ namespace akari::Gui {
 
     template <> inline bool Edit(const char *label, Spectrum &value) {
         //        ImGui::PushID(&value);
-        int flags = 0;
-        bool ret = ImGui::ColorPicker3(label, reinterpret_cast<float *>(&value), flags);
+        ImGui::SameLine();
+        int flags =  ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_HDR;
+        bool ret = false;
+        // if (ImGui::Button("Edit.."))
+            // ImGui::OpenPopup("Pick##random_id@@@");
+        // if(ImGui::BeginPopup("Pick##random_id@@@")){
+            ret = ret | ImGui::ColorEdit3(label, reinterpret_cast<float *>(&value), flags);
+            // ImGui::EndPopup();
+        // }
         //        ImGui::PopID();
         return ret;
     }

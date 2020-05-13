@@ -49,6 +49,7 @@ namespace akari {
 
             std::string _file = file.string();
             bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err, _file.c_str());
+            (void)ret;
             std::vector<Vertex> vertices;
             std::vector<int> indices;
             std::unordered_map<std::string, int> name_to_group;
