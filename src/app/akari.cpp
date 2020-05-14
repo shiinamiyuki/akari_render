@@ -66,7 +66,7 @@ int main(int argc, char **argv) {
         inputFilename = fs::path(inputFilename).filename().string();
         std::shared_ptr<SceneGraph> graph;
         {
-            Info("Loading {}\n", inputFilename);
+            info("Loading {}\n", inputFilename);
             std::ifstream in(inputFilename);
             std::string str((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
             json data = str.empty() ? json::object() : json::parse(str);
@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
             graph = std::make_shared<SceneGraph>(serialize::load_from_json<SceneGraph>(data));
         }
         graph->commit();
-        Info("Start Rendering ...\n");
+        info("Start Rendering ...\n");
         for (size_t i = 0; i < graph->render.size(); i++) {
             auto task = graph->create_render_task(i);
             task->Start();

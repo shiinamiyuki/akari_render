@@ -43,8 +43,8 @@ bool RunTestBSDF_SamplePdf(const vec3 &wo, const BSDFComponent *bsdf, Sampler *s
     }
     double expected = Pi * 2;
     auto actual = sum / good;
-    Info("good: {}, bad: {}\n", good, bad);
-    Info("integral = {}, abs_diff = {}, rel_diff = {}\n", actual, abs(expected - actual),
+    info("good: {}, bad: {}\n", good, bad);
+    info("integral = {}, abs_diff = {}, rel_diff = {}\n", actual, abs(expected - actual),
          abs((expected - actual) / actual));
     return true;
 }
@@ -68,8 +68,8 @@ bool RunTestMicrofacet(const vec3 &wo, const MicrofacetModel* model, Sampler *sa
     }
     double expected = Pi * 2;
     auto actual = sum / good;
-    Info("good: {}, bad: {}\n", good, bad);
-    Info("integral = {}, abs_diff = {}, rel_diff = {}\n", actual, abs(expected - actual),
+    info("good: {}, bad: {}\n", good, bad);
+    info("integral = {}, abs_diff = {}, rel_diff = {}\n", actual, abs(expected - actual),
          abs((expected - actual) / actual));
     return true;
 }
@@ -77,14 +77,14 @@ int main() {
     Application app;
     try {
         vec3 wo = normalize(vec3(0, 1, 0));
-        Info("Test BSDFComponent::Sample()\n");
+        info("Test BSDFComponent::Sample()\n");
         {
-            auto sampler = Cast<Sampler>(create_component("RandomSampler"));
+            auto sampler = dyn_cast<Sampler>(create_component("RandomSampler"));
             LambertianReflection bsdf(Spectrum(1));
             RunTestBSDF_SamplePdf(wo, &bsdf, sampler.get());
         }
         {
-            auto sampler = Cast<Sampler>(create_component("RandomSampler"));
+            auto sampler = dyn_cast<Sampler>(create_component("RandomSampler"));
             FresnelDielectric fresnel(1.0, 1.3);
             MicrofacetModel model(MicrofacetType::EGGX, 0.3);
             RunTestMicrofacet(wo,&model, sampler.get());

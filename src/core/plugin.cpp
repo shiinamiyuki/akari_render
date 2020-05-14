@@ -68,7 +68,7 @@ namespace akari {
       public:
         void set_plugin_path(const char *path) override { prefix = path; }
         bool load_path(const char *path) override {
-            Info("Loading {}\n", path);
+            info("Loading {}\n", path);
             auto lib = std::make_unique<SharedLibraryLoader>(path);
             if (!lib) {
                 error("Cannot load {}\n", path);

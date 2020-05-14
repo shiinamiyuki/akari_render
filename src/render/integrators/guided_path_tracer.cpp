@@ -112,7 +112,7 @@ namespace akari {
             AKARI_CHECK(!std::isnan(s));
             auto factor = s <= 0.0f ? 0.25f : _sum[idx].value() / s;
             if (factor < 0) {
-                Info("{} {} {}\n", factor, _sum[idx].value(), s);
+                info("{} {} {}\n", factor, _sum[idx].value(), s);
             }
             AKARI_CHECK(factor >= 0);
             if (child(idx, nodes)) {
@@ -729,7 +729,7 @@ namespace akari {
                     samples = (uint32_t)trainingSamples - accumulatedSamples;
                 }
 
-                Info("Learning pass {}, spp:{}\n", pass + 1, samples);
+                info("Learning pass {}, spp:{}\n", pass + 1, samples);
                 accumulatedSamples += samples;
                 parallel_for_2d(nTiles, [=](ivec2 tilePos, uint32_t tid) {
                     (void) tid;
@@ -752,8 +752,8 @@ namespace akari {
                         }
                     }
                 });
-                Info("Refining SDTree; pass: {}\n", pass + 1);
-                Info("nodes: {}\n", sTree->nodes.size());
+                info("Refining SDTree; pass: {}\n", pass + 1);
+                info("nodes: {}\n", sTree->nodes.size());
                 sTree->refine(12000 * std::sqrt(samples));
             }
         }
@@ -800,7 +800,7 @@ namespace akari {
                 });
                 auto endTime = std::chrono::high_resolution_clock::now();
                 std::chrono::duration<double> elapsed = (endTime - beginTime);
-                Info("Rendering done in {} secs, traced {} rays, {} M rays/sec\n", elapsed.count(),
+                info("Rendering done in {} secs, traced {} rays, {} M rays/sec\n", elapsed.count(),
                      scene->GetRayCounter(), scene->GetRayCounter() / elapsed.count() / 1e6);
             });
         }

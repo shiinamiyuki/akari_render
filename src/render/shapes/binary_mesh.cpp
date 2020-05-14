@@ -63,7 +63,7 @@ namespace akari {
     int BinaryMesh::get_primitive_group(int idx) const { return groups[idx]; }
     const char *AKR_MESH_MAGIC = "AKARI_BINARY_MESH";
     bool BinaryMesh::load_path(const char *path) {
-        Info("Loading {}\n", path);
+        info("Loading {}\n", path);
         std::ifstream in(path, std::ios::binary | std::ios::in);
         char buffer[128] = {0};
         in.read(buffer, strlen(AKR_MESH_MAGIC));
@@ -88,7 +88,7 @@ namespace akari {
             return false;
         }
         _loaded = true;
-        Info("Loaded {} triangles\n", groups.size());
+        info("Loaded {} triangles\n", groups.size());
         return true;
     }
     void BinaryMesh::save_path(const char *path) {
@@ -115,7 +115,7 @@ namespace akari {
                 continue;
             }
             if (!mat.emission.color || !mat.emission.strength) {
-                Info("Mesh [{}] prim: [{}] of group: [{}] marked as light but don't have texture\n");
+                info("Mesh [{}] prim: [{}] of group: [{}] marked as light but don't have texture\n");
                 continue;
             }
             lights.emplace_back(CreateAreaLight(*this, id));

@@ -29,13 +29,13 @@ namespace akari {
         auto &sampler = setting.sampler;
         auto &integrator = setting.integrator;
         if (!sampler) {
-            sampler = Cast<Sampler>(create_component("RandomSampler"));
+            sampler = dyn_cast<Sampler>(create_component("RandomSampler"));
         }
         if (!camera) {
-            camera = Cast<Camera>(create_component("PerspectiveCamera"));
+            camera = dyn_cast<Camera>(create_component("PerspectiveCamera"));
         }
         if (!integrator) {
-            integrator = Cast<Integrator>(create_component("PathTracer"));
+            integrator = dyn_cast<Integrator>(create_component("PathTracer"));
         }
         camera->commit();
         sampler->commit();
@@ -46,21 +46,21 @@ namespace akari {
         pScene = std::make_shared<Scene>();
         for (auto &mesh : scene.meshes) {
             mesh.mesh->commit();
-            pScene->AddMesh(mesh.mesh);
+            pScene->add_mesh(mesh.mesh);
         }
         for(auto & light : scene.lights){
-            pScene->AddLight(light);
+            pScene->add_light(light);
         }
         if (!scene.accelerator) {
 #ifdef AKR_USE_EMBREE
-            scene.accelerator = Cast<Accelerator>(create_component("EmbreeAccelerator"));
+            scene.accelerator = dyn_cast<Accelerator>(create_component("EmbreeAccelerator"));
 #else
-            scene.accelerator = Cast<Accelerator>(create_component("BVHAccelerator"));
+            scene.accelerator = dyn_cast<Accelerator>(create_component("BVHAccelerator"));
 #endif
         }
-        pScene->SetAccelerator(scene.accelerator);
-        Info("Building Accelerator\n");
-        pScene->Commit();
+        pScene->set_accelerator(scene.accelerator);
+        info("Building Accelerator\n");
+        pScene->commit();
     }
     std::shared_ptr<RenderTask> SceneGraph::create_render_task(int settingId) {
         commit_settings(render.at(settingId));

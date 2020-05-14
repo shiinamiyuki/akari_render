@@ -26,7 +26,7 @@
 #include <akari/render/mesh.h>
 #include <akari/render/scene.h>
 namespace akari {
-    void Scene::Commit() {
+    void Scene::commit() {
         accelerator->build(*this);
 
         for (auto &mesh : meshes) {
@@ -35,7 +35,7 @@ namespace akari {
                 lights.emplace_back(light);
         }
 
-        Info("Building distribution for {} lights\n", lights.size());
+        info("Building distribution for {} lights\n", lights.size());
         {
             std::vector<Float> func;
             for (auto &light : lights) {

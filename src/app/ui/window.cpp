@@ -336,17 +336,17 @@ namespace akari::Gui {
             if (ImGui::BeginMenuBar()) {
                 if (ImGui::BeginMenu("File")) {
                     if (ImGui::MenuItem("Open")) {
-                        Info("open\n");
+                        info("open\n");
                         auto path = GetOpenFilePath();
                         if (!path.empty()) {
-                            Info("Open {}\n", path.string());
+                            info("Open {}\n", path.string());
                             auto _tmp = sceneGraph;
                             std::thread th([=]() {
                                 fs::current_path(fs::absolute(path).parent_path());
                                 currentScenePath = fs::absolute(fs::current_path());
                                 auto npath = path.filename();
                                 try {
-                                    Info("Loading {}\n", path.string());
+                                    info("Loading {}\n", path.string());
                                     std::ifstream in(npath);
                                     std::string str((std::istreambuf_iterator<char>(in)),
                                                     std::istreambuf_iterator<char>());

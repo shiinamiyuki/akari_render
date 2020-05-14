@@ -136,7 +136,7 @@ namespace akari {
                 // auto &_sampler = ctx.sampler;
                 auto film = camera->GetFilm();
                 scene->ClearRayCounter();
-                Info("Start bootstrapping\n");
+                info("Start bootstrapping\n");
                 std::random_device rd;
                 std::uniform_int_distribution<uint64_t> dist;
                 std::uniform_real_distribution<float> distF;
@@ -175,7 +175,7 @@ namespace akari {
                 }
                 auto depthDist = std::make_shared<Distribution1D>(depthWeight.data(), depthWeight.size());
                 Float avgLuminance = std::accumulate(depthWeight.begin(), depthWeight.end(), 0.0f);
-                Info("Average luminance: {}\n", avgLuminance);
+                info("Average luminance: {}\n", avgLuminance);
                 if (avgLuminance == 0.0f) {
                     error("Average luminance is ZERO; Improper scene setup?\n");
                     error("Aborting...\n");
@@ -190,7 +190,7 @@ namespace akari {
                         arenas[tid].reset();
                     }
                 });
-                Info("Running {} Markov Chains\n", nChains);
+                info("Running {} Markov Chains\n", nChains);
                 // done bootstrapping
                 auto dim = film->Dimension();
                 int64_t nTotalMutations = spp * dim.x * dim.y;
@@ -241,7 +241,7 @@ namespace akari {
                 }
                 auto endTime = std::chrono::high_resolution_clock::now();
                 std::chrono::duration<double> elapsed = (endTime - beginTime);
-                Info("Rendering done in {} secs, traced {} rays, {} M rays/sec\n", elapsed.count(),
+                info("Rendering done in {} secs, traced {} rays, {} M rays/sec\n", elapsed.count(),
                      scene->GetRayCounter(), scene->GetRayCounter() / elapsed.count() / 1e6);
             });
         }
@@ -271,7 +271,7 @@ namespace akari {
             auto setting = json::parse(pathTracerSetting);
             auto pathTracer = serialize::load_from_json<std::shared_ptr<Integrator>>(setting);
             AKR_ASSERT(pathTracer);
-            Info("Render direct samples\n");
+            info("Render direct samples\n");
             (void)pathTracer;
             auto task = pathTracer->create_render_task(ctx);
             task->Start();

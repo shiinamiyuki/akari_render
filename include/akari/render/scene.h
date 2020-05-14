@@ -45,11 +45,11 @@ namespace akari {
         std::unordered_map<const Light *, Float> lightPdfMap;
 
       public:
-        void AddLight(const std::shared_ptr<Light>& light){lights.emplace_back(light);}
-        void AddMesh(const std::shared_ptr<const Mesh> &mesh) { meshes.emplace_back(mesh); }
+        void add_light(const std::shared_ptr<Light>& light){lights.emplace_back(light);}
+        void add_mesh(const std::shared_ptr<const Mesh> &mesh) { meshes.emplace_back(mesh); }
         [[nodiscard]] const std::vector<std::shared_ptr<const Mesh>> &GetMeshes() const { return meshes; }
-        void SetAccelerator(std::shared_ptr<Accelerator> p) { accelerator = std::move(p); }
-        void Commit();
+        void set_accelerator(std::shared_ptr<Accelerator> p) { accelerator = std::move(p); }
+        void commit();
         void ClearRayCounter() const { rayCounter = 0; }
         size_t GetRayCounter() const { return rayCounter.load(); }
         bool intersect(const Ray &ray, Intersection *intersection) const {

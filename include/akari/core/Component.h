@@ -47,7 +47,7 @@ namespace akari {
         template <typename Archive> void save(Archive &ar) {}
         template <typename Archive> void load(Archive &ar) {}
     };
-    template <typename T, typename U> std::shared_ptr<T> Cast(const std::shared_ptr<U> &p) {
+    template <typename T, typename U> std::shared_ptr<T> dyn_cast(const std::shared_ptr<U> &p) {
         return std::dynamic_pointer_cast<T>(p);
     }
 

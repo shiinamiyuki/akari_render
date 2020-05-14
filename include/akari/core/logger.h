@@ -60,7 +60,7 @@ namespace akari {
         logger->Error(fmt::format(fmt, std::forward<Args>(args)...));
     }
 
-    template <typename... Args> void Info(const char *fmt, Args &&... args) {
+    template <typename... Args> void info(const char *fmt, Args &&... args) {
         auto logger = GetDefaultLogger();
         logger->Info(fmt::format(fmt, std::forward<Args>(args)...));
     }

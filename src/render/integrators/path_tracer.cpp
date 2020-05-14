@@ -198,7 +198,7 @@ namespace akari {
                 });
                 auto endTime = std::chrono::high_resolution_clock::now();
                 std::chrono::duration<double> elapsed = (endTime - beginTime);
-                Info("Rendering done in {} secs, traced {} rays, {} M rays/sec\n", elapsed.count(),
+                info("Rendering done in {} secs, traced {} rays, {} M rays/sec\n", elapsed.count(),
                      scene->GetRayCounter(), scene->GetRayCounter() / elapsed.count() / 1e6);
             });
         }
