@@ -3,6 +3,7 @@ build/
 .vscode/
 .idea/
 data/
+old_data
 scenes/
 **/generated
 out/

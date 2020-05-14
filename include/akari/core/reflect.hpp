@@ -146,20 +146,27 @@ namespace akari {
                 }
                 return Any();
             }
+            Actual & get_actual()const {
+                if constexpr (detail::is_reference_wrapper_v<T>) {
+                    auto &tmp = const_cast<Actual &>(static_cast<detail::get_internal_t<T> &>(value));
+                    return tmp;
+                } else {
+                    return const_cast<Actual &>(value);
+                }
+            }
             [[nodiscard]] inline std::optional<TypeInfo> get_underlying_type() override {
                 if constexpr (detail::is_shared_ptr_v<Actual> || std::is_pointer_v<Actual>) {
-                    return type_of<detail::get_internal_t<Actual>>();
+                    if(get_actual() != nullptr)
+                        return type_of(*get_actual());
+                    else{
+                        return type_of<detail::get_internal_t<Actual>>();
+                    }
                 }
                 return {};
             }
             [[nodiscard]] std::optional<std::shared_ptr<void>> get_shared() const override {
                 if constexpr (detail::is_shared_ptr_v<Actual>) {
-                    if constexpr (detail::is_reference_wrapper_v<T>) {
-                        auto &tmp = const_cast<Actual &>(static_cast<detail::get_internal_t<T> &>(value));
-                        return tmp;
-                    } else {
-                        return value;
-                    }
+                    return get_actual();
                 } else {
                     return {};
                 }

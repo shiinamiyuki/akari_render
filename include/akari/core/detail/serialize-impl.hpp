@@ -141,7 +141,8 @@ namespace akari::serialize {
                 f(std::forward<Args>(args)...);
             } catch (SerializationError &e) {
                 throw e;
-            } catch (std::exception &e) {
+            } 
+            catch (std::exception &e) {
                 std::string msg;
                 for (auto &i : locator) {
                     msg.append(i);
@@ -214,7 +215,11 @@ namespace akari::serialize {
                     return;
                 auto it = ptrs.find(raw);
                 if (it == ptrs.end()) {
-                    _top() = json{{"type", mgr.inv_name_map.at(any.get_underlying_type().name)}};
+                    auto it1 = mgr.inv_name_map.find(any.get_underlying_type().name);
+                    if(it1 == mgr.inv_name_map.end()){
+                        throw std::runtime_error("unable to find type name");
+                    }
+                    _top() = json{{"type", it1->second}};
                     _top()["props"] = json();
                     _makeNode(_top()["props"]);
                     Type type = any.get_underlying_type();

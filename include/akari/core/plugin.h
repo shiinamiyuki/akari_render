@@ -62,10 +62,11 @@ namespace akari {
         virtual bool load_path(const char *path) = 0;
         virtual bool load_plugin(const char *name) = 0;
     };
-
-#define AKR_EXPORT_PLUGIN(_p)                                                                                   \
-    void akari::_AkariPluginOnLoad(Plugin &);                                                                                 \
-    void akari::_AkariGeneratedMeta(Plugin &);                                                                                \
+#define _AKR_MEVAL(x)   #x
+#define AKR_STRINGFY(x) _AKR_MEVAL(x)
+#define AKR_EXPORT_PLUGIN(_p)                                                                                          \
+    void akari::_AkariPluginOnLoad(Plugin &);                                                                          \
+    void akari::_AkariGeneratedMeta(Plugin &);                                                                         \
     extern "C" AKR_EXPORT Plugin *akari_plugin_onload() {                                                              \
         static Plugin plugin;                                                                                          \
         static std::once_flag flag;                                                                                    \
@@ -73,11 +74,12 @@ namespace akari {
             plugin.name = __AKR_PLUGIN_NAME__;                                                                         \
             get_compiler_info(&plugin.compiler_info);                                                                  \
             get_build_info(&plugin.build_info);                                                                        \
-            akari::_AkariGeneratedMeta(plugin);                                                                               \
-            akari::_AkariPluginOnLoad(plugin);                                                                                \
+            akari::_AkariGeneratedMeta(plugin);                                                                        \
+            akari::_AkariPluginOnLoad(plugin);                                                                         \
         });                                                                                                            \
         return &plugin;                                                                                                \
     }                                                                                                                  \
+    static Plugin *__static_init = akari_plugin_onload();                                                              \
     void _AkariPluginOnLoad(Plugin &_p)
 
     AKR_EXPORT PluginManager *get_plugin_manager();
@@ -87,8 +89,8 @@ namespace akari {
         compiler_info->name = "g++";
         compiler_info->version = __VERSION__;
 #else
-        compiler_info->name = "unknown";
-        compiler_info->version = "unknown";
+        compiler_info->name = "MSVC";
+        compiler_info->version = AKR_STRINGFY(_MSC_VER);
 #endif
     }
     static inline void get_build_info(BuildInfo *build_info) {

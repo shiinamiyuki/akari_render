@@ -26,6 +26,7 @@
 #include <akari/plugins/rgbtexture.h>
 #include <akari/render/scene_graph.h>
 #include <memory>
+#include <iostream>
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
@@ -153,6 +154,6 @@ int main(int argc, char **argv) {
     auto data = serialize::save_to_json(mesh);
     std::ofstream o(out);
     o << data.dump(1) << std::endl;
-
+    std::cout << "convert done\n";
     return 0;
 }

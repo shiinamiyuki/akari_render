@@ -52,7 +52,7 @@ namespace akari {
             pScene->AddLight(light);
         }
         if (!scene.accelerator) {
-#ifdef AKARI_USE_EMBREE
+#ifdef AKR_USE_EMBREE
             scene.accelerator = Cast<Accelerator>(create_component("EmbreeAccelerator"));
 #else
             scene.accelerator = Cast<Accelerator>(create_component("BVHAccelerator"));
