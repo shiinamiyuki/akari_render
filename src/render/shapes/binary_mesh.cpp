@@ -72,12 +72,14 @@ namespace akari {
             return false;
         }
         size_t vertexCount;
+        size_t triangleCount;
         in.read(reinterpret_cast<char *>(&vertexCount), sizeof(size_t));
+        in.read(reinterpret_cast<char *>(&triangleCount), sizeof(size_t));
         vertexBuffer.resize(vertexCount);
         in.read(reinterpret_cast<char *>(vertexBuffer.data()), sizeof(Vertex) * vertexCount);
-        indexBuffer.resize(vertexCount);
+        indexBuffer.resize(triangleCount * 3);
         in.read(reinterpret_cast<char *>(indexBuffer.data()), sizeof(int) * vertexCount);
-        groups.resize(vertexCount / 3);
+        groups.resize(triangleCount);
         in.read(reinterpret_cast<char *>(groups.data()), sizeof(int) * groups.size());
         memset(buffer, 0, sizeof(buffer));
         in.read(buffer, strlen(AKR_MESH_MAGIC));
@@ -93,10 +95,12 @@ namespace akari {
         std::ofstream out(path, std::ios::binary | std::ios::out);
         out.write(AKR_MESH_MAGIC, strlen(AKR_MESH_MAGIC));
         size_t vertexCount = vertexBuffer.size();
+        size_t triangleCount = groups.size();
         out.write(reinterpret_cast<char *>(&vertexCount), sizeof(size_t));
+        out.write(reinterpret_cast<char *>(&triangleCount), sizeof(size_t));
         out.write(reinterpret_cast<char *>(vertexBuffer.data()), sizeof(Vertex) * vertexCount);
-        out.write(reinterpret_cast<char *>(indexBuffer.data()), sizeof(int) * vertexCount);
-        out.write(reinterpret_cast<char *>(groups.data()), sizeof(int) * groups.size());
+        out.write(reinterpret_cast<char *>(indexBuffer.data()), sizeof(int) * triangleCount * 3);
+        out.write(reinterpret_cast<char *>(groups.data()), sizeof(int) * triangleCount);
         out.write(AKR_MESH_MAGIC, strlen(AKR_MESH_MAGIC));
     }
     void BinaryMesh::commit() {
