@@ -24,6 +24,8 @@
 #include <akari/core/parallel.h>
 #include <akari/core/plugin.h>
 #include <akari/plugins/image_texture.h>
+#include <akari/core/resource.h>
+#include <akari/core/logger.h>
 namespace akari {
     class ImageTexture : public Texture {
         std::shared_ptr<RGBAImage> image;
@@ -35,8 +37,12 @@ namespace akari {
         ImageTexture(const fs::path &path) : path(path) {}
         AKR_IMPLS(Texture)
         void commit() override {
-            auto loader = image_loader();
-            auto tmp = loader->Load(path);
+            auto exp = resource_manager()->load_path<ImageResource>(path);
+            if(!exp.has_value()){
+                error("cannot load {}: {}", path.string(),exp.error().what());
+                return;
+            }
+            auto tmp = (*exp)->image();
             if (tmp != image) {
                 image = tmp;
                 AtomicFloat sum(0);

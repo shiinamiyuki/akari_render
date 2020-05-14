@@ -23,11 +23,12 @@
 #ifndef AKARIRENDER_IMAGE_HPP
 #define AKARIRENDER_IMAGE_HPP
 
+#include <list>
+#include <vector>
 #include <akari/core/akari.h>
 #include <akari/core/component.h>
 #include <akari/core/math.h>
-#include <list>
-#include <vector>
+
 namespace akari {
     template <class T> class TImage {
         std::vector<T> _texels;
@@ -134,12 +135,8 @@ namespace akari {
 
     AKR_EXPORT std::shared_ptr<ImageWriter> default_image_writer();
     AKR_EXPORT std::shared_ptr<ImageReader> default_image_reader();
-    class AKR_EXPORT ImageLoader {
-      public:
-        virtual std::shared_ptr<RGBAImage> Load(const fs::path &) = 0;
-        virtual ~ImageLoader() = default;
-    };
-    AKR_EXPORT std::shared_ptr<ImageLoader> image_loader();
+
+
 } // namespace akari
 
 #endif // AKARIRENDER_IMAGE_HPP

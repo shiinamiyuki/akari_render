@@ -100,30 +100,4 @@ namespace akari {
     };
 
     std::shared_ptr<ImageReader> default_image_reader() { return std::make_shared<DefaultImageReader>(); }
-    class ImageLoaderImpl : public ImageLoader {
-        struct Record {
-            std::shared_ptr<RGBAImage> image;
-            //            std::filesystem::file_time_type lwt;
-        };
-        std::unordered_map<std::string, Record> dict;
-        std::shared_ptr<ImageReader> reader = default_image_reader();
-
-      public:
-        std::shared_ptr<RGBAImage> Load(const fs::path &path) override {
-            auto f = fs::absolute(path).string();
-            auto it = dict.find(f);
-            if (it != dict.end()) {
-                return it->second.image;
-            }
-            dict[f] = Record{reader->read(path)};
-            return dict.at(f).image;
-        }
-    };
-
-    std::shared_ptr<ImageLoader> image_loader() {
-        static std::shared_ptr<ImageLoader> loader;
-        static std::once_flag flag;
-        std::call_once(flag, [&]() { loader = std::make_shared<ImageLoaderImpl>(); });
-        return loader;
-    }
 } // namespace akari
