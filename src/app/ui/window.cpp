@@ -21,9 +21,11 @@
 // SOFTWARE.
 #include "window_context.h"
 
+#include <map>
 #include "editor_functions.hpp"
 #include <akari/core/logger.h>
 #include <akari/render/scene_graph.h>
+
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
@@ -58,16 +60,67 @@ namespace akari::Gui {
             }
             return ret;
         }
+        template<typename T>
+        bool choose_implementation(const char * label, std::shared_ptr<T> &value){
+            Type type(type_of<T>());
+            ImGuiIdGuard _(label);
+            std::map<std::string_view, Type> derives;
+            type.foreach_derived([&](const Type & derived){
+                // derives[derived.pretty_name()] = derived;
+                derives.emplace(derived.pretty_name(), derived);
+            });
+            std::string_view current_select = "None";
+            bool changed = false;
+            if(value){
+                current_select = Type(type_of(*value)).pretty_name();
+            }
+            if (ImGui::BeginCombo(label, current_select.data())) 
+            {
+                // for (int n = 0; n < IM_ARRAYSIZE(items); n++)
+                // {
+                //     bool is_selected = (item_current == items[n]);
+                //     if (ImGui::Selectable(items[n], is_selected))
+                //         item_current = items[n];
+                //     if (is_selected)
+                //         ImGui::SetItemDefaultFocus(); 
+                // }
+                for(auto & item : derives){
+                    bool is_selected;
+                    if(value == nullptr){ 
+                        is_selected = false;
+                    }else{
+                        is_selected = item.first == current_select;
+                    }
+                    if (ImGui::Selectable(item.first.data(), is_selected) && current_select != item.first){
+                        current_select = item.first;
+                        changed = true;
+                        
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            if(changed){
+                if(current_select != "None")
+                    value = derives.at(current_select).create_shared().shared_cast<T>();
+                else{
+                    value = nullptr;
+                }
+            }
+            return true;
+
+        }
         template <> inline bool Edit(EditorState &state, const char *label, std::shared_ptr<Material> &value) {
             bool ret = false;
-            ImGuiIdGuard _(value.get());
-            ret = display_props(state, label, value);
+            ImGuiIdGuard _(&value);
+            ret = ret | choose_implementation("material", value);
+            ret = ret |display_props(state, label, value);
             return ret;
         }
         template <> inline bool Edit(EditorState &state, const char *label, std::shared_ptr<Texture> &value) {
             bool ret = false;
-            ImGuiIdGuard _(value.get());
-            ret = display_props(state, label, value);
+            ImGuiIdGuard _(&value);
+            ret = ret | choose_implementation("texture", value);
+            ret = ret | display_props(state, label, value);
             return ret;
         }
         template <> inline bool Edit(EditorState &state, const char *label, std::shared_ptr<Mesh> &value) {

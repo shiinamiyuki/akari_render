@@ -42,15 +42,15 @@ namespace akari {
 
     inline Float abs_cos_theta(const vec3 &w) { return std::abs(cos_theta(w)); }
 
-    inline Float Cos2Theta(const vec3 &w) { return w.y * w.y; }
+    inline Float cos2_theta(const vec3 &w) { return w.y * w.y; }
 
-    inline Float Sin2Theta(const vec3 &w) { return 1 - Cos2Theta(w); }
+    inline Float sin2_theta(const vec3 &w) { return 1 - cos2_theta(w); }
 
-    inline Float sin_theta(const vec3 &w) { return std::sqrt(std::fmax(0.0f, Sin2Theta(w))); }
+    inline Float sin_theta(const vec3 &w) { return std::sqrt(std::fmax(0.0f, sin2_theta(w))); }
 
-    inline Float Tan2Theta(const vec3 &w) { return Sin2Theta(w) / Cos2Theta(w); }
+    inline Float tan2_theta(const vec3 &w) { return sin2_theta(w) / cos2_theta(w); }
 
-    inline Float TanTheta(const vec3 &w) { return std::sqrt(std::fmax(0.0f, Tan2Theta(w))); }
+    inline Float tan_theta(const vec3 &w) { return std::sqrt(std::fmax(0.0f, tan2_theta(w))); }
 
     inline Float cos_phi(const vec3 &w) {
         Float sinTheta = sin_theta(w);
@@ -61,8 +61,8 @@ namespace akari {
         return (sinTheta == 0) ? 0 : std::clamp<float>(w.z / sinTheta, -1, 1);
     }
 
-    inline Float Cos2Phi(const vec3 &w) { return cos_phi(w) * cos_phi(w); }
-    inline Float Sin2Phi(const vec3 &w) { return sin_phi(w) * sin_phi(w); }
+    inline Float cos2_phi(const vec3 &w) { return cos_phi(w) * cos_phi(w); }
+    inline Float sin2_phi(const vec3 &w) { return sin_phi(w) * sin_phi(w); }
 
     inline bool same_hemisphere(const vec3 &wo, const vec3 &wi) { return wo.y * wi.y >= 0; }
 

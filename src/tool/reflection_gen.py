@@ -65,9 +65,11 @@ def parse(src: str, options: dict):
             print('generating meta info for ' + classname + ' ...')
             class_body = src[class_.start(): end]
             is_component = 'AKR_DECL_COMP' in class_body or 'AKR_IMPLS' in class_body
+            meta['is_component'] = is_component
             bases = set()
             if is_component:
                 bases.add('Component')
+                meta['methods'].append('commit')
             if 'AKR_IMPLS' in class_body:
                 impls = re.search(r'AKR_IMPLS\s*\(.*?\)', class_body)
                 impls = class_body[impls.start():impls.end()]
@@ -116,7 +118,8 @@ def parse(src: str, options: dict):
 
         for field_name in meta['fields']:
             generated_src += '  c.property("{}", &{}::{});\n'.format(field_name, classname, field_name)
-
+        for method_name in meta['methods']:
+            generated_src += '  c.method("{}", &{}::{});\n'.format(method_name, classname, method_name)
         generated_src += '  c.method("save", &{}::save);\n  c.method("load", &{}::load);\n'.format(classname, classname)
 
         generated_src += ' }\n'

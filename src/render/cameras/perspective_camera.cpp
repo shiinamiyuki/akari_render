@@ -47,7 +47,7 @@ namespace akari {
             sample->p_film = vec2(raster) + (u2 - 0.5f);
             sample->weight = 1;
 
-            vec2 p = vec2(rasterToCamera.ApplyPoint(vec3(sample->p_film, 0)));
+            vec2 p = vec2(rasterToCamera.apply_point(vec3(sample->p_film, 0)));
             Ray ray(vec3(0), normalize(vec3(p, 0) - vec3(0, 0, 1)));
             if (lens_radius > 0 && focal_distance > 0) {
                 Float ft = focal_distance / abs(ray.d.z);
@@ -55,9 +55,9 @@ namespace akari {
                 ray.o = vec3(sample->p_lens, 0);
                 ray.d = normalize(pFocus - ray.o);
             }
-            ray.o = cameraToWorld.ApplyPoint(ray.o);
-            ray.d = cameraToWorld.ApplyNormal(ray.d);
-            sample->normal = cameraToWorld.ApplyNormal(vec3(0, 0, -1));
+            ray.o = cameraToWorld.apply_point(ray.o);
+            ray.d = cameraToWorld.apply_normal(ray.d);
+            sample->normal = cameraToWorld.apply_normal(vec3(0, 0, -1));
             ;
             sample->primary = ray;
         }
@@ -65,7 +65,7 @@ namespace akari {
         void commit() override {
             film = std::make_shared<Film>(resolution);
             cameraToWorld = Transform(transform.ToMatrix4());
-            worldToCamera = cameraToWorld.Inverse();
+            worldToCamera = cameraToWorld.inverse();
             mat4 m = identity<mat4>();
             m = scale(mat4(1.0), vec3(1.0f / resolution.x, 1.0f / resolution.y, 1)) * m;
             m = scale(mat4(1.0), vec3(2, 2, 1)) * m;
@@ -78,13 +78,13 @@ namespace akari {
                 m = scale(mat4(1.0), vec3(s * float(resolution.x) / resolution.y, s, 1)) * m;
             }
             rasterToCamera = Transform(m);
-            cameraToRaster = rasterToCamera.Inverse();
+            cameraToRaster = rasterToCamera.inverse();
         }
         [[nodiscard]] std::shared_ptr<Film> GetFilm() const override { return film; }
         Spectrum We(const Ray &ray, vec2 *pRaster) const override {
-            Float cosTheta = dot(cameraToWorld.ApplyVector(vec3(0, 0, -1)), ray.d);
+            Float cosTheta = dot(cameraToWorld.apply_vector(vec3(0, 0, -1)), ray.d);
             vec3 pFocus = ray.At((lens_radius == 0 ? 1 : focal_distance) / cosTheta);
-            vec2 raster = cameraToRaster.ApplyPoint(worldToCamera.ApplyPoint(pFocus));
+            vec2 raster = cameraToRaster.apply_point(worldToCamera.apply_point(pFocus));
             (void)raster;
             if (cosTheta <= 0) {
                 return Spectrum(0);
@@ -102,14 +102,14 @@ namespace akari {
         Float A() const {
             vec3 pMin = vec3(0);
             vec3 pMax = vec3(film->Dimension(), 0);
-            pMin = rasterToCamera.ApplyPoint(pMin);
-            pMax = rasterToCamera.ApplyPoint(pMax);
+            pMin = rasterToCamera.apply_point(pMin);
+            pMax = rasterToCamera.apply_point(pMax);
             return std::abs((pMax.y - pMin.y) * (pMax.x - pMin.x));
         }
         void pdf_emission(const Ray &ray, Float *pdfPos, Float *pdfDir) const override {
-            Float cosTheta = dot(cameraToWorld.ApplyVector(vec3(0, 0, -1)), ray.d);
+            Float cosTheta = dot(cameraToWorld.apply_vector(vec3(0, 0, -1)), ray.d);
             vec3 pFocus = ray.At((lens_radius == 0 ? 1 : focal_distance) / cosTheta);
-            vec2 raster = cameraToRaster.ApplyPoint(worldToCamera.ApplyPoint(pFocus));
+            vec2 raster = cameraToRaster.apply_point(worldToCamera.apply_point(pFocus));
             (void)raster;
             if (cosTheta <= 0) {
                 return;
@@ -126,8 +126,8 @@ namespace akari {
                               VisibilityTester *tester) const override {
             vec2 pLens = lens_radius * concentric_disk_sampling(u);
 
-            vec3 pLensWorld = cameraToWorld.ApplyPoint(vec3(pLens, 0));
-            sample->normal = cameraToWorld.ApplyNormal(vec3(0, 0, -1));
+            vec3 pLensWorld = cameraToWorld.apply_point(vec3(pLens, 0));
+            sample->normal = cameraToWorld.apply_normal(vec3(0, 0, -1));
             sample->wi = pLensWorld - ref.p;
             Float dist = length(sample->wi);
             sample->wi /= dist;

@@ -650,6 +650,8 @@ namespace akari {
             std::vector<Function> shared_constructors;
             std::vector<std::string_view> base_classes;
             std::vector<std::string_view> derived_classes;
+            TypeInfo type_info;
+            std::string_view pretty_name;
         };
 
         template <typename U> struct meta_instance_handle {
@@ -848,11 +850,17 @@ namespace akari {
                 mgr.inv_name_map.emplace(type_of<T>().name, name);
             }
         }
+        auto & instance =  mgr.instances.at(type.name);
+        instance.type_info = type;
+        if(name)
+           instance.pretty_name = name;
+        else if(instance.pretty_name.empty() || instance.pretty_name == "" )
+            instance.pretty_name = type.name;
         if constexpr (sizeof...(Base) > 0) {
             detail::register_cast_func<T>::template do_it<Base...>();
             detail::register_cast_func<T>::template do_it_shared<Base...>();
         }
-        auto c = detail::meta_instance_handle<T>(mgr.instances.at(type.name));
+        auto c = detail::meta_instance_handle<T>(instance);
         if constexpr (std::is_default_constructible_v<T>) {
             c.template constructor<>();
         }
@@ -950,6 +958,26 @@ namespace akari {
 
         Type(TypeInfo typeInfo) : Type(typeInfo.name) {}
 
+        template<typename F>
+        void foreach_base(F && f){
+            auto & instance = _get();
+            for(auto & base : instance.base_classes){
+                auto base_type = Type(base);
+                f(base_type);
+            }
+        }
+        template<typename F>
+        void foreach_derived(F && f){
+            auto & instance = _get();
+            for(auto & base : instance.derived_classes){
+                auto base_type = Type(base);
+                f(base_type);
+            }
+        }
+        [[nodiscard]] std::string_view pretty_name()const{
+            auto & instance = _get();
+            return instance.pretty_name.data();
+        }
       private:
         std::function<detail::meta_instance &(void)> _get;
         Type(detail::meta_instance &instance) {

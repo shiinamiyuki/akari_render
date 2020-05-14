@@ -115,7 +115,7 @@ namespace akari {
         explicit Transform(const mat4 &m)
             : t(m), invt(glm::inverse(m)), t3(mat3(m)), invt3(glm::inverse(mat3(m))), invt3t(transpose(invt3)) {}
 
-        [[nodiscard]] vec3 ApplyPoint(const vec3 &p) const {
+        [[nodiscard]] vec3 apply_point(const vec3 &p) const {
             auto q = t * vec4(p, 1);
             if (q.w != 1) {
                 return vec3(q) / q.w;
@@ -123,11 +123,11 @@ namespace akari {
             return vec3(q);
         }
 
-        [[nodiscard]] vec3 ApplyNormal(const vec3 &n) const { return invt3t * n; }
+        [[nodiscard]] vec3 apply_normal(const vec3 &n) const { return invt3t * n; }
 
-        [[nodiscard]] vec3 ApplyVector(const vec3 &v) const { return t3 * v; }
+        [[nodiscard]] vec3 apply_vector(const vec3 &v) const { return t3 * v; }
 
-        [[nodiscard]] Transform Inverse() const { return Transform(invt); }
+        [[nodiscard]] Transform inverse() const { return Transform(invt); }
 
       private:
         mat4 t, invt;

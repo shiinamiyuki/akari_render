@@ -166,7 +166,7 @@ namespace akari {
                         weights[i] = ScalarContributionFunction(record.radiance);
                     });
                     Distribution1D distribution(weights.data(), weights.size());
-                    depthWeight[depth] = distribution.Integral();
+                    depthWeight[depth] = distribution.integral();
                     for (auto &chain : markovChains) {
                         auto seedIdx = distribution.sample_discrete(distF(rd));
                         auto seed = bootstrapSeeds[seedIdx];

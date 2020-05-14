@@ -35,8 +35,8 @@ namespace akari {
     inline Float BeckmannD(Float alpha, const vec3 &m) {
         if (m.y <= 0.0f)
             return 0.0f;
-        auto c = Cos2Theta(m);
-        auto t = Tan2Theta(m);
+        auto c = cos2_theta(m);
+        auto t = tan2_theta(m);
         auto a2 = alpha * alpha;
         return std::exp(-t / a2) / (Pi * a2 * c * c);
     }
@@ -45,7 +45,7 @@ namespace akari {
         if (dot(v, m) * v.y <= 0) {
             return 0.0f;
         }
-        auto a = 1.0f / (alpha * TanTheta(v));
+        auto a = 1.0f / (alpha * tan_theta(v));
         if (a < 1.6) {
             return (3.535 * a + 2.181 * a * a) / (1.0f + 2.276 * a + 2.577 * a * a);
         } else {
@@ -56,7 +56,7 @@ namespace akari {
         if (dot(v, m) * v.y <= 0) {
             return 0.0f;
         }
-        auto a = std::sqrt(0.5f * alpha + 1.0f) / TanTheta(v);
+        auto a = std::sqrt(0.5f * alpha + 1.0f) / tan_theta(v);
         if (a < 1.6) {
             return (3.535 * a + 2.181 * a * a) / (1.0f + 2.276 * a + 2.577 * a * a);
         } else {
@@ -74,8 +74,8 @@ namespace akari {
         if (m.y <= 0.0f)
             return 0.0f;
         Float a2 = alpha * alpha;
-        auto c2 = Cos2Theta(m);
-        auto t2 = Tan2Theta(m);
+        auto c2 = cos2_theta(m);
+        auto t2 = tan2_theta(m);
         auto at = (a2 + t2);
         return a2 / (Pi * c2 * c2 * at * at);
     }
@@ -84,7 +84,7 @@ namespace akari {
         if (dot(v, m) * v.y <= 0) {
             return 0.0f;
         }
-        return 2.0 / (1.0 + std::sqrt(1.0 + alpha * alpha * Tan2Theta(m)));
+        return 2.0 / (1.0 + std::sqrt(1.0 + alpha * alpha * tan2_theta(m)));
     }
     // see https://www.cs.cornell.edu/~srm/publications/EGSR07-btdf.pdf
     struct MicrofacetModel {
