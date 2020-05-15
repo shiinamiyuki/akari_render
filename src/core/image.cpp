@@ -38,7 +38,7 @@ namespace akari {
             RGBAImage image;
             postProcessor.process(_image, image);
             auto &texels = image.texels();
-            auto dimension = image.Dimension();
+            auto dimension = image.resolution();
             std::vector<uint8_t> buffer(texels.size() * 3);
             parallel_for(
                     texels.size(),
@@ -60,11 +60,11 @@ namespace akari {
     };
 
     void GammaCorrection::process(const RGBAImage &in, RGBAImage &out) const {
-        out.Resize(in.Dimension());
+        out.Resize(in.resolution());
         parallel_for(
-                in.Dimension().y,
+                in.resolution().y,
                 [&](uint32_t y, uint32_t) {
-                    for (int i = 0; i < in.Dimension().x; i++)
+                    for (int i = 0; i < in.resolution().x; i++)
                         out(i, y) = vec4(pow(vec3(in(i, y)), vec3(gamma)), in(i, y).w);
                 },
                 1024);
@@ -80,16 +80,16 @@ namespace akari {
             const auto *data = stbi_load(path.string().c_str(), &x, &y, &channel, 3);
             image = std::make_shared<RGBAImage>(ivec2(x, y));
             parallel_for(
-                    image->Dimension().y,
+                    image->resolution().y,
                     [=, &image](uint32_t y, uint32_t) {
-                        for (int x = 0; x < image->Dimension().x; x++) {
+                        for (int x = 0; x < image->resolution().x; x++) {
                             vec3 rgb;
                             if (channel == 1) {
-                                rgb = vec3((float) data[x + y * image->Dimension().x] / 255.0f);
+                                rgb = vec3((float) data[x + y * image->resolution().x] / 255.0f);
                             } else {
-                                rgb[0] = (float) data[3 * (x + y * image->Dimension().x) + 0] / 255.0f;
-                                rgb[1] = (float) data[3 * (x + y * image->Dimension().x) + 1] / 255.0f;
-                                rgb[2] = (float) data[3 * (x + y * image->Dimension().x) + 2] / 255.0f;
+                                rgb[0] = (float) data[3 * (x + y * image->resolution().x) + 0] / 255.0f;
+                                rgb[1] = (float) data[3 * (x + y * image->resolution().x) + 1] / 255.0f;
+                                rgb[2] = (float) data[3 * (x + y * image->resolution().x) + 2] / 255.0f;
                             }
                             (*image)(x, y) = vec4(rgb, 1.0f);
                         }

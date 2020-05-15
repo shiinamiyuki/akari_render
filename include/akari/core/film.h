@@ -57,7 +57,7 @@ namespace akari {
             return pixels[q.x + q.y * _size.x];
         }
 
-        void AddSample(const vec2 &p, const Spectrum &radiance, Float weight) {
+        void add_sample(const vec2 &p, const Spectrum &radiance, Float weight) {
             auto &pix = (*this)(p);
             pix.weight += weight;
             pix.radiance += radiance;
@@ -72,14 +72,14 @@ namespace akari {
       public:
         Float splatScale = 1.0f;
         explicit Film(const ivec2 &dimension) : radiance(dimension), weight(dimension), splat(dimension) {}
-        Tile GetTile(const Bounds2i &bounds) { return Tile(bounds); }
+        Tile tile(const Bounds2i &bounds) { return Tile(bounds); }
 
-        [[nodiscard]] ivec2 Dimension() const { return radiance.Dimension(); }
+        [[nodiscard]] ivec2 resolution() const { return radiance.resolution(); }
 
-        [[nodiscard]] Bounds2i bounds() const { return Bounds2i{ivec2(0), Dimension()}; }
+        [[nodiscard]] Bounds2i bounds() const { return Bounds2i{ivec2(0), resolution()}; }
         void merge_tile(const Tile &tile) {
             const auto lo = max(tile.bounds.p_min - ivec2(1, 1), ivec2(0, 0));
-            const auto hi = min(tile.bounds.p_max + ivec2(1, 1), radiance.Dimension());
+            const auto hi = min(tile.bounds.p_max + ivec2(1, 1), radiance.resolution());
             for (int y = lo.y; y < hi.y; y++) {
                 for (int x = lo.x; x < hi.x; x++) {
                     auto &pix = tile(vec2(x, y));
@@ -90,11 +90,11 @@ namespace akari {
         }
 
         void write_image(const fs::path &path, const PostProcessor &postProcessor = GammaCorrection()) const {
-            RGBAImage image(Dimension());
+            RGBAImage image(resolution());
             parallel_for(
-                    radiance.Dimension().y,
+                    radiance.resolution().y,
                     [&](uint32_t y, uint32_t) {
-                        for (int x = 0; x < radiance.Dimension().x; x++) {
+                        for (int x = 0; x < radiance.resolution().x; x++) {
                             Spectrum s =
                                     Spectrum(splat(x, y).color[0], splat(x, y).color[1], splat(x, y).color[2]) *
                                     splatScale;

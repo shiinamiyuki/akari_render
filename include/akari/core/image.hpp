@@ -32,21 +32,21 @@
 namespace akari {
     template <class T> class TImage {
         std::vector<T> _texels;
-        ivec2 dimension;
+        ivec2 _resolution;
 
       public:
-        TImage(const ivec2 &dim = ivec2(1)) : _texels(dim[0] * dim[1]), dimension(dim) {}
+        TImage(const ivec2 &dim = ivec2(1)) : _texels(dim[0] * dim[1]), _resolution(dim) {}
 
         const T &operator()(int x, int y) const {
-            x = std::clamp(x, 0, dimension[0] - 1);
-            y = std::clamp(y, 0, dimension[1] - 1);
-            return _texels[x + y * dimension[0]];
+            x = std::clamp(x, 0, _resolution[0] - 1);
+            y = std::clamp(y, 0, _resolution[1] - 1);
+            return _texels[x + y * _resolution[0]];
         }
 
         T &operator()(int x, int y) {
-            x = std::clamp(x, 0, dimension[0] - 1);
-            y = std::clamp(y, 0, dimension[1] - 1);
-            return _texels[x + y * dimension[0]];
+            x = std::clamp(x, 0, _resolution[0] - 1);
+            y = std::clamp(y, 0, _resolution[1] - 1);
+            return _texels[x + y * _resolution[0]];
         }
 
         const T &operator()(float x, float y) const { return (*this)(vec2(x, y)); }
@@ -57,18 +57,18 @@ namespace akari {
 
         T &operator()(const ivec2 &p) { return (*this)(p.x, p.y); }
 
-        const T &operator()(const vec2 &p) const { return (*this)(ivec2(p * vec2(dimension))); }
+        const T &operator()(const vec2 &p) const { return (*this)(ivec2(p * vec2(_resolution))); }
 
-        T &operator()(const vec2 &p) { return (*this)(ivec2(p * vec2(dimension))); }
+        T &operator()(const vec2 &p) { return (*this)(ivec2(p * vec2(_resolution))); }
 
         [[nodiscard]] const std::vector<T> &texels() const { return _texels; }
 
         void Resize(const ivec2 &size) {
-            dimension = size;
-            _texels.resize(dimension[0] * dimension[1]);
+            _resolution = size;
+            _texels.resize(_resolution[0] * _resolution[1]);
         }
 
-        [[nodiscard]] ivec2 Dimension() const { return dimension; }
+        [[nodiscard]] ivec2 resolution() const { return _resolution; }
         T *data() { return _texels.data(); }
 
         [[nodiscard]] const T *data() const { return _texels.data(); }

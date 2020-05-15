@@ -26,13 +26,13 @@
 namespace akari {
     class Task {
       public:
-        virtual bool CanPause() const { return false; }
+        virtual bool can_pause() const { return false; }
         // Try to pause the task, might not work at all!
-        virtual void Pause() {}
-        virtual void Start() = 0;
-        virtual void Stop() {}
-        virtual void Resume() {}
-        virtual void Wait() = 0;
+        virtual void request_pause() {}
+        virtual void start() = 0;
+        virtual void request_stop() {}
+        virtual void resume() {}
+        virtual void wait() = 0;
     };
 
 } // namespace akari

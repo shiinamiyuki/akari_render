@@ -26,13 +26,7 @@
 #include <akari/core/component.h>
 #include <fmt/format.h>
 namespace akari {
-    enum class LogLevel {
-        Info,
-        Debug,
-        Warning,
-        Error,
-        Fatal
-    };
+    enum class LogLevel { Info, Debug, Warning, Error, Fatal };
     class LogHandler {
       public:
         virtual void AddMessage(LogLevel level, const std::string &msg) = 0;
@@ -46,6 +40,7 @@ namespace akari {
         virtual void Info(const std::string &msg) = 0;
         virtual void Debug(const std::string &msg) = 0;
         virtual void Fatal(const std::string &msg) = 0;
+        virtual ~Logger() = default;
     };
 
     AKR_EXPORT Logger *GetDefaultLogger();

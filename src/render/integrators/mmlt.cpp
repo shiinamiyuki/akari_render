@@ -52,24 +52,24 @@ namespace akari {
                        float clamp, size_t maxConsecutiveRejects)
             : ctx(std::move(ctx)), spp(spp), maxDepth(maxDepth), nBootstrap(nBootstrap), nChains(nChains),
               directSamples(nDirect), clamp(clamp), maxConsecutiveRejects(maxConsecutiveRejects) {}
-        bool HasFilmUpdate() override { return false; }
-        std::shared_ptr<const Film> GetFilmUpdate() override { return ctx.camera->GetFilm(); }
-        bool IsDone() override { return false; }
-        bool WaitEvent(Event event) override {
+        bool has_film_update() override { return false; }
+        std::shared_ptr<const Film> film_update() override { return ctx.camera->GetFilm(); }
+        bool is_done() override { return false; }
+        bool wait_event(Event event) override {
             if (event == Event::EFILM_AVAILABLE) {
                 std::unique_lock<std::mutex> lock(mutex);
 
-                filmAvailable.wait(lock, [=]() { return HasFilmUpdate() || IsDone(); });
-                return HasFilmUpdate();
+                filmAvailable.wait(lock, [=]() { return has_film_update() || is_done(); });
+                return has_film_update();
             } else if (event == Event::ERENDER_DONE) {
                 std::unique_lock<std::mutex> lock(mutex);
 
-                done.wait(lock, [=]() { return IsDone(); });
+                done.wait(lock, [=]() { return is_done(); });
                 return true;
             }
             return false;
         }
-        void Wait() override {
+        void wait() override {
             future.wait();
             done.notify_all();
         }
@@ -80,7 +80,7 @@ namespace akari {
             sampler.StartStream(MLTSampler::ECamera);
             float pFilmX = sampler.next1d();
             float pFilmY = sampler.next1d();
-            auto dim = ctx.camera->GetFilm()->Dimension();
+            auto dim = ctx.camera->GetFilm()->resolution();
             ivec2 pRaster = round(vec2(pFilmX, pFilmY) * vec2(dim));
             pRaster.x = std::clamp(pRaster.x, 0, dim.x - 1);
             pRaster.y = std::clamp(pRaster.y, 0, dim.y - 1);
@@ -127,7 +127,7 @@ namespace akari {
             return radianceRecord;
         }
         static Float ScalarContributionFunction(const Spectrum &L) { return std::max(0.0f, L.luminance()); }
-        void Start() override {
+        void start() override {
             future = std::async(std::launch::async, [=]() {
                 DirectLighting();
                 auto beginTime = std::chrono::high_resolution_clock::now();
@@ -192,7 +192,7 @@ namespace akari {
                 });
                 info("Running {} Markov Chains\n", nChains);
                 // done bootstrapping
-                auto dim = film->Dimension();
+                auto dim = film->resolution();
                 int64_t nTotalMutations = spp * dim.x * dim.y;
                 parallel_for(nChains, [&](uint32_t i, uint32_t tid) {
                     Rng rng(i);
@@ -274,8 +274,8 @@ namespace akari {
             info("Render direct samples\n");
             (void)pathTracer;
             auto task = pathTracer->create_render_task(ctx);
-            task->Start();
-            task->Wait();
+            task->start();
+            task->wait();
         }
     };
     class MMLT : public Integrator {

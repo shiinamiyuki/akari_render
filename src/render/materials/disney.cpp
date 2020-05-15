@@ -163,7 +163,7 @@ namespace akari {
             //                //TODO: subsurface
             //            }
         }
-        bool support_bidirectional() const override { return true; }
+        [[refl]] bool support_bidirectional() const override { return true; }
     };
 
 #include "generated/DisneyMaterial.hpp"

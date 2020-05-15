@@ -47,16 +47,16 @@ namespace akari {
                 image = tmp;
                 AtomicFloat sum(0);
                 parallel_for(
-                    image->Dimension().y,
+                    image->resolution().y,
                     [=, &sum](uint32_t y, uint32_t) {
-                        for (int x = 0; x < image->Dimension().x; x++) {
+                        for (int x = 0; x < image->resolution().x; x++) {
                             auto color = (*image)(x, y);
                             Spectrum rgb = Spectrum(color.x, color.y, color.z);
                             sum.add(rgb.luminance());
                         }
                     },
                     32);
-                average = sum.value() / float(image->Dimension().x * image->Dimension().y);
+                average = sum.value() / float(image->resolution().x * image->resolution().y);
             }
         }
         Float average_luminance() const override { return average; }

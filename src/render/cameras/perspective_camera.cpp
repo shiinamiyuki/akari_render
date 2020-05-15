@@ -101,7 +101,7 @@ namespace akari {
         }
         Float A() const {
             vec3 pMin = vec3(0);
-            vec3 pMax = vec3(film->Dimension(), 0);
+            vec3 pMax = vec3(film->resolution(), 0);
             pMin = rasterToCamera.apply_point(pMin);
             pMax = rasterToCamera.apply_point(pMax);
             return std::abs((pMax.y - pMin.y) * (pMax.x - pMin.x));

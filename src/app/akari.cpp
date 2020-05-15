@@ -77,9 +77,9 @@ int main(int argc, char **argv) {
         info("Start Rendering ...\n");
         for (size_t i = 0; i < graph->render.size(); i++) {
             auto task = graph->create_render_task(i);
-            task->Start();
-            task->Wait();
-            auto film = task->GetFilmUpdate();
+            task->start();
+            task->wait();
+            auto film = task->film_update();
             film->write_image(graph->render[i].output);
         }
     } catch (std::exception &e) {

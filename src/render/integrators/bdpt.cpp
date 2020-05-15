@@ -49,24 +49,24 @@ namespace akari {
                 pyramid.resize((maxDepth + 2) * (maxDepth + 2));
             }
         }
-        bool HasFilmUpdate() override { return false; }
-        std::shared_ptr<const Film> GetFilmUpdate() override { return ctx.camera->GetFilm(); }
-        bool IsDone() override { return false; }
-        bool WaitEvent(Event event) override {
+        bool has_film_update() override { return false; }
+        std::shared_ptr<const Film> film_update() override { return ctx.camera->GetFilm(); }
+        bool is_done() override { return false; }
+        bool wait_event(Event event) override {
             if (event == Event::EFILM_AVAILABLE) {
                 std::unique_lock<std::mutex> lock(mutex);
 
-                filmAvailable.wait(lock, [=]() { return HasFilmUpdate() || IsDone(); });
-                return HasFilmUpdate();
+                filmAvailable.wait(lock, [=]() { return has_film_update() || is_done(); });
+                return has_film_update();
             } else if (event == Event::ERENDER_DONE) {
                 std::unique_lock<std::mutex> lock(mutex);
 
-                done.wait(lock, [=]() { return IsDone(); });
+                done.wait(lock, [=]() { return is_done(); });
                 return true;
             }
             return false;
         }
-        void Wait() override {
+        void wait() override {
             future.wait();
             done.notify_all();
         }
@@ -99,7 +99,7 @@ namespace akari {
             }
             return L;
         }
-        void Start() override {
+        void start() override {
             future = std::async(std::launch::async, [=]() {
                 auto beginTime = std::chrono::high_resolution_clock::now();
 
@@ -107,26 +107,26 @@ namespace akari {
                 auto &camera = ctx.camera;
                 auto &_sampler = ctx.sampler;
                 auto film = camera->GetFilm();
-                auto nTiles = ivec2(film->Dimension() + ivec2(TileSize - 1)) / ivec2(TileSize);
+                auto nTiles = ivec2(film->resolution() + ivec2(TileSize - 1)) / ivec2(TileSize);
                 if (visualizeMIS) {
                     for (auto &p : pyramid) {
-                        p = std::make_shared<Film>(film->Dimension());
+                        p = std::make_shared<Film>(film->resolution());
                     }
                 }
                 parallel_for_2d(nTiles, [=](ivec2 tilePos, uint32_t tid) {
                     (void) tid;
                     MemoryArena arena;
                     Bounds2i tileBounds = Bounds2i{tilePos * (int) TileSize, (tilePos + ivec2(1)) * (int) TileSize};
-                    auto tile = film->GetTile(tileBounds);
+                    auto tile = film->tile(tileBounds);
                     auto sampler = _sampler->clone();
                     for (int y = tile.bounds.p_min.y; y < tile.bounds.p_max.y; y++) {
                         for (int x = tile.bounds.p_min.x; x < tile.bounds.p_max.x; x++) {
-                            sampler->set_sample_index(x + y * film->Dimension().x);
+                            sampler->set_sample_index(x + y * film->resolution().x);
                             for (int s = 0; s < spp; s++) {
                                 sampler->start_next_sample();
                                 auto Li = this->Li(film.get(), *scene, *camera, ivec2(x, y), sampler.get(), arena);
                                 arena.reset();
-                                tile.AddSample(ivec2(x, y), Li, 1.0f);
+                                tile.add_sample(ivec2(x, y), Li, 1.0f);
                             }
                         }
                     }

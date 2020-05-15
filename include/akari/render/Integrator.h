@@ -37,10 +37,10 @@ namespace akari {
     class RenderTask : public Task {
       public:
         enum class Event { ERENDER_DONE, EFILM_AVAILABLE };
-        virtual bool HasFilmUpdate() = 0;
-        virtual std::shared_ptr<const Film> GetFilmUpdate() = 0;
-        virtual bool IsDone() = 0;
-        virtual bool WaitEvent(Event event) = 0;
+        virtual bool has_film_update() = 0;
+        virtual std::shared_ptr<const Film> film_update() = 0;
+        virtual bool is_done() = 0;
+        virtual bool wait_event(Event event) = 0;
     };
 
     struct RenderContext {
