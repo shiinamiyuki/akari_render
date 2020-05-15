@@ -26,11 +26,20 @@
 #include <akari/core/plugin.h>
 #include <akari/render/material.h>
 #include <akari/render/mesh.h>
+#include <akari/core/resource.h>
 
 namespace akari {
     AKR_EXPORT std::shared_ptr<Mesh> create_binary_mesh(const fs::path& file, std::vector<Vertex> vertex,
                                              std::vector<int> index, std::vector<int> groups,
                                              std::vector<MaterialSlot> materials);
+
+    struct BinaryGeometry : Resource{
+        std::vector<Vertex> vertex_buffer;
+        std::vector<int> index_buffer;
+        std::vector<int> groups;
+        Expected<bool> load(const fs::path &)override;
+        Expected<bool> save(const fs::path &)const;
+    };
 } // namespace akari
 
 #endif // AKARIRENDER_BINARYMESH_H
