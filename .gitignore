@@ -7,3 +7,4 @@ old_data
 scenes/
 **/generated
 out/
+**/__pycache__/

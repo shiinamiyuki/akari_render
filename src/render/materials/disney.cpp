@@ -148,7 +148,7 @@ namespace akari {
 //        AKR_SER(base_color, subsurface, metallic, specular, specularTint, roughness, anisotropic, sheen, sheen_tint,
 //                clearcoat, clearcoat_gloss, ior, spec_trans)
         AKR_IMPLS(Material)
-        void compute_scattering_functions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
+        [[refl]] void compute_scattering_functions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
                                           Float scale) const override {
             //            si->bsdf = arena.alloc<BSDF>(*si);
             //            Spectrum color = base_color->evaluate(si->sp);

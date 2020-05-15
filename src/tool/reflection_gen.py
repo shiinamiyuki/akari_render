@@ -1,7 +1,9 @@
 import sys
 import re
 import os
-
+from collections import OrderedDict
+from parser_combinator import get_cpp_parser
+remove_duplicates = lambda t:list(OrderedDict.fromkeys(t))
 '''
 class:
     name: str
@@ -81,30 +83,32 @@ def parse(src: str, options: dict):
             # print(class_body)
             start = 0
             while True:
-                match = field_refl.search(class_body, start)
+                match = attribute_refl.search(class_body, start)
                 if not match:
                     break
-                field = class_body[match.span()[0]: match.span()[1] - 1].strip()
-                # print(match.group(1))
-                # print('field: ' + field)
-                if '=' in field:
-                    field = field.split('=')[0]
-                field_sep = [x for x in field.split(' ') if x]
-                field_name = field_sep[-1]
-                # print(field_name)
-                meta['fields'].append(field_name)
+                m = get_cpp_parser()['field_decl'](class_body, match.span()[0])
+                if m is not None:
+                    m2 = get_cpp_parser()['attr_type_decl'](class_body, match.span()[0])
+                    field_name = class_body[m2: m].strip().strip(';').strip('=').strip()
+                    # print('field ' + field_name)
+                    meta['fields'].append(field_name)
                 start = match.end()
+            start = 0
+            while True:
+                match = attribute_refl.search(class_body, start)
+                if not match:
+                    break
+                m = get_cpp_parser()['function_decl'](class_body, match.span()[0])
+                if m is not None:
+                    m2 = get_cpp_parser()['attr_type_decl'](class_body, match.span()[0])
+                    method_name = class_body[m2: m].strip().strip('(').strip('=').strip()
+                    # print('method ' + method_name)
+                    meta['methods'].append(method_name)
+                start = match.end()
+            meta['fields'] = remove_duplicates(meta['fields'])
+            meta['methods'] = remove_duplicates(meta['methods'])
             generated[classname] = meta
-            # constructor_ = re.compile(classname + r'\s*\((.|\r\n?|\n)*?\)\s*?[;{]')
-            # start = 0
-            # while True:
-            #     match = constructor_.search(class_body, start)
-            #     if not match:
-            #         break
-            #     ctor = class_body[match.span()[0]: match.span()[1] - 1].strip()
-            #     args = ctor[len(classname):].strip().strip('(').strip(')')
-            #     print(args)
-            #     start = match.end()
+        
         src = src[end:]
     # print(generated)
     generated_src = 'void _AkariGeneratedMeta(Plugin &p){\n'
