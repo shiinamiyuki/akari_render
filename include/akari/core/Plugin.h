@@ -65,8 +65,8 @@ namespace akari {
 #define _AKR_MEVAL(x)   #x
 #define AKR_STRINGFY(x) _AKR_MEVAL(x)
 #define AKR_EXPORT_PLUGIN(_p)                                                                                          \
-    void akari::_AkariPluginOnLoad(Plugin &);                                                                          \
-    void akari::_AkariGeneratedMeta(Plugin &);                                                                         \
+    void _AkariPluginOnLoad(Plugin &);                                                                          \
+    void _AkariGeneratedMeta(Plugin &);                                                                         \
     extern "C" AKR_EXPORT Plugin *akari_plugin_onload() {                                                              \
         static Plugin plugin;                                                                                          \
         static std::once_flag flag;                                                                                    \

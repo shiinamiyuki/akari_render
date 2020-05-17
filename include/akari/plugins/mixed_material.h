@@ -20,17 +20,15 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef AKARIRENDER_IMAGETEXTURE_H
-#define AKARIRENDER_IMAGETEXTURE_H
+#ifndef AKARIRENDER_MIXED_MATERIAL_H
+#define AKARIRENDER_MIXED_MATERIAL_H
 
+#include <akari/render/material.h>
 #include <akari/render/texture.h>
 
-namespace akari{
-    enum class ImageTextureFilter : uint8_t {
-        ENEAREST,
-        ETRILINEAR
-    };
-    AKR_EXPORT std::shared_ptr<Texture> create_image_texture(const fs::path & );
-}
-
-#endif // AKARIRENDER_IMAGETEXTURE_H
+namespace akari {
+    AKR_EXPORT std::shared_ptr<Material> create_mixed_material(const std::shared_ptr<Texture> &fraction,
+                                                               const std::shared_ptr<Material> &matA,
+                                                               const std::shared_ptr<Material> &matB);
+} // namespace akari
+#endif // AKARIRENDER_MATTE_H

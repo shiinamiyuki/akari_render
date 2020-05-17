@@ -29,7 +29,8 @@ namespace akari{
             Type ty = value.get_type();
             if(ty.has_method("commit")){
                 if(value.is_shared_pointer()){
-                    ty.get_method("commit").invoke(value.get_underlying());
+                    if(!value.is_null())
+                        ty.get_method("commit").invoke(value.get_underlying());
                 }else {
                     ty.get_method("commit").invoke(value);
                 }

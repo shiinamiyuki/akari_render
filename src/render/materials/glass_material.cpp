@@ -39,7 +39,6 @@ namespace akari {
         AKR_IMPLS(Material, Component)
         void compute_scattering_functions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
                                           Float scale) const override {
-            si->bsdf = arena.alloc<BSDF>(*si);
             auto c = color->evaluate(si->sp) * scale;
             auto eta = ior->evaluate(si->sp)[0];
             si->bsdf->add_component(arena.alloc<FresnelSpecular>(c, c, 1.0f, eta, mode));

@@ -69,5 +69,5 @@ namespace akari {
     AKR_EXPORT_PLUGIN(p) {
     }
 
-    std::shared_ptr<Texture> CreateImageTexture(const fs::path &path) { return std::make_shared<ImageTexture>(path); }
+    std::shared_ptr<Texture> create_image_texture(const fs::path &path) { return std::make_shared<ImageTexture>(path); }
 } // namespace akari

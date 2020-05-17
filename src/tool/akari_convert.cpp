@@ -84,7 +84,7 @@ namespace akari {
                             } else {
                                 cvtMaterial.marked_as_light = false;
                             }
-                            cvtMaterial.material = CreateMatteMaterial(create_rgb_texture(kd));
+                            cvtMaterial.material = create_matte_material(create_rgb_texture(kd));
                             cvtMaterial.name = name;
                             cvtMaterial.emission.strength = create_rgb_texture(vec3(strength));
                             cvtMaterial.emission.color = create_rgb_texture(ke);

@@ -37,17 +37,13 @@ namespace akari {
         AKR_IMPLS(Material)
         void compute_scattering_functions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
                                           Float scale) const override {
-            si->bsdf = arena.alloc<BSDF>(*si);
             auto c = color->evaluate(si->sp);
             si->bsdf->add_component(arena.alloc<SpecularReflection>(c * scale, arena.alloc<FresnelNoOp>()));
         }
-        void commit() override { color->commit(); }
-        bool support_bidirectional() const override { return true; }
+        [[refl]] bool support_bidirectional() const override { return true; }
     };
 #include "generated/MirrorMaterial.hpp"
     AKR_EXPORT_PLUGIN(p) {
-        auto c = class_<MirrorMaterial>();
-        c.method("support_bidirectional", &MirrorMaterial::support_bidirectional);
     }
 
 } // namespace akari

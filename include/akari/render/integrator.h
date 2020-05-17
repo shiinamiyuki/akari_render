@@ -51,6 +51,11 @@ namespace akari {
 
     class Integrator : public Component {
       public:
+        enum class RenderMode {
+          EProgressive,
+          ETile,
+        };
+        virtual bool supports_mode(RenderMode mode) const = 0;
         virtual std::shared_ptr<RenderTask> create_render_task(const RenderContext &ctx) = 0;
 
     };

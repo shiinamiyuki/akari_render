@@ -23,6 +23,7 @@
 #include <akari/core/plugin.h>
 #include <akari/render/material.h>
 #include <akari/render/reflection.h>
+#include <akari/render/microfacet.h>
 
 namespace akari {
     inline Float SchlickWeight(Float cosTheta) { return Power<5>(std::clamp<float>(1 - cosTheta, 0, 1)); }
@@ -134,7 +135,7 @@ namespace akari {
         [[refl]] std::shared_ptr<Texture> subsurface;
         [[refl]] std::shared_ptr<Texture> metallic;
         [[refl]] std::shared_ptr<Texture> specular;
-        [[refl]] std::shared_ptr<Texture> specularTint;
+        [[refl]] std::shared_ptr<Texture> specular_tint;
         [[refl]] std::shared_ptr<Texture> roughness;
         [[refl]] std::shared_ptr<Texture> anisotropic;
         [[refl]] std::shared_ptr<Texture> sheen;
@@ -145,23 +146,42 @@ namespace akari {
         [[refl]] std::shared_ptr<Texture> spec_trans;
 
       public:
-//        AKR_SER(base_color, subsurface, metallic, specular, specularTint, roughness, anisotropic, sheen, sheen_tint,
-//                clearcoat, clearcoat_gloss, ior, spec_trans)
+        DisneyMaterial() = default;
+        DisneyMaterial(std::shared_ptr<Texture> base_color, std::shared_ptr<Texture> subsurface,
+                       std::shared_ptr<Texture> metallic, std::shared_ptr<Texture> specular,
+                       std::shared_ptr<Texture> specular_tint, std::shared_ptr<Texture> roughness,
+                       std::shared_ptr<Texture> anisotropic, std::shared_ptr<Texture> sheen,
+                       std::shared_ptr<Texture> sheen_tint, std::shared_ptr<Texture> clearcoat,
+                       std::shared_ptr<Texture> clearcoat_gloss, std::shared_ptr<Texture> ior,
+                       std::shared_ptr<Texture> spec_trans)
+            : base_color(std::move(base_color)), subsurface(std::move(subsurface)), metallic(std::move(metallic)),
+              specular(std::move(specular)), specular_tint(std::move(specular_tint)), roughness(std::move(roughness)),
+              anisotropic(std::move(anisotropic)), sheen(std::move(sheen)), sheen_tint(std::move(sheen_tint)),
+              clearcoat(std::move(clearcoat)), clearcoat_gloss(std::move(clearcoat_gloss)), ior(std::move(ior)),
+              spec_trans(std::move(spec_trans)) {}
         AKR_IMPLS(Material)
         [[refl]] void compute_scattering_functions(SurfaceInteraction *si, MemoryArena &arena, TransportMode mode,
-                                          Float scale) const override {
-            //            si->bsdf = arena.alloc<BSDF>(*si);
-            //            Spectrum color = base_color->evaluate(si->sp);
-            //            Float metallicWeight = metallic->evaluate(si->sp)[0];
-            //            Float eta = ior->evaluate(si->sp)[0];
-            //            Float trans = specTrans->evaluate(si->sp)[0];
-            //            Float diffuseWeight = (1.0f - trans) * (1.0f - metallicWeight);
-            //            Float transWeight = trans * (1.0f - metallicWeight);
-            //            Float alpha = roughness->evaluate(si->sp)[0];
-            //            if (diffuseWeight > 0) {
-            //                si->bsdf->add_component(arena.alloc<DisneyDiffuse>(color * diffuseWeight));
-            //                //TODO: subsurface
-            //            }
+                                                   Float scale) const override {
+            Spectrum color = base_color->evaluate(si->sp) * scale;
+            Float metallicWeight = metallic->evaluate(si->sp)[0];
+            Float eta = ior->evaluate(si->sp)[0];
+            Float trans = spec_trans->evaluate(si->sp)[0];
+            Float diffuseWeight = (1.0f - trans) * (1.0f - metallicWeight);
+            Float transWeight = trans * (1.0f - metallicWeight);
+            Float alpha = roughness->evaluate(si->sp)[0];
+            if (diffuseWeight > 0) {
+                si->bsdf->add_component(arena.alloc<DisneyDiffuse>(color * diffuseWeight));
+                // TODO: subsurface
+            }
+            if (metallicWeight > 0) {
+                si->bsdf->add_component(arena.alloc<MicrofacetReflection>(
+                    color * metallicWeight, MicrofacetModel(EGGX, alpha),
+                    arena.alloc<DisneyFresnel>(color * metallicWeight, metallicWeight, eta)));
+            }
+            if (transWeight > 0) {
+                si->bsdf->add_component(arena.alloc<MicrofacetTransmission>(
+                    color * transWeight, MicrofacetModel(EGGX, alpha), 1.0f, eta, mode));
+            }
         }
         [[refl]] bool support_bidirectional() const override { return true; }
     };

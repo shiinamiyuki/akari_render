@@ -20,17 +20,20 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef AKARIRENDER_IMAGETEXTURE_H
-#define AKARIRENDER_IMAGETEXTURE_H
+#ifndef AKARIRENDER_MC_INTEGRATOR_H
+#define AKARIRENDER_MC_INTEGRATOR_H
 
-#include <akari/render/texture.h>
+#include <akari/render/integrator.h>
 
-namespace akari{
-    enum class ImageTextureFilter : uint8_t {
-        ENEAREST,
-        ETRILINEAR
+namespace akari {
+    template<typename Derived>
+    class MonteCarloIntegrator : public Integrator {
+      public:
+        bool supports_mode(RenderMode mode) const override { return true; }
+        std::shared_ptr<RenderTask> create_render_task(const RenderContext &ctx) override{
+            
+        }
     };
-    AKR_EXPORT std::shared_ptr<Texture> create_image_texture(const fs::path & );
-}
+} // namespace akari
 
-#endif // AKARIRENDER_IMAGETEXTURE_H
+#endif

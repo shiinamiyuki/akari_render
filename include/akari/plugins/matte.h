@@ -27,6 +27,6 @@
 #include <akari/render/texture.h>
 
 namespace akari {
-    AKR_EXPORT std::shared_ptr<Material> CreateMatteMaterial(const std::shared_ptr<Texture> & color);
+    AKR_EXPORT std::shared_ptr<Material> create_matte_material(const std::shared_ptr<Texture> & color);
 } // namespace akari
 #endif // AKARIRENDER_MATTE_H
