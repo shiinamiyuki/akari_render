@@ -52,6 +52,7 @@ namespace akari {
                 // auto fresnel = arena.alloc<FresnelDielectric>(1.0f, eta);
                 // auto fresnel = arena.alloc<FresnelNoOp>();
                 // si->bsdf->add_component(arena.alloc<SpecularReflection>(c, fresnel));
+                // si->bsdf->add_component(arena.alloc<MicrofacetReflection>(c, MicrofacetModel(EGGX, alpha), fresnel));
                 // si->bsdf->add_component(
                     // arena.alloc<MicrofacetTransmission>(c, MicrofacetModel(EGGX, alpha), 1.0f, eta, mode));
                 // si->bsdf->add_component(arena.alloc<SpecularTransmission>(c,1.0f, eta, mode));

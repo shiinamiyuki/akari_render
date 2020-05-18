@@ -123,7 +123,7 @@ namespace akari {
             }
             sampler.StartStream(MLTSampler::EConnect);
             radianceRecord.radiance =
-                connect_path(scene, sampler, eyePath, t, lightPath, s, &radianceRecord.pRaster) * nStrategies;
+                glm::clamp(connect_path(scene, sampler, eyePath, t, lightPath, s, &radianceRecord.pRaster) * nStrategies, 0.0f,20.0f);
             return radianceRecord;
         }
         static Float ScalarContributionFunction(const Spectrum &L) { return std::max(0.0f, L.luminance()); }

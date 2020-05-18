@@ -97,7 +97,7 @@ namespace akari {
             if (child(idx, nodes)) {
                 return 4.0f * child(idx, nodes)->eval((p - offset(idx)) * 2.0f, nodes);
             } else {
-                AKARI_CHECK(_sum[idx].value() >= 0.0f);
+                AKR_CHECK(_sum[idx].value() >= 0.0f);
                 return 4.0f * float(_sum[idx]);
             }
         }
@@ -108,13 +108,13 @@ namespace akari {
             //                return 0.0f;
             //            }
             auto s = sum();
-            AKARI_CHECK(s >= 0);
-            AKARI_CHECK(!std::isnan(s));
+            AKR_CHECK(s >= 0);
+            AKR_CHECK(!std::isnan(s));
             auto factor = s <= 0.0f ? 0.25f : _sum[idx].value() / s;
             if (factor < 0) {
                 info("{} {} {}\n", factor, _sum[idx].value(), s);
             }
-            AKARI_CHECK(factor >= 0);
+            AKR_CHECK(factor >= 0);
             if (child(idx, nodes)) {
                 return 4.0f * factor * child(idx, nodes)->pdf((p - offset(idx)) * 2.0f, nodes);
             } else {
@@ -128,7 +128,7 @@ namespace akari {
             auto right = m[1] + m[3];
             auto total = left + right;
             // log::log("total: {}\n", total);
-            //            AKARI_CHECK(total > 0);
+            //            AKR_CHECK(total > 0);
             if (total == 0) {
                 total = 1;
                 m[0] = m[1] = m[2] = m[3] = 0.25;
@@ -168,8 +168,8 @@ namespace akari {
             int idx = childIndex(p);
             _sum[idx].add(e);
             auto c = child(idx, nodes);
-            AKARI_CHECK(e >= 0);
-            AKARI_CHECK(_sum[idx].value() >= 0);
+            AKR_CHECK(e >= 0);
+            AKR_CHECK(_sum[idx].value() >= 0);
             if (c) {
                 c->deposit((p - offset(idx)) * 2.0f, e, nodes);
             }
@@ -277,7 +277,7 @@ namespace akari {
 
                 // log::log("other index: {}, sum: {}\n",node.otherNode, otherNode.sum());
                 for (int i = 0; i < 4; ++i) {
-                    AKARI_CHECK(node.otherNode >= 0);
+                    AKR_CHECK(node.otherNode >= 0);
                     auto &otherNode = node.tree->nodes.at(node.otherNode);
                     auto fraction = total == 0.0f ? std::pow(0.25, node.depth) : otherNode._sum[i].value() / total;
                     // log::log("{} {}\n", otherNode._sum[i].value(), fraction);
@@ -285,9 +285,9 @@ namespace akari {
                         if (otherNode.isLeaf(i)) {
                             stack.push({nodes.size(), nodes.size(), this, node.depth + 1});
                         } else {
-                            AKARI_CHECK(otherNode._children[i] > 0);
-                            AKARI_CHECK((size_t)otherNode._children[i] != node.otherNode);
-                            AKARI_CHECK(node.tree == &prev);
+                            AKR_CHECK(otherNode._children[i] > 0);
+                            AKR_CHECK((size_t)otherNode._children[i] != node.otherNode);
+                            AKR_CHECK(node.tree == &prev);
                             stack.push({nodes.size(), (size_t)otherNode._children[i], &prev, node.depth + 1});
                         }
                         nodes[node.node]._children[i] = nodes.size();
@@ -326,17 +326,17 @@ namespace akari {
         Float eval(const vec3 &w) { return sampling.eval(dirToCanonical(w)); }
 
         void deposit(const vec3 &w, Float e) {
-            AKARI_CHECK(!building.nodes.empty());
+            AKR_CHECK(!building.nodes.empty());
             auto p = dirToCanonical(w);
             building.deposit(p, e);
         }
 
         void refine() {
-            AKARI_CHECK(building.sum.value() >= 0.0f);
+            AKR_CHECK(building.sum.value() >= 0.0f);
             //            building._build();
             sampling = building;
             sampling._build();
-            AKARI_CHECK(sampling.sum.value() >= 0.0f);
+            AKR_CHECK(sampling.sum.value() >= 0.0f);
             building.refine(sampling, 0.01);
         }
     };
@@ -386,7 +386,7 @@ namespace akari {
         }
 
         auto getDTree(vec3 p, std::vector<STreeNode> &nodes) {
-            //            AKARI_CHECK(0.0f - 1e-6f <= p[axis] && p[axis] <= 1.0f + 1e-6f);
+            //            AKR_CHECK(0.0f - 1e-6f <= p[axis] && p[axis] <= 1.0f + 1e-6f);
             //            log::log("{} {}\n",axis,p[axis]);
             if (isLeaf()) {
                 return &dTree;
@@ -470,7 +470,7 @@ namespace akari {
                     node.nSample = nodes[idx].nSample / 2;
                     node.axis = (nodes[idx].axis + 1) % 3;
                     node.dTree = nodes[idx].dTree;
-                    AKARI_CHECK(node.isLeaf());
+                    AKR_CHECK(node.isLeaf());
                 }
                 nodes[idx]._isLeaf = false;
                 nodes[idx].dTree = DTreeWrapper();
@@ -480,12 +480,12 @@ namespace akari {
                 for (int i = 0; i < 2; i++) {
                     refine(nodes[idx]._children[i], maxSample, depth + 1);
                 }
-                AKARI_CHECK(nodes[idx]._children[0] > 0 && nodes[idx]._children[1] > 0);
+                AKR_CHECK(nodes[idx]._children[0] > 0 && nodes[idx]._children[1] > 0);
             }
         }
 
         void refine(size_t maxSample) {
-            AKARI_CHECK(maxSample > 0);
+            AKR_CHECK(maxSample > 0);
             for (auto &i : nodes) {
                 if (i.isLeaf()) {
                     i.dTree.refine();
@@ -616,7 +616,7 @@ namespace akari {
                         //                    log::log("{}\n", reinterpret_cast<size_t>(dTree));
                         if (u0 < bsdfSamplingFraction) {
                             si->bsdf->sample(bsdfSample);
-                            AKARI_CHECK(bsdfSample.pdf >= 0);
+                            AKR_CHECK(bsdfSample.pdf >= 0);
                             bsdfSample.pdf *= bsdfSamplingFraction;
                             if (!(bsdfSample.sampledType & BSDF_SPECULAR)) {
 
@@ -627,7 +627,7 @@ namespace akari {
                             auto w = dTree->sample(u1, u2);
                             bsdfSample.wi = w;
                             bsdfSample.pdf = dTree->pdf(w);
-                            AKARI_CHECK(bsdfSample.pdf >= 0);
+                            AKR_CHECK(bsdfSample.pdf >= 0);
                             bsdfSample.f = si->bsdf->evaluate(bsdfSample.wo, bsdfSample.wi);
                             bsdfSample.sampledType = static_cast<BSDFType>(BSDF_ALL & ~BSDF_SPECULAR);
                             bsdfSample.pdf *= 1.0f - bsdfSamplingFraction;
@@ -635,9 +635,9 @@ namespace akari {
                                              bsdfSamplingFraction * si->bsdf->evaluate_pdf(bsdfSample.wo, bsdfSample.wi);
                         }
 
-                        AKARI_CHECK(!std::isnan(bsdfSample.pdf));
-                        AKARI_CHECK(bsdfSample.pdf >= 0.0);
-                        AKARI_CHECK(min_comp(bsdfSample.f) >= 0.0f);
+                        AKR_CHECK(!std::isnan(bsdfSample.pdf));
+                        AKR_CHECK(bsdfSample.pdf >= 0.0);
+                        AKR_CHECK(min_comp(bsdfSample.f) >= 0.0f);
                         if (std::isnan(bsdfSample.pdf) || bsdfSample.pdf <= 0.0f) {
                             break;
                         }
@@ -706,7 +706,7 @@ namespace akari {
             if (training) {
                 for (int i = 0; i < nVertices; i++) {
                     auto irradiance = vertices[i].L.remove_nans().luminance();
-                    AKARI_CHECK(irradiance >= 0);
+                    AKR_CHECK(irradiance >= 0);
                     sTree->deposit(vertices[i].p, vertices[i].wi, irradiance);
                 }
             }
@@ -810,7 +810,7 @@ namespace akari {
         [[refl]] int spp = 16;
         [[refl]] int min_depth = 5;
         [[refl]] int max_depth = 16;
-        [[refl]] int trainingSamples = 16;
+        [[refl]] int spp_train = 16;
         [[refl]] bool enable_rr = false;
 
       public:
@@ -819,7 +819,7 @@ namespace akari {
              return mode == RenderMode::EProgressive;
          }
         std::shared_ptr<RenderTask> create_render_task(const RenderContext &ctx) override {
-            return std::make_shared<GPTRenderTask>(ctx, spp, min_depth, max_depth, trainingSamples, enable_rr);
+            return std::make_shared<GPTRenderTask>(ctx, spp, min_depth, max_depth, spp_train, enable_rr);
         }
     };
 #include "generated/GuidedPathTracer.hpp"

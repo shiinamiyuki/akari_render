@@ -65,7 +65,7 @@ namespace akari {
             auto &si = vertex.si;
             BSDFSample bsdfSample(sampler.next1d(), sampler.next2d(), si);
             si.bsdf->sample(bsdfSample);
-            AKR_ASSERT(bsdfSample.pdf >= 0);
+            AKR_CHECK(bsdfSample.pdf >= 0);
             if (bsdfSample.pdf == 0) {
                 break;
             }
