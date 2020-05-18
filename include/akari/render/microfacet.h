@@ -178,6 +178,24 @@ namespace akari {
         [[nodiscard]] Spectrum evaluate(const vec3 &wo, const vec3 &wi) const override;
         Spectrum sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const override;
     };
+    class AKR_EXPORT FresnelGlossy : public BSDFComponent {
+        const Spectrum R, T;
+        const MicrofacetModel microfacet;
+        const Float etaA, etaB;
+        const FresnelDielectric fresnel;
+        const TransportMode mode;
+        MicrofacetReflection brdf;
+        MicrofacetTransmission btdf;
 
+      public:
+        explicit FresnelGlossy(const Spectrum &R, const Spectrum &T, const MicrofacetModel &microfacet, Float etaA,
+                               Float etaB, TransportMode mode)
+            : BSDFComponent(BSDFType(BSDF_REFLECTION | BSDF_TRANSMISSION | BSDF_GLOSSY)), R(R), T(T),
+              microfacet(microfacet), etaA(etaA), etaB(etaB), fresnel(etaA, etaB), mode(mode),
+              brdf(R, microfacet, &fresnel), btdf(T, microfacet, etaA, etaB, mode) {}
+        [[nodiscard]] Float evaluate_pdf(const vec3 &wo, const vec3 &wi) const override;
+        [[nodiscard]] Spectrum evaluate(const vec3 &wo, const vec3 &wi) const override;
+        Spectrum sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const override;
+    };
 } // namespace akari
 #endif // AKARIRENDER_MICROFACET_H

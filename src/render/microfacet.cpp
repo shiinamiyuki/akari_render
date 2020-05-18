@@ -40,7 +40,7 @@ namespace akari {
             return Spectrum(0);
         wh = normalize(wh);
         auto F = fresnel->evaluate(dot(wi, wh));
-        return R * F * (microfacet.D(wh) * microfacet.G(wo, wi, wh) * F / (4.0f * cosThetaI * cosThetaO));
+        return R * (microfacet.D(wh) * microfacet.G(wo, wi, wh) * F / (4.0f * cosThetaI * cosThetaO));
     }
     Spectrum MicrofacetReflection::sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf,
                                           BSDFType *sampledType) const {
@@ -74,13 +74,15 @@ namespace akari {
         auto denom = sqrtDenom * sqrtDenom;
         Float k = (mode == TransportMode::ERadiance) ? (1.0f / eta) : 1.0f;
         auto factor = abs(dot(wi, wh) * dot(wo, wh) * k * k) / (cosThetaI * cosThetaO);
-        return (Spectrum(1) - F) * T * std::abs(D * G * eta * eta / denom * factor);
+        return (Spectrum(1) - F) * T * std::abs(D * G / denom * factor);
     }
     Float MicrofacetTransmission::evaluate_pdf(const vec3 &wo, const vec3 &wi) const {
         if (same_hemisphere(wo, wi))
             return 0.0f;
         Float eta = cos_theta(wo) > 0 ? (etaB / etaA) : (etaA / etaB);
         vec3 wh = normalize(wo + wi * eta);
+        if (wh.y < 0)
+            wh = -wh;
         Float sqrtDenom = dot(wo, wh) + eta * dot(wi, wh);
         Float dwh_dwi = std::abs((eta * eta * dot(wi, wh)) / (sqrtDenom * sqrtDenom));
         return microfacet.evaluate_pdf(wh) * dwh_dwi;
@@ -100,5 +102,28 @@ namespace akari {
         *pdf = evaluate_pdf(wo, *wi);
         return evaluate(wo, *wi);
     }
-
+    Spectrum FresnelGlossy::sample(const vec2 &u0, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const {
+        Float F = fr_dielectric(cos_theta(wo), etaA, etaB);
+        vec2 u = u0;
+        AKR_ASSERT(F >= 0 && F <= 1);
+        if (u[0] < F) {
+            u[0] /= F;
+            auto f = brdf.sample(u,wo, wi, pdf, sampledType);
+            *pdf *= F;
+            return f;
+        } else {
+            u[0] = (u[0] - F) / (1.0f - F);
+            auto f = btdf.sample(u,wo, wi, pdf, sampledType);
+            *pdf *= (1.0f - F);
+            return f;
+        }
+    }
+    Float FresnelGlossy::evaluate_pdf(const vec3 &wo, const vec3 &wi) const {
+        Float F = fr_dielectric(cos_theta(wo), etaA, etaB);
+        return F * brdf.evaluate_pdf(wo, wi) + (1.0f - F) * btdf.evaluate_pdf(wo, wi);
+    }
+    Spectrum FresnelGlossy::evaluate(const vec3 &wo, const vec3 &wi) const {
+        Float F = fr_dielectric(cos_theta(wo), etaA, etaB);
+        return F * brdf.evaluate(wo, wi) + (1.0f - F) * btdf.evaluate(wo, wi);
+    }
 } // namespace akari

@@ -62,7 +62,7 @@ namespace akari {
         Vector3 normal;
     };
     using SurfaceSample = TSurfaceSample<float>;
-    template <typename Value, typename IValue> struct TIntersection;
+    template <typename Value> struct TIntersection;
     template <typename Value> struct TTriangle {
         using Vector3 = vec<3, Value>;
         using Vector2 = vec<2, Value>;
@@ -91,7 +91,7 @@ namespace akari {
             sample->normal = interpolated_normal(u);
         }
 
-        template <typename IValue> bool Intersect(const TRay<Value> &ray, TIntersection<Value, IValue> *) const;
+        bool Intersect(const TRay<Value> &ray, TIntersection<Value> *) const;
     };
     using Triangle = TTriangle<float>;
     struct PrimitiveHandle {
@@ -99,13 +99,16 @@ namespace akari {
         int32_t primId = -1;
     };
 
-    template <typename Value, typename IValue> struct TIntersection {
+    template <typename Value> struct TIntersection {
         Value t = Inf;
         using Vector3 = vec<3, Value>;
         using Vector2 = vec<2, Value>;
+        using Int = replace_scalar_t<Value, int>;
         TTriangle<Value> triangle;
-        IValue meshId = -1;
-        IValue primId = -1;
+        Int meshId = -1;
+        Int primId = -1;
+        // Int exclude_meshId = -1;
+        // Int exclude_primId = -1;
         Vector2 uv;
         Vector3 Ng;
         Vector3 p;
@@ -113,10 +116,9 @@ namespace akari {
         TIntersection() = default;
         explicit TIntersection(const TRay<Value> &ray) : wo(-ray.d) {}
     };
-    using Intersection = TIntersection<float, int32_t>;
+    using Intersection = TIntersection<float>;
     template <typename Value>
-    template <typename IValue>
-    inline bool TTriangle<Value>::Intersect(const TRay<Value> &ray, TIntersection<Value, IValue> *intersection) const {
+    inline bool TTriangle<Value>::Intersect(const TRay<Value> &ray, TIntersection<Value> *intersection) const {
         auto &v0 = v[0];
         auto &v1 = v[1];
         auto &v2 = v[2];

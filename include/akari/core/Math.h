@@ -69,7 +69,10 @@ namespace akari {
     template <typename T> inline T RadiansToDegrees(const T &rad) { return rad * (180.0f / Pi); }
     template <typename T> inline T DegreesToRadians(const T &rad) { return rad * (Pi / 180.0f); }
     template <typename T> struct Angle { T value; };
+    template <typename T, typename U> struct replace_ { using type = U; };
 
+    template <typename T, size_t N, typename U> struct replace_<simd_array<T, N>, U> { using type = simd_array<U, N>; };
+    template <typename T, typename U> using replace_scalar_t = typename replace_<T, U>::type;
     using EulerAngle = Angle<vec3>;
 
     template <typename T> void from_json(const json &j, Angle<T> &angle) {

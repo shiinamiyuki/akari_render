@@ -66,10 +66,10 @@ namespace akari {
         {
             auto *comp = components[selected];
             sample.f = comp->sample(sample.u, wo, &wi, &sample.pdf, &sample.sampledType);
-            sample.wi = local_to_world(wi);
-            if (comp->is_delta()) {
+            if(sample.pdf <= 0){
                 return;
             }
+            sample.wi = local_to_world(wi);
         }
         auto &f = sample.f;
         auto woW = local_to_world(wo);

@@ -28,6 +28,7 @@
 #include <akari/core/logger.h>
 
 namespace akari {
+    inline Float sqr(Float x){return x * x;}
     inline Float SchlickWeight(Float cosTheta) { return Power<5>(std::clamp<float>(1 - cosTheta, 0, 1)); }
     inline Float FrSchlick(Float R0, Float cosTheta) { return lerp(SchlickWeight(cosTheta), R0, 1.0f); }
     inline Spectrum FrSchlick(const Spectrum &R0, Float cosTheta) {
@@ -120,7 +121,7 @@ namespace akari {
             return evaluate(wo, *wi);
         }
     };
-    inline Float SchlickR0FromEta(Float eta) { return sqrt(eta - 1.0f) / sqrt(eta + 1.0f); }
+    inline Float SchlickR0FromEta(Float eta) { return sqr(eta - 1.0f) / sqr(eta + 1.0f); }
     class DisneyFresnel : public Fresnel {
         const Spectrum R0;
         const Float metallic, eta;
