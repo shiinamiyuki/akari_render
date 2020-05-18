@@ -72,13 +72,14 @@ namespace akari {
         auto G = microfacet.G(wo, wi, wh);
         auto sqrtDenom = dot(wo, wh) + eta * dot(wi, wh);
         auto denom = sqrtDenom * sqrtDenom;
-        auto factor = abs(dot(wi, wh) * dot(wo, wh)) / (cosThetaI * cosThetaO);
-        return (Spectrum(1) - F) * T * D * G / denom * factor;
+        Float k = (mode == TransportMode::ERadiance) ? (1.0f / eta) : 1.0f;
+        auto factor = abs(dot(wi, wh) * dot(wo, wh) * k * k) / (cosThetaI * cosThetaO);
+        return (Spectrum(1) - F) * T * std::abs(D * G * eta * eta / denom * factor);
     }
     Float MicrofacetTransmission::evaluate_pdf(const vec3 &wo, const vec3 &wi) const {
-        if (!same_hemisphere(wo, wi))
+        if (same_hemisphere(wo, wi))
             return 0.0f;
-        Float eta = cos_theta(wo) > 0 ? (etaA / etaB) : (etaB / etaA);
+        Float eta = cos_theta(wo) > 0 ? (etaB / etaA) : (etaA / etaB);
         vec3 wh = normalize(wo + wi * eta);
         Float sqrtDenom = dot(wo, wh) + eta * dot(wi, wh);
         Float dwh_dwi = std::abs((eta * eta * dot(wi, wh)) / (sqrtDenom * sqrtDenom));

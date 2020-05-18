@@ -154,14 +154,14 @@ namespace akari {
     };
     class BDPT : public Integrator {
         [[refl]] int spp = 4;
-        [[refl]] int maxDepth = 5;
+        [[refl]] int max_depth = 5;
         [[refl]] bool visualize_mis = false;
 
       public:
         AKR_IMPLS(Integrator)
         bool supports_mode(RenderMode mode) const {return true;}
         std::shared_ptr<RenderTask> create_render_task(const RenderContext &ctx) override {
-            return std::make_shared<BDPTRenderTask>(ctx, spp, maxDepth, visualize_mis);
+            return std::make_shared<BDPTRenderTask>(ctx, spp, max_depth, visualize_mis);
         }
     };
 #include "generated/BDPT.hpp"

@@ -184,15 +184,17 @@ namespace akari {
                 }
             }
             auto tint = CalculateTint(color);
-            Spectrum color_spec = SchlickR0FromEta(eta) * lerp(Spectrum(1), Spectrum(specTint), tint);
+            Spectrum color_spec = SchlickR0FromEta(eta) * lerp(Spectrum(1), tint, Spectrum(specTint));
             color_spec = lerp(color_spec, color, Spectrum(metallicWeight));
-            si->bsdf->add_component(arena.alloc<MicrofacetReflection>(
-                Spectrum(1.0f), MicrofacetModel(EGGX, alpha),
-                arena.alloc<DisneyFresnel>(color_spec, metallicWeight, eta)));
-            
+            si->bsdf->add_component(
+                arena.alloc<MicrofacetReflection>(Spectrum(1.0f), MicrofacetModel(EGGX, alpha),
+                                                  arena.alloc<DisneyFresnel>(color_spec, metallicWeight, eta)));
+
             if (transWeight > 0) {
+                Spectrum c = transWeight * sqrt(clamp(color, 0.001f, 1.0f));
                 si->bsdf->add_component(arena.alloc<MicrofacetTransmission>(
-                    color * transWeight, MicrofacetModel(EGGX, alpha), 1.0f, eta, mode));
+                    c, MicrofacetModel(EGGX, alpha), 1.0f, eta, mode));
+                // si->bsdf->add_component(arena.alloc<SpecularTransmission>(c, 1.0f, eta, mode));
             }
             Float cc = clearcoat->evaluate(si->sp)[0];
             if (cc > 0) {
