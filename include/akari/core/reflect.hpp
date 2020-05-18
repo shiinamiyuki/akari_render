@@ -290,7 +290,8 @@ namespace akari {
                 if (auto opt = any_pointer_cast(type_of<T>(), type, const_cast<void *>(p))) {
                     return *reinterpret_cast<T *>(const_cast<P>(opt.value()));
                 } else {
-                    throw std::runtime_error("bad Any::as<T>()");
+                    std::string msg = std::string("bad Any::as<T>(); T: ").append(typeid(T).name()).append("this: ").append(type.name.data());
+                    throw std::runtime_error(msg);
                 }
 
             } else {

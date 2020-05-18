@@ -69,7 +69,7 @@ namespace akari {
         }
         static std::string PrintVec3(const vec3 &v) { return fmt::format("{} {} {}", v.x, v.y, v.z); }
         Spectrum Li(Ray ray, Sampler *sampler, MemoryArena &arena) {
-            auto& scene = ctx.scene;
+            auto &scene = ctx.scene;
 
             Spectrum Li(0), beta(1);
             bool specular = false;
@@ -169,8 +169,15 @@ namespace akari {
                         if (cur % (tot / 10) == 0) {
                             show_progress(double(cur) / tot, 70);
                         }
+                    } else if (spp <= 40) {
+                        if (cur % (tot / 100) == 0) {
+                            show_progress(double(cur) / tot, 70);
+                        }
+
                     } else {
-                        show_progress(double(cur) / tot, 70);
+                        if (cur % (tot / 200) == 0) {
+                            show_progress(double(cur) / tot, 70);
+                        }
                     }
                 });
                 parallel_for_2d(nTiles, [=, &progressReporter](ivec2 tilePos, uint32_t tid) {
@@ -212,7 +219,7 @@ namespace akari {
 
       public:
         AKR_IMPLS(Integrator)
-        bool supports_mode(RenderMode mode) const {return true;}
+        bool supports_mode(RenderMode mode) const { return true; }
         std::shared_ptr<RenderTask> create_render_task(const RenderContext &ctx) override {
             return std::make_shared<PTRenderTask>(ctx, spp, min_depth, max_depth, enable_rr);
         }

@@ -78,9 +78,9 @@ namespace akari {
         std::unordered_map<int, const Light *> lightMap;
 
       public:
-        const Vertex* vertex_buffer;
-        const int * index_buffer;
-        const int * groups;
+        const Vertex *vertex_buffer;
+        const int *index_buffer;
+        const int *groups;
         std::shared_ptr<BinaryGeometry> geometry;
         [[refl]] std::vector<MaterialSlot> materials;
         [[refl]] fs::path file;
@@ -105,9 +105,9 @@ namespace akari {
     size_t BinaryMesh::triangle_count() const { return geometry->index_buffer.size() / 3; }
     size_t BinaryMesh::vertex_count() const { return geometry->vertex_buffer.size(); }
     int BinaryMesh::get_primitive_group(int idx) const { return groups[idx]; }
-    
+
     bool BinaryMesh::load_path(const char *path) {
-        if(auto _ = resource_manager()->load_path<BinaryGeometry>(path)){
+        if (auto _ = resource_manager()->load_path<BinaryGeometry>(path)) {
             geometry = *_;
             vertex_buffer = geometry->vertex_buffer.data();
             index_buffer = geometry->index_buffer.data();
@@ -116,12 +116,20 @@ namespace akari {
         }
         return false;
     }
-    void BinaryMesh::save_path(const char *path) {
-        geometry->save(fs::path(path));
-    }
+    void BinaryMesh::save_path(const char *path) { geometry->save(fs::path(path)); }
     void BinaryMesh::commit() {
         if (_loaded) {
             return;
+        }
+        for (auto &mat : materials) {
+            if (mat.emission.color) {
+                mat.emission.color->commit();
+            }
+            if (mat.emission.strength) {
+                mat.emission.strength->commit();
+            }
+            if(mat.material)
+                mat.material->commit();
         }
         load_path(file.string().c_str());
         for (uint32_t id = 0; id < triangle_count(); id++) {
@@ -130,10 +138,12 @@ namespace akari {
             if (!mat.marked_as_light) {
                 continue;
             }
+
             if (!mat.emission.color || !mat.emission.strength) {
                 info("Mesh [{}] prim: [{}] of group: [{}] marked as light but don't have texture\n");
                 continue;
             }
+
             lights.emplace_back(CreateAreaLight(*this, id));
             lightMap[id] = lights.back().get();
         }
