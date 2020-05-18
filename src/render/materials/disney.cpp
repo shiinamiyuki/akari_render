@@ -51,11 +51,11 @@ namespace akari {
 
     class DisneySheen : public BSDFComponent {
         const Spectrum base_color;
-        const Spectrum sheen;
+        const Float sheen;
         const Spectrum sheenTint;
 
       public:
-        DisneySheen(const Spectrum &base_color, const Spectrum &sheen, const Spectrum &sheenTint)
+        DisneySheen(const Spectrum &base_color, Float sheen, const Spectrum &sheenTint)
             : BSDFComponent(BSDFType(BSDF_GLOSSY | BSDF_REFLECTION)), base_color(base_color), sheen(sheen),
               sheenTint(sheenTint) {}
         [[nodiscard]] Spectrum evaluate(const vec3 &wo, const vec3 &wi) const override {
@@ -170,10 +170,16 @@ namespace akari {
             Float diffuseWeight = (1.0f - trans) * (1.0f - metallicWeight);
             Float transWeight = trans * (1.0f - metallicWeight);
             Float alpha = roughness->evaluate(si->sp)[0];
-            // Float sheenWeight = 0;
+
             if (diffuseWeight > 0) {
                 si->bsdf->add_component(arena.alloc<DisneyDiffuse>(color * diffuseWeight));
                 // TODO: subsurface
+
+                Float sheenWeight = sheen->evaluate(si->sp)[0];
+                if (sheenWeight > 0) {
+                    Spectrum st = sheen_tint->evaluate(si->sp);
+                    si->bsdf->add_component(arena.alloc<DisneySheen>(color * diffuseWeight, sheenWeight, st));
+                }
             }
             if (metallicWeight > 0) {
                 si->bsdf->add_component(arena.alloc<MicrofacetReflection>(
@@ -184,25 +190,29 @@ namespace akari {
                 si->bsdf->add_component(arena.alloc<MicrofacetTransmission>(
                     color * transWeight, MicrofacetModel(EGGX, alpha), 1.0f, eta, mode));
             }
+            Float cc = clearcoat->evaluate(si->sp)[0];
+            if(cc > 0){
+                Float ccg = clearcoat_gloss->evaluate(si->sp)[0];
+                si->bsdf->add_component(arena.alloc<DisneyClearCoat>(cc, ccg));
+            }
         }
         [[refl]] bool support_bidirectional() const override { return true; }
-        [[refl]] void commit()override;
+        [[refl]] void commit() override;
     };
 
 #include "generated/DisneyMaterial.hpp"
 
-    void DisneyMaterial::commit(){
+    void DisneyMaterial::commit() {
         Component::commit();
-        StaticMeta<DisneyMaterial>::foreach_property(*this, [](const StaticProperty& meta, auto && prop){
+        StaticMeta<DisneyMaterial>::foreach_property(*this, [](const StaticProperty &meta, auto &&prop) {
             using T = std::decay_t<decltype(prop)>;
-            if constexpr (std::is_same_v<T, std::shared_ptr<Texture>>){
-                if(prop == nullptr){
+            if constexpr (std::is_same_v<T, std::shared_ptr<Texture>>) {
+                if (prop == nullptr) {
                     prop = std::make_shared<NullTexture>();
                 }
             }
         });
     }
-
 
     AKR_EXPORT_PLUGIN(p) {}
 

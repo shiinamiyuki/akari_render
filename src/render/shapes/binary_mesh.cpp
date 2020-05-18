@@ -117,7 +117,7 @@ namespace akari {
         return false;
     }
     void BinaryMesh::save_path(const char *path) {
-
+        geometry->save(fs::path(path));
     }
     void BinaryMesh::commit() {
         if (_loaded) {

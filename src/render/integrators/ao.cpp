@@ -28,24 +28,18 @@
 #include <akari/render/integrator.h>
 #include <future>
 #include <mutex>
-namespace akari {
-    static Float MisWeight(Float pdfA, Float pdfB) {
-        pdfA *= pdfA;
-        pdfB *= pdfB;
-        return pdfA / (pdfA + pdfB);
-    }
 
-    struct PTRenderTask : RenderTask {
+namespace akari {
+
+    struct AORenderTask : RenderTask {
         RenderContext ctx;
         std::mutex mutex;
         std::condition_variable filmAvailable, done;
         std::future<void> future;
         int spp;
-        int minDepth;
-        int maxDepth;
-        bool enableRR;
-        PTRenderTask(const RenderContext &ctx, int spp, int minDepth, int maxDepth, bool enableRR)
-            : ctx(ctx), spp(spp), minDepth(minDepth), maxDepth(maxDepth), enableRR(enableRR) {}
+        Float occlude_distance;
+        AORenderTask(const RenderContext &ctx, int spp, Float occlude_distance)
+            : ctx(ctx), spp(spp), occlude_distance(occlude_distance) {}
         bool has_film_update() override { return false; }
         std::shared_ptr<const Film> film_update() override { return ctx.camera->GetFilm(); }
         bool is_done() override { return false; }
@@ -69,91 +63,29 @@ namespace akari {
         }
         static std::string PrintVec3(const vec3 &v) { return fmt::format("{} {} {}", v.x, v.y, v.z); }
         Spectrum Li(Ray ray, Sampler *sampler, MemoryArena &arena) {
-            auto& scene = ctx.scene;
+            auto &scene = ctx.scene;
 
-            Spectrum Li(0), beta(1);
-            bool specular = false;
-            Float prevScatteringPdf = 0;
-            Interaction *prevInteraction = nullptr;
-            int depth = 0;
-            while (true) {
-                Intersection intersection(ray);
-                if (scene->intersect(ray, &intersection)) {
-                    auto &mesh = scene->get_mesh(intersection.meshId);
-                    int group = mesh.get_primitive_group(intersection.primId);
-                    const auto &materialSlot = mesh.get_material_slot(group);
-                    const auto *light = mesh.get_light(intersection.primId);
+            Intersection intersection(ray);
+            if (scene->intersect(ray, &intersection)) {
+                auto &mesh = scene->get_mesh(intersection.meshId);
 
-                    auto material = materialSlot.material;
-                    if (!material) {
-                        debug("no material!!\n");
-                        break;
-                    }
-                    Triangle triangle{};
-                    mesh.get_triangle(intersection.primId, &triangle);
-                    const auto &p = intersection.p;
-                    auto *si = arena.alloc<SurfaceInteraction>(&materialSlot, -ray.d, p, triangle, intersection, arena);
-                    si->compute_scattering_functions(arena, TransportMode::EImportance, 1.0f);
-                    auto Le = si->Le(si->wo);
-                    if (!Le.is_black()) {
-                        if (!light || specular || depth == 0)
-                            Li += beta * (light->Li(si->wo, si->uv));
-                        else {
-                            auto lightPdf = light->pdf_incidence(*prevInteraction, ray.d) * scene->PdfLight(light);
-                            Li += beta * (light->Li(si->wo, si->uv) * MisWeight(prevScatteringPdf, lightPdf));
-                        }
-                    }
-                    if (depth++ >= maxDepth) {
-                        break;
-                    }
-                    BSDFSample bsdfSample(sampler->next1d(), sampler->next2d(), *si);
-                    si->bsdf->sample(bsdfSample);
-
-                    assert(bsdfSample.pdf >= 0);
-                    if (bsdfSample.pdf <= 0) {
-                        break;
-                    }
-                    specular = bsdfSample.sampledType & BSDF_SPECULAR;
-                    {
-                        Float lightPdf = 0;
-                        auto sampledLight = scene->sample_one_light(sampler->next1d(), &lightPdf);
-                        if (sampledLight && lightPdf > 0) {
-                            LightSample lightSample{};
-                            VisibilityTester tester{};
-                            sampledLight->sample_incidence(sampler->next2d(), *si, &lightSample, &tester);
-                            lightPdf *= lightSample.pdf;
-                            auto wi = lightSample.wi;
-                            auto wo = si->wo;
-                            auto f = si->bsdf->evaluate(wo, wi) * abs(dot(lightSample.wi, si->Ns));
-                            if (lightPdf > 0 && max_comp(f) > 0 && tester.visible(*scene)) {
-                                if (specular || Light::is_delta(sampledLight->get_light_type())) {
-                                    Li += beta * f * lightSample.I / lightPdf;
-                                } else {
-                                    auto scatteringPdf = si->bsdf->evaluate_pdf(wo, wi);
-                                    Li += beta * f * lightSample.I / lightPdf * MisWeight(lightPdf, scatteringPdf);
-                                }
-                            }
-                        }
-                    }
-                    prevScatteringPdf = bsdfSample.pdf;
-                    auto wiW = bsdfSample.wi;
-                    beta *= bsdfSample.f * abs(dot(wiW, si->Ns)) / bsdfSample.pdf;
-                    if (enableRR && depth > minDepth) {
-                        Float continueProb = std::min(0.95f, max_comp(beta));
-                        if (sampler->next1d() < continueProb) {
-                            beta /= continueProb;
-                        } else {
-                            break;
-                        }
-                    }
-                    ray = si->spawn_dir(wiW);
-                    prevInteraction = si;
+                Triangle triangle{};
+                mesh.get_triangle(intersection.primId, &triangle);
+                const auto &p = intersection.p;
+                auto Ns = triangle.interpolated_normal(intersection.uv);
+                CoordinateSystem frame(Ns);
+                auto w = cosine_hemisphere_sampling(sampler->next2d());
+                w = frame.local_to_world(w);
+                ray = Ray(p, w);
+                ray.t_max = occlude_distance;
+                if (scene->occlude(ray)) {
+                    return Spectrum(0);
                 } else {
-                    Li += beta * Spectrum(0);
-                    break;
+                    return Spectrum(1);
                 }
+            } else {
+                return Spectrum(0);
             }
-            return Li;
         }
         void start() override {
             future = std::async(std::launch::async, [=]() {
@@ -204,19 +136,17 @@ namespace akari {
         }
     };
 
-    class PathTracer : public Integrator {
+    class RTAO : public Integrator {
         [[refl]] int spp = 16;
-        [[refl]] int min_depth = 5;
-        [[refl]] int max_depth = 16;
-        [[refl]] bool enable_rr = true;
+        [[refl]] Float occlude_distance = 100000.0f;
 
       public:
         AKR_IMPLS(Integrator)
-        bool supports_mode(RenderMode mode) const {return true;}
+        bool supports_mode(RenderMode mode) const { return true; }
         std::shared_ptr<RenderTask> create_render_task(const RenderContext &ctx) override {
-            return std::make_shared<PTRenderTask>(ctx, spp, min_depth, max_depth, enable_rr);
+            return std::make_shared<AORenderTask>(ctx, spp, occlude_distance);
         }
     };
-#include "generated/PathTracer.hpp"
+#include "generated/RTAO.hpp"
     AKR_EXPORT_PLUGIN(p) {}
 } // namespace akari

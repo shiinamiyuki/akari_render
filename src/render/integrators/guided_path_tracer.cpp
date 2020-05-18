@@ -551,7 +551,7 @@ namespace akari {
         };
 
         Spectrum Li(bool enableNEE, bool training, Ray ray, Sampler *sampler, MemoryArena &arena) {
-            auto scene = ctx.scene;
+            auto& scene = ctx.scene;
             auto vertices = arena.allocN<PathVertex>(maxDepth + 1);
             Spectrum Li(0), beta(1);
             bool specular = false;

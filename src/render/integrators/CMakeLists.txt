@@ -1,4 +1,5 @@
 #add_plugin(RTDebug rtdebug.cpp)
+add_plugin(RTAO ao.cpp)
 add_plugin(PathTracer path_tracer.cpp)
 add_plugin(GuidedPathTracer guided_path_tracer.cpp)
 add_plugin(BDPT bdpt.cpp)

@@ -129,7 +129,7 @@ namespace akari {
                     // shapes[s].mesh.material_ids[f];
                 }
             }
-            mesh = create_binary_mesh(file,std::move(vertices),std::move(indices),std::move(group),std::move(cvtMaterials));
+            mesh = create_binary_mesh(output,std::move(vertices),std::move(indices),std::move(group),std::move(cvtMaterials));
         }
         mesh->save_path(output.string().c_str());
         return mesh;
