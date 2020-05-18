@@ -289,6 +289,7 @@ namespace akari {
 
       public:
         AKR_IMPLS(Integrator)
+        bool supports_mode(RenderMode mode) const {return mode == RenderMode::EProgressive;}
         std::shared_ptr<RenderTask> create_render_task(const RenderContext &ctx) override {
             return std::make_shared<MMLTRenderTask>(ctx, spp, max_depth, n_bootstrap, n_chains, n_direct, clamp,
                                                     max_consecutive_rejects);

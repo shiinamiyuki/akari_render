@@ -118,7 +118,7 @@ namespace akari {
 
     struct MeshWrapper {
         fs::path file; // path to json file
-        AffineTransform transform;
+        TransformManipulator transform;
         std::shared_ptr<Mesh> mesh;
         //        AKR_SER(file, mesh)
         template <class Archive> void save(Archive &ar) const {

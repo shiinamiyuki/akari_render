@@ -81,12 +81,12 @@ namespace akari {
     }
 
     template <typename T> void to_json(json &j, const Angle<T> &angle) { j["deg"] = RadiansToDegrees(angle.value); }
-    struct AffineTransform {
+    struct TransformManipulator {
         EulerAngle rotation;
         vec3 translation;
         vec3 scale = vec3(1);
 
-        [[nodiscard]] mat4 ToMatrix4() const {
+        [[nodiscard]] mat4 matrix4() const {
             auto m = identity<mat4>();
             m = math::scale(mat4(1.0), scale) * m;
             m = math::rotate(mat4(1.0), rotation.value.z, vec3(0, 0, 1)) * m;
@@ -97,13 +97,13 @@ namespace akari {
         }
     };
 
-    inline void from_json(const json &j, AffineTransform &transform) {
+    inline void from_json(const json &j, TransformManipulator &transform) {
         transform.rotation = j.at("rotation").get<EulerAngle>();
         transform.translation = j.at("translation").get<vec3>();
         transform.scale = j.at("scale").get<vec3>();
     }
 
-    inline void to_json(json &j, const AffineTransform &transform) {
+    inline void to_json(json &j, const TransformManipulator &transform) {
         j[("rotation")] = transform.rotation;
         j[("translation")] = transform.translation;
         j[("scale")] = transform.scale;
@@ -134,30 +134,30 @@ namespace akari {
         mat3 t3, invt3, invt3t;
     };
 
-    inline auto MinComp(const vec3 &v) { return min(min(v.x, v.y), v.z); }
+    inline auto min_comp(const vec3 &v) { return min(min(v.x, v.y), v.z); }
 
-    inline auto MaxComp(const vec3 &v) { return max(max(v.x, v.y), v.z); }
+    inline auto max_comp(const vec3 &v) { return max(max(v.x, v.y), v.z); }
 
     template <typename T, int N> struct BoundingBox {
         using P = glm::vec<N, T, glm::defaultp>;
         P p_min, p_max;
 
-        BoundingBox UnionOf(const BoundingBox &box) const {
+        BoundingBox union_of(const BoundingBox &box) const {
             return BoundingBox{min(p_min, box.p_min), max(p_max, box.p_max)};
         }
 
-        BoundingBox UnionOf(const P &rhs) const { return BoundingBox{min(p_min, rhs), max(p_max, rhs)}; }
+        BoundingBox union_of(const P &rhs) const { return BoundingBox{min(p_min, rhs), max(p_max, rhs)}; }
 
-        P Centroid() const { return Size() * 0.5f + p_min; }
+        P centroid() const { return size() * 0.5f + p_min; }
 
-        P Size() const { return p_max - p_min; }
+        P size() const { return p_max - p_min; }
 
-        T SurfaceArea() const {
-            auto a = (Size()[0] * Size()[1] + Size()[0] * Size()[2] + Size()[1] * Size()[2]);
+        T surface_area() const {
+            auto a = (size()[0] * size()[1] + size()[0] * size()[2] + size()[1] * size()[2]);
             return a + a;
         }
 
-        bool Intersects(const BoundingBox &rhs) const {
+        bool intersects(const BoundingBox &rhs) const {
             for (size_t i = 0; i < N; i++) {
                 if (p_min[i] > rhs.p_max[i] || p_max[i] < rhs.p_min[i])
                     ;
@@ -168,20 +168,20 @@ namespace akari {
             return false;
         }
 
-        BoundingBox Intersect(const BoundingBox &rhs) const {
+        BoundingBox intersection_of(const BoundingBox &rhs) const {
             return BoundingBox{max(p_min, rhs.p_min), min(p_max, rhs.p_max)};
         }
 
         P offset(const P &p) const {
             auto o = p - p_min;
-            return o / Size();
+            return o / size();
         }
     };
 
     using Bounds3f = BoundingBox<float, 3>;
     using Bounds2i = BoundingBox<int, 2>;
 
-    inline void ComputeLocalFrame(const vec3 &v1, vec3 *v2, vec3 *v3) {
+    inline void compute_local_frame(const vec3 &v1, vec3 *v2, vec3 *v3) {
         if (std::abs(v1.x) > std::abs(v1.y))
             *v2 = vec3(-v1.z, (0), v1.x) / std::sqrt(v1.x * v1.x + v1.z * v1.z);
         else
@@ -193,7 +193,7 @@ namespace akari {
 
         CoordinateSystem() = default;
 
-        explicit CoordinateSystem(const vec3 &v) : normal(v) { ComputeLocalFrame(v, &T, &B); }
+        explicit CoordinateSystem(const vec3 &v) : normal(v) { compute_local_frame(v, &T, &B); }
 
         [[nodiscard]] vec3 world_to_local(const vec3 &v) const { return vec3(dot(T, v), dot(normal, v), dot(B, v)); }
 

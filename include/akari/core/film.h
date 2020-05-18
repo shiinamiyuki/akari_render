@@ -45,7 +45,7 @@ namespace akari {
         std::vector<Pixel> pixels;
 
         explicit Tile(const Bounds2i &bounds)
-            : bounds(bounds), _size(bounds.Size() + ivec2(2, 2)), pixels(_size.x * _size.y) {}
+            : bounds(bounds), _size(bounds.size() + ivec2(2, 2)), pixels(_size.x * _size.y) {}
 
         auto &operator()(const vec2 &p) {
             auto q = ivec2(floor(p + vec2(0.5) - vec2(bounds.p_min) + vec2(1)));

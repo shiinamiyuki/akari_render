@@ -68,8 +68,8 @@ namespace akari {
             vec3 t0 = (box.p_min - ray.o) * invd;
             vec3 t1 = (box.p_max - ray.o) * invd;
             vec3 tMin = min(t0, t1), tMax = max(t0, t1);
-            if (MaxComp(tMin) <= MinComp(tMax)) {
-                auto t = std::max(ray.t_min, MaxComp(tMin));
+            if (max_comp(tMin) <= min_comp(tMax)) {
+                auto t = std::max(ray.t_min, max_comp(tMin));
                 if (t >= ray.t_max) {
                     return -1;
                 }
@@ -85,8 +85,8 @@ namespace akari {
             if (end == begin)
                 return -1;
             for (auto i = begin; i < end; i++) {
-                box = box.UnionOf(get(primitives[i]).getBoundingBox());
-                centroidBound = centroidBound.UnionOf(get(primitives[i]).getBoundingBox().Centroid());
+                box = box.union_of(get(primitives[i]).getBoundingBox());
+                centroidBound = centroidBound.union_of(get(primitives[i]).getBoundingBox().centroid());
             }
 
             if (depth == 0) {
@@ -105,7 +105,7 @@ namespace akari {
             } else {
 
                 int axis = depth % 3;
-                auto size = centroidBound.Size();
+                auto size = centroidBound.size();
                 if (size.x > size.y) {
                     if (size.x > size.z) {
                         axis = 0;
@@ -130,10 +130,10 @@ namespace akari {
                     };
                     Bucket buckets[nBuckets];
                     for (int i = begin; i < end; i++) {
-                        auto offset = centroidBound.offset(get(primitives[i]).getBoundingBox().Centroid())[axis];
+                        auto offset = centroidBound.offset(get(primitives[i]).getBoundingBox().centroid())[axis];
                         int b = std::min<int>(nBuckets - 1, (int)std::floor(offset * nBuckets));
                         buckets[b].count++;
-                        buckets[b].bound = buckets[b].bound.UnionOf(get(primitives[i]).getBoundingBox());
+                        buckets[b].bound = buckets[b].bound.union_of(get(primitives[i]).getBoundingBox());
                     }
                     Float cost[nBuckets - 1] = {0};
                     for (uint32_t i = 0; i < nBuckets - 1; i++) {
@@ -141,16 +141,16 @@ namespace akari {
                         Bounds3f b1{{MaxFloat, MaxFloat, MaxFloat}, {MinFloat, MinFloat, MinFloat}};
                         int count0 = 0, count1 = 0;
                         for (uint32_t j = 0; j <= i; j++) {
-                            b0 = b0.UnionOf(buckets[j].bound);
+                            b0 = b0.union_of(buckets[j].bound);
                             count0 += buckets[j].count;
                         }
                         for (uint32_t j = i + 1; j < nBuckets; j++) {
-                            b1 = b1.UnionOf(buckets[j].bound);
+                            b1 = b1.union_of(buckets[j].bound);
                             count1 += buckets[j].count;
                         }
-                        float cost0 = count0 == 0 ? 0 : count0 * b0.SurfaceArea();
-                        float cost1 = count1 == 0 ? 0 : count1 * b1.SurfaceArea();
-                        cost[i] = 0.125f + (cost0 + cost1) / box.SurfaceArea();
+                        float cost0 = count0 == 0 ? 0 : count0 * b0.surface_area();
+                        float cost1 = count1 == 0 ? 0 : count1 * b1.surface_area();
+                        cost[i] = 0.125f + (cost0 + cost1) / box.surface_area();
                         assert(cost[i] >= 0);
                     }
                     int splitBuckets = 0;
@@ -163,7 +163,7 @@ namespace akari {
                     }
                     assert(minCost > 0);
                     mid = std::partition(&primitives[begin], &primitives[end - 1] + 1, [&](Index &p) {
-                        auto b = int(centroidBound.offset(get(p).getBoundingBox().Centroid())[axis] * nBuckets);
+                        auto b = int(centroidBound.offset(get(p).getBoundingBox().centroid())[axis] * nBuckets);
                         if (b == (int)nBuckets) {
                             b = (int)nBuckets - 1;
                         }
@@ -185,10 +185,7 @@ namespace akari {
                 return (int)ret;
             }
         }
-        static std::string PrintVec3(const vec3 &v) { return fmt::format("{} {} {}", v.x, v.y, v.z); }
-        static void PrintBox(const Bounds3f &box, const char *name) {
-            debug("{}.p_min: {}, {}.p_max: {}\n", name, PrintVec3(box.p_min), name, PrintVec3(box.p_max));
-        }
+
         bool intersect(const Ray &ray, Hit &isct) const {
             bool hit = false;
             auto invd = vec3(1) / ray.d;
@@ -259,9 +256,9 @@ namespace akari {
                 auto v = mesh->get_vertex_buffer();
                 auto i = mesh->get_index_buffer();
                 Bounds3f box{{MaxFloat, MaxFloat, MaxFloat}, {MinFloat, MinFloat, MinFloat}};
-                box = box.UnionOf(v[i[idx * 3 + 0]].pos);
-                box = box.UnionOf(v[i[idx * 3 + 1]].pos);
-                box = box.UnionOf(v[i[idx * 3 + 2]].pos);
+                box = box.union_of(v[i[idx * 3 + 0]].pos);
+                box = box.union_of(v[i[idx * 3 + 1]].pos);
+                box = box.union_of(v[i[idx * 3 + 2]].pos);
                 return box;
             }
         };

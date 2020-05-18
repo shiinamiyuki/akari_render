@@ -125,7 +125,7 @@ namespace akari {
                             auto wi = lightSample.wi;
                             auto wo = si->wo;
                             auto f = si->bsdf->evaluate(wo, wi) * abs(dot(lightSample.wi, si->Ns));
-                            if (lightPdf > 0 && MaxComp(f) > 0 && tester.visible(*scene)) {
+                            if (lightPdf > 0 && max_comp(f) > 0 && tester.visible(*scene)) {
                                 if (specular || Light::is_delta(sampledLight->get_light_type())) {
                                     Li += beta * f * lightSample.I / lightPdf;
                                 } else {
@@ -139,7 +139,7 @@ namespace akari {
                     auto wiW = bsdfSample.wi;
                     beta *= bsdfSample.f * abs(dot(wiW, si->Ns)) / bsdfSample.pdf;
                     if (enableRR && depth > minDepth) {
-                        Float continueProb = std::min(0.95f, MaxComp(beta));
+                        Float continueProb = std::min(0.95f, max_comp(beta));
                         if (sampler->next1d() < continueProb) {
                             beta /= continueProb;
                         } else {
@@ -212,6 +212,7 @@ namespace akari {
 
       public:
         AKR_IMPLS(Integrator)
+        bool supports_mode(RenderMode mode) const {return true;}
         std::shared_ptr<RenderTask> create_render_task(const RenderContext &ctx) override {
             return std::make_shared<PTRenderTask>(ctx, spp, min_depth, max_depth, enable_rr);
         }

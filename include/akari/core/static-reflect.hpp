@@ -20,20 +20,30 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef AKARIRENDER_MC_INTEGRATOR_H
-#define AKARIRENDER_MC_INTEGRATOR_H
+#pragma once
 
-#include <akari/render/integrator.h>
+#include <type_traits>
 
 namespace akari {
-    template<typename Derived>
-    class MonteCarloIntegrator : public Integrator {
-      public:
-        bool supports_mode(RenderMode mode) const override { return true; }
-        std::shared_ptr<RenderTask> create_render_task(const RenderContext &ctx) override{
-            
+    struct StaticAttribute {
+        std::string_view key, value;
+    };
+    struct StaticProperty {
+        const std::string_view name;
+        const StaticAttribute * const attributes;
+        const size_t attribute_count;
+        template<size_t N>
+        static constexpr StaticProperty make(std::string_view name, const StaticAttribute (&attributes) [N]) {
+            return StaticProperty{
+                name, attributes, N
+            };
         }
     };
-} // namespace akari
-
-#endif
+    template<typename T>
+    struct StaticMeta {
+        template<class F, typename = std::invoke_t<const StaticProperty&, size_t>>
+        static void foreach_property(T & object,F && f){}
+        static size_t property_count() {return 0;}
+        static size_t method_count() {return 0;}
+    };
+}

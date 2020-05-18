@@ -24,7 +24,7 @@
 #ifndef AKARIRENDER_MLTSAMPLER_H
 #define AKARIRENDER_MLTSAMPLER_H
 
-#include <akari/core/distribution.hpp>
+#include <akari/render/distribution.hpp>
 #include <akari/render/sampler.h>
 #include <akari/core/spectrum.h>
 

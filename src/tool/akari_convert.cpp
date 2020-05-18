@@ -75,11 +75,11 @@ namespace akari {
                             vec3 kd = vec3(material.diffuse[0], material.diffuse[1], material.diffuse[2]);
                             vec3 ke = vec3(material.emission[0], material.emission[1], material.emission[2]);
                             Float strength = 1;
-                            if (MaxComp(ke) > 0) {
-                                strength = MaxComp(ke);
+                            if (max_comp(ke) > 0) {
+                                strength = max_comp(ke);
                                 ke /= strength;
                             }
-                            if (MinComp(ke) > 0.01) {
+                            if (min_comp(ke) > 0.01) {
                                 cvtMaterial.marked_as_light = true;
                             } else {
                                 cvtMaterial.marked_as_light = false;

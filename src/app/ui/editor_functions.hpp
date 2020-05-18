@@ -74,7 +74,7 @@ namespace akari::Gui {
         }
         return ret;
     }
-    template <> inline bool Edit(const char *label, AffineTransform &value) {
+    template <> inline bool Edit(const char *label, TransformManipulator &value) {
         bool ret = false;
         if (ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_DefaultOpen)) {
             ret = ret | Edit("translation", value.translation);

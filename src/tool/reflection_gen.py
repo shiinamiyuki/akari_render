@@ -128,18 +128,49 @@ def parse(src: str, options: dict):
 
         generated_src += ' }\n'
     generated_src += '}\n'
+    
+    for classname in generated:
+        meta = generated[classname]
+        generated_src += 'template<> struct StaticMeta<{}>'.format(classname) + '{\n'
+        for field_name in meta['fields']:
+            generated_src += '''  static constexpr StaticAttribute _attr_{}[] = '''.format(field_name)
+            generated_src += '''{{ {{"name", "{}" }}  }};\n'''.format(field_name)
+        generated_src += ''' static size_t property_count() {{return {0};}}\n  static size_t method_count() {{return {1};}}\n'''.format(len(meta['fields']), len(meta['methods']))
+        generated_src += ''' template<class F>static void foreach_property({} & object,F && f){{\n'''.format(classname)
+        for field_name in meta['fields']:
+            generated_src += '  f(StaticProperty::make("{}", _attr_{}), object.{});\n'.format(field_name, field_name, field_name)
+        generated_src += ' }\n'
+        generated_src += ''' template<class F>static void foreach_property(const {} & object,F && f){{\n'''.format(classname)
+        for field_name in meta['fields']:
+            generated_src += '  f(StaticProperty::make("{}", _attr_{}), object.{});\n'.format(field_name, field_name, field_name)
+        generated_src += ' }\n'
+        generated_src += '};\n'
     for classname in generated:
         meta = generated[classname]
         fields = ','.join(meta['fields'])
+        __func = \
+r'''
+    StaticMeta<@@CLASS@@>::foreach_property(*this, [&](const StaticProperty& meta, auto && prop){
+        using T = std::decay_t<decltype(prop)>;
+        v.visit(std::forward<T>(prop), meta.name.data());
+    });
+'''
+        __const_func = \
+r'''
+    StaticMeta<@@CLASS@@>::foreach_property(*this, [&](const StaticProperty& meta, auto && prop){
+        using T = std::decay_t<decltype(prop)>;
+        v.visit(std::forward<const T>(prop), meta.name.data());
+    });
+'''
         generated_src += 'void {}::save(serialize::OutputArchive &ar)const{{\n'.format(classname)
         if meta['fields']:
             generated_src += '''  akari::serialize::AutoSaveVisitor v{{ar}};
-                  _AKR_DETAIL_REFL(v, {});\n'''.format(fields)
+                  {};\n'''.format( __const_func.replace("@@CLASS@@", classname))
         generated_src += '}\n'
         generated_src += 'void {}::load(serialize::InputArchive &ar){{\n'.format(classname)
         if meta['fields']:
             generated_src += '''  akari::serialize::AutoLoadVisitor v{{ar}};
-                  _AKR_DETAIL_REFL(v, {});\n'''.format(fields)
+                  {}\n'''.format(__func.replace("@@CLASS@@", classname))
         generated_src += '}\n'
     generated_src += '#define __AKR_PLUGIN_NAME__ "{}"'.format(plugin_name)
     # print(generated_src)

@@ -26,6 +26,7 @@
 #include <akari/core/akari.h>
 #include <akari/core/detail/serialize-impl.hpp>
 #include <akari/core/serialize.hpp>
+#include <akari/core/static-reflect.hpp>
 #include <memory>
 #include <mutex>
 
@@ -65,8 +66,8 @@ namespace akari {
 #define _AKR_MEVAL(x)   #x
 #define AKR_STRINGFY(x) _AKR_MEVAL(x)
 #define AKR_EXPORT_PLUGIN(_p)                                                                                          \
-    void _AkariPluginOnLoad(Plugin &);                                                                          \
-    void _AkariGeneratedMeta(Plugin &);                                                                         \
+    void _AkariPluginOnLoad(Plugin &);                                                                                 \
+    void _AkariGeneratedMeta(Plugin &);                                                                                \
     extern "C" AKR_EXPORT Plugin *akari_plugin_onload() {                                                              \
         static Plugin plugin;                                                                                          \
         static std::once_flag flag;                                                                                    \

@@ -24,6 +24,7 @@
 #include <akari/render/material.h>
 #include <akari/render/reflection.h>
 #include <akari/render/microfacet.h>
+#include <akari/plugins/rgbtexture.h>
 
 namespace akari {
     inline Float SchlickWeight(Float cosTheta) { return Power<5>(std::clamp<float>(1 - cosTheta, 0, 1)); }
@@ -169,6 +170,7 @@ namespace akari {
             Float diffuseWeight = (1.0f - trans) * (1.0f - metallicWeight);
             Float transWeight = trans * (1.0f - metallicWeight);
             Float alpha = roughness->evaluate(si->sp)[0];
+            // Float sheenWeight = 0;
             if (diffuseWeight > 0) {
                 si->bsdf->add_component(arena.alloc<DisneyDiffuse>(color * diffuseWeight));
                 // TODO: subsurface
@@ -184,9 +186,23 @@ namespace akari {
             }
         }
         [[refl]] bool support_bidirectional() const override { return true; }
+        [[refl]] void commit()override;
     };
 
 #include "generated/DisneyMaterial.hpp"
+
+    void DisneyMaterial::commit(){
+        Component::commit();
+        StaticMeta<DisneyMaterial>::foreach_property(*this, [](const StaticProperty& meta, auto && prop){
+            using T = std::decay_t<decltype(prop)>;
+            if constexpr (std::is_same_v<T, std::shared_ptr<Texture>>){
+                if(prop == nullptr){
+                    prop = std::make_shared<NullTexture>();
+                }
+            }
+        });
+    }
+
 
     AKR_EXPORT_PLUGIN(p) {}
 

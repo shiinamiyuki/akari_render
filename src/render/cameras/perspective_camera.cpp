@@ -33,7 +33,7 @@ namespace akari {
         [[refl]]float lens_radius = 0;
         [[refl]]Angle<float> fov = {DegreesToRadians(80.0f)};
         Transform cameraToWorld, worldToCamera;
-        [[refl]] AffineTransform transform;
+        [[refl]] TransformManipulator transform;
         [[refl]] Float focal_distance = 1;
         Transform rasterToCamera{}, cameraToRaster{};
 
@@ -64,7 +64,7 @@ namespace akari {
 
         void commit() override {
             film = std::make_shared<Film>(resolution);
-            cameraToWorld = Transform(transform.ToMatrix4());
+            cameraToWorld = Transform(transform.matrix4());
             worldToCamera = cameraToWorld.inverse();
             mat4 m = identity<mat4>();
             m = scale(mat4(1.0), vec3(1.0f / resolution.x, 1.0f / resolution.y, 1)) * m;

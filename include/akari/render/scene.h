@@ -24,7 +24,7 @@
 #define AKARIRENDER_SCENE_H
 
 
-#include <akari/core/distribution.hpp>
+#include <akari/render/distribution.hpp>
 #include <akari/render/accelerator.h>
 #include <akari/render/geometry.hpp>
 #include "material.h"

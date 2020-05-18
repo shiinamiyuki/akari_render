@@ -436,8 +436,8 @@ namespace akari {
         std::vector<STreeNode> nodes;
 
         explicit STree(const Bounds3f &box) : nodes(1) {
-            auto sz = MaxComp(box.Size()) * 0.5f;
-            auto centroid = box.Centroid();
+            auto sz = max_comp(box.size()) * 0.5f;
+            auto centroid = box.centroid();
             this->box = Bounds3f{centroid - vec3(sz), centroid + vec3(sz)};
         }
 
@@ -637,7 +637,7 @@ namespace akari {
 
                         AKARI_CHECK(!std::isnan(bsdfSample.pdf));
                         AKARI_CHECK(bsdfSample.pdf >= 0.0);
-                        AKARI_CHECK(MinComp(bsdfSample.f) >= 0.0f);
+                        AKARI_CHECK(min_comp(bsdfSample.f) >= 0.0f);
                         if (std::isnan(bsdfSample.pdf) || bsdfSample.pdf <= 0.0f) {
                             break;
                         }
@@ -661,7 +661,7 @@ namespace akari {
                             auto absCos = abs(dot(lightSample.wi, si->Ns));
                             auto f = si->bsdf->evaluate(wo, wi) * absCos;
                             Spectrum radiance;
-                            if (lightPdf > 0 && MaxComp(f) > 0 && tester.visible(*scene)) {
+                            if (lightPdf > 0 && max_comp(f) > 0 && tester.visible(*scene)) {
                                 Float weight = 1;
                                 if (specular) {
                                     radiance = (f * lightSample.I / lightPdf);
@@ -687,7 +687,7 @@ namespace akari {
 
                     if (enableRR) {
                         if (depth > minDepth) {
-                            Float continueProb = std::min(0.95f, MaxComp(beta));
+                            Float continueProb = std::min(0.95f, max_comp(beta));
                             if (sampler->next1d() < continueProb) {
                                 updateBeta(Spectrum(1.0f) / continueProb);
                             } else {
@@ -815,6 +815,9 @@ namespace akari {
 
       public:
         AKR_IMPLS(Integrator)
+         bool supports_mode(RenderMode mode) const{
+             return mode == RenderMode::EProgressive;
+         }
         std::shared_ptr<RenderTask> create_render_task(const RenderContext &ctx) override {
             return std::make_shared<GPTRenderTask>(ctx, spp, min_depth, max_depth, trainingSamples, enable_rr);
         }

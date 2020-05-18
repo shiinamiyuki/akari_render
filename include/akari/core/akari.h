@@ -76,9 +76,11 @@ namespace akari {
         CurrentPathGuard() : _cur(fs::current_path()) {}
         ~CurrentPathGuard() { fs::current_path(_cur); }
     };
-#define AKARI_NON_COPYABLE(CLASS)                                                                                      \
-    CLASS(const CLASS &) = delete;                                                                                     \
-    CLASS &operator=(const CLASS &) = delete;
+    struct NonCopyable {
+        NonCopyable() = default;
+        NonCopyable(const NonCopyable&) = delete;
+        NonCopyable & operator=(const NonCopyable&) = delete;
+    };
 #define AKR_PANIC(msg) panic(__FILE__, __LINE__, msg)
 #define AKARI_CHECK(expr)                                                                                              \
     do {                                                                                                               \

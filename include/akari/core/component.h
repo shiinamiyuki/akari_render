@@ -43,6 +43,7 @@ namespace akari {
         virtual void clear_dirty_bit() { dirty = false; }
         virtual void set_dirty_Bit() { dirty = true; }
         virtual bool is_dirty() const { return dirty; }
+        virtual bool is_null_object(std::string_view interface) = 0;
         virtual TypeInfo type_info() const = 0;
         template <typename Archive> void save(Archive &ar) {}
         template <typename Archive> void load(Archive &ar) {}
@@ -51,13 +52,20 @@ namespace akari {
         return std::dynamic_pointer_cast<T>(p);
     }
 
+    template <typename T> struct StaticMeta;
+#define AKR_DECL_NULL(Interface)                                                                                       \
+    TypeInfo type_info() const override { return type_of<std::decay_t<decltype(*this)>>(); }                           \
+    bool is_null_object(std::string_view interface) { return interface == #Interface; }
 #define AKR_DECL_COMP()                                                                                                \
     TypeInfo type_info() const override { return type_of<std::decay_t<decltype(*this)>>(); }                           \
-    friend void _AkariPluginOnLoad(Plugin &); \
-    friend void _AkariGeneratedMeta(Plugin &);
+    bool is_null_object(std::string_view interface) { return false; }                                                  \
+    friend void _AkariPluginOnLoad(Plugin &);                                                                          \
+    friend void _AkariGeneratedMeta(Plugin &);                                                                         \
+    template <typename T> friend struct StaticMeta;
 
-#define AKR_IMPLS(...) AKR_DECL_COMP() \
-    void save(serialize::OutputArchive &ar)const;\
+#define AKR_IMPLS(...)                                                                                                 \
+    AKR_DECL_COMP()                                                                                                    \
+    void save(serialize::OutputArchive &ar) const;                                                                     \
     void load(serialize::InputArchive &ar);
 
     using GetPluginFunc = akari::Plugin *(*)();

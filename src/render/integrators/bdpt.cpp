@@ -159,6 +159,7 @@ namespace akari {
 
       public:
         AKR_IMPLS(Integrator)
+        bool supports_mode(RenderMode mode) const {return true;}
         std::shared_ptr<RenderTask> create_render_task(const RenderContext &ctx) override {
             return std::make_shared<BDPTRenderTask>(ctx, spp, maxDepth, visualize_mis);
         }

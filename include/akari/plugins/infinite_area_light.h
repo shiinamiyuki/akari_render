@@ -20,24 +20,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef AKARIRENDER_TEXTURE_H
-#define AKARIRENDER_TEXTURE_H
+#ifndef AKARIRENDER_INFINITE_AREA_LIGHT_H
+#define AKARIRENDER_INFINITE_AREA_LIGHT_H
+#include <akari/render/light.h>
+#include <akari/render/texture.h>
+namespace akari{
+    AKR_EXPORT std::shared_ptr<Light> create_infinite_area_light(const std::shared_ptr<Texture> & emission, const Bounds3f & world_bounds);
+}
 
-#include <akari/core/component.h>
-#include <akari/render/geometry.hpp>
-#include <akari/core/spectrum.h>
-namespace akari {
-
-    class Texture : public Component {
-      public:
-        virtual Spectrum evaluate(const ShadingPoint &sp) const = 0;
-        virtual Float average_luminance() const { return 0.0f; }
-    };
-    class NullTexture : public Texture {
-      public:
-        AKR_DECL_NULL(Texture)
-        Spectrum evaluate(const ShadingPoint &sp) const override { return Spectrum(0); }
-        Float average_luminance() const override { return 0.0f; }
-    };
-} // namespace akari
-#endif // AKARIRENDER_TEXTURE_H
+#endif // AKARIRENDER_AREALIGHT_H

@@ -186,7 +186,7 @@ namespace akari::Gui {
         }
 
         inline bool EditItem(EditorState &state, const char *label, const Any &ref) {
-            return EditItemV<int, float, ivec2, ivec3, vec2, vec3, Spectrum, Angle<float>, Angle<vec3>, AffineTransform,
+            return EditItemV<int, float, ivec2, ivec3, vec2, vec3, Spectrum, Angle<float>, Angle<vec3>, TransformManipulator,
                              std::shared_ptr<Texture>, std::shared_ptr<Material>, MeshWrapper>(state, label, ref)
                 .second;
         }

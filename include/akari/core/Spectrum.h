@@ -127,7 +127,7 @@ namespace akari {
             }
             return tmp;
         }
-        [[nodiscard]] Float is_black() const { return MaxComp(*this) <= 0; }
+        [[nodiscard]] Float is_black() const { return max_comp(*this) <= 0; }
     };
 
     using RGBSpectrum = CoefficientSpectrum<3>;
