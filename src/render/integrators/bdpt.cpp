@@ -23,6 +23,7 @@
 #include <akari/core/logger.h>
 #include <akari/core/parallel.h>
 #include <akari/core/plugin.h>
+#include <akari/core/progress.hpp>
 #include <akari/render/integrator.h>
 #include <akari/plugins/core_bidir.h>
 #include <future>
@@ -84,6 +85,7 @@ namespace akari {
                         continue;
                     vec2 pRaster = raster;
                     Spectrum LPath = connect_path(scene, *sampler, eyePath, t, lightPath, s, &pRaster);
+                    LPath = clamp(LPath, 0.0f, 20.0f);
                     if (t != 1) {
                         if (visualizeMIS) {
                             pyramid.at(BufferIndex(s, t))->add_splat(LPath, raster);
@@ -113,10 +115,26 @@ namespace akari {
                         p = std::make_shared<Film>(film->resolution());
                     }
                 }
-                parallel_for_2d(nTiles, [=](ivec2 tilePos, uint32_t tid) {
-                    (void) tid;
+                ProgressReporter progressReporter(nTiles.x * nTiles.y, [=](size_t cur, size_t tot) {
+                    if (spp <= 16) {
+                        if (cur % (tot / 10) == 0) {
+                            show_progress(double(cur) / tot, 70);
+                        }
+                    } else if (spp <= 40) {
+                        if (cur % (tot / 100) == 0) {
+                            show_progress(double(cur) / tot, 70);
+                        }
+
+                    } else {
+                        if (cur % (tot / 200) == 0) {
+                            show_progress(double(cur) / tot, 70);
+                        }
+                    }
+                });
+                parallel_for_2d(nTiles, [=, &progressReporter](ivec2 tilePos, uint32_t tid) {
+                    (void)tid;
                     MemoryArena arena;
-                    Bounds2i tileBounds = Bounds2i{tilePos * (int) TileSize, (tilePos + ivec2(1)) * (int) TileSize};
+                    Bounds2i tileBounds = Bounds2i{tilePos * (int)TileSize, (tilePos + ivec2(1)) * (int)TileSize};
                     auto tile = film->tile(tileBounds);
                     auto sampler = _sampler->clone();
                     for (int y = tile.bounds.p_min.y; y < tile.bounds.p_max.y; y++) {
@@ -132,6 +150,7 @@ namespace akari {
                     }
                     std::lock_guard<std::mutex> lock(mutex);
                     film->merge_tile(tile);
+                    progressReporter.update();
                 });
                 auto endTime = std::chrono::high_resolution_clock::now();
                 std::chrono::duration<double> elapsed = (endTime - beginTime);
@@ -159,11 +178,11 @@ namespace akari {
 
       public:
         AKR_IMPLS(Integrator)
-        bool supports_mode(RenderMode mode) const {return true;}
+        bool supports_mode(RenderMode mode) const { return true; }
         std::shared_ptr<RenderTask> create_render_task(const RenderContext &ctx) override {
             return std::make_shared<BDPTRenderTask>(ctx, spp, max_depth, visualize_mis);
         }
     };
 #include "generated/BDPT.hpp"
-    AKR_EXPORT_PLUGIN(p){}
+    AKR_EXPORT_PLUGIN(p) {}
 } // namespace akari

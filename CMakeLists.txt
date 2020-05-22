@@ -51,8 +51,8 @@ include_directories(external/fmt-6.1.2/include)
 add_subdirectory(external/fmt-6.1.2)
 set(AKR_CORE_EXT_LIBS ${AKR_CORE_EXT_LIBS} fmt)
 
-include_directories(external/asmjit/src)
-add_subdirectory(external/asmjit)
+# include_directories(external/asmjit/src)
+# add_subdirectory(external/asmjit)
 
 
 include(cmake/GUI.cmake)

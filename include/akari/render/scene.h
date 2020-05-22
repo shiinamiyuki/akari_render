@@ -23,7 +23,6 @@
 #ifndef AKARIRENDER_SCENE_H
 #define AKARIRENDER_SCENE_H
 
-
 #include <akari/render/distribution.hpp>
 #include <akari/render/accelerator.h>
 #include <akari/render/geometry.hpp>
@@ -36,6 +35,10 @@ namespace akari {
     class Acceleator;
     class Light;
     struct MaterialSlot;
+    class WorldLightFactory : public Component {
+      public:
+        virtual std::shared_ptr<Light> create(const Scene & ) const = 0;
+    };
     class AKR_EXPORT Scene {
         std::vector<std::shared_ptr<const Mesh>> meshes;
         std::shared_ptr<Accelerator> accelerator;
@@ -45,7 +48,7 @@ namespace akari {
         std::unordered_map<const Light *, Float> lightPdfMap;
 
       public:
-        void add_light(const std::shared_ptr<Light>& light){lights.emplace_back(light);}
+        void add_light(const std::shared_ptr<Light> &light) { lights.emplace_back(light); }
         void add_mesh(const std::shared_ptr<const Mesh> &mesh) { meshes.emplace_back(mesh); }
         [[nodiscard]] const std::vector<std::shared_ptr<const Mesh>> &GetMeshes() const { return meshes; }
         void set_accelerator(std::shared_ptr<Accelerator> p) { accelerator = std::move(p); }
@@ -64,11 +67,11 @@ namespace akari {
             rayCounter++;
             return accelerator->occlude(ray);
         }
-        void get_triangle(const PrimitiveHandle & handle, Triangle * triangle)const;
-        const MaterialSlot& GetMaterialSlot(const PrimitiveHandle & handle)const;
-        const Light * GetLight(const PrimitiveHandle & handle)const;
+        void get_triangle(const PrimitiveHandle &handle, Triangle *triangle) const;
+        const MaterialSlot &GetMaterialSlot(const PrimitiveHandle &handle) const;
+        const Light *GetLight(const PrimitiveHandle &handle) const;
         const Mesh &get_mesh(const uint32_t id) const { return *meshes[id]; }
-        const Light *sample_one_light(const Float u0, Float *pdf) const ;
+        const Light *sample_one_light(const Float u0, Float *pdf) const;
         Float PdfLight(const Light *light) const {
             auto it = lightPdfMap.find(light);
             if (it == lightPdfMap.end())

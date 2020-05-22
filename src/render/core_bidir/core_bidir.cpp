@@ -289,7 +289,8 @@ namespace akari {
             return Spectrum(0);
         Float misWeight = 1.0f / (s + t);
         misWeight = mis_weight<1>(scene, sampler, eyePath, t, lightPath, s, sampled);
-        AKR_ASSERT(misWeight >= 0);
+        AKR_CHECK(misWeight >= 0);
+        misWeight = std::clamp(misWeight, 0.0f, 1.0f);
         L *= misWeight;
         return L.remove_nans();
     }

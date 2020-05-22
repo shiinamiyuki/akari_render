@@ -1,7 +1,18 @@
 option(AKR_USE_OIDN "USE Intel OpenImageDenoise" OFF)
+option(AKR_BUILD_OIDN "USE Intel OpenImageDenoise" OFF)
 
 if(AKR_USE_OIDN)
-    include_directories(external/oidn/include)
-    add_subdirectory(external/oidn)
-
+    if(AKARI_BUILD_OIDN)
+        include_directories(external/oidn/include)
+        add_subdirectory(external/oidn)
+    else()
+        if(NOT OIDN_ROOT)
+            message(FATAL_ERROR "OIDN_ROOT not specified")
+        else()
+            set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} ${OIDN_ROOT})
+            include_directories(${OIDN_ROOT}/include)
+            find_package(OpenImageDenoise)
+            
+        endif()
+    endif()
 endif()
