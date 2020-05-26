@@ -73,6 +73,14 @@ namespace akari {
 
     template <typename T, size_t N, typename U> struct replace_<simd_array<T, N>, U> { using type = simd_array<U, N>; };
     template <typename T, typename U> using replace_scalar_t = typename replace_<T, U>::type;
+
+    // these would be changed in the future
+    using Point3f = vec3;
+    using Vector3f = vec3;
+    using Point2f = vec2;
+    using Point2i = ivec2;
+    using Vector2f = vec2;
+
     using EulerAngle = Angle<vec3>;
 
     template <typename T> void from_json(const json &j, Angle<T> &angle) {
@@ -192,11 +200,11 @@ namespace akari {
         *v3 = normalize(cross(v1, *v2));
     }
 
-    struct CoordinateSystem {
+    struct Frame3f {
 
-        CoordinateSystem() = default;
+        Frame3f() = default;
 
-        explicit CoordinateSystem(const vec3 &v) : normal(v) { compute_local_frame(v, &T, &B); }
+        explicit Frame3f(const vec3 &v) : normal(v) { compute_local_frame(v, &T, &B); }
 
         [[nodiscard]] vec3 world_to_local(const vec3 &v) const { return vec3(dot(T, v), dot(normal, v), dot(B, v)); }
 

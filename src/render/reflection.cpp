@@ -25,7 +25,7 @@
 
 namespace akari {
     Spectrum FresnelNoOp::evaluate(Float cosThetaI) const { return Spectrum(1.0f); }
-    Spectrum FresnelConductor::evaluate(Float cosThetaI) const { return FrConductor(cosThetaI, etaI, etaT, k); }
+    Spectrum FresnelConductor::evaluate(Float cosThetaI) const { return fr_conductor(cosThetaI, etaI, etaT, k); }
     Spectrum FresnelDielectric::evaluate(Float cosThetaI) const {
         return Spectrum(fr_dielectric(cosThetaI, etaI, etaT));
     }

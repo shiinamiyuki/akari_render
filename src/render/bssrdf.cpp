@@ -20,30 +20,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#pragma once
+// #include <akari/render/bssrdf.h>
 
-#include <type_traits>
+namespace akrai {
+    // Spectrum SeparableBSSRDF::sample_S(const Scene &scene, Float u1, const Point2f &u2, MemoryArena &arena,
+    //                                    SurfaceInteraction *si, Float *pdf) const {
 
-namespace akari {
-    struct StaticAttribute {
-        std::string_view key, value;
-    };
-    struct StaticProperty {
-        const std::string_view name;
-        const StaticAttribute * const attributes;
-        const size_t attribute_count;
-        template<size_t N>
-        static constexpr StaticProperty make(std::string_view name, const StaticAttribute (&attributes) [N]) {
-            return StaticProperty{
-                name, attributes, N
-            };
-        }
-    };
-    template<typename T>
-    struct StaticMeta {
-        template<class F, typename = std::invoke_result_t<const StaticProperty&, size_t>>
-        static void foreach_property(T & object,F && f){}
-        static size_t property_count() {return 0;}
-        static size_t method_count() {return 0;}
-    };
-}
+    //                                    }
+
+} // namespace akrai

@@ -33,7 +33,7 @@ namespace akari {
         Triangle triangle{};
         Float area = 0.0f;
         Emission emission;
-        CoordinateSystem localFrame;
+        Frame3f localFrame;
 
       public:
         LightType get_light_type() const override { return LightType::ENone; }
@@ -43,7 +43,7 @@ namespace akari {
             area = triangle.Area();
             auto mat = mesh->get_material_slot(mesh->get_primitive_group(primId));
             emission = mat.emission;
-            localFrame = CoordinateSystem(triangle.Ng);
+            localFrame = Frame3f(triangle.Ng);
         }
         AKR_IMPLS(Light)
         Spectrum Li(const vec3 &wo, const vec2 &uv) const override {

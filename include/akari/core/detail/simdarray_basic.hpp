@@ -219,7 +219,7 @@ namespace akari {
     template <size_t N> struct mask_select {
         using A = array_mask<N>;
         template <size_t M>
-        static void impl(simd32_storage<M> &res, const simd32_storage<M> &mask, const simd32_storage<M> &a,
+        static __forceinline void impl(simd32_storage<M> &res, const simd32_storage<M> &mask, const simd32_storage<M> &a,
                          const simd32_storage<M> &b) {
             using head = decltype(simd32_storage<M>::head);
             constexpr size_t rest = simd32_storage<M>::n_rest;
@@ -236,7 +236,7 @@ namespace akari {
                 impl(res.next, mask.next, a.next, b.next);
             }
         }
-        static A apply(const array_mask<N> &mask, const A &a, const A &b) {
+        static __forceinline A apply(const array_mask<N> &mask, const A &a, const A &b) {
             A tmp;
             impl(tmp._m, mask._m, a._m, b._m);
             return tmp;
@@ -328,7 +328,7 @@ namespace akari {
 
 #define AKR_SIMD_GEN_VFLOAT_OPERATOR_(assign_op, delegate, intrin_sse, intrin_avx2)                                    \
     template <size_t N> struct delegate<float, N> {                                                                    \
-        template <size_t M> inline static void simd_float_impl(simd32_storage<M> &lhs, const simd32_storage<M> &rhs) { \
+        template <size_t M> __forceinline static void simd_float_impl(simd32_storage<M> &lhs, const simd32_storage<M> &rhs) { \
             using head = decltype(simd32_storage<M>::head);                                                            \
             constexpr size_t rest = simd32_storage<M>::n_rest;                                                         \
             if constexpr (std::is_same_v<head, simdf32x8>) {                                                           \
@@ -345,12 +345,12 @@ namespace akari {
             }                                                                                                          \
         }                                                                                                              \
         using A = simd_array<float, N>;                                                                                \
-        static void apply(A &a, const A &b) { simd_float_impl(a._m, b._m); }                                           \
+        static __forceinline void apply(A &a, const A &b) { simd_float_impl(a._m, b._m); }                                           \
     };
 #define AKR_SIMD_GEN_VFLOAT_CMP_OPERATOR_(cmp_op, intrin_op, delegate, intrin_sse, intrin_avx2)                        \
     template <size_t N> struct delegate<float, N> {                                                                    \
         template <size_t M>                                                                                            \
-        inline static void simd_float_impl(simd32_storage<M> &mask, const simd32_storage<M> &lhs,                      \
+        __forceinline static void simd_float_impl(simd32_storage<M> &mask, const simd32_storage<M> &lhs,                      \
                                            const simd32_storage<M> &rhs) {                                             \
             using head = decltype(simd32_storage<M>::head);                                                            \
             constexpr size_t rest = simd32_storage<M>::n_rest;                                                         \
@@ -370,7 +370,7 @@ namespace akari {
         }                                                                                                              \
         using A = simd_array<float, N>;                                                                                \
         using M = array_mask<N>;                                                                                       \
-        static M apply(const A &a, const A &b) {                                                                       \
+        static __forceinline M apply(const A &a, const A &b) {                                                                       \
             M m;                                                                                                       \
             simd_float_impl(m._m, a._m, b._m);                                                                         \
             return m;                                                                                                  \
@@ -378,7 +378,7 @@ namespace akari {
     };
 #define AKR_SIMD_GEN_VMASK_OPERATOR_(assign_op, delegate, intrin_sse, intrin_avx2)                                     \
     template <size_t N> struct delegate {                                                                              \
-        template <size_t M> inline static void simd_float_impl(simd32_storage<M> &lhs, const simd32_storage<M> &rhs) { \
+        template <size_t M> __forceinline static void simd_float_impl(simd32_storage<M> &lhs, const simd32_storage<M> &rhs) { \
             using head = decltype(simd32_storage<M>::head);                                                            \
             constexpr size_t rest = simd32_storage<M>::n_rest;                                                         \
             if constexpr (std::is_same_v<head, simdf32x8>) {                                                           \
@@ -396,7 +396,7 @@ namespace akari {
             }                                                                                                          \
         }                                                                                                              \
         using A = array_mask<N>;                                                                                       \
-        static void apply(A &a, const A &b) { simd_float_impl(a._m, b._m); }                                           \
+        static __forceinline void apply(A &a, const A &b) { simd_float_impl(a._m, b._m); }                                           \
     };
 
     AKR_SIMD_DEFAULT_OPERATOR(array_operator_add, +=)
@@ -499,7 +499,7 @@ namespace akari {
         T &operator[](size_t i) { return this->data[i]; }
         const T &operator[](size_t i) const { return this->data[i]; }
 #define AKR_SIMD_GEN_VFLOAT_ASSIGN_OPERATOR(assign_op, delegate)                                                       \
-    Derived &operator assign_op(const Derived &rhs) {                                                                  \
+    __forceinline Derived &operator assign_op(const Derived &rhs) {                                                                  \
         delegate<T, N>::apply(static_cast<Derived &>(*this), rhs);                                                     \
         return static_cast<Derived &>(*this);                                                                          \
     }
@@ -525,8 +525,8 @@ namespace akari {
         auto operator->() const { return array_operator_arrow<T, N>::apply(*this); }
         auto operator->() { return array_operator_arrow<T, N>::apply(*this); }
     };
-    template<size_t N>struct array_mask_masked_assign{
-        array_mask<N>& _array;
+    template <size_t N> struct array_mask_masked_assign {
+        array_mask<N> &_array;
         array_mask<N> _mask;
         void operator=(const array_mask<N> &rhs) { _array = mask_select<N>::apply(_mask, rhs, _array); }
     };
@@ -604,7 +604,7 @@ namespace akari {
         void clear(size_t i) { this->data[i] = 0; }
         void clear_all() { std::memset(this, 0, sizeof(*this)); }
 #define AKR_SIMD_GEN_VMASK_ASSIGN_OPERATOR(assign_op, delegate)                                                        \
-    array_mask &operator assign_op(const array_mask &rhs) {                                                            \
+    __forceinline array_mask &operator assign_op(const array_mask &rhs) {                                                            \
         delegate<N>::apply(*this, rhs);                                                                                \
         return *this;                                                                                                  \
     }
@@ -623,7 +623,7 @@ namespace akari {
     template <size_t N> inline auto operator~(const array_mask<N> &mask) { return array_mask_not<N>::apply(mask); }
     template <size_t N> inline auto operator!(const array_mask<N> &mask) { return array_mask_not<N>::apply(mask); }
     template <size_t N> struct array_broadcast<float, N> {
-        template <size_t M> static void apply(simd32_storage<M> &simd, const float &v) {
+        template <size_t M> static __forceinline void apply(simd32_storage<M> &simd, const float &v) {
             using head = decltype(simd32_storage<M>::head);
             constexpr size_t rest = simd32_storage<M>::n_rest;
             if constexpr (std::is_same_v<head, simdf32x8>) {
@@ -639,10 +639,10 @@ namespace akari {
                 apply(simd.next, v);
             }
         }
-        static void apply(simd_array<float, N> &arr, const float &v) { apply(arr._m, v); }
+        static __forceinline void apply(simd_array<float, N> &arr, const float &v) { apply(arr._m, v); }
     };
     template <size_t N> struct array_broadcast<int, N> {
-        template <size_t M> static void apply(simd32_storage<M> &simd, const int &v) {
+        template <size_t M> static __forceinline void apply(simd32_storage<M> &simd, const int &v) {
             using head = decltype(simd32_storage<M>::head);
             constexpr size_t rest = simd32_storage<M>::n_rest;
             if constexpr (std::is_same_v<head, simdf32x8>) {
@@ -658,14 +658,14 @@ namespace akari {
                 apply(simd.next, v);
             }
         }
-        static void apply(simd_array<int, N> &arr, const int &v) { apply(arr._m, v); }
+        static __forceinline void apply(simd_array<int, N> &arr, const int &v) { apply(arr._m, v); }
     };
     template <size_t N> struct array_select<float, N> {
         using T = float;
         using A = simd_array<T, N>;
         template <size_t M>
-        static void impl(simd32_storage<M> &res, const simd32_storage<M> &mask, const simd32_storage<M> &a,
-                         const simd32_storage<M> &b) {
+        static __forceinline void impl(simd32_storage<M> &res, const simd32_storage<M> &mask,
+                                       const simd32_storage<M> &a, const simd32_storage<M> &b) {
             using head = decltype(simd32_storage<M>::head);
             constexpr size_t rest = simd32_storage<M>::n_rest;
             if constexpr (std::is_same_v<head, simdf32x8>) {
@@ -681,7 +681,7 @@ namespace akari {
                 impl(res.next, mask.next, a.next, b.next);
             }
         }
-        static A apply(const array_mask<N> &mask, const A &a, const A &b) {
+        static __forceinline A apply(const array_mask<N> &mask, const A &a, const A &b) {
             A tmp;
             impl<N>(tmp._m, mask._m, a._m, b._m);
             return tmp;
@@ -691,8 +691,8 @@ namespace akari {
         using T = float;
         using A = simd_array<T, N>;
         template <size_t M>
-        static void impl(simd32_storage<M> &res, const simd32_storage<M> &mask, const simd32_storage<M> &a,
-                         const simd32_storage<M> &b) {
+        static __forceinline void impl(simd32_storage<M> &res, const simd32_storage<M> &mask,
+                                       const simd32_storage<M> &a, const simd32_storage<M> &b) {
             using head = decltype(simd32_storage<M>::head);
             constexpr size_t rest = simd32_storage<M>::n_rest;
             if constexpr (std::is_same_v<head, simdf32x8>) {
@@ -708,14 +708,14 @@ namespace akari {
                 impl(res.next, mask.next, a.next, b.next);
             }
         }
-        static A apply(const array_mask<N> &mask, const A &a, const A &b) {
+        static __forceinline A apply(const array_mask<N> &mask, const A &a, const A &b) {
             A tmp;
             impl<N>(tmp._m, mask._m, a._m, b._m);
             return tmp;
         }
     };
     template <typename T, size_t N>
-    auto select(const array_mask<N> &mask, const simd_array<T, N> &a, const simd_array<T, N> &b) {
+    __forceinline auto select(const array_mask<N> &mask, const simd_array<T, N> &a, const simd_array<T, N> &b) {
         return array_select<T, N>::apply(mask, a, b);
     }
 
@@ -734,22 +734,21 @@ namespace akari {
         return m ? a : b;
     }
     template <typename T, size_t N>
-    simd_array_masked_assign<simd_array<T, N>, T, N> masked(simd_array<T, N> &arr, const array_mask<N> &_mask) {
+    __forceinline simd_array_masked_assign<simd_array<T, N>, T, N> masked(simd_array<T, N> &arr, const array_mask<N> &_mask) {
         return simd_array_masked_assign<simd_array<T, N>, T, N>{arr, _mask};
     }
-    template <size_t N>
-    array_mask_masked_assign<N> masked(array_mask<N> &arr, const array_mask<N> &_mask) {
+    template <size_t N> __forceinline array_mask_masked_assign<N> masked(array_mask<N> &arr, const array_mask<N> &_mask) {
         return array_mask_masked_assign<N>{arr, _mask};
     }
     template <typename T, typename _ = std::enable_if<is_scalar_v<T>>>
-    simd_array_masked_assign<T, T, 1> masked(T &arr, const bool &_mask) {
+    __forceinline simd_array_masked_assign<T, T, 1> masked(T &arr, const bool &_mask) {
         return simd_array_masked_assign<T, T, 1>{arr, _mask};
     }
     template <size_t N> struct simd_tag_t { constexpr static size_t lanes = N; };
 
     template <size_t N> static constexpr simd_tag_t<N> simd_tag{};
 
-    inline bool any(bool x) { return x; }
-    inline bool all(bool x) { return x; }
+    __forceinline bool any(bool x) { return x; }
+    __forceinline bool all(bool x) { return x; }
 } // namespace akari
 #endif // AKARIRENDER_SIMDARRAYBASIC_HPP

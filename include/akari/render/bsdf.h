@@ -116,7 +116,7 @@ namespace akari {
         constexpr static int MaxBSDF = 8;
         std::array<const BSDFComponent *, MaxBSDF> components{};
         int nComp = 0;
-        const CoordinateSystem frame;
+        const Frame3f frame;
         vec3 Ng;
         vec3 Ns;
 

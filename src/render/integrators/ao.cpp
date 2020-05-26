@@ -73,7 +73,7 @@ namespace akari {
                 mesh.get_triangle(intersection.primId, &triangle);
                 const auto &p = intersection.p;
                 auto Ns = triangle.interpolated_normal(intersection.uv);
-                CoordinateSystem frame(Ns);
+                Frame3f frame(Ns);
                 auto w = cosine_hemisphere_sampling(sampler->next2d());
                 w = frame.local_to_world(w);
                 ray = Ray(p, w);

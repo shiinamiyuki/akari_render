@@ -25,6 +25,7 @@
 #include "editor_functions.hpp"
 #include <akari/core/logger.h>
 #include <akari/render/scene_graph.h>
+#include <akari/core/plugin.h>
 
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -43,15 +44,27 @@ namespace akari::Gui {
         template <typename T> explicit ImGuiIdGuard(T p) { ImGui::PushID(p); }
         ~ImGuiIdGuard() { ImGui::PopID(); }
     };
+
+    // struct TextureObject {
+    //     GLuint id;
+    //     TextureObject(const ivec2 & res){
+    //         glEnabl
+    //     }
+    // };
+
     namespace detail {
         inline bool EditItem(EditorState &state, const char *label, const Any &ref);
         template <typename T> bool Edit(EditorState &, const char *label, T &value) {
             ImGuiIdGuard _(&value);
             return Gui::Edit(label, value);
         }
-        inline bool display_props(EditorState &state,const char * label, const std::shared_ptr<Component>& comp){
-             bool ret = false;
-             if (ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_DefaultOpen)) {
+        inline bool display_props(EditorState &state, const char *label, const std::shared_ptr<Component> &comp) {
+            bool ret = false;
+            if (!comp) {
+                ImGui::Text("%s", label);
+                return ret;
+            }
+            if (ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_DefaultOpen)) {
                 auto props = Type::get_by_typeid(*comp).get_properties();
                 for (auto &prop : props) {
                     ret = ret | EditItem(state, prop.name(), prop.get(make_any_ref(*comp)));
@@ -60,65 +73,67 @@ namespace akari::Gui {
             }
             return ret;
         }
-        template<typename T>
-        bool choose_implementation(const char * label, std::shared_ptr<T> &value){
+        template <typename T> bool choose_implementation(const char *label, std::shared_ptr<T> &value) {
             Type type(type_of<T>());
             ImGuiIdGuard _(label);
             std::map<std::string_view, Type> derives;
-            type.foreach_derived([&](const Type & derived){
+            type.foreach_derived([&](const Type &derived) {
                 // derives[derived.pretty_name()] = derived;
                 derives.emplace(derived.pretty_name(), derived);
             });
             std::string_view current_select = "None";
             bool changed = false;
-            if(value){
+            if (value) {
                 current_select = Type(type_of(*value)).pretty_name();
             }
-            if (ImGui::BeginCombo(label, current_select.data())) 
-            {
+            if (ImGui::BeginCombo(label, current_select.data())) {
                 // for (int n = 0; n < IM_ARRAYSIZE(items); n++)
                 // {
                 //     bool is_selected = (item_current == items[n]);
                 //     if (ImGui::Selectable(items[n], is_selected))
                 //         item_current = items[n];
                 //     if (is_selected)
-                //         ImGui::SetItemDefaultFocus(); 
+                //         ImGui::SetItemDefaultFocus();
                 // }
-                for(auto & item : derives){
+                if (ImGui::Selectable("null", value == nullptr) && value) {
+                    changed = true;
+                    current_select = "None";
+                }
+                for (auto &item : derives) {
                     bool is_selected;
-                    if(value == nullptr){ 
+                    if (value == nullptr) {
                         is_selected = false;
-                    }else{
+                    } else {
                         is_selected = item.first == current_select;
                     }
-                    if (ImGui::Selectable(item.first.data(), is_selected) && current_select != item.first){
+                    if (ImGui::Selectable(item.first.data(), is_selected) && current_select != item.first) {
                         current_select = item.first;
                         changed = true;
-                        
                     }
                 }
                 ImGui::EndCombo();
             }
-            if(changed){
-                if(current_select != "None")
+            if (changed) {
+                if (current_select != "None")
                     value = derives.at(current_select).create_shared().shared_cast<T>();
-                else{
+                else {
                     value = nullptr;
                 }
             }
             return true;
-
         }
         template <> inline bool Edit(EditorState &state, const char *label, std::shared_ptr<Material> &value) {
             bool ret = false;
             ImGuiIdGuard _(&value);
+            ImGui::Separator();
             ret = ret | choose_implementation("material", value);
-            ret = ret |display_props(state, label, value);
+            ret = ret | display_props(state, label, value);
             return ret;
         }
         template <> inline bool Edit(EditorState &state, const char *label, std::shared_ptr<Texture> &value) {
             bool ret = false;
             ImGuiIdGuard _(&value);
+            ImGui::Separator();
             ret = ret | choose_implementation("texture", value);
             ret = ret | display_props(state, label, value);
             return ret;
@@ -186,8 +201,9 @@ namespace akari::Gui {
         }
 
         inline bool EditItem(EditorState &state, const char *label, const Any &ref) {
-            return EditItemV<int, float, ivec2, ivec3, vec2, vec3, Spectrum, Angle<float>, Angle<vec3>, TransformManipulator,
-                             std::shared_ptr<Texture>, std::shared_ptr<Material>, MeshWrapper>(state, label, ref)
+            return EditItemV<int, float, ivec2, ivec3, vec2, vec3, Spectrum, Angle<float>, Angle<vec3>,
+                             TransformManipulator, std::shared_ptr<Texture>, std::shared_ptr<Material>, MeshWrapper>(
+                       state, label, ref)
                 .second;
         }
     }; // namespace detail
@@ -328,10 +344,19 @@ namespace akari::Gui {
                 ShowSceneGraph();
                 ShowInspector();
                 ShowStyleEditor();
+                show_setting_panel();
                 logWindow->Show();
             });
         }
-
+        void show_setting_panel() {
+            if (ImGui::Begin("Control")) {
+                std::array<char, 256> buffer = {0};
+                if (ImGui::InputText("load plugin", &buffer[0], 256, ImGuiInputTextFlags_EnterReturnsTrue)) {
+                    (void)get_plugin_manager()->load_plugin(&buffer[0]);
+                }
+                ImGui::End();
+            }
+        }
         void ShowMenu() {
             if (ImGui::BeginMenuBar()) {
                 if (ImGui::BeginMenu("File")) {

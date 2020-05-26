@@ -69,7 +69,7 @@ namespace akari {
     }
 
     // https://seblagarde.wordpress.com/2013/04/29/memo-on-fresnel-equations/
-    inline Spectrum FrConductor(Float cosThetaI, const Spectrum &etaI, const Spectrum &etaT, const Spectrum &k) {
+    inline Spectrum fr_conductor(Float cosThetaI, const Spectrum &etaI, const Spectrum &etaT, const Spectrum &k) {
         float CosTheta2 = cosThetaI * cosThetaI;
         float SinTheta2 = 1 - CosTheta2;
         Spectrum Eta = etaT / etaI;
