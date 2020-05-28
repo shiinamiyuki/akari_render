@@ -30,9 +30,10 @@
 
 namespace akari {
     class MixedMaterial : public Material {
+        [[refl]] std::shared_ptr<Texture> fraction;
         [[refl]] std::shared_ptr<Material> matA;
         [[refl]] std::shared_ptr<Material> matB;
-        [[refl]] std::shared_ptr<Texture> fraction;
+        
 
       public:
         MixedMaterial() = default;

@@ -24,6 +24,7 @@
 #include <immintrin.h>
 #include <type_traits>
 #include <array>
+#include <cstring>
 namespace akari {
     AKR_FORCEINLINE float uintBitsToFloat(uint32_t x) {
         float v;
@@ -311,12 +312,12 @@ namespace akari {
         Array(Args &&... args) {
             static_assert(sizeof...(args) <= N);
             T _tmp[] = {args...};
-            std::memcpy(&at<0>(), &_tmp[0], sizeof(_tmp));
+            std::memcpy(&this->template at<0>(), &_tmp[0], sizeof(_tmp));
             // if constexpr ()
         }
 #define AKR_ARRAY_ACCESS_OP(name, idx)                                                                                 \
-    const T &name() const { return at<idx>(); }                                                                        \
-    T &name() { return at<idx>(); }
+    const T &name() const { return this->template at<idx>(); }                                                                        \
+    T &name() { return this->template at<idx>(); }
         AKR_ARRAY_ACCESS_OP(x, 0)
         AKR_ARRAY_ACCESS_OP(y, 1)
         AKR_ARRAY_ACCESS_OP(z, 2)

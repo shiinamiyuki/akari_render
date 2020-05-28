@@ -1,5 +1,6 @@
 cmake-*/
 build/
+build-wsl/
 .vscode/
 .idea/
 data/*

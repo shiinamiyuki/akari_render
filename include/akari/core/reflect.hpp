@@ -801,7 +801,7 @@ namespace akari {
                         auto q = dynamic_cast<To *>(reinterpret_cast<From *>(p));
                         return q;
                     }
-                    return {};
+                    return std::nullopt;
                 };
 
                 mgr.cast_funcs.emplace(std::make_pair(type_of<To>().name, type_of<From>().name), f);
