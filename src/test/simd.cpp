@@ -20,33 +20,34 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <akari/core/platform.h>
 #include <immintrin.h>
 #include <type_traits>
 #include <array>
 namespace akari {
-    __forceinline float uintBitsToFloat(uint32_t x) {
+    AKR_FORCEINLINE float uintBitsToFloat(uint32_t x) {
         float v;
         std::memcpy(&v, &x, sizeof(float));
         return v;
     }
-    __forceinline float intBitsToFloat(int32_t x) {
+    AKR_FORCEINLINE float intBitsToFloat(int32_t x) {
         float v;
         std::memcpy(&v, &x, sizeof(float));
         return v;
     }
-    __forceinline uint32_t floatBitsToInt(float x) {
+    AKR_FORCEINLINE uint32_t floatBitsToInt(float x) {
         uint32_t v;
         std::memcpy(&v, &x, sizeof(float));
         return v;
     }
-    __forceinline int32_t floatBitsToUint(float x) {
+    AKR_FORCEINLINE int32_t floatBitsToUint(float x) {
         int32_t v;
         std::memcpy(&v, &x, sizeof(float));
         return v;
     }
     template <typename T, size_t N, typename Derived> struct ArrayOperatorDefault {
 #define AKR_ARRAY_DEFAULT_OP(op, func)                                                                                 \
-    __forceinline Derived func(const Derived &rhs) const {                                                             \
+    AKR_FORCEINLINE Derived func(const Derived &rhs) const {                                                             \
         Derived tmp;                                                                                                   \
         for (size_t i = 0; i < N; i++) {                                                                               \
             tmp.s[i] = (derived()->s[i] op rhs.s[i]);                                                                  \
@@ -71,7 +72,7 @@ namespace akari {
         using Self = ArrayStorage;
         static constexpr bool is_specialized = false;
         std::array<T, N> s;
-        template <typename F> __forceinline ArrayStorage apply(F &&f) const {
+        template <typename F> AKR_FORCEINLINE ArrayStorage apply(F &&f) const {
             ArrayStorage tmp;
             for (size_t i = 0; i < N; i++) {
                 tmp.s[i] = f(s[i]);
@@ -98,7 +99,7 @@ namespace akari {
         SIMD32x4(float x) : f32x4(_mm_set1_ps(x)) {}
         SIMD32x4(__m128 x) : f32x4(x) {}
 #define AKR_ARRAY_OP(func, intrin)                                                                                     \
-    __forceinline Derived func(const Derived &rhs) const { return Derived(intrin(this->f32x4, rhs.f32x4)); }
+    AKR_FORCEINLINE Derived func(const Derived &rhs) const { return Derived(intrin(this->f32x4, rhs.f32x4)); }
         AKR_ARRAY_OP(add_, _mm_add_ps)
         AKR_ARRAY_OP(sub_, _mm_sub_ps)
         AKR_ARRAY_OP(mul_, _mm_mul_ps)
@@ -123,7 +124,7 @@ namespace akari {
         SIMDi32x4(int32_t x) : i32x4(_mm_set1_epi32(x)) {}
         SIMDi32x4(__m128i x) : i32x4(x) {}
 #define AKR_ARRAY_OP(func, intrin)                                                                                     \
-    __forceinline Derived func(const Derived &rhs) const { return Derived(intrin(this->f32x4, rhs.f32x4)); }
+    AKR_FORCEINLINE Derived func(const Derived &rhs) const { return Derived(intrin(this->f32x4, rhs.f32x4)); }
         AKR_ARRAY_OP(and_, _mm_and_ps)
         AKR_ARRAY_OP(or_, _mm_or_ps)
         AKR_ARRAY_OP(xor_, _mm_xor_ps)
@@ -142,7 +143,7 @@ namespace akari {
         SIMD32x8(float x) : f32x8(_mm256_set1_ps(x)) {}
         SIMD32x8(__m256 x) : f32x8(x) {}
 #define AKR_ARRAY_OP(func, intrin)                                                                                     \
-    __forceinline Derived func(const Derived &rhs) const { return Derived(intrin(this->f32x8, rhs.f32x8)); }
+    AKR_FORCEINLINE Derived func(const Derived &rhs) const { return Derived(intrin(this->f32x8, rhs.f32x8)); }
         AKR_ARRAY_OP(add_, _mm256_add_ps)
         AKR_ARRAY_OP(sub_, _mm256_sub_ps)
         AKR_ARRAY_OP(mul_, _mm256_mul_ps)
@@ -166,7 +167,7 @@ namespace akari {
         SIMDi32x8(int32_t x) : f32x8(_mm256_set1_epi32(x)) {}
         SIMDi32x8(__m256i x) : i32x8(x) {}
 #define AKR_ARRAY_OP(func, intrin)                                                                                     \
-    __forceinline Derived func(const Derived &rhs) const { return Derived(intrin(this->f32x8, rhs.f32x8)); }
+    AKR_FORCEINLINE Derived func(const Derived &rhs) const { return Derived(intrin(this->f32x8, rhs.f32x8)); }
         AKR_ARRAY_OP(and_, _mm256_and_ps)
         AKR_ARRAY_OP(or_, _mm256_or_ps)
         AKR_ARRAY_OP(xor_, _mm256_xor_ps)
@@ -219,7 +220,7 @@ namespace akari {
         ArrayStoragePair(const T &a) : lo(a), hi(a) {}
         ArrayStoragePair(const Array1 &a, const Array2 &b) : lo(a), hi(b) {}
 #define AKR_ARRAY_OP(func)                                                                                             \
-    __forceinline Self func(const Self &rhs) const { return Self(lo.func(rhs.lo), hi.func(rhs.hi)); }
+    AKR_FORCEINLINE Self func(const Self &rhs) const { return Self(lo.func(rhs.lo), hi.func(rhs.hi)); }
         AKR_ARRAY_OP(add_)
         AKR_ARRAY_OP(sub_)
         AKR_ARRAY_OP(mul_)
@@ -246,7 +247,7 @@ namespace akari {
         ArrayBaseImpl(const T &v) : Base(v) {}
         ArrayBaseImpl(const Base &rhs) : Base(rhs) {}
 #define AKR_ARRAY_OP(func)                                                                                             \
-    __forceinline Self func(const Self &rhs) const { return Self(static_cast<const Base *>(this)->func(rhs)); }
+    AKR_FORCEINLINE Self func(const Self &rhs) const { return Self(static_cast<const Base *>(this)->func(rhs)); }
         AKR_ARRAY_OP(add_)
         AKR_ARRAY_OP(sub_)
         AKR_ARRAY_OP(mul_)
@@ -264,7 +265,7 @@ namespace akari {
         using Base::ArrayBaseImpl;
         ArrayBaseCommon(const Base &rhs) : Base(rhs) {}
 #define AKR_ARRAY_OP(func)                                                                                             \
-    __forceinline Derived func(const Self &rhs) const { return Self(static_cast<const Base *>(this)->func(rhs)); }
+    AKR_FORCEINLINE Derived func(const Self &rhs) const { return Self(static_cast<const Base *>(this)->func(rhs)); }
         AKR_ARRAY_OP(add_)
         AKR_ARRAY_OP(sub_)
         AKR_ARRAY_OP(mul_)
@@ -276,7 +277,7 @@ namespace akari {
         AKR_ARRAY_OP(xor_)
 #undef AKR_ARRAY_OP
 #define AKR_ARRAY_IOP(op, func)                                                                                        \
-    __forceinline Derived &operator op(const Self &rhs) {                                                              \
+    AKR_FORCEINLINE Derived &operator op(const Self &rhs) {                                                              \
         *this = Derived(static_cast<const Base *>(this)->func(rhs));                                                   \
         return *this;                                                                                                  \
     }
@@ -289,10 +290,10 @@ namespace akari {
     template <typename T, size_t N, typename Derived> struct ArrayBase : ArrayBaseCommon<T, N, Derived> {
         using Base = ArrayBaseCommon<T, N, Derived>;
         using Base::ArrayBaseCommon;
-        __forceinline T *raw() { return reinterpret_cast<T *>(this); }
-        __forceinline const T *raw() const { return reinterpret_cast<T *>(this); }
-        __forceinline T &operator[](size_t idx) { return raw()[idx]; }
-        __forceinline const T &operator[](size_t idx) const { return raw()[idx]; }
+        AKR_FORCEINLINE T *raw() { return reinterpret_cast<T *>(this); }
+        AKR_FORCEINLINE const T *raw() const { return reinterpret_cast<T *>(this); }
+        AKR_FORCEINLINE T &operator[](size_t idx) { return raw()[idx]; }
+        AKR_FORCEINLINE const T &operator[](size_t idx) const { return raw()[idx]; }
         template <size_t Idx> T &at() {
             static_assert(Idx < N);
             return raw()[Idx];

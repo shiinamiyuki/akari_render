@@ -105,11 +105,11 @@ namespace akari {
 
       public:
         Distribution2D(const Float *data, size_t nu, size_t nv) {
-            for (auto v = 0; v < nv; v++) {
+            for (auto v = 0u; v < nv; v++) {
                 pConditionalV.emplace_back(std::make_unique<Distribution1D>(&data[v * nu], nu));
             }
             std::vector<Float> m;
-            for (auto v = 0; v < nv; v++) {
+            for (auto v = 0u; v < nv; v++) {
                 m.emplace_back(pConditionalV[v]->funcInt);
             }
             pMarginal = std::make_unique<Distribution1D>(&m[0], nv);
