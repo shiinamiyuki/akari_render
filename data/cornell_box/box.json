@@ -1,0 +1,336 @@
+{
+ "props": {
+  "file": "box.mesh",
+  "materials": [
+   {
+    "emission": {
+     "color": {
+      "props": {
+       "rgb": [
+        0.0,
+        0.0,
+        0.0
+       ]
+      },
+      "type": "RGBTexture"
+     },
+     "strength": {
+      "props": {
+       "rgb": [
+        1.0,
+        1.0,
+        1.0
+       ]
+      },
+      "type": "RGBTexture"
+     }
+    },
+    "marked_as_light": false,
+    "material": {
+     "props": {
+      "color": {
+       "props": {
+        "rgb": [
+         0.7250000238418579,
+         0.7099999785423279,
+         0.6800000071525574
+        ]
+       },
+       "type": "RGBTexture"
+      }
+     },
+     "type": "MatteMaterial"
+    },
+    "name": "floor_floor"
+   },
+   {
+    "emission": {
+     "color": {
+      "props": {
+       "rgb": [
+        0.0,
+        0.0,
+        0.0
+       ]
+      },
+      "type": "RGBTexture"
+     },
+     "strength": {
+      "props": {
+       "rgb": [
+        1.0,
+        1.0,
+        1.0
+       ]
+      },
+      "type": "RGBTexture"
+     }
+    },
+    "marked_as_light": false,
+    "material": {
+     "props": {
+      "color": {
+       "props": {
+        "rgb": [
+         0.7250000238418579,
+         0.7099999785423279,
+         0.6800000071525574
+        ]
+       },
+       "type": "RGBTexture"
+      }
+     },
+     "type": "MatteMaterial"
+    },
+    "name": "ceiling_ceiling"
+   },
+   {
+    "emission": {
+     "color": {
+      "props": {
+       "rgb": [
+        0.0,
+        0.0,
+        0.0
+       ]
+      },
+      "type": "RGBTexture"
+     },
+     "strength": {
+      "props": {
+       "rgb": [
+        1.0,
+        1.0,
+        1.0
+       ]
+      },
+      "type": "RGBTexture"
+     }
+    },
+    "marked_as_light": false,
+    "material": {
+     "props": {
+      "color": {
+       "props": {
+        "rgb": [
+         0.7250000238418579,
+         0.7099999785423279,
+         0.6800000071525574
+        ]
+       },
+       "type": "RGBTexture"
+      }
+     },
+     "type": "MatteMaterial"
+    },
+    "name": "backWall_backWall"
+   },
+   {
+    "emission": {
+     "color": {
+      "props": {
+       "rgb": [
+        0.0,
+        0.0,
+        0.0
+       ]
+      },
+      "type": "RGBTexture"
+     },
+     "strength": {
+      "props": {
+       "rgb": [
+        1.0,
+        1.0,
+        1.0
+       ]
+      },
+      "type": "RGBTexture"
+     }
+    },
+    "marked_as_light": false,
+    "material": {
+     "props": {
+      "color": {
+       "props": {
+        "rgb": [
+         0.14000000059604645,
+         0.44999998807907104,
+         0.09099999815225601
+        ]
+       },
+       "type": "RGBTexture"
+      }
+     },
+     "type": "MatteMaterial"
+    },
+    "name": "rightWall_rightWall"
+   },
+   {
+    "emission": {
+     "color": {
+      "props": {
+       "rgb": [
+        0.0,
+        0.0,
+        0.0
+       ]
+      },
+      "type": "RGBTexture"
+     },
+     "strength": {
+      "props": {
+       "rgb": [
+        1.0,
+        1.0,
+        1.0
+       ]
+      },
+      "type": "RGBTexture"
+     }
+    },
+    "marked_as_light": false,
+    "material": {
+     "props": {
+      "color": {
+       "props": {
+        "rgb": [
+         0.6299999952316284,
+         0.06499999761581421,
+         0.05000000074505806
+        ]
+       },
+       "type": "RGBTexture"
+      }
+     },
+     "type": "MatteMaterial"
+    },
+    "name": "leftWall_leftWall"
+   },
+   {
+    "emission": {
+     "color": {
+      "props": {
+       "rgb": [
+        0.0,
+        0.0,
+        0.0
+       ]
+      },
+      "type": "RGBTexture"
+     },
+     "strength": {
+      "props": {
+       "rgb": [
+        1.0,
+        1.0,
+        1.0
+       ]
+      },
+      "type": "RGBTexture"
+     }
+    },
+    "marked_as_light": false,
+    "material": {
+     "props": {
+      "color": {
+       "props": {
+        "rgb": [
+         0.7250000238418579,
+         0.7099999785423279,
+         0.6800000071525574
+        ]
+       },
+       "type": "RGBTexture"
+      }
+     },
+     "type": "MatteMaterial"
+    },
+    "name": "leftWall_shortBox"
+   },
+   {
+    "emission": {
+     "color": {
+      "props": {
+       "rgb": [
+        0.0,
+        0.0,
+        0.0
+       ]
+      },
+      "type": "RGBTexture"
+     },
+     "strength": {
+      "props": {
+       "rgb": [
+        1.0,
+        1.0,
+        1.0
+       ]
+      },
+      "type": "RGBTexture"
+     }
+    },
+    "marked_as_light": false,
+    "material": {
+     "props": {
+      "color": {
+       "props": {
+        "rgb": [
+         0.7250000238418579,
+         0.7099999785423279,
+         0.6800000071525574
+        ]
+       },
+       "type": "RGBTexture"
+      }
+     },
+     "type": "MatteMaterial"
+    },
+    "name": "shortBox_tallBox"
+   },
+   {
+    "emission": {
+     "color": {
+      "props": {
+       "rgb": [
+        1.0,
+        0.7058823704719543,
+        0.23529411852359772
+       ]
+      },
+      "type": "RGBTexture"
+     },
+     "strength": {
+      "props": {
+       "rgb": [
+        17.0,
+        17.0,
+        17.0
+       ]
+      },
+      "type": "RGBTexture"
+     }
+    },
+    "marked_as_light": true,
+    "material": {
+     "props": {
+      "color": {
+       "props": {
+        "rgb": [
+         0.7799999713897705,
+         0.7799999713897705,
+         0.7799999713897705
+        ]
+       },
+       "type": "RGBTexture"
+      }
+     },
+     "type": "MatteMaterial"
+    },
+    "name": "light_light"
+   }
+  ]
+ },
+ "type": "BinaryMesh"
+}

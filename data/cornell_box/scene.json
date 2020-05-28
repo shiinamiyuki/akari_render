@@ -1,0 +1,53 @@
+{
+    "render": [
+        {
+            "camera": {
+                "type": "PerspectiveCamera",
+                "props": {
+                    "resolution": [
+                        400,
+                        400
+                    ],
+                    "fov": {
+                        "deg": 15
+                    },
+                    "transform": {
+                        "rotation": {
+                            "deg": [
+                                0,
+                                0,
+                                0
+                            ]
+                        },
+                        "translation": [
+                            0,
+                            1,
+                            9
+                        ],
+                        "scale": [
+                            1,
+                            1,
+                            1
+                        ]
+                    }
+                }
+            },
+            "integrator": {
+                "type": "PathTracer",
+                "props": {
+                    "spp": 8,
+                    "max_depth": 7
+                }
+            },
+            "output": "render-pt.png"
+        }
+    ],
+    "scene": {
+        "meshes": [
+            {
+                "file": "box.json"
+            }
+        ],
+        "lights": []
+    }
+}

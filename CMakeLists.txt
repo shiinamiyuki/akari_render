@@ -58,7 +58,7 @@ set(AKR_CORE_EXT_LIBS ${AKR_CORE_EXT_LIBS} fmt)
 include(cmake/GUI.cmake)
 include(cmake/Embree.cmake)
 include(cmake/OIDN.cmake)
-include (cmake/Cuda.cmake)
+include(cmake/Vulkan.cmake)
 #include(cmake/LLVM.cmake)
 
 ##set(AKR_CORE_EXT_LIBS ${AKR_CORE_EXT_LIBS} embree embree_sse42 embree_avx embree_avx2 lexers math simd tasking sys)

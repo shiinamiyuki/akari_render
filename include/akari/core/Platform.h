@@ -31,10 +31,12 @@ namespace akari {
     #pragma warning(disable : 4251) // 'field' : class 'A' needs to have dll-interface to be used by clients of class 'B'
     #pragma warning(disable : 4800) // 'type' : forcing value to bool 'true' or 'false' (performance warning)
     #pragma warning(disable : 4996) // Secure SCL warnings
+    #define AKR_FORCEINLINE __forceinline
 #else
     #if defined _WIN32 || defined __CYGWIN__
         #ifdef __GNUC__
           #define AKR_EXPORT __attribute__ ((dllexport))
+          
         #else
           #define AKR_EXPORT __declspec(dllexport) // Note: actually gcc seems to also supports this syntax.
         #endif
@@ -43,6 +45,7 @@ namespace akari {
         #define AKR_EXPORT __attribute__ ((visibility ("default")))
 
     #endif
+    #define AKR_FORCEINLINE   inline __attribute__((always_inline))
 #endif
 } // namespace akari
 #endif // AKARIRENDER_PLATFORM_H
