@@ -66,7 +66,7 @@ namespace akari {
     // we need to write our own math functions
     template <size_t N> struct simd_float_fma {
         template <size_t M>
-        static __forceinline void impl(const simd32_storage<M> &res, const simd32_storage<M> &a, const simd32_storage<M> &b,
+        static AKR_FORCEINLINE void impl(const simd32_storage<M> &res, const simd32_storage<M> &a, const simd32_storage<M> &b,
                          const simd32_storage<M> &c) {
             using ::std::fma;
             using head = decltype(simd32_storage<M>::head);
@@ -88,60 +88,60 @@ namespace akari {
 
     // (x * y) + z
     template <size_t N>
-    __forceinline  simd_array<float, N> fma(const simd_array<float, N> &x, const simd_array<float, N> &y,
+    AKR_FORCEINLINE  simd_array<float, N> fma(const simd_array<float, N> &x, const simd_array<float, N> &y,
                                     const simd_array<float, N> &z) {
         simd_array<float, N> r;
         simd_float_fma<N>::impl(r._m, x._m, y._m, z._m);
         return r;
     }
-    __forceinline float fma(float x, float y, float z) { return std::fma(x, y, z); }
+    AKR_FORCEINLINE float fma(float x, float y, float z) { return std::fma(x, y, z); }
 
-    template <typename T, typename S = scalar_t<T>> __forceinline T poly2(const T &x, const S &c0, const S &c1, const S &c2) {
+    template <typename T, typename S = scalar_t<T>> AKR_FORCEINLINE T poly2(const T &x, const S &c0, const S &c1, const S &c2) {
         auto x2 = x * x;
         return fma(x2, T(c2), fma(x, T(c1), T(c0)));
     }
 
     template <typename T, typename S = scalar_t<T>>
-    __forceinline T poly3(const T &x, const S &c0, const S &c1, const S &c2, const S &c3) {
+    AKR_FORCEINLINE T poly3(const T &x, const S &c0, const S &c1, const S &c2, const S &c3) {
         auto x2 = x * x;
         return fma(x2, fma(x, T(c3), T(c2)), fma(x, T(c1), T(c0)));
     }
 
     template <typename T, typename S = scalar_t<T>>
-    __forceinline T poly4(const T &x, const S &c0, const S &c1, const S &c2, const S &c3, const S &c4) {
+    AKR_FORCEINLINE T poly4(const T &x, const S &c0, const S &c1, const S &c2, const S &c3, const S &c4) {
         auto x2 = x * x;
         auto x4 = x2 * x2;
         return fma(x2, fma(x, T(c3), T(c2)), fma(x, T(c1), T(c0))) + x4 * c4;
     }
 
     template <typename T, typename S = scalar_t<T>>
-    __forceinline T poly5(const T &x, const S &c0, const S &c1, const S &c2, const S &c3, const S &c4, const S &c5) {
+    AKR_FORCEINLINE T poly5(const T &x, const S &c0, const S &c1, const S &c2, const S &c3, const S &c4, const S &c5) {
         auto x2 = x * x;
         auto x4 = x2 * x2;
         return fma(x4, fma(x, T(c5), T(c4)), fma(x2, fma(x, T(c3), T(c2)), fma(x, T(c1), T(c0))));
     }
 
     template <typename T, typename S = scalar_t<T>>
-    __forceinline T poly6(const T &x, const S &c0, const S &c1, const S &c2, const S &c3, const S &c4, const S &c5,
+    AKR_FORCEINLINE T poly6(const T &x, const S &c0, const S &c1, const S &c2, const S &c3, const S &c4, const S &c5,
                    const S &c6) {
         auto x2 = x * x;
         auto x4 = x2 * x2;
         return x4 * (fma(x, T(c5), T(c4)) + x2 * c6) + fma(x2, fma(x, T(c3), T(c2)), fma(x, T(c1), T(c0)));
     }
 
-    template <size_t N> __forceinline simd_array<float, N> floatbits(const simd_array<int, N> &x) {
+    template <size_t N> AKR_FORCEINLINE simd_array<float, N> floatbits(const simd_array<int, N> &x) {
         simd_array<float, N> y;
         static_assert(sizeof(x) == sizeof(y));
         std::memcpy(y.data, x.data, sizeof(x));
     }
 
-    template <size_t N> __forceinline simd_array<int, N> intbits(const simd_array<float, N> &x) {
+    template <size_t N> AKR_FORCEINLINE simd_array<int, N> intbits(const simd_array<float, N> &x) {
         simd_array<int, N> y;
         static_assert(sizeof(x) == sizeof(y));
         std::memcpy(y.data, x.data, sizeof(x));
     }
     // from https://github.com/ispc/ispc/blob/master/stdlib.ispc
-    template <typename F, typename I> __forceinline F _sin(const F &x_full) {
+    template <typename F, typename I> AKR_FORCEINLINE F _sin(const F &x_full) {
         static const auto pi_over_two_vec = F(1.57079637050628662109375f);
         static const auto two_over_pi_vec = F(0.636619746685028076171875f);
         F scaled = x_full * two_over_pi_vec;
@@ -182,7 +182,7 @@ namespace akari {
         return formula;
     }
 
-    template <typename F, typename I> __forceinline F _cos(const F &x_full) {
+    template <typename F, typename I> AKR_FORCEINLINE F _cos(const F &x_full) {
         static const auto pi_over_two_vec = F(1.57079637050628662109375f);
         static const auto two_over_pi_vec = F(0.636619746685028076171875f);
         F scaled = x_full * two_over_pi_vec;
@@ -222,7 +222,7 @@ namespace akari {
         formula = select(flip_sign, F(-1.0f) * formula, formula);
         return formula;
     }
-    template <typename F, typename I> __forceinline F ldexp(const F &x, const I &n) {
+    template <typename F, typename I> AKR_FORCEINLINE F ldexp(const F &x, const I &n) {
         I ex = 0x7F800000u;
         I ix = intbits(x);
         ex &= ix;               // extract old exponent;
@@ -232,7 +232,7 @@ namespace akari {
         return floatbits(ix);
     }
 
-    template <typename F, typename I> __forceinline F _fastexp(const F &x_full) {
+    template <typename F, typename I> AKR_FORCEINLINE F _fastexp(const F &x_full) {
         F z = floor(1.44269504088896341f * x_full + 0.5f);
         I n;
         x_full -= z * 0.693359375f;
@@ -252,7 +252,7 @@ namespace akari {
         return x_full;
     }
 
-    template <typename F, typename I> __forceinline F _exp(const F &x_full) {
+    template <typename F, typename I> AKR_FORCEINLINE F _exp(const F &x_full) {
         const F ln2_part1 = 0.6931457519;
         const F ln2_part2 = 1.4286067653e-6;
         const F one_over_ln2 = 1.44269502162933349609375;
@@ -305,15 +305,15 @@ namespace akari {
 
     template <size_t N> struct array_sin<float, N> {
         using A = simd_array<float, N>;
-        static __forceinline A apply(const A &x) { return _sin<simd_array<float, N>, simd_array<int, N>>(x); }
+        static AKR_FORCEINLINE A apply(const A &x) { return _sin<simd_array<float, N>, simd_array<int, N>>(x); }
     };
     template <size_t N> struct array_cos<float, N> {
         using A = simd_array<float, N>;
-        static __forceinline A apply(const A &x) { return _cos<simd_array<float, N>, simd_array<int, N>>(x); }
+        static AKR_FORCEINLINE A apply(const A &x) { return _cos<simd_array<float, N>, simd_array<int, N>>(x); }
     };
     template <size_t N> struct array_exp<float, N> {
         using A = simd_array<float, N>;
-        static __forceinline A apply(const A &x) { return _exp<simd_array<float, N>, simd_array<int, N>>(x); }
+        static AKR_FORCEINLINE A apply(const A &x) { return _exp<simd_array<float, N>, simd_array<int, N>>(x); }
     };
 
     template <size_t N> simd_array<float, N> fastexp(const simd_array<float, N> &x) {
