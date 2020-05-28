@@ -41,7 +41,7 @@ namespace akari {
     };
     template<typename T>
     struct StaticMeta {
-        template<class F, typename = std::invoke_result_t<const StaticProperty&, size_t>>
+        template<class F>
         static void foreach_property(T & object,F && f){}
         static size_t property_count() {return 0;}
         static size_t method_count() {return 0;}
