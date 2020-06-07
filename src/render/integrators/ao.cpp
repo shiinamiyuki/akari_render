@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright (c) 2019 椎名深雪
+// Copyright (c) 2020 椎名深雪
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -90,20 +90,26 @@ namespace akari {
         void start() override {
             future = std::async(std::launch::async, [=]() {
                 auto beginTime = std::chrono::high_resolution_clock::now();
-
                 auto scene = ctx.scene;
                 auto &camera = ctx.camera;
                 auto &_sampler = ctx.sampler;
                 auto film = camera->GetFilm();
                 auto nTiles = ivec2(film->resolution() + ivec2(TileSize - 1)) / ivec2(TileSize);
                 ProgressReporter progressReporter(nTiles.x * nTiles.y, [=](size_t cur, size_t tot) {
-                    if (spp <= 16) {
-                        if (cur % (tot / 10) == 0) {
-                            show_progress(double(cur) / tot, 70);
-                        }
-                    } else {
-                        show_progress(double(cur) / tot, 70);
-                    }
+                    //  if (spp <= 16) {
+                    //     if (cur % (tot / 10) == 0) {
+                    //         show_progress(double(cur) / tot, 70);
+                    //     }
+                    // } else if (spp <= 40) {
+                    //     if (cur % (tot / 100) == 0) {
+                    //         show_progress(double(cur) / tot, 70);
+                    //     }
+
+                    // } else {
+                    //     if (cur % (tot / 200) == 0) {
+                    //         show_progress(double(cur) / tot, 70);
+                    //     }
+                    // }
                 });
                 parallel_for_2d(nTiles, [=, &progressReporter](ivec2 tilePos, uint32_t tid) {
                     (void)tid;

@@ -59,13 +59,14 @@ include(cmake/GUI.cmake)
 include(cmake/Embree.cmake)
 include(cmake/OIDN.cmake)
 include(cmake/Vulkan.cmake)
-#include(cmake/LLVM.cmake)
+include(cmake/LLVM.cmake)
 
 ##set(AKR_CORE_EXT_LIBS ${AKR_CORE_EXT_LIBS} embree embree_sse42 embree_avx embree_avx2 lexers math simd tasking sys)
 #
 file(GLOB AKR_API_SRC include/akari/core/*.* include/akari/render/*.*)
 file(GLOB AKR_CORE_SRC src/core/*.* )
 file(GLOB AKR_CORE_RENDER_SRC src/render/*.*)
+file(GLOB AKR_COMPUTE_SRC src/compute/*.* src/compute/*/*.*)
 add_library(AkariCore SHARED ${AKR_CORE_SRC})
 target_link_libraries(AkariCore  ${AKR_CORE_EXT_LIBS})
 target_compile_options(AkariCore PUBLIC ${AKR_CXX_FLAGS})
@@ -123,8 +124,42 @@ add_subdirectory(src/tool)
 add_executable(akari src/app/akari.cpp)
 target_link_libraries(akari AkariCoreRender)
 
-# add_executable(AkariCompute src/app/akari_expr.cpp)
-# target_link_libraries(AkariCompute AkariCore)
+add_library(AkariCompute SHARED ${AKR_COMPUTE_SRC})
+target_link_libraries(AkariCompute AkariCore)
+target_include_directories(AkariCompute PUBLIC ${LLVM_INCLUDE_DIR})
+target_link_directories(AkariCompute PUBLIC ${LLVM_LIBRARY_DIRS})
+target_link_libraries(AkariCompute
+        LLVMX86Disassembler
+        LLVMX86AsmParser
+#        LLVMX86AsmPrinter
+        LLVMX86CodeGen
+
+        LLVMSelectionDAG
+
+        LLVMAsmPrinter
+        LLVMMCParser
+        LLVMX86Info
+
+        LLVMMCJIT
+        LLVMInterpreter
+        LLVMExecutionEngine
+
+        LLVMCodeGen
+        LLVMScalarOpts
+        LLVMTransformUtils
+
+        LLVMipo
+        LLVMAnalysis
+        LLVMTarget
+        LLVMMC
+
+        LLVMCore
+        LLVMSupport
+        )
+
+
+add_executable(akaric src/app/akari_expr.cpp)
+target_link_libraries(akaric AkariCompute)
 
 if(AKR_BUILD_GUI)
     file(GLOB AkariGuiSrc src/app/ui/*.*)

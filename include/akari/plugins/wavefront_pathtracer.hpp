@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright (c) 2019 椎名深雪
+// Copyright (c) 2020 椎名深雪
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -23,8 +23,8 @@
 #include <akari/render/geometry.hpp>
 namespace akari {
     struct TraversalFlags{
-        static size_t EValid = 1;
-        static size_t ETerminated = 1 << 1;
+        static constexpr size_t EValid = 1;
+        static constexpr size_t ETerminated = 1 << 1;
         TraversalFlags(size_t f):flags(f){}
         operator size_t ()const{return flags;}
     private:
@@ -36,7 +36,7 @@ namespace akari {
         using AnyHitShader = void(*)(void*);
         using ClosestHitshader = void(*)(void*, Intersection&);
         using Continuation = void(*)(void*);
-        void trace(const Ray & ray, PathState & state,)
+        void trace(const Ray & ray, void * state,Continuation cont);
     }; 
 
     template<typename PathState, class RayGenerationProgram>
@@ -46,7 +46,7 @@ namespace akari {
         using AnyHitShader = void(*)(PathState&);
         using ClosestHitshader = void(*)(PathState &, Intersection& );
         using Continuation = void(*)(PathState&);
-
+        
         void trace(const Ray& ray, PathState & state, Continuation cont){
             
         }

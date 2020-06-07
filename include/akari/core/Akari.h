@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright (c) 2019 椎名深雪
+// Copyright (c) 2020 椎名深雪
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -29,7 +29,8 @@
 #pragma warning(disable : 4244)
 #pragma warning(disable : 4146)
 #pragma warning(disable : 4305)
-#pragma warning(disable : 5030)
+#pragma warning(disable : 4244)
+
 #else
 #pragma GCC diagnostic error "-Wall"
 #pragma clang diagnostic error "-Wall"

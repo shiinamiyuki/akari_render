@@ -1,10 +1,10 @@
 IF(WIN32)
     set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "C:/Program Files (x86)/LLVM/lib/cmake")
 ELSE()
-#    set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "/usr/lib64/cmake/")
+   set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "/usr/lib64/cmake/")
 ENDIF()
 
-find_package(LLVM 8.0)
+find_package(LLVM 10.0)
 if(NOT LLVM_FOUND)
     message(FATAL_ERROR "LLVM not found")
 else()

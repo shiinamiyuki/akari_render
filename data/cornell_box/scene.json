@@ -5,8 +5,8 @@
                 "type": "PerspectiveCamera",
                 "props": {
                     "resolution": [
-                        400,
-                        400
+                        1024,
+                        1024
                     ],
                     "fov": {
                         "deg": 15
@@ -35,14 +35,19 @@
             "integrator": {
                 "type": "PathTracer",
                 "props": {
-                    "spp": 8,
-                    "max_depth": 7
+                    "spp": 32,
+                    "min_depth": 3,
+                    "max_depth": 65
                 }
             },
             "output": "render-pt.png"
         }
     ],
     "scene": {
+        "accelerator" :{
+            "type":"EmbreeAccelerator",
+            "props":{}
+        },
         "meshes": [
             {
                 "file": "box.json"
