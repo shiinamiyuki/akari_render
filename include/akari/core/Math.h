@@ -61,6 +61,7 @@ namespace akari {
     constexpr Float Pi2 = Pi * 0.5f;
     constexpr Float Pi4 = Pi * 0.25f;
     constexpr Float InvPi = 1.0f / Pi;
+    constexpr Float Inv2Pi = 1.0f / (2.0f * Pi);
     constexpr Float Inv4Pi = 1.0f / (4.0f * Pi);
     constexpr Float Inf = std::numeric_limits<Float>::infinity();
     constexpr Float MaxFloat = std::numeric_limits<Float>::max();
@@ -234,5 +235,17 @@ namespace akari {
     }
 
     inline vec3 face_forward(const vec3 &n, const vec3 &w) { return dot(n, w) < 0 ? -n : n; }
+
+    inline vec3 spherical_to_xyz(Float sinTheta, Float cosTheta, Float phi) {
+        return vec3(sinTheta * std::cos(phi), cosTheta, sinTheta * std::sin(phi));
+    }
+
+    inline Float spherical_theta(const vec3 &v) { return std::acos(clamp<Float>(v.y, -1.0f, 1.0f)); }
+
+    inline Float spherical_phi(const vec3 &v) {
+        auto p = std::atan2(v.z, v.x);
+        return p < 0 ? (p + 2 * Pi) : p;
+    }
+    
 } // namespace akari
 #endif // AKARIRENDER_MATH_H

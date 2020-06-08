@@ -28,7 +28,11 @@
 namespace akari {
     void Scene::commit() {
         accelerator->build(*this);
-
+        if (this->world_light_factory) {
+            world_light = world_light_factory->create(*this);
+            world_light->commit();
+            lights.emplace_back(world_light);
+        }
         for (auto &mesh : meshes) {
             auto meshLights = mesh->get_mesh_lights();
             for (auto &light : meshLights)

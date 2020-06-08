@@ -67,8 +67,8 @@ namespace akari {
         // Assume: 0 <= i < n
         [[nodiscard]] Float pdf_discrete(int i) const { return func[i] / (funcInt * count()); }
         [[nodiscard]] Float pdf_continuous(Float x) const {
-            uint32_t offset = static_cast<uint32_t>(x * count());
-            return func[(size_t)(offset / funcInt)];
+            uint32_t offset = std::clamp<uint32_t>(static_cast<uint32_t>(x * count()), 0, count() - 1);
+            return func[offset] / funcInt;
         }
         int sample_discrete(Float u, Float *pdf = nullptr) {
             uint32_t i = UpperBound(0, cdf.size(), [=](int idx) { return cdf[idx] <= u; });

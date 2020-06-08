@@ -26,6 +26,7 @@
 #include <variant>
 #include <akari/core/platform.h>
 #include <akari/compute/base.hpp>
+#include <akari/compute/types.hpp>
 
 namespace akari::compute::ir {
     AKR_EXPORT size_t generate_id();
@@ -53,6 +54,7 @@ namespace akari::compute::ir {
     };
     using NodePtr = std::shared_ptr<Node>;
     using VarNodePtr = std::shared_ptr<VarNode>;
+    using FunctionNodePtr = std::shared_ptr<FunctionNode>;
 #define AKR_DECL_NODE(Type)                                                                                            \
     std::string type_name() const { return #Type; }                                                                    \
     void accept(NodeVisitor &vis) { vis.visit(*this); }

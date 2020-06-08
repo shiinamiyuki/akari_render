@@ -96,7 +96,9 @@ namespace akari {
                     si->compute_scattering_functions(arena, TransportMode::EImportance, 1.0f);
                     auto Le = si->Le(si->wo);
                     if (!Le.is_black()) {
-                        if (!light || specular || depth == 0)
+                        if (!light) {
+                            Li += beta * Le;
+                        } else if (specular || depth == 0)
                             Li += beta * (light->Li(si->wo, si->uv));
                         else {
                             auto lightPdf = light->pdf_incidence(*prevInteraction, ray.d) * scene->PdfLight(light);
@@ -149,7 +151,17 @@ namespace akari {
                     ray = si->spawn_dir(wiW);
                     prevInteraction = si;
                 } else {
-                    Li += beta * Spectrum(0);
+                    auto light = scene->get_world_light().get();
+                    if (light) {
+                        auto wo = -ray.d;
+                        if (specular || depth == 0)
+                            Li += beta * (light->Li(wo, vec2()));
+                        else {
+                            auto lightPdf = light->pdf_incidence(*prevInteraction, ray.d) * scene->PdfLight(light);
+                            Li += beta * (light->Li(wo, vec2()) * MisWeight(prevScatteringPdf, lightPdf));
+                        }
+                    }
+                    // Li += beta * Spectrum(0);
                     break;
                 }
             }

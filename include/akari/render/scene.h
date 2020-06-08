@@ -37,7 +37,7 @@ namespace akari {
     struct MaterialSlot;
     class WorldLightFactory : public Component {
       public:
-        virtual std::shared_ptr<Light> create(const Scene & ) const = 0;
+        virtual std::shared_ptr<Light> create(const Scene &) const = 0;
     };
     class AKR_EXPORT Scene {
         std::vector<std::shared_ptr<const Mesh>> meshes;
@@ -46,7 +46,8 @@ namespace akari {
         std::unique_ptr<Distribution1D> lightDistribution;
         std::vector<std::shared_ptr<Light>> lights;
         std::unordered_map<const Light *, Float> lightPdfMap;
-
+        std::shared_ptr<Light> world_light;
+        std::shared_ptr<WorldLightFactory> world_light_factory;
       public:
         void add_light(const std::shared_ptr<Light> &light) { lights.emplace_back(light); }
         void add_mesh(const std::shared_ptr<const Mesh> &mesh) { meshes.emplace_back(mesh); }
@@ -67,6 +68,8 @@ namespace akari {
             rayCounter++;
             return accelerator->occlude(ray);
         }
+        const std::shared_ptr<Light> &get_world_light() const { return world_light; }
+        void set_world_light(const  std::shared_ptr<WorldLightFactory> &p) { world_light_factory = p; }
         void get_triangle(const PrimitiveHandle &handle, Triangle *triangle) const;
         const MaterialSlot &GetMaterialSlot(const PrimitiveHandle &handle) const;
         const Light *GetLight(const PrimitiveHandle &handle) const;

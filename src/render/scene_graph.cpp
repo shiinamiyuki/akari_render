@@ -58,6 +58,9 @@ namespace akari {
             scene.accelerator = dyn_cast<Accelerator>(create_component("BVHAccelerator"));
 #endif
         }
+        if(scene.world.background){
+            pScene->set_world_light(scene.world.background);
+        }
         pScene->set_accelerator(scene.accelerator);
         info("Building Accelerator\n");
         pScene->commit();

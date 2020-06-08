@@ -25,7 +25,6 @@
 #include <akari/core/logger.h>
 namespace akari {
     static int _ = ([](){
-        info("static init\n");
         class_<Texture, Component>();
         class_<Material, Component>();
         class_<NullTexture, Texture, Component>("NullTexture");

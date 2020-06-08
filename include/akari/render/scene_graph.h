@@ -42,11 +42,16 @@ namespace akari {
         fs::path output;
         AKR_SER(camera, sampler, integrator, output)
     };
+    struct WorldSetting {
+        std::shared_ptr<WorldLightFactory> background;
+        AKR_SER(background)
+    };
     struct SceneSetting {
         std::vector<MeshWrapper> meshes;
         std::shared_ptr<Accelerator> accelerator;
         std::vector<std::shared_ptr<Light>> lights;
-        AKR_SER(meshes, accelerator, lights)
+        WorldSetting world;
+        AKR_SER(meshes, accelerator, lights, world)
     };
     struct AKR_EXPORT SceneGraph {
         std::vector<RenderSetting> render;

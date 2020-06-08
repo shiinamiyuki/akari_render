@@ -31,6 +31,7 @@ namespace akari {
     #pragma warning(disable : 4251) // 'field' : class 'A' needs to have dll-interface to be used by clients of class 'B'
     #pragma warning(disable : 4800) // 'type' : forcing value to bool 'true' or 'false' (performance warning)
     #pragma warning(disable : 4996) // Secure SCL warnings
+    #pragma warning(disable : 5030)
     #define AKR_FORCEINLINE __forceinline
 #else
     #if defined _WIN32 || defined __CYGWIN__

@@ -20,17 +20,20 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 #pragma once
+#include <akari/core/akari.h>
+#include <akari/core/platform.h>
 
 #ifdef _MSC_VER
-    #define AKR_EXPORT __declspec(dllexport)
-    #pragma warning(disable : 4275)
-    #pragma warning(disable : 4267)
-    #pragma warning(disable : 4251) // 'field' : class 'A' needs to have dll-interface to be used by clients of class 'B'
-    #pragma warning(disable : 4800) // 'type' : forcing value to bool 'true' or 'false' (performance warning)
-    #pragma warning(disable : 4996) // Secure SCL warnings
-    #pragma warning(disable : 4244)
-    #pragma warning(disable : 4624)
-#else
+#pragma warning(disable : 4146)
+#pragma warning(disable : 4624)
+#pragma warning(disable : 4267)
+#pragma warning(disable : 5030)
+#pragma warning(disable : 4244)
+#pragma warning(disable : 4324)
+#pragma warning(disable : 4245)
+#pragma warning(disable : 4458)
+#pragma warning(disable : 4141)
+#endif
 
 #include <llvm/ADT/STLExtras.h>
 #include <llvm/ExecutionEngine/MCJIT.h>
@@ -51,18 +54,56 @@
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
 
-#include <akari/core/akari.h>
-#include <akari/core/platform.h>
 #include <akari/compute/backend.h>
+#include <mutex>
 
+namespace akari::compute {
+    using namespace ir;
+    struct LLVMInit {
+        LLVMInit() {
+            llvm::InitializeNativeTarget();
+            LLVMInitializeNativeAsmPrinter();
+            LLVMInitializeNativeAsmParser();
+        }
+        ~LLVMInit() { llvm::llvm_shutdown(); }
+    };
+    static void static_init() {
+        static std::once_flag flag;
+        static std::unique_ptr<LLVMInit> p;
+        std::call_once(flag, [&]() { p = std::make_unique<LLVMInit>(); });
+    }
+    class LLVMBackendImpl : public LLVMBackend {
+        llvm::LLVMContext ctx;
+        std::unique_ptr<llvm::Module> owner;
+        std::list<Module> todos;
+        std::unordered_map<std::string, void *> modules;
+        llvm::ExecutionEngine *EE = nullptr;
+        void *do_compile(const FunctionNodePtr &func) {}
 
-namespace akari::compute{
-    class LLVMBackendImpl : public LLVMBackend{
-    public:
-
+      public:
+        LLVMBackendImpl() {
+            static_init();
+            owner = std::make_unique<llvm::Module>("test", ctx);
+        }
+        Expected<void> add_module(const Module &m) override {
+            todos.emplace_back(m);
+            return {};
+        }
+        Expected<void> compile() override {
+            for (auto &m : todos) {
+                modules[m.name] = do_compile(m.function);
+            }
+            return {};
+        }
+        void *get_module_func(const std::string &name) override { return modules.at(name); }
+        ~LLVMBackendImpl() {
+            if (EE) {
+                delete EE;
+            }
+        }
     };
 
-    std::shared_ptr<LLVMBackend> create_llvm_backend(){
-        return std::make_shared<LLVMBackendImpl>();
-    }
-}
+    // std::shared_ptr<LLVMBackend> create_llvm_backend(){
+    //     return std::make_shared<LLVMBackendImpl>();
+    // }
+} // namespace akari::compute

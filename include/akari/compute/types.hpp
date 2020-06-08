@@ -44,6 +44,7 @@ namespace akari::compute::type {
         virtual void visit(StructType &) {}
         virtual void visit(EnumType &) {}
         virtual void visit(GenericType &) {}
+        virtual void visit(TupleType &) {}
     };
 #define AKR_DECL_TYPENODE(Type)                                                                                        \
     std::string type_name() const { return #Type; }                                                                    \

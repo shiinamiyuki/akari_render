@@ -27,6 +27,7 @@
 #include <type_traits>
 #include <memory>
 #include <variant>
+#include <optional>
 
 namespace akari {
     struct Error {
@@ -40,7 +41,7 @@ namespace akari {
       private:
         std::unique_ptr<char[]> _message;
     };
-    template <typename T> struct Expected {
+    template <typename T=void> struct Expected {
         static_assert(!std::is_same_v<Error, T>, "T cannot be Error");
         using value_type = T;
         using reference = T &;
@@ -58,6 +59,17 @@ namespace akari {
 
       private:
         std::variant<T, Error> _storage;
+    };
+    template <> struct Expected<void> {
+        Expected()=default;
+        Expected(Error err) : _storage(std::move(err)) {}
+        operator bool() const { return has_value(); }
+        bool has_value() const { return !_storage.has_value(); }
+        const Error &error() const { return _storage.value(); }
+        Error extract_error() { return std::move(_storage).value(); }
+
+      private:
+        std::optional<Error> _storage;
     };
 } // namespace akari
 

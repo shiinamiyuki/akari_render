@@ -60,8 +60,11 @@ namespace akari {
             }
         }
         Float average_luminance() const override { return average; }
+
+        // texture coordinates (0,0) at bottom-left
         Spectrum evaluate(const ShadingPoint &sp) const override {
-            auto texCoords = mod(sp.texCoords, vec2(1));
+            auto uv = vec2(sp.texCoords.x, 1.0f - sp.texCoords.y);
+            auto texCoords = mod(uv, vec2(1));
             return (*image)(texCoords);
         }
     };
