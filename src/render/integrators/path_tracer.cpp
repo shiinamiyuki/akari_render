@@ -158,6 +158,7 @@ namespace akari {
                             Li += beta * (light->Li(wo, vec2()));
                         else {
                             auto lightPdf = light->pdf_incidence(*prevInteraction, ray.d) * scene->PdfLight(light);
+                            // printf("%f\n",lightPdf);
                             Li += beta * (light->Li(wo, vec2()) * MisWeight(prevScatteringPdf, lightPdf));
                         }
                     }

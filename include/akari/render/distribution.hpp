@@ -125,7 +125,7 @@ namespace akari {
         Float pdf_continuous(const vec2 &p) const {
             auto iu = clamp<int>(p[0] * pConditionalV[0]->count(), 0, pConditionalV[0]->count() - 1);
             auto iv = clamp<int>(p[1] * pMarginal->count(), 0, pMarginal->count() - 1);
-            return pMarginal->pdf_continuous(iv) * pConditionalV[0]->pdf_continuous(iu);
+            return pConditionalV[iv]->func[iu] / pMarginal->funcInt;;
         }
     };
 } // namespace akari

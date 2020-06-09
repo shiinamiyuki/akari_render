@@ -23,7 +23,9 @@
 #include <akari/core/serialize.hpp>
 #include <akari/plugins/binary_mesh.h>
 #include <akari/plugins/matte.h>
+#include <akari/plugins/disney_material.h>
 #include <akari/plugins/rgbtexture.h>
+#include <akari/plugins/float_texture.h>
 #include <akari/render/scene_graph.h>
 #include <memory>
 #include <iostream>
@@ -73,6 +75,7 @@ namespace akari {
                             auto material = materials[shapes[s].mesh.material_ids[f]];
                             MaterialSlot cvtMaterial;
                             vec3 kd = vec3(material.diffuse[0], material.diffuse[1], material.diffuse[2]);
+                            vec3 ks = vec3(material.specular[0], material.specular[1], material.specular[2]);
                             vec3 ke = vec3(material.emission[0], material.emission[1], material.emission[2]);
                             Float strength = 1;
                             if (max_comp(ke) > 0) {
@@ -84,7 +87,26 @@ namespace akari {
                             } else {
                                 cvtMaterial.marked_as_light = false;
                             }
-                            cvtMaterial.material = create_matte_material(create_rgb_texture(kd));
+                            std::shared_ptr<Texture> color, metallic, specular, specular_tint, roughness, ior,
+                                clearcoat, clearcoat_gloss, spec_trans;
+                            spec_trans = create_float_texture(material.transmittance[0]);
+                            color = create_rgb_texture(kd);
+                            {
+                                auto m = max_comp(ks) / (max_comp(kd) + max_comp(ks));
+                                if (!std::isnormal(m)) {
+                                    m = 0;
+                                }
+                                metallic = create_float_texture(m);
+                            }
+                            specular = create_float_texture(0.0f);
+                            specular_tint = create_float_texture(0.0f);
+                            roughness = create_float_texture(std::sqrt(2.0f / (material.shininess + 2.0f)));
+                            ior = create_float_texture(1.5f);
+                            clearcoat = create_float_texture(0.0f);
+                            clearcoat_gloss = create_float_texture(0.2);
+                            cvtMaterial.material = create_disney_material(
+                                color, nullptr, metallic, specular, specular_tint, roughness, nullptr, nullptr, nullptr,
+                                clearcoat, clearcoat_gloss, ior, spec_trans);
                             cvtMaterial.name = name;
                             cvtMaterial.emission.strength = create_rgb_texture(vec3(strength));
                             cvtMaterial.emission.color = create_rgb_texture(ke);
@@ -129,7 +151,8 @@ namespace akari {
                     // shapes[s].mesh.material_ids[f];
                 }
             }
-            mesh = create_binary_mesh(output,std::move(vertices),std::move(indices),std::move(group),std::move(cvtMaterials));
+            mesh = create_binary_mesh(output, std::move(vertices), std::move(indices), std::move(group),
+                                      std::move(cvtMaterials));
         }
         mesh->save_path(output.string().c_str());
         return mesh;
@@ -148,7 +171,7 @@ int main(int argc, char **argv) {
     std::shared_ptr<SceneGraph> graph;
     CurrentPathGuard _guard;
     auto mesh = Convert(in, out);
-    if(out.extension().empty()){
+    if (out.extension().empty()) {
         out.concat(".json");
     }
     auto data = serialize::save_to_json(mesh);

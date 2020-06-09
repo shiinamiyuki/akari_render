@@ -98,7 +98,7 @@ namespace akari {
                             (*image)(x, y) = vec4(rgb, 1.0f);
                         }
                     },
-                    1024);
+                    128);
             } else {
                 const auto *data = stbi_load(path.string().c_str(), &x, &y, &channel, 3);
                 image = std::make_shared<RGBAImage>(ivec2(x, y));
@@ -117,7 +117,7 @@ namespace akari {
                             (*image)(x, y) = vec4(rgb, 1.0f);
                         }
                     },
-                    1024);
+                    128);
             }
             return image;
         }

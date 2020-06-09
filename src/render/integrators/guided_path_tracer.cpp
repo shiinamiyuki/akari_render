@@ -699,7 +699,17 @@ namespace akari {
                     ray = si->spawn_dir(wiW);
                     prevInteraction = si;
                 } else {
-                    addRadiance(BackgroundLi(ray));
+                    // addRadiance(BackgroundLi(ray));
+                    auto light = scene->get_world_light().get();
+                    if (light) {
+                        auto wo = -ray.d;
+                        if (specular || depth == 0)
+                            addRadiance(light->Li(wo, vec2()));
+                        else {
+                            auto lightPdf = light->pdf_incidence(*prevInteraction, ray.d) * scene->PdfLight(light);
+                            addRadiance(light->Li(wo, vec2()) * MisWeight(prevScatteringPdf, lightPdf));
+                        }
+                    }
                     break;
                 }
             }
@@ -771,8 +781,15 @@ namespace akari {
                         if (cur % (tot / 10) == 0) {
                             show_progress(double(cur) / tot, 70);
                         }
+                    } else if (spp <= 40) {
+                        if (cur % (tot / 100) == 0) {
+                            show_progress(double(cur) / tot, 70);
+                        }
+
                     } else {
-                        show_progress(double(cur) / tot, 70);
+                        if (cur % (tot / 200) == 0) {
+                            show_progress(double(cur) / tot, 70);
+                        }
                     }
                 });
                 parallel_for_2d(nTiles, [=, &progressReporter](ivec2 tilePos, uint32_t tid) {

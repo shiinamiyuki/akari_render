@@ -25,6 +25,7 @@
 #include <akari/core/parallel.h>
 #include <akari/core/plugin.h>
 #include <akari/render/scene.h>
+#include <akari/core/logger.h>
 
 namespace akari {
 
@@ -41,10 +42,11 @@ namespace akari {
       public:
         AKR_IMPLS(Light)
         InfiniteAreaLightImpl() = default;
-        InfiniteAreaLightImpl(std::shared_ptr<Texture> color, const Bounds3f &world_bounds)
-            : color(color), world_bounds(world_bounds) {
-            world_to_light = Transform(transform.matrix4());
-            light_to_world = world_to_light.inverse();
+        InfiniteAreaLightImpl(std::shared_ptr<Texture> color, const Bounds3f &world_bounds,
+        const TransformManipulator& transform)
+            : color(color), transform(transform), world_bounds(world_bounds) {
+            light_to_world = Transform(transform.matrix4());
+            world_to_light = light_to_world.inverse();
             world_radius = length(world_bounds.p_max - world_bounds.centroid());
         }
         Float power() const override { return _power; }
@@ -113,6 +115,7 @@ namespace akari {
             color->commit();
             light_to_world = Transform(transform.matrix4());
             world_to_light = light_to_world.inverse();
+            info("Updating importance map\n");
             std::vector<Float> v(distribution_map_resolution * distribution_map_resolution);
             AtomicFloat sum(0.0f);
             parallel_for(
@@ -142,7 +145,7 @@ namespace akari {
       public:
         AKR_IMPLS(WorldLightFactory)
         virtual std::shared_ptr<Light> create(const Scene &scene) const {
-            return std::make_shared<InfiniteAreaLightImpl>(color, scene.bounds());
+            return std::make_shared<InfiniteAreaLightImpl>(color, scene.bounds(), transform);
         }
     };
 #include "generated/InfiniteAreaLight.hpp"
