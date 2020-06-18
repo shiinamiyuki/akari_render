@@ -19,18 +19,31 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+
 #pragma once
-#include <memory>
-#include <string>
-#include <vector>
-#include <akari/compute/ir.hpp>
+#include <unordered_map>
+#include <akari/compute/transform.hpp>
+#include <akari/core/akari.h>
 
-namespace akari::compute::transform{
-    class TransformPass {
-      public:  
-        virtual std::shared_ptr<ir::Node> transform(const std::shared_ptr<ir::Node>&) = 0;
+namespace akari::compute::transform {
+    struct LetList {
+        std::list<std::pair<ir::VarNodePtr, ir::NodePtr>> list;
+        ir::NodePtr construct(const ir::NodePtr &body) {
+            ir::NodePtr expr = body;
+            for (auto it = list.rbegin(); it != list.rend(); it++) {
+                expr = std::make_shared<ir::LetNode>(it->first, it->second, expr);
+            }
+            return expr;
+        }
+        void push(ir::VarNodePtr var, ir::NodePtr val) { list.emplace_back(var, val); }
+        ir::VarNodePtr push(ir::NodePtr val) {
+            auto var = std::make_shared<ir::VarNode>(ir::generate_id());
+            push(var, val);
+            return var;
+        }
+        template <typename F> static ir::NodePtr with(F &&f) {
+            LetList ll;
+            return ll.construct(f(ll));
+        }
     };
-
-    AKR_EXPORT std::shared_ptr<TransformPass> convert_to_anf();
-    AKR_EXPORT std::shared_ptr<TransformPass> partial_eval();
 }

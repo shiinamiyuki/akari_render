@@ -111,6 +111,7 @@ namespace akari {
         }
         [[nodiscard]] bool is_delta() const { return ((uint32_t)type & (uint32_t)BSDF_SPECULAR) != 0; }
         [[nodiscard]] bool match_flags(BSDFType flag) const { return ((uint32_t)type & (uint32_t)flag) != 0; }
+        [[nodiscard]] virtual Float importance(const vec3 &wo) const { return 1.0f; }
     };
     class AKR_EXPORT BSDF {
         constexpr static int MaxBSDF = 8;
@@ -119,7 +120,7 @@ namespace akari {
         const Frame3f frame;
         vec3 Ng;
         vec3 Ns;
-
+        void evaluate_importance(const vec3 &wo,std::array<Float, MaxBSDF> & func)const;
       public:
         BSDF(const vec3 &Ng, const vec3 &Ns) : frame(Ns), Ng(Ng), Ns(Ns) {}
         explicit BSDF(const SurfaceInteraction &si) : frame(si.Ns), Ng(si.Ng), Ns(si.Ns) {}
@@ -129,6 +130,7 @@ namespace akari {
         [[nodiscard]] vec3 world_to_local(const vec3 &w) const { return frame.world_to_local(w); }
         [[nodiscard]] Spectrum evaluate(const vec3 &woW, const vec3 &wiW) const;
         void sample(BSDFSample &sample) const;
+        
     };
     inline BSDFSample::BSDFSample(Float u0, const vec2 &u, const SurfaceInteraction &si) : wo(si.wo), u0(u0), u(u) {}
 

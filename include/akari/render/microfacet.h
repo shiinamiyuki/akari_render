@@ -162,6 +162,7 @@ namespace akari {
         [[nodiscard]] Float evaluate_pdf(const vec3 &wo, const vec3 &wi) const override;
         [[nodiscard]] Spectrum evaluate(const vec3 &wo, const vec3 &wi) const override;
         Spectrum sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const override;
+        [[nodiscard]] Float importance(const vec3 & wo)const override;
     };
     class AKR_EXPORT MicrofacetTransmission : public BSDFComponent {
         const Spectrum T;
@@ -177,6 +178,7 @@ namespace akari {
         [[nodiscard]] Float evaluate_pdf(const vec3 &wo, const vec3 &wi) const override;
         [[nodiscard]] Spectrum evaluate(const vec3 &wo, const vec3 &wi) const override;
         Spectrum sample(const vec2 &u, const vec3 &wo, vec3 *wi, Float *pdf, BSDFType *sampledType) const override;
+        [[nodiscard]] Float importance(const vec3 & wo)const override;
     };
     class AKR_EXPORT FresnelGlossy : public BSDFComponent {
         const Spectrum R, T;

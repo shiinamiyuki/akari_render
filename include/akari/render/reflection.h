@@ -98,6 +98,7 @@ namespace akari {
         explicit LambertianReflection(const Spectrum &R)
             : BSDFComponent(BSDFType(BSDF_DIFFUSE | BSDF_REFLECTION)), R(R) {}
         [[nodiscard]] Spectrum evaluate(const vec3 &wo, const vec3 &wi) const override;
+        [[nodiscard]] Float importance()const{return R.luminance();}
     };
     class AKR_EXPORT SpecularReflection : public BSDFComponent {
         const Spectrum R;

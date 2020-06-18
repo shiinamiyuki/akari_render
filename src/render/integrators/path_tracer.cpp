@@ -44,8 +44,9 @@ namespace akari {
         int minDepth;
         int maxDepth;
         bool enableRR;
-        PTRenderTask(const RenderContext &ctx, int spp, int minDepth, int maxDepth, bool enableRR)
-            : ctx(ctx), spp(spp), minDepth(minDepth), maxDepth(maxDepth), enableRR(enableRR) {}
+        float ray_clamp;
+        PTRenderTask(const RenderContext &ctx, int spp, int minDepth, int maxDepth, bool enableRR, float ray_clamp)
+            : ctx(ctx), spp(spp), minDepth(minDepth), maxDepth(maxDepth), enableRR(enableRR), ray_clamp(ray_clamp) {}
         bool has_film_update() override { return false; }
         std::shared_ptr<const Film> film_update() override { return ctx.camera->GetFilm(); }
         bool is_done() override { return false; }
@@ -166,7 +167,7 @@ namespace akari {
                     break;
                 }
             }
-            return Li;
+            return  glm::clamp(Li, vec3(0), vec3(ray_clamp));;
         }
         void start() override {
             future = std::async(std::launch::async, [=]() {
@@ -229,12 +230,13 @@ namespace akari {
         [[refl]] int min_depth = 5;
         [[refl]] int max_depth = 16;
         [[refl]] bool enable_rr = true;
+        [[refl]] float clamp = 100000;
 
       public:
         AKR_IMPLS(Integrator)
         bool supports_mode(RenderMode mode) const { return true; }
         std::shared_ptr<RenderTask> create_render_task(const RenderContext &ctx) override {
-            return std::make_shared<PTRenderTask>(ctx, spp, min_depth, max_depth, enable_rr);
+            return std::make_shared<PTRenderTask>(ctx, spp, min_depth, max_depth, enable_rr, clamp);
         }
     };
 #include "generated/PathTracer.hpp"

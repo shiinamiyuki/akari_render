@@ -19,18 +19,33 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-#pragma once
-#include <memory>
-#include <string>
-#include <vector>
-#include <akari/compute/ir.hpp>
 
-namespace akari::compute::transform{
-    class TransformPass {
-      public:  
-        virtual std::shared_ptr<ir::Node> transform(const std::shared_ptr<ir::Node>&) = 0;
+#include <unordered_map>
+#include <akari/compute/transform.hpp>
+#include <akari/core/akari.h>
+
+#include "letlist.hpp"
+
+namespace akari::compute::transform {
+    using namespace ir;
+    struct PStatic;
+    struct Empty{};
+    using SFunction = std::function<PStatic(const std::vector<PStatic>&)>;
+    struct SValue : std::variant<ConstantNodePtr,SFunction, Empty>{
+        using std::variant<ConstantNodePtr,SFunction, Empty>::variant;
+
+    };
+    struct PStatic {
+
+    };
+    class PartialEvaluate : public TransformPass {
+    public:
+        NodePtr transform(const NodePtr &root) override {
+            return nullptr;
+        }
     };
 
-    AKR_EXPORT std::shared_ptr<TransformPass> convert_to_anf();
-    AKR_EXPORT std::shared_ptr<TransformPass> partial_eval();
+    AKR_EXPORT std::shared_ptr<TransformPass> partial_eval(){
+        return std::make_shared<PartialEvaluate>();
+    }
 }

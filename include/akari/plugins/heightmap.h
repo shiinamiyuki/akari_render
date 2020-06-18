@@ -19,18 +19,14 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+
 #pragma once
-#include <memory>
-#include <string>
-#include <vector>
-#include <akari/compute/ir.hpp>
 
-namespace akari::compute::transform{
-    class TransformPass {
-      public:  
-        virtual std::shared_ptr<ir::Node> transform(const std::shared_ptr<ir::Node>&) = 0;
-    };
+#include <akari/core/plugin.h>
+#include <akari/render/material.h>
+#include <akari/render/mesh.h>
+#include <akari/core/resource.h>
 
-    AKR_EXPORT std::shared_ptr<TransformPass> convert_to_anf();
-    AKR_EXPORT std::shared_ptr<TransformPass> partial_eval();
+namespace akari {
+    AKR_EXPORT std::shared_ptr<Mesh> create_mesh_from_heightmap(const fs::path& file, const std::shared_ptr<Material>& mat);
 }

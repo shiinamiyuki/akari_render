@@ -24,28 +24,11 @@
 #include <akari/compute/transform.hpp>
 #include <akari/core/akari.h>
 
+#include "letlist.hpp"
+
 namespace akari::compute::transform {
     using namespace ir;
-    struct LetList {
-        std::list<std::pair<VarNodePtr, NodePtr>> list;
-        NodePtr construct(const NodePtr &body) {
-            NodePtr expr = body;
-            for (auto it = list.rbegin(); it != list.rend(); it++) {
-                expr = std::make_shared<LetNode>(it->first, it->second, expr);
-            }
-            return expr;
-        }
-        void push(VarNodePtr var, NodePtr val) { list.emplace_back(var, val); }
-        VarNodePtr push(NodePtr val) {
-            auto var = std::make_shared<VarNode>(generate_id());
-            push(var, val);
-            return var;
-        }
-        template <typename F> static NodePtr with(F &&f) {
-            LetList ll;
-            return ll.construct(f(ll));
-        }
-    };
+
     class ToAnf : public TransformPass {
         std::unordered_map<std::shared_ptr<ir::Node>, std::shared_ptr<ir::VarNode>> var_map;
 

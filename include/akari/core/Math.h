@@ -66,7 +66,8 @@ namespace akari {
     constexpr Float Inf = std::numeric_limits<Float>::infinity();
     constexpr Float MaxFloat = std::numeric_limits<Float>::max();
     constexpr Float MinFloat = std::numeric_limits<Float>::min();
-    constexpr Float MachineEpsilon = std::numeric_limits<Float>::epsilon();
+    constexpr Float MachineEpsilon = std::numeric_limits<Float>::epsilon() * 0.5f;
+    constexpr Float OneMinusEpsilon = 1.0f - MachineEpsilon;
     template <typename T> inline T RadiansToDegrees(const T &rad) { return rad * (180.0f / Pi); }
     template <typename T> inline T DegreesToRadians(const T &rad) { return rad * (Pi / 180.0f); }
     template <typename T> struct Angle { T value; };
@@ -245,6 +246,9 @@ namespace akari {
     inline Float spherical_phi(const vec3 &v) {
         auto p = std::atan2(v.z, v.x);
         return p < 0 ? (p + 2 * Pi) : p;
+    }
+    inline Float clamp01(Float v){
+        return std::clamp(v, 0.0f, OneMinusEpsilon);
     }
     
 } // namespace akari

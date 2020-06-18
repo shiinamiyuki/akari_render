@@ -55,6 +55,7 @@ namespace akari::compute::ir {
     using NodePtr = std::shared_ptr<Node>;
     using VarNodePtr = std::shared_ptr<VarNode>;
     using FunctionNodePtr = std::shared_ptr<FunctionNode>;
+    using ConstantNodePtr = std::shared_ptr<ConstantNode>;
 #define AKR_DECL_NODE(Type)                                                                                            \
     std::string type_name() const { return #Type; }                                                                    \
     void accept(NodeVisitor &vis) { vis.visit(*this); }

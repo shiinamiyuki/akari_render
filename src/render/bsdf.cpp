@@ -25,18 +25,17 @@ namespace akari {
     Float BSDF::evaluate_pdf(const vec3 &woW, const vec3 &wiW) const {
         auto wo = world_to_local(woW);
         auto wi = world_to_local(wiW);
+        std::array<Float, MaxBSDF> importance;
+        evaluate_importance(wo, importance);
         Float pdf = 0;
         int cnt = 0;
         for (int i = 0; i < nComp; i++) {
             auto *comp = components[i];
             if (!comp->is_delta()) {
 
-                pdf += comp->evaluate_pdf(wo, wi);
+                pdf += comp->evaluate_pdf(wo, wi) * importance[i];
             }
             cnt++;
-        }
-        if (cnt > 1) {
-            pdf /= (float)cnt;
         }
         return pdf;
     }
@@ -48,28 +47,58 @@ namespace akari {
             auto *comp = components[i];
             if (!comp->is_delta()) {
                 auto reflect = (dot(woW, Ns) * dot(wiW, Ns) > 0);
-                if ((reflect && comp->match_flags(BSDF_REFLECTION)) || (!reflect && comp->match_flags(BSDF_TRANSMISSION))) {
+                if ((reflect && comp->match_flags(BSDF_REFLECTION)) ||
+                    (!reflect && comp->match_flags(BSDF_TRANSMISSION))) {
                     f += comp->evaluate(wo, wi);
                 }
             }
         }
         return f;
     }
+    void BSDF::evaluate_importance(const vec3 &wo, std::array<Float, MaxBSDF> &func) const {
+        Float funcInt = 0.0f;
+        for (size_t i = 0; i < nComp; i++) {
+            func[i] = components[i]->importance(wo);
+            funcInt += func[i];
+        }
+        for (size_t i = 0; i < nComp; i++) {
+            func[i] /= funcInt;
+        }
+    }
     void BSDF::sample(BSDFSample &sample) const {
         if (nComp == 0) {
             return;
         }
-        int selected = std::clamp(int(sample.u0 * (float)nComp), 0, nComp - 1);
-        sample.u0 = std::min(sample.u0 * (float)nComp - (float)selected, 1.0f - 1e-7f);
+        std::array<Float, MaxBSDF> importance;
         vec3 wo, wi;
         wo = world_to_local(sample.wo);
+        evaluate_importance(wo, importance);
+        // int selected = std::clamp(int(sample.u0 * (float)nComp), 0, nComp - 1);
+        int selected = 0;
+        {
+            Float _int = 0.0f;
+            for (size_t i = 0; i < nComp; i++) {
+                _int += importance[i];
+                if (sample.u0 < _int) {
+                    sample.u0 = clamp01((sample.u0 - _int) / importance[i]);
+                    break;
+                }
+                selected++;
+            }
+            selected = std::min(selected, nComp - 1);
+        }
+
         {
             auto *comp = components[selected];
             sample.f = comp->sample(sample.u, wo, &wi, &sample.pdf, &sample.sampledType);
-            if(sample.pdf <= 0){
+            if (sample.pdf <= 0) {
                 return;
             }
             sample.wi = local_to_world(wi);
+            sample.pdf *= importance[selected];
+            if (sample.sampledType & BSDF_SPECULAR) {
+                return;
+            }
         }
         auto &f = sample.f;
         auto woW = local_to_world(wo);
@@ -83,10 +112,7 @@ namespace akari {
             if ((reflect && comp->match_flags(BSDF_REFLECTION)) || (!reflect && comp->match_flags(BSDF_TRANSMISSION))) {
                 f += comp->evaluate(wo, wi);
             }
-            sample.pdf += comp->evaluate_pdf(wo, wi);
-        }
-        if (nComp > 1) {
-            sample.pdf /= nComp;
+            sample.pdf += comp->evaluate_pdf(wo, wi) * importance[i];
         }
     }
 } // namespace akari

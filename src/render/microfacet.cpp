@@ -28,6 +28,9 @@ namespace akari {
         auto wh = normalize(wo + wi);
         return microfacet.evaluate_pdf(wh) / (4.0f * dot(wo, wh));
     }
+    Float MicrofacetReflection::importance(const vec3 &wo) const{
+        return R.luminance() * fresnel->evaluate(abs_cos_theta(wo)).luminance()* 0.9f + 0.1f;
+    }
     Spectrum MicrofacetReflection::evaluate(const vec3 &wo, const vec3 &wi) const {
         if (!same_hemisphere(wo, wi))
             return {};
@@ -81,6 +84,9 @@ namespace akari {
         Float k = (mode == TransportMode::ERadiance) ? (1.0f / eta) : 1.0f;
         auto factor = abs(dot(wi, wh) * dot(wo, wh) * k * k) / (cosThetaI * cosThetaO);
         return (Spectrum(1) - F) * T * std::abs(D * G / denom * factor);
+    }
+    Float MicrofacetTransmission::importance(const vec3 &wo) const{
+        return T.luminance() *  fr_dielectric(cos_theta(wo), etaA, etaB) * 0.9f + 0.1f;
     }
     Float MicrofacetTransmission::evaluate_pdf(const vec3 &wo, const vec3 &wi) const {
         if (same_hemisphere(wo, wi))

@@ -31,6 +31,7 @@
 namespace akari {
     struct MaterialSlot;
     class Light;
+    // untransformed mesh
     class AKR_EXPORT Mesh : public Component {
       public:
         struct RayHit {
