@@ -21,17 +21,29 @@
 // SOFTWARE.
 #pragma once
 #include <memory>
+#include <type_traits>
 namespace akari::compute {
-     class Base : public std::enable_shared_from_this<Base> {
+    template <typename T> struct is_shared_ptr : std::false_type {};
+    template <typename T> struct is_shared_ptr<std::shared_ptr<T>> : std::true_type {};
+    class Base : public std::enable_shared_from_this<Base> {
       public:
-        template <typename T> bool isa() const { 
-            return dynamic_cast<const T*>(this) != nullptr;
-         }
-        template <typename T> std::shared_ptr<const T> cast() const {
-            return std::dynamic_pointer_cast<const T>(shared_from_this());
+        template <typename T> bool isa() const {
+            static_assert(is_shared_ptr<T>::value);
+            using U = typename T::element_type;
+
+            return dynamic_cast<const U *>(this) != nullptr;
         }
-        template <typename T> std::shared_ptr<T> cast() { return std::dynamic_pointer_cast<T>(shared_from_this()); }
+        template <typename T> T cast() const {
+            static_assert(is_shared_ptr<T>::value);
+            using U = typename T::element_type;
+            return std::dynamic_pointer_cast<const U>(shared_from_this());
+        }
+        template <typename T> T cast() {
+            static_assert(is_shared_ptr<T>::value);
+            using U = typename T::element_type;
+            return std::dynamic_pointer_cast<U>(shared_from_this());
+        }
         virtual std::string type_name() const = 0;
         virtual ~Base() = default;
     };
-}
+} // namespace akari::compute

@@ -29,21 +29,11 @@ using namespace akari::compute;
 int main() {
     using namespace akari::compute;
     using namespace lang;
-    Function top([]()->Var{
-        Var x(1);
-        Var y = x + 1;
-        y += 2;
-        Var z = 3 * y + x + x;
-        Function add([](Var a, Var b)->Var{
-            return a + b;
-        });
-        return add(z, z);
-    });
     
-    // Function add([](Var x, Var y) -> Var { return x + y; });
-    // Var f = add;
-    // std::cout << f.get_expr()->dump() << std::endl;
-    auto expr = top.get_expr();
-    auto anf = transform::convert_to_anf()->transform(expr);
-    std::cout << debug::to_text(anf) << std::endl;
+    auto func = std::make_shared<ir::FunctionBlock>();
+    ir::IRBuilder::get()->set_func_block(func);
+    float32 x = 1.0f;
+    ir::IRBuilder::get()->create_ret();
+    auto f = func->get_func_node();
+    std::cout << debug::to_text(f) << std::endl;
 }

@@ -26,9 +26,27 @@
 #include <variant>
 #include <akari/core/platform.h>
 #include <akari/compute/base.hpp>
-#include <akari/compute/types.hpp>
 
 namespace akari::compute::ir {
+    class TypeNode : public Base {};
+#define AKR_DECL_TYPENODE(Type)                                                                                        \
+    std::string type_name() const { return #Type; }
+    enum class PrimitiveTy {
+        boolean,
+        int32,
+        float32,
+        float64,
+    };
+    using Type = std::shared_ptr<TypeNode>;
+    class PrimitiveTypeNode : public TypeNode {
+      public:
+        AKR_DECL_TYPENODE(PrimitiveTypeNode)
+        PrimitiveTypeNode(PrimitiveTy prim) : prim(prim) {}
+        PrimitiveTy prim;
+    };
+    using PrimitiveType = std::shared_ptr<PrimitiveTypeNode>;
+    AKR_EXPORT PrimitiveType get_primitive_type(PrimitiveTy);
+
     AKR_EXPORT size_t generate_id();
     class NodeVisitor;
     class CallNode;
@@ -48,121 +66,137 @@ namespace akari::compute::ir {
         virtual void visit(IfNode &) {}
         virtual void visit(VarNode &) {}
     };
-    class Node : public Base {
+    class IRNode : public Base {
       public:
+        Type type;
         virtual void accept(NodeVisitor &) = 0;
     };
-    using NodePtr = std::shared_ptr<Node>;
-    using VarNodePtr = std::shared_ptr<VarNode>;
-    using FunctionNodePtr = std::shared_ptr<FunctionNode>;
-    using ConstantNodePtr = std::shared_ptr<ConstantNode>;
+    class AtomicNode : public IRNode {};
+    using Atomic = std::shared_ptr<AtomicNode>;
+    using Node = std::shared_ptr<IRNode>;
+    using Var = std::shared_ptr<VarNode>;
+    using Let = std::shared_ptr<LetNode>;
+    using Call = std::shared_ptr<CallNode>;
+    using Function = std::shared_ptr<FunctionNode>;
+    using Constant = std::shared_ptr<ConstantNode>;
 #define AKR_DECL_NODE(Type)                                                                                            \
     std::string type_name() const { return #Type; }                                                                    \
     void accept(NodeVisitor &vis) { vis.visit(*this); }
     // class Expr : public Node {};
-    using Expr = Node;
-    class VarNode : public Expr {
+    using ExprNode = IRNode;
+    using Expr = std::shared_ptr<ExprNode>;
+    class VarNode : public AtomicNode {
         size_t id;
         std::string _name;
 
       public:
-        explicit VarNode(size_t id):id(id), _name(std::to_string(id)){}
+        explicit VarNode(size_t id) : id(id), _name(std::to_string(id)) {}
         VarNode(size_t id, std::string name) : id(id), _name(std::move(name)) {}
-        auto & name()const{return _name;}
+        auto &name() const { return _name; }
         AKR_DECL_NODE(VarNode)
     };
 
-    enum class Primitive {
-        EAdd,
-        ESub,
-        EMul,
-        EDiv,
-        EAnd,
-        EOr,
-        EXor,
+    enum class PrimitiveOp {
+        Invalid,
+        // GenericBegin,
+        // GAdd,
+        // GSub,
+        // GMul,
+        // GDiv,
+        // GMod,
+        // GenericEnd,
+        INeg,
+        IAdd,
+        ISub,
+        IMul,
+        IDiv,
+        IMod,
+        Shl,
+        Shr,
+        And,
+        Or,
+        Xor,
+        Not,
+        FNeg,
+        FAdd,
+        FSub,
+        FMul,
+        FDiv,
+        ConvertSP2I,
+        ConvertI2SP,
+        ConvertDP2I,
+        ConvertI2DP,
     };
 
-    class PrimitiveNode : public Expr {
-        Primitive _prim;
+    class PrimitiveNode : public AtomicNode {
+        PrimitiveOp _prim;
 
       public:
-        PrimitiveNode(Primitive p) : _prim(p) {}
-        Primitive primitive() const { return _prim; }
+        PrimitiveNode(PrimitiveOp p) : _prim(p) {}
+        PrimitiveOp primitive() const { return _prim; }
         AKR_DECL_NODE(PrimitiveNode)
     };
-
+    using Primitive = std::shared_ptr<PrimitiveNode>;
     // Anonymous Function Node
-    class FunctionNode : public Expr {
-        std::vector<std::shared_ptr<VarNode>> _parameters;
-        std::shared_ptr<Expr> _body;
+    class FunctionNode : public ExprNode {
+        std::vector<Var> _parameters;
+        Expr _body;
 
       public:
-        FunctionNode(std::vector<std::shared_ptr<VarNode>> parameters, std::shared_ptr<Expr> body)
+        FunctionNode(std::vector<Var> parameters, Expr body)
             : _parameters(std::move(parameters)), _body(std::move(body)) {}
-        const std::vector<std::shared_ptr<VarNode>> &parameters() const { return _parameters; }
+        const std::vector<Var> &parameters() const { return _parameters; }
         auto body() const { return _body; }
         AKR_DECL_NODE(FunctionNode)
     };
-    class IfNode : public Expr {
-        std::shared_ptr<Node> _cond, _then, _else;
+    class IfNode : public ExprNode {
+        Node _cond, _then, _else;
 
       public:
-        IfNode(std::shared_ptr<Node> _cond, std::shared_ptr<Node> _then, std::shared_ptr<Node> _else)
+        IfNode(Node _cond, Node _then, Node _else)
             : _cond(std::move(_cond)), _then(std::move(_then)), _else(std::move(_else)) {}
         AKR_DECL_NODE(IfNode)
-        const std::shared_ptr<Node> &cond() const { return _cond; }
-        const std::shared_ptr<Node> &then() const { return _then; }
-        const std::shared_ptr<Node> &else_() const { return _else; }
+        const Node &cond() const { return _cond; }
+        const Node &then() const { return _then; }
+        const Node &else_() const { return _else; }
     };
-    class LetNode : public Expr {
-        VarNodePtr _var;
-        std::shared_ptr<Node>  _val, _body;
+    using If = std::shared_ptr<IfNode>;
+    class LetNode : public ExprNode {
+        Var _var;
+        Node _val, _body;
 
       public:
       public:
-        LetNode(VarNodePtr _var, std::shared_ptr<Node> _val, std::shared_ptr<Node> _body)
+        LetNode(Var _var, Node _val, Node _body)
             : _var(std::move(_var)), _val(std::move(_val)), _body(std::move(_body)) {}
-        const VarNodePtr &var() const { return _var; }
-        const std::shared_ptr<Node> &value() const { return _val; }
-        const std::shared_ptr<Node> &body() const { return _body; }
+        const Var &var() const { return _var; }
+        const Node &value() const { return _val; }
+        const Node &body() const { return _body; }
         AKR_DECL_NODE(LetNode)
     };
-    class CallNode : public Expr {
-        std::shared_ptr<Node> _op;
-        std::vector<std::shared_ptr<Expr>> _args;
-
-      public:
-        CallNode()=default;
-        CallNode(std::shared_ptr<Node> op, std::vector<std::shared_ptr<Expr>> args)
-            : _op(std::move(op)), _args(std::move(args)) {}
-        const std::shared_ptr<Node> &op() const { return _op; }
-        const std::vector<std::shared_ptr<Expr>> &args() const { return _args; }
-        AKR_DECL_NODE(CallNode)
-        void set_op(std::shared_ptr<Node> op) { _op = std::move(op); }
-        void add_arg(std::shared_ptr<Expr> a) { _args.emplace_back(std::move(a)); }
-    };
-
     template <typename T> struct is_value : std::false_type {};
     template <> struct is_value<int> : std::true_type {};
     template <> struct is_value<float> : std::true_type {};
 
-    template <typename T> std::shared_ptr<Expr> to_expr(T &&v) {
-        if constexpr (is_value<T>::value) {
-            return std::make_shared<ConstantNode>(v);
-        } else {
-            return v;
-        }
-    }
-    template <typename... Ts> std::shared_ptr<CallNode> call(Primitive op, Ts &&... _args) {
-        std::vector<std::shared_ptr<Expr>> args = {to_expr(std::forward<Ts>(_args))...};
-        auto cnode = std::make_shared<CallNode>();
-        cnode->set_op(std::make_shared<PrimitiveNode>(op));
-        for (auto &a : args) {
-            cnode->add_arg(a);
-        }
-        return cnode;
-    }
-    class ConstantNode : public Expr {
+    class CallNode : public ExprNode {
+        Atomic _op;
+        std::vector<Atomic> _args;
+
+      public:
+        CallNode() = default;
+        CallNode(Atomic op, const Atomic &a0) : _op(std::move(op)), _args({a0}) {}
+        CallNode(Atomic op, const Atomic &a0, const Atomic &a1) : _op(std::move(op)), _args({a0, a1}) {}
+        CallNode(Atomic op, const Atomic &a0, const Atomic &a1, const Atomic &a2)
+            : _op(std::move(op)), _args({a0, a1, a2}) {}
+        CallNode(Atomic op, std::vector<Atomic> args) : _op(std::move(op)), _args(std::move(args)) {}
+        const Atomic &op() const { return _op; }
+        const std::vector<Atomic> &args() const { return _args; }
+        AKR_DECL_NODE(CallNode)
+        void set_op(Atomic op) { _op = std::move(op); }
+        void add_arg(Atomic a) { _args.emplace_back(std::move(a)); }
+    };
+
+    class ConstantNode : public AtomicNode {
       public:
         AKR_DECL_NODE(ConstantNode)
         using Value = std::variant<int, float, double>;
@@ -172,4 +206,5 @@ namespace akari::compute::ir {
       private:
         Value _value;
     };
+
 } // namespace akari::compute::ir

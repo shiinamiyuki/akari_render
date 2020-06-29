@@ -26,5 +26,5 @@
 #include <akari/compute/ir.hpp>
 
 namespace akari::compute::debug{
-    AKR_EXPORT std::string to_text(const ir::NodePtr & node);
+    AKR_EXPORT std::string to_text(const ir::Node & node);
 }

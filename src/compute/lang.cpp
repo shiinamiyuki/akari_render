@@ -20,31 +20,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef AKARIRENDER_WINDOWCONTEXT_H
-#define AKARIRENDER_WINDOWCONTEXT_H
-#include <GL/gl3w.h>
-#include <GLFW/glfw3.h>
-#include <imgui.h>
-#include <examples/imgui_impl_glfw.h>
-#include <examples/imgui_impl_opengl3.h>
-#include <memory>
+#include <akari/compute/lang.hpp>
 
-namespace akari::Gui {
-    class GLFWContext {
-      public:
-        GLFWContext();
-        ~GLFWContext();
-    };
-
-    class Window {
-      protected:
-        GLFWwindow *window = nullptr;
-
-      public:
-        Window(GLFWContext &context);
-        virtual void Show() = 0;
-        ~Window();
-    };
-    std::shared_ptr<Window> CreateAppWindow(GLFWContext &context);
-} // namespace akari::Gui
-#endif // AKARIRENDER_WINDOWCONTEXT_H
+namespace akari::compute::lang {
+      
+}

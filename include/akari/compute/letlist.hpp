@@ -19,33 +19,26 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+#pragma once
+#include <akari/compute/ir.hpp>
+#include <list>
 
-#include <unordered_map>
-#include <akari/compute/transform.hpp>
-#include <akari/core/akari.h>
-
-#include "letlist.hpp"
-
-namespace akari::compute::transform {
-    using namespace ir;
-    struct PStatic;
-    struct Empty{};
-    using SFunction = std::function<PStatic(const std::vector<PStatic>&)>;
-    struct SValue : std::variant<ConstantNodePtr,SFunction, Empty>{
-        using std::variant<ConstantNodePtr,SFunction, Empty>::variant;
-
-    };
-    struct PStatic {
-
-    };
-    class PartialEvaluate : public TransformPass {
-    public:
-        NodePtr transform(const NodePtr &root) override {
-            return nullptr;
+namespace akari::compute::ir {
+    struct LetList {
+        std::list<std::pair<Var, Expr>> list;
+        Expr get(Expr expr) {
+            for(auto it = list.rbegin(); it != list.rend(); it++){
+                expr = std::make_shared<LetNode>(it->first, it->second, expr);
+            }
+            return expr;
+        }
+        Var push(const Var & v, const Expr & e){
+            list.emplace_back(v,e);
+            return v;
+        }
+        Var push(const Expr & e){
+            auto v = std::make_shared<VarNode>(generate_id());
+            return push(v, e);
         }
     };
-
-    AKR_EXPORT std::shared_ptr<TransformPass> partial_eval(){
-        return std::make_shared<PartialEvaluate>();
-    }
 }

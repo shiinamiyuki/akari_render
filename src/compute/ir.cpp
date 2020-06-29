@@ -22,10 +22,27 @@
 
 #include <akari/compute/ir.hpp>
 
-namespace akari::compute::ir{
-     size_t generate_id(){
+namespace akari::compute::ir {
+    size_t generate_id() {
         static size_t i = 0;
         return i++;
-        
     }
-}
+    static PrimitiveType boolean = std::make_shared<PrimitiveTypeNode>(PrimitiveTy::boolean);
+    static PrimitiveType int32 = std::make_shared<PrimitiveTypeNode>(PrimitiveTy::int32);
+    static PrimitiveType float32 = std::make_shared<PrimitiveTypeNode>(PrimitiveTy::float32);
+    static PrimitiveType float64 = std::make_shared<PrimitiveTypeNode>(PrimitiveTy::float64);
+    PrimitiveType get_primitive_type(PrimitiveTy ty) {
+        switch (ty) {
+        case PrimitiveTy::boolean:
+            return boolean;
+        case PrimitiveTy::int32:
+            return int32;
+        case PrimitiveTy::float32:
+            return float32;
+        case PrimitiveTy::float64:
+            return float64;
+        default:
+            return nullptr;
+        }
+    }
+} // namespace akari::compute::ir

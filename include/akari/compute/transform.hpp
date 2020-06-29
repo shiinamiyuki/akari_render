@@ -31,6 +31,4 @@ namespace akari::compute::transform{
         virtual std::shared_ptr<ir::Node> transform(const std::shared_ptr<ir::Node>&) = 0;
     };
 
-    AKR_EXPORT std::shared_ptr<TransformPass> convert_to_anf();
-    AKR_EXPORT std::shared_ptr<TransformPass> partial_eval();
 }

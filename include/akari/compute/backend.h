@@ -24,7 +24,7 @@
 #include <akari/core/error.hpp>
 namespace akari::compute {
     struct Module {
-        ir::FunctionNodePtr function;
+        ir::Function function;
         std::string name;
     };
     class Backend {

@@ -27,106 +27,166 @@
 #include <functional>
 
 #include <akari/compute/ir.hpp>
+#include <akari/compute/letlist.hpp>
+#include <akari/compute/irbuilder.h>
 
 // AkariCompute Embedded DSL
 namespace akari::compute::lang {
-    static size_t new_var_id() {
-        static size_t id = 0;
-        return id++;
+    template <typename T> ir::Type get_type_from_native() {
+        if constexpr (std::is_same_v<T, float>) {
+            return ir::get_primitive_type(ir::PrimitiveTy::float32);
+        } else if constexpr (std::is_same_v<T, double>) {
+            return ir::get_primitive_type(ir::PrimitiveTy::float64);
+        } else if constexpr (std::is_same_v<T, int32_t>) {
+            return ir::get_primitive_type(ir::PrimitiveTy::int32);
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return ir::get_primitive_type(ir::PrimitiveTy::boolean);
+        } else {
+            return nullptr;
+        }
     }
 
-    // template<typename T=void>
-    namespace detail {
-        struct named {};
+    // class Thunk {
+    // public:
+    //     Thunk(const Thunk&)=delete;
+    //     Thunk(Thunk&&)=delete;
+    //     Thunk&operator=(const Thunk&)=delete;
+    //     Thunk&operaotr=(Thunk&&)=delete;
+    // };
 
-        struct any {};
-    } // namespace detail
+    template <typename T> struct Var {
+        template <typename U> Var(const Var<U> &rhs) {
+            using From = U;
+            using To = T;
+            if constexpr (std::is_same_v<From, int32_t>) {
+                if constexpr (std::is_same_v<To, float>) {
+                    var = ir::IRBuilder::get()->create_i2sp(rhs);
+                } else if constexpr (std::is_same_v<To, double>) {
+                    var = ir::IRBuilder::get()->create_i2dp(rhs);
+                } else {
+                    static_assert(false);
+                }
+            } else if constexpr (std::is_same_v<From, float>) {
+                if constexpr (std::is_same_v<To, int32_t>) {
+                    var = ir::IRBuilder::get()->create_sp2i(rhs);
+                } else {
+                    static_assert(false);
+                }
+            } else if constexpr (std::is_same_v<From, double>) {
+                if constexpr (std::is_same_v<To, int32_t>) {
+                    var = ir::IRBuilder::get()->create_dp2i(rhs);
+                } else {
+                    static_assert(false);
+                }
+            }
+        }
+        Var(const T &v) { var = ir::IRBuilder::get()->add_constant(std::make_shared<ir::ConstantNode>(v)); }
+        template <typename U> auto operator+(const Var<U> &rhs) const {
+            using R = decltype(std::declval<T>() + std::declval<U>());
+            Var<R> converted_lhs = *this, converted_rhs = rhs;
+            Var<R> res;
+            if constexpr (std::is_same_v < std::is_floating_point_v<R>) {
+                res.var = ir::IRBuilder::get()->create_fadd(converted_lhs.var,converted_rhs.var);
+            } else {
+                res.var = ir::IRBuilder::get()->create_iadd(converted_lhs.var,converted_rhs.var);
+            }
+            return res;
+        }
+        template <typename U> auto operator-(const Var<U> &rhs) const {
+            using R = decltype(std::declval<T>() - std::declval<U>());
+            Var<R> converted_lhs = *this, converted_rhs = rhs;
+            Var<R> res;
+            if constexpr (std::is_same_v < std::is_floating_point_v<R>) {
+                res.var = ir::IRBuilder::get()->create_fsub(converted_lhs.var,converted_rhs.var);
+            } else {
+                res.var = ir::IRBuilder::get()->create_isub(converted_lhs.var,converted_rhs.var);
+            }
+            return res;
+        }
 
-    struct Function;
-    namespace type {
-        struct Generic {};
-        template <typename T, size_t... Dims> struct Tensor {};
-        template <typename T> using Scalar = Tensor<T, 1>;
-        template <typename T, size_t N> using Vector = Tensor<T, N>;
-        template <typename T, size_t M, size_t N> using Matrix = Tensor<T, M, N>;
+        template <typename U> auto operator*(const Var<U> &rhs) const {
+            using R = decltype(std::declval<T>() * std::declval<U>());
+            Var<R> converted_lhs = *this, converted_rhs = rhs;
+            Var<R> res;
+             if constexpr (std::is_same_v < std::is_floating_point_v<R>) {
+                res.var = ir::IRBuilder::get()->create_fmul(converted_lhs.var,converted_rhs.var);
+            } else {
+                res.var = ir::IRBuilder::get()->create_imul(converted_lhs.var,converted_rhs.var);
+            }
+            return res;
+        }
 
-    } // namespace type
-    struct Var {
-        template <typename T, typename = std::enable_if_t<ir::is_value<T>::value>>
-        Var(const T &v, const std::string &name = "") : name(name) {
-            expr = std::make_shared<ir::ConstantNode>(v);
+        template <typename U> auto operator/(const Var<U> &rhs) const {
+            using R = decltype(std::declval<T>() / std::declval<U>());
+            Var<R> converted_lhs = *this, converted_rhs = rhs;
+            Var<R> res;
+            if constexpr (std::is_same_v < std::is_floating_point_v<R>) {
+                res.var = ir::IRBuilder::get()->create_fdiv(converted_lhs.var,converted_rhs.var);
+            } else {
+                res.var = ir::IRBuilder::get()->create_idiv(converted_lhs.var,converted_rhs.var);
+            }
+            return res;
         }
-        Var() = default;
-        inline Var(const Function &f);
-        Var(detail::named, const std::string &name = "") { expr = std::make_shared<ir::VarNode>(new_var_id(), name); }
-        Var(std::shared_ptr<ir::Expr> expr) : expr(std::move(expr)) {}
-        const std::shared_ptr<ir::Expr> &get_expr() const { return expr; }
-        friend Var operator+(const Var &lhs, const Var &rhs) {
-            return Var(ir::call(ir::Primitive::EAdd, lhs.expr, rhs.expr));
+        template <typename U> auto operator%(const Var<U> &rhs) const {
+            static_assert(std::is_integral_v<T> && std::is_integral_v<U>);
+            using R = decltype(std::declval<T>() % std::declval<U>());
+            Var<R> converted_lhs = *this, converted_rhs = rhs;
+            Var<R> res;
+            res.var = ir::IRBuilder::get()->create_imod(converted_lhs.var,converted_rhs.var);
+            return res;
         }
-        friend Var operator-(const Var &lhs, const Var &rhs) {
-            return Var(ir::call(ir::Primitive::ESub, lhs.expr, rhs.expr));
+        template <typename U> auto operator<<(const Var<U> &rhs) const {
+            static_assert(std::is_integral_v<T> && std::is_integral_v<U>);
+            using R = decltype(std::declval<T>() << std::declval<U>());
+            Var<R> converted_lhs = *this, converted_rhs = rhs;
+            Var<R> res;
+            res.var = ir::IRBuilder::get()->create_shl(converted_lhs.var,converted_rhs.var);
+            return res;
         }
-        friend Var operator*(const Var &lhs, const Var &rhs) {
-            return Var(ir::call(ir::Primitive::EMul, lhs.expr, rhs.expr));
+        template <typename U> auto operator>>(const Var<U> &rhs) const {
+            static_assert(std::is_integral_v<T> && std::is_integral_v<U>);
+            using R = decltype(std::declval<T>() >> std::declval<U>());
+            Var<R> converted_lhs = *this, converted_rhs = rhs;
+            Var<R> res;
+            res.var = ir::IRBuilder::get()->create_shr(converted_lhs.var,converted_rhs.var);
+            return res;
         }
-        friend Var operator/(const Var &lhs, const Var &rhs) {
-            return Var(ir::call(ir::Primitive::EDiv, lhs.expr, rhs.expr));
-        }
-        Var operator+=(const Var &rhs) {
+        template <typename U> Var &operator+=(const Var<U> &rhs) {
             *this = *this + rhs;
             return *this;
         }
-        Var operator-=(const Var &rhs) {
+        template <typename U> Var &operator-=(const Var<U> &rhs) {
             *this = *this - rhs;
             return *this;
         }
-        Var operator*=(const Var &rhs) {
+        template <typename U> Var &operator*=(const Var<U> &rhs) {
             *this = *this * rhs;
             return *this;
         }
-        Var operator/=(const Var &rhs) {
+        template <typename U> Var &operator/=(const Var<U> &rhs) {
             *this = *this / rhs;
             return *this;
         }
+        template <typename U> Var &operator%=(const Var<U> &rhs) {
+            *this = *this % rhs;
+            return *this;
+        }
 
-      protected:
-        std::string name;
-        std::shared_ptr<ir::Expr> expr;
+      private:
+        ir::Var var;
     };
 
-    struct Function : Var{
-        template <typename T, T... ints, typename F>
-        Var invoke(std::index_sequence<ints...>, const F &f, const std::vector<Var> &parameters) {
-            return f(parameters.at(ints)...);
-        }
-        template <typename... Ts>
-        // typename = std::enable_if_t<std::conjunction_v<std::is_same_v<std::decay_t<Ts>, Var>>>>
-        Function(std::function<Var(Ts...)> f) {
-            std::vector<Var> parameters;
-            for (size_t i = 0; i < sizeof...(Ts); i++) {
-                parameters.emplace_back(detail::named{}, fmt::format("param{}", i));
-            }
+    // template <typename Ret, typename... Args> struct Function {
+    //     Function(Ret (*func)(Args &&...)) {
+            
+    //     }
 
-            Var body(invoke<size_t>(std::index_sequence_for<Ts...>{}, f, parameters));
-            std::vector<std::shared_ptr<ir::VarNode>> true_parameters;
-            std::transform(parameters.begin(), parameters.end(), std::back_inserter(true_parameters),
-                           [](const Var &var) {
-                               AKR_ASSERT(var.get_expr() && var.get_expr()->isa<ir::VarNode>());
-                               return var.get_expr()->cast<ir::VarNode>();
-                           });
-            // AKR_ASSERT(body.get_expr());
-            expr = std::make_shared<ir::FunctionNode>(true_parameters, body.get_expr());
-        }
-        template <typename... Ts> Var operator()(Ts &&... args) {
-            std::vector<Var> parameters{args...};
-            std::vector<ir::NodePtr> true_parameters;
-            for (auto &p : parameters) {
-                true_parameters.emplace_back(p.get_expr());
-            }
-            return Var(std::make_shared<ir::CallNode>(expr, true_parameters));
-        }
-        template <typename F> explicit Function(F &&f) : Function(std::function(f)) {}
-    };
-    inline Var::Var(const Function &f) : expr(f.expr) {}
+    //   private:
+    //     ir::Function function;
+    // };
+
+    using boolean = Var<bool>;
+    using int32 = Var<int32_t>;
+    using float32 = Var<float>;
+    using float64 = Var<double>;
 } // namespace akari::compute::lang

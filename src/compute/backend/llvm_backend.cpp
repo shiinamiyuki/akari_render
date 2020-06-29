@@ -33,6 +33,7 @@
 #pragma warning(disable : 4245)
 #pragma warning(disable : 4458)
 #pragma warning(disable : 4141)
+#pragma warning(disable : 4459)
 #endif
 
 #include <llvm/ADT/STLExtras.h>
@@ -78,7 +79,7 @@ namespace akari::compute {
         std::list<Module> todos;
         std::unordered_map<std::string, void *> modules;
         llvm::ExecutionEngine *EE = nullptr;
-        void *do_compile(const FunctionNodePtr &func) {}
+        void *do_compile(const Function &func) {return nullptr;}
 
       public:
         LLVMBackendImpl() {
