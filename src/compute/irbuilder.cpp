@@ -29,6 +29,11 @@ namespace akari::compute::ir {
         void set_func_block(std::shared_ptr<FunctionBlock> fb) override { cur_block = std::move(fb); }
         std::shared_ptr<FunctionBlock> get_func_block() override { return cur_block; }
         Var append(const Expr &e) { recent = cur_block->ll.push(e); return recent;}
+        Var make_parameter(const Type & ty) override {
+            auto v = std::make_shared<VarNode>(generate_id());
+            v->type = ty;
+            return v;
+        }
         Var add_constant(const Constant &c) override { return append(c); }
         Var create_fadd(const Var &lhs, const Var &rhs) override {
             return append(

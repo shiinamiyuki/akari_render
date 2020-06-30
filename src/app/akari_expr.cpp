@@ -30,10 +30,10 @@ int main() {
     using namespace akari::compute;
     using namespace lang;
     
-    auto func = std::make_shared<ir::FunctionBlock>();
-    ir::IRBuilder::get()->set_func_block(func);
-    float32 x = 1.0f;
-    ir::IRBuilder::get()->create_ret();
-    auto f = func->get_func_node();
-    std::cout << debug::to_text(f) << std::endl;
+    Function<float32(float32)> f = [](float32 x)->float32{
+        return x * x + 2.0f;
+    };
+    std::cout << debug::to_text(f.__get_func_node()) << std::endl;
+    auto fp = f.compile();
+    std::cout << fp(2.0f) << std::endl;
 }

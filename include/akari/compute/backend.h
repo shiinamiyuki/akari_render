@@ -23,15 +23,9 @@
 #include <akari/compute/ir.hpp>
 #include <akari/core/error.hpp>
 namespace akari::compute {
-    struct Module {
-        ir::Function function;
-        std::string name;
-    };
     class Backend {
       public:
-        virtual Expected<void> add_module(const Module &m) = 0;
-        virtual Expected<void> compile() = 0;
-        virtual void *get_module_func(const std::string &name) = 0;
+        virtual void * compile(const ir::Function& ) = 0;
     };
 
     class AKR_EXPORT LLVMBackend : public Backend {

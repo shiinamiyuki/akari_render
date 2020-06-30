@@ -28,7 +28,9 @@ namespace akari::compute::ir {
         std::list<std::pair<Var, Expr>> list;
         Expr get(Expr expr) {
             for(auto it = list.rbegin(); it != list.rend(); it++){
+                auto ty = expr->type;
                 expr = std::make_shared<LetNode>(it->first, it->second, expr);
+                expr->type = ty;
             }
             return expr;
         }

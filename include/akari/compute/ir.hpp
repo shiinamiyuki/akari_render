@@ -196,11 +196,28 @@ namespace akari::compute::ir {
         void add_arg(Atomic a) { _args.emplace_back(std::move(a)); }
     };
 
+    template <typename T> ir::Type get_type_from_native() {
+        if constexpr (std::is_same_v<T, float>) {
+            return ir::get_primitive_type(ir::PrimitiveTy::float32);
+        } else if constexpr (std::is_same_v<T, double>) {
+            return ir::get_primitive_type(ir::PrimitiveTy::float64);
+        } else if constexpr (std::is_same_v<T, int32_t>) {
+            return ir::get_primitive_type(ir::PrimitiveTy::int32);
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return ir::get_primitive_type(ir::PrimitiveTy::boolean);
+        } else {
+            return nullptr;
+        }
+    }
+
     class ConstantNode : public AtomicNode {
       public:
         AKR_DECL_NODE(ConstantNode)
         using Value = std::variant<int, float, double>;
-        template <typename T, typename = std::enable_if_t<is_value<T>::value>> ConstantNode(const T &v) : _value(v) {}
+        template <typename T, typename = std::enable_if_t<is_value<T>::value>>
+        ConstantNode(const T &v) : _value(v) {
+          type = (get_type_from_native<T>());
+        }
         const Value &value() const { return _value; }
 
       private:

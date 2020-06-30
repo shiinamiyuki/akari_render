@@ -71,6 +71,7 @@ namespace akari::compute::ir {
         virtual Var create_dp2i(const Var &v) = 0;
         virtual Var create_i2sp(const Var &v) = 0;
         virtual Var create_i2dp(const Var &v) = 0;
+        virtual Var make_parameter(const Type & ty) =0 ;
         static IRBuilder *get();
     };
 } // namespace akari::compute::ir

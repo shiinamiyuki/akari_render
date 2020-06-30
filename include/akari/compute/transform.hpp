@@ -25,10 +25,14 @@
 #include <vector>
 #include <akari/compute/ir.hpp>
 
-namespace akari::compute::transform{
+namespace akari::compute::transform {
     class TransformPass {
-      public:  
-        virtual std::shared_ptr<ir::Node> transform(const std::shared_ptr<ir::Node>&) = 0;
+      public:
+        virtual std::shared_ptr<ir::Node> transform(const std::shared_ptr<ir::Node> &) = 0;
     };
 
-}
+    /*  Does type infer if type is not provided
+        Checks against provided type
+    */
+    AKR_EXPORT std::unique_ptr<TransformPass> type_infer_pass();
+} // namespace akari::compute::transform

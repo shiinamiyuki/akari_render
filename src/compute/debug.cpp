@@ -22,12 +22,18 @@
 #include <akari/core/akari.h>
 #include <akari/compute/debug.h>
 #include <magic_enum.hpp>
+#include <fmt/format.h>
 namespace akari::compute::debug {
     using namespace ir;
     AKR_EXPORT std::string to_text(const ir::Node &node) {
         struct DumpVisitor {
             std::string out;
-
+            std::string dump_type(const Type & ty){
+                if(ty->isa<PrimitiveType>()){
+                    return std::string(magic_enum::enum_name(ty->cast<PrimitiveType>()->prim));
+                }
+                return "unknown";
+            }
             void emit(int level, const std::string &s) { out.append(std::string(level, ' ')).append(s); }
             void emit(const std::string &s) { out.append(s); }
             void recurse(const Node &node, int level) {
@@ -85,9 +91,10 @@ namespace akari::compute::debug {
                     recurse(let->var(), level);
                     emit(level, " = ");
                     recurse(let->value(), level);
-                    emit(";\n");
+                    emit(fmt::format(" : {}\n", dump_type(let->var()->type)));
                     if (!let->body()->isa<Let>()) {
                         emit(level, "");
+
                     }
                     recurse(let->body(), level);
                 } else {
