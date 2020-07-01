@@ -29,9 +29,23 @@ using namespace akari::compute;
 int main() {
     using namespace akari::compute;
     using namespace lang;
+   /*
+
+   fun(a,b,c){
+       AKR_CACHE_FUNC(fun, a, b,c);
+   }
+   template<typename T>
+   struct Point2 {
+       T x, y;
+   };
     
+    AKR_COMPUTE_STRUCT(WrappendPoint2f, x, y)
+   */
     Function<float32(float32)> f = [](float32 x)->float32{
-        return x * x + 2.0f;
+         auto sqr = [](float32 x)->float32{
+            return x * x;
+        };
+        return sqr(x) + 2.0f;
     };
     std::cout << debug::to_text(f.__get_func_node()) << std::endl;
     auto fp = f.compile();

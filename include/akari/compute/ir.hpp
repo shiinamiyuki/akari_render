@@ -105,6 +105,8 @@ namespace akari::compute::ir {
         // GDiv,
         // GMod,
         // GenericEnd,
+        StoreField, // Struct StoreField(Struct st, int field_id, Var value)
+        LoadField, // Var LoadField(Struct st, int field_id)
         INeg,
         IAdd,
         ISub,
