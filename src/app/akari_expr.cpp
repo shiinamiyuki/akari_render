@@ -28,7 +28,7 @@ using namespace akari::compute;
 
 int main() {
     using namespace akari::compute;
-    using namespace lang;
+    using namespace lang  ;
    /*
 
    fun(a,b,c){
@@ -48,6 +48,6 @@ int main() {
         return sqr(x) + 2.0f;
     };
     std::cout << debug::to_text(f.__get_func_node()) << std::endl;
-    auto fp = f.compile();
+    auto fp = f  .compile();
     std::cout << fp(2.0f) << std::endl;
 }
