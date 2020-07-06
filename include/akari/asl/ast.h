@@ -35,7 +35,9 @@ namespace akari::asl::ast {
             j["loc"] = fmt::format("{}:{}:{}", loc.filename, loc.line, loc.col);
         }
     };
+    using AST = std::shared_ptr<ASTNode>;
     class ExpressionNode : public ASTNode {};
+    class StatementNode : public ASTNode {};
     using Expr = std::shared_ptr<ExpressionNode>;
 
     class IdentifierNode : public ExpressionNode {
@@ -52,7 +54,9 @@ namespace akari::asl::ast {
         }
     };
     using Identifier = std::shared_ptr<IdentifierNode>;
-    class TypenameNode : public ASTNode {
+    class TypeDeclNode : public ASTNode {};
+    using TypeDecl = std::shared_ptr<TypeDeclNode>();
+    class TypenameNode : public TypeDeclNode {
       public:
         AKR_DECL_NODE(TypenameNode)
         std::string name;
@@ -66,8 +70,12 @@ namespace akari::asl::ast {
         }
     };
     using Typename = std::shared_ptr<TypenameNode>;
-
-    class IntLiteralNode : public ExpressionNode {
+    class LiteralNode : public ExpressionNode {
+      public:
+        AKR_DECL_NODE(LiteralNode)
+    };
+    using Literal = std::shared_ptr<LiteralNode>;
+    class IntLiteralNode : public LiteralNode {
       public:
         AKR_DECL_NODE(IntLiteralNode)
         int64_t val;
@@ -78,10 +86,11 @@ namespace akari::asl::ast {
     };
     using IntLiteral = std::shared_ptr<IntLiteralNode>;
 
-    class FloatLiteralNode : public ExpressionNode {
+    class FloatLiteralNode : public LiteralNode {
       public:
         AKR_DECL_NODE(FloatLiteralNode)
         double val;
+        type::PrimitiveType type;
         void dump_json(json &j) const {
             ASTNode::dump_json(j);
             j["val"] = val;
@@ -179,6 +188,24 @@ namespace akari::asl::ast {
             rhs->dump_json(j["rhs"]);
         }
     };
+    using BinaryExpression = std::shared_ptr<BinaryExpressionNode>;
+    class AssignmentNode : public StatementNode {
+      public:
+        std::string op;
+        Expr lhs, rhs;
+        AKR_DECL_NODE(AssignmentNode)
+        AssignmentNode(const Token &t) {
+            op = t.tok;
+            loc = t.loc;
+        }
+        void dump_json(json &j) const {
+            ASTNode::dump_json(j);
+            j["op"] = op;
+            lhs->dump_json(j["lhs"]);
+            rhs->dump_json(j["rhs"]);
+        }
+    };
+    using Assignment = std::shared_ptr<AssignmentNode>;
     class UnaryExpressionNode : public ExpressionNode {
       public:
         std::string op;
@@ -194,7 +221,7 @@ namespace akari::asl::ast {
             operand->dump_json(j["operand"]);
         }
     };
-    using BinaryExpression = std::shared_ptr<BinaryExpressionNode>;
+
     class VarDeclNode : public ASTNode {
       public:
         Identifier var;
@@ -212,7 +239,7 @@ namespace akari::asl::ast {
     };
     using VarDecl = std::shared_ptr<VarDeclNode>;
 
-    class StatementNode : public ASTNode {};
+    
     using Stmt = std::shared_ptr<StatementNode>;
     class VarDeclStatementNode : public StatementNode {
       public:
@@ -292,7 +319,7 @@ namespace akari::asl::ast {
         Identifier name;
         std::vector<VarDecl> parameters;
         Typename type;
-        Stmt body;
+        SeqStmt body;
         AKR_DECL_NODE(VarDeclNode)
         void dump_json(json &j) const {
             ASTNode::dump_json(j);
@@ -302,7 +329,7 @@ namespace akari::asl::ast {
         }
     };
     using FunctionDecl = std::shared_ptr<FunctionDeclNode>;
-    class StructDeclNode : public ASTNode {
+    class StructDeclNode : public TypeDeclNode {
       public:
         Typename struct_name;
         std::vector<VarDecl> fields;

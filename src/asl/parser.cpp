@@ -23,6 +23,7 @@
 #include <akari/asl/parser.h>
 #include <iostream>
 #include <fmt/format.h>
+#include <unordered_set>
 namespace akari::asl {
     using namespace ast;
     class Parser::Impl {
@@ -56,10 +57,10 @@ namespace akari::asl {
         int ternaryPrec;
         std::unordered_map<std::string, int> opPrec;
         std::unordered_map<std::string, int> opAssoc; // 1 for left 0 for right
-
+        std::unordered_set<std::string> assignOps;
         void expect(const std::string &s) {
             if (cur().tok != s) {
-                throw std::runtime_error(fmt::format("expect '{}' but found '{}'", s, cur().tok));
+                error(cur().loc, fmt::format("expect '{}' but found '{}'", s, cur().tok));
             }
             consume();
         }
@@ -75,20 +76,20 @@ namespace akari::asl {
             /*
              *   opPrec[","] = prec;
              * prec++;*/
-            opPrec["="] = prec;
-            opPrec["+="] = prec;
-            opPrec["-="] = prec;
-            opPrec["*="] = prec;
-            opPrec["/="] = prec;
-            opPrec[">>="] = prec;
-            opPrec["<<="] = prec;
-            opPrec["%="] = prec;
-            opPrec["|="] = prec;
-            opPrec["&="] = prec;
-            opPrec["^="] = prec;
-            opPrec["&&="] = prec;
-            opPrec["||="] = prec;
-            prec++;
+            // opPrec["="] = prec;
+            // opPrec["+="] = prec;
+            // opPrec["-="] = prec;
+            // opPrec["*="] = prec;
+            // opPrec["/="] = prec;
+            // opPrec[">>="] = prec;
+            // opPrec["<<="] = prec;
+            // opPrec["%="] = prec;
+            // opPrec["|="] = prec;
+            // opPrec["&="] = prec;
+            // opPrec["^="] = prec;
+            // opPrec["&&="] = prec;
+            // opPrec["||="] = prec;
+            // prec++;
             opPrec["?"] = ternaryPrec = prec;
             prec++;
             opPrec["||"] = prec;
@@ -120,11 +121,11 @@ namespace akari::asl {
             opPrec["%"] = prec;
             prec++;
             opPrec["."] = prec;
-            opAssoc = {{"+=", 0}, {"-=", 0}, {"*=", 0}, {"/=", 0},  {">>=", 0}, {"<<=", 0}, {"%=", 0},
-                       {"&=", 0}, {"|=", 0}, {":=", 0}, {"::=", 0}, {"=", 0},   {"+", 1},   {"-", 1},
-                       {"*", 1},  {"/", 1},  {"!=", 1}, {"==", 1},  {">", 1},   {">=", 1},  {"<=", 1},
-                       {"<", 1},  {"%", 1},  {"&&", 1}, {"&", 1},   {"||", 1},  {"|", 1}};
-
+            opAssoc = {{"+", 1},  {"-", 1}, {"*", 1}, {"/", 1},  {"!=", 1}, {"==", 1}, {">", 1}, {">=", 1},
+                       {"<=", 1}, {"<", 1}, {"%", 1}, {"&&", 1}, {"&", 1},  {"||", 1}, {"|", 1}};
+            assignOps = {
+                "=", "+=", "-=", "*=", "/=", ">>=", "<<=", "%=", "|=", "&=", "^=", "&&=", "||=",
+            };
             typenames.insert("bool", true);
             typenames.insert("int", true);
             typenames.insert("uint", true);
@@ -149,7 +150,7 @@ namespace akari::asl {
             throw std::runtime_error(fmt::format("error: {} at {}:{}:{}", msg, loc.filename, loc.line, loc.col));
         }
         ast::Expr parse_expr(int lev = 0) {
-            ast::Expr result = parse_atom();
+            ast::Expr result = parse_postfix_expr();
             while (!end()) {
                 auto c = cur();
                 // std::cout << c.tok << std::endl;
@@ -228,6 +229,7 @@ namespace akari::asl {
                 }
                 error(cur().loc, "identifier expected in function call");
             }
+            return e;
         }
         ast::Expr parse_atom() {
             if (cur().type == identifier) {
@@ -261,7 +263,7 @@ namespace akari::asl {
                 consume();
                 return lit;
             }
-            error(cur().loc, "unexpected token");
+            error(cur().loc, fmt::format("unexpected token {}", cur().tok));
             return nullptr;
         }
         ast::Typename parse_typename() {
@@ -275,6 +277,9 @@ namespace akari::asl {
         ast::StructDecl parse_struct_decl() {
             expect("struct");
             if (cur().type == identifier) {
+                if (typenames.at(cur().tok).has_value()) {
+                    error(cur().loc, fmt::format("{} redefined", cur().tok));
+                }
                 typenames.insert(cur().tok, true);
             } else {
                 error(cur().loc, "identifier expected");
@@ -288,6 +293,7 @@ namespace akari::asl {
                 expect(";");
             }
             expect("}");
+            expect(";");
             return st;
         }
         ast::VarDecl parse_var_decl() {
@@ -359,8 +365,17 @@ namespace akari::asl {
             if (cur().tok == "return") {
                 return parse_ret();
             }
-            auto st = std::make_shared<ExpressionStatementNode>();
-            st->expr = parse_expr();
+            auto lvalue = parse_postfix_expr();
+            if (!assignOps.count(cur().tok)) {
+                error(cur().loc, "assignment op expected");
+            }
+            auto op = cur();
+            consume();
+            auto e = parse_expr();
+            auto st = std::make_shared<ast::AssignmentNode>(op);
+            st->lhs = lvalue;
+            st->rhs = e;
+            expect(";");
             return st;
         }
         ast::FunctionDecl parse_func_decl() {

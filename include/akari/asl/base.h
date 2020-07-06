@@ -43,9 +43,11 @@ namespace akari::asl {
             using U = typename T::element_type;
             return std::dynamic_pointer_cast<U>(shared_from_this());
         }
+        virtual bool is_parent_of(const std::shared_ptr<Base> &ptr) const = 0;
         virtual std::string type_name() const = 0;
         virtual ~Base() = default;
     };
 #define AKR_DECL_NODE(Type)                                                                                            \
-    std::string type_name() const { return #Type; }
+    std::string type_name() const { return #Type; }                                                                    \
+    bool is_parent_of(const std::shared_ptr<Base> &ptr) const { return ptr->isa<std::shared_ptr<Type>>(); }
 } // namespace akari::asl

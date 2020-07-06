@@ -19,34 +19,19 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+#pragma once
+#include <akari/asl/ast.h>
+#include <akari/asl/type.h>
+namespace akari::asl {
+    struct Program {
+        std::vector<ast::TopLevel> modules;
+    };
+    class Backend {
+      public:
+        virtual void compile(const Program &) = 0;
+        virtual void *get_function_address(const std::string &name) = 0;
+        virtual void add_function(const std::string &name, const type::FunctionType &ty, void *) = 0;
+    };
 
-#include <akari/core/logger.h>
-#include <akari/asl/parser.h>
-#include <akari/asl/backend.h>
-#include <iostream>
-using namespace akari::asl;
-int main() {
-    try {
-        Parser parser(R"(
-        float main(){
-            float x = 1.5;
-            while(x < 10){
-                x = x + 1;
-            }
-            return x;
-        }
-    )");
-        auto ast = parser();
-        nlohmann::json j;
-        ast->dump_json(j);
-        std::cout << j.dump(1) << std::endl;
-        auto be = create_llvm_backend();
-        Program prog;
-        prog.modules.emplace_back(ast);
-        be->compile(prog);
-        auto f = reinterpret_cast<float(*)(void)>(be->get_function_address("main"));
-        std::cout << f() << std::endl;
-    } catch (std::runtime_error &e) {
-        std::cerr << e.what() << std::endl;
-    }
-}
+    AKR_EXPORT std::shared_ptr<Backend> create_llvm_backend();
+} // namespace akari::asl
