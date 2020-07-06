@@ -19,17 +19,35 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-#pragma once
-#include <akari/compute/ir.hpp>
-#include <akari/core/error.hpp>
-namespace akari::compute {
-    class Backend {
-      public:
-        virtual void * compile(const ir::Function& ) = 0;
-    };
 
-    class AKR_EXPORT LLVMBackend : public Backend {
-      public:
+#pragma once
+#include <akari/asl/type.h>
+namespace akari::asl {
+    struct SourceLocation {
+        std::string filename;
+        int line = 1, col = 1;
     };
-    AKR_EXPORT std::shared_ptr<LLVMBackend> create_llvm_backend();
-} // namespace akari::compute
+    enum TokenType {
+        symbol,
+        identifier,
+        keyword,
+        string_literal,
+        int_literal,
+        float_literal,
+        terminator
+    };
+    struct Token {
+        std::string tok;
+        TokenType type;
+        SourceLocation loc;
+    };
+    using TokenStream = std::list<Token>;
+    class AKR_EXPORT Lexer {
+        class Impl;
+        std::shared_ptr<Impl> impl;
+
+      public:
+        Lexer();
+        const TokenStream &operator()(const std::string &s);
+    };
+} // namespace akari::asl

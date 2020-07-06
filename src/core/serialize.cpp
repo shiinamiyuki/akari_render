@@ -19,10 +19,6 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-#include <akari/core/component.h>
-#include <akari/core/plugin.h>
-#include <akari/core/serialize.hpp>
 
-namespace akari {
 
-} // namespace akari
+namespace akari::core {}

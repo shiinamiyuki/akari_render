@@ -21,8 +21,8 @@
 // SOFTWARE.
 #pragma once
 #include <memory>
-#include <type_traits>
-namespace akari::compute {
+#include <string>
+namespace akari::asl {
     template <typename T> struct is_shared_ptr : std::false_type {};
     template <typename T> struct is_shared_ptr<std::shared_ptr<T>> : std::true_type {};
     class Base : public std::enable_shared_from_this<Base> {
@@ -46,4 +46,6 @@ namespace akari::compute {
         virtual std::string type_name() const = 0;
         virtual ~Base() = default;
     };
-} // namespace akari::compute
+#define AKR_DECL_NODE(Type)                                                                                            \
+    std::string type_name() const { return #Type; }
+} // namespace akari::asl

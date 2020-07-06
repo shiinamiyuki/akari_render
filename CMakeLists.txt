@@ -66,7 +66,7 @@ include(cmake/LLVM.cmake)
 file(GLOB AKR_API_SRC include/akari/core/*.* include/akari/render/*.*)
 file(GLOB AKR_CORE_SRC src/core/*.* )
 file(GLOB AKR_CORE_RENDER_SRC src/render/*.*)
-file(GLOB AKR_COMPUTE_SRC src/compute/*.* src/compute/*/*.*)
+file(GLOB AKR_ASL_SRC src/asl/*.* src/asl/*/*.*)
 add_library(AkariCore SHARED ${AKR_CORE_SRC})
 target_link_libraries(AkariCore  ${AKR_CORE_EXT_LIBS})
 target_compile_options(AkariCore PUBLIC ${AKR_CXX_FLAGS})
@@ -124,11 +124,11 @@ add_subdirectory(src/tool)
 add_executable(akari src/app/akari.cpp)
 target_link_libraries(akari AkariCoreRender)
 
-add_library(AkariCompute SHARED ${AKR_COMPUTE_SRC})
-target_link_libraries(AkariCompute AkariCore)
-target_include_directories(AkariCompute PUBLIC ${LLVM_INCLUDE_DIR})
-target_link_directories(AkariCompute PUBLIC ${LLVM_LIBRARY_DIRS})
-target_link_libraries(AkariCompute
+add_library(AkariShading SHARED ${AKR_ASL_SRC})
+target_link_libraries(AkariShading AkariCore)
+target_include_directories(AkariShading PUBLIC ${LLVM_INCLUDE_DIR})
+target_link_directories(AkariShading PUBLIC ${LLVM_LIBRARY_DIRS})
+target_link_libraries(AkariShading
         LLVMX86Disassembler
         LLVMX86AsmParser
 #        LLVMX86AsmPrinter
@@ -159,7 +159,7 @@ target_link_libraries(AkariCompute
 
 
 add_executable(akaric src/app/akari_expr.cpp)
-target_link_libraries(akaric AkariCompute)
+target_link_libraries(akaric AkariShading)
 
 if(AKR_BUILD_GUI)
     file(GLOB AkariGuiSrc src/app/ui/*.*)

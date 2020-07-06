@@ -21,33 +21,33 @@
 // SOFTWARE.
 
 #include <akari/core/logger.h>
-#include <akari/compute/lang.hpp>
-#include <akari/compute/transform.hpp>
-#include <akari/compute/debug.h>
-using namespace akari::compute;
-
+#include <akari/asl/parser.h>
+#include <iostream>
+using namespace akari::asl;
 int main() {
-    using namespace akari::compute;
-    using namespace lang  ;
-   /*
+    try{
+    Parser parser(R"(
+        struct point {float x; float y;}
+        int sgn(float x){
+            if(x> 0.0){
+                return 1;
+            }
+            if(x < 0.0){
+                return -1;
+            }
+            return 0;
+        }
+        vec3 main(vec3 v){
+            return v;
+        }
 
-   fun(a,b,c){
-       AKR_CACHE_FUNC(fun, a, b,c);
-   }
-   template<typename T>
-   struct Point2 {
-       T x, y;
-   };
-    
-    AKR_COMPUTE_STRUCT(WrappendPoint2f, x, y)
-   */
-    Function<float32(float32)> f = [](float32 x)->float32{
-         auto sqr = [](float32 x)->float32{
-            return x * x;
-        };
-        return sqr(x) + 2.0f;
-    };
-    std::cout << debug::to_text(f.__get_func_node()) << std::endl;
-    auto fp = f  .compile();
-    std::cout << fp(2.0f) << std::endl;
+
+    )");
+    auto ast = parser();
+    nlohmann::json j;
+    ast->dump_json(j);
+    std::cout << j.dump(1) << std::endl;
+    }catch(std::runtime_error & e){
+        std::cerr << e.what() << std::endl;
+    }
 }
