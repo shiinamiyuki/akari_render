@@ -102,12 +102,23 @@ namespace akari::asl {
 
     //     }
     // };
+    class MCJITProgram : public Program {
+        std::shared_ptr<LLVMInit> _init;
+        std::unique_ptr<llvm::ExecutionEngine> EE;
 
+      public:
+        MCJITProgram(llvm::ExecutionEngine *EE) : EE(EE) {
+            AKR_ASSERT(EE);
+            _init = init.lock();
+            AKR_ASSERT(_init);
+        }
+        void *get_function_pointer(const std::string &s) { return (void *)EE->getFunctionAddress(s); }
+    };
+    static thread_local llvm::LLVMContext ctx;
     class LLVMBackend : public Backend {
-        llvm::LLVMContext ctx;
+
         std::unique_ptr<llvm::Module> owner;
         std::shared_ptr<LLVMInit> _init;
-        llvm::ExecutionEngine *EE = nullptr;
         FunctionRecord cur_function;
         std::unique_ptr<llvm::IRBuilder<>> builder;
         Environment<std::string, LValueRecord> vars;
@@ -638,11 +649,13 @@ namespace akari::asl {
             init_types();
         }
 
-        void compile(const Program &prog) override {
+        std::shared_ptr<Program> compile(const ParsedProgram &prog) override {
             owner = std::make_unique<llvm::Module>("test", ctx);
             pass_mgr_builder.OptLevel = 2;
             FPM = std::make_unique<llvm::legacy::FunctionPassManager>(owner.get());
+            MPM = std::make_unique<llvm::legacy::PassManager>();
             pass_mgr_builder.populateFunctionPassManager(*FPM);
+            pass_mgr_builder.populateModulePassManager(*MPM);
             // llvm::PassBuilder pass_builder;
             // llvm::ModuleAnalysisManager mgr;
             // pass_builder.registerModuleAnalyses(mgr);
@@ -662,12 +675,14 @@ namespace akari::asl {
                     compile_func(decl);
                 }
             }
-
+            MPM->run(*owner);
             // opt_pass.run(*owner, mgr);
             llvm::outs() << *owner << "\n";
-            EE = llvm::EngineBuilder(std::move(owner)).create();
+            auto EE = llvm::EngineBuilder(std::move(owner)).create();
+            AKR_ASSERT(EE->getFunctionAddress("main") != 0);
+            return std::make_shared<MCJITProgram>(EE);
         }
-        void *get_function_address(const std::string &name) { return (void *)EE->getFunctionAddress(name); }
+
         void add_function(const std::string &name, const type::FunctionType &ty, void *) {}
     };
 

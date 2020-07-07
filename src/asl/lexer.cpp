@@ -32,9 +32,9 @@ namespace akari::asl {
         {"&&=", "||=", ">>=", "<<=", "..."},
         {"&&", "||", "++", "--", "+=", "-=", "*=", "/=", "%=", "|=", "&=", "^=", ">=", "<=", "!=", "==", "->", ">>",
          "<<"},
-        {"+", "-", "*", "/", "%",  "&", "|", "^", "(", ")", "[", "]",";",
+        {"+", "-", "*", "/", "%",  "&", "|", "^", "(", ")", "[", "]", ";",
          "{", "}", ",", "=", "\\", "<", ">", ".", ":", "?", "~", "!"}};
-    static std::set<char> op_char = {'+', '-', '*', '/', '%', '^', '>', '<',  '!', '=', '(', ')',';',
+    static std::set<char> op_char = {'+', '-', '*', '/', '%', '^', '>', '<',  '!', '=', '(', ')', ';',
                                      '[', ']', '{', '}', '.', ':', ',', '\\', '&', '|', '~', '?'};
     class Lexer::Impl {
         std::string src;
@@ -121,7 +121,8 @@ namespace akari::asl {
                 advance();
             }
         }
-        const TokenStream &operator()(std::string _s) {
+        const TokenStream &operator()(const std::string &filename, std::string _s) {
+            loc.filename = filename;
             src = std::move(_s);
             while (cur()) {
                 skip_space();
@@ -158,6 +159,8 @@ namespace akari::asl {
             return ts;
         }
     };
-    Lexer::Lexer() : impl(std::make_shared<Impl>()) {}
-    const TokenStream &Lexer::operator()(const std::string &s) { return (*impl)(s); }
+    Lexer::Lexer() :impl(std::make_shared<Impl>()){}
+    const TokenStream &Lexer::operator()(const std::string &filename, const std::string &s) {
+        return (*impl)(filename, s);
+    }
 } // namespace akari::asl

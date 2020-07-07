@@ -20,33 +20,29 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#pragma once
-#include <akari/asl/type.h>
+#include <iostream>
+#include <json.hpp>
+#include <akari/asl/asl.h>
+#include <akari/asl/parser.h>
+#include <akari/asl/backend.h>
+
 namespace akari::asl {
-    struct SourceLocation {
-        std::string filename;
-        int line = 1, col = 1;
-    };
-    enum TokenType {
-        symbol,
-        identifier,
-        keyword,
-        string_literal,
-        int_literal,
-        float_literal,
-        terminator
-    };
-    struct Token {
-        std::string tok;
-        TokenType type;
-        SourceLocation loc;
-    };
-    using TokenStream = std::list<Token>;
-    class AKR_EXPORT Lexer {
-        class Impl;
-        std::shared_ptr<Impl> impl;
-      public:
-        Lexer();
-        const TokenStream &operator()(const std::string &filename, const std::string &s);
-    };
+    Expected<std::shared_ptr<Program>> compile(const std::vector<TranslationUnit> &units,
+                                               CompileOptions opt) {
+        try {
+            ParsedProgram prog;
+            using namespace nlohmann;
+            json j = json::array();
+            for (auto &unit : units) {
+                prog.modules.emplace_back(Parser(unit.filename, unit.source)());
+                json _;
+                prog.modules.back()->dump_json(_);
+            }
+            std::cout << j.dump(1) << std::endl;
+            auto backend = create_llvm_backend();
+            return backend->compile(prog);
+        } catch (std::runtime_error &e) {
+            return Error(e.what());
+        }
+    }
 } // namespace akari::asl

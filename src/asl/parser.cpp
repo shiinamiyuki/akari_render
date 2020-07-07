@@ -66,8 +66,8 @@ namespace akari::asl {
         }
 
       public:
-        Impl(const std::string &src) {
-            ts = Lexer()(src);
+        Impl(const std::string &filename, const std::string &src) {
+            ts = Lexer()(filename, src);
             it = ts.begin();
             // for(auto & t: ts){
             //     std::cout << t.tok << std::endl;
@@ -411,6 +411,8 @@ namespace akari::asl {
             return top;
         }
     };
-    Parser::Parser(const std::string &src) { impl = std::make_shared<Impl>(src); }
+    Parser::Parser(const std::string &filename, const std::string &src) {
+        impl = std::make_shared<Impl>(filename, src);
+    }
     ast::TopLevel Parser::operator()() { return (*impl)(); }
 } // namespace akari::asl

@@ -19,34 +19,34 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-
 #pragma once
-#include <akari/asl/type.h>
+#include <string>
+#include <vector>
+#include <memory>
+#include <akari/core/platform.h>
+#include <akari/core/error.hpp>
 namespace akari::asl {
-    struct SourceLocation {
-        std::string filename;
-        int line = 1, col = 1;
+    struct CompileOptions {
+        enum OptLevel {
+            OFF,
+            O0,
+            O1,
+            O2,
+            O3,
+        };
+        OptLevel opt_level;
+        const char *backend = "llvm";
     };
-    enum TokenType {
-        symbol,
-        identifier,
-        keyword,
-        string_literal,
-        int_literal,
-        float_literal,
-        terminator
-    };
-    struct Token {
-        std::string tok;
-        TokenType type;
-        SourceLocation loc;
-    };
-    using TokenStream = std::list<Token>;
-    class AKR_EXPORT Lexer {
-        class Impl;
-        std::shared_ptr<Impl> impl;
+    class Program {
       public:
-        Lexer();
-        const TokenStream &operator()(const std::string &filename, const std::string &s);
+        virtual void *get_function_pointer(const std::string &s) = 0;
     };
+
+    struct TranslationUnit {
+        std::string filename;
+        std::string source;
+    };
+    AKR_EXPORT Expected<std::shared_ptr<Program>> compile(const std::vector<TranslationUnit> &,
+                                                          CompileOptions opt = CompileOptions());
+
 } // namespace akari::asl

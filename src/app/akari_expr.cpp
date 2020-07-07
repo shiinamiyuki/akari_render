@@ -27,7 +27,7 @@
 using namespace akari::asl;
 int main() {
     try {
-        Parser parser(R"(
+        auto src = R"(
         float sqr(float x){
             return x * x;
         }
@@ -38,17 +38,27 @@ int main() {
             }
             return sqr(x);
         }
-    )");
-        auto ast = parser();
-        nlohmann::json j;
-        ast->dump_json(j);
-        std::cout << j.dump(1) << std::endl;
-        auto be = create_llvm_backend();
-        Program prog;
-        prog.modules.emplace_back(ast);
-        be->compile(prog);
-        auto f = reinterpret_cast<float(*)(void)>(be->get_function_address("main"));
-        std::cout << f() << std::endl;
+    )";
+        // auto ast = parser();
+        // nlohmann::json j;
+        // ast->dump_json(j);
+        // std::cout << j.dump(1) << std::endl;
+        // auto be = create_llvm_backend();
+        // ParsedProgram prog;
+        // prog.modules.emplace_back(ast);
+        // be->compile(prog);
+        // auto f = reinterpret_cast<float(*)(void)>(be->get_function_address("main"));
+        // std::cout << f() << std::endl;
+        std::vector<TranslationUnit> units;
+        units.emplace_back(TranslationUnit{"test.asl", src});
+        auto r = compile(units);
+        if (r.has_value()) {
+            auto program = r.extract_value();
+            auto f = reinterpret_cast<float (*)(void)>(program->get_function_pointer("main"));
+            std::cout << f() << std::endl;
+        }else {
+            std::cerr << r.error().what() << std::endl;
+        }
     } catch (std::runtime_error &e) {
         std::cerr << e.what() << std::endl;
     }

@@ -22,14 +22,14 @@
 #pragma once
 #include <akari/asl/ast.h>
 #include <akari/asl/type.h>
+#include <akari/asl/asl.h>
 namespace akari::asl {
-    struct Program {
+    struct ParsedProgram {
         std::vector<ast::TopLevel> modules;
     };
     class Backend {
       public:
-        virtual void compile(const Program &) = 0;
-        virtual void *get_function_address(const std::string &name) = 0;
+        virtual std::shared_ptr<Program> compile(const ParsedProgram &) = 0;
         virtual void add_function(const std::string &name, const type::FunctionType &ty, void *) = 0;
     };
 

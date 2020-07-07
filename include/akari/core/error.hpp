@@ -41,7 +41,7 @@ namespace akari {
       private:
         std::unique_ptr<char[]> _message;
     };
-    template <typename T=void> struct Expected {
+    template <typename T = void> struct Expected {
         static_assert(!std::is_same_v<Error, T>, "T cannot be Error");
         using value_type = T;
         using reference = T &;
@@ -56,12 +56,14 @@ namespace akari {
         Error extract_error() { return std::move(*std::get_if<Error>(&_storage)); }
         const_reference operator*() const { return *std::get_if<T>(&_storage); }
         reference operator*() { return *std::get_if<T>(&_storage); }
+        const T &value() const { return *std::get_if<T>(&_storage); }
+        T extract_value() const { return std::move(*std::get_if<T>(&_storage)); }
 
       private:
         std::variant<T, Error> _storage;
     };
     template <> struct Expected<void> {
-        Expected()=default;
+        Expected() = default;
         Expected(Error err) : _storage(std::move(err)) {}
         operator bool() const { return has_value(); }
         bool has_value() const { return !_storage.has_value(); }
