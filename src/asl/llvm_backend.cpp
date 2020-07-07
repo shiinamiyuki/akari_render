@@ -49,7 +49,11 @@
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
+#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Type.h>
+#include <llvm/IR/Verifier.h>
+#include <llvm/Passes/PassBuilder.h>
+#include <llvm/Transforms/IPO/PassManagerBuilder.h>
 #include <llvm/Support/Casting.h>
 #include <llvm/Support/ManagedStatic.h>
 #include <llvm/Support/TargetSelect.h>
@@ -81,6 +85,24 @@ namespace akari::asl {
         type::StructType type;
         llvm::StructType *llvm_type;
     };
+    // class Managler {
+    //   public:
+    //     std::string mangle(const type::Type & ty){
+    //         if(ty->isa<type::PrimitiveType>()){
+    //             return fmt::format("@P{}@p", ty->type_name());
+    //         }else if(ty->isa<type::VectorType>()){
+    //             auto v = ty->cast<type::VectorType>();
+    //             return fmt::format("@V{}@{}n@v", mangle(v->element_type(), v->count));
+    //         }else if(ty->isa<type::StructType>())
+    //     }
+    //     std::string mangle_arg(const type::Type & ty){
+    //         return fmt::format("@A{}@a", mange(ty));
+    //     }
+    //     std::string mangle(const std::string &name, const type::FunctionType &type) {
+
+    //     }
+    // };
+
     class LLVMBackend : public Backend {
         llvm::LLVMContext ctx;
         std::unique_ptr<llvm::Module> owner;
@@ -88,15 +110,18 @@ namespace akari::asl {
         llvm::ExecutionEngine *EE = nullptr;
         FunctionRecord cur_function;
         std::unique_ptr<llvm::IRBuilder<>> builder;
-        std::unordered_map<std::string, FunctionRecord> funcs;
         Environment<std::string, LValueRecord> vars;
         std::unordered_map<std::string, StructRecord> structs;
         std::unordered_map<std::string, type::Type> types;
-        std::unordered_map<std::string, llvm::Function *> prototypes;
+        std::unordered_map<std::string, FunctionRecord> prototypes;
         std::unordered_map<type::Type, llvm::Type *> type_cache;
+        std::unique_ptr<llvm::legacy::FunctionPassManager> FPM;
+        std::unique_ptr<llvm::legacy::PassManager> MPM;
+        llvm::PassManagerBuilder pass_mgr_builder;
         [[noreturn]] void error(const SourceLocation &loc, std::string &&msg) {
             throw std::runtime_error(fmt::format("error: {} at {}:{}:{}", msg, loc.filename, loc.line, loc.col));
         }
+
         void init_types() {
             types["bool"] = type::boolean;
             types["int"] = type::int32;
@@ -217,13 +242,14 @@ namespace akari::asl {
             return st;
         }
         void gen_prototype(const ast::FunctionDecl &decl) {
-            auto ty = llvm::dyn_cast<llvm::FunctionType>(to_llvm_type(process_type(decl)));
+            auto f_ty = process_type(decl)->cast<type::FunctionType>();
+            auto ty = llvm::dyn_cast<llvm::FunctionType>(to_llvm_type(f_ty));
             llvm::Function *F =
                 llvm::Function::Create(ty, llvm::Function::ExternalLinkage, decl->name->identifier, owner.get());
             unsigned Idx = 0;
             for (auto &Arg : F->args())
                 Arg.setName(decl->parameters[Idx++]->var->identifier);
-            prototypes[decl->name->identifier] = F;
+            prototypes[decl->name->identifier] = FunctionRecord{F, f_ty};
         }
         std::pair<ValueRecord, ValueRecord> arith_promote(const std::string &op, SourceLocation &loc,
                                                           const ValueRecord &lhs, const ValueRecord &rhs) {
@@ -231,12 +257,147 @@ namespace akari::asl {
                 return std::make_pair(lhs, cast(loc, rhs, lhs.type));
             } else if (rhs.type->is_parent_of(lhs.type)) {
                 return std::make_pair(cast(loc, lhs, rhs.type), rhs);
-            } else if (rhs.type->isa<type::PrimitiveType>() && lhs.type->isa<type::PrimitiveType>()) {
-                return std::make_pair(cast(loc, lhs, type::float64), cast(loc, rhs, type::float64));
             } else {
                 error(loc, fmt::format("illegal binary op '{}' with {} and {}", op, lhs.type->type_name(),
                                        rhs.type->type_name()));
             }
+        }
+        ValueRecord compile_binary_expr(const ast::BinaryExpression &e) {
+            auto binop = e->cast<ast::BinaryExpression>();
+            auto op = binop->op;
+            if (op == "||") {
+                auto *lhs_bb = builder->GetInsertBlock();
+                auto lhs = cast(binop->lhs->loc, compile_expr(binop->lhs), type::boolean);
+                auto *rhs_bb = llvm::BasicBlock::Create(ctx, "or_rhs", cur_function.function);
+                auto *merge_bb = llvm::BasicBlock::Create(ctx, "merge", cur_function.function);
+                builder->CreateCondBr(lhs.value, merge_bb, rhs_bb);
+                builder->SetInsertPoint(rhs_bb);
+                auto rhs = cast(binop->rhs->loc, compile_expr(binop->rhs), type::boolean);
+                builder->CreateBr(merge_bb);
+                builder->SetInsertPoint(merge_bb);
+                auto phi = builder->CreatePHI(to_llvm_type(type::boolean), 2, "or_phi");
+                phi->addIncoming(lhs.value, lhs_bb);
+                phi->addIncoming(rhs.value, rhs_bb);
+                return {phi, type::boolean};
+            }
+            if (op == "&&") {
+                auto *lhs_bb = builder->GetInsertBlock();
+                auto lhs = cast(binop->lhs->loc, compile_expr(binop->lhs), type::boolean);
+                auto *rhs_bb = llvm::BasicBlock::Create(ctx, "and_rhs", cur_function.function);
+                auto *merge_bb = llvm::BasicBlock::Create(ctx, "merge", cur_function.function);
+                builder->CreateCondBr(lhs.value, rhs_bb, merge_bb);
+                builder->SetInsertPoint(rhs_bb);
+                auto rhs = cast(binop->rhs->loc, compile_expr(binop->rhs), type::boolean);
+                builder->CreateBr(merge_bb);
+                builder->SetInsertPoint(merge_bb);
+                auto phi = builder->CreatePHI(to_llvm_type(type::boolean), 2, "and_phi");
+                phi->addIncoming(lhs.value, lhs_bb);
+                phi->addIncoming(rhs.value, rhs_bb);
+                return {phi, type::boolean};
+            }
+            auto lhs = compile_expr(binop->lhs);
+            auto rhs = compile_expr(binop->rhs);
+            auto [L, R] = arith_promote(op, binop->loc, lhs, rhs);
+            AKR_ASSERT(L.type == R.type);
+            if (op == "+") {
+                if (L.type->is_float()) {
+                    return {builder->CreateFAdd(L.value, R.value), L.type};
+                } else {
+                    return {builder->CreateAdd(L.value, R.value), L.type};
+                }
+            } else if (op == "-") {
+                if (L.type->is_float()) {
+                    return {builder->CreateFSub(L.value, R.value), L.type};
+                } else {
+                    return {builder->CreateSub(L.value, R.value), L.type};
+                }
+            } else if (op == "*") {
+                if (L.type->is_float()) {
+                    return {builder->CreateFMul(L.value, R.value), L.type};
+                } else {
+
+                    return {builder->CreateFMul(L.value, R.value), L.type};
+
+                    return {builder->CreateMul(L.value, R.value), L.type};
+                }
+            } else if (op == "/") {
+                if (L.type->is_float()) {
+                    return {builder->CreateFDiv(L.value, R.value), L.type};
+                } else if (L.type->is_signed_int()) {
+                    return {builder->CreateSDiv(L.value, R.value), L.type};
+                } else {
+                    return {builder->CreateUDiv(L.value, R.value), L.type};
+                }
+            } else if (op == "<") {
+                if (L.type->is_float()) {
+                    return {builder->CreateFCmpOLT(L.value, R.value), type::boolean};
+                } else if (L.type->is_signed_int()) {
+                    return {builder->CreateICmpSLT(L.value, R.value), type::boolean};
+                } else {
+                    return {builder->CreateICmpULT(L.value, R.value), type::boolean};
+                }
+            } else if (op == "<=") {
+                if (L.type->is_float()) {
+                    return {builder->CreateFCmpOLE(L.value, R.value), type::boolean};
+                } else if (L.type->is_signed_int()) {
+                    return {builder->CreateICmpSLE(L.value, R.value), type::boolean};
+                } else {
+                    return {builder->CreateICmpULE(L.value, R.value), type::boolean};
+                }
+            } else if (op == ">") {
+                if (L.type->is_float()) {
+                    return {builder->CreateFCmpOGT(L.value, R.value), type::boolean};
+                } else if (L.type->is_signed_int()) {
+                    return {builder->CreateICmpSGT(L.value, R.value), type::boolean};
+                } else {
+                    return {builder->CreateICmpUGT(L.value, R.value), type::boolean};
+                }
+            } else if (op == ">=") {
+                if (L.type->is_float()) {
+                    return {builder->CreateFCmpOGE(L.value, R.value), type::boolean};
+                } else if (L.type->is_signed_int()) {
+                    return {builder->CreateICmpSGE(L.value, R.value), type::boolean};
+                } else {
+                    return {builder->CreateICmpUGE(L.value, R.value), type::boolean};
+                }
+            } else if (op == "==") {
+                if (L.type->is_float()) {
+                    return {builder->CreateFCmpOEQ(L.value, R.value), type::boolean};
+                } else {
+                    return {builder->CreateICmpEQ(L.value, R.value), type::boolean};
+                }
+            } else if (op == "!=") {
+                if (L.type->is_float()) {
+                    return {builder->CreateFCmpONE(L.value, R.value), type::boolean};
+                } else {
+                    return {builder->CreateICmpNE(L.value, R.value), type::boolean};
+                }
+            }
+            AKR_ASSERT(false);
+        }
+        ValueRecord compile_func_call(const ast::FunctionCall &call) {
+            auto func = call->func->identifier;
+            if (!prototypes.count(func)) {
+                error(call->loc, fmt::format("{} is not a function or it is undefined", func));
+            }
+            auto &f_rec = prototypes.at(func);
+            std::vector<ValueRecord> args;
+            auto expected_num = f_rec.type->args.size();
+            auto actual_num = call->args.size();
+            if (expected_num != actual_num) {
+                error(call->loc, fmt::format("{} arguments expected but found {}", expected_num, actual_num));
+            }
+            for (int i = 0; i < f_rec.type->args.size(); i++) {
+                auto &expected_ty = f_rec.type->args[i];
+                auto arg = compile_expr(call->args[i]);
+                // auto &arg_ty = arg.type;
+                args.emplace_back(cast(call->args[i]->loc, arg, expected_ty));
+            }
+            std::vector<llvm::Value *> llvm_args;
+            for (auto &a : args) {
+                llvm_args.emplace_back(a.value);
+            }
+            return {builder->CreateCall(f_rec.function, llvm_args), f_rec.type->ret};
         }
         ValueRecord compile_expr(const ast::Expr &e) {
             if (e->isa<ast::Literal>()) {
@@ -246,118 +407,30 @@ namespace akari::asl {
                 return compile_var(e->cast<ast::Identifier>());
             }
             if (e->isa<ast::BinaryExpression>()) {
-                auto binop = e->cast<ast::BinaryExpression>();
-                auto op = binop->op;
-                if (op == "||") {
-                    auto *lhs_bb = builder->GetInsertBlock();
-                    auto lhs = cast(binop->lhs->loc, compile_expr(binop->lhs), type::boolean);
-                    auto *rhs_bb = llvm::BasicBlock::Create(ctx, "or_rhs", cur_function.function);
-                    auto *merge_bb = llvm::BasicBlock::Create(ctx, "merge", cur_function.function);
-                    builder->CreateCondBr(lhs.value, merge_bb, rhs_bb);
-                    builder->SetInsertPoint(rhs_bb);
-                    auto rhs = cast(binop->rhs->loc, compile_expr(binop->rhs), type::boolean);
-                    builder->CreateBr(merge_bb);
-                    builder->SetInsertPoint(merge_bb);
-                    auto phi = builder->CreatePHI(to_llvm_type(type::boolean), 2, "or_phi");
-                    phi->addIncoming(lhs.value, lhs_bb);
-                    phi->addIncoming(rhs.value, rhs_bb);
-                    return {phi, type::boolean};
-                }
-                if (op == "&&") {
-                    auto *lhs_bb = builder->GetInsertBlock();
-                    auto lhs = cast(binop->lhs->loc, compile_expr(binop->lhs), type::boolean);
-                    auto *rhs_bb = llvm::BasicBlock::Create(ctx, "and_rhs", cur_function.function);
-                    auto *merge_bb = llvm::BasicBlock::Create(ctx, "merge", cur_function.function);
-                    builder->CreateCondBr(lhs.value, rhs_bb, merge_bb);
-                    builder->SetInsertPoint(rhs_bb);
-                    auto rhs = cast(binop->rhs->loc, compile_expr(binop->rhs), type::boolean);
-                    builder->CreateBr(merge_bb);
-                    builder->SetInsertPoint(merge_bb);
-                    auto phi = builder->CreatePHI(to_llvm_type(type::boolean), 2, "and_phi");
-                    phi->addIncoming(lhs.value, lhs_bb);
-                    phi->addIncoming(rhs.value, rhs_bb);
-                    return {phi, type::boolean};
-                }
-                auto lhs = compile_expr(binop->lhs);
-                auto rhs = compile_expr(binop->rhs);
-                auto [L, R] = arith_promote(op, binop->loc, lhs, rhs);
-                AKR_ASSERT(L.type == R.type);
-                if (op == "+") {
-                    if (L.type->is_float()) {
-                        return {builder->CreateFAdd(L.value, R.value), L.type};
-                    } else {
-                        return {builder->CreateAdd(L.value, R.value), L.type};
-                    }
-                } else if (op == "-") {
-                    if (L.type->is_float()) {
-                        return {builder->CreateFSub(L.value, R.value), L.type};
-                    } else {
-                        return {builder->CreateSub(L.value, R.value), L.type};
-                    }
-                } else if (op == "*") {
-                    if (L.type->is_float()) {
-                        return {builder->CreateFMul(L.value, R.value), L.type};
-                    } else {
-
-                        return {builder->CreateFMul(L.value, R.value), L.type};
-
-                        return {builder->CreateMul(L.value, R.value), L.type};
-                    }
-                } else if (op == "/") {
-                    if (L.type->is_float()) {
-                        return {builder->CreateFDiv(L.value, R.value), L.type};
-                    } else if (L.type->is_signed_int()) {
-                        return {builder->CreateSDiv(L.value, R.value), L.type};
-                    } else {
-                        return {builder->CreateUDiv(L.value, R.value), L.type};
-                    }
-                } else if (op == "<") {
-                    if (L.type->is_float()) {
-                        return {builder->CreateFCmpOLT(L.value, R.value), type::boolean};
-                    } else if (L.type->is_signed_int()) {
-                        return {builder->CreateICmpSLT(L.value, R.value), type::boolean};
-                    } else {
-                        return {builder->CreateICmpULT(L.value, R.value), type::boolean};
-                    }
-                } else if (op == "<=") {
-                    if (L.type->is_float()) {
-                        return {builder->CreateFCmpOLE(L.value, R.value), type::boolean};
-                    } else if (L.type->is_signed_int()) {
-                        return {builder->CreateICmpSLE(L.value, R.value), type::boolean};
-                    } else {
-                        return {builder->CreateICmpULE(L.value, R.value), type::boolean};
-                    }
-                } else if (op == ">") {
-                    if (L.type->is_float()) {
-                        return {builder->CreateFCmpOGT(L.value, R.value), type::boolean};
-                    } else if (L.type->is_signed_int()) {
-                        return {builder->CreateICmpSGT(L.value, R.value), type::boolean};
-                    } else {
-                        return {builder->CreateICmpUGT(L.value, R.value), type::boolean};
-                    }
-                } else if (op == ">=") {
-                    if (L.type->is_float()) {
-                        return {builder->CreateFCmpOGE(L.value, R.value), type::boolean};
-                    } else if (L.type->is_signed_int()) {
-                        return {builder->CreateICmpSGE(L.value, R.value), type::boolean};
-                    } else {
-                        return {builder->CreateICmpUGE(L.value, R.value), type::boolean};
-                    }
-                } else if (op == "==") {
-                    if (L.type->is_float()) {
-                        return {builder->CreateFCmpOEQ(L.value, R.value), type::boolean};
-                    } else {
-                        return {builder->CreateICmpEQ(L.value, R.value), type::boolean};
-                    }
-                } else if (op == "!=") {
-                    if (L.type->is_float()) {
-                        return {builder->CreateFCmpONE(L.value, R.value), type::boolean};
-                    } else {
-                        return {builder->CreateICmpNE(L.value, R.value), type::boolean};
-                    }
-                }
+                return compile_binary_expr(e->cast<ast::BinaryExpression>());
+            }
+            if (e->isa<ast::FunctionCall>()) {
+                return compile_func_call(e->cast<ast::FunctionCall>());
             }
             AKR_ASSERT(false);
+        }
+        static const char *get_typename_str(const type::Type &ty) {
+            if (ty == type::float32) {
+                return "float";
+            }
+            if (ty == type::float64) {
+                return "double";
+            }
+            if (ty == type::int32) {
+                return "int";
+            }
+            if (ty == type::uint32) {
+                return "uint";
+            }
+            if (ty == type::boolean) {
+                return "bool";
+            }
+            return "unknown";
         }
         ValueRecord cast(const SourceLocation &loc, const ValueRecord &in, const type::Type &to) {
             // fmt::print("convert value from {} to {}\n", in.type->type_name(), to->type_name());
@@ -369,15 +442,14 @@ namespace akari::asl {
                     if (in.type->is_int()) {
                         return {builder->CreateICmpEQ(in.value, llvm::ConstantInt::get(ctx, llvm::APInt(8, 0))), to};
                     } else {
-                        return {builder->CreateFCmpOEQ(in.value, llvm::ConstantFP::get(ctx, llvm::APFloat(0.0))), to};
+                        error(loc, fmt::format("implicit conversion from {} to {} is not allowed",
+                                               get_typename_str(in.type), get_typename_str(to)));
                     }
                 }
                 if (in.type->is_float()) {
-                    if (to->is_int() && to->is_signed_int()) {
-                        return {builder->CreateFPToSI(in.value, to_llvm_type(to)), to};
-                    }
-                    if (to->is_int() && !to->is_signed_int()) {
-                        return {builder->CreateFPToUI(in.value, to_llvm_type(to)), to};
+                    if (to->is_int()) {
+                        error(loc, fmt::format("implicit conversion from {} to {} is not allowed",
+                                               get_typename_str(in.type), get_typename_str(to)));
                     }
                     if (in.type == type::float32 && to == type::float64) {
                         return {builder->CreateFPExt(in.value, to_llvm_type(to)), to};
@@ -387,14 +459,10 @@ namespace akari::asl {
                     }
                     AKR_ASSERT(false);
                 }
-                if (in.type->is_int() && in.type->is_signed_int()) {
-                    if (to->is_float()) {
-                        return {builder->CreateSIToFP(in.value, to_llvm_type(to)), to};
-                    }
-                }
-                if (in.type->is_int() && !in.type->is_signed_int()) {
-                    if (to->is_float()) {
-                        return {builder->CreateUIToFP(in.value, to_llvm_type(to)), to};
+                if (in.type->is_int() && to->is_float()) {
+                    if (to->is_int()) {
+                        error(loc, fmt::format("implicit conversion from {} to {} is not allowed",
+                                               get_typename_str(in.type), get_typename_str(to)));
                     }
                 }
                 if (in.type->is_int() && to->is_int()) {
@@ -450,9 +518,8 @@ namespace akari::asl {
         void compile_var_decl(const ast::VarDeclStmt &stmt) {
             auto decl = stmt->decl;
             auto ty = process_type(decl->type);
-            llvm::IRBuilder<> tmp(&cur_function.function->getEntryBlock(),
-                                  cur_function.function->getEntryBlock().begin());
-            auto var = tmp.CreateAlloca(to_llvm_type(ty));
+
+            auto var = create_entry_block_alloca(ty);
             vars.insert(decl->var->identifier, LValueRecord{var, ty});
             if (decl->init) {
                 auto init = compile_expr(decl->init);
@@ -534,23 +601,29 @@ namespace akari::asl {
                 compile_stmt(s);
             }
         }
+        llvm::AllocaInst *create_entry_block_alloca(const type::Type &ty) {
+            llvm::IRBuilder<> tmp(&cur_function.function->getEntryBlock(),
+                                  cur_function.function->getEntryBlock().begin());
+            return tmp.CreateAlloca(to_llvm_type(ty));
+        }
         void compile_func(const ast::FunctionDecl &func) {
-            auto *F = prototypes.at(func->name->identifier);
+            auto *F = prototypes.at(func->name->identifier).function;
             cur_function = FunctionRecord{F, process_type(func)->cast<type::FunctionType>()};
+            auto *bb = llvm::BasicBlock::Create(ctx, "", cur_function.function);
+            auto _ = vars.push();
+            builder = std::make_unique<llvm::IRBuilder<>>(bb);
             for (uint32_t i = 0; i < func->parameters.size(); i++) {
                 auto p = func->parameters[i];
                 llvm::IRBuilder<> tmp(&cur_function.function->getEntryBlock(),
                                       cur_function.function->getEntryBlock().begin());
-                auto *alloca = tmp.CreateAlloca(to_llvm_type(process_type(p->type)));
-
-                vars.insert(p->var->identifier,
-                            LValueRecord{tmp.CreateStore(F->getArg(i), alloca), process_type(p->type)});
+                auto *alloca = create_entry_block_alloca(process_type(p->type));
+                builder->CreateStore(F->getArg(i), alloca);
+                vars.insert(p->var->identifier, LValueRecord{alloca, process_type(p->type)});
             }
-            auto *bb = llvm::BasicBlock::Create(ctx, "", cur_function.function);
-
-            builder = std::make_unique<llvm::IRBuilder<>>(bb);
 
             (void)compile_block(func->body);
+            llvm::verifyFunction(*F);
+            FPM->run(*F);
             builder = nullptr;
         }
 
@@ -567,6 +640,13 @@ namespace akari::asl {
 
         void compile(const Program &prog) override {
             owner = std::make_unique<llvm::Module>("test", ctx);
+            pass_mgr_builder.OptLevel = 2;
+            FPM = std::make_unique<llvm::legacy::FunctionPassManager>(owner.get());
+            pass_mgr_builder.populateFunctionPassManager(*FPM);
+            // llvm::PassBuilder pass_builder;
+            // llvm::ModuleAnalysisManager mgr;
+            // pass_builder.registerModuleAnalyses(mgr);
+            // opt_pass = pass_builder.buildModuleOptimizationPipeline(llvm::PassBuilder::OptimizationLevel::O3);
             for (auto &m : prog.modules) {
                 for (auto &decl : m->structs) {
                     (void)process_struct_decl(decl);
@@ -582,6 +662,8 @@ namespace akari::asl {
                     compile_func(decl);
                 }
             }
+
+            // opt_pass.run(*owner, mgr);
             llvm::outs() << *owner << "\n";
             EE = llvm::EngineBuilder(std::move(owner)).create();
         }

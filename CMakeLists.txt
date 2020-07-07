@@ -129,6 +129,8 @@ target_link_libraries(AkariShading AkariCore)
 target_include_directories(AkariShading PUBLIC ${LLVM_INCLUDE_DIR})
 target_link_directories(AkariShading PUBLIC ${LLVM_LIBRARY_DIRS})
 target_link_libraries(AkariShading
+        LLVMPasses
+
         LLVMX86Disassembler
         LLVMX86AsmParser
 #        LLVMX86AsmPrinter

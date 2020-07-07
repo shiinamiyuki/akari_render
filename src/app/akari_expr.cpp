@@ -28,12 +28,15 @@ using namespace akari::asl;
 int main() {
     try {
         Parser parser(R"(
+        float sqr(float x){
+            return x * x;
+        }
         float main(){
             float x = 1.5;
-            while(x < 10){
-                x = x + 1;
+            while(x < 10.0){
+                x = x + 1.0;
             }
-            return x;
+            return sqr(x);
         }
     )");
         auto ast = parser();

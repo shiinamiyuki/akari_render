@@ -62,7 +62,7 @@ namespace akari::asl {
         };
         Guard push() {
             _push();
-            return Guard { *this; };
+            return Guard { *this };
         }
         std::optional<V> at(const K &k) { return frame->at(k); }
         void insert(const K &k, const V &v) { frame->insert(k, v); }

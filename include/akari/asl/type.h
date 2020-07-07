@@ -62,7 +62,7 @@ namespace akari::asl::type {
         size_t width() const override { return 32; }
     };
 
-    class PrimitiveTypeInt32 : public PrimitiveTypeFloat32 {
+    class PrimitiveTypeInt32 : public PrimitiveTypeNode {
       public:
         AKR_DECL_TYPENODE(PrimitiveTypeInt32)
         bool is_float() const override { return false; }
@@ -71,7 +71,7 @@ namespace akari::asl::type {
         bool is_aggregate() const override { return false; }
         size_t width() const override { return 32; }
     };
-    class PrimitiveTypeUint32 : public PrimitiveTypeInt32 {
+    class PrimitiveTypeUint32 : public PrimitiveTypeNode {
       public:
         AKR_DECL_TYPENODE(PrimitiveTypeUint32)
         bool is_float() const override { return false; }
