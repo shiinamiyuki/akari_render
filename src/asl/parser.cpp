@@ -66,9 +66,8 @@ namespace akari::asl {
         }
 
       public:
-        Impl(const std::string &filename, const std::string &src) {
-            ts = Lexer()(filename, src);
-            it = ts.begin();
+        Impl() {
+
             // for(auto & t: ts){
             //     std::cout << t.tok << std::endl;
             // }
@@ -304,7 +303,7 @@ namespace akari::asl {
                 auto init = parse_expr();
                 return std::make_shared<VarDeclNode>(iden, ty, init);
             }
-            return std::make_shared<VarDeclNode>(iden, ty, iden);
+            return std::make_shared<VarDeclNode>(iden, ty, nullptr);
         }
         ast::VarDeclStmt parse_var_decl_stmt() {
             auto st = std::make_shared<VarDeclStatementNode>(parse_var_decl());
@@ -398,7 +397,10 @@ namespace akari::asl {
             func->body = parse_block();
             return func;
         }
-        ast::TopLevel operator()() {
+        ast::TopLevel operator()(const std::string &filename, const std::string &src) {
+            ts = Lexer()(filename, src);
+            it = ts.begin();
+
             auto top = std::make_shared<TopLevelNode>();
             while (!end()) {
                 if (cur().tok == "struct") {
@@ -411,8 +413,8 @@ namespace akari::asl {
             return top;
         }
     };
-    Parser::Parser(const std::string &filename, const std::string &src) {
-        impl = std::make_shared<Impl>(filename, src);
+    Parser::Parser() { impl = std::make_shared<Impl>(); }
+    ast::TopLevel Parser::operator()(const std::string &filename, const std::string &src) {
+        return (*impl)(filename, src);
     }
-    ast::TopLevel Parser::operator()() { return (*impl)(); }
 } // namespace akari::asl

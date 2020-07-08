@@ -30,8 +30,8 @@ namespace akari::asl {
         std::shared_ptr<Impl> impl;
 
       public:
-        Parser(const std::string &filename, const std::string &src);
-        ast::TopLevel operator()();
+        Parser();
+        ast::TopLevel operator()(const std::string &filename, const std::string &src);
     };
     template <typename K, typename V> struct EnvironmentFrame {
         std::unordered_map<K, V> map;

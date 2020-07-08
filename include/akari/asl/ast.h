@@ -137,7 +137,7 @@ namespace akari::asl::ast {
             j["member"] = member;
         }
     };
-    using MemberAcess = std::shared_ptr<MemberAccessNode>;
+    using MemberAccess = std::shared_ptr<MemberAccessNode>;
     class FunctionCallNode : public ExpressionNode {
       public:
         AKR_DECL_NODE(FunctionCallNode)

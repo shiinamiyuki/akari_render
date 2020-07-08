@@ -205,10 +205,20 @@ namespace akari::asl {
                 llvm::Type *ret;
                 auto func = ty->cast<type::FunctionType>();
                 for (auto &a : func->args) {
-                    args.emplace_back(to_llvm_type(a));
+                    if (a->isa<type::PrimitiveType>())
+                        args.emplace_back(to_llvm_type(a));
+                    else {
+                        auto elem_type = to_llvm_type(a);
+                        args.emplace_back(llvm::PointerType::get(elem_type, 0));
+                    }
                 }
                 ret = to_llvm_type(func->ret);
-                type_cache[ty] = llvm::FunctionType::get(ret, args, false);
+                if (func->ret->isa<type::PrimitiveType>()) {
+                    type_cache[ty] = llvm::FunctionType::get(ret, args, false);
+                } else {
+                    args.insert(args.begin(), llvm::PointerType::get(ret, 0));
+                    type_cache[ty] = llvm::FunctionType::get(llvm::Type::getVoidTy(ctx), args, false);
+                }
                 return type_cache.at(ty);
             }
             AKR_ASSERT(false);
@@ -257,12 +267,11 @@ namespace akari::asl {
             auto ty = llvm::dyn_cast<llvm::FunctionType>(to_llvm_type(f_ty));
             llvm::Function *F =
                 llvm::Function::Create(ty, llvm::Function::ExternalLinkage, decl->name->identifier, owner.get());
-            unsigned Idx = 0;
-            for (auto &Arg : F->args())
-                Arg.setName(decl->parameters[Idx++]->var->identifier);
+            // unsigned Idx = 0;
+
             prototypes[decl->name->identifier] = FunctionRecord{F, f_ty};
         }
-        std::pair<ValueRecord, ValueRecord> arith_promote(const std::string &op, SourceLocation &loc,
+        std::pair<ValueRecord, ValueRecord> arith_promote(const std::string &op, const SourceLocation &loc,
                                                           const ValueRecord &lhs, const ValueRecord &rhs) {
             if (lhs.type->is_parent_of(rhs.type)) {
                 return std::make_pair(lhs, cast(loc, rhs, lhs.type));
@@ -273,42 +282,9 @@ namespace akari::asl {
                                        rhs.type->type_name()));
             }
         }
-        ValueRecord compile_binary_expr(const ast::BinaryExpression &e) {
-            auto binop = e->cast<ast::BinaryExpression>();
-            auto op = binop->op;
-            if (op == "||") {
-                auto *lhs_bb = builder->GetInsertBlock();
-                auto lhs = cast(binop->lhs->loc, compile_expr(binop->lhs), type::boolean);
-                auto *rhs_bb = llvm::BasicBlock::Create(ctx, "or_rhs", cur_function.function);
-                auto *merge_bb = llvm::BasicBlock::Create(ctx, "merge", cur_function.function);
-                builder->CreateCondBr(lhs.value, merge_bb, rhs_bb);
-                builder->SetInsertPoint(rhs_bb);
-                auto rhs = cast(binop->rhs->loc, compile_expr(binop->rhs), type::boolean);
-                builder->CreateBr(merge_bb);
-                builder->SetInsertPoint(merge_bb);
-                auto phi = builder->CreatePHI(to_llvm_type(type::boolean), 2, "or_phi");
-                phi->addIncoming(lhs.value, lhs_bb);
-                phi->addIncoming(rhs.value, rhs_bb);
-                return {phi, type::boolean};
-            }
-            if (op == "&&") {
-                auto *lhs_bb = builder->GetInsertBlock();
-                auto lhs = cast(binop->lhs->loc, compile_expr(binop->lhs), type::boolean);
-                auto *rhs_bb = llvm::BasicBlock::Create(ctx, "and_rhs", cur_function.function);
-                auto *merge_bb = llvm::BasicBlock::Create(ctx, "merge", cur_function.function);
-                builder->CreateCondBr(lhs.value, rhs_bb, merge_bb);
-                builder->SetInsertPoint(rhs_bb);
-                auto rhs = cast(binop->rhs->loc, compile_expr(binop->rhs), type::boolean);
-                builder->CreateBr(merge_bb);
-                builder->SetInsertPoint(merge_bb);
-                auto phi = builder->CreatePHI(to_llvm_type(type::boolean), 2, "and_phi");
-                phi->addIncoming(lhs.value, lhs_bb);
-                phi->addIncoming(rhs.value, rhs_bb);
-                return {phi, type::boolean};
-            }
-            auto lhs = compile_expr(binop->lhs);
-            auto rhs = compile_expr(binop->rhs);
-            auto [L, R] = arith_promote(op, binop->loc, lhs, rhs);
+        ValueRecord binary_expr_helper(const SourceLocation &loc, const std::string &op, const ValueRecord &lhs,
+                                       const ValueRecord &rhs) {
+            auto [L, R] = arith_promote(op, loc, lhs, rhs);
             AKR_ASSERT(L.type == R.type);
             if (op == "+") {
                 if (L.type->is_float()) {
@@ -386,6 +362,169 @@ namespace akari::asl {
             }
             AKR_ASSERT(false);
         }
+        ValueRecord compile_member_access(const ast::MemberAccess &access) {
+            auto agg = compile_expr(access->var);
+            if (auto v = agg.type->cast<type::VectorType>()) {
+                auto member = access->member;
+                auto n = v->count;
+                int idx;
+                if (member == "x" || member == "r") {
+                    idx = 0;
+                } else if (member == "y" || member == "g") {
+                    idx = 1;
+                } else if (member == "z" || member == "b") {
+                    idx = 2;
+                } else if (member == "w" || member == "a") {
+                    idx = 3;
+                }
+                if (idx >= n) {
+                    error(access->loc, "index out of bound");
+                }
+                return {builder->CreateExtractElement(agg.value, idx), v->element_type};
+            }
+            AKR_ASSERT(false);
+        }
+        void compile_assignment_member_access(const ast::Assignment &asgn) {
+            auto access = asgn->lhs->cast<ast::MemberAccess>();
+            AKR_ASSERT(access);
+            auto var = eval_lvalue(access->var);
+            if (auto v = var.type->cast<type::VectorType>()) {
+                auto member = access->member;
+                auto n = v->count;
+                int idx;
+                if (member == "x" || member == "r") {
+                    idx = 0;
+                } else if (member == "y" || member == "g") {
+                    idx = 1;
+                } else if (member == "z" || member == "b") {
+                    idx = 2;
+                } else if (member == "w" || member == "a") {
+                    idx = 3;
+                }
+                if (idx >= n) {
+                    error(access->loc, "index out of bound");
+                }
+                auto val = cast(asgn->loc, compile_expr(asgn->rhs), v->element_type);
+                auto tmp = builder->CreateLoad(var.value);
+                auto new_vec = builder->CreateInsertElement(tmp, val.value, idx);
+                builder->CreateStore(new_vec, var.value);
+            } else {
+                AKR_ASSERT(false);
+            }
+        }
+
+        ValueRecord compile_binary_expr(const ast::BinaryExpression &e) {
+            auto binop = e->cast<ast::BinaryExpression>();
+            auto op = binop->op;
+            if (op == "||") {
+                auto *lhs_bb = builder->GetInsertBlock();
+                auto lhs = cast(binop->lhs->loc, compile_expr(binop->lhs), type::boolean);
+                auto *rhs_bb = llvm::BasicBlock::Create(ctx, "or_rhs", cur_function.function);
+                auto *merge_bb = llvm::BasicBlock::Create(ctx, "merge", cur_function.function);
+                builder->CreateCondBr(lhs.value, merge_bb, rhs_bb);
+                builder->SetInsertPoint(rhs_bb);
+                auto rhs = cast(binop->rhs->loc, compile_expr(binop->rhs), type::boolean);
+                builder->CreateBr(merge_bb);
+                builder->SetInsertPoint(merge_bb);
+                auto phi = builder->CreatePHI(to_llvm_type(type::boolean), 2, "or_phi");
+                phi->addIncoming(lhs.value, lhs_bb);
+                phi->addIncoming(rhs.value, rhs_bb);
+                return {phi, type::boolean};
+            }
+            if (op == "&&") {
+                auto *lhs_bb = builder->GetInsertBlock();
+                auto lhs = cast(binop->lhs->loc, compile_expr(binop->lhs), type::boolean);
+                auto *rhs_bb = llvm::BasicBlock::Create(ctx, "and_rhs", cur_function.function);
+                auto *merge_bb = llvm::BasicBlock::Create(ctx, "merge", cur_function.function);
+                builder->CreateCondBr(lhs.value, rhs_bb, merge_bb);
+                builder->SetInsertPoint(rhs_bb);
+                auto rhs = cast(binop->rhs->loc, compile_expr(binop->rhs), type::boolean);
+                builder->CreateBr(merge_bb);
+                builder->SetInsertPoint(merge_bb);
+                auto phi = builder->CreatePHI(to_llvm_type(type::boolean), 2, "and_phi");
+                phi->addIncoming(lhs.value, lhs_bb);
+                phi->addIncoming(rhs.value, rhs_bb);
+                return {phi, type::boolean};
+            }
+            auto lhs = compile_expr(binop->lhs);
+            auto rhs = compile_expr(binop->rhs);
+            return binary_expr_helper(binop->loc, op, lhs, rhs);
+        }
+        ValueRecord default_initialize(const SourceLocation &loc, const type::Type &ty) {
+            if (ty->isa<type::PrimitiveType>() && ty->is_int()) {
+                return {llvm::ConstantInt::get(to_llvm_type(ty), 0), ty};
+            }
+            if (ty->isa<type::PrimitiveType>() && ty->is_float()) {
+                return {llvm::ConstantFP::get(to_llvm_type(ty), 0), ty};
+            }
+            if (ty->isa<type::VectorType>()) {
+                auto v = ty->cast<type::VectorType>();
+                return {builder->CreateVectorSplat(v->count, default_initialize(loc, v->element_type).value), v};
+            }
+            AKR_ASSERT(false);
+        }
+        ValueRecord compile_ctor_call(const ast::ConstructorCall &call) {
+            auto type = process_type(call->type);
+            if (type->isa<type::PrimitiveType>()) {
+                if (call->args.size() != 1) {
+                    error(call->loc, fmt::format("call to `constructor {}` expected 1 argumnet but found {}",
+                                                 get_typename_str(type), call->args.size()));
+                }
+                auto a = compile_expr(call->args[0]);
+                return cast(call->loc, a, type);
+            } else if (type->isa<type::VectorType>()) {
+                auto vt = type->cast<type::VectorType>();
+                // auto cnt = vt->count;
+                auto n_args = call->args.size();
+                // if (n_args != 1 && n_args != cnt) {
+                //     error(call->loc, fmt::format("call to `constructor {}` expected 1 or {} argumnets but found {}",
+                //                                  get_typename_str(type), cnt, n_args));
+                // }
+                if (n_args == 1) {
+                    auto a = compile_expr(call->args[0]);
+                    return cast(call->loc, a, type);
+
+                } else {
+                    auto vec =
+                        builder->CreateVectorSplat(vt->count, default_initialize(call->loc, vt->element_type).value);
+                    int emitted_cnt = 0;
+                    for (int i = 0; i < n_args; i++) {
+                        auto a = compile_expr(call->args[i]);
+                        if (auto u = a.type->cast<type::VectorType>()) {
+                            if (u->element_type != vt->element_type) {
+                                error(call->args[i]->loc,
+                                      fmt::format(
+                                          "in call to `constructor {}` argument {}, implicit conversion is illegal",
+                                          get_typename_str(vt), i + 1));
+                            }
+                            if (emitted_cnt + u->count > vt->count) {
+                                error(call->args[i]->loc,
+                                      fmt::format("in call to `constructor {}` {} elements provided, only expects {}",
+                                                  get_typename_str(vt), emitted_cnt + u->count, vt->count));
+                            }
+                            for (int j = 0; j < u->count; j++) {
+                                auto elem = builder->CreateExtractElement(a.value, i);
+                                vec = builder->CreateInsertElement(vec, elem, emitted_cnt + j);
+                            }
+                            emitted_cnt += u->count;
+                        } else if (auto _ = a.type->cast<type::PrimitiveType>()) {
+                            auto elem = cast(call->args[i]->loc, a, vt->element_type);
+                            vec = builder->CreateInsertElement(vec, elem.value, i);
+                            emitted_cnt += 1;
+                        }
+                    }
+                    if (emitted_cnt < vt->count) {
+                        auto elem = default_initialize(call->loc, vt->element_type);
+                        for (int k = emitted_cnt; k < vt->count; k++) {
+                            vec = builder->CreateInsertElement(vec, elem.value, k);
+                        }
+                    }
+                    return {vec, vt};
+                }
+            } else {
+            }
+            AKR_ASSERT(false);
+        }
         ValueRecord compile_func_call(const ast::FunctionCall &call) {
             auto func = call->func->identifier;
             if (!prototypes.count(func)) {
@@ -406,9 +545,23 @@ namespace akari::asl {
             }
             std::vector<llvm::Value *> llvm_args;
             for (auto &a : args) {
-                llvm_args.emplace_back(a.value);
+                if (a.type->isa<type::PrimitiveType>())
+                    llvm_args.emplace_back(a.value);
+                else {
+                    // pass byval
+                    auto copy = create_entry_block_alloca(a.type);
+                    builder->CreateStore(a.value, copy);
+                    llvm_args.emplace_back(copy);
+                }
             }
-            return {builder->CreateCall(f_rec.function, llvm_args), f_rec.type->ret};
+            if (f_rec.type->ret->isa<type::PrimitiveType>()) {
+                return {builder->CreateCall(f_rec.function, llvm_args), f_rec.type->ret};
+            } else {
+                auto ret_value = create_entry_block_alloca(f_rec.type->ret);
+                llvm_args.insert(llvm_args.begin(), ret_value);
+                builder->CreateCall(f_rec.function, llvm_args);
+                return {builder->CreateLoad(ret_value), f_rec.type->ret};
+            }
         }
         ValueRecord compile_expr(const ast::Expr &e) {
             if (e->isa<ast::Literal>()) {
@@ -423,9 +576,15 @@ namespace akari::asl {
             if (e->isa<ast::FunctionCall>()) {
                 return compile_func_call(e->cast<ast::FunctionCall>());
             }
+            if (e->isa<ast::ConstructorCall>()) {
+                return compile_ctor_call(e->cast<ast::ConstructorCall>());
+            }
+            if (e->isa<ast::MemberAccess>()) {
+                return compile_member_access(e->cast<ast::MemberAccess>());
+            }
             AKR_ASSERT(false);
         }
-        static const char *get_typename_str(const type::Type &ty) {
+        static std::string get_typename_str(const type::Type &ty) {
             if (ty == type::float32) {
                 return "float";
             }
@@ -440,6 +599,13 @@ namespace akari::asl {
             }
             if (ty == type::boolean) {
                 return "bool";
+            }
+            if (ty->isa<type::VectorType>()) {
+                auto v = ty->cast<type::VectorType>();
+                return fmt::format("vec[{} x {}]", v->count, get_typename_str(v->element_type));
+            }
+            if (ty->isa<type::StructType>()) {
+                return fmt::format("struct {}", ty->cast<type::StructType>()->name);
             }
             return "unknown";
         }
@@ -487,7 +653,7 @@ namespace akari::asl {
                 auto v = to->cast<type::VectorType>();
                 auto e = v->element_type;
                 auto cvt = cast(loc, in, e);
-                return {builder->CreateVectorSplat(v->count, cvt.value)};
+                return {builder->CreateVectorSplat(v->count, cvt.value), to};
             }
             if (in.type->isa<type::VectorType>() && to->isa<type::PrimitiveType>()) {
                 error(loc, "cannot convert vector type to scalar");
@@ -507,7 +673,12 @@ namespace akari::asl {
         }
         void compile_ret(const ast::Return &ret) {
             auto r = compile_expr(ret->expr);
-            builder->CreateRet(cast(ret->loc, r, cur_function.type->ret).value);
+            if (cur_function.type->ret->isa<type::PrimitiveType>())
+                builder->CreateRet(cast(ret->loc, r, cur_function.type->ret).value);
+            else {
+                builder->CreateStore(r.value, cur_function.function->getArg(0));
+                builder->CreateRetVoid();
+            }
         }
         void assign_var(const SourceLocation &loc, const LValueRecord &lvalue, const ValueRecord &value) {
             auto cvt = cast(loc, value, lvalue.type);
@@ -517,6 +688,9 @@ namespace akari::asl {
             if (e->isa<ast::Identifier>()) {
                 return vars.at(e->cast<ast::Identifier>()->identifier).value();
             }
+            // else if (e->isa<ast::MemberAccess>()) {
+            //     return eval_lvalue_member_access(e->cast<ast::MemberAccess>());
+            // }
             AKR_ASSERT(false);
         }
         ValueRecord compile_var(const ast::Identifier &var) {
@@ -535,12 +709,20 @@ namespace akari::asl {
             if (decl->init) {
                 auto init = compile_expr(decl->init);
                 assign_var(decl->var->loc, vars.at(decl->var->identifier).value(), init);
+            } else {
+                auto init = default_initialize(stmt->loc, ty);
+                assign_var(decl->var->loc, vars.at(decl->var->identifier).value(), init);
             }
         }
+
         void compile_assignment(const ast::Assignment &asgn) {
-            auto lvalue = eval_lvalue(asgn->lhs);
-            auto rvalue = compile_expr(asgn->rhs);
-            assign_var(asgn->loc, lvalue, rvalue);
+            if (asgn->lhs->isa<ast::MemberAccess>()) {
+                compile_assignment_member_access(asgn);
+            } else {
+                auto lvalue = eval_lvalue(asgn->lhs);
+                auto rvalue = compile_expr(asgn->rhs);
+                assign_var(asgn->loc, lvalue, rvalue);
+            }
         }
         void compile_if(const ast::IfStmt &st) {
             auto cond = compile_expr(st->cond);
@@ -623,18 +805,35 @@ namespace akari::asl {
             auto *bb = llvm::BasicBlock::Create(ctx, "", cur_function.function);
             auto _ = vars.push();
             builder = std::make_unique<llvm::IRBuilder<>>(bb);
+            int f_arg_offset = 0;
+            if (!cur_function.type->ret->isa<type::PrimitiveType>()) {
+                f_arg_offset = 1;
+                F->getArg(0)->addAttr(llvm::Attribute::StructRet);
+                F->getArg(0)->addAttr(llvm::Attribute::NoAlias);
+            }
+            // fmt::print("compiling {}\n", func->name->identifier);
             for (uint32_t i = 0; i < func->parameters.size(); i++) {
                 auto p = func->parameters[i];
-                llvm::IRBuilder<> tmp(&cur_function.function->getEntryBlock(),
-                                      cur_function.function->getEntryBlock().begin());
-                auto *alloca = create_entry_block_alloca(process_type(p->type));
-                builder->CreateStore(F->getArg(i), alloca);
-                vars.insert(p->var->identifier, LValueRecord{alloca, process_type(p->type)});
+                auto p_ty = process_type(p->type);
+                if (p_ty->isa<type::PrimitiveType>()) {
+                    auto *alloca = create_entry_block_alloca(p_ty);
+                    builder->CreateStore(F->getArg(i + f_arg_offset), alloca);
+                    vars.insert(p->var->identifier, LValueRecord{alloca, p_ty});
+                    // fmt::print("store prim args\n");
+                } else {
+                    F->getArg(i + f_arg_offset)->addAttr(llvm::Attribute::NoAlias);
+                    F->getArg(i + f_arg_offset)->addAttr(llvm::Attribute::ByVal);
+                    vars.insert(p->var->identifier, LValueRecord{F->getArg(i + f_arg_offset), p_ty});
+                }
+                fflush(stdout);
+                F->getArg(i + f_arg_offset)->setName(func->parameters[i]->var->identifier);
             }
 
             (void)compile_block(func->body);
             llvm::verifyFunction(*F);
-            FPM->run(*F);
+            if (opt.opt_level != CompileOptions::OptLevel::OFF) {
+                FPM->run(*F);
+            }
             builder = nullptr;
         }
 
@@ -648,18 +847,15 @@ namespace akari::asl {
             }
             init_types();
         }
-
-        std::shared_ptr<Program> compile(const ParsedProgram &prog) override {
+        CompileOptions opt;
+        std::shared_ptr<Program> compile(const ParsedProgram &prog, const CompileOptions &_opt) override {
+            opt = _opt;
             owner = std::make_unique<llvm::Module>("test", ctx);
             pass_mgr_builder.OptLevel = 2;
             FPM = std::make_unique<llvm::legacy::FunctionPassManager>(owner.get());
             MPM = std::make_unique<llvm::legacy::PassManager>();
             pass_mgr_builder.populateFunctionPassManager(*FPM);
             pass_mgr_builder.populateModulePassManager(*MPM);
-            // llvm::PassBuilder pass_builder;
-            // llvm::ModuleAnalysisManager mgr;
-            // pass_builder.registerModuleAnalyses(mgr);
-            // opt_pass = pass_builder.buildModuleOptimizationPipeline(llvm::PassBuilder::OptimizationLevel::O3);
             for (auto &m : prog.modules) {
                 for (auto &decl : m->structs) {
                     (void)process_struct_decl(decl);
@@ -675,8 +871,9 @@ namespace akari::asl {
                     compile_func(decl);
                 }
             }
-            MPM->run(*owner);
-            // opt_pass.run(*owner, mgr);
+            if (opt.opt_level != CompileOptions::OptLevel::OFF) {
+                MPM->run(*owner);
+            }
             llvm::outs() << *owner << "\n";
             auto EE = llvm::EngineBuilder(std::move(owner)).create();
             AKR_ASSERT(EE->getFunctionAddress("main") != 0);

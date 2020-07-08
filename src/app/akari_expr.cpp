@@ -21,9 +21,11 @@
 // SOFTWARE.
 
 #include <akari/core/logger.h>
+#include <akari/core/math.h>
 #include <akari/asl/parser.h>
 #include <akari/asl/backend.h>
 #include <iostream>
+using namespace akari;
 using namespace akari::asl;
 int main() {
     try {
@@ -31,31 +33,23 @@ int main() {
         float sqr(float x){
             return x * x;
         }
-        float main(){
-            float x = 1.5;
-            while(x < 10.0){
-                x = x + 1.0;
-            }
-            return sqr(x);
+        vec3 sqr_vec3(vec3 x){
+            return x * x;
+        }
+        vec3 main(vec3 v){
+            return sqr_vec3(v);
         }
     )";
-        // auto ast = parser();
-        // nlohmann::json j;
-        // ast->dump_json(j);
-        // std::cout << j.dump(1) << std::endl;
-        // auto be = create_llvm_backend();
-        // ParsedProgram prog;
-        // prog.modules.emplace_back(ast);
-        // be->compile(prog);
-        // auto f = reinterpret_cast<float(*)(void)>(be->get_function_address("main"));
-        // std::cout << f() << std::endl;
         std::vector<TranslationUnit> units;
         units.emplace_back(TranslationUnit{"test.asl", src});
-        auto r = compile(units);
+        CompileOptions opt;
+        opt.opt_level = CompileOptions::O3;
+        auto r = compile(units, opt);
         if (r.has_value()) {
             auto program = r.extract_value();
-            auto f = reinterpret_cast<float (*)(void)>(program->get_function_pointer("main"));
-            std::cout << f() << std::endl;
+            auto f = reinterpret_cast<vec3 (*)(vec3)>(program->get_function_pointer("main"));
+            auto v = f(vec3(1,2,3));
+            std::cout << v.x << " " << v.y << std::endl;
         }else {
             std::cerr << r.error().what() << std::endl;
         }

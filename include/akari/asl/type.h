@@ -121,6 +121,10 @@ namespace akari::asl::type {
         AKR_DECL_TYPENODE(VectorTypeNode)
         Type element_type;
         int count;
+        bool is_float() const override { return element_type->is_float(); }
+        bool is_int() const override { return element_type->is_int(); }
+        bool is_signed_int() const override { return element_type->is_signed_int(); }
+        bool is_aggregate() const override { return false; }
     };
     using VectorType = std::shared_ptr<VectorTypeNode>;
 } // namespace akari::asl::type

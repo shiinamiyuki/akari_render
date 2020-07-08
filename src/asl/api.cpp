@@ -33,14 +33,17 @@ namespace akari::asl {
             ParsedProgram prog;
             using namespace nlohmann;
             json j = json::array();
+            Parser parser;
             for (auto &unit : units) {
-                prog.modules.emplace_back(Parser(unit.filename, unit.source)());
+                prog.modules.emplace_back(parser(unit.filename, unit.source));
                 json _;
                 prog.modules.back()->dump_json(_);
+                // std::cout << _.dump(1) <
+                j.emplace_back(_);
             }
             std::cout << j.dump(1) << std::endl;
             auto backend = create_llvm_backend();
-            return backend->compile(prog);
+            return backend->compile(prog, opt);
         } catch (std::runtime_error &e) {
             return Error(e.what());
         }

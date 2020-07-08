@@ -29,7 +29,7 @@ namespace akari::asl {
     };
     class Backend {
       public:
-        virtual std::shared_ptr<Program> compile(const ParsedProgram &) = 0;
+        virtual std::shared_ptr<Program> compile(const ParsedProgram &, const CompileOptions &opt) = 0;
         virtual void add_function(const std::string &name, const type::FunctionType &ty, void *) = 0;
     };
 
