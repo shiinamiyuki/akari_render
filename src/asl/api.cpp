@@ -69,6 +69,28 @@ vec3 tanf3(vec3 v){
 vec4 tanf4(vec4 v){
     return vec4(tan(v.x),tan(v.y),tan(v.z), tan(v.w));
 }
+
+float dotf2(vec2 u, vec2 v){
+    return v.x * u.x + v.y * u.y;
+}
+float dotf3(vec2 u, vec2 v){
+    return v.x * u.x + v.y * u.y + v.z * u.z;
+}
+float lengthf3(vec3 v){
+    return sqrt(dotf3(v,v));
+}
+vec3 normalizef3(vec3 v){
+    return v / lengthf3(v);
+}
+vec3 cross(vec3 x, vec3 y){
+    return vec3(x.y * y.z - y.y * x.z,
+				x.z * y.x - y.z * x.x,
+				x.x * y.y - y.x * x.y);
+}
+float distancef3(vec3 p, vec3 q){
+    return lengthf3(p - q);
+}
+
     )";
     Expected<std::shared_ptr<Program>> compile(const std::vector<TranslationUnit> &units,
                                                CompileOptions opt) {

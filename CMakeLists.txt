@@ -75,7 +75,7 @@ target_link_libraries(AkariCoreRender AkariCore)
 #
 #
 set(AKR_ALL_PLUGINS "")
-set(PYTHON_INTERPRETER "python3")
+set(PYTHON_INTERPRETER "python")
 
 function(add_plugin target)
     list(SUBLIST ARGN 0 -1 FILES)

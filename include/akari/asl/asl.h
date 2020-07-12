@@ -34,7 +34,7 @@ namespace akari::asl {
             O2,
             O3,
         };
-        OptLevel opt_level;
+        OptLevel opt_level = O2;
         const char *backend = "llvm";
     };
     class Program {

@@ -25,6 +25,7 @@
 #include <type_traits>
 #include <array>
 #include <cstring>
+#include <typeinfo>
 namespace akari {
     AKR_FORCEINLINE float uintBitsToFloat(uint32_t x) {
         float v;

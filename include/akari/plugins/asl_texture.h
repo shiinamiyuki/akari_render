@@ -19,23 +19,7 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-
-#ifndef AKARIRENDER_GRID_H
-#define AKARIRENDER_GRID_H
-
-#include <akari/render/geometry.hpp>
-
+#include <akari/render/texture.h>
 namespace akari {
-    class Grid3D : public Component{
-      public:
-        struct RayHit {
-            vec2 uv;
-            vec3 Ng;
-            Float t = Inf;
-            int face = 0; // -1 = -001 -> -x; -4 = -100 -> -z
-            int group = -1;
-        };
-        bool Intersect()
-    };
+     AKR_EXPORT std::shared_ptr<Texture> create_asl_texture(const fs::path& path);
 }
-#endif //AKARIRENDER_GRID_H
