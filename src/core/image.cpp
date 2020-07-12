@@ -24,6 +24,7 @@
 #include <memory>
 #include <akari/core/logger.h>
 #include <akari/core/parallel.h>
+#include <akari/core/spectrum.h>
 #include <mutex>
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -44,7 +45,7 @@ namespace akari {
                 texels.size(),
                 [&](uint32_t i, uint32_t) {
                     auto pixel = static_cast<uint8_t *>(&buffer[i * 3]);
-                    auto rgb = vec3(texels[i]);
+                    auto rgb = vec3(texels[i].first);
                     rgb = clamp(rgb, vec3(0), vec3(1));
                     for (int comp = 0; comp < 3; comp++) {
                         pixel[comp] = (uint8_t)std::clamp<int>((int)std::round(rgb[comp] * 255.5), 0, 255);
@@ -65,7 +66,7 @@ namespace akari {
             in.resolution().y,
             [&](uint32_t y, uint32_t) {
                 for (int i = 0; i < in.resolution().x; i++)
-                    out(i, y) = vec4(pow(vec3(in(i, y)), vec3(gamma)), in(i, y).w);
+                    out(i, y) = std::make_pair(linear_to_srgb(in(i,y).first), in(i, y).second);
             },
             1024);
     }
@@ -87,15 +88,15 @@ namespace akari {
                     image->resolution().y,
                     [=, &image](uint32_t y, uint32_t) {
                         for (int x = 0; x < image->resolution().x; x++) {
-                            vec3 rgb;
+                            RGBSpectrum rgb;
                             if (channel == 1) {
-                                rgb = vec3(data[x + y * image->resolution().x]);
+                                rgb = RGBSpectrum(data[x + y * image->resolution().x]);
                             } else {
                                 rgb[0] = data[3 * (x + y * image->resolution().x) + 0];
                                 rgb[1] = data[3 * (x + y * image->resolution().x) + 1];
                                 rgb[2] = data[3 * (x + y * image->resolution().x) + 2];
                             }
-                            (*image)(x, y) = vec4(rgb, 1.0f);
+                            (*image)(x, y) = std::make_pair(rgb, 1.0f);
                         }
                     },
                     128);
@@ -106,15 +107,15 @@ namespace akari {
                     image->resolution().y,
                     [=, &image](uint32_t y, uint32_t) {
                         for (int x = 0; x < image->resolution().x; x++) {
-                            vec3 rgb;
+                            RGBSpectrum rgb;
                             if (channel == 1) {
-                                rgb = vec3(inv_gamma((float)data[x + y * image->resolution().x] / 255.0f));
+                                rgb = RGBSpectrum((float)data[x + y * image->resolution().x] / 255.0f);
                             } else {
-                                rgb[0] = inv_gamma((float)data[3 * (x + y * image->resolution().x) + 0] / 255.0f);
-                                rgb[1] = inv_gamma((float)data[3 * (x + y * image->resolution().x) + 1] / 255.0f);
-                                rgb[2] = inv_gamma((float)data[3 * (x + y * image->resolution().x) + 2] / 255.0f);
+                                rgb[0] = (float)data[3 * (x + y * image->resolution().x) + 0] / 255.0f;
+                                rgb[1] = (float)data[3 * (x + y * image->resolution().x) + 1] / 255.0f;
+                                rgb[2] = (float)data[3 * (x + y * image->resolution().x) + 2] / 255.0f;
                             }
-                            (*image)(x, y) = vec4(rgb, 1.0f);
+                            (*image)(x, y) = std::make_pair(rgb, 1.0f);
                         }
                     },
                     128);

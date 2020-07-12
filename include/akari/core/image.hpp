@@ -28,6 +28,7 @@
 #include <akari/core/akari.h>
 #include <akari/core/component.h>
 #include <akari/core/math.h>
+#include <akari/core/spectrum.h>
 
 namespace akari {
     template <class T> class TImage {
@@ -74,14 +75,14 @@ namespace akari {
         [[nodiscard]] const T *data() const { return _texels.data(); }
     };
 
-    class RGBImage : public TImage<vec3> {
+    class RGBImage : public TImage<RGBSpectrum> {
       public:
-        using TImage<vec3>::TImage;
+        using TImage<RGBSpectrum>::TImage;
     };
 
-    class RGBAImage : public TImage<vec4> {
+    class RGBAImage : public TImage<std::pair<RGBSpectrum, float>> {
       public:
-        using TImage<vec4>::TImage;
+        using TImage<std::pair<RGBSpectrum, float>>::TImage;
     };
 
     class AKR_EXPORT PostProcessor : public Component {
@@ -94,11 +95,10 @@ namespace akari {
         void process(const RGBAImage &in, RGBAImage &out) const override { out = in; }
     };
     class AKR_EXPORT GammaCorrection : public PostProcessor {
-        Float gamma;
 
       public:
         AKR_DECL_COMP()
-        explicit GammaCorrection(Float gamma = 1.0 / 2.2f) : gamma(gamma) {}
+        explicit GammaCorrection() {}
         void process(const RGBAImage &in, RGBAImage &out) const override;
     };
 

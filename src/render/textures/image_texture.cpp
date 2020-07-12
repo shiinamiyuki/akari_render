@@ -26,16 +26,20 @@
 #include <akari/plugins/image_texture.h>
 #include <akari/core/resource.h>
 #include <akari/core/logger.h>
+#include <akari/core/lazy.hpp>
 namespace akari {
     class ImageTexture : public Texture {
         std::shared_ptr<RGBAImage> image;
         [[refl]] fs::path path;
-        Float average = 0;
+        std::optional<Lazy<Float>> average = std::nullopt;
 
       public:
         ImageTexture() = default;
         ImageTexture(const fs::path &path) : path(path) {}
         AKR_IMPLS(Texture)
+        ivec2 importance_map_resolution_hint()const override {
+            return image->resolution();
+        }
         void commit() override {
             auto exp = resource_manager()->load_path<ImageResource>(path);
             if(!exp.has_value()){
@@ -45,27 +49,28 @@ namespace akari {
             auto tmp = (*exp)->image();
             if (tmp != image) {
                 image = tmp;
+                average.emplace([=]()->Float{
                 AtomicFloat sum(0);
                 parallel_for(
                     image->resolution().y,
                     [=, &sum](uint32_t y, uint32_t) {
                         for (int x = 0; x < image->resolution().x; x++) {
-                            auto color = (*image)(x, y);
-                            Spectrum rgb = Spectrum(color.x, color.y, color.z);
-                            sum.add(rgb.luminance());
+                            auto color = (*image)(x, y).first;
+                            sum.add(srgb_to_linear(color).luminance());
                         }
                     },
                     32);
-                average = sum.value() / float(image->resolution().x * image->resolution().y);
+                    return sum.value() / float(image->resolution().x * image->resolution().y);
+                });
             }
         }
-        Float average_luminance() const override { return average; }
+        Float average_luminance() const override { return average.value().get(); }
 
         // texture coordinates (0,0) at bottom-left
         Spectrum evaluate(const ShadingPoint &sp) const override {
             auto uv = vec2(sp.texCoords.x, 1.0f - sp.texCoords.y);
             auto texCoords = mod(uv, vec2(1));
-            return (*image)(texCoords);
+            return srgb_to_linear((*image)(texCoords).first);
         }
     };
 #include "generated/ImageTexture.hpp"

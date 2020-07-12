@@ -143,6 +143,24 @@ namespace akari {
             j[i] = s[i];
         }
     }
+    inline Float linear_to_srgb(Float x){
+        if(x <= 0.0031308f)
+            return x * 12.92f;
+        else
+            return 1.055f * std::pow(x, 1.0f/2.4f) - 0.055f;  
+    }
+    inline Float srgb_to_linear(Float x){
+            if(x <= 0.0404482362771082f)
+                return x / 12.92f;
+            else
+                return std::pow((x + 0.055f)/1.055f, 2.4f);    
+    }
+    inline RGBSpectrum linear_to_srgb(const RGBSpectrum & s){
+        return RGBSpectrum(linear_to_srgb(s.x),linear_to_srgb(s.y),linear_to_srgb(s.z));
+    }
+    inline RGBSpectrum srgb_to_linear(const RGBSpectrum & s){
+        return RGBSpectrum(srgb_to_linear(s.x),srgb_to_linear(s.y),srgb_to_linear(s.z));
+    }
 
 } // namespace akari
 #endif // AKARIRENDER_SPECTRUM_H

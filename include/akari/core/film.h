@@ -99,10 +99,10 @@ namespace akari {
                                     Spectrum(splat(x, y).color[0], splat(x, y).color[1], splat(x, y).color[2]) *
                                     splatScale;
                             if (weight(x, y) != 0) {
-                                vec3 color = (radiance(x, y) + s) / weight(x, y);
-                                image(x, y) = vec4(color, 1);
+                                auto color = (radiance(x, y) + s) / weight(x, y);
+                                image(x, y) = std::make_pair(color, 1);
                             } else {
-                                image(x, y) = vec4(s, 1);
+                                image(x, y) = std::make_pair(s, 1);
                             }
                         }
                     },

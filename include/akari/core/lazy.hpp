@@ -20,27 +20,24 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef AKARIRENDER_TEXTURE_H
-#define AKARIRENDER_TEXTURE_H
-
-#include <akari/core/component.h>
-#include <akari/render/geometry.hpp>
-#include <akari/core/spectrum.h>
+#pragma once
+#include <functional>
+#include <mutex>
 namespace akari {
-
-    class Texture : public Component {
-      public:
-        virtual Spectrum evaluate(const ShadingPoint &sp) const = 0;
-        virtual Float average_luminance() const { return 0.0f; }
-        virtual ivec2 importance_map_resolution_hint()const {
-          return ivec2(1);
+    template<typename T>
+    struct Lazy{
+        Lazy()=default;
+        template<typename F>
+        Lazy(F && f):f(f){}
+        T & get()const{
+            std::call_once(flag, [&](){
+                _result.emplace(f());
+            });
+            return _result.value();
         }
+    private:
+        std::function<T(void)> f;
+        mutable std::once_flag flag;
+        mutable std::optional<T> _result;
     };
-    class NullTexture : public Texture {
-      public:
-        AKR_DECL_NULL(Texture)
-        Spectrum evaluate(const ShadingPoint &sp) const override { return Spectrum(0); }
-        Float average_luminance() const override { return 0.0f; }
-    };
-} // namespace akari
-#endif // AKARIRENDER_TEXTURE_H
+}
