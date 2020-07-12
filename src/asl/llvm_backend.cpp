@@ -85,6 +85,12 @@ namespace akari::asl {
         type::StructType type;
         llvm::StructType *llvm_type;
     };
+
+    struct Intrinsic {
+        llvm::Intrinsic::ID id;
+        int arity;
+        std::function<bool(const type::Type &)> type_checker;
+    };
     // class Managler {
     //   public:
     //     std::string mangle(const type::Type & ty){
@@ -126,6 +132,7 @@ namespace akari::asl {
         std::unordered_map<std::string, type::Type> types;
         std::unordered_map<std::string, FunctionRecord> prototypes;
         std::unordered_map<type::Type, llvm::Type *> type_cache;
+        std::unordered_map<std::string, Intrinsic> intrinsics;
         std::unique_ptr<llvm::legacy::FunctionPassManager> FPM;
         std::unique_ptr<llvm::legacy::PassManager> MPM;
         llvm::PassManagerBuilder pass_mgr_builder;
@@ -153,6 +160,23 @@ namespace akari::asl {
             //         types[fmt::format("dmat{}", m, n)] = create_vec_type(type::float64, i);
             //     }
             // }
+        }
+        void init_intrinsics() {
+            std::function<bool(const type::Type &)> accept_fp_vector = [](const type::Type &ty) {
+                if (ty->is_float() || ty->isa<type::VectorType>()) {
+                    return true;
+                }
+                return false;
+            };
+            intrinsics.emplace("sin", Intrinsic{llvm::Intrinsic::sin, 1, accept_fp_vector});
+            intrinsics.emplace("cos", Intrinsic{llvm::Intrinsic::cos, 1, accept_fp_vector});
+            intrinsics.emplace("exp", Intrinsic{llvm::Intrinsic::exp, 1, accept_fp_vector});
+            intrinsics.emplace("pow", Intrinsic{llvm::Intrinsic::pow, 2, accept_fp_vector});
+            intrinsics.emplace("sqrt", Intrinsic{llvm::Intrinsic::sqrt, 1, accept_fp_vector});
+            // intrinsics.emplace("reduce_min", Intrinsic{"reduce_min", accept_fp_vector});
+            // intrinsics.emplace("reduce_max", Intrinsic{"reduce_max", accept_fp_vector});
+            // intrinsics.emplace("reduce_add", Intrinsic{"reduce_add", accept_fp_vector});
+            // intrinsics.emplace("reduce_mul", Intrinsic{"reduce_mul", accept_fp_vector});
         }
         type::Type create_vec_type(const type::Type &base, int n) {
             auto v = std::make_shared<type::VectorTypeNode>();
@@ -260,6 +284,7 @@ namespace akari::asl {
             }
             st->name = decl->struct_name->name;
             types.emplace(st->name, st);
+            structs[st->name] = {};
             return st;
         }
         void gen_prototype(const ast::FunctionDecl &decl) {
@@ -364,7 +389,8 @@ namespace akari::asl {
         }
         ValueRecord compile_member_access(const ast::MemberAccess &access) {
             auto agg = compile_expr(access->var);
-            if (auto v = agg.type->cast<type::VectorType>()) {
+            if (agg.type->isa<type::VectorType>()) {
+                auto v = agg.type->cast<type::VectorType>();
                 auto member = access->member;
                 auto n = v->count;
                 int idx;
@@ -381,6 +407,14 @@ namespace akari::asl {
                     error(access->loc, "index out of bound");
                 }
                 return {builder->CreateExtractElement(agg.value, idx), v->element_type};
+            }else if(agg.type->isa<type::StructType>()){
+                auto st = agg.type->cast<type::StructType>();
+                for(size_t i = 0; i < st->fields.size(); i ++){
+                    if(access->member == st->fields[i].name){
+                        return {builder->CreateExtractValue(agg.value,i), st->fields[i].type};
+                    }
+                }
+                 error(access->loc, fmt::format("{} cannot found in {}", access->member, get_typename_str(st)));
             }
             AKR_ASSERT(false);
         }
@@ -388,7 +422,8 @@ namespace akari::asl {
             auto access = asgn->lhs->cast<ast::MemberAccess>();
             AKR_ASSERT(access);
             auto var = eval_lvalue(access->var);
-            if (auto v = var.type->cast<type::VectorType>()) {
+            if (var.type->isa<type::VectorType>()) {
+                auto v = var.type->cast<type::VectorType>();
                 auto member = access->member;
                 auto n = v->count;
                 int idx;
@@ -408,6 +443,17 @@ namespace akari::asl {
                 auto tmp = builder->CreateLoad(var.value);
                 auto new_vec = builder->CreateInsertElement(tmp, val.value, idx);
                 builder->CreateStore(new_vec, var.value);
+            } else if(var.type->isa<type::StructType>()){
+                auto st = var.type->cast<type::StructType>();
+                for(size_t i = 0; i < st->fields.size(); i ++){
+                    if(access->member == st->fields[i].name){
+                        auto val = cast(asgn->loc, compile_expr(asgn->rhs), st->fields[i].type);
+                        auto gep = builder->CreateConstGEP2_32(to_llvm_type(var.type),var.value, 0, i);
+                        builder->CreateStore(val.value, gep);
+                        return;
+                    }
+                }
+                error(access->loc, fmt::format("{} cannot found in {}", access->member, get_typename_str(st)));
             } else {
                 AKR_ASSERT(false);
             }
@@ -525,8 +571,41 @@ namespace akari::asl {
             }
             AKR_ASSERT(false);
         }
+        ValueRecord compile_intrinsic_call(const ast::FunctionCall &call) {
+            auto &intrinsic = intrinsics.at(call->func->identifier);
+            auto arity = intrinsic.arity;
+            if (arity != call->args.size()) {
+                error(call->loc, fmt::format("call to intrinsic `{}` {} arguments expected but found {}", call->func->identifier,
+                                             arity, call->args.size()));
+            }
+            std::vector<llvm::Value *> llvm_args;
+            type::Type arg_type = nullptr;
+            for (auto &a : call->args) {
+                auto arg = compile_expr(a);
+                if (!intrinsic.type_checker(arg.type)) {
+                    error(call->loc, fmt::format("call to intrinsic `{}` type {} of argument {} is not support",
+                                                 call->func->identifier, get_typename_str(arg.type), llvm_args.size() + 1));
+                }
+                if (!arg_type) {
+                    arg_type = arg.type;
+                } else {
+                    arg = cast(a->loc, arg, arg_type);
+                }
+                llvm_args.emplace_back(arg.value);
+            }
+            if (arity == 1) {
+                return {builder->CreateUnaryIntrinsic(intrinsic.id,llvm_args.at(0)), arg_type};
+            }else if(arity == 2){
+                return {builder->CreateBinaryIntrinsic(intrinsic.id,llvm_args.at(0),llvm_args.at(1)), arg_type};
+            }else{
+                AKR_ASSERT(false);
+            }
+        }
         ValueRecord compile_func_call(const ast::FunctionCall &call) {
             auto func = call->func->identifier;
+            if (intrinsics.count(func)) {
+                return compile_intrinsic_call(call);
+            }
             if (!prototypes.count(func)) {
                 error(call->loc, fmt::format("{} is not a function or it is undefined", func));
             }
@@ -846,6 +925,7 @@ namespace akari::asl {
                 _init = init.lock();
             }
             init_types();
+            init_intrinsics();
         }
         CompileOptions opt;
         std::shared_ptr<Program> compile(const ParsedProgram &prog, const CompileOptions &_opt) override {
@@ -874,7 +954,7 @@ namespace akari::asl {
             if (opt.opt_level != CompileOptions::OptLevel::OFF) {
                 MPM->run(*owner);
             }
-            llvm::outs() << *owner << "\n";
+            // llvm::outs() << *owner << "\n";
             auto EE = llvm::EngineBuilder(std::move(owner)).create();
             AKR_ASSERT(EE->getFunctionAddress("main") != 0);
             return std::make_shared<MCJITProgram>(EE);

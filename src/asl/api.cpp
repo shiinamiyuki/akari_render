@@ -27,6 +27,49 @@
 #include <akari/asl/backend.h>
 
 namespace akari::asl {
+    const char * asl_stdlib = R"(
+float tan(float x){
+    return sin(x)/cos(x);
+}
+
+
+vec2 sqrtf2(vec2 v){
+    return vec2(sqrt(v.x),sqrt(v.y));
+}
+vec3 sqrtf3(vec3 v){
+    return vec3(sqrt(v.x),sqrt(v.y),sqrt(v.z));
+}
+vec4 sqrtf4(vec4 v){
+    return vec4(sqrt(v.x),sqrt(v.y),sqrt(v.z), sqrt(v.w));
+}
+vec2 sinf2(vec2 v){
+    return vec2(sin(v.x),sin(v.y));
+}
+vec3 sinf3(vec3 v){
+    return vec3(sin(v.x),sin(v.y),sin(v.z));
+}
+vec4 sinf4(vec4 v){
+    return vec4(sin(v.x),sin(v.y),sin(v.z), sin(v.w));
+}
+vec2 cosf2(vec2 v){
+    return vec2(cos(v.x),cos(v.y));
+}
+vec3 cosf3(vec3 v){
+    return vec3(cos(v.x),cos(v.y),cos(v.z));
+}
+vec4 cosf4(vec4 v){
+    return vec4(cos(v.x),cos(v.y),cos(v.z), cos(v.w));
+}
+vec2 tanf2(vec2 v){
+    return vec2(tan(v.x),tan(v.y));
+}
+vec3 tanf3(vec3 v){
+    return vec3(tan(v.x),tan(v.y),tan(v.z));
+}
+vec4 tanf4(vec4 v){
+    return vec4(tan(v.x),tan(v.y),tan(v.z), tan(v.w));
+}
+    )";
     Expected<std::shared_ptr<Program>> compile(const std::vector<TranslationUnit> &units,
                                                CompileOptions opt) {
         try {
@@ -34,6 +77,11 @@ namespace akari::asl {
             using namespace nlohmann;
             json j = json::array();
             Parser parser;
+            prog.modules.emplace_back(parser("stdlib.asl", asl_stdlib));
+            {
+                json _;
+                prog.modules.back()->dump_json(_);
+            }
             for (auto &unit : units) {
                 prog.modules.emplace_back(parser(unit.filename, unit.source));
                 json _;
@@ -41,7 +89,7 @@ namespace akari::asl {
                 // std::cout << _.dump(1) <
                 j.emplace_back(_);
             }
-            std::cout << j.dump(1) << std::endl;
+            // std::cout << j.dump(1) << std::endl;
             auto backend = create_llvm_backend();
             return backend->compile(prog, opt);
         } catch (std::runtime_error &e) {

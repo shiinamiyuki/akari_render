@@ -27,17 +27,26 @@
 #include <iostream>
 using namespace akari;
 using namespace akari::asl;
+struct ShadingPoint {
+    vec2 uv;
+    vec2 texcoords;
+};
 int main() {
     try {
         auto src = R"(
+        struct ShadingPoint {
+            vec2 uv;
+            vec2 texcoords;
+        };
         float sqr(float x){
             return x * x;
         }
         vec3 sqr_vec3(vec3 x){
             return x * x;
         }
-        vec3 main(vec3 v){
-            return sqr_vec3(v);
+        vec3 main(ShadingPoint sp){
+            float _ = sp.uv.y;
+            return sqrtf3(vec3(_));
         }
     )";
         std::vector<TranslationUnit> units;
@@ -47,9 +56,9 @@ int main() {
         auto r = compile(units, opt);
         if (r.has_value()) {
             auto program = r.extract_value();
-            auto f = reinterpret_cast<vec3 (*)(vec3)>(program->get_function_pointer("main"));
-            auto v = f(vec3(1,2,3));
-            std::cout << v.x << " " << v.y << std::endl;
+            auto f = reinterpret_cast<vec3 (*)(ShadingPoint)>(program->get_function_pointer("main"));
+            auto v = f(ShadingPoint{vec2(2,1),vec2(0.4,0.3)});
+            std::cout << v.y << " " << v.z << std::endl;
         }else {
             std::cerr << r.error().what() << std::endl;
         }

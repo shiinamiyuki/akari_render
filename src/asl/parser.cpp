@@ -201,23 +201,25 @@ namespace akari::asl {
                 return call;
             }
             auto e = parse_atom();
-            if (cur().tok == ".") {
-                auto access = std::make_shared<MemberAccessNode>();
-                access->loc = cur().loc;
-                consume();
-                auto m = parse_identifier();
-                access->var = e;
-                access->member = m->identifier;
-                return access;
-            }
-            if (cur().tok == "[") {
-                consume();
-                auto i = parse_expr();
-                expect("]");
-                auto idx = std::make_shared<IndexNode>();
-                idx->expr = e;
-                idx->idx = i;
-                return idx;
+            while(!end() && (cur().tok == "." ||cur().tok == "[")){
+                if (cur().tok == ".") {
+                    auto access = std::make_shared<MemberAccessNode>();
+                    access->loc = cur().loc;
+                    consume();
+                    auto m = parse_identifier();
+                    access->var = e;
+                    access->member = m->identifier;
+                    e = access;
+                }
+                if (cur().tok == "[") {
+                    consume();
+                    auto i = parse_expr();
+                    expect("]");
+                    auto idx = std::make_shared<IndexNode>();
+                    idx->expr = e;
+                    idx->idx = i;
+                    e = idx;
+                }
             }
             if (cur().tok == "(") {
                 if (e->isa<Identifier>()) {
@@ -275,6 +277,7 @@ namespace akari::asl {
         }
         ast::StructDecl parse_struct_decl() {
             expect("struct");
+            std::unordered_set<std::string> fields;
             if (cur().type == identifier) {
                 if (typenames.at(cur().tok).has_value()) {
                     error(cur().loc, fmt::format("{} redefined", cur().tok));
@@ -289,6 +292,10 @@ namespace akari::asl {
             while (!end() && cur().tok != "}") {
                 auto decl = parse_var_decl();
                 st->fields.emplace_back(decl);
+                if(fields.count(decl->var->identifier)){
+                    error(decl->loc, fmt::format("field {} alreay exists", decl->var->identifier));
+                }
+                fields.insert(decl->var->identifier);
                 expect(";");
             }
             expect("}");
