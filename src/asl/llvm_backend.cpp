@@ -91,23 +91,23 @@ namespace akari::asl {
         int arity;
         std::function<bool(const type::Type &)> type_checker;
     };
-    // class Managler {
-    //   public:
-    //     std::string mangle(const type::Type & ty){
-    //         if(ty->isa<type::PrimitiveType>()){
-    //             return fmt::format("@P{}@p", ty->type_name());
-    //         }else if(ty->isa<type::VectorType>()){
-    //             auto v = ty->cast<type::VectorType>();
-    //             return fmt::format("@V{}@{}n@v", mangle(v->element_type(), v->count));
-    //         }else if(ty->isa<type::StructType>())
-    //     }
-    //     std::string mangle_arg(const type::Type & ty){
-    //         return fmt::format("@A{}@a", mange(ty));
-    //     }
-    //     std::string mangle(const std::string &name, const type::FunctionType &type) {
+    class Managler {
+      public:
+        std::string mangle(const type::Type & ty){
+            if(ty->isa<type::PrimitiveType>()){
+                return fmt::format("@P{}@p", ty->type_name());
+            }else if(ty->isa<type::VectorType>()){
+                auto v = ty->cast<type::VectorType>();
+                return fmt::format("@V{}@{}n@v", mangle(v->element_type()), v->count);
+            }else if(ty->isa<type::StructType>())
+        }
+        std::string mangle_arg(const type::Type & ty){
+            return fmt::format("@A{}@a", mangle(ty));
+        }
+        std::string mangle(const std::string &name, const type::FunctionType &type) {
 
-    //     }
-    // };
+        }
+    };
     class MCJITProgram : public Program {
         std::shared_ptr<LLVMInit> _init;
         std::unique_ptr<llvm::ExecutionEngine> EE;
@@ -136,8 +136,9 @@ namespace akari::asl {
         std::unique_ptr<llvm::legacy::FunctionPassManager> FPM;
         std::unique_ptr<llvm::legacy::PassManager> MPM;
         llvm::PassManagerBuilder pass_mgr_builder;
-        llvm::BasicBlock * loop_pred = nullptr;
-        llvm::BasicBlock * loop_merge = nullptr;
+        llvm::BasicBlock *loop_pred = nullptr;
+        llvm::BasicBlock *loop_merge = nullptr;
+        bool is_terminated = false;
         [[noreturn]] void error(const SourceLocation &loc, std::string &&msg) {
             throw std::runtime_error(fmt::format("error: {} at {}:{}:{}", msg, loc.filename, loc.line, loc.col));
         }
@@ -474,10 +475,10 @@ namespace akari::asl {
                 auto *rhs_bb = llvm::BasicBlock::Create(ctx, "or_rhs", cur_function.function);
                 auto *merge_bb = llvm::BasicBlock::Create(ctx, "merge", cur_function.function);
                 builder->CreateCondBr(lhs.value, merge_bb, rhs_bb);
-                builder->SetInsertPoint(rhs_bb);
+                set_cur_bb(rhs_bb);
                 auto rhs = cast(binop->rhs->loc, compile_expr(binop->rhs), type::boolean);
                 builder->CreateBr(merge_bb);
-                builder->SetInsertPoint(merge_bb);
+                set_cur_bb(merge_bb);
                 auto phi = builder->CreatePHI(to_llvm_type(type::boolean), 2, "or_phi");
                 phi->addIncoming(lhs.value, lhs_bb);
                 phi->addIncoming(rhs.value, rhs_bb);
@@ -489,10 +490,10 @@ namespace akari::asl {
                 auto *rhs_bb = llvm::BasicBlock::Create(ctx, "and_rhs", cur_function.function);
                 auto *merge_bb = llvm::BasicBlock::Create(ctx, "merge", cur_function.function);
                 builder->CreateCondBr(lhs.value, rhs_bb, merge_bb);
-                builder->SetInsertPoint(rhs_bb);
+                set_cur_bb(rhs_bb);
                 auto rhs = cast(binop->rhs->loc, compile_expr(binop->rhs), type::boolean);
                 builder->CreateBr(merge_bb);
-                builder->SetInsertPoint(merge_bb);
+                set_cur_bb(merge_bb);
                 auto phi = builder->CreatePHI(to_llvm_type(type::boolean), 2, "and_phi");
                 phi->addIncoming(lhs.value, lhs_bb);
                 phi->addIncoming(rhs.value, rhs_bb);
@@ -555,13 +556,13 @@ namespace akari::asl {
                                                   get_typename_str(vt), emitted_cnt + u->count, vt->count));
                             }
                             for (int j = 0; j < u->count; j++) {
-                                auto elem = builder->CreateExtractElement(a.value, i);
+                                auto elem = builder->CreateExtractElement(a.value, j);
                                 vec = builder->CreateInsertElement(vec, elem, emitted_cnt + j);
                             }
                             emitted_cnt += u->count;
                         } else if (auto _ = a.type->cast<type::PrimitiveType>()) {
                             auto elem = cast(call->args[i]->loc, a, vt->element_type);
-                            vec = builder->CreateInsertElement(vec, elem.value, i);
+                            vec = builder->CreateInsertElement(vec, elem.value, emitted_cnt);
                             emitted_cnt += 1;
                         }
                     }
@@ -759,12 +760,14 @@ namespace akari::asl {
         }
         void compile_ret(const ast::Return &ret) {
             auto r = compile_expr(ret->expr);
+            // auto *term_bb = llvm::BasicBlock::Create(ctx, "", cur_function.function);
             if (cur_function.type->ret->isa<type::PrimitiveType>())
                 builder->CreateRet(cast(ret->loc, r, cur_function.type->ret).value);
             else {
                 builder->CreateStore(r.value, cur_function.function->getArg(0));
                 builder->CreateRetVoid();
             }
+            is_terminated = true;
         }
         void assign_var(const SourceLocation &loc, const LValueRecord &lvalue, const ValueRecord &value) {
             auto cvt = cast(loc, value, lvalue.type);
@@ -813,6 +816,10 @@ namespace akari::asl {
                 assign_var(asgn->loc, lvalue, rvalue);
             }
         }
+        void set_cur_bb(llvm::BasicBlock *bb) {
+            is_terminated = false;
+            builder->SetInsertPoint(bb);
+        }
         void compile_if(const ast::IfStmt &st) {
             auto cond = compile_expr(st->cond);
             cond = cast(st->loc, cond, type::boolean);
@@ -823,29 +830,32 @@ namespace akari::asl {
 
                 builder->CreateCondBr(cond.value, then_bb, else_bb);
 
-                builder->SetInsertPoint(then_bb);
+                set_cur_bb(then_bb);
                 compile_stmt(st->if_true);
-                builder->CreateBr(merge_bb);
+                if (!is_terminated)
+                    builder->CreateBr(merge_bb);
 
-                builder->SetInsertPoint(else_bb);
+                set_cur_bb(else_bb);
                 compile_stmt(st->if_false);
-                builder->CreateBr(merge_bb);
+                if (!is_terminated)
+                    builder->CreateBr(merge_bb);
 
-                builder->SetInsertPoint(merge_bb);
+                set_cur_bb(merge_bb);
             } else {
                 auto *then_bb = llvm::BasicBlock::Create(ctx, "", cur_function.function);
                 auto *merge_bb = llvm::BasicBlock::Create(ctx, "", cur_function.function);
                 builder->CreateCondBr(cond.value, then_bb, merge_bb);
-                builder->SetInsertPoint(then_bb);
+                set_cur_bb(then_bb);
                 compile_stmt(st->if_true);
-                builder->CreateBr(merge_bb);
-                builder->SetInsertPoint(merge_bb);
+                if (!is_terminated)
+                    builder->CreateBr(merge_bb);
+                set_cur_bb(merge_bb);
             }
         }
         void compile_for(const ast::ForStmt &st) {
             // auto prev_bb = builder->GetInsertBlock();
             auto _ = vars.push();
-            if(st->init)
+            if (st->init)
                 compile_var_decl(st->init);
             auto cond_bb = llvm::BasicBlock::Create(ctx, "", cur_function.function);
             auto body_bb = llvm::BasicBlock::Create(ctx, "", cur_function.function);
@@ -859,17 +869,19 @@ namespace akari::asl {
 
             builder->CreateBr(cond_bb);
 
-            builder->SetInsertPoint(cond_bb);
+            set_cur_bb(cond_bb);
             auto cond = compile_expr(st->cond);
             cond = cast(st->loc, cond, type::boolean);
             builder->CreateCondBr(cond.value, body_bb, merge_bb);
 
-            builder->SetInsertPoint(body_bb);
+            set_cur_bb(body_bb);
             compile_stmt(st->body);
-            compile_stmt(st->step);
-            builder->CreateBr(cond_bb);
+            if (!is_terminated) {
+                compile_stmt(st->step);
+                builder->CreateBr(cond_bb);
+            }
 
-            builder->SetInsertPoint(merge_bb);
+            set_cur_bb(merge_bb);
 
             loop_pred = tmp_pre;
             loop_merge = tmp_merge;
@@ -888,16 +900,17 @@ namespace akari::asl {
 
             builder->CreateBr(cond_bb);
 
-            builder->SetInsertPoint(cond_bb);
+            set_cur_bb(cond_bb);
             auto cond = compile_expr(st->cond);
             cond = cast(st->loc, cond, type::boolean);
             builder->CreateCondBr(cond.value, body_bb, merge_bb);
 
-            builder->SetInsertPoint(body_bb);
+            set_cur_bb(body_bb);
             compile_stmt(st->body);
-            builder->CreateBr(cond_bb);
+            if (!is_terminated)
+                builder->CreateBr(cond_bb);
 
-            builder->SetInsertPoint(merge_bb);
+            set_cur_bb(merge_bb);
 
             loop_pred = tmp_pre;
             loop_merge = tmp_merge;
@@ -915,19 +928,21 @@ namespace akari::asl {
                 compile_if(stmt->cast<ast::IfStmt>());
             } else if (stmt->isa<ast::WhileStmt>()) {
                 compile_while(stmt->cast<ast::WhileStmt>());
-            } else if (stmt->isa<ast::BreakStmt>()) {
+            } else if (stmt->isa<ast::ForStmt>()) {
+                compile_for(stmt->cast<ast::ForStmt>());
+            }else if (stmt->isa<ast::BreakStmt>()) {
                 auto st = (stmt->cast<ast::BreakStmt>());
-                if(!loop_pred){
+                if (!loop_pred) {
                     error(stmt->loc, "`break` outside of loop!");
                 }
                 builder->CreateBr(loop_merge);
-            }else if (stmt->isa<ast::BreakStmt>()) {
+            } else if (stmt->isa<ast::BreakStmt>()) {
                 auto st = (stmt->cast<ast::BreakStmt>());
-                if(!loop_pred){
+                if (!loop_pred) {
                     error(stmt->loc, "`continue` outside of loop!");
                 }
                 builder->CreateBr(loop_pred);
-            }else {
+            } else {
                 AKR_ASSERT(false);
             }
         }
