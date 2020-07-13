@@ -26,20 +26,17 @@
 #include <akari/asl/asl.h>
 #include <akari/core/logger.h>
 namespace akari {
-    static void _dummy(vec3*s,ShadingPoint* ){*s = vec3(0);}
+
     class ASLTexture final : public Texture {
       public:
         [[refl]] fs::path path;
         std::shared_ptr<asl::Program> program;
-        void (*fp)(vec3 *, ShadingPoint*) = nullptr;
+        std::function<vec3(ShadingPoint)> fp;
         ASLTexture()=default;
         ASLTexture(const fs::path & path):path(path){}
         AKR_IMPLS(Texture)
         Spectrum evaluate(const ShadingPoint &sp) const override { 
-            ShadingPoint _ = sp;
-            vec3 s;
-            fp(&s, &_);
-            s = max(vec3(0), s);
+            auto s = max(vec3(0), fp(sp));
             return Spectrum(s.x,s.y,s.z);
         }
         void commit() {
@@ -53,10 +50,10 @@ namespace akari {
             auto result = asl::compile(units, opt);
             if(result.has_value()){
                 program = result.extract_value();
-                fp = reinterpret_cast<decltype(fp)>(program->get_function_pointer("main"));
+                fp = program->get<vec3, ShadingPoint>();
             }else{
                 error("error when compile {}:\n{}", path.string(), result.extract_error().what());
-                fp = &_dummy;
+                fp = [](ShadingPoint){return vec3(0);};
             }
         }
     };

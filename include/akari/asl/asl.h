@@ -39,7 +39,16 @@ namespace akari::asl {
     };
     class Program {
       public:
-        virtual void *get_function_pointer(const std::string &s) = 0;
+        template <typename ShadingResult, typename ShadingArg> std::function<ShadingResult(ShadingArg)> get() {
+            auto fp = reinterpret_cast<void (*)(ShadingResult *, const ShadingArg *)>(get_entry());
+            return [=](ShadingArg arg) -> ShadingResult {
+                ShadingArg _ = arg;
+                ShadingResult res;
+                fp(&res, &_);
+                return res;
+            };
+        }
+        virtual void *get_entry() = 0;
     };
 
     struct TranslationUnit {

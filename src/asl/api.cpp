@@ -33,62 +33,62 @@ float tan(float x){
 }
 
 
-vec2 sqrt2f(vec2 v){
+vec2 sqrt(vec2 v){
     return vec2(sqrt(v.x),sqrt(v.y));
 }
-vec3 sqrtf3(vec3 v){
+vec3 sqrt(vec3 v){
     return vec3(sqrt(v.x),sqrt(v.y),sqrt(v.z));
 }
-vec4 sqrtf4(vec4 v){
+vec4 sqrt(vec4 v){
     return vec4(sqrt(v.x),sqrt(v.y),sqrt(v.z), sqrt(v.w));
 }
-vec2 sin2f(vec2 v){
+vec2 sin(vec2 v){
     return vec2(sin(v.x),sin(v.y));
 }
-vec3 sinf3(vec3 v){
+vec3 sin(vec3 v){
     return vec3(sin(v.x),sin(v.y),sin(v.z));
 }
-vec4 sinf4(vec4 v){
+vec4 sin(vec4 v){
     return vec4(sin(v.x),sin(v.y),sin(v.z), sin(v.w));
 }
-vec2 cos2f(vec2 v){
+vec2 cos(vec2 v){
     return vec2(cos(v.x),cos(v.y));
 }
-vec3 cosf3(vec3 v){
+vec3 cos(vec3 v){
     return vec3(cos(v.x),cos(v.y),cos(v.z));
 }
-vec4 cosf4(vec4 v){
+vec4 cos(vec4 v){
     return vec4(cos(v.x),cos(v.y),cos(v.z), cos(v.w));
 }
-vec2 tan2f(vec2 v){
+vec2 tan(vec2 v){
     return vec2(tan(v.x),tan(v.y));
 }
-vec3 tan3f(vec3 v){
+vec3 tan(vec3 v){
     return vec3(tan(v.x),tan(v.y),tan(v.z));
 }
-vec4 tanf4(vec4 v){
+vec4 tan(vec4 v){
     return vec4(tan(v.x),tan(v.y),tan(v.z), tan(v.w));
 }
 
-float dot2f(vec2 u, vec2 v){
+float dot(vec2 u, vec2 v){
     return v.x * u.x + v.y * u.y;
 }
-float dot3f(vec3 u, vec3 v){
+float dot(vec3 u, vec3 v){
     return v.x * u.x + v.y * u.y + v.z * u.z;
 }
-float length3f(vec3 v){
-    return sqrt(dot3f(v,v));
+float length(vec3 v){
+    return sqrt(dot(v,v));
 }
-vec3 normalize3f(vec3 v){
-    return v / length3f(v);
+vec3 normalize(vec3 v){
+    return v / length(v);
 }
 vec3 cross(vec3 x, vec3 y){
     return vec3(x.y * y.z - y.y * x.z,
 				x.z * y.x - y.z * x.x,
 				x.x * y.y - y.x * x.y);
 }
-float distancef3(vec3 p, vec3 q){
-    return length3f(p - q);
+float distance(vec3 p, vec3 q){
+    return length(p - q);
 }
 
     )";

@@ -41,12 +41,12 @@ int main() {
         float sqr(float x){
             return x * x;
         }
-        vec3 sqr_vec3(vec3 x){
+        vec3 sqr(vec3 x){
             return x * x;
         }
         vec3 main(ShadingPoint sp){
             float _ = sp.uv.y;
-            return sqrtf3(vec3(_));
+            return sqrt(vec3(_));
         }
     )";
         std::vector<TranslationUnit> units;
@@ -56,7 +56,7 @@ int main() {
         auto r = compile(units, opt);
         if (r.has_value()) {
             auto program = r.extract_value();
-            auto f = reinterpret_cast<vec3 (*)(ShadingPoint)>(program->get_function_pointer("main"));
+            auto f = program->get<vec3, ShadingPoint>();
             auto v = f(ShadingPoint{vec2(2,1),vec2(0.4,0.3)});
             std::cout << v.y << " " << v.z << std::endl;
         }else {

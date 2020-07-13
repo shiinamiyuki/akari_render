@@ -91,21 +91,28 @@ namespace akari::asl {
         int arity;
         std::function<bool(const type::Type &)> type_checker;
     };
-    class Managler {
-      public:
-        std::string mangle(const type::Type & ty){
-            if(ty->isa<type::PrimitiveType>()){
+    class Mangler {
+        std::string mangle(const type::Type &ty) {
+            if (ty->isa<type::PrimitiveType>()) {
                 return fmt::format("@P{}@p", ty->type_name());
-            }else if(ty->isa<type::VectorType>()){
+            } else if (ty->isa<type::VectorType>()) {
                 auto v = ty->cast<type::VectorType>();
-                return fmt::format("@V{}@{}n@v", mangle(v->element_type()), v->count);
-            }else if(ty->isa<type::StructType>())
+                return fmt::format("@V{}@{}n@v", mangle(v->element_type), v->count);
+            } else if (ty->isa<type::StructType>()) {
+                return fmt::format("@S{}@s", ty->cast<type::StructType>()->name);
+            } else {
+                AKR_ASSERT(false);
+            }
         }
-        std::string mangle_arg(const type::Type & ty){
-            return fmt::format("@A{}@a", mangle(ty));
-        }
-        std::string mangle(const std::string &name, const type::FunctionType &type) {
+        std::string mangle_arg(const type::Type &ty) { return fmt::format("@A{}@a", mangle(ty)); }
 
+      public:
+        std::string mangle(const std::string &name, const std::vector<type::Type> &args) {
+            std::string s = fmt::format("@F{}", name);
+            for (auto &a : args) {
+                s.append(mangle_arg(a));
+            }
+            return s.append("@f");
         }
     };
     class MCJITProgram : public Program {
@@ -118,7 +125,7 @@ namespace akari::asl {
             _init = init.lock();
             AKR_ASSERT(_init);
         }
-        void *get_function_pointer(const std::string &s) { return (void *)EE->getFunctionAddress(s); }
+        void *get_entry() { return (void *)EE->getFunctionAddress("main"); }
     };
     static thread_local llvm::LLVMContext ctx;
     class LLVMBackend : public Backend {
@@ -138,6 +145,7 @@ namespace akari::asl {
         llvm::PassManagerBuilder pass_mgr_builder;
         llvm::BasicBlock *loop_pred = nullptr;
         llvm::BasicBlock *loop_merge = nullptr;
+        std::string entry_name;
         bool is_terminated = false;
         [[noreturn]] void error(const SourceLocation &loc, std::string &&msg) {
             throw std::runtime_error(fmt::format("error: {} at {}:{}:{}", msg, loc.filename, loc.line, loc.col));
@@ -232,20 +240,13 @@ namespace akari::asl {
                 llvm::Type *ret;
                 auto func = ty->cast<type::FunctionType>();
                 for (auto &a : func->args) {
-                    if (a->isa<type::PrimitiveType>())
-                        args.emplace_back(to_llvm_type(a));
-                    else {
-                        auto elem_type = to_llvm_type(a);
-                        args.emplace_back(llvm::PointerType::get(elem_type, 0));
-                    }
+
+                    args.emplace_back(to_llvm_type(a));
                 }
                 ret = to_llvm_type(func->ret);
-                if (func->ret->isa<type::PrimitiveType>()) {
-                    type_cache[ty] = llvm::FunctionType::get(ret, args, false);
-                } else {
-                    args.insert(args.begin(), llvm::PointerType::get(ret, 0));
-                    type_cache[ty] = llvm::FunctionType::get(llvm::Type::getVoidTy(ctx), args, false);
-                }
+
+                type_cache[ty] = llvm::FunctionType::get(ret, args, false);
+
                 return type_cache.at(ty);
             }
             AKR_ASSERT(false);
@@ -293,11 +294,18 @@ namespace akari::asl {
         void gen_prototype(const ast::FunctionDecl &decl) {
             auto f_ty = process_type(decl)->cast<type::FunctionType>();
             auto ty = llvm::dyn_cast<llvm::FunctionType>(to_llvm_type(f_ty));
+            auto mangled_name = Mangler().mangle(decl->name->identifier, f_ty->args);
             llvm::Function *F =
-                llvm::Function::Create(ty, llvm::Function::ExternalLinkage, decl->name->identifier, owner.get());
+                llvm::Function::Create(ty, llvm::Function::ExternalLinkage, mangled_name, owner.get());
             // unsigned Idx = 0;
-
-            prototypes[decl->name->identifier] = FunctionRecord{F, f_ty};
+            
+            if (decl->name->identifier == "main") {
+                entry_name = mangled_name;
+                if (decl->parameters.size() != 1) {
+                    error(decl->loc, "only one parameter expected in `main`");
+                }
+            }
+            prototypes[mangled_name] = FunctionRecord{F, f_ty};
         }
         std::pair<ValueRecord, ValueRecord> arith_promote(const std::string &op, const SourceLocation &loc,
                                                           const ValueRecord &lhs, const ValueRecord &rhs) {
@@ -611,44 +619,34 @@ namespace akari::asl {
         }
         ValueRecord compile_func_call(const ast::FunctionCall &call) {
             auto func = call->func->identifier;
-            if (intrinsics.count(func)) {
-                return compile_intrinsic_call(call);
-            }
-            if (!prototypes.count(func)) {
-                error(call->loc, fmt::format("{} is not a function or it is undefined", func));
-            }
-            auto &f_rec = prototypes.at(func);
+
             std::vector<ValueRecord> args;
-            auto expected_num = f_rec.type->args.size();
-            auto actual_num = call->args.size();
-            if (expected_num != actual_num) {
-                error(call->loc, fmt::format("{} arguments expected but found {}", expected_num, actual_num));
-            }
-            for (int i = 0; i < f_rec.type->args.size(); i++) {
-                auto &expected_ty = f_rec.type->args[i];
+            std::vector<type::Type> arg_types;
+            for (int i = 0; i < call->args.size(); i++) {
                 auto arg = compile_expr(call->args[i]);
                 // auto &arg_ty = arg.type;
-                args.emplace_back(cast(call->args[i]->loc, arg, expected_ty));
+                args.emplace_back(arg);
+                arg_types.emplace_back(arg.type);
             }
+            auto mangled_name = Mangler().mangle(func, arg_types);
+            if (!prototypes.count(mangled_name)) {
+                if (intrinsics.count(func)) {
+                    return compile_intrinsic_call(call);
+                }
+                std::string err;
+                for (auto &a : arg_types) {
+                    err.append(fmt::format("{}, ", get_typename_str(a)));
+                }
+                error(call->loc, fmt::format("not matching function call to {} with args ({})", func, err));
+            }
+            auto &f_rec = prototypes.at(mangled_name);
             std::vector<llvm::Value *> llvm_args;
             for (auto &a : args) {
-                if (a.type->isa<type::PrimitiveType>())
-                    llvm_args.emplace_back(a.value);
-                else {
-                    // pass byval
-                    auto copy = create_entry_block_alloca(a.type);
-                    builder->CreateStore(a.value, copy);
-                    llvm_args.emplace_back(copy);
-                }
+
+                llvm_args.emplace_back(a.value);
             }
-            if (f_rec.type->ret->isa<type::PrimitiveType>()) {
-                return {builder->CreateCall(f_rec.function, llvm_args), f_rec.type->ret};
-            } else {
-                auto ret_value = create_entry_block_alloca(f_rec.type->ret);
-                llvm_args.insert(llvm_args.begin(), ret_value);
-                builder->CreateCall(f_rec.function, llvm_args);
-                return {builder->CreateLoad(ret_value), f_rec.type->ret};
-            }
+
+            return {builder->CreateCall(f_rec.function, llvm_args), f_rec.type->ret};
         }
         ValueRecord compile_expr(const ast::Expr &e) {
             if (e->isa<ast::Literal>()) {
@@ -760,13 +758,8 @@ namespace akari::asl {
         }
         void compile_ret(const ast::Return &ret) {
             auto r = compile_expr(ret->expr);
-            // auto *term_bb = llvm::BasicBlock::Create(ctx, "", cur_function.function);
-            if (cur_function.type->ret->isa<type::PrimitiveType>())
-                builder->CreateRet(cast(ret->loc, r, cur_function.type->ret).value);
-            else {
-                builder->CreateStore(r.value, cur_function.function->getArg(0));
-                builder->CreateRetVoid();
-            }
+            builder->CreateRet(cast(ret->loc, r, cur_function.type->ret).value);
+
             is_terminated = true;
         }
         void assign_var(const SourceLocation &loc, const LValueRecord &lvalue, const ValueRecord &value) {
@@ -930,14 +923,14 @@ namespace akari::asl {
                 compile_while(stmt->cast<ast::WhileStmt>());
             } else if (stmt->isa<ast::ForStmt>()) {
                 compile_for(stmt->cast<ast::ForStmt>());
-            }else if (stmt->isa<ast::BreakStmt>()) {
+            } else if (stmt->isa<ast::BreakStmt>()) {
                 auto st = (stmt->cast<ast::BreakStmt>());
                 if (!loop_pred) {
                     error(stmt->loc, "`break` outside of loop!");
                 }
                 builder->CreateBr(loop_merge);
-            } else if (stmt->isa<ast::BreakStmt>()) {
-                auto st = (stmt->cast<ast::BreakStmt>());
+            } else if (stmt->isa<ast::ContinueStmt>()) {
+                auto st = (stmt->cast<ast::ContinueStmt>());
                 if (!loop_pred) {
                     error(stmt->loc, "`continue` outside of loop!");
                 }
@@ -958,33 +951,23 @@ namespace akari::asl {
             return tmp.CreateAlloca(to_llvm_type(ty));
         }
         void compile_func(const ast::FunctionDecl &func) {
-            auto *F = prototypes.at(func->name->identifier).function;
+            auto f_ty = process_type(func)->cast<type::FunctionType>();
+            auto *F = prototypes.at(Mangler().mangle(func->name->identifier, f_ty->args)).function;
             cur_function = FunctionRecord{F, process_type(func)->cast<type::FunctionType>()};
             auto *bb = llvm::BasicBlock::Create(ctx, "", cur_function.function);
             auto _ = vars.push();
             builder = std::make_unique<llvm::IRBuilder<>>(bb);
-            int f_arg_offset = 0;
-            if (!cur_function.type->ret->isa<type::PrimitiveType>()) {
-                f_arg_offset = 1;
-                // F->getArg(0)->addAttr(llvm::Attribute::StructRet);
-                // F->getArg(0)->addAttr(llvm::Attribute::NoAlias);
-            }
-            // fmt::print("compiling {}\n", func->name->identifier);
+            is_terminated = false;
             for (uint32_t i = 0; i < func->parameters.size(); i++) {
                 auto p = func->parameters[i];
                 auto p_ty = process_type(p->type);
-                if (p_ty->isa<type::PrimitiveType>()) {
-                    auto *alloca = create_entry_block_alloca(p_ty);
-                    builder->CreateStore(F->getArg(i + f_arg_offset), alloca);
-                    vars.insert(p->var->identifier, LValueRecord{alloca, p_ty});
-                    // fmt::print("store prim args\n");
-                } else {
-                    // F->getArg(i + f_arg_offset)->addAttr(llvm::Attribute::NoAlias);
-                    // F->getArg(i + f_arg_offset)->addAttr(llvm::Attribute::ByVal);
-                    vars.insert(p->var->identifier, LValueRecord{F->getArg(i + f_arg_offset), p_ty});
-                }
+                auto *alloca = create_entry_block_alloca(p_ty);
+                builder->CreateStore(F->getArg(i), alloca);
+                vars.insert(p->var->identifier, LValueRecord{alloca, p_ty});
+                // fmt::print("store prim args\n");
+
                 fflush(stdout);
-                F->getArg(i + f_arg_offset)->setName(func->parameters[i]->var->identifier);
+                F->getArg(i)->setName(func->parameters[i]->var->identifier);
             }
 
             compile_block(func->body);
@@ -993,6 +976,26 @@ namespace akari::asl {
                 FPM->run(*F);
             }
             builder = nullptr;
+        }
+        void gen_main_wrapper() {
+            if (entry_name.empty()) {
+                throw std::runtime_error("`main` is not defined");
+            }
+            auto &main = prototypes.at(entry_name);
+            // auto &ty = main.type;
+            auto arg_ty = main.type->args.at(0);
+            auto ret_ty = main.type->ret;
+            std::vector<llvm::Type *> types;
+            types.emplace_back(llvm::PointerType::get(to_llvm_type(ret_ty), 0));
+            types.emplace_back(llvm::PointerType::get(to_llvm_type(arg_ty), 0));
+            auto wrapper = llvm::Function::Create(llvm::FunctionType::get(llvm::Type::getVoidTy(ctx), types, false),
+                                                  llvm::Function::ExternalLinkage, "main", owner.get());
+            auto body = llvm::BasicBlock::Create(ctx, "main_body", wrapper);
+            builder = std::make_unique<llvm::IRBuilder<>>(body);
+            auto arg_var = builder->CreateLoad(wrapper->getArg(1));
+            auto ret_var = builder->CreateCall(main.function, {arg_var});
+            builder->CreateStore(ret_var, wrapper->getArg(0));
+            builder->CreateRetVoid();
         }
 
       public:
@@ -1030,6 +1033,7 @@ namespace akari::asl {
                     compile_func(decl);
                 }
             }
+            gen_main_wrapper();
             if (opt.opt_level != CompileOptions::OptLevel::OFF) {
                 MPM->run(*owner);
             }
