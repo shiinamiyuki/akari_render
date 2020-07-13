@@ -31,7 +31,6 @@ namespace akari {
     class Texture : public Component {
       public:
         virtual Spectrum evaluate(const ShadingPoint &sp) const = 0;
-        virtual Float average_luminance() const { return 0.0f; }
         virtual ivec2 importance_map_resolution_hint()const {
           return ivec2(1);
         }
@@ -40,7 +39,6 @@ namespace akari {
       public:
         AKR_DECL_NULL(Texture)
         Spectrum evaluate(const ShadingPoint &sp) const override { return Spectrum(0); }
-        Float average_luminance() const override { return 0.0f; }
     };
 } // namespace akari
 #endif // AKARIRENDER_TEXTURE_H

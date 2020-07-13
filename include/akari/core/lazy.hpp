@@ -26,18 +26,23 @@
 namespace akari {
     template<typename T>
     struct Lazy{
-        Lazy()=default;
+        Lazy(){
+            cb = std::make_shared<ControlBlock>();
+        }
         template<typename F>
         Lazy(F && f):f(f){}
         T & get()const{
-            std::call_once(flag, [&](){
-                _result.emplace(f());
+            std::call_once(cb->flag, [&](){
+                cb->_result.emplace(f());
             });
-            return _result.value();
+            return cb->_result.value();
         }
     private:
         std::function<T(void)> f;
-        mutable std::once_flag flag;
-        mutable std::optional<T> _result;
+        struct ControlBlock{
+            std::once_flag flag;
+            std::optional<T> _result;
+        };
+        std::shared_ptr<ControlBlock> cb;
     };
 }

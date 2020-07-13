@@ -19,12 +19,17 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+
+#include <random>
 #include <akari/core/math.h>
 #include <akari/core/plugin.h>
 #include <akari/core/spectrum.h>
 #include <akari/render/light.h>
 #include <akari/render/material.h>
 #include <akari/render/mesh.h>
+#include <akari/core/lazy.hpp>
+#include <akari/core/parallel.h>
+
 
 namespace akari {
     class AreaLight final : public Light {
@@ -34,7 +39,7 @@ namespace akari {
         Float area = 0.0f;
         Emission emission;
         Frame3f localFrame;
-
+        Float _power = 0.0f;
       public:
         LightType get_light_type() const override { return LightType::ENone; }
         AreaLight() = default;
@@ -46,6 +51,30 @@ namespace akari {
             localFrame = Frame3f(triangle.Ng);
         }
         AKR_IMPLS(Light)
+        void commit()override {
+            Component::commit();
+            if(!emission.color || !emission.strength)
+                return;
+            auto v0 = vec3(triangle.texCoords[0], 0);
+            auto v1 = vec3(triangle.texCoords[1], 1);
+            auto v2 = vec3(triangle.texCoords[2], 2);
+            auto _tex_area = std::min(1.0f, std::abs(length(cross(v1 - v0, v2 - v0))));
+            auto hint1 = emission.color->importance_map_resolution_hint();
+            auto hint2 = emission.strength->importance_map_resolution_hint();
+            size_t total_samples = std::max(hint1.x, hint2.x) * std::max(hint1.y, hint2.y);
+            size_t samples = std::max<size_t>(1, _tex_area * total_samples);
+            std::random_device rd;
+            std::uniform_real_distribution<Float> dist;
+
+            _power = 0;
+            for(size_t i =0 ;i <samples;i++){
+                vec2 uv(dist(rd),dist(rd));
+                auto tex_coord = triangle.interpolated_tex_coord(uv);
+                ShadingPoint sp{tex_coord};
+                _power += (emission.color->evaluate(sp) * emission.strength->evaluate(sp)).luminance();
+            }
+            
+        }
         Spectrum Li(const vec3 &wo, const vec2 &uv) const override {
             ShadingPoint sp;
             sp.texCoords = triangle.interpolated_tex_coord(uv);
@@ -84,10 +113,7 @@ namespace akari {
             return 1.0f / SA;
         }
         Float power() const override {
-            if (emission.strength && emission.color) {
-                return area * emission.strength->average_luminance() * emission.color->average_luminance();
-            }
-            return 0.0f;
+            return _power;
         }
         void pdf_emission(const Ray &ray, Float *pdfPos, Float *pdfDir) const override {
             *pdfPos = 1 / area;

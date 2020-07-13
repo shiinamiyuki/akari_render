@@ -33,7 +33,7 @@ float tan(float x){
 }
 
 
-vec2 sqrtf2(vec2 v){
+vec2 sqrt2f(vec2 v){
     return vec2(sqrt(v.x),sqrt(v.y));
 }
 vec3 sqrtf3(vec3 v){
@@ -42,7 +42,7 @@ vec3 sqrtf3(vec3 v){
 vec4 sqrtf4(vec4 v){
     return vec4(sqrt(v.x),sqrt(v.y),sqrt(v.z), sqrt(v.w));
 }
-vec2 sinf2(vec2 v){
+vec2 sin2f(vec2 v){
     return vec2(sin(v.x),sin(v.y));
 }
 vec3 sinf3(vec3 v){
@@ -51,7 +51,7 @@ vec3 sinf3(vec3 v){
 vec4 sinf4(vec4 v){
     return vec4(sin(v.x),sin(v.y),sin(v.z), sin(v.w));
 }
-vec2 cosf2(vec2 v){
+vec2 cos2f(vec2 v){
     return vec2(cos(v.x),cos(v.y));
 }
 vec3 cosf3(vec3 v){
@@ -60,27 +60,27 @@ vec3 cosf3(vec3 v){
 vec4 cosf4(vec4 v){
     return vec4(cos(v.x),cos(v.y),cos(v.z), cos(v.w));
 }
-vec2 tanf2(vec2 v){
+vec2 tan2f(vec2 v){
     return vec2(tan(v.x),tan(v.y));
 }
-vec3 tanf3(vec3 v){
+vec3 tan3f(vec3 v){
     return vec3(tan(v.x),tan(v.y),tan(v.z));
 }
 vec4 tanf4(vec4 v){
     return vec4(tan(v.x),tan(v.y),tan(v.z), tan(v.w));
 }
 
-float dotf2(vec2 u, vec2 v){
+float dot2f(vec2 u, vec2 v){
     return v.x * u.x + v.y * u.y;
 }
-float dotf3(vec2 u, vec2 v){
+float dot3f(vec3 u, vec3 v){
     return v.x * u.x + v.y * u.y + v.z * u.z;
 }
-float lengthf3(vec3 v){
-    return sqrt(dotf3(v,v));
+float length3f(vec3 v){
+    return sqrt(dot3f(v,v));
 }
-vec3 normalizef3(vec3 v){
-    return v / lengthf3(v);
+vec3 normalize3f(vec3 v){
+    return v / length3f(v);
 }
 vec3 cross(vec3 x, vec3 y){
     return vec3(x.y * y.z - y.y * x.z,
@@ -88,7 +88,7 @@ vec3 cross(vec3 x, vec3 y){
 				x.x * y.y - y.x * x.y);
 }
 float distancef3(vec3 p, vec3 q){
-    return lengthf3(p - q);
+    return length3f(p - q);
 }
 
     )";
@@ -103,6 +103,7 @@ float distancef3(vec3 p, vec3 q){
             {
                 json _;
                 prog.modules.back()->dump_json(_);
+                j.emplace_back(_);
             }
             for (auto &unit : units) {
                 prog.modules.emplace_back(parser(unit.filename, unit.source));

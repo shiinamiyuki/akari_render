@@ -24,28 +24,40 @@
 #include <akari/core/spectrum.h>
 #include <akari/render/texture.h>
 #include <akari/asl/asl.h>
+#include <akari/core/logger.h>
 namespace akari {
+    static void _dummy(vec3*s,ShadingPoint* ){*s = vec3(0);}
     class ASLTexture final : public Texture {
       public:
         [[refl]] fs::path path;
         std::shared_ptr<asl::Program> program;
-        vec3 (*fp)(ShadingPoint) = nullptr;
+        void (*fp)(vec3 *, ShadingPoint*) = nullptr;
         ASLTexture()=default;
         ASLTexture(const fs::path & path):path(path){}
         AKR_IMPLS(Texture)
         Spectrum evaluate(const ShadingPoint &sp) const override { 
-            auto s = fp(sp);
+            ShadingPoint _ = sp;
+            vec3 s;
+            fp(&s, &_);
+            s = max(vec3(0), s);
             return Spectrum(s.x,s.y,s.z);
         }
-        Float average_luminance() const override { return 1; }
         void commit() {
             std::vector<asl::TranslationUnit> units;
             std::ifstream src_file(path);
             std::string src((std::istreambuf_iterator<char>(src_file)),
                  std::istreambuf_iterator<char>());
             units.emplace_back(asl::TranslationUnit{path.string(), src});
-            program = asl::compile(units).extract_value();
-            fp = reinterpret_cast<vec3(*)(ShadingPoint)>(program->get_function_pointer("main"));
+            asl::CompileOptions opt;
+            // opt.opt_level = asl::CompileOptions::OFF;
+            auto result = asl::compile(units, opt);
+            if(result.has_value()){
+                program = result.extract_value();
+                fp = reinterpret_cast<decltype(fp)>(program->get_function_pointer("main"));
+            }else{
+                error("error when compile {}:\n{}", path.string(), result.extract_error().what());
+                fp = &_dummy;
+            }
         }
     };
     AKR_EXPORT std::shared_ptr<Texture> create_asl_texture(const fs::path& path){

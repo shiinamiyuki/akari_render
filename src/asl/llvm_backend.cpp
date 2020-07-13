@@ -136,6 +136,8 @@ namespace akari::asl {
         std::unique_ptr<llvm::legacy::FunctionPassManager> FPM;
         std::unique_ptr<llvm::legacy::PassManager> MPM;
         llvm::PassManagerBuilder pass_mgr_builder;
+        llvm::BasicBlock * loop_pred = nullptr;
+        llvm::BasicBlock * loop_merge = nullptr;
         [[noreturn]] void error(const SourceLocation &loc, std::string &&msg) {
             throw std::runtime_error(fmt::format("error: {} at {}:{}:{}", msg, loc.filename, loc.line, loc.col));
         }
@@ -302,6 +304,10 @@ namespace akari::asl {
                 return std::make_pair(lhs, cast(loc, rhs, lhs.type));
             } else if (rhs.type->is_parent_of(lhs.type)) {
                 return std::make_pair(cast(loc, lhs, rhs.type), rhs);
+            } else if (lhs.type->isa<type::VectorType>() && rhs.type->isa<type::PrimitiveType>()) {
+                return std::make_pair(lhs, cast(loc, rhs, lhs.type));
+            } else if (rhs.type->isa<type::VectorType>() && lhs.type->isa<type::PrimitiveType>()) {
+                return std::make_pair(cast(loc, lhs, rhs.type), rhs);
             } else {
                 error(loc, fmt::format("illegal binary op '{}' with {} and {}", op, lhs.type->type_name(),
                                        rhs.type->type_name()));
@@ -407,14 +413,14 @@ namespace akari::asl {
                     error(access->loc, "index out of bound");
                 }
                 return {builder->CreateExtractElement(agg.value, idx), v->element_type};
-            }else if(agg.type->isa<type::StructType>()){
+            } else if (agg.type->isa<type::StructType>()) {
                 auto st = agg.type->cast<type::StructType>();
-                for(size_t i = 0; i < st->fields.size(); i ++){
-                    if(access->member == st->fields[i].name){
-                        return {builder->CreateExtractValue(agg.value,i), st->fields[i].type};
+                for (size_t i = 0; i < st->fields.size(); i++) {
+                    if (access->member == st->fields[i].name) {
+                        return {builder->CreateExtractValue(agg.value, i), st->fields[i].type};
                     }
                 }
-                 error(access->loc, fmt::format("{} cannot found in {}", access->member, get_typename_str(st)));
+                error(access->loc, fmt::format("{} cannot found in {}", access->member, get_typename_str(st)));
             }
             AKR_ASSERT(false);
         }
@@ -443,12 +449,12 @@ namespace akari::asl {
                 auto tmp = builder->CreateLoad(var.value);
                 auto new_vec = builder->CreateInsertElement(tmp, val.value, idx);
                 builder->CreateStore(new_vec, var.value);
-            } else if(var.type->isa<type::StructType>()){
+            } else if (var.type->isa<type::StructType>()) {
                 auto st = var.type->cast<type::StructType>();
-                for(size_t i = 0; i < st->fields.size(); i ++){
-                    if(access->member == st->fields[i].name){
+                for (size_t i = 0; i < st->fields.size(); i++) {
+                    if (access->member == st->fields[i].name) {
                         auto val = cast(asgn->loc, compile_expr(asgn->rhs), st->fields[i].type);
-                        auto gep = builder->CreateConstGEP2_32(to_llvm_type(var.type),var.value, 0, i);
+                        auto gep = builder->CreateConstGEP2_32(to_llvm_type(var.type), var.value, 0, i);
                         builder->CreateStore(val.value, gep);
                         return;
                     }
@@ -575,16 +581,17 @@ namespace akari::asl {
             auto &intrinsic = intrinsics.at(call->func->identifier);
             auto arity = intrinsic.arity;
             if (arity != call->args.size()) {
-                error(call->loc, fmt::format("call to intrinsic `{}` {} arguments expected but found {}", call->func->identifier,
-                                             arity, call->args.size()));
+                error(call->loc, fmt::format("call to intrinsic `{}` {} arguments expected but found {}",
+                                             call->func->identifier, arity, call->args.size()));
             }
             std::vector<llvm::Value *> llvm_args;
             type::Type arg_type = nullptr;
             for (auto &a : call->args) {
                 auto arg = compile_expr(a);
                 if (!intrinsic.type_checker(arg.type)) {
-                    error(call->loc, fmt::format("call to intrinsic `{}` type {} of argument {} is not support",
-                                                 call->func->identifier, get_typename_str(arg.type), llvm_args.size() + 1));
+                    error(call->loc,
+                          fmt::format("call to intrinsic `{}` type {} of argument {} is not support",
+                                      call->func->identifier, get_typename_str(arg.type), llvm_args.size() + 1));
                 }
                 if (!arg_type) {
                     arg_type = arg.type;
@@ -594,10 +601,10 @@ namespace akari::asl {
                 llvm_args.emplace_back(arg.value);
             }
             if (arity == 1) {
-                return {builder->CreateUnaryIntrinsic(intrinsic.id,llvm_args.at(0)), arg_type};
-            }else if(arity == 2){
-                return {builder->CreateBinaryIntrinsic(intrinsic.id,llvm_args.at(0),llvm_args.at(1)), arg_type};
-            }else{
+                return {builder->CreateUnaryIntrinsic(intrinsic.id, llvm_args.at(0)), arg_type};
+            } else if (arity == 2) {
+                return {builder->CreateBinaryIntrinsic(intrinsic.id, llvm_args.at(0), llvm_args.at(1)), arg_type};
+            } else {
                 AKR_ASSERT(false);
             }
         }
@@ -779,8 +786,7 @@ namespace akari::asl {
             auto r = vars.at(var->identifier).value();
             return ValueRecord{builder->CreateLoad(r.value), r.type};
         }
-        void compile_var_decl(const ast::VarDeclStmt &stmt) {
-            auto decl = stmt->decl;
+        void compile_var_decl(const ast::VarDecl &decl) {
             auto ty = process_type(decl->type);
 
             auto var = create_entry_block_alloca(ty);
@@ -789,9 +795,13 @@ namespace akari::asl {
                 auto init = compile_expr(decl->init);
                 assign_var(decl->var->loc, vars.at(decl->var->identifier).value(), init);
             } else {
-                auto init = default_initialize(stmt->loc, ty);
+                auto init = default_initialize(decl->loc, ty);
                 assign_var(decl->var->loc, vars.at(decl->var->identifier).value(), init);
             }
+        }
+        void compile_var_decl(const ast::VarDeclStmt &stmt) {
+            auto decl = stmt->decl;
+            return compile_var_decl(decl);
         }
 
         void compile_assignment(const ast::Assignment &asgn) {
@@ -832,11 +842,50 @@ namespace akari::asl {
                 builder->SetInsertPoint(merge_bb);
             }
         }
+        void compile_for(const ast::ForStmt &st) {
+            // auto prev_bb = builder->GetInsertBlock();
+            auto _ = vars.push();
+            if(st->init)
+                compile_var_decl(st->init);
+            auto cond_bb = llvm::BasicBlock::Create(ctx, "", cur_function.function);
+            auto body_bb = llvm::BasicBlock::Create(ctx, "", cur_function.function);
+            auto merge_bb = llvm::BasicBlock::Create(ctx, "", cur_function.function);
+
+            auto tmp_pre = loop_pred;
+            auto tmp_merge = loop_merge;
+
+            loop_pred = cond_bb;
+            loop_merge = merge_bb;
+
+            builder->CreateBr(cond_bb);
+
+            builder->SetInsertPoint(cond_bb);
+            auto cond = compile_expr(st->cond);
+            cond = cast(st->loc, cond, type::boolean);
+            builder->CreateCondBr(cond.value, body_bb, merge_bb);
+
+            builder->SetInsertPoint(body_bb);
+            compile_stmt(st->body);
+            compile_stmt(st->step);
+            builder->CreateBr(cond_bb);
+
+            builder->SetInsertPoint(merge_bb);
+
+            loop_pred = tmp_pre;
+            loop_merge = tmp_merge;
+        }
         void compile_while(const ast::WhileStmt &st) {
             // auto prev_bb = builder->GetInsertBlock();
             auto cond_bb = llvm::BasicBlock::Create(ctx, "", cur_function.function);
             auto body_bb = llvm::BasicBlock::Create(ctx, "", cur_function.function);
             auto merge_bb = llvm::BasicBlock::Create(ctx, "", cur_function.function);
+
+            auto tmp_pre = loop_pred;
+            auto tmp_merge = loop_merge;
+
+            loop_pred = cond_bb;
+            loop_merge = merge_bb;
+
             builder->CreateBr(cond_bb);
 
             builder->SetInsertPoint(cond_bb);
@@ -849,6 +898,9 @@ namespace akari::asl {
             builder->CreateBr(cond_bb);
 
             builder->SetInsertPoint(merge_bb);
+
+            loop_pred = tmp_pre;
+            loop_merge = tmp_merge;
         }
         void compile_stmt(const ast::Stmt &stmt) {
             if (stmt->isa<ast::VarDeclStmt>()) {
@@ -863,7 +915,19 @@ namespace akari::asl {
                 compile_if(stmt->cast<ast::IfStmt>());
             } else if (stmt->isa<ast::WhileStmt>()) {
                 compile_while(stmt->cast<ast::WhileStmt>());
-            } else {
+            } else if (stmt->isa<ast::BreakStmt>()) {
+                auto st = (stmt->cast<ast::BreakStmt>());
+                if(!loop_pred){
+                    error(stmt->loc, "`break` outside of loop!");
+                }
+                builder->CreateBr(loop_merge);
+            }else if (stmt->isa<ast::BreakStmt>()) {
+                auto st = (stmt->cast<ast::BreakStmt>());
+                if(!loop_pred){
+                    error(stmt->loc, "`continue` outside of loop!");
+                }
+                builder->CreateBr(loop_pred);
+            }else {
                 AKR_ASSERT(false);
             }
         }
@@ -887,8 +951,8 @@ namespace akari::asl {
             int f_arg_offset = 0;
             if (!cur_function.type->ret->isa<type::PrimitiveType>()) {
                 f_arg_offset = 1;
-                F->getArg(0)->addAttr(llvm::Attribute::StructRet);
-                F->getArg(0)->addAttr(llvm::Attribute::NoAlias);
+                // F->getArg(0)->addAttr(llvm::Attribute::StructRet);
+                // F->getArg(0)->addAttr(llvm::Attribute::NoAlias);
             }
             // fmt::print("compiling {}\n", func->name->identifier);
             for (uint32_t i = 0; i < func->parameters.size(); i++) {
@@ -900,15 +964,15 @@ namespace akari::asl {
                     vars.insert(p->var->identifier, LValueRecord{alloca, p_ty});
                     // fmt::print("store prim args\n");
                 } else {
-                    F->getArg(i + f_arg_offset)->addAttr(llvm::Attribute::NoAlias);
-                    F->getArg(i + f_arg_offset)->addAttr(llvm::Attribute::ByVal);
+                    // F->getArg(i + f_arg_offset)->addAttr(llvm::Attribute::NoAlias);
+                    // F->getArg(i + f_arg_offset)->addAttr(llvm::Attribute::ByVal);
                     vars.insert(p->var->identifier, LValueRecord{F->getArg(i + f_arg_offset), p_ty});
                 }
                 fflush(stdout);
                 F->getArg(i + f_arg_offset)->setName(func->parameters[i]->var->identifier);
             }
 
-            (void)compile_block(func->body);
+            compile_block(func->body);
             llvm::verifyFunction(*F);
             if (opt.opt_level != CompileOptions::OptLevel::OFF) {
                 FPM->run(*F);
@@ -954,7 +1018,7 @@ namespace akari::asl {
             if (opt.opt_level != CompileOptions::OptLevel::OFF) {
                 MPM->run(*owner);
             }
-            // llvm::outs() << *owner << "\n";
+            llvm::outs() << *owner << "\n";
             auto EE = llvm::EngineBuilder(std::move(owner)).create();
             AKR_ASSERT(EE->getFunctionAddress("main") != 0);
             return std::make_shared<MCJITProgram>(EE);

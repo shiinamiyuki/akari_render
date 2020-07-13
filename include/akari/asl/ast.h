@@ -289,6 +289,43 @@ namespace akari::asl::ast {
         }
     };
     using WhileStmt = std::shared_ptr<WhileStatementNode>;
+    class BreakStatementNode : public StatementNode {
+      public:
+        AKR_DECL_NODE(BreakStatementNode)
+    };
+    using BreakStmt = std::shared_ptr<BreakStatementNode>;
+    class ContinueStatementNode : public StatementNode {
+      public:
+        AKR_DECL_NODE(BreakStatementNode)
+    };
+    using ContinueStmt = std::shared_ptr<ContinueStatementNode>;
+    class ConstDeclNode : public StatementNode {
+      public:
+        AKR_DECL_NODE(ConstDeclNode)
+        VarDecl var;
+        void dump_json(json &j) const {
+            ASTNode::dump_json(j);
+            var->dump_json(j["var"]);
+        }
+    };
+    using ConstDecl = std::shared_ptr<ConstDeclNode>;
+
+    class ForStatementNode : public StatementNode {
+      public:
+        AKR_DECL_NODE(ForStatementNode)
+        VarDecl init;
+        Expr cond;
+        Stmt step;
+        Stmt body;
+        void dump_json(json &j) const {
+            ASTNode::dump_json(j);
+            init->dump_json(j["init"]);
+            cond->dump_json(j["cond"]);
+            body->dump_json(j["body"]);
+            step->dump_json(j["step"]);
+        }
+    };
+    using ForStmt = std::shared_ptr<ForStatementNode>;
     class SeqStatementNode : public StatementNode {
       public:
         AKR_DECL_NODE(SeqStatementNode)

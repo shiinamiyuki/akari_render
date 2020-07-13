@@ -31,7 +31,6 @@ namespace akari {
     class ImageTexture : public Texture {
         std::shared_ptr<RGBAImage> image;
         [[refl]] fs::path path;
-        std::optional<Lazy<Float>> average = std::nullopt;
 
       public:
         ImageTexture() = default;
@@ -49,22 +48,9 @@ namespace akari {
             auto tmp = (*exp)->image();
             if (tmp != image) {
                 image = tmp;
-                average.emplace([=]()->Float{
-                AtomicFloat sum(0);
-                parallel_for(
-                    image->resolution().y,
-                    [=, &sum](uint32_t y, uint32_t) {
-                        for (int x = 0; x < image->resolution().x; x++) {
-                            auto color = (*image)(x, y).first;
-                            sum.add(srgb_to_linear(color).luminance());
-                        }
-                    },
-                    32);
-                    return sum.value() / float(image->resolution().x * image->resolution().y);
-                });
+            
             }
         }
-        Float average_luminance() const override { return average.value().get(); }
 
         // texture coordinates (0,0) at bottom-left
         Spectrum evaluate(const ShadingPoint &sp) const override {

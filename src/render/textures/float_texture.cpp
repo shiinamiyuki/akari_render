@@ -33,7 +33,6 @@ namespace akari {
         explicit FloatTexture(Float value) : value(value) {}
         AKR_IMPLS(Texture)
         Spectrum evaluate(const ShadingPoint &sp) const override { return Spectrum(value); }
-        Float average_luminance() const override { return value; }
     };
 
     AKR_EXPORT std::shared_ptr<Texture> create_float_texture(Float v) { return std::make_shared<FloatTexture>(v); }

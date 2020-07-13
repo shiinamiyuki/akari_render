@@ -33,7 +33,6 @@ namespace akari {
         explicit RGBTexture(const vec3 &rgb) : rgb(rgb) {}
         AKR_IMPLS(Texture)
         Spectrum evaluate(const ShadingPoint &sp) const override { return rgb; }
-        Float average_luminance() const override { return rgb.luminance(); }
     };
 
     AKR_EXPORT std::shared_ptr<Texture> create_rgb_texture(const vec3 &rgb) { return std::make_shared<RGBTexture>(rgb); }

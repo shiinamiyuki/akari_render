@@ -326,6 +326,19 @@ namespace akari::asl {
             w->body = parse_stmt();
             return w;
         }
+        ast::ForStmt parse_for() {
+            expect("for");
+            auto w = std::make_shared<ForStatementNode>();
+            expect("(");
+            w->init = parse_var_decl();
+            expect(";");
+            w->cond = parse_expr();
+            expect(";");
+            w->step = parse_assignment();
+            expect(")");
+            w->body = parse_stmt();
+            return w;
+        }
         ast::SeqStmt parse_block() {
             expect("{");
             auto seq = std::make_shared<SeqStatementNode>();
@@ -355,12 +368,28 @@ namespace akari::asl {
             expect(";");
             return ret;
         }
+        ast::Assignment parse_assignment(){
+             auto lvalue = parse_postfix_expr();
+            if (!assignOps.count(cur().tok)) {
+                error(cur().loc, "assignment op expected");
+            }
+            auto op = cur();
+            consume();
+            auto e = parse_expr();
+            auto st = std::make_shared<ast::AssignmentNode>(op);
+            st->lhs = lvalue;
+            st->rhs = e;
+            return st;
+        }
         ast::Stmt parse_stmt() {
             if (typenames.at(cur().tok).has_value()) {
                 return parse_var_decl_stmt();
             }
             if (cur().tok == "while") {
                 return parse_while();
+            }
+            if (cur().tok == "for") {
+                return parse_for();
             }
             if (cur().tok == "if") {
                 return parse_if();
@@ -371,16 +400,17 @@ namespace akari::asl {
             if (cur().tok == "return") {
                 return parse_ret();
             }
-            auto lvalue = parse_postfix_expr();
-            if (!assignOps.count(cur().tok)) {
-                error(cur().loc, "assignment op expected");
+            if (cur().tok == "break") {
+                consume();
+                expect(";");
+                return std::make_shared<BreakStatementNode>();
             }
-            auto op = cur();
-            consume();
-            auto e = parse_expr();
-            auto st = std::make_shared<ast::AssignmentNode>(op);
-            st->lhs = lvalue;
-            st->rhs = e;
+            if (cur().tok == "continue") {
+                consume();
+                expect(";");
+                return std::make_shared<ContinueStatementNode>();
+            }
+            auto st = parse_assignment();
             expect(";");
             return st;
         }
