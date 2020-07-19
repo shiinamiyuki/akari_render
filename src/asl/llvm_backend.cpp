@@ -182,6 +182,9 @@ namespace akari::asl {
             intrinsics.emplace("sin", Intrinsic{llvm::Intrinsic::sin, 1, accept_fp_vector});
             intrinsics.emplace("cos", Intrinsic{llvm::Intrinsic::cos, 1, accept_fp_vector});
             intrinsics.emplace("exp", Intrinsic{llvm::Intrinsic::exp, 1, accept_fp_vector});
+            intrinsics.emplace("log", Intrinsic{llvm::Intrinsic::log, 1, accept_fp_vector});
+            intrinsics.emplace("log2", Intrinsic{llvm::Intrinsic::log2, 1, accept_fp_vector});
+            intrinsics.emplace("log10", Intrinsic{llvm::Intrinsic::log10, 1, accept_fp_vector});
             intrinsics.emplace("pow", Intrinsic{llvm::Intrinsic::pow, 2, accept_fp_vector});
             intrinsics.emplace("sqrt", Intrinsic{llvm::Intrinsic::sqrt, 1, accept_fp_vector});
             // intrinsics.emplace("reduce_min", Intrinsic{"reduce_min", accept_fp_vector});
@@ -295,10 +298,9 @@ namespace akari::asl {
             auto f_ty = process_type(decl)->cast<type::FunctionType>();
             auto ty = llvm::dyn_cast<llvm::FunctionType>(to_llvm_type(f_ty));
             auto mangled_name = Mangler().mangle(decl->name->identifier, f_ty->args);
-            llvm::Function *F =
-                llvm::Function::Create(ty, llvm::Function::ExternalLinkage, mangled_name, owner.get());
+            llvm::Function *F = llvm::Function::Create(ty, llvm::Function::ExternalLinkage, mangled_name, owner.get());
             // unsigned Idx = 0;
-            
+
             if (decl->name->identifier == "main") {
                 entry_name = mangled_name;
                 if (decl->parameters.size() != 1) {
@@ -1037,7 +1039,7 @@ namespace akari::asl {
             if (opt.opt_level != CompileOptions::OptLevel::OFF) {
                 MPM->run(*owner);
             }
-            llvm::outs() << *owner << "\n";
+            // llvm::outs() << *owner << "\n";
             auto EE = llvm::EngineBuilder(std::move(owner)).create();
             AKR_ASSERT(EE->getFunctionAddress("main") != 0);
             return std::make_shared<MCJITProgram>(EE);

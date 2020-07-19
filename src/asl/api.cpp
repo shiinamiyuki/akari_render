@@ -90,6 +90,67 @@ vec3 cross(vec3 x, vec3 y){
 float distance(vec3 p, vec3 q){
     return length(p - q);
 }
+float min(float x, float y){
+    if(x < y)
+        return x;
+    return y;
+}
+float max(float x, float y){
+    if(x > y)
+        return x;
+    return y;
+}
+vec2 min(vec2 x, vec2 y){
+    return vec2(min(x.x,y.x), min(x.y,y.y));
+}
+vec3 min(vec3 x, vec3 y){
+    return vec3(min(x.x,y.x), min(x.y,y.y),min(x.z,y.z));
+}
+vec4 min(vec4 x, vec4 y){
+    return vec4(min(x.x,y.x), min(x.y,y.y),min(x.z,y.z),min(x.w,y.w));
+}
+
+int min(int x, int y){
+    if(x < y)
+        return x;
+    return y;
+}
+int max(int x, int y){
+    if(x > y)
+        return x;
+    return y;
+}
+ivec2 min(ivec2 x, ivec2 y){
+    return ivec2(min(x.x,y.x), min(x.y,y.y));
+}
+ivec3 min(ivec3 x, ivec3 y){
+    return ivec3(min(x.x,y.x), min(x.y,y.y),min(x.z,y.z));
+}
+ivec4 min(ivec4 x, ivec4 y){
+    return ivec4(min(x.x,y.x), min(x.y,y.y),min(x.z,y.z),min(x.w,y.w));
+}
+vec3 mix(vec3 x, vec3 y, float a){
+    return x * (1.0 - a) + y * a;
+}
+vec2 mix(vec2 x, vec2 y, float a){
+    return x * (1.0 - a) + y * a;
+}
+vec3 mix(vec3 x, vec3 y, vec3 a){
+    return x * (1.0 - a) + y * a;
+}
+vec2 mix(vec2 x, vec2 y, vec2 a){
+    return x * (1.0 - a) + y * a;
+}
+
+vec3 pow(vec3 b, vec3 e){
+    return vec3(pow(b.x, e.x), pow(b.y,e.y), pow(b.z,e.z));
+}
+vec3 exp(vec3 b){
+    return vec3(exp(b.x), exp(b.y), exp(b.z));
+}
+vec3 log(vec3 x){
+    return vec3(log(x.x), log(x.y), log(x.z));
+}
 
     )";
     Expected<std::shared_ptr<Program>> compile(const std::vector<TranslationUnit> &units,
