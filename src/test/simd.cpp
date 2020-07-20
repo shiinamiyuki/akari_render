@@ -20,370 +20,418 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/core/platform.h>
+#include <cstdio>
+#include <cstring>
+#include <array>
 #include <immintrin.h>
 #include <type_traits>
-#include <array>
-#include <cstring>
-#include <typeinfo>
+#include <cstdint>
+#include <cmath>
 namespace akari {
-    AKR_FORCEINLINE float uintBitsToFloat(uint32_t x) {
-        float v;
-        std::memcpy(&v, &x, sizeof(float));
-        return v;
-    }
-    AKR_FORCEINLINE float intBitsToFloat(int32_t x) {
-        float v;
-        std::memcpy(&v, &x, sizeof(float));
-        return v;
-    }
-    AKR_FORCEINLINE uint32_t floatBitsToInt(float x) {
-        uint32_t v;
-        std::memcpy(&v, &x, sizeof(float));
-        return v;
-    }
-    AKR_FORCEINLINE int32_t floatBitsToUint(float x) {
-        int32_t v;
-        std::memcpy(&v, &x, sizeof(float));
-        return v;
-    }
-    template <typename T, size_t N, typename Derived> struct ArrayOperatorDefault {
-#define AKR_ARRAY_DEFAULT_OP(op, func)                                                                                 \
-    AKR_FORCEINLINE Derived func(const Derived &rhs) const {                                                             \
-        Derived tmp;                                                                                                   \
-        for (size_t i = 0; i < N; i++) {                                                                               \
-            tmp.s[i] = (derived()->s[i] op rhs.s[i]);                                                                  \
+    using std::min;
+    using std::max;
+    using std::floor;
+    using std::ceil;
+    template <typename T, int N, bool isMask = false> struct Array;
+    template <typename T, int N> constexpr bool vector_recursive_is_base_case() { return N <= 4; }
+    template <typename T, int N, bool isMask, typename Derived, typename = void> struct ArrayImpl {};
+
+    template <typename V> struct ArrayMask;
+    template <typename T, int N, bool isMask> struct ArrayMask<Array<T, N, isMask>> { using type = Array<T, N, true>; };
+    template <typename T, int N, typename Derived>
+    struct ArrayImpl<T, N, false, Derived, std::enable_if_t<vector_recursive_is_base_case<T, N>()>> {
+        std::array<T, N> arr;
+        ArrayImpl() = default;
+        ArrayImpl(T v) {
+            for (int i = 0; i < N; i++) {
+                arr[i] = v;
+            }
+        }
+        ArrayImpl(const std::array<T, N> &arr) : arr(arr) {}
+#define AKR_FUNC1(func, op)                                                                                            \
+    Derived func(const Derived &rhs) const {                                                                           \
+        std::array<T, N> r;                                                                                            \
+        for (int i = 0; i < N; i++) {                                                                                  \
+            r[i] = arr[i] op rhs.arr[i];                                                                                 \
         }                                                                                                              \
-        return tmp;                                                                                                    \
+        return Derived(r);                                                                                             \
     }
-        AKR_ARRAY_DEFAULT_OP(+, add_)
-        AKR_ARRAY_DEFAULT_OP(-, sub_)
-        AKR_ARRAY_DEFAULT_OP(*, mul_)
-        AKR_ARRAY_DEFAULT_OP(/, div_)
-        AKR_ARRAY_DEFAULT_OP(&, and_)
-        AKR_ARRAY_DEFAULT_OP(|, or_)
-        AKR_ARRAY_DEFAULT_OP(^, xor_)
-#undef AKR_ARRAY_DEFAULT_OP
-      private:
-        Derived *derived() { return static_cast<Derived *>(this); }
-        const Derived *derived() const { return static_cast<const Derived *>(this); }
-    };
-    template <typename T, size_t N> struct ArrayStorage : ArrayOperatorDefault<T, N, ArrayStorage<T, N>> {
-        using element_type = T;
-        using mask_t = ArrayStorage<int32_t, N>;
-        using Self = ArrayStorage;
-        static constexpr bool is_specialized = false;
-        std::array<T, N> s;
-        template <typename F> AKR_FORCEINLINE ArrayStorage apply(F &&f) const {
-            ArrayStorage tmp;
-            for (size_t i = 0; i < N; i++) {
-                tmp.s[i] = f(s[i]);
+        AKR_FUNC1(add, +)
+        AKR_FUNC1(sub, -)
+        AKR_FUNC1(mul, *)
+        AKR_FUNC1(div, /)
+        AKR_FUNC1(mod, %)
+        AKR_FUNC1(and_, &)
+        AKR_FUNC1(or_, |)
+        AKR_FUNC1(xor_, ^)
+#undef AKR_FUNC1
+#define AKR_FUNC0(func, f)                                                                                                \
+    Derived func() const {                                                                                             \
+        std::array<T, N> r;                                                                                            \
+        for (int i = 0; i < N; i++) {                                                                                  \
+            r[i] = f(arr[i]);                                                                                     \
+        }                                                                                                              \
+        return Derived(r);                                                                                             \
+    }
+        AKR_FUNC0(floor_,floor)
+        AKR_FUNC0(ceil_, ceil)
+#define AKR_FUNC1(func, f)                                                                                                \
+    Derived func(const Derived &rhs) const {                                                                           \
+        std::array<T, N> r;                                                                                            \
+        for (int i = 0; i < N; i++) {                                                                                  \
+            r[i] = f(arr[i], rhs.arr[i]);                                                                         \
+        }                                                                                                              \
+        return Derived(r);                                                                                             \
+    }
+        AKR_FUNC1(min_,min)
+        AKR_FUNC1(max_,max)
+#undef AKR_FUNC1
+
+        using Mask = typename ArrayMask<Derived>::type;
+#define AKR_FUNC1(func, op)                                                                                            \
+    Mask func(const Derived &rhs) const {                                                                              \
+        Mask m;                                                                                                        \
+        for (int i = 0; i < N; i++) {                                                                                  \
+            m.arr[i] = arr[i] op rhs.arr[i];                                                                           \
+        }                                                                                                              \
+        return m;                                                                                                      \
+    }
+        AKR_FUNC1(lt, <)
+        AKR_FUNC1(gt, >)
+        AKR_FUNC1(le, <=)
+        AKR_FUNC1(ge, >=)
+        AKR_FUNC1(ne, !=)
+        AKR_FUNC1(eq, ==)
+#undef AKR_FUNC1
+        static Derived select(const Mask &m, const Derived &x, const Derived &y) {
+            std::array<T, N> r;
+            for (int i = 0; i < N; i++) {
+                r[i] = m.arr[i] ? x.arr[i] : y.arr[i];
             }
-            return tmp;
+            return Derived(r);
         }
-        ArrayStorage() = default;
-        ArrayStorage(const T &x) {
-            for (auto &i : s) {
-                i = x;
-            }
-        }
-    };
-    template <typename Derived> struct SIMD32x4 : ArrayOperatorDefault<float, 4, Derived> {
-        using element_type = float;
-        static constexpr bool is_specialized = true;
-        using Self = SIMD32x4;
-        union {
-            __m128 f32x4;
-            __m128i i32x4;
-            float s[4];
-        };
-        SIMD32x4() = default;
-        SIMD32x4(float x) : f32x4(_mm_set1_ps(x)) {}
-        SIMD32x4(__m128 x) : f32x4(x) {}
-#define AKR_ARRAY_OP(func, intrin)                                                                                     \
-    AKR_FORCEINLINE Derived func(const Derived &rhs) const { return Derived(intrin(this->f32x4, rhs.f32x4)); }
-        AKR_ARRAY_OP(add_, _mm_add_ps)
-        AKR_ARRAY_OP(sub_, _mm_sub_ps)
-        AKR_ARRAY_OP(mul_, _mm_mul_ps)
-        AKR_ARRAY_OP(div_, _mm_div_ps)
-        AKR_ARRAY_OP(min_, _mm_min_ps)
-        AKR_ARRAY_OP(max_, _mm_max_ps)
-        AKR_ARRAY_OP(and_, _mm_and_ps)
-        AKR_ARRAY_OP(or_, _mm_or_ps)
-        AKR_ARRAY_OP(xor_, _mm_xor_ps)
-#undef AKR_ARRAY_OP
-    };
-    template <typename Derived> struct SIMDi32x4 : ArrayOperatorDefault<int, 4, Derived> {
-        using element_type = float;
-        static constexpr bool is_specialized = true;
-        using Self = SIMDi32x4;
-        union {
-            __m128 f32x4;
-            __m128i i32x4;
-            float s[4];
-        };
-        SIMDi32x4() = default;
-        SIMDi32x4(int32_t x) : i32x4(_mm_set1_epi32(x)) {}
-        SIMDi32x4(__m128i x) : i32x4(x) {}
-#define AKR_ARRAY_OP(func, intrin)                                                                                     \
-    AKR_FORCEINLINE Derived func(const Derived &rhs) const { return Derived(intrin(this->f32x4, rhs.f32x4)); }
-        AKR_ARRAY_OP(and_, _mm_and_ps)
-        AKR_ARRAY_OP(or_, _mm_or_ps)
-        AKR_ARRAY_OP(xor_, _mm_xor_ps)
-#undef AKR_ARRAY_OP
-    };
-    template <typename Derived> struct SIMD32x8 : ArrayOperatorDefault<float, 8, Derived> {
-        using element_type = float;
-        using Self = SIMD32x8;
-        static constexpr bool is_specialized = true;
-        union {
-            __m256 f32x8;
-            __m256i i32x8;
-            float s[8];
-        };
-        SIMD32x8() = default;
-        SIMD32x8(float x) : f32x8(_mm256_set1_ps(x)) {}
-        SIMD32x8(__m256 x) : f32x8(x) {}
-#define AKR_ARRAY_OP(func, intrin)                                                                                     \
-    AKR_FORCEINLINE Derived func(const Derived &rhs) const { return Derived(intrin(this->f32x8, rhs.f32x8)); }
-        AKR_ARRAY_OP(add_, _mm256_add_ps)
-        AKR_ARRAY_OP(sub_, _mm256_sub_ps)
-        AKR_ARRAY_OP(mul_, _mm256_mul_ps)
-        AKR_ARRAY_OP(div_, _mm256_div_ps)
-        AKR_ARRAY_OP(min_, _mm256_min_ps)
-        AKR_ARRAY_OP(max_, _mm256_max_ps)
-        AKR_ARRAY_OP(and_, _mm256_and_ps)
-        AKR_ARRAY_OP(or_, _mm256_or_ps)
-        AKR_ARRAY_OP(xor_, _mm256_xor_ps)
-#undef AKR_ARRAY_OP
-    };
-    template <typename Derived> struct SIMDi32x8 : ArrayOperatorDefault<int, 8, Derived> {
-        using element_type = float;
-        using Self = SIMDi32x8;
-        union {
-            __m256 f32x8;
-            __m256i i32x8;
-            float s[8];
-        };
-        SIMDi32x8() = default;
-        SIMDi32x8(int32_t x) : f32x8(_mm256_set1_epi32(x)) {}
-        SIMDi32x8(__m256i x) : i32x8(x) {}
-#define AKR_ARRAY_OP(func, intrin)                                                                                     \
-    AKR_FORCEINLINE Derived func(const Derived &rhs) const { return Derived(intrin(this->f32x8, rhs.f32x8)); }
-        AKR_ARRAY_OP(and_, _mm256_and_ps)
-        AKR_ARRAY_OP(or_, _mm256_or_ps)
-        AKR_ARRAY_OP(xor_, _mm256_xor_ps)
-#undef AKR_ARRAY_OP
-    };
-#define AKR_SPECIALIZE(Ty, N, Base)                                                                                    \
-    template <> struct ArrayStorage<Ty, N> : Base<ArrayStorage<Ty, N>> {                                               \
-        using element_type = Ty;                                                                                       \
-        static constexpr bool is_specialized = true;                                                                   \
-        using Self = ArrayStorage;                                                                                     \
-        using Base<Self>::Base;                                                                                        \
     };
 
-    AKR_SPECIALIZE(float, 4, SIMD32x4)
-    AKR_SPECIALIZE(uint32_t, 4, SIMDi32x4)
-    AKR_SPECIALIZE(int32_t, 4, SIMDi32x4)
-    AKR_SPECIALIZE(float, 8, SIMD32x8)
-    AKR_SPECIALIZE(uint32_t, 8, SIMDi32x8)
-    AKR_SPECIALIZE(int32_t, 8, SIMDi32x8)
-    constexpr size_t minmaxpow2(size_t x) {
-        size_t i = 1;
-        while (i != x) {
-            auto t = i;
-            i = i << 1;
-            if (i >= x) {
-                return t;
+    template <typename T, int N, typename Derived>
+    struct ArrayImpl<T, N, true, Derived, std::enable_if_t<vector_recursive_is_base_case<T, N>()>> {
+        std::array<uint32_t, N> arr;
+        ArrayImpl() = default;
+        ArrayImpl(const std::array<uint32_t, N> &arr) : arr(arr) {}
+#define AKR_FUNC1(func, op)                                                                                            \
+    Derived func(const Derived &rhs) const {                                                                           \
+        std::array<T, N> r;                                                                                            \
+        for (int i = 0; i < N; i++) {                                                                                  \
+            r[i] = arr[i] op rhs.arr[i];                                                                                 \
+        }                                                                                                              \
+        return Derived(r);                                                                                             \
+    }
+        AKR_FUNC1(and_, &)
+        AKR_FUNC1(or_, |)
+        AKR_FUNC1(xor_, ^)
+
+        static Derived select(const Derived &m, const Derived &x, const Derived &y) {
+            std::array<uint32_t, N> r;
+            for (int i = 0; i < N; i++) {
+                r[i] = m[i] ? x.arr[i] : y.arr[i];
             }
+            return Derived(r);
         }
-        return i;
-    }
-    constexpr size_t adjusted_array_size(size_t x) {
-        if (x <= 2) {
-            return x;
+    };
+    template <typename Derived> struct maskf32x4 {
+        __m128 m;
+        const maskf32x4 &_this() const { return static_cast<const maskf32x4 &>(*this); }
+        maskf32x4(float v) : m(_mm_set_ps1(v)) {}
+        maskf32x4() = default;
+        maskf32x4(__m128 m) : m(m) {}
+#define AKR_F32X4_FUNC(func, intrinsic)                                                                                \
+    Derived func(const Derived &rhs) const { return Derived(intrinsic(m, rhs._this().m)); }
+        AKR_F32X4_FUNC(and_, _mm_and_ps)
+        AKR_F32X4_FUNC(or_, _mm_or_ps)
+        AKR_F32X4_FUNC(xor_, _mm_xor_ps)
+#undef AKR_F32X4_FUNC
+        static Derived select(const Derived &m, const Derived &x, const Derived &y) {
+            return Derived(_mm_blendv_ps(y._this().m, x._this().m, m.m));
         }
-        x = 4 * ((x + 3) / 4);
-        return x;
+    };
+
+    template <typename Derived> struct f32x4 {
+        __m128 m;
+        const f32x4 &_this() const { return static_cast<const f32x4 &>(*this); }
+        f32x4(float v) : m(_mm_set_ps1(v)) {}
+        f32x4() = default;
+        f32x4(__m128 m) : m(m) {}
+#define AKR_F32X4_FUNC(func, intrinsic)                                                                                \
+    Derived func(const Derived &rhs) const { return Derived(intrinsic(m, rhs._this().m)); }
+        AKR_F32X4_FUNC(add, _mm_add_ps)
+        AKR_F32X4_FUNC(sub, _mm_sub_ps)
+        AKR_F32X4_FUNC(mul, _mm_mul_ps)
+        AKR_F32X4_FUNC(div, _mm_div_ps)
+        AKR_F32X4_FUNC(min_, _mm_min_ps)
+        AKR_F32X4_FUNC(max_, _mm_max_ps)
+#undef AKR_F32X4_FUNC
+#define AKR_F32X4_FUNC(func, intrinsic)                                                                                \
+    Derived func() const { return Derived(intrinsic(m)); }
+        AKR_F32X4_FUNC(floor_, _mm_floor_ps)
+        AKR_F32X4_FUNC(ceil_, _mm_ceil_ps)
+#undef AKR_F32X4_FUNC
+        using Mask = typename ArrayMask<Derived>::type;
+#define AKR_F32X4_FUNC(func, intrinsic)                                                                                \
+    Mask func(const Derived &rhs) const { return Mask(_mm_cmp_ps(m, rhs._this().m, intrinsic)); }
+        AKR_F32X4_FUNC(lt, _CMP_LT_OS)
+        AKR_F32X4_FUNC(gt, _CMP_GT_OS)
+        AKR_F32X4_FUNC(le, _CMP_LE_OS)
+        AKR_F32X4_FUNC(ge, _CMP_GE_OS)
+        AKR_F32X4_FUNC(ne, _CMP_NEQ_OS)
+        AKR_F32X4_FUNC(eq, _CMP_EQ_OS)
+#undef AKR_F32X4_FUNC
+        static Derived select(const Mask &m, const Derived &x, const Derived &y) {
+            return Derived(_mm_blendv_ps(y._this().m, x._this().m, m.m));
+        }
+    };
+
+    template <typename Derived> struct i32x4 {
+        union {
+            __m128 m;
+            __m128i mi;
+            int arr[4];
+        };
+        const i32x4 &_this() const { return static_cast<const i32x4 &>(*this); }
+        i32x4() = default;
+        i32x4(__m128 m) : m(m) {}
+        i32x4(__m128i mi) : mi(mi) {}
+        i32x4(float v) : m(_mm_set_ps1(v)) {}
+        i32x4(int i) : mi(_mm_set1_epi32(i)) {}
+#define AKR_I32X4_FUNC(func, intrinsic)                                                                                \
+    Derived func(const Derived &rhs) const { return Derived(intrinsic(m, rhs._this().m)); }
+        AKR_I32X4_FUNC(and_, _mm_and_ps)
+        AKR_I32X4_FUNC(or_, _mm_or_ps)
+        AKR_I32X4_FUNC(xor_, _mm_xor_ps)
+#undef AKR_I32X4_FUNC
+
+#define AKR_I32X4_FUNC(func, intrinsic)                                                                                \
+    Derived func(const Derived &rhs) const { return Derived(intrinsic(mi, rhs._this().mi)); }
+        AKR_I32X4_FUNC(add, _mm_add_epi32)
+        AKR_I32X4_FUNC(sub, _mm_sub_epi32)
+        AKR_I32X4_FUNC(mul, _mm_mul_epi32)
+        AKR_I32X4_FUNC(min_, _mm_min_epi32)
+        AKR_I32X4_FUNC(max_, _mm_max_epi32)
+#define AKR_I32x4_SCALAR_FUNC(func, op)                                                                                \
+    Derived func(const Derived &rhs) const {                                                                           \
+        i32x4 r;                                                                                                       \
+        for (int i = 0; i < 4; i++) {                                                                                  \
+            r.arr[i] = arr[i] op rhs._this().arr[i];                                                                   \
+        }                                                                                                              \
+        return Derived(r);                                                                                             \
     }
-    template <typename T, size_t N, size_t _M = adjusted_array_size(N)> struct Array;
-    template <typename T, size_t N, size_t M = minmaxpow2(N)> struct ArrayBaseImpl;
-    template <typename T, size_t N, typename Derived> struct ArrayBase;
-    template <typename Array1, typename Array2> struct ArrayStoragePair {
-        // using Array1 = ArrayStorage<T, N1>;
-        // using Array2 = ArrayBaseImpl<T, N2>;
-        using T = typename Array1::element_type;
-        static_assert(std::is_same_v<T, typename Array2::element_type>);
-        Array1 lo;
-        Array2 hi;
-        using Self = ArrayStoragePair;
-        ArrayStoragePair() = default;
-        ArrayStoragePair(const T &a) : lo(a), hi(a) {}
-        ArrayStoragePair(const Array1 &a, const Array2 &b) : lo(a), hi(b) {}
-#define AKR_ARRAY_OP(func)                                                                                             \
-    AKR_FORCEINLINE Self func(const Self &rhs) const { return Self(lo.func(rhs.lo), hi.func(rhs.hi)); }
-        AKR_ARRAY_OP(add_)
-        AKR_ARRAY_OP(sub_)
-        AKR_ARRAY_OP(mul_)
-        AKR_ARRAY_OP(div_)
-        AKR_ARRAY_OP(min_)
-        AKR_ARRAY_OP(max_)
-        AKR_ARRAY_OP(and_)
-        AKR_ARRAY_OP(or_)
-        AKR_ARRAY_OP(xor_)
-#undef AKR_ARRAY_OP
+        AKR_I32x4_SCALAR_FUNC(div, /) AKR_I32x4_SCALAR_FUNC(mod, %)
+#undef AKR_I32X4_FUNC
+            static Derived select(const Derived &m, const Derived &x, const Derived &y) {
+            return Derived(_mm_blendv_ps(y._this().m, x._this().m, m.m));
+        }
     };
-    template <typename T, size_t N, size_t M> struct ArrayStoragePair_Indirect {
-        using type = ArrayStoragePair<ArrayStorage<T, N>, ArrayStorage<T, M>>;
+
+    template <typename Derived> struct ArrayImpl<float, 4, false, Derived> : f32x4<Derived> {
+        using f32x4<Derived>::f32x4;
     };
-    template <typename T, size_t N> struct ArrayStorage_Indirect { using type = ArrayStorage<T, N>; };
-    template <typename T, size_t N, size_t M>
-    using ArrayBaseImplBase = typename std::conditional_t<
-        ArrayStorage<T, N>::is_specialized, ArrayStorage_Indirect<T, N>,
-        std::conditional_t<N == M, ArrayStorage_Indirect<T, N>, ArrayStoragePair_Indirect<T, M, N - M>>>::type;
-    template <typename T, size_t N, size_t M> struct ArrayBaseImpl : ArrayBaseImplBase<T, N, M> {
-        using Self = ArrayBaseImpl;
-        using Base = ArrayBaseImplBase<T, N, M>;
-        ArrayBaseImpl() = default;
-        ArrayBaseImpl(const T &v) : Base(v) {}
-        ArrayBaseImpl(const Base &rhs) : Base(rhs) {}
-#define AKR_ARRAY_OP(func)                                                                                             \
-    AKR_FORCEINLINE Self func(const Self &rhs) const { return Self(static_cast<const Base *>(this)->func(rhs)); }
-        AKR_ARRAY_OP(add_)
-        AKR_ARRAY_OP(sub_)
-        AKR_ARRAY_OP(mul_)
-        AKR_ARRAY_OP(div_)
-        AKR_ARRAY_OP(min_)
-        AKR_ARRAY_OP(max_)
-        AKR_ARRAY_OP(and_)
-        AKR_ARRAY_OP(or_)
-        AKR_ARRAY_OP(xor_)
-#undef AKR_ARRAY_OP
+    template <typename Derived> struct ArrayImpl<float, 3, false, Derived> : f32x4<Derived> {
+        using f32x4<Derived>::f32x4;
     };
-    template <typename T, size_t N, typename Derived> struct ArrayBaseCommon : ArrayBaseImpl<T, N> {
-        using Self = ArrayBaseCommon;
-        using Base = ArrayBaseImpl<T, N>;
-        using Base::ArrayBaseImpl;
-        ArrayBaseCommon(const Base &rhs) : Base(rhs) {}
-#define AKR_ARRAY_OP(func)                                                                                             \
-    AKR_FORCEINLINE Derived func(const Self &rhs) const { return Self(static_cast<const Base *>(this)->func(rhs)); }
-        AKR_ARRAY_OP(add_)
-        AKR_ARRAY_OP(sub_)
-        AKR_ARRAY_OP(mul_)
-        AKR_ARRAY_OP(div_)
-        AKR_ARRAY_OP(min_)
-        AKR_ARRAY_OP(max_)
-        AKR_ARRAY_OP(and_)
-        AKR_ARRAY_OP(or_)
-        AKR_ARRAY_OP(xor_)
-#undef AKR_ARRAY_OP
-#define AKR_ARRAY_IOP(op, func)                                                                                        \
-    AKR_FORCEINLINE Derived &operator op(const Self &rhs) {                                                              \
-        *this = Derived(static_cast<const Base *>(this)->func(rhs));                                                   \
+    template <typename Derived> struct ArrayImpl<float, 4, true, Derived> : maskf32x4<Derived> {
+        using maskf32x4<Derived>::maskf32x4;
+    };
+    template <typename Derived> struct ArrayImpl<float, 3, true, Derived> : maskf32x4<Derived> {
+        using maskf32x4<Derived>::maskf32x4;
+    };
+
+    template <typename Derived> struct ArrayImpl<int, 4, false, Derived> : i32x4<Derived> {
+        using i32x4<Derived>::i32x4;
+    };
+    template <typename Derived> struct ArrayImpl<int, 3, false, Derived> : i32x4<Derived> {
+        using i32x4<Derived>::i32x4;
+    };
+    template <typename Derived> struct ArrayImpl<int, 4, true, Derived> : i32x4<Derived> {
+        using i32x4<Derived>::i32x4;
+    };
+    template <typename Derived> struct ArrayImpl<int, 3, true, Derived> : maskf32x4<Derived> {
+        using i32x4<Derived>::i32x4;
+    };
+
+    template <typename V, int N> struct GetArrayPartition {};
+
+    template <typename T, int N, bool isMask, int M> struct GetArrayPartition<Array<T, N, isMask>, M> {
+        using type = Array<T, M, isMask>;
+    };
+
+    template <typename T, int N> constexpr int get_vector_recursive_head() {
+        static_assert(!vector_recursive_is_base_case<T, N>());
+        if constexpr (N > 16)
+            return 16;
+        else if constexpr (N > 8)
+            return 8;
+        else if constexpr (N > 4)
+            return 4;
+    }
+    template <typename T, int N, bool isMask, typename Derived>
+    struct ArrayImpl<T, N, isMask, Derived, std::enable_if_t<!vector_recursive_is_base_case<T, N>()>> {
+        static constexpr int head = get_vector_recursive_head<T, N>();
+        using Derived1 = typename GetArrayPartition<Derived, head>::type;
+        using Derived2 = typename GetArrayPartition<Derived, N - head>::type;
+        using Array1 = ArrayImpl<T, head, isMask, Derived1>;
+        using Array2 = ArrayImpl<T, N - head, isMask, Derived2>;
+        Array1 arr1;
+        Array2 arr2;
+        ArrayImpl() = default;
+        ArrayImpl(const T &v) : arr1(v), arr2(v) {}
+        ArrayImpl(const Derived1 &arr1, const Derived2 &arr2) : arr1(arr1), arr2(arr2) {}
+#define AKR_VEC_FORWARD0(func)                                                                                         \
+    template <typename R = Derived> std::enable_if_t<!isMask, R> func() const {                                        \
+        return Derived(arr1.func(), arr2.func());                                                                      \
+    }
+        AKR_VEC_FORWARD0(floor_)
+        AKR_VEC_FORWARD0(ceil_)
+#define AKR_VEC_FORWARD1(func)                                                                                         \
+    template <typename R = Derived> std::enable_if_t<!isMask, R> func(const Derived &rhs) const {                      \
+        auto &r = static_cast<const ArrayImpl &>(rhs);                                                                 \
+        return Derived(arr1.func(r.arr1), arr2.func(r.arr2));                                                          \
+    }
+        AKR_VEC_FORWARD1(add)
+        AKR_VEC_FORWARD1(sub)
+        AKR_VEC_FORWARD1(mul)
+        AKR_VEC_FORWARD1(div)
+        AKR_VEC_FORWARD1(and_)
+        AKR_VEC_FORWARD1(or_)
+        AKR_VEC_FORWARD1(xor_)
+        AKR_VEC_FORWARD1(min_)
+        AKR_VEC_FORWARD1(max_)
+
+        using Mask = typename ArrayMask<Derived>::type;
+#define AKR_VEC_FORWARD_CMP(func)                                                                                      \
+    template <typename R = Mask> std::enable_if_t<!isMask, R> func(const Derived &rhs) const {                         \
+        auto &r = static_cast<const ArrayImpl &>(rhs);                                                                 \
+        return Mask(arr1.func(r.arr1), arr2.func(r.arr2));                                                             \
+    }
+
+        AKR_VEC_FORWARD_CMP(lt)
+        AKR_VEC_FORWARD_CMP(gt)
+        AKR_VEC_FORWARD_CMP(le)
+        AKR_VEC_FORWARD_CMP(ge)
+        AKR_VEC_FORWARD_CMP(ne)
+        AKR_VEC_FORWARD_CMP(eq)
+
+        static Derived select(const Mask &m, const Derived &x, const Derived &y) {
+            return Derived(Derived1::select(m.arr1, x.arr1, y.arr1), Derived2::select(m.arr2, x.arr2, y.arr2));
+        }
+    };
+    template <typename T, int N, bool isMask> struct Array : ArrayImpl<T, N, isMask, Array<T, N, isMask>> {
+        using Base = ArrayImpl<T, N, isMask, Array<T, N, isMask>>;
+        // using Mask = Array<T, N, true>;
+        using ArrayImpl<T, N, isMask, Array<T, N, isMask>>::ArrayImpl;
+        Array(const Base &b) : Base(b) {}
+        T& operator [](int i){return reinterpret_cast<T*>(this)[i];}
+        const T& operator [](int i)const{return reinterpret_cast<T*>(this)[i];}
+#define GEN_ACCESS(name, idx)                                                                                          \
+    const T &name() const {                                                                                            \
+        static_assert(N > idx);                                                                                        \
+        return (*this)[idx];                                                                                           \
+    }                                                                                                                  \
+    T &name() {                                                                                                        \
+        static_assert(N > idx);                                                                                        \
+        return (*this)[idx];                                                                                           \
+    }
+        GEN_ACCESS(x, 0)
+        GEN_ACCESS(y, 1)
+        GEN_ACCESS(z, 2)
+        GEN_ACCESS(w, 3)
+#define GEN_ASSIGN_OP(op, op2)                                                                                         \
+    template <typename U> Array &operator op2(const U &rhs) {                                                          \
+        *this = *this op rhs;                                                                                          \
         return *this;                                                                                                  \
     }
-        AKR_ARRAY_IOP(+=, add_)
-        AKR_ARRAY_IOP(-=, sub_)
-        AKR_ARRAY_IOP(*=, mul_)
-        AKR_ARRAY_IOP(/=, div_)
-#undef AKR_ARRAY_IOP
+        GEN_ASSIGN_OP(+, +=)
+        GEN_ASSIGN_OP(-, -=)
+        GEN_ASSIGN_OP(*, *=)
+        GEN_ASSIGN_OP(/, /=)
+        GEN_ASSIGN_OP(&, &=)
+        GEN_ASSIGN_OP(|, |=)
+        GEN_ASSIGN_OP(^, ^=)
     };
-    template <typename T, size_t N, typename Derived> struct ArrayBase : ArrayBaseCommon<T, N, Derived> {
-        using Base = ArrayBaseCommon<T, N, Derived>;
-        using Base::ArrayBaseCommon;
-        AKR_FORCEINLINE T *raw() { return reinterpret_cast<T *>(this); }
-        AKR_FORCEINLINE const T *raw() const { return reinterpret_cast<T *>(this); }
-        AKR_FORCEINLINE T &operator[](size_t idx) { return raw()[idx]; }
-        AKR_FORCEINLINE const T &operator[](size_t idx) const { return raw()[idx]; }
-        template <size_t Idx> T &at() {
-            static_assert(Idx < N);
-            return raw()[Idx];
-        }
-        template <size_t Idx> const T &at() const {
-            static_assert(Idx < N);
-            return raw()[Idx];
-        }
-    };
-    template <typename T, size_t N, size_t _M> struct Array : ArrayBase<T, _M, Array<T, N, _M>> {
-        using Base = ArrayBase<T, _M, Array<T, N, _M>>;
-        using Base::ArrayBase;
-        template <typename... Args,
-                  typename = std::enable_if_t<(sizeof...(Args) > 1) && std::conjunction_v<std::is_same<Args, T>...>>>
-        Array(Args &&... args) {
-            static_assert(sizeof...(args) <= N);
-            T _tmp[] = {args...};
-            std::memcpy(&this->template at<0>(), &_tmp[0], sizeof(_tmp));
-            // if constexpr ()
-        }
-#define AKR_ARRAY_ACCESS_OP(name, idx)                                                                                 \
-    const T &name() const { return this->template at<idx>(); }                                                                        \
-    T &name() { return this->template at<idx>(); }
-        AKR_ARRAY_ACCESS_OP(x, 0)
-        AKR_ARRAY_ACCESS_OP(y, 1)
-        AKR_ARRAY_ACCESS_OP(z, 2)
-        AKR_ARRAY_ACCESS_OP(w, 2)
-#undef AKR_ARRAY_ACCESS_OP
-    };
-    template <size_t N> using Mask = Array<uint32_t, N>;
-    template <typename T> struct is_array : std::false_type {};
-    template <typename T, size_t N> struct is_array<Array<T, N>> : std::true_type {};
-    template <typename T> constexpr bool is_array_v = is_array<T>::value;
-    template <typename T> struct array_size_ { static constexpr size_t value = 1; };
-    template <typename T, size_t N> struct array_size_<Array<T, N>> { static constexpr size_t value = N; };
-    template <typename T> constexpr size_t array_size_v = array_size_<T>::value;
-    template <typename T> struct is_scalar : std::true_type {};
-    template <typename T, size_t N> struct is_scalar<Array<T, N>> : std::false_type {};
-    template <size_t N> struct is_scalar<Mask<N>> : std::false_type {};
-    template <typename T> constexpr bool is_scalar_v = is_scalar<T>::value;
-    template <typename T> struct scalar_ { using type = T; };
-    template <typename T, size_t N> struct scalar_<Array<T, N>> { using type = T; };
-    template <typename T> using scalar_t = typename scalar_<T>::type;
-    template <typename T, typename U> struct replace_scalar_ {};
-    template <typename T, size_t N, typename U> struct replace_scalar_<Array<T, N>, U> { using type = Array<U, N>; };
-    template <typename T> using scalar_t = typename scalar_<T>::type;
-    template <typename T, typename U> using replace_scalar_t = typename replace_scalar_<T, U>::type;
 
-#define AKR_ARRAY_OP(op, func)                                                                                         \
-    template <typename T, typename U, typename = std::enable_if_t<is_array_v<T> || is_array_v<U>>>                     \
-    inline auto operator op(const T &a, const U &b) {                                                                  \
-        using ST = scalar_t<T>;                                                                                        \
-        using SU = scalar_t<U>;                                                                                        \
-        constexpr auto N = is_array_v<T> ? array_size_v<T> : array_size_v<U>;                                          \
-        using R = decltype(std::declval<ST>() + std::declval<SU>());                                                   \
-        if constexpr (!is_array_v<T>) {                                                                                \
-            auto arr_a = Array<R, N>(a);                                                                               \
-            return a.func(b);                                                                                          \
-        } else if constexpr (!is_array_v<U>) {                                                                         \
-            auto arr_b = Array<R, N>(b);                                                                               \
-            return a.func(arr_b);                                                                                      \
-        } else {                                                                                                       \
-            return a.func(b);                                                                                          \
-        }                                                                                                              \
+    template <typename T, int N> using Mask = Array<T, N, true>;
+
+    template <typename T> struct is_array : std::false_type {};
+    template <typename T, int N> struct is_array<Array<T, N>> : std::true_type {};
+    template <typename T> constexpr static bool is_array_v = is_array<T>::value;
+    template <typename T> struct scalar_ { using type = T; };
+    template <typename T, int N> struct scalar_<Array<T, N>> { using type = T; };
+    template <typename T> using scalar_t = typename scalar_<T>::type;
+    template <typename T, typename U> struct replace_scalar { using type = U; };
+    template <typename T, int N, typename U> struct replace_scalar<Array<T, N>, U> { using type = Array<U, N>; };
+    template <typename T, typename U> using replace_scalar_t = typename replace_scalar<T, U>::type;
+
+#define AKR_ARR_BINOP(func, op)                                                                                        \
+    template <typename T, int N, bool isMask, typename A = Array<T, N, isMask>>                                        \
+    inline A operator op(const Array<T, N, isMask> &lhs, const Array<T, N, isMask> &rhs) {                             \
+        return lhs.func(rhs);                                                                                          \
+    }                                                                                                                  \
+    template <typename T, int N, bool isMask, typename A = Array<T, N, isMask>, typename M = typename A::Mask>         \
+    inline A operator op(const T &lhs, const Array<T, N, isMask> &rhs) {                                               \
+        return A(lhs).func(rhs);                                                                                       \
+    }                                                                                                                  \
+    template <typename T, int N, bool isMask, typename A = Array<T, N, isMask>, typename M = typename A::Mask>         \
+    inline A operator op(const Array<T, N, isMask> &lhs, const T &rhs) {                                               \
+        return lhs.func(A(rhs));                                                                                       \
     }
-    AKR_ARRAY_OP(+, add_)
-    AKR_ARRAY_OP(-, sub_)
-    AKR_ARRAY_OP(*, mul_)
-    AKR_ARRAY_OP(/, div_)
-    AKR_ARRAY_OP(&, and_)
-    AKR_ARRAY_OP(|, or_)
-    AKR_ARRAY_OP(&&, and_)
-    AKR_ARRAY_OP(||, or_)
-    AKR_ARRAY_OP(^, xor_)
-#undef AKR_ARRAY_OP
+#define AKR_ARR_BINOP_CMP(func, op)                                                                                    \
+    template <typename T, int N, bool isMask, typename A = Array<T, N, isMask>, typename M = typename A::Mask>         \
+    inline M operator op(const Array<T, N, isMask> &lhs, const Array<T, N, isMask> &rhs) {                             \
+        return lhs.func(rhs);                                                                                          \
+    }                                                                                                                  \
+    template <typename T, int N, bool isMask, typename A = Array<T, N, isMask>, typename M = typename A::Mask>         \
+    inline M operator op(const T &lhs, const Array<T, N, isMask> &rhs) {                                               \
+        return A(lhs).func(rhs);                                                                                       \
+    }                                                                                                                  \
+    template <typename T, int N, bool isMask, typename A = Array<T, N, isMask>, typename M = typename A::Mask>         \
+    inline M operator op(const Array<T, N, isMask> &lhs, const T &rhs) {                                               \
+        return lhs.func(A(rhs));                                                                                       \
+    }
+    AKR_ARR_BINOP(add, +)
+    AKR_ARR_BINOP(sub, -)
+    AKR_ARR_BINOP(mul, *)
+    AKR_ARR_BINOP(div, /)
+    AKR_ARR_BINOP(and_, &)
+    AKR_ARR_BINOP(or_, |)
+    AKR_ARR_BINOP(xor_, ^)
+    AKR_ARR_BINOP_CMP(lt, <)
+    AKR_ARR_BINOP_CMP(gt, >)
+    AKR_ARR_BINOP_CMP(le, <=)
+    AKR_ARR_BINOP_CMP(ge, >=)
+    AKR_ARR_BINOP_CMP(ne, !=)
+    AKR_ARR_BINOP_CMP(eq, ==)
+
+    template <typename T, int N, bool isMask, typename A = Array<T, N, isMask>, typename M = typename A::Mask>
+    inline A select(const Mask<T, N> &m, const Array<T, N, isMask> &x, const A &y) {
+        return A::select(m, x, y);
+    }
+    extern Array<float, 16> add_f32x12(const Array<float, 16> &a, const Array<float, 16> &b) { return a + 1.0f; }
+    extern Array<int, 16> add_i32x16(const Array<int, 16> &a, const Array<int, 16> &b) { return a & b; }
 } // namespace akari
 
-using namespace akari;
-
 int main() {
-    Array<int, 3> a(1, 2, 4);
-    Array<int, 3> c(77);
-    auto b = c + a;
-    printf("%s\n", typeid(ArrayBaseImplBase<int, 4, minmaxpow2(4)>).name());
-    // static_assert(adjusted_array_size(3) == 4);
-    // static_assert(sizeof(a) == sizeof(float) * 4);
-    (void)a;
-    printf("%zd %d %d %d\n", sizeof(a), c[0], c[1], c[2]);
-    printf("%zd %d %d %d\n", sizeof(a), a[0], a[1], a[2]);
-    printf("%zd %d %d %d\n", sizeof(a), b[0], b[1], b[2]);
+    using namespace akari;
+    Array<float, 6> a(10), b(20);
+    Array<float, 6> c;
+    for (int i = 0; i < 6; i++) {
+        c[i] = float(3 * i + 10);
+    }
+    for (int i = 0; i < 6; i++) {
+        printf("%f\n", c[i]);
+    }
+    auto m = c <= 14.0f;
+    for (int i = 0; i < 6; i++) {
+        printf("%f\n", m[i]);
+    }
+    a = select(m, a, b);
+    for (int i = 0; i < 6; i++) {
+        printf("%f\n", a[i]);
+    }
 }
