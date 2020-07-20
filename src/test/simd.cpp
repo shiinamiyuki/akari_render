@@ -28,10 +28,10 @@
 #include <cstdint>
 #include <cmath>
 namespace akari {
-    using std::min;
-    using std::max;
-    using std::floor;
     using std::ceil;
+    using std::floor;
+    using std::max;
+    using std::min;
     template <typename T, int N, bool isMask = false> struct Array;
     template <typename T, int N> constexpr bool vector_recursive_is_base_case() { return N <= 4; }
     template <typename T, int N, bool isMask, typename Derived, typename = void> struct ArrayImpl {};
@@ -52,7 +52,7 @@ namespace akari {
     Derived func(const Derived &rhs) const {                                                                           \
         std::array<T, N> r;                                                                                            \
         for (int i = 0; i < N; i++) {                                                                                  \
-            r[i] = arr[i] op rhs.arr[i];                                                                                 \
+            r[i] = arr[i] op rhs.arr[i];                                                                               \
         }                                                                                                              \
         return Derived(r);                                                                                             \
     }
@@ -65,26 +65,26 @@ namespace akari {
         AKR_FUNC1(or_, |)
         AKR_FUNC1(xor_, ^)
 #undef AKR_FUNC1
-#define AKR_FUNC0(func, f)                                                                                                \
+#define AKR_FUNC0(func, f)                                                                                             \
     Derived func() const {                                                                                             \
         std::array<T, N> r;                                                                                            \
         for (int i = 0; i < N; i++) {                                                                                  \
-            r[i] = f(arr[i]);                                                                                     \
+            r[i] = f(arr[i]);                                                                                          \
         }                                                                                                              \
         return Derived(r);                                                                                             \
     }
-        AKR_FUNC0(floor_,floor)
+        AKR_FUNC0(floor_, floor)
         AKR_FUNC0(ceil_, ceil)
-#define AKR_FUNC1(func, f)                                                                                                \
+#define AKR_FUNC1(func, f)                                                                                             \
     Derived func(const Derived &rhs) const {                                                                           \
         std::array<T, N> r;                                                                                            \
         for (int i = 0; i < N; i++) {                                                                                  \
-            r[i] = f(arr[i], rhs.arr[i]);                                                                         \
+            r[i] = f(arr[i], rhs.arr[i]);                                                                              \
         }                                                                                                              \
         return Derived(r);                                                                                             \
     }
-        AKR_FUNC1(min_,min)
-        AKR_FUNC1(max_,max)
+        AKR_FUNC1(min_, min)
+        AKR_FUNC1(max_, max)
 #undef AKR_FUNC1
 
         using Mask = typename ArrayMask<Derived>::type;
@@ -121,7 +121,7 @@ namespace akari {
     Derived func(const Derived &rhs) const {                                                                           \
         std::array<T, N> r;                                                                                            \
         for (int i = 0; i < N; i++) {                                                                                  \
-            r[i] = arr[i] op rhs.arr[i];                                                                                 \
+            r[i] = arr[i] op rhs.arr[i];                                                                               \
         }                                                                                                              \
         return Derived(r);                                                                                             \
     }
@@ -207,7 +207,7 @@ namespace akari {
         AKR_I32X4_FUNC(or_, _mm_or_ps)
         AKR_I32X4_FUNC(xor_, _mm_xor_ps)
 #undef AKR_I32X4_FUNC
-
+        using Mask = typename ArrayMask<Derived>::type;
 #define AKR_I32X4_FUNC(func, intrinsic)                                                                                \
     Derived func(const Derived &rhs) const { return Derived(intrinsic(mi, rhs._this().mi)); }
         AKR_I32X4_FUNC(add, _mm_add_epi32)
@@ -215,6 +215,14 @@ namespace akari {
         AKR_I32X4_FUNC(mul, _mm_mul_epi32)
         AKR_I32X4_FUNC(min_, _mm_min_epi32)
         AKR_I32X4_FUNC(max_, _mm_max_epi32)
+#define AKR_I32X4_CMP_FUNC(func, intrinsic)                                                                            \
+    Mask func(const Derived &rhs) const { return Mask(intrinsic(mi, rhs._this().mi)); }
+        AKR_I32X4_FUNC(lt, _mm_cmplt_epi32)
+        AKR_I32X4_FUNC(gt, _mm_cmpgt_epi32)
+        AKR_I32X4_FUNC(ne, _mm_cmpneq_epi32)
+        AKR_I32X4_FUNC(eq, _mm_cmpeq_epi32)
+        Mask ge(const Derived &rhs) const { return Mask(gt(rhs).or_(eq(rhs)).mi); }
+        Mask le(const Derived &rhs) const { return Mask(lt(rhs).or_(eq(rhs)).mi); }
 #define AKR_I32x4_SCALAR_FUNC(func, op)                                                                                \
     Derived func(const Derived &rhs) const {                                                                           \
         i32x4 r;                                                                                                       \
@@ -225,7 +233,7 @@ namespace akari {
     }
         AKR_I32x4_SCALAR_FUNC(div, /) AKR_I32x4_SCALAR_FUNC(mod, %)
 #undef AKR_I32X4_FUNC
-            static Derived select(const Derived &m, const Derived &x, const Derived &y) {
+            static Derived select(const Mask &m, const Derived &x, const Derived &y) {
             return Derived(_mm_blendv_ps(y._this().m, x._this().m, m.m));
         }
     };
@@ -327,8 +335,8 @@ namespace akari {
         // using Mask = Array<T, N, true>;
         using ArrayImpl<T, N, isMask, Array<T, N, isMask>>::ArrayImpl;
         Array(const Base &b) : Base(b) {}
-        T& operator [](int i){return reinterpret_cast<T*>(this)[i];}
-        const T& operator [](int i)const{return reinterpret_cast<T*>(this)[i];}
+        T &operator[](int i) { return reinterpret_cast<T *>(this)[i]; }
+        const T &operator[](int i) const { return reinterpret_cast<T *>(this)[i]; }
 #define GEN_ACCESS(name, idx)                                                                                          \
     const T &name() const {                                                                                            \
         static_assert(N > idx);                                                                                        \
@@ -418,20 +426,20 @@ namespace akari {
 
 int main() {
     using namespace akari;
-    Array<float, 6> a(10), b(20);
-    Array<float, 6> c;
+    Array<int, 6> a(10), b(20);
+    Array<int, 6> c;
     for (int i = 0; i < 6; i++) {
-        c[i] = float(3 * i + 10);
+        c[i] = int(3 * i + 10);
     }
     for (int i = 0; i < 6; i++) {
-        printf("%f\n", c[i]);
+        printf("%d\n", c[i]);
     }
-    auto m = c <= 14.0f;
+    auto m = c <= 14;
     for (int i = 0; i < 6; i++) {
-        printf("%f\n", m[i]);
+        printf("%d\n", m[i]);
     }
     a = select(m, a, b);
     for (int i = 0; i < 6; i++) {
-        printf("%f\n", a[i]);
+        printf("%d\n", a[i]);
     }
 }
