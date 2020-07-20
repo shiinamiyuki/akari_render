@@ -47,6 +47,11 @@ namespace akari {
                 arr[i] = v;
             }
         }
+        template <typename U, typename D> explicit ArrayImpl(const ArrayImpl<T, N, false, D> &rhs) {
+            for (int i = 0; i < N; i++) {
+                arr[i] = T(rhs[i]);
+            }
+        }
         ArrayImpl(const std::array<T, N> &arr) : arr(arr) {}
 #define AKR_FUNC1(func, op)                                                                                            \
     Derived func(const Derived &rhs) const {                                                                           \
@@ -61,6 +66,8 @@ namespace akari {
         AKR_FUNC1(mul, *)
         AKR_FUNC1(div, /)
         AKR_FUNC1(mod, %)
+        AKR_FUNC1(shl, <<)
+        AKR_FUNC1(shr, >>)
         AKR_FUNC1(and_, &)
         AKR_FUNC1(or_, |)
         AKR_FUNC1(xor_, ^)
@@ -415,7 +422,14 @@ namespace akari {
     AKR_ARR_BINOP_CMP(ge, >=)
     AKR_ARR_BINOP_CMP(ne, !=)
     AKR_ARR_BINOP_CMP(eq, ==)
-
+    template <typename T, int N> inline Array<T, N> floor(const Array<T, N> &a) { return a.floor_(); }
+    template <typename T, int N> inline Array<T, N> ceil(const Array<T, N> &a) { return a.ceil_(); }
+    template <typename T, int N> inline Array<T, N> min(const Array<T, N> &a, const Array<T, N> &b) {
+        return a.min_(b);
+    }
+    template <typename T, int N> inline Array<T, N> max(const Array<T, N> &a, const Array<T, N> &b) {
+        return a.max_(b);
+    }
     template <typename T, int N, bool isMask, typename A = Array<T, N, isMask>, typename M = typename A::Mask>
     inline A select(const Mask<T, N> &m, const Array<T, N, isMask> &x, const A &y) {
         return A::select(m, x, y);
