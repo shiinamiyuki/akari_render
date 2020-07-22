@@ -23,7 +23,8 @@
 #ifndef AKARIRENDER_RESOURCE_H
 #define AKARIRENDER_RESOURCE_H
 
-#include <akari/core/component.h>
+#include <akari/core/akari.h>
+#include <akari/core/platform.h>
 #include <akari/core/error.hpp>
 
 namespace akari {

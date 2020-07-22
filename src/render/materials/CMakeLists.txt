@@ -1,6 +1,0 @@
-add_plugin(MatteMaterial matte.cpp)
-add_plugin(GlassMaterial glass_material.cpp)
-add_plugin(MirrorMaterial mirror_material.cpp)
-add_plugin(DisneyMaterial disney.cpp)
-target_link_libraries(DisneyMaterial FloatTexture)
-add_plugin(MixedMaterial mixed.cpp)

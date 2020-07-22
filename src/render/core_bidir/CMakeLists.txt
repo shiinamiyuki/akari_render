@@ -1,1 +1,0 @@
-add_plugin(AkariCoreBidir core_bidir.cpp)

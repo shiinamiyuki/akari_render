@@ -1,4 +1,4 @@
- // MIT License
+// MIT License
 //
 // Copyright (c) 2020 椎名深雪
 //
@@ -20,70 +20,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#pragma warning(disable : 4819)
-#include <cxxopts.hpp>
-#include <fstream>
-#include <akari/core/application.h>
-#include <akari/core/logger.h>
-#include <akari/render/scene_graph.h>
-
-using namespace akari;
-
-static std::string inputFilename;
-
-void parse(int argc, char **argv) {
-    try {
-        cxxopts::Options options("akari", " - AkariRender Command Line Interface");
-        options.positional_help("input output").show_positional_help();
-        {
-            auto opt = options.allow_unrecognised_options().add_options();
-            opt("i,input", "Input Scene Description File", cxxopts::value<std::string>());
-            opt("help", "Show this help");
-        }
-        options.parse_positional({"input"});
-        auto result = options.parse(argc, argv);
-        if (!result.count("input")) {
-            fatal("Input file must be provided\n");
-            std::cout << options.help() << std::endl;
-            exit(0);
-        }
-        if (result.arguments().empty() || result.count("help")) {
-            std::cout << options.help() << std::endl;
-            exit(0);
-        }
-        inputFilename = result["input"].as<std::string>();
-    } catch (const cxxopts::OptionException &e) {
-        std::cout << "error parsing options: " << e.what() << std::endl;
-        exit(1);
-    }
-}
-int main(int argc, char **argv) {
-    Application app;
-    parse(argc, argv);
-    try {
-        CurrentPathGuard _guard;
-        fs::current_path(fs::absolute(fs::path(inputFilename)).parent_path());
-        inputFilename = fs::path(inputFilename).filename().string();
-        std::shared_ptr<SceneGraph> graph;
-        {
-            info("Loading {}\n", inputFilename);
-            std::ifstream in(inputFilename);
-            std::string str((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-            json data = str.empty() ? json::object() : json::parse(str);
-
-            graph = std::make_shared<SceneGraph>(serialize::load_from_json<SceneGraph>(data));
-        }
-        graph->commit();
-        info("Start Rendering ...\n");
-        for (size_t i = 0; i < graph->render.size(); i++) {
-            auto task = graph->create_render_task(i);
-            task->start();
-            task->wait();
-            auto film = task->film_update();
-            film->write_image(graph->render[i].output);
-        }
-    } catch (std::exception &e) {
-        fatal("Exception: {}", e.what());
-        exit(1);
-    }
+int main () {
+    
 }

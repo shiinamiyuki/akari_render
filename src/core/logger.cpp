@@ -23,6 +23,8 @@
 #include <akari/core/logger.h>
 #include <chrono>
 #include <mutex>
+#include <cstdio>
+#include <vector>
 
 namespace akari {
     class DefaultLogger : public Logger {

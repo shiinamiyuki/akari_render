@@ -23,9 +23,9 @@
 #include <akari/core/akari.h>
 #include <akari/core/application.h>
 #include <akari/core/parallel.h>
-#include <akari/core/plugin.h>
+
 
 namespace akari {
-    Application::Application() { get_plugin_manager();}
+    Application::Application() {}
     Application::~Application() { ThreadPoolFinalize(); }
 } // namespace akari

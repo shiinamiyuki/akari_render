@@ -1,1 +1,0 @@
-add_plugin(RandomSampler random.cpp)

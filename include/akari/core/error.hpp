@@ -28,12 +28,14 @@
 #include <memory>
 #include <variant>
 #include <optional>
+#include <cstring>
 
 namespace akari {
     struct Error {
         explicit Error(const char *msg) {
             _message = std::unique_ptr<char[]>(new char[strlen(msg) + 1]);
-            strcpy(_message.get(), msg);
+            std::memcpy(_message.get(), msg, strlen(msg));
+            _message.get()[strlen(msg)] = 0;
         }
         explicit Error(const std::string &msg) : Error(msg.c_str()) {}
         const char *what() const { return _message.get(); }

@@ -26,7 +26,6 @@
 #include <list>
 #include <vector>
 #include <akari/core/akari.h>
-#include <akari/core/component.h>
 #include <akari/core/math.h>
 #include <akari/core/spectrum.h>
 
@@ -85,19 +84,17 @@ namespace akari {
         using TImage<std::pair<RGBSpectrum, float>>::TImage;
     };
 
-    class AKR_EXPORT PostProcessor : public Component {
+    class AKR_EXPORT PostProcessor {
       public:
         virtual void process(const RGBAImage &in, RGBAImage &out) const = 0;
     };
     class IdentityProcessor : public PostProcessor {
       public:
-        AKR_DECL_COMP()
         void process(const RGBAImage &in, RGBAImage &out) const override { out = in; }
     };
     class AKR_EXPORT GammaCorrection : public PostProcessor {
 
       public:
-        AKR_DECL_COMP()
         explicit GammaCorrection() {}
         void process(const RGBAImage &in, RGBAImage &out) const override;
     };
@@ -106,7 +103,6 @@ namespace akari {
         std::list<std::shared_ptr<PostProcessor>> pipeline;
 
       public:
-        AKR_DECL_COMP()
         void Add(const std::shared_ptr<PostProcessor> &p) { pipeline.emplace_back(p); }
         void process(const RGBAImage &in, RGBAImage &out) const override {
             RGBAImage tmp;
