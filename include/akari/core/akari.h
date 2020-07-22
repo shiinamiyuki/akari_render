@@ -96,6 +96,10 @@ namespace akari {
         }                                                                                                              \
     } while (0)
 
+    template<typename T, typename U>
+    std::shared_ptr<U> dyn_cast(const std::shared_ptr<T> & p){
+        return std::dynamic_pointer_cast<U>(p);
+    }
 //    using Float = float;
 } // namespace akari
 #endif // AKARIRENDER_AKARI_H

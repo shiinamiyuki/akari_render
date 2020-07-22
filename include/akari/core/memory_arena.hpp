@@ -25,18 +25,16 @@
 #include <cstddef>
 #include <cstdint>
 #include <list>
-namespace akari{
+namespace akari {
     class MemoryArena {
-        static constexpr size_t align16(size_t x) {
-            return (x + 15ULL) & (~15ULL);
-        }
+        static constexpr size_t align16(size_t x) { return (x + 15ULL) & (~15ULL); }
 
         struct Block {
             size_t size;
             uint8_t *data;
 
             Block(uint8_t *data, size_t size) : size(size), data(data) {
-//                log::log("???\n");
+                //                log::log("???\n");
             }
 
             ~Block() = default;
@@ -46,29 +44,29 @@ namespace akari{
 
         size_t currentBlockPos = 0;
         Block currentBlock;
-      public:
-        MemoryArena():currentBlock(new uint8_t[262144], 262144) {
-        }
 
-        template<typename T, typename ... Args>
-        T *allocN(size_t count, Args&&... args) {
+      public:
+        static constexpr size_t DEFAULT_BLOCK_SIZE = 262144ull;
+        MemoryArena() : currentBlock(new uint8_t[DEFAULT_BLOCK_SIZE], DEFAULT_BLOCK_SIZE) {}
+
+        template <typename T, typename... Args> T *allocN(size_t count, Args &&... args) {
             typename std::list<Block>::iterator iter;
             auto allocSize = sizeof(T) * count;
 
-            uint8_t  * p = nullptr;
-            if(currentBlockPos + allocSize > currentBlock.size){
+            uint8_t *p = nullptr;
+            if (currentBlockPos + allocSize > currentBlock.size) {
                 usedBlocks.emplace_front(currentBlock);
                 currentBlockPos = 0;
-                for(iter = availableBlocks.begin();iter!=availableBlocks.end();iter++){
-                    if(iter->size >= allocSize){
+                for (iter = availableBlocks.begin(); iter != availableBlocks.end(); iter++) {
+                    if (iter->size >= allocSize) {
                         currentBlockPos = allocSize;
                         currentBlock = *iter;
                         availableBlocks.erase(iter);
                         break;
                     }
                 }
-                if(iter == availableBlocks.end()) {
-                    auto sz = std::max<size_t>(allocSize, 262144ull);
+                if (iter == availableBlocks.end()) {
+                    auto sz = std::max<size_t>(allocSize, DEFAULT_BLOCK_SIZE);
                     currentBlock = Block(new uint8_t[sz], sz);
                 }
             }
@@ -76,14 +74,13 @@ namespace akari{
             currentBlockPos += allocSize;
             if constexpr (!std::is_trivially_constructible_v<T>) {
                 for (size_t i = 0; i < count; i++) {
-                    new(p + i * sizeof(T)) T(std::forward<Args>(args)...);
+                    new (p + i * sizeof(T)) T(std::forward<Args>(args)...);
                 }
             }
             return reinterpret_cast<T *>(p);
         }
 
-        template<typename T, typename ... Args>
-        T *alloc(Args&&... args) {
+        template <typename T, typename... Args> T *alloc(Args &&... args) {
             return allocN<T>(1, std::forward<Args>(args)...);
         }
 
@@ -93,14 +90,14 @@ namespace akari{
         }
 
         ~MemoryArena() {
-            delete [] currentBlock.data;
-            for (auto i: availableBlocks) {
-                delete[]i.data;
+            delete[] currentBlock.data;
+            for (auto i : availableBlocks) {
+                delete[] i.data;
             }
-            for (auto i:usedBlocks) {
+            for (auto i : usedBlocks) {
                 delete[] i.data;
             }
         }
     };
-}
+} // namespace akari
 #endif // AKARIRENDER_MEMORYARENA_HPP

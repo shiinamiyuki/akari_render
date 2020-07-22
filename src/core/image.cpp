@@ -77,7 +77,6 @@ namespace akari {
       public:
         std::shared_ptr<RGBAImage> read(const fs::path &path) override {
             info("Loading {}\n", path.string());
-            auto inv_gamma = [](float x) { return std::pow(x, 2.2f); };
             std::shared_ptr<RGBAImage> image;
             int x, y, channel;
             auto ext = path.extension().string();
