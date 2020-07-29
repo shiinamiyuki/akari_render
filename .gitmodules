@@ -6,10 +6,7 @@
 	url = https://github.com/jarro2783/cxxopts
 [submodule "external/oidn"]
 	path = external/oidn
-	url = https://github.com/OpenImageDenoise/oidn.git
-[submodule "external/asmjit"]
-	path = external/asmjit
-	url = https://github.com/asmjit/asmjit
+	url = https://github.com/OpenImageDenoise/oidn.git	
 [submodule "external/magic_enum"]
 	path = external/magic_enum
 	url = https://github.com/Neargye/magic_enum

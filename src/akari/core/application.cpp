@@ -20,9 +20,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <core/akari.h>
-#include <core/application.h>
-#include <core/parallel.h>
+#include <akari/core/akari.h>
+#include <akari/core/application.h>
+#include <akari/core/parallel.h>
 
 
 namespace akari {

@@ -22,8 +22,8 @@
 
 #include <mutex>
 #include <fmt/format.h>
-#include <core/resource.h>
-#include <core/image.hpp>
+#include <akari/core/resource.h>
+#include <akari/core/image.hpp>
 
 namespace akari{
 

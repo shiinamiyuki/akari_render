@@ -20,11 +20,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <core/image.hpp>
+#include <akari/core/image.hpp>
 #include <memory>
-#include <core/logger.h>
-#include <core/parallel.h>
-#include <core/spectrum.h>
+#include <akari/core/logger.h>
+#include <akari/core/parallel.h>
+#include <akari/core/spectrum.h>
 #include <mutex>
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
