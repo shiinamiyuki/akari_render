@@ -24,13 +24,13 @@
 #define AKARIRENDER_MATH_H
 
 #include <json.hpp>
-#include <akari/core/config.h>
+#include <core/config.h>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
 
-#include <akari/core/config.h>
-#include <akari/core/platform.h>
+#include <core/config.h>
+#include <core/platform.h>
 
 namespace akari::math {
     using namespace glm;
@@ -230,8 +230,6 @@ namespace akari {
             return tmp * tmp * x;
         }
     }
-
-    inline vec3 face_forward(const vec3 &n, const vec3 &w) { return dot(n, w) < 0 ? -n : n; }
 
     inline vec3 spherical_to_xyz(Float sinTheta, Float cosTheta, Float phi) {
         return vec3(sinTheta * std::cos(phi), cosTheta, sinTheta * std::sin(phi));

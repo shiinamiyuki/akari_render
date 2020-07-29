@@ -20,7 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/core/logger.h>
+#include <core/logger.h>
 #include <chrono>
 #include <mutex>
 #include <cstdio>

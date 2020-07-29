@@ -20,16 +20,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef AKARIRENDER_APPLICATION_H
-#define AKARIRENDER_APPLICATION_H
+#include <core/akari.h>
+#include <core/application.h>
+#include <core/parallel.h>
 
-#include <akari/core/platform.h>
+
 namespace akari {
-    class AKR_EXPORT Application {
-      public:
-        Application();
-        ~Application();
-    };
-
+    Application::Application() {}
+    Application::~Application() { ThreadPoolFinalize(); }
 } // namespace akari
-#endif // AKARIRENDER_APPLICATION_H

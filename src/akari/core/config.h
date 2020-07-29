@@ -23,7 +23,7 @@
 #ifndef AKARIRENDER_CONFIG_H
 #define AKARIRENDER_CONFIG_H
 
-#include <akari/core/platform.h>
+#include <core/platform.h>
 #include <stddef.h>
 #define AKR_USE_SIMD
 

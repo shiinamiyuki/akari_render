@@ -23,9 +23,9 @@
 #ifndef AKARIRENDER_RESOURCE_H
 #define AKARIRENDER_RESOURCE_H
 
-#include <akari/core/akari.h>
-#include <akari/core/platform.h>
-#include <akari/core/error.hpp>
+#include <core/akari.h>
+#include <core/platform.h>
+#include <core/error.hpp>
 
 namespace akari {
     class AKR_EXPORT Resource {

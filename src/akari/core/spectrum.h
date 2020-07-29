@@ -24,7 +24,7 @@
 #define AKARIRENDER_SPECTRUM_H
 
 #include <json.hpp>
-#include <akari/core/math.h>
+#include <core/math.h>
 
 namespace akari {
     template <size_t N> struct CoefficientSpectrum : public vec<N, float, defaultp> {
@@ -161,6 +161,6 @@ namespace akari {
     inline RGBSpectrum srgb_to_linear(const RGBSpectrum & s){
         return RGBSpectrum(srgb_to_linear(s.x),srgb_to_linear(s.y),srgb_to_linear(s.z));
     }
-
+ 
 } // namespace akari
 #endif // AKARIRENDER_SPECTRUM_H

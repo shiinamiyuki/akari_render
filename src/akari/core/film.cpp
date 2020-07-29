@@ -20,16 +20,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/core/config.h>
-#include <mutex>
-#include <thread>
+#include <core/film.h>
+
 namespace akari {
-    AKR_EXPORT Config *GetConfig() {
-        static Config config;
-        static std::once_flag flag;
-        std::call_once(flag, [&]() { config.NumCore = std::thread::hardware_concurrency(); });
-        return &config;
-    }
-    AKR_EXPORT Float Eps() { return 1e-4f; }
-    AKR_EXPORT  Float ShadowEps() { return 1e-4f; }
-} // namespace akari
+
+
+}

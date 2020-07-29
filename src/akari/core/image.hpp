@@ -25,9 +25,9 @@
 
 #include <list>
 #include <vector>
-#include <akari/core/akari.h>
-#include <akari/core/math.h>
-#include <akari/core/spectrum.h>
+#include <core/akari.h>
+#include <core/math.h>
+#include <core/spectrum.h>
 
 namespace akari {
     template <class T> class TImage {
