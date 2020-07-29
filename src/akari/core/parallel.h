@@ -23,8 +23,8 @@
 #ifndef AKARIRENDER_PARALLEL_HPP
 #define AKARIRENDER_PARALLEL_HPP
 
-#include <core/config.h>
-#include <core/math.h>
+#include <akari/core/config.h>
+#include <akari/core/math.h>
 #include <atomic>
 #include <functional>
 

@@ -24,13 +24,13 @@
 #define AKARIRENDER_MATH_H
 
 #include <json.hpp>
-#include <core/config.h>
+#include <akari/core/config.h>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
 
-#include <core/config.h>
-#include <core/platform.h>
+#include <akari/core/config.h>
+#include <akari/core/platform.h>
 
 namespace akari::math {
     using namespace glm;

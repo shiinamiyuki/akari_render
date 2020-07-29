@@ -21,7 +21,7 @@
 // SOFTWARE.
 #pragma once
 #include <type_traits>
-#include <core/akari.h>
+#include <akari/core/akari.h>
 namespace akari {
     template <typename... T> struct TypeIndex {
         template <typename U, typename Tp, typename... Rest> struct GetIndex_ {
@@ -84,7 +84,7 @@ namespace akari {
     case N:                                                                                                            \
         if constexpr (N < nTypes) {                                                                                    \
             using ty = typename Index::template GetType<N>::type;                                                      \
-            return visitor(*reinterpret_cast<ty *>(data));                                                              \
+            return visitor(*reinterpret_cast<ty *>(data));                                                             \
         };
 #define _GEN_CASES_2()                                                                                                 \
     _GEN_CASE_N(0)                                                                                                     \
