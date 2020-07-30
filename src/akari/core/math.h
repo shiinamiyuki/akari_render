@@ -23,33 +23,7 @@
 #ifndef AKARIRENDER_MATH_H
 #define AKARIRENDER_MATH_H
 
-#include <json.hpp>
-#include <akari/core/config.h>
-#include <glm/gtc/matrix_inverse.hpp>
-#include <glm/gtc/matrix_transform.hpp>
 
-
-#include <akari/core/config.h>
-#include <akari/core/platform.h>
-
-namespace akari::math {
-    using namespace glm;
-
-} // namespace akari::math
-
-namespace glm {
-    template <int N, typename T, qualifier Q> void from_json(const nlohmann::json &j, glm::vec<N, T, Q> &vec) {
-        for (int i = 0; i < N; i++) {
-            vec[i] = j[i].get<T>();
-        }
-    }
-
-    template <int N, typename T, qualifier Q> void to_json(nlohmann::json &j, const glm::vec<N, T, Q> &vec) {
-        for (int i = 0; i < N; i++) {
-            j[i] = vec[i];
-        }
-    }
-} // namespace glm
 
 namespace akari {
     using namespace math;
@@ -212,7 +186,7 @@ namespace akari {
         vec3 T, B;
     };
 
-    template <typename V, typename V2> inline V Interpolate(const V &v0, const V &v1, const V &v2, const V2 &uv) {
+    template <typename V, typename V2> inline V interpolate(const V &v0, const V &v1, const V &v2, const V2 &uv) {
         return (1.0f - uv.x - uv.y) * v0 + uv.x * v1 + uv.y * v2;
     }
     template<typename V>

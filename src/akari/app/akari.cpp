@@ -19,7 +19,40 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+#include <akari/common/math.hpp>
+int main() {
+    using Vector3f = akari::Vector<float, 3>;
+    using Vector4f = akari::Vector<float, 4>;
+    using Point3f = akari::Point<float, 3>;
+    // auto v = Vector3f(1.0);
+    // auto p = Point3f(0);
+    // auto p2 = v + p;
+    // v = Vector3f(sin(v));
+    using Matrix4f = akari::Matrix<float, 4>;
+    Matrix4f m(2.0);
+    m = m + m;
+    m(2,3) = 10.0;
+    // using namespace akari;
 
-int main () {
-    
+    // static_assert(sizeof(Array<Array<float, 4>, 4>) == sizeof(float[4][4]));
+    auto minv = inverse(m);
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++) {
+            printf("%f ", m(i, j));
+        }
+        putchar('\n');
+    }
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++) {
+            printf("%f ", minv(i, j));
+        }
+        putchar('\n');
+    }
+    auto id = m * minv;
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++) {
+            printf("%f ", id(i, j));
+        }
+        putchar('\n');
+    }
 }

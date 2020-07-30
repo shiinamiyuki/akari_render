@@ -64,6 +64,7 @@ set(AKR_CORE_EXT_LIBS ${AKR_CORE_EXT_LIBS} fmt)
 ##set(AKR_CORE_EXT_LIBS ${AKR_CORE_EXT_LIBS} embree embree_sse42 embree_avx embree_avx2 lexers math simd tasking sys)
 #
 
+file(GLOB AKR_COMMON_SRC src/akari/common/*.*)
 file(GLOB AKR_CORE_SRC src/akari/core/*.* )
 add_library(akari_core ${AKR_CORE_SRC})
 target_link_libraries(akari_core  ${AKR_CORE_EXT_LIBS})
@@ -74,4 +75,5 @@ file(GLOB AKR_KERNEL_SRC src/akari/kernel/*.* src/akari/kernel/*/*.*)
 
 
 add_executable(akari src/akari/app/akari.cpp)
-target_link_libraries(akari akari_core)
+target_include_directories(akari PUBLIC src/)
+# target_link_libraries(akari akari_core)

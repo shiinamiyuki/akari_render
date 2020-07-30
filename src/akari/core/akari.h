@@ -65,12 +65,10 @@ namespace akari {
 
 #include <functional>
 #include <string_view>
+#include <akari/common/panic.hpp>
 
 namespace akari {
-    [[noreturn]] inline void panic(const char *file, int line, const char *msg) {
-        fprintf(stderr, "PANIC at %s:%d: %s\n", file, line, msg);
-        abort();
-    }
+    
 
     struct CurrentPathGuard {
         fs::path _cur;
@@ -82,19 +80,7 @@ namespace akari {
         NonCopyable(const NonCopyable&) = delete;
         NonCopyable & operator=(const NonCopyable&) = delete;
     };
-#define AKR_PANIC(msg) panic(__FILE__, __LINE__, msg)
-#define AKR_CHECK(expr)                                                                                              \
-    do {                                                                                                               \
-        if (!(expr)) {                                                                                                 \
-            fprintf(stderr, #expr " not satisfied at %s:%d\n", __FILE__, __LINE__);                                    \
-        }                                                                                                              \
-    } while (0)
-#define AKR_ASSERT(expr)                                                                                             \
-    do {                                                                                                               \
-        if (!(expr)) {                                                                                                 \
-            AKR_PANIC(#expr " not satisfied");                                                                       \
-        }                                                                                                              \
-    } while (0)
+
 
     template<typename T, typename U>
     std::shared_ptr<U> dyn_cast(const std::shared_ptr<T> & p){
