@@ -21,35 +21,57 @@
 // SOFTWARE.
 #include <cstdint>
 #include <cstddef>
+
 namespace akari {
+    // AkariRender needs a bit of retargeting capability
+    // like different types of Spectrum
+    // float vs double
+    // however vectorization is not supported
+
 #define AKR_VARIANT template <typename Float, typename Spectrum>
 
     template <typename Float, int N> struct Vector;
     template <typename Float, int N> struct Point;
     template <typename Float, int N> struct Normal;
-    template <typename Float> struct Matrix4;
+    template <typename Float, int N> struct Matrix;
+
+    template <typename Float> struct Transform;
+    template <typename Vector> struct Frame;
+
+    template <typename T> struct scalar_ { using type = T; };
+    template <typename T, int N> struct scalar_<Vector<T, N>> { using type = T; };
+    template <typename T, int N> struct scalar_<Point<T, N>> { using type = T; };
+    template <typename T, int N> struct scalar_<Normal<T, N>> { using type = T; };
+    template <typename T> using scalar_t = typename scalar_<T>::type;
     template <typename T, typename S> struct replace_scalar_ { using type = S; };
     template <typename T, int N, typename S> struct replace_scalar_<Vector<T, N>, S> { using type = Vector<S, N>; };
     template <typename T, int N, typename S> struct replace_scalar_<Point<T, N>, S> { using type = Point<S, N>; };
     template <typename T, int N, typename S> struct replace_scalar_<Normal<T, N>, S> { using type = Normal<S, N>; };
-    template <typename T, typename S> struct replace_scalar_<Matrix4<T>, S> { using type = Matrix4<S>; };
+    template <typename T, int N, typename S> struct replace_scalar_<Matrix<T, N>, S> { using type = Matrix<S, N>; };
     template <typename T, typename S> using replace_scalar_t = typename replace_scalar_<T, S>::type;
-    template <typename T> using int32_array_t = replace_scalar_t<T, int32_t>;
-    template <typename T> using uint32_array_t = replace_scalar_t<T, uint32_t>;
-    template <typename T> using int64_array_t = replace_scalar_t<T, uint64_t>;
-    template <typename T> using uint64_array_t = replace_scalar_t<T, uint64_t>;
-    template <typename T> using uint32_array_t = replace_scalar_t<T, uint32_t>;
-    template <typename T> using float32_array_t = replace_scalar_t<T, float>;
-    template <typename T> using float64_array_t = replace_scalar_t<T, double>;
+    // template <typename T>
+    // using int32_array_t = replace_scalar_t<T, int32_t>;
+    // template <typename T>
+    // using uint32_array_t = replace_scalar_t<T, uint32_t>;
+    // template <typename T>
+    // using int64_array_t = replace_scalar_t<T, uint64_t>;
+    // template <typename T>
+    // using uint64_array_t = replace_scalar_t<T, uint64_t>;
+    // template <typename T>
+    // using uint32_array_t = replace_scalar_t<T, uint32_t>;
+    // template <typename T>
+    // using float32_array_t = replace_scalar_t<T, float>;
+    // template <typename T>
+    // using float64_array_t = replace_scalar_t<T, double>;
 
-    AKR_VARIANT struct CoreAliases {
-        using Int8 = replace_scalar_t<Float, int8_t>;
-        using Int32 = int32_array_t<Float>;
-        using UInt32 = uint32_array_t<Float>;
-        using Int64 = int64_array_t<Float>;
-        using UInt64 = uint64_array_t<Float>;
-        using Float32 = float32_array_t<Float>;
-        using Float64 = float64_array_t<Float>;
+    template <typename Float> struct CoreAliases {
+        using Int8 = int8_t;
+        using Int32 = int32_t;
+        using UInt32 = uint32_t;
+        using Int64 = int64_t;
+        using UInt64 = uint64_t;
+        using Float32 = float;
+        using Float64 = double;
 
         using Vector1i = Vector<Int32, 1>;
         using Vector2i = Vector<Int32, 2>;
@@ -94,7 +116,78 @@ namespace akari {
         using Normal3f = Normal<Float, 3>;
         using Normal3d = Normal<Float64, 3>;
 
-        // using Matrix4f = 
+        using Matrix2f = Matrix<Float, 2>;
+        using Matrix2d = Matrix<Float64, 2>;
+        using Matrix3f = Matrix<Float, 3>;
+        using Matrix3d = Matrix<Float64, 3>;
+        using Matrix4f = Matrix<Float, 4>;
+        using Matrix4d = Matrix<Float64, 4>;
+
+        using Frame3f = Frame<Vector3f>;
+        using Transform3f = Transform<Float>;
+    };
+
+#define AKR_IMPORT_CORE_TYPES_PREFIX(Float_, prefix)                                                                   \
+    using prefix##CoreAliases = akari::CoreAliases<Float_>;                                                            \
+    using prefix##Int8 = typename prefix##CoreAliases::Int8;                                                           \
+    using prefix##Int32 = typename prefix##CoreAliases::Int32;                                                         \
+    using prefix##UInt32 = typename prefix##CoreAliases::UInt32;                                                       \
+    using prefix##Int64 = typename prefix##CoreAliases::Int64;                                                         \
+    using prefix##UInt64 = typename prefix##CoreAliases::UInt64;                                                       \
+    using prefix##Float32 = typename prefix##CoreAliases::Float32;                                                     \
+    using prefix##Float64 = typename prefix##CoreAliases::Float64;                                                     \
+    using prefix##Vector1i = typename prefix##CoreAliases::Vector1i;                                                   \
+    using prefix##Vector2i = typename prefix##CoreAliases::Vector2i;                                                   \
+    using prefix##Vector3i = typename prefix##CoreAliases::Vector3i;                                                   \
+    using prefix##Vector4i = typename prefix##CoreAliases::Vector4i;                                                   \
+    using prefix##Vector1u = typename prefix##CoreAliases::Vector1u;                                                   \
+    using prefix##Vector2u = typename prefix##CoreAliases::Vector2u;                                                   \
+    using prefix##Vector3u = typename prefix##CoreAliases::Vector3u;                                                   \
+    using prefix##Vector4u = typename prefix##CoreAliases::Vector4u;                                                   \
+    using prefix##Vector1f = typename prefix##CoreAliases::Vector1f;                                                   \
+    using prefix##Vector2f = typename prefix##CoreAliases::Vector2f;                                                   \
+    using prefix##Vector3f = typename prefix##CoreAliases::Vector3f;                                                   \
+    using prefix##Vector4f = typename prefix##CoreAliases::Vector4f;                                                   \
+    using prefix##Vector1d = typename prefix##CoreAliases::Vector1d;                                                   \
+    using prefix##Vector2d = typename prefix##CoreAliases::Vector2d;                                                   \
+    using prefix##Vector3d = typename prefix##CoreAliases::Vector3d;                                                   \
+    using prefix##Vector4d = typename prefix##CoreAliases::Vector4d;                                                   \
+    using prefix##Point1i = typename prefix##CoreAliases::Point1i;                                                     \
+    using prefix##Point2i = typename prefix##CoreAliases::Point2i;                                                     \
+    using prefix##Point3i = typename prefix##CoreAliases::Point3i;                                                     \
+    using prefix##Point4i = typename prefix##CoreAliases::Point4i;                                                     \
+    using prefix##Point1u = typename prefix##CoreAliases::Point1u;                                                     \
+    using prefix##Point2u = typename prefix##CoreAliases::Point2u;                                                     \
+    using prefix##Point3u = typename prefix##CoreAliases::Point3u;                                                     \
+    using prefix##Point4u = typename prefix##CoreAliases::Point4u;                                                     \
+    using prefix##Point1f = typename prefix##CoreAliases::Point1f;                                                     \
+    using prefix##Point2f = typename prefix##CoreAliases::Point2f;                                                     \
+    using prefix##Point3f = typename prefix##CoreAliases::Point3f;                                                     \
+    using prefix##Point4f = typename prefix##CoreAliases::Point4f;                                                     \
+    using prefix##Point1d = typename prefix##CoreAliases::Point1d;                                                     \
+    using prefix##Point2d = typename prefix##CoreAliases::Point2d;                                                     \
+    using prefix##Point3d = typename prefix##CoreAliases::Point3d;                                                     \
+    using prefix##Point4d = typename prefix##CoreAliases::Point4d;                                                     \
+    using prefix##Normal3f = typename prefix##CoreAliases::Normal3f;                                                   \
+    using prefix##Normal3d = typename prefix##CoreAliases::Normal3d;                                                   \
+    using prefix##Matrix2f = typename prefix##CoreAliases::Matrix2f;                                                   \
+    using prefix##Matrix2d = typename prefix##CoreAliases::Matrix2d;                                                   \
+    using prefix##Matrix3f = typename prefix##CoreAliases::Matrix3f;                                                   \
+    using prefix##Matrix3d = typename prefix##CoreAliases::Matrix3d;                                                   \
+    using prefix##Matrix4f = typename prefix##CoreAliases::Matrix4f;                                                   \
+    using prefix##Matrix4d = typename prefix##CoreAliases::Matrix4d;                                                   \
+    using prefix##Frame3f = typename prefix##CoreAliases::Frame3f;                                                     \
+    using prefix##Transform3f = typename prefix##CoreAliases::Transform3f;
+
+#define AKR_IMPORT_CORE_TYPES() AKR_IMPORT_CORE_TYPES_PREFIX(Float, )
+
+    AKR_VARIANT struct Ray;
+
+    template <typename Float_, typename Spectrum_> struct RenderAliases {
+        using Float = Float_;
+        using Spectrum = Spectrum_;
+
+        using Ray3f = Ray<Float, Spectrum>;
     };
 
 } // namespace akari

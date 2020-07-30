@@ -24,18 +24,22 @@ int main() {
     using Vector3f = akari::Vector<float, 3>;
     using Vector4f = akari::Vector<float, 4>;
     using Point3f = akari::Point<float, 3>;
-    // auto v = Vector3f(1.0);
-    // auto p = Point3f(0);
-    // auto p2 = v + p;
-    // v = Vector3f(sin(v));
+    using Normal3f = akari::Normal<float, 3>;
+    auto v = Vector3f(1.0);
+    auto p = Point3f(0);
+    auto p2 = v + p;
+    v = (sin(v));
     using Matrix4f = akari::Matrix<float, 4>;
     Matrix4f m(2.0);
     m = m + m;
-    m(2,3) = 10.0;
-    // using namespace akari;
-
+    m(2, 3) = 10.0;
+    using namespace akari;
+    using Frame3f = Frame<Vector3f>;
+    Frame3f f(Normal3f(normalize(v)));
+    Transform<float> transform(m);
+    transform *v;
     // static_assert(sizeof(Array<Array<float, 4>, 4>) == sizeof(float[4][4]));
-    auto minv = inverse(m);
+    auto minv = m.inverse();
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
             printf("%f ", m(i, j));

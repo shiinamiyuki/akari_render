@@ -124,7 +124,7 @@ namespace akari {
     Array operator op(const Array &rhs) const {                                                                        \
         Array self;                                                                                                    \
         for (int i = 0; i < N; i++) {                                                                                  \
-            self[i] = (*this)[i] op rhs[i];                                                                               \
+            self[i] = (*this)[i] op rhs[i];                                                                            \
         }                                                                                                              \
         return self;                                                                                                   \
     }                                                                                                                  \
@@ -155,6 +155,8 @@ namespace akari {
             }
             return s;
         }
+        friend T length(const Array &a) { return sqrt(dot(a, a)); }
+        friend Array normalize(const Array &a) { return a / sqrt(dot(a, a)); }
     }; // namespace detail
 
 #define FWD_MATH_FUNC1(name)                                                                                           \
@@ -212,24 +214,32 @@ namespace akari {
     AKR_ARRAY_IMPORT_ARITH_OP(%, %=, Base, Self)                                                                       \
     friend Self operator*(const Self::value_t &v, const Self &rhs) { return Self(v) * rhs; }                           \
     friend Array operator/(const Self::value_t &v, const Self &rhs) { return Self(v) / rhs; }                          \
-    Self operator-() const { return Self(-static_cast<const Base &>(*this)); }
+    Self operator-() const { return Self(-static_cast<const Base &>(*this)); }                                         \
+    Self &operator=(const Base &base) {                                                                                \
+        static_cast<Base &>(*this) = base;                                                                             \
+        return *this;                                                                                                  \
+    }                                                                                                                  \
+    Self(const Base &base) : Base(base) {}
 
     template <typename Value, int N> struct Vector : Array<Value, N> {
         using Base = Array<Value, N>;
         using Base::Base;
         using value_t = Value;
+        static constexpr size_t size = N;
         AKR_ARRAY_IMPORT(Base, Vector)
     };
     template <typename Value, int N> struct Point : Array<Value, N> {
         using Base = Array<Value, N>;
         using Base::Base;
         using value_t = Value;
+        static constexpr size_t size = N;
         AKR_ARRAY_IMPORT(Base, Point)
     };
     template <typename Value, int N> struct Normal : Array<Value, N> {
         using Base = Array<Value, N>;
         using Base::Base;
         using value_t = Value;
+        static constexpr size_t size = N;
         AKR_ARRAY_IMPORT(Base, Normal)
     };
 
@@ -256,7 +266,7 @@ namespace akari {
     }
 
     template <typename V, typename V2> inline V lerp3(const V &v0, const V &v1, const V &v2, const V2 &uv) {
-        return (1.0f - uv.x - uv.y) * v0 + uv.x * v1 + uv.y * v2;
+        return (1.0f - uv.x() - uv.y()) * v0 + uv.x() * v1 + uv.y() * v2;
     }
 
     template <typename Float, int N> struct Matrix {
@@ -283,9 +293,16 @@ namespace akari {
             }
             return r;
         }
-        Matrix operator+(const Matrix &rhs) { return Matrix(rows + rhs.rows); }
-        Matrix operator-(const Matrix &rhs) { return Matrix(rows - rhs.rows); }
-        Matrix operator*(const Matrix &rhs) {
+        Matrix operator+(const Matrix &rhs) const { return Matrix(rows + rhs.rows); }
+        Matrix operator-(const Matrix &rhs) const { return Matrix(rows - rhs.rows); }
+        Array<Float, N> operator*(const Array<Float, N> &v) const {
+            Array<Float, N> r;
+            for (int i = 0; i < N; i++) {
+                r[i] = dot(row(i), v);
+            }
+            return r;
+        }
+        Matrix operator*(const Matrix &rhs) const {
             Matrix m;
             for (int i = 0; i < N; i++) {
                 for (int j = 0; j < N; j++) {
@@ -294,8 +311,18 @@ namespace akari {
             }
             return m;
         }
-        friend Matrix inverse(const Matrix &m) {
+        Matrix transpose() const {
+            Matrix m;
+            for (int i = 0; i < N; i++) {
+                for (int j = 0; j < N; j++) {
+                    m(i, j) = (*this)(j, i);
+                }
+            }
+            return m;
+        }
+        Matrix inverse() const {
             // from pbrt
+            auto &m = *this;
             int indxc[N], indxr[N];
             int ipiv[N] = {0};
             Float minv[N][N];
@@ -355,4 +382,89 @@ namespace akari {
             return Matrix(minv);
         }
     };
+
+    template <typename T> Vector<T, 3> cross(const Vector<T, 3> &v1, const Vector<T, 3> &v2) {
+        T v1x = v1.x(), v1y = v1.y(), v1z = v1.z();
+        T v2x = v2.x(), v2y = v2.y(), v2z = v2.z();
+        return Vector<T, 3>((v1y * v2z) - (v1z * v2y), (v1z * v2x) - (v1x * v2z), (v1x * v2y) - (v1y * v2x));
+    }
+    template <typename T> Normal<T, 3> cross(const Normal<T, 3> &v1, const Normal<T, 3> &v2) {
+        T v1x = v1.x(), v1y = v1.y(), v1z = v1.z();
+        T v2x = v2.x(), v2y = v2.y(), v2z = v2.z();
+        return Normal<T, 3>((v1y * v2z) - (v1z * v2y), (v1z * v2x) - (v1x * v2z), (v1x * v2y) - (v1y * v2x));
+    }
+    AKR_VARIANT struct Ray {
+        // Float time = 0.0f;
+        AKR_IMPORT_CORE_TYPES()
+        Point3f o;
+        Vector3f d;
+        Float tmin, tmax;
+        Ray(const Point3f &o, const Vector3f &d, Float tmin, Float tmax = = std::numeric_limits<Float>::infinity())
+            : o(o), d(d), tmin(tmin), tmax(tmax) {}
+        Point3f operator()(Float t) const { return o + t * d; }
+    };
+
+    template <typename Vector> struct Frame {
+        using Value = typename Vector::value_t;
+        using Vector3f = Vector;
+        using Normal3f = Normal<Value, 3>;
+        Frame() = default;
+        static inline void compute_local_frame(const Normal3f &v1, Vector3f *v2, Vector3f *v3) {
+            if (std::abs(v1.x()) > std::abs(v1.y()))
+                *v2 = Vector3f(-v1.z(), (0), v1.x()) / std::sqrt(v1.x() * v1.x() + v1.z() * v1.z());
+            else
+                *v2 = Vector3f((0), v1.z(), -v1.y()) / std::sqrt(v1.y() * v1.y() + v1.z() * v1.z());
+            *v3 = normalize(cross(Vector3f(v1), *v2));
+        }
+        explicit Frame(const Normal3f &v) : normal(v) { compute_local_frame(v, &T, &B); }
+
+        [[nodiscard]] Vector3f world_to_local(const Vector3f &v) const {
+            return Vector3f(dot(T, v), dot(normal, v), dot(B, v));
+        }
+
+        [[nodiscard]] Vector3f local_to_world(const Vector3f &v) const {
+            return Vector3f(v.x() * T + v.y() * Vector3f(normal) + v.z() * B);
+        }
+
+        Normal3f normal;
+        Vector3f T, B;
+    };
+
+    template <typename Float> struct Transform {
+        AKR_IMPORT_CORE_TYPES()
+        Matrix4f m, minv;
+        Matrix3f m3, m3inv;
+        Transform(const Matrix4f &m) : Transform(m, m.inverse()) {}
+        Transform(const Matrix4f &m, const Matrix4f &minv) : m(m), minv(minv) {
+            for (int i = 0; i < 3; i++) {
+                for (int j = 0; j < 3; j++) {
+                    m3(i, j) = m(i, j);
+                }
+            }
+            m3inv = m3.inverse();
+        }
+        Transform inverse() const { return Transform(minv, m); }
+        Point3f operator*(const Point3f &p) const {
+            Vector4f v(p.x(), p.y(), p.z(), 1.0);
+            v = m * v;
+            Point3f q(v.x(), v.y(), v.z());
+            if (v.w() != 1.0) {
+                q /= v.w();
+            }
+            return q;
+        }
+        Transform operator*(const Transform &t) const { return Transform(m * t.m); }
+        Vector3f operator*(const Vector3f &v) const { return m3 * v; }
+        Normal3f operator*(const Normal3f &n) const { return m3inv.transpose() * n; }
+        template <typename Spectrum> Ray<Float, Spectrum> operator*(const Ray<Float, Spectrum> &ray) const {
+            using Ray3f = Ray<Float, Spectrum>;
+            auto &T = *this;
+            auto d2 = T * ray.d;
+            auto len1 = dot(ray.d, ray.d);
+            auto len2 = dot(d2, d2);
+            auto scale = len2 / len1;
+            return Ray3f(T * ray.o, d2, ray.tmin * scale, ray.tmax * scale);
+        }
+    };
+
 } // namespace akari
