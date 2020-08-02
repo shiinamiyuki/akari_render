@@ -21,7 +21,7 @@
 // SOFTWARE.
 #pragma once
 #include <type_traits>
-#include <akari/core/akari.h>
+
 namespace akari {
     template <typename... T> struct TypeIndex {
         template <typename U, typename Tp, typename... Rest> struct GetIndex_ {
@@ -49,42 +49,85 @@ namespace akari {
     };
     template <typename T> struct SizeOf<T> { static constexpr int value = sizeof(T); };
 
-    template <typename... T> struct TaggedPointer {
+    template <typename... T> struct Variant {
         static constexpr int nTypes = sizeof...(T);
-        void *data = nullptr;
+        static constexpr std::size_t alignment_value = std::max({alignof(T)...});
+        typename std::aligned_storage<SizeOf<T...>::value, alignment_value>::type data;
         int index = -1;
         using Index = TypeIndex<T...>;
 
-        TaggedPointer() = default;
-        TaggedPointer(std::nullptr_t) = delete;
-        template <typename U> TaggedPointer(U *p) {
-            static_assert(Index::template GetIndex<U>::value != -1, "U is not in T...");
-            data = p;
+        Variant() = default;
+
+        template <typename U, typename = std::enable_if_t<Index::template GetIndex<U>::value != -1, void>>
+        Variant(const U &u) {
+            new (&data) U(u);
             index = Index::template GetIndex<U>::value;
         }
 
-        template <typename U> TaggedPointer &TaggedPointer = (U * p) {
+        Variant(const Variant &v) : index(v.index) {
+            v.accept([&](const auto &item) {
+                using U = std::decay_t<decltype(item)>;
+                new (&data) U(item);
+            });
+        }
+
+        Variant &operator=(const Variant &v) noexcept {
+            if (this == &v)
+                return *this;
+            if (index != -1)
+                _drop();
+            index = v.index;
+            auto that = this;
+            v.accept([&](const auto &item) {
+                using U = std::decay_t<decltype(item)>;
+                *that->template get<U>() = item;
+            });
+            return *this;
+        }
+
+        Variant(Variant &&v) noexcept : index(v.index) {
+            index = v.index;
+            v.index = -1;
+            std::memcpy(&data, &v.data, sizeof(data));
+        }
+
+        Variant &operator=(Variant &&v) noexcept {
+            if (index != -1)
+                _drop();
+            index = v.index;
+            v.index = -1;
+            std::memcpy(&data, &v.data, sizeof(data));
+            return *this;
+        }
+
+        template <typename U> Variant &operator=(const U &u) {
+            if (index != -1) {
+                _drop();
+            }
             static_assert(Index::template GetIndex<U>::value != -1, "U is not in T...");
-            data = p;
+            new (&data) U(u);
             index = Index::template GetIndex<U>::value;
             return *this;
         }
 
-        template <typename U> bool isa() const {
+        template <typename U> U *get() {
             static_assert(Index::template GetIndex<U>::value != -1, "U is not in T...");
-            return Index::template GetIndex<U>::value == index;
+            return Index::template GetIndex<U>::value != index ? nullptr : reinterpret_cast<U *>(&data);
         }
 
-        template <typename U> U *cast() const {
+        template <typename U> const U *get() const {
             static_assert(Index::template GetIndex<U>::value != -1, "U is not in T...");
-            return Index::template GetIndex<U>::value != index ? nullptr : reinterpret_cast<U *>(data);
+            return Index::template GetIndex<U>::value != index ? nullptr : reinterpret_cast<U *>(&data);
         }
 
 #define _GEN_CASE_N(N)                                                                                                 \
     case N:                                                                                                            \
         if constexpr (N < nTypes) {                                                                                    \
             using ty = typename Index::template GetType<N>::type;                                                      \
-            return visitor(*reinterpret_cast<ty *>(data));                                                             \
+            if constexpr (std::is_const_v<std::remove_pointer_t<decltype(this)>>)                                      \
+                return visitor(*reinterpret_cast<const ty *>(&data));                                                  \
+            else                                                                                                       \
+                return visitor(*reinterpret_cast<ty *>(&data));                                                        \
         };
 #define _GEN_CASES_2()                                                                                                 \
     _GEN_CASE_N(0)                                                                                                     \
@@ -110,6 +153,25 @@ namespace akari {
     _GEN_CASE_N(14)                                                                                                    \
     _GEN_CASE_N(15)
 
+        template <class Visitor> auto accept(Visitor &&visitor) {
+            using Ret = std::invoke_result_t<Visitor, typename FirstOf<T...>::type &>;
+            static_assert(nTypes <= 16, "too many types");
+            if constexpr (nTypes <= 2) {
+                switch (index) { _GEN_CASES_2(); }
+            } else if constexpr (nTypes <= 4) {
+                switch (index) { _GEN_CASES_4(); }
+            } else if constexpr (nTypes <= 8) {
+                switch (index) { _GEN_CASES_8(); }
+            } else if constexpr (nTypes <= 16) {
+                switch (index) { _GEN_CASES_16(); }
+            }
+            if constexpr (std::is_same_v<void, Ret>) {
+                return;
+            } else {
+                return Ret();
+            }
+        }
+
         template <class Visitor> auto accept(Visitor &&visitor) const {
             using Ret = std::invoke_result_t<Visitor, const typename FirstOf<T...>::type &>;
             static_assert(nTypes <= 16, "too many types");
@@ -128,15 +190,26 @@ namespace akari {
                 return Ret();
             }
         }
-#undef _GEN_CASE_N
-#undef _GEN_CASES_2
-#undef _GEN_CASES_4
-#undef _GEN_CASES_8
-#undef _GEN_CASES_16
-    };
-#define TAGGED_DISPATCH(method, ...)                                                                                   \
+
+        ~Variant() {
+            if (index != -1)
+                _drop();
+        }
+
+      private:
+        void _drop() {
+            auto *that = this; // prevent gcc ICE
+            accept([=](auto &&self) {
+                using U = std::decay_t<decltype(self)>;
+                that->template get<U>()->~U();
+            });
+        }
+
+#define VAR_DISPATCH(method, ...)                                                                                      \
     return accept([&, this](auto &&self) {                                                                             \
         (void)this;                                                                                                    \
         return self.method(__VA_ARGS__);                                                                               \
     });
+    };
+
 } // namespace akari

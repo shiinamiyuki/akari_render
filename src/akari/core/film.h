@@ -26,48 +26,43 @@
 #include "spectrum.h"
 #include <akari/core/image.hpp>
 #include <akari/core/parallel.h>
+#include <akari/common/fwd.hpp>
 
 namespace akari {
-    struct Pixel {
+    AKR_VARIANT struct Pixel {
         Spectrum radiance = Spectrum(0);
         Float weight = 0;
     };
-    struct SplatPixel {
-        std::array<AtomicFloat, 3> color;
-        static_assert(sizeof(AtomicFloat) == sizeof(float));
-        float _padding{};
-    };
-    static_assert(sizeof(SplatPixel) == 4 * sizeof(float));
-    const size_t TileSize = 16;
-    struct Tile {
+    constexpr size_t TileSize = 16;
+    AKR_VARIANT struct Tile {
+        AKR_IMPORT_CORE_TYPES()
         Bounds2i bounds{};
-        ivec2 _size;
+        Point2i _size;
         std::vector<Pixel> pixels;
 
         explicit Tile(const Bounds2i &bounds)
             : bounds(bounds), _size(bounds.size() + ivec2(2, 2)), pixels(_size.x * _size.y) {}
 
-        auto &operator()(const vec2 &p) {
+        auto &operator()(const Point2f &p) {
             auto q = ivec2(floor(p + vec2(0.5) - vec2(bounds.p_min) + vec2(1)));
             return pixels[q.x + q.y * _size.x];
         }
 
-        const auto &operator()(const vec2 &p) const {
+        const auto &operator()(const Point2f &p) const {
             auto q = ivec2(floor(p + vec2(0.5) - vec2(bounds.p_min) + vec2(1)));
             return pixels[q.x + q.y * _size.x];
         }
 
-        void add_sample(const vec2 &p, const Spectrum &radiance, Float weight) {
+        void add_sample(const Point2f &p, const Spectrum &radiance, Float weight) {
             auto &pix = (*this)(p);
             pix.weight += weight;
             pix.radiance += radiance;
         }
     };
 
-    class Film {
+    AKR_VARIANT class Film {
         TImage<Spectrum> radiance;
-        TImage<float> weight;
-        TImage<SplatPixel> splat;
+        TImage<Float> weight;
 
       public:
         Float splatScale = 1.0f;

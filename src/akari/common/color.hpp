@@ -19,10 +19,18 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-#pragma once
-#include <akari/common/fwd.hpp>
-namespace akari {
-    AKR_VARIANT struct Ray{
 
+#pragma once
+
+#include <akari/common/fwd.hpp>
+
+namespace akari {
+    template <typename Float, int N> struct Color : Array<Float, N> {
+        using Base = Array<Float, N>;
+        using Base::Base;
+        using value_t = Value;
+        static constexpr size_t size = N;
+        AKR_ARRAY_IMPORT(Base, Color)
     };
-}
+
+} // namespace akari

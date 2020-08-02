@@ -34,6 +34,7 @@ namespace akari {
     template <typename Float, int N> struct Point;
     template <typename Float, int N> struct Normal;
     template <typename Float, int N> struct Matrix;
+    template <typename Float, int N> struct Color;
 
     template <typename Float> struct Transform;
     template <typename Vector> struct Frame;
@@ -49,6 +50,17 @@ namespace akari {
     template <typename T, int N, typename S> struct replace_scalar_<Normal<T, N>, S> { using type = Normal<S, N>; };
     template <typename T, int N, typename S> struct replace_scalar_<Matrix<T, N>, S> { using type = Matrix<S, N>; };
     template <typename T, typename S> using replace_scalar_t = typename replace_scalar_<T, S>::type;
+
+    template<typename T>
+    struct array_size{static constexpr size_t value = 1;}
+    template<typename T, int N>
+    struct array_size<Point<T, N>>{static constexpr size_t value = N;}
+    template<typename T, int N>
+    struct array_size<Vector<T, N>>{static constexpr size_t value = N;}
+    template<typename T, int N>
+    struct array_size<Normal<T, N>>{static constexpr size_t value = N;}
+    template<typename T>
+    constexpr auto array_size_v = array_size<T>::value;
     // template <typename T>
     // using int32_array_t = replace_scalar_t<T, int32_t>;
     // template <typename T>
@@ -72,6 +84,9 @@ namespace akari {
         using UInt64 = uint64_t;
         using Float32 = float;
         using Float64 = double;
+
+        using Color1f = Color<Float, 1>;
+        using Color3f = Color<Float, 3>;
 
         using Vector1i = Vector<Int32, 1>;
         using Vector2i = Vector<Int32, 2>;
@@ -177,17 +192,37 @@ namespace akari {
     using prefix##Matrix4f = typename prefix##CoreAliases::Matrix4f;                                                   \
     using prefix##Matrix4d = typename prefix##CoreAliases::Matrix4d;                                                   \
     using prefix##Frame3f = typename prefix##CoreAliases::Frame3f;                                                     \
-    using prefix##Transform3f = typename prefix##CoreAliases::Transform3f;
+    using prefix##Transform3f = typename prefix##CoreAliases::Transform3f;                                             \
+    using prefix##Color1f = typename prefix##CoreAliases::Color1f;                                                     \
+    using prefix##Color3f = typename prefix##CoreAliases::Color3f;
 
 #define AKR_IMPORT_CORE_TYPES() AKR_IMPORT_CORE_TYPES_PREFIX(Float, )
 
     AKR_VARIANT struct Ray;
+    AKR_VARIANT class Film;
+    AKR_VARIANT struct Pixel;
+    AKR_VARIANT struct Tile;
 
-    template <typename Float_, typename Spectrum_> struct RenderAliases {
+    template <typename Float_, typename Spectrum_> struct KernelAliases {
         using Float = Float_;
         using Spectrum = Spectrum_;
-
         using Ray3f = Ray<Float, Spectrum>;
     };
+#define AKR_IMPORT_KNL_TYPES()                                                                                         \
+    AKR_IMPORT_CORE_TYPES()                                                                                            \
+    using KernelAliases = akari::KernelAliases<Float, Spectrum>;                                                       \
+    using Ray3f = KernelAliases::Ray3f;
 
+    template <typename Float_, typename Spectrum_> struct HostAliases {
+        using Float = Float_;
+        using Spectrum = Spectrum_;
+        using Film = akari::Film<Float, Spectrum>;
+        using Tile = akari::Tile<Float, Spectrum>;
+        using Pixel = akari::Pixel<Float, Spectrum>;
+    };
+#define AKR_IMPORT_HOST_TYPE()                                                                                         \
+    AKR_IMPORT_CORE_TYPES()                                                                                            \
+    using HostAliases = akari::HostAliases<Float, Spectrum>;                                                           \
+    using Film = HostAliases::Film;                                                                                    \
+    using Tile = HostAliases::Tile;
 } // namespace akari

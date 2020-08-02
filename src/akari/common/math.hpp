@@ -28,7 +28,7 @@
 #include <algorithm>
 #include <cstring>
 namespace akari {
-
+    template <typename Float> struct Constants { constexpr Float Inf = std::numeric_limits<Float>::infinity(); };
     template <typename T, size_t N, int packed> constexpr int compute_padded_size() {
         if (!std::is_fundamental_v<T>) {
             return N;
@@ -137,7 +137,25 @@ namespace akari {
         GEN_ARITH_OP(*, *=)
         GEN_ARITH_OP(/, /=)
         GEN_ARITH_OP(%, %=)
+        GEN_ARITH_OP(&, &=)
+        GEN_ARITH_OP(|, |=)
+        GEN_ARITH_OP(^, ^=)
 #undef GEN_ARITH_OP
+#define GEN_CMP_OP(op)                                                                                                 \
+    Array<bool, N> operator op(const Array &rhs) const {                                                               \
+        Array<bool, N> r;                                                                                              \
+        for (int i = 0; i < N; i++) {                                                                                  \
+            r[i] = (*this)[i] op rhs[i];                                                                               \
+        }                                                                                                              \
+        return r;                                                                                                      \
+    }
+        GEN_CMP_OP(==)
+        GEN_CMP_OP(!=)
+        GEN_CMP_OP(<=)
+        GEN_CMP_OP(>=)
+        GEN_CMP_OP(<)
+        GEN_CMP_OP(>)
+#undef GEN_CMP_OP
         friend Array operator*(const T &v, const Array &rhs) { return Array(v) * rhs; }
         friend Array operator/(const T &v, const Array &rhs) { return Array(v) / rhs; }
         Array operator-() const {
@@ -155,8 +173,42 @@ namespace akari {
             }
             return s;
         }
+        template <class F> friend T reduce(const Array &a, F &&f) {
+            T acc = a[0];
+            for (int i = 1; i < N; i++) {
+                acc = f(acc, a[i]);
+            }
+            return acc;
+        }
+        friend T hsum(const Array &a) {
+            return reduce(a, [](T acc, T b) { return acc + b; });
+        }
+        friend T hprod(const Array &a) {
+            return reduce(a, [](T acc, T b) { return acc * b; });
+        }
+        friend T hmin(const Array &a) {
+            return reduce(a, [](T acc, T b) { return min(acc, b); });
+        }
+        friend T hmax(const Array &a) {
+            return reduce(a, [](T acc, T b) { return max(acc, b); });
+        }
+        friend bool any(const Array &a) {
+            return reduce(a, [](T acc, T b) { return acc || (bool)a; });
+        }
+        friend bool all(const Array &a) {
+            return reduce(a, [](T acc, T b) { return acc && (bool)a; });
+        }
         friend T length(const Array &a) { return sqrt(dot(a, a)); }
         friend Array normalize(const Array &a) { return a / sqrt(dot(a, a)); }
+        template <typename T, T... args> auto shuffle(const Array &a) {
+            constexpr T pack[] = {args...};
+            static_assert(... && (args < N));
+            Array<T, sizeof...(args)> s;
+            for (int i = 0; i < sizeof...(args); i++) {
+                s[i] = a[pack[i]];
+            }
+            return s;
+        }
     }; // namespace detail
 
 #define FWD_MATH_FUNC1(name)                                                                                           \
@@ -195,6 +247,8 @@ namespace akari {
     FWD_MATH_FUNC1(atan)
     FWD_MATH_FUNC2(atan2)
     FWD_MATH_FUNC2(pow)
+    FWD_MATH_FUNC2(min)
+    FWD_MATH_FUNC2(max)
 
 #undef FWD_MATH_FUNC1
 #undef FWD_MATH_FUNC2
@@ -464,6 +518,47 @@ namespace akari {
             auto len2 = dot(d2, d2);
             auto scale = len2 / len1;
             return Ray3f(T * ray.o, d2, ray.tmin * scale, ray.tmax * scale);
+        }
+    };
+
+    template <typename Point> struct BoundingBox {
+        using Float = value_t<Point>;
+        using N = array_size_v<Point>;
+        using Vector = akari::Vector<Float, N>;
+        Point pmin, pmax;
+        BoundingBox() { reset(); }
+        void reset() {
+            pmin = Point(Constants<Float>::Inf);
+            pmax = Point(-Constants<Float>::Inf);
+        }
+        Vector extents() const { return pmax - pmin; }
+        Vector offset(const Point &p) { return (p - pmin) / extents(); }
+        void expand(const Point &p) {
+            pmin = min(pmin, p);
+            pmax = max(pmax, p);
+        }
+        static BoundingBox merge(const BoundingBox &b1, const BoundingBox &b2) {
+            return BoundingBox(min(b1.pmin, b2.pmin), max(p1.pmax, b2.pmax));
+        }
+        Point centroid() const { return extents() * 0.5f + p_min; }
+        T surface_area() const {
+            if constexpr (N == 3) {
+                auto ext = extents();
+                return hsum(shuffle<1, 2, 0>(ext) * ext) * Float(2);
+            } else {
+                auto ext = extents();
+                Float result = Float(0);
+                for (size_t i = 0; i < N; ++i) {
+                    Float term = Float(1);
+                    for (size_t j = 0; j < N; ++j) {
+                        if (i == j)
+                            continue;
+                        term *= ext[j];
+                    }
+                    result += term;
+                }
+                return result * Float(2);
+            }
         }
     };
 
