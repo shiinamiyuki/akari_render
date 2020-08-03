@@ -35,22 +35,22 @@ namespace akari {
     };
     constexpr size_t TileSize = 16;
     AKR_VARIANT struct Tile {
-        AKR_IMPORT_CORE_TYPES()
+        AKR_IMPORT_TYPES(Pixel)
         Bounds2i bounds{};
         Point2i _size;
         std::vector<Pixel> pixels;
 
         explicit Tile(const Bounds2i &bounds)
-            : bounds(bounds), _size(bounds.size() + ivec2(2, 2)), pixels(_size.x * _size.y) {}
+            : bounds(bounds), _size(bounds.size() + Point2f(2, 2)), pixels(_size.x() * _size.y()) {}
 
         auto &operator()(const Point2f &p) {
-            auto q = ivec2(floor(p + vec2(0.5) - vec2(bounds.p_min) + vec2(1)));
-            return pixels[q.x + q.y * _size.x];
+            auto q = Point2i(floor(p + Point2f(0.5) - Point2f(bounds.p_min) + Point2f(1)));
+            return pixels[q.x() + q.y() * _size.x()];
         }
 
         const auto &operator()(const Point2f &p) const {
-            auto q = ivec2(floor(p + vec2(0.5) - vec2(bounds.p_min) + vec2(1)));
-            return pixels[q.x + q.y * _size.x];
+            auto q = Point2i(floor(p + Point2f(0.5) - Point2f(bounds.p_min) + Point2f(1)));
+            return pixels[q.x() + q.y() * _size.x()];
         }
 
         void add_sample(const Point2f &p, const Spectrum &radiance, Float weight) {
@@ -63,21 +63,21 @@ namespace akari {
     AKR_VARIANT class Film {
         TImage<Spectrum> radiance;
         TImage<Float> weight;
-
+        AKR_IMPORT_TYPES(Tile, Pixel)
       public:
         Float splatScale = 1.0f;
-        explicit Film(const ivec2 &dimension) : radiance(dimension), weight(dimension), splat(dimension) {}
+        explicit Film(const Point2i &dimension) : radiance(dimension), weight(dimension), splat(dimension) {}
         Tile tile(const Bounds2i &bounds) { return Tile(bounds); }
 
-        [[nodiscard]] ivec2 resolution() const { return radiance.resolution(); }
+        [[nodiscard]] Point2i resolution() const { return radiance.resolution(); }
 
-        [[nodiscard]] Bounds2i bounds() const { return Bounds2i{ivec2(0), resolution()}; }
+        [[nodiscard]] Bounds2i bounds() const { return Bounds2i{Point2i(0), resolution()}; }
         void merge_tile(const Tile &tile) {
-            const auto lo = max(tile.bounds.p_min - ivec2(1, 1), ivec2(0, 0));
-            const auto hi = min(tile.bounds.p_max + ivec2(1, 1), radiance.resolution());
-            for (int y = lo.y; y < hi.y; y++) {
-                for (int x = lo.x; x < hi.x; x++) {
-                    auto &pix = tile(vec2(x, y));
+            const auto lo = max(tile.bounds.p_min - Point2i(1, 1), Point2i(0, 0));
+            const auto hi = min(tile.bounds.p_max + Point2i(1, 1), radiance.resolution());
+            for (int y = lo.y(); y < hi.y(); y++) {
+                for (int x = lo.x(); x < hi.x(); x++) {
+                    auto &pix = tile(Point2f(x, y));
                     radiance(x, y) += pix.radiance;
                     weight(x, y) += pix.weight;
                 }
@@ -87,9 +87,9 @@ namespace akari {
         void write_image(const fs::path &path, const PostProcessor &postProcessor = GammaCorrection()) const {
             RGBAImage image(resolution());
             parallel_for(
-                    radiance.resolution().y,
+                    radiance.resolution().y(),
                     [&](uint32_t y, uint32_t) {
-                        for (int x = 0; x < radiance.resolution().x; x++) {
+                        for (int x = 0; x < radiance.resolution().x(); x++) {
                             Spectrum s =
                                     Spectrum(splat(x, y).color[0], splat(x, y).color[1], splat(x, y).color[2]) *
                                     splatScale;
@@ -105,7 +105,7 @@ namespace akari {
             default_image_writer()->write(image, path, postProcessor);
         }
 
-        void add_splat(const Spectrum &L, const vec2 &p) {
+        void add_splat(const Spectrum &L, const Point2f &p) {
             ivec2 ip = ivec2(p);
             splat(ip).color[0].add(L[0]);
             splat(ip).color[1].add(L[1]);

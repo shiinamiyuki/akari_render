@@ -69,9 +69,9 @@ add_custom_command(OUTPUT ${AKR_CONFIG_H}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     DEPENDS akari.conf resources/configure.py)
 
-file(GLOB AKR_COMMON_SRC src/akari/common/*.*  ${AKR_CONFIG_H})
-file(GLOB AKR_CORE_SRC src/akari/core/*.* )
-add_library(akari_core ${AKR_CORE_SRC})
+file(GLOB AKR_COMMON_SRC src/akari/common/*.*)
+file(GLOB AKR_CORE_SRC ${AKR_COMMON_SRC} src/akari/core/*.* )
+add_library(akari_core ${AKR_CORE_SRC} ${AKR_CONFIG_H})
 target_link_libraries(akari_core  ${AKR_CORE_EXT_LIBS})
 target_compile_options(akari_core PUBLIC ${AKR_CXX_FLAGS})
 target_include_directories(akari_core PUBLIC src/)

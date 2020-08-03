@@ -30,22 +30,22 @@
 namespace akari {
     template <typename Float> struct Constants { static constexpr Float Inf = std::numeric_limits<Float>::infinity(); };
     template <typename T, size_t N, int packed> constexpr int compute_padded_size() {
-        if (!std::is_fundamental_v<T>) {
+        if constexpr (!std::is_fundamental_v<T>) {
             return N;
         }
-        if (packed || N <= 2) {
+        if constexpr (packed || N <= 2) {
             return N;
         }
-        if (sizeof(T) == 1) {
+        if constexpr (sizeof(T) == 1) {
             // round to 128 bits
             return (N + 15u) & ~15u;
-        } else if (sizeof(T) == 2) {
+        } else if constexpr (sizeof(T) == 2) {
             // round to 128 bits
             return (N + 7u) & ~7u;
-        } else if (sizeof(T) == 4) {
+        } else if constexpr (sizeof(T) == 4) {
             // round to 128 bits
             return (N + 3u) & ~3u;
-        } else if (sizeof(T) == 8) {
+        } else if constexpr (sizeof(T) == 8) {
             // round to 128 bits
             return (N + 1u) & ~1u;
         } else {
@@ -53,10 +53,10 @@ namespace akari {
         }
     }
     template <typename T, size_t N, int packed> constexpr int compute_align() {
-        if (!std::is_fundamental_v<T>) {
+        if constexpr (!std::is_fundamental_v<T>) {
             return alignof(T);
         }
-        if (packed || N <= 2) {
+        if constexpr (packed || N <= 2) {
             return alignof(T);
         }
         return 128 / 32;
@@ -165,52 +165,61 @@ namespace akari {
             }
             return self;
         }
-
-        friend T dot(const Array &a1, const Array &a2) {
-            T s = a1[0] * a2[0];
-            for (int i = 1; i < N; i++) {
-                s += a1[i] * a2[i];
-            }
-            return s;
-        }
-        template <class F> friend T reduce(const Array &a, F &&f) {
-            T acc = a[0];
-            for (int i = 1; i < N; i++) {
-                acc = f(acc, a[i]);
-            }
-            return acc;
-        }
-        friend T hsum(const Array &a) {
-            return reduce(a, [](T acc, T b) { return acc + b; });
-        }
-        friend T hprod(const Array &a) {
-            return reduce(a, [](T acc, T b) { return acc * b; });
-        }
-        friend T hmin(const Array &a) {
-            return reduce(a, [](T acc, T b) { return min(acc, b); });
-        }
-        friend T hmax(const Array &a) {
-            return reduce(a, [](T acc, T b) { return max(acc, b); });
-        }
-        friend bool any(const Array &a) {
-            return reduce(a, [](T acc, T b) { return acc || (bool)a; });
-        }
-        friend bool all(const Array &a) {
-            return reduce(a, [](T acc, T b) { return acc && (bool)a; });
-        }
-        friend T length(const Array &a) { return sqrt(dot(a, a)); }
-        friend Array normalize(const Array &a) { return a / sqrt(dot(a, a)); }
-        template <typename T, T... args> auto shuffle(const Array &a) {
-            constexpr T pack[] = {args...};
-            static_assert(... && (args < N));
-            Array<T, sizeof...(args)> s;
-            for (int i = 0; i < sizeof...(args); i++) {
-                s[i] = a[pack[i]];
-            }
-            return s;
-        }
     }; // namespace detail
-
+    template <typename T, int N> T dot(const Array<T, N> &a1, const Array<T, N> &a2) {
+        T s = a1[0] * a2[0];
+        for (int i = 1; i < N; i++) {
+            s += a1[i] * a2[i];
+        }
+        return s;
+    }
+    template <typename T, int N, class F> T reduce(const Array<T, N> &a, F &&f) {
+        T acc = a[0];
+        for (int i = 1; i < N; i++) {
+            acc = f(acc, a[i]);
+        }
+        return acc;
+    }
+    template <typename T, int N> T hsum(const Array<T, N> &a) {
+        return reduce(a, [](T acc, T b) { return acc + b; });
+    }
+    template <typename T, int N> T hprod(const Array<T, N> &a) {
+        return reduce(a, [](T acc, T b) { return acc * b; });
+    }
+    template <typename T, int N> T hmin(const Array<T, N> &a) {
+        return reduce(a, [](T acc, T b) { return min(acc, b); });
+    }
+    template <typename T, int N> T hmax(const Array<T, N> &a) {
+        return reduce(a, [](T acc, T b) { return max(acc, b); });
+    }
+    template <typename T, int N> bool any(const Array<T, N> &a) {
+        return reduce(a, [](T acc, T b) { return acc || (bool)a; });
+    }
+    template <typename T, int N> bool all(const Array<T, N> &a) {
+        return reduce(a, [](T acc, T b) { return acc && (bool)a; });
+    }
+    template <typename T, int N> Array<T, N> clamp(const Array<T, N> &x, const Array<T, N> &lo, const Array<T, N> &hi) {
+        return max(min(x, hi), lo);
+    }
+    template <typename T, int N>
+    Array<T, N> select(const Array<bool, N> &x, const Array<T, N> &a, const Array<T, N> &b) {
+        Array<T, N> r;
+        for (int i = 0; i < N; i++) {
+            r[i] = x[i] ? a[i] : b[i];
+        }
+        return r;
+    }
+    template <typename T, int N> T length(const Array<T, N> &a) { return sqrt(dot(a, a)); }
+    template <typename T, int N> Array<T, N> normalize(const Array<T, N> &a) { return a / sqrt(dot(a, a)); }
+    template <int... args, typename T, int N> auto shuffle(const Array<T, N> &a) {
+        constexpr int pack[] = {args...};
+        static_assert(((args < N) && ...));
+        Array<T, sizeof...(args)> s;
+        for (int i = 0; i < sizeof...(args); i++) {
+            s[i] = a[pack[i]];
+        }
+        return s;
+    }
 #define FWD_MATH_FUNC1(name)                                                                                           \
     using std::name;                                                                                                   \
     template <typename V, int N, bool P> Array<V, N, P> _##name(const Array<V, N, P> &v) {                             \
@@ -249,7 +258,9 @@ namespace akari {
     FWD_MATH_FUNC2(pow)
     FWD_MATH_FUNC2(min)
     FWD_MATH_FUNC2(max)
-
+    template <typename V, int N, bool P> Array<V, N, P> pow(const Array<V, N, P> &v1, V p){
+        return pow(v1, Array<V, N, P>(p));
+    }
 #undef FWD_MATH_FUNC1
 #undef FWD_MATH_FUNC2
 #define AKR_ARRAY_IMPORT_ARITH_OP(op, assign_op, Base, Self)                                                           \
@@ -519,8 +530,37 @@ namespace akari {
             auto scale = len2 / len1;
             return Ray3f(T * ray.o, d2, ray.tmin * scale, ray.tmax * scale);
         }
+
+        Transform translate(const Vector3f &v) {
+            float m[] = {1, 0, 0, v.x(), 0, 1, 0, v.y(), 0, 0, 1, v.z(), 0, 0, 0, 1};
+            return Transform(Matrix4f(m));
+        }
+        static Transform scale(const Vector3f &s) {
+            float m[] = {s.x(), 0, 0, 0, 0, s.y(), 0, 0, 0, 0, s.z(), 0, 0, 0, 0, 1};
+            return Transform(Matrix4f(m));
+        }
+        static Transform rotate_x(Float theta) {
+            Float sinTheta = std::sin(theta);
+            Float cosTheta = std::cos(theta);
+            float m[] = {1, 0, 0, 0, 0, cosTheta, -sinTheta, 0, 0, sinTheta, cosTheta, 0, 0, 0, 0, 1};
+            return Transform(m, Matrix4f(m).transpose());
+        }
+
+        static Transform rotate_y(Float theta) {
+            Float sinTheta = std::sin(theta);
+            Float cosTheta = std::cos(theta);
+            float m[] = {cosTheta, 0, sinTheta, 0, 0, 1, 0, 0, -sinTheta, 0, cosTheta, 0, 0, 0, 0, 1};
+            return Transform(m, Matrix4f(m).transpose());
+        }
+
+        static Transform rotate_z(Float theta) {
+            Float sinTheta = std::sin(theta);
+            Float cosTheta = std::cos(theta);
+            float m[] = {cosTheta, -sinTheta, 0, 0, sinTheta, cosTheta, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+            return Transform(m, Matrix4f(m).transpose());
+        }
     };
-    
+
     template <typename Point> struct BoundingBox {
         using Float = value_t<Point>;
         static constexpr auto N = array_size_v<Point>;
@@ -532,6 +572,7 @@ namespace akari {
             pmax = Point(-Constants<Float>::Inf);
         }
         Vector extents() const { return pmax - pmin; }
+        Vector skze() const { return extents(); }
         Vector offset(const Point &p) { return (p - pmin) / extents(); }
         void expand(const Point &p) {
             pmin = min(pmin, p);
@@ -544,7 +585,7 @@ namespace akari {
         Float surface_area() const {
             if constexpr (N == 3) {
                 auto ext = extents();
-                return hsum(shuffle<1, 2, 0>(ext) * ext) * Float(2);
+                return hsum(akari::shuffle<1, 2, 0>(ext) * ext) * Float(2);
             } else {
                 auto ext = extents();
                 Float result = Float(0);

@@ -24,7 +24,6 @@
 #include <memory>
 #include <akari/core/logger.h>
 #include <akari/core/parallel.h>
-#include <akari/core/spectrum.h>
 #include <mutex>
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -32,8 +31,10 @@
 #include <stb_image_write.h>
 
 namespace akari {
+    using RGBSpectrum = Color<float, 3>;
     class DefaultImageWriter : public ImageWriter {
       public:
+        AKR_IMPORT_CORE_TYPES_WITH(float)
         bool write(const RGBAImage &_image, const fs::path &path, const PostProcessor &postProcessor) override {
             const auto ext = path.extension().string();
             RGBAImage image;
@@ -45,28 +46,28 @@ namespace akari {
                 texels.size(),
                 [&](uint32_t i, uint32_t) {
                     auto pixel = static_cast<uint8_t *>(&buffer[i * 3]);
-                    auto rgb = vec3(texels[i].first);
-                    rgb = clamp(rgb, vec3(0), vec3(1));
+                    auto rgb = Point3f(texels[i].first);
+                    rgb = clamp(rgb, Point3f(0), Point3f(1));
                     for (int comp = 0; comp < 3; comp++) {
                         pixel[comp] = (uint8_t)std::clamp<int>((int)std::round(rgb[comp] * 255.5), 0, 255);
                     }
                 },
                 1024u);
             if (ext == ".png")
-                return stbi_write_png(path.string().c_str(), dimension.x, dimension.y, 3, buffer.data(), 0);
+                return stbi_write_png(path.string().c_str(), dimension.x(), dimension.y(), 3, buffer.data(), 0);
             else if (ext == ".jpg")
-                return stbi_write_jpg(path.string().c_str(), dimension.x, dimension.y, 3, buffer.data(), 0);
+                return stbi_write_jpg(path.string().c_str(), dimension.x(), dimension.y(), 3, buffer.data(), 0);
             return false;
         }
     };
 
     void GammaCorrection::process(const RGBAImage &in, RGBAImage &out) const {
-        out.Resize(in.resolution());
+        out.resize(in.resolution());
         parallel_for(
-            in.resolution().y,
+            in.resolution().y(),
             [&](uint32_t y, uint32_t) {
-                for (int i = 0; i < in.resolution().x; i++)
-                    out(i, y) = std::make_pair(linear_to_srgb(in(i,y).first), in(i, y).second);
+                for (int i = 0; i < in.resolution().x(); i++)
+                    out(i, y) = std::make_pair(linear_to_srgb(in(i, y).first), in(i, y).second);
             },
             1024);
     }
@@ -75,6 +76,7 @@ namespace akari {
 
     class DefaultImageReader : public ImageReader {
       public:
+        AKR_IMPORT_CORE_TYPES_WITH(float)
         std::shared_ptr<RGBAImage> read(const fs::path &path) override {
             info("Loading {}\n", path.string());
             std::shared_ptr<RGBAImage> image;
@@ -82,18 +84,18 @@ namespace akari {
             auto ext = path.extension().string();
             if (ext == ".hdr") {
                 const float *data = stbi_loadf(path.string().c_str(), &x, &y, &channel, 3);
-                image = std::make_shared<RGBAImage>(ivec2(x, y));
+                image = std::make_shared<RGBAImage>(Point2i(x, y));
                 parallel_for(
-                    image->resolution().y,
+                    image->resolution().y(),
                     [=, &image](uint32_t y, uint32_t) {
-                        for (int x = 0; x < image->resolution().x; x++) {
+                        for (int x = 0; x < image->resolution().x(); x++) {
                             RGBSpectrum rgb;
                             if (channel == 1) {
-                                rgb = RGBSpectrum(data[x + y * image->resolution().x]);
+                                rgb = RGBSpectrum(data[x + y * image->resolution().x()]);
                             } else {
-                                rgb[0] = data[3 * (x + y * image->resolution().x) + 0];
-                                rgb[1] = data[3 * (x + y * image->resolution().x) + 1];
-                                rgb[2] = data[3 * (x + y * image->resolution().x) + 2];
+                                rgb[0] = data[3 * (x + y * image->resolution().x()) + 0];
+                                rgb[1] = data[3 * (x + y * image->resolution().x()) + 1];
+                                rgb[2] = data[3 * (x + y * image->resolution().x()) + 2];
                             }
                             (*image)(x, y) = std::make_pair(rgb, 1.0f);
                         }
@@ -101,18 +103,18 @@ namespace akari {
                     128);
             } else {
                 const auto *data = stbi_load(path.string().c_str(), &x, &y, &channel, 3);
-                image = std::make_shared<RGBAImage>(ivec2(x, y));
+                image = std::make_shared<RGBAImage>(Point2i(x, y));
                 parallel_for(
-                    image->resolution().y,
+                    image->resolution().y(),
                     [=, &image](uint32_t y, uint32_t) {
-                        for (int x = 0; x < image->resolution().x; x++) {
+                        for (int x = 0; x < image->resolution().x(); x++) {
                             RGBSpectrum rgb;
                             if (channel == 1) {
-                                rgb = RGBSpectrum((float)data[x + y * image->resolution().x] / 255.0f);
+                                rgb = RGBSpectrum((float)data[x + y * image->resolution().x()] / 255.0f);
                             } else {
-                                rgb[0] = (float)data[3 * (x + y * image->resolution().x) + 0] / 255.0f;
-                                rgb[1] = (float)data[3 * (x + y * image->resolution().x) + 1] / 255.0f;
-                                rgb[2] = (float)data[3 * (x + y * image->resolution().x) + 2] / 255.0f;
+                                rgb[0] = (float)data[3 * (x + y * image->resolution().x()) + 0] / 255.0f;
+                                rgb[1] = (float)data[3 * (x + y * image->resolution().x()) + 1] / 255.0f;
+                                rgb[2] = (float)data[3 * (x + y * image->resolution().x()) + 2] / 255.0f;
                             }
                             (*image)(x, y) = std::make_pair(rgb, 1.0f);
                         }

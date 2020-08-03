@@ -20,7 +20,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 #include <akari/common/math.hpp>
+
+
+
 int main() {
+    AKR_USING_TYPES(akari::CoreAliases<float>, Point2f)
     using Vector3f = akari::Vector<float, 3>;
     using Vector4f = akari::Vector<float, 4>;
     using Point3f = akari::Point<float, 3>;
@@ -29,6 +33,7 @@ int main() {
     auto p = Point3f(0);
     auto p2 = v + p;
     v = (sin(v));
+    v = pow(v, Vector3f(2.0));
     using Matrix4f = akari::Matrix<float, 4>;
     Matrix4f m(2.0);
     m = m + m;
@@ -59,4 +64,7 @@ int main() {
         }
         putchar('\n');
     }
+    using Bounds3f = akari::BoundingBox<Point3f>;
+    Bounds3f bb;
+    bb.surface_area();
 }

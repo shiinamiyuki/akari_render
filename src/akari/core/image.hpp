@@ -26,16 +26,19 @@
 #include <list>
 #include <vector>
 #include <akari/core/akari.h>
-#include <akari/core/math.h>
-#include <akari/core/spectrum.h>
+#include <akari/common/math.hpp>
+#include <akari/common/color.hpp>
 
 namespace akari {
+    
     template <class T> class TImage {
+        using Float = float;
+        AKR_IMPORT_CORE_TYPES()
         std::vector<T> _texels;
-        ivec2 _resolution;
+        Point2i _resolution;
 
       public:
-        TImage(const ivec2 &dim = ivec2(1)) : _texels(dim[0] * dim[1]), _resolution(dim) {}
+        TImage(const Point2i &dim = Point2i(1)) : _texels(dim[0] * dim[1]), _resolution(dim) {}
 
         const T &operator()(int x, int y) const {
             x = std::clamp(x, 0, _resolution[0] - 1);
@@ -53,35 +56,35 @@ namespace akari {
 
         T &operator()(float x, float y) { return (*this)(vec2(x, y)); }
 
-        const T &operator()(const ivec2 &p) const { return (*this)(p.x, p.y); }
+        const T &operator()(const Point2i &p) const { return (*this)(p.x, p.y); }
 
-        T &operator()(const ivec2 &p) { return (*this)(p.x, p.y); }
+        T &operator()(const Point2i &p) { return (*this)(p.x, p.y); }
 
-        const T &operator()(const vec2 &p) const { return (*this)(ivec2(p * vec2(_resolution))); }
+        const T &operator()(const Point2f &p) const { return (*this)(ivec2(p * vec2(_resolution))); }
 
-        T &operator()(const vec2 &p) { return (*this)(ivec2(p * vec2(_resolution))); }
+        T &operator()(const Point2f &p) { return (*this)(ivec2(p * vec2(_resolution))); }
 
         [[nodiscard]] const std::vector<T> &texels() const { return _texels; }
 
-        void Resize(const ivec2 &size) {
+        void resize(const Point2i &size) {
             _resolution = size;
             _texels.resize(_resolution[0] * _resolution[1]);
         }
 
-        [[nodiscard]] ivec2 resolution() const { return _resolution; }
+        [[nodiscard]] Point2i resolution() const { return _resolution; }
         T *data() { return _texels.data(); }
 
         [[nodiscard]] const T *data() const { return _texels.data(); }
     };
 
-    class RGBImage : public TImage<RGBSpectrum> {
+    class RGBImage : public TImage<Color<float, 3>> {
       public:
-        using TImage<RGBSpectrum>::TImage;
+        using TImage<Color<float, 3>>::TImage;
     };
 
-    class RGBAImage : public TImage<std::pair<RGBSpectrum, float>> {
+    class RGBAImage : public TImage<std::pair<Color<float, 3>, float>> {
       public:
-        using TImage<std::pair<RGBSpectrum, float>>::TImage;
+        using TImage<std::pair<Color<float, 3>, float>>::TImage;
     };
 
     class AKR_EXPORT PostProcessor {
@@ -131,7 +134,6 @@ namespace akari {
 
     AKR_EXPORT std::shared_ptr<ImageWriter> default_image_writer();
     AKR_EXPORT std::shared_ptr<ImageReader> default_image_reader();
-
 
 } // namespace akari
 

@@ -22,7 +22,7 @@
 
 #ifndef AKARIRENDER_AKARI_H
 #define AKARIRENDER_AKARI_H
-
+#include <akari/core/platform.h>
 #ifdef _MSC_VER
 #pragma warning(push, 4)
 #pragma warning(disable : 4100)

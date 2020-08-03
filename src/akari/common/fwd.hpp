@@ -19,9 +19,11 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+#pragma once
 #include <cstdint>
 #include <cstddef>
 #include <akari/common/config.h>
+#include "detail/macro.h"
 namespace akari {
     // AkariRender needs a bit of retargeting capability
     // like different types of Spectrum
@@ -38,6 +40,7 @@ namespace akari {
 
     template <typename Float> struct Transform;
     template <typename Vector> struct Frame;
+    template <typename Point> struct BoundingBox;
 
     template <typename T> struct value_ { using type = T; };
     template <typename T, int N> struct value_<Vector<T, N>> { using type = T; };
@@ -51,16 +54,11 @@ namespace akari {
     template <typename T, int N, typename S> struct replace_scalar_<Matrix<T, N>, S> { using type = Matrix<S, N>; };
     template <typename T, typename S> using replace_scalar_t = typename replace_scalar_<T, S>::type;
 
-    template<typename T>
-    struct array_size{static constexpr size_t value = 1;};
-    template<typename T, int N>
-    struct array_size<Point<T, N>>{static constexpr size_t value = N;};
-    template<typename T, int N>
-    struct array_size<Vector<T, N>>{static constexpr size_t value = N;};
-    template<typename T, int N>
-    struct array_size<Normal<T, N>>{static constexpr size_t value = N;};
-    template<typename T>
-    constexpr size_t array_size_v = array_size<T>::value;
+    template <typename T> struct array_size { static constexpr size_t value = 1; };
+    template <typename T, int N> struct array_size<Point<T, N>> { static constexpr size_t value = N; };
+    template <typename T, int N> struct array_size<Vector<T, N>> { static constexpr size_t value = N; };
+    template <typename T, int N> struct array_size<Normal<T, N>> { static constexpr size_t value = N; };
+    template <typename T> constexpr size_t array_size_v = array_size<T>::value;
     // template <typename T>
     // using int32_array_t = replace_scalar_t<T, int32_t>;
     // template <typename T>
@@ -140,6 +138,10 @@ namespace akari {
 
         using Frame3f = Frame<Vector3f>;
         using Transform3f = Transform<Float>;
+
+        using Bounds2i = BoundingBox<Point2i>;
+        using Bounds2f = BoundingBox<Point2f>;
+        using Bounds3f = BoundingBox<Point3f>;
     };
 
 #define AKR_IMPORT_CORE_TYPES_PREFIX(Float_, prefix)                                                                   \
@@ -194,35 +196,37 @@ namespace akari {
     using prefix##Frame3f = typename prefix##CoreAliases::Frame3f;                                                     \
     using prefix##Transform3f = typename prefix##CoreAliases::Transform3f;                                             \
     using prefix##Color1f = typename prefix##CoreAliases::Color1f;                                                     \
-    using prefix##Color3f = typename prefix##CoreAliases::Color3f;
+    using prefix##Color3f = typename prefix##CoreAliases::Color3f;                                                     \
+    using prefix##Bounds2f = typename prefix##CoreAliases::Bounds2f;                                                   \
+    using prefix##Bounds3f = typename prefix##CoreAliases::Bounds3f;                                                   \
+    using prefix##Bounds2i = typename prefix##CoreAliases::Bounds2i;
 
 #define AKR_IMPORT_CORE_TYPES() AKR_IMPORT_CORE_TYPES_PREFIX(Float, )
+#define AKR_IMPORT_CORE_TYPES_WITH(fl)                                                                                 \
+    using Float = fl;                                                                                                  \
+    AKR_IMPORT_CORE_TYPES()
 
+    
     AKR_VARIANT struct Ray;
     AKR_VARIANT class Film;
     AKR_VARIANT struct Pixel;
     AKR_VARIANT struct Tile;
 
-    template <typename Float_, typename Spectrum_> struct KernelAliases {
+    template <typename Float_, typename Spectrum_> struct RenderlAliases {
         using Float = Float_;
         using Spectrum = Spectrum_;
         using Ray3f = Ray<Float, Spectrum>;
-    };
-#define AKR_IMPORT_KNL_TYPES()                                                                                         \
-    AKR_IMPORT_CORE_TYPES()                                                                                            \
-    using KernelAliases = akari::KernelAliases<Float, Spectrum>;                                                       \
-    using Ray3f = KernelAliases::Ray3f;
-
-    template <typename Float_, typename Spectrum_> struct HostAliases {
-        using Float = Float_;
-        using Spectrum = Spectrum_;
         using Film = akari::Film<Float, Spectrum>;
         using Tile = akari::Tile<Float, Spectrum>;
         using Pixel = akari::Pixel<Float, Spectrum>;
     };
-#define AKR_IMPORT_HOST_TYPE()                                                                                         \
+#define AKR_IMPORT_BASIC_RENDER_TYPES()                                                                                \
     AKR_IMPORT_CORE_TYPES()                                                                                            \
-    using HostAliases = akari::HostAliases<Float, Spectrum>;                                                           \
-    using Film = HostAliases::Film;                                                                                    \
-    using Tile = HostAliases::Tile;
+    using RenderAliases = akari::RenderlAliases<Float, Spectrum>;                                                     \
+    using Ray = typename RenderlAliases::Ray3f;
+
+#define AKR_IMPORT_TYPES(...)                                                                                          \
+    AKR_IMPORT_BASIC_RENDER_TYPES()                                                                                    \
+    AKR_USING_TYPES(RenderAliases, __VA_ARGS__)
+
 } // namespace akari

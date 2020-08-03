@@ -51,15 +51,16 @@ namespace akari {
         std::uint32_t nThreadFinished;
         ParallelForWorkPool() : workId(0), nThreadFinished(0) {
             stopped = false;
-            auto n = (int)GetConfig()->NumCore;
-            for (int tid = 0; tid < n; tid++) {
+            auto n = std::thread::hardware_concurrency();
+            for (uint32_t tid = 0; tid < n; tid++) {
                 threads.emplace_back([=]() {
                     while (!stopped) {
                         std::unique_lock<std::mutex> lock(workMutex);
-                        while (works.empty() && ! stopped) {
+                        while (works.empty() && !stopped) {
                             hasWork.wait(lock);
                         }
-                        if(stopped)return;
+                        if (stopped)
+                            return;
                         auto &loop = works.front();
                         auto id = workId;
                         lock.unlock();
@@ -125,7 +126,5 @@ namespace akari {
         pool->wait();
     }
 
-    void ThreadPoolFinalize(){
-        pool.reset(nullptr);
-    }
+    void ThreadPoolFinalize() { pool.reset(nullptr); }
 } // namespace akari

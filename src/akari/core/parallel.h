@@ -23,8 +23,8 @@
 #ifndef AKARIRENDER_PARALLEL_HPP
 #define AKARIRENDER_PARALLEL_HPP
 
-#include <akari/core/config.h>
-#include <akari/core/math.h>
+#include <akari/core/akari.h>
+#include <akari/common/math.hpp>
 #include <atomic>
 #include <functional>
 
@@ -32,6 +32,7 @@ namespace akari {
     class AtomicFloat {
         std::atomic<float> val;
       public:
+        using Float = float;
         explicit AtomicFloat(Float v = 0) : val(v) {}
 
         AtomicFloat(const AtomicFloat &rhs) : val((float)rhs.val) {}
@@ -56,14 +57,14 @@ namespace akari {
 
     AKR_EXPORT void parallel_for(int count, const std::function<void(uint32_t, uint32_t)> &func, size_t chunkSize = 1);
 
-    inline void parallel_for_2d(const ivec2 &dim, const std::function<void(ivec2, uint32_t)> &func,
+    inline void parallel_for_2d(const Point<int, 2> &dim, const std::function<void(Point<int, 2>, uint32_t)> &func,
                                 size_t chunkSize = 1) {
         parallel_for(
-                dim.x * dim.y,
+                dim.x() * dim.y(),
                 [&](uint32_t idx, int tid) {
-                    auto x = idx % dim.x;
-                    auto y = idx / dim.x;
-                    func(ivec2(x, y), tid);
+                    auto x = idx % dim.x();
+                    auto y = idx / dim.x();
+                    func(Point<int, 2>(x, y), tid);
                 },
                 chunkSize);
     }
