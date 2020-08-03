@@ -23,10 +23,10 @@
 #ifndef AKARIRENDER_FILM_H
 #define AKARIRENDER_FILM_H
 
-#include "spectrum.h"
+#include <akari/common/fwd.hpp>
 #include <akari/core/image.hpp>
 #include <akari/core/parallel.h>
-#include <akari/common/fwd.hpp>
+
 
 namespace akari {
     AKR_VARIANT struct Pixel {

@@ -31,6 +31,7 @@ if(NOT WIN32)
     set(AKR_CORE_EXT_LIBS ${AKR_CORE_EXT_LIBS} pthread dl)
 endif()
 
+find_package(Python COMPONENTS Interpreter)
 
 #
 #if(AKR_BUILD_GUI)
@@ -62,9 +63,13 @@ set(AKR_CORE_EXT_LIBS ${AKR_CORE_EXT_LIBS} fmt)
 # include(cmake/LLVM.cmake)
 
 ##set(AKR_CORE_EXT_LIBS ${AKR_CORE_EXT_LIBS} embree embree_sse42 embree_avx embree_avx2 lexers math simd tasking sys)
-#
+set(AKR_CONFIG_H src/akari/common/config.h )
+add_custom_command(OUTPUT ${AKR_CONFIG_H}
+    COMMAND python resources/configure.py akari.conf  ${AKR_CONFIG_H}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    DEPENDS akari.conf resources/configure.py)
 
-file(GLOB AKR_COMMON_SRC src/akari/common/*.*)
+file(GLOB AKR_COMMON_SRC src/akari/common/*.*  ${AKR_CONFIG_H})
 file(GLOB AKR_CORE_SRC src/akari/core/*.* )
 add_library(akari_core ${AKR_CORE_SRC})
 target_link_libraries(akari_core  ${AKR_CORE_EXT_LIBS})
@@ -74,6 +79,6 @@ target_include_directories(akari_core PUBLIC src/)
 file(GLOB AKR_KERNEL_SRC src/akari/kernel/*.* src/akari/kernel/*/*.*)
 
 
-add_executable(akari src/akari/app/akari.cpp)
+add_executable(akari src/akari/app/akari.cpp ${AKR_CONFIG_H})
 target_include_directories(akari PUBLIC src/)
 # target_link_libraries(akari akari_core)

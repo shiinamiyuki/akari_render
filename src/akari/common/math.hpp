@@ -28,7 +28,7 @@
 #include <algorithm>
 #include <cstring>
 namespace akari {
-    template <typename Float> struct Constants { constexpr Float Inf = std::numeric_limits<Float>::infinity(); };
+    template <typename Float> struct Constants { static constexpr Float Inf = std::numeric_limits<Float>::infinity(); };
     template <typename T, size_t N, int packed> constexpr int compute_padded_size() {
         if (!std::is_fundamental_v<T>) {
             return N;
@@ -520,10 +520,10 @@ namespace akari {
             return Ray3f(T * ray.o, d2, ray.tmin * scale, ray.tmax * scale);
         }
     };
-
+    
     template <typename Point> struct BoundingBox {
         using Float = value_t<Point>;
-        using N = array_size_v<Point>;
+        static constexpr auto N = array_size_v<Point>;
         using Vector = akari::Vector<Float, N>;
         Point pmin, pmax;
         BoundingBox() { reset(); }
@@ -541,7 +541,7 @@ namespace akari {
             return BoundingBox(min(b1.pmin, b2.pmin), max(p1.pmax, b2.pmax));
         }
         Point centroid() const { return extents() * 0.5f + p_min; }
-        T surface_area() const {
+        Float surface_area() const {
             if constexpr (N == 3) {
                 auto ext = extents();
                 return hsum(shuffle<1, 2, 0>(ext) * ext) * Float(2);

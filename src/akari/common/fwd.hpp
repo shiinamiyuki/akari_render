@@ -21,7 +21,7 @@
 // SOFTWARE.
 #include <cstdint>
 #include <cstddef>
-
+#include <akari/common/config.h>
 namespace akari {
     // AkariRender needs a bit of retargeting capability
     // like different types of Spectrum
@@ -39,11 +39,11 @@ namespace akari {
     template <typename Float> struct Transform;
     template <typename Vector> struct Frame;
 
-    template <typename T> struct scalar_ { using type = T; };
-    template <typename T, int N> struct scalar_<Vector<T, N>> { using type = T; };
-    template <typename T, int N> struct scalar_<Point<T, N>> { using type = T; };
-    template <typename T, int N> struct scalar_<Normal<T, N>> { using type = T; };
-    template <typename T> using scalar_t = typename scalar_<T>::type;
+    template <typename T> struct value_ { using type = T; };
+    template <typename T, int N> struct value_<Vector<T, N>> { using type = T; };
+    template <typename T, int N> struct value_<Point<T, N>> { using type = T; };
+    template <typename T, int N> struct value_<Normal<T, N>> { using type = T; };
+    template <typename T> using value_t = typename value_<T>::type;
     template <typename T, typename S> struct replace_scalar_ { using type = S; };
     template <typename T, int N, typename S> struct replace_scalar_<Vector<T, N>, S> { using type = Vector<S, N>; };
     template <typename T, int N, typename S> struct replace_scalar_<Point<T, N>, S> { using type = Point<S, N>; };
@@ -52,15 +52,15 @@ namespace akari {
     template <typename T, typename S> using replace_scalar_t = typename replace_scalar_<T, S>::type;
 
     template<typename T>
-    struct array_size{static constexpr size_t value = 1;}
+    struct array_size{static constexpr size_t value = 1;};
     template<typename T, int N>
-    struct array_size<Point<T, N>>{static constexpr size_t value = N;}
+    struct array_size<Point<T, N>>{static constexpr size_t value = N;};
     template<typename T, int N>
-    struct array_size<Vector<T, N>>{static constexpr size_t value = N;}
+    struct array_size<Vector<T, N>>{static constexpr size_t value = N;};
     template<typename T, int N>
-    struct array_size<Normal<T, N>>{static constexpr size_t value = N;}
+    struct array_size<Normal<T, N>>{static constexpr size_t value = N;};
     template<typename T>
-    constexpr auto array_size_v = array_size<T>::value;
+    constexpr size_t array_size_v = array_size<T>::value;
     // template <typename T>
     // using int32_array_t = replace_scalar_t<T, int32_t>;
     // template <typename T>
