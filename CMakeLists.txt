@@ -31,8 +31,8 @@ if(NOT WIN32)
     set(AKR_CORE_EXT_LIBS ${AKR_CORE_EXT_LIBS} pthread dl)
 endif()
 
-find_package(Python COMPONENTS Interpreter)
-
+find_package(Python COMPONENTS Interpreter Development)
+add_subdirectory(external/pybind11)
 #
 #if(AKR_BUILD_GUI)
 #    include_directories(external/glfw-3.3.2/include)
@@ -71,14 +71,17 @@ add_custom_command(OUTPUT ${AKR_CONFIG_H}
 
 file(GLOB AKR_COMMON_SRC src/akari/common/*.*)
 file(GLOB AKR_CORE_SRC ${AKR_COMMON_SRC} src/akari/core/*.* )
-add_library(akari_core ${AKR_CORE_SRC} ${AKR_CONFIG_H})
-target_link_libraries(akari_core  ${AKR_CORE_EXT_LIBS})
+add_library(akari_core SHARED ${AKR_CORE_SRC} ${AKR_CONFIG_H})
+target_link_libraries(akari_core  ${AKR_CORE_EXT_LIBS} ${Python_LIBRARIES})
 target_compile_options(akari_core PUBLIC ${AKR_CXX_FLAGS})
 target_include_directories(akari_core PUBLIC src/)
+target_include_directories(akari_core PUBLIC external/pybind11/include)
+target_include_directories(akari_core PUBLIC ${Python_INCLUDE_DIRS})
 
 file(GLOB AKR_KERNEL_SRC src/akari/kernel/*.* src/akari/kernel/*/*.*)
+add_library(akari_kernel ${AKR_KERNEL_SRC})
 
 
 add_executable(akari src/akari/app/akari.cpp ${AKR_CONFIG_H})
 target_include_directories(akari PUBLIC src/)
-# target_link_libraries(akari akari_core)
+target_link_libraries(akari akari_core)

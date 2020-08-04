@@ -11,8 +11,4 @@ AkariRender is a CPU/GPU physically based renderer written in C++17.
  - Optional Embree backend
  - Optional Intel OpenImageDenoise
 
-## Source Structure:
- - `core`: Host code
- - `common`: Shared code between host and device
- - `kernel`: Device code
 

@@ -26,8 +26,8 @@
 #include <list>
 #include <vector>
 #include <akari/core/akari.h>
-#include <akari/common/math.hpp>
-#include <akari/common/color.hpp>
+#include <akari/common/math.h>
+#include <akari/common/color.h>
 
 namespace akari {
     

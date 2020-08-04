@@ -23,8 +23,8 @@
 #pragma once
 #include <type_traits>
 #include <cmath>
-#include <akari/common/fwd.hpp>
-#include <akari/common/panic.hpp>
+#include <akari/common/fwd.h>
+#include <akari/common/panic.h>
 #include <algorithm>
 #include <cstring>
 namespace akari {
@@ -193,10 +193,10 @@ namespace akari {
         return reduce(a, [](T acc, T b) { return max(acc, b); });
     }
     template <typename T, int N> bool any(const Array<T, N> &a) {
-        return reduce(a, [](T acc, T b) { return acc || (bool)a; });
+        return reduce(a, [](T acc, T b) { return acc || (bool)b; });
     }
     template <typename T, int N> bool all(const Array<T, N> &a) {
-        return reduce(a, [](T acc, T b) { return acc && (bool)a; });
+        return reduce(a, [](T acc, T b) { return acc && (bool)b; });
     }
     template <typename T, int N> Array<T, N> clamp(const Array<T, N> &x, const Array<T, N> &lo, const Array<T, N> &hi) {
         return max(min(x, hi), lo);

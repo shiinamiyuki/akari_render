@@ -23,7 +23,7 @@
 #ifndef AKARIRENDER_FILM_H
 #define AKARIRENDER_FILM_H
 
-#include <akari/common/fwd.hpp>
+#include <akari/common/fwd.h>
 #include <akari/core/image.hpp>
 #include <akari/core/parallel.h>
 

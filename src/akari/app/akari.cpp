@@ -19,52 +19,63 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-#include <akari/common/math.hpp>
 
+#include <fstream>
+#include <cxxopts.hpp>
+#include <akari/core/application.h>
+#include <akari/core/logger.h>
+#include <akari/core/scenegraph.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/embed.h>
+using namespace akari;
+namespace py = pybind11;
+static std::string inputFilename;
 
+void parse(int argc, char **argv) {
+    try {
+        cxxopts::Options options("akari", " - AkariRender Command Line Interface");
+        options.positional_help("input output").show_positional_help();
+        {
+            auto opt = options.allow_unrecognised_options().add_options();
+            opt("i,input", "Input Scene Description File", cxxopts::value<std::string>());
+            opt("help", "Show this help");
+        }
+        options.parse_positional({"input"});
+        auto result = options.parse(argc, argv);
+        if (!result.count("input")) {
+            fatal("Input file must be provided\n");
+            std::cout << options.help() << std::endl;
+            exit(0);
+        }
+        if (result.arguments().empty() || result.count("help")) {
+            std::cout << options.help() << std::endl;
+            exit(0);
+        }
+        inputFilename = result["input"].as<std::string>();
+    } catch (const cxxopts::OptionException &e) {
+        std::cout << "error parsing options: " << e.what() << std::endl;
+        exit(1);
+    }
+}
+int main(int argc, char **argv) {
+    Application app;
+    parse(argc, argv);
+    try {
+        CurrentPathGuard _guard;
+        py::scoped_interpreter py_guard{}; 
+        py::module::import("akari");
+        fs::current_path(fs::absolute(fs::path(inputFilename)).parent_path());
+        inputFilename = fs::path(inputFilename).filename().string();
 
-int main() {
-    AKR_USING_TYPES(akari::CoreAliases<float>, Point2f)
-    using Vector3f = akari::Vector<float, 3>;
-    using Vector4f = akari::Vector<float, 4>;
-    using Point3f = akari::Point<float, 3>;
-    using Normal3f = akari::Normal<float, 3>;
-    auto v = Vector3f(1.0);
-    auto p = Point3f(0);
-    auto p2 = v + p;
-    v = (sin(v));
-    v = pow(v, Vector3f(2.0));
-    using Matrix4f = akari::Matrix<float, 4>;
-    Matrix4f m(2.0);
-    m = m + m;
-    m(2, 3) = 10.0;
-    using namespace akari;
-    using Frame3f = Frame<Vector3f>;
-    Frame3f f(Normal3f(normalize(v)));
-    Transform<float> transform(m);
-    transform *v;
-    // static_assert(sizeof(Array<Array<float, 4>, 4>) == sizeof(float[4][4]));
-    auto minv = m.inverse();
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 4; j++) {
-            printf("%f ", m(i, j));
+        {
+            info("Loading {}\n", inputFilename);
+            std::ifstream in(inputFilename);
+            std::string str((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+            py::exec(str);
         }
-        putchar('\n');
+        
+    } catch (std::exception &e) {
+        fatal("Exception: {}", e.what());
+        exit(1);
     }
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 4; j++) {
-            printf("%f ", minv(i, j));
-        }
-        putchar('\n');
-    }
-    auto id = m * minv;
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 4; j++) {
-            printf("%f ", id(i, j));
-        }
-        putchar('\n');
-    }
-    using Bounds3f = akari::BoundingBox<Point3f>;
-    Bounds3f bb;
-    bb.surface_area();
 }

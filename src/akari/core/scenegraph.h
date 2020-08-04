@@ -19,26 +19,28 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-
-#pragma once
-
-#include <akari/common/fwd.hpp>
-#include <akari/common/math.hpp>
+#include <akari/core/akari.h>
+// #include <akari/kernel/materials/material.h>
 namespace akari {
-    template <typename Float, int N> struct Color : Array<Float, N> {
-        using Base = Array<Float, N>;
-        using Base::Base;
-        using value_t = Float;
-        static constexpr size_t size = N;
-        AKR_ARRAY_IMPORT(Base, Color)
+    class SceneGraphNode {
+      public:
+        virtual void commit() {}
     };
-
-    template <typename Float> Color<Float, 3> linear_to_srgb(const Color<Float, 3> &L) {
-        using Color3f = Color<Float, 3>;
-        return select(L < 0.0031308, L * 12.92, 1.055 * pow(L, Color3f(2.4) - 0.055));
-    }
-    template <typename Float> Color<Float, 3> srgb_to_linear(const Color<Float, 3> &S) {
-        using Color3f = Color<Float, 3>;
-        return select(S < 0.04045, S / 12.92, pow((S + 0.055) / 1.055), Color3f(1.0 / 2.4));
-    }
+    class CameraNode : public SceneGraphNode {
+      public:
+    };
+    class MaterialNode : public SceneGraphNode {
+      public:
+    };
+    class MeshNode : public SceneGraphNode {
+      public:
+        std::shared_ptr<MaterialNode> material;
+    };
+    class SceneNode : public SceneGraphNode {
+      public:
+        std::string variant;
+        std::shared_ptr<CameraNode> camera;
+        std::vector<std::shared_ptr<MeshNode>> shapes;
+    };
+    
 } // namespace akari

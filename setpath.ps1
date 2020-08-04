@@ -1,0 +1,1 @@
+$env:Path += ";./build;./build/Debug;./build/RelWithDebInfo;./build/Release"

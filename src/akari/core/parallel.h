@@ -24,7 +24,7 @@
 #define AKARIRENDER_PARALLEL_HPP
 
 #include <akari/core/akari.h>
-#include <akari/common/math.hpp>
+#include <akari/common/math.h>
 #include <atomic>
 #include <functional>
 
