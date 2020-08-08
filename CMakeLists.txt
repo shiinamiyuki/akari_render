@@ -63,7 +63,7 @@ set(AKR_CORE_EXT_LIBS ${AKR_CORE_EXT_LIBS} fmt)
 # include(cmake/LLVM.cmake)
 
 ##set(AKR_CORE_EXT_LIBS ${AKR_CORE_EXT_LIBS} embree embree_sse42 embree_avx embree_avx2 lexers math simd tasking sys)
-set(AKR_CONFIG_H src/akari/common/config.h )
+set(AKR_CONFIG_H ${CMAKE_CURRENT_SOURCE_DIR}/src/akari/common/config.h )
 add_custom_command(OUTPUT ${AKR_CONFIG_H}
     COMMAND python resources/configure.py akari.conf  ${AKR_CONFIG_H}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}

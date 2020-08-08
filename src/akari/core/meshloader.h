@@ -20,16 +20,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/common/math.h>
-#include <akari/common/buffer.h>
-
+#pragma once
+#include <akari/core/akari.h>
+#include <akari/kernel/mesh.h>
 namespace akari {
-    struct Mesh {
-        struct VertexData {
-            Buffer<float> data;
-            Buffer<int> index;
-        };        
-        VertexData position, normal, texcoords;
-        Buffer<int> material_index;
-    };
-} // namespace akari
+    Mesh load_wavefront_obj(const fs::path & path);
+}

@@ -26,17 +26,31 @@
 
 namespace akari {
     AKR_VARIANT struct BSDFSample {
-        
+        AKR_IMPORT_CORE_TYPES()
+        Vector3f wi = Vector3f(0);
+        Flota pdf = 0.0;
+    };
+    AKR_VARIANT struct BSDFSampleContext {
+        AKR_IMPORT_CORE_TYPES()
+        Vector3f wi;
+        Normal3f ng, ns;
+        Point3f p;
+    };
+    AKR_VARIANT struct DiffuseClosure {
+
     };
 
-    AKR_VARIANT class BSDFClosure {
-
-    };
-    
-
-    AKR_VARIANT class Material {
-
+    AKR_VARIANT struct SumBSDF {
+        int bsdfs[2];
     };
 
 
-}
+    AKR_VARIANT class BSDFClosure {};
+
+    AKR_VARIANT class BSDF {
+        std::array<BSDFClosure, 16> closures;
+    };
+
+    AKR_VARIANT class Material {};
+
+} // namespace akari

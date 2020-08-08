@@ -123,7 +123,7 @@ namespace akari {
 #define GEN_ARITH_OP(op, assign_op)                                                                                    \
     Array operator op(const Array &rhs) const {                                                                        \
         Array self;                                                                                                    \
-        for (int i = 0; i < N; i++) {                                                                                  \
+        for (int i = 0; i < padded_size; i++) {                                                                                  \
             self[i] = (*this)[i] op rhs[i];                                                                            \
         }                                                                                                              \
         return self;                                                                                                   \
@@ -144,7 +144,7 @@ namespace akari {
 #define GEN_CMP_OP(op)                                                                                                 \
     Array<bool, N> operator op(const Array &rhs) const {                                                               \
         Array<bool, N> r;                                                                                              \
-        for (int i = 0; i < N; i++) {                                                                                  \
+        for (int i = 0; i < padded_size; i++) {                                                                                  \
             r[i] = (*this)[i] op rhs[i];                                                                               \
         }                                                                                                              \
         return r;                                                                                                      \
@@ -160,7 +160,7 @@ namespace akari {
         friend Array operator/(const T &v, const Array &rhs) { return Array(v) / rhs; }
         Array operator-() const {
             Array self;
-            for (int i = 0; i < N; i++) {
+            for (int i = 0; i < padded_size; i++) {
                 self[i] = -(*this)[i];
             }
             return self;

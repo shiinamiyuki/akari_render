@@ -30,6 +30,11 @@ namespace akari {
     std::vector<const char *> _get_enabled_variants() {
         return std::vector<const char *>(std::begin(enabled_variants), std::end(enabled_variants));
     }
+
+    class OBJMesh : public MeshNode {
+      public:
+        std::string path;
+    };
     void register_scene_graph(py::module &m) {
         py::class_<SceneGraphNode, std::shared_ptr<SceneGraphNode>>(m, "SceneGraphNode")
             .def("commit", &SceneGraphNode::commit);
@@ -42,6 +47,10 @@ namespace akari {
             .def(py::init<>())
             .def_readwrite("material", &MeshNode::material)
             .def("commit", &MeshNode::commit);
+        py::class_<OBJMesh, MeshNode, std::shared_ptr<OBJMesh>>(m, "OBJMesh")
+            .def(py::init<>())
+            .def("commit", &OBJMesh::commit)
+            .def_readwrite("path", &OBJMesh::path);
         m.def("enabled_variants", _get_enabled_variants);
     }
     PYBIND11_EMBEDDED_MODULE(akari, m) { register_scene_graph(m); }

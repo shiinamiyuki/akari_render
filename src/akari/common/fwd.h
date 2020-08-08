@@ -212,6 +212,9 @@ namespace akari {
     AKR_VARIANT struct Tile;
     AKR_VARIANT class Material;
     AKR_VARIANT class BSDFClosure;
+    AKR_VARIANT struct sampling;
+    AKR_VARIANT struct microfacet;
+
     template <typename Float_, typename Spectrum_> struct RenderlAliases {
         using Float = Float_;
         using Spectrum = Spectrum_;
@@ -221,11 +224,15 @@ namespace akari {
         using Pixel = akari::Pixel<Float, Spectrum>;
         using Material = akari::Material<Float, Spectrum>;
         using BSDFClosure = akari::BSDFClosure<Float, Spectrum>;
+        using sampling = akari::sampling<Float, Spectrum>;
+        using microfacet = akari::microfacet<Float, Spectrum>;
     };
 #define AKR_IMPORT_BASIC_RENDER_TYPES()                                                                                \
     AKR_IMPORT_CORE_TYPES()                                                                                            \
     using RenderAliases = akari::RenderlAliases<Float, Spectrum>;                                                      \
-    using Ray = typename RenderlAliases::Ray3f;
+    using Ray = typename RenderAliases::Ray3f;                                                                         \
+    using sampling = typename RenderAliases::sampling;                                                                 \
+    using microfacet = typename RenderAliases::microfacet;
 
 #define AKR_IMPORT_TYPES(...)                                                                                          \
     AKR_IMPORT_BASIC_RENDER_TYPES()                                                                                    \
