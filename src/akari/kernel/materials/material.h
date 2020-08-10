@@ -23,12 +23,13 @@
 #pragma once
 
 #include <akari/common/variant.h>
+#include <akari/common/math.h>
 
 namespace akari {
     AKR_VARIANT struct BSDFSample {
         AKR_IMPORT_CORE_TYPES()
         Vector3f wi = Vector3f(0);
-        Flota pdf = 0.0;
+        Float pdf = 0.0;
     };
     AKR_VARIANT struct BSDFSampleContext {
         AKR_IMPORT_CORE_TYPES()
@@ -48,6 +49,8 @@ namespace akari {
     AKR_VARIANT class BSDFClosure {};
 
     AKR_VARIANT class BSDF {
+        
+        AKR_IMPORT_RENDER_TYPES(BSDFClosure)
         std::array<BSDFClosure, 16> closures;
     };
 

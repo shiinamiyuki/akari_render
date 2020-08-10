@@ -20,33 +20,14 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "meshloader.h"
-#include <tiny_obj_loader.h>
+#pragma once
+#include <akari/common/math.h>
+#include <akari/common/bufferview.h>
+
 namespace akari {
-    Mesh load_wavefront_obj(const fs::path &obj) {
-        fs::path parent_path = fs::absolute(obj).parent_path();
-        fs::path file = obj.filename();
-        CurrentPathGuard _;
-        if (!parent_path.empty())
-            fs::current_path(parent_path);
-
-        tinyobj::attrib_t attrib;
-        std::vector<tinyobj::shape_t> shapes;
-        std::vector<tinyobj::material_t> materials;
-
-        std::string err;
-
-        std::string _file = file.string();
-        bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err, _file.c_str());
-        (void)ret;
-        for (size_t s = 0; s < shapes.size(); s++) {
-            // Loop over faces(polygon)
-            size_t index_offset = 0;
-            for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
-
-                auto mat = materials[shapes[s].mesh.material_ids[f]].name;
-                
-            }
-        }
-    }
+    struct MeshView {
+        BufferView<float> position, normal, texcoords;
+        BufferView<int> index;
+        BufferView<int> material_index;
+    };
 } // namespace akari

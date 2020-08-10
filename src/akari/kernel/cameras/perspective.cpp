@@ -20,28 +20,22 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/common/fwd.h>
-namespace akari {
-    template <typename T> struct Buffer {
-        struct MutAccessor {
-            Buffer<T> *_buf;
-            T &operator[](int i) { return _buf._data[i]; }
-            size_t size() const { return _buf._data.size(); }
-        };
-        struct Accessor {
-            const Buffer<T> &_buf;
-            const T &operator[](int i) const { return _buf._data[i]; }
-            size_t size() const { return _buf._data.size(); }
-        };
-        MutAccessor mut_accessor() { return MutAccessor{*this}; }
-        MutAccessor accessor() const { return MutAccessor{*this}; }
-        friend struct MutAccessor;
-        friend struct Accessor;
-        std::vector<T> &data() const { return _data; }
+#include <akari/kernel/cameras/camera.h>
 
-      private:
-        std::vector<T> _data;
-        mutable int16_t _borrow_cnt = 0;
-        mutable bool _borrow_mut = false;
-    };
+namespace akari {
+    AKR_VARIANT void PerspectiveCamera<Float, Spectrum>::preprocess() {
+        Transform3f m;
+        m = Transform3f::scale(Vector3f(1.0f / resolution.x(), 1.0f / resolution.y(), 1)) * m;
+        m = Transform3f::scale(Vector3f(2, 2, 1)) * m;
+        m = Transform3f::translate(Point3f(-1, -1, 0)) * m;
+        m = Transform3f::scale(Vector3f(1, -1, 1)) * m;
+        auto s = std::atan(fov / 2);
+        if (resolution.x() > resolution.y()) {
+            m = Transform3f::scale(Vector3f(s, s * Float(resolution.y()) / resolution.x(), 1)) * m;
+        } else {
+            m = Transform3f::scale(Vector3f(s * Float(resolution.x()) / resolution.y(), s, 1)) * m;
+        }
+        r2w = m;
+    }
+    AKR_RENDER_CLASS(PerspectiveCamera)
 } // namespace akari

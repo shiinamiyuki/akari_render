@@ -19,26 +19,11 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-#include <akari/core/akari.h>
-#include <akari/common/fwd.h>
-// #include <akari/kernel/materials/material.h>
-namespace akari {
-    AKR_VARIANT class SceneGraphNode {
-      public:
-        AKR_IMPORT_BASIC_RENDER_TYPES()
-        virtual void commit(Scene&) {}
-    };
-    AKR_VARIANT class CameraNode : public SceneGraphNode<Float, Spectrum> { public: };
-    AKR_VARIANT class FilmNode : public SceneGraphNode<Float, Spectrum> { public: };
-    AKR_VARIANT class MaterialNode : public SceneGraphNode<Float, Spectrum> { public: };
-    AKR_VARIANT class MeshNode : public SceneGraphNode<Float, Spectrum> {
-      public:
-    };
-    AKR_VARIANT class SceneNode : public SceneGraphNode<Float, Spectrum> {
-      public:
-        std::string variant;
-        std::shared_ptr<CameraNode<Float, Spectrum>> camera;
-        std::vector<std::shared_ptr<MeshNode<Float, Spectrum>>> shapes;
-    };
 
-} // namespace akari
+#pragma once
+#include <vector>
+#include <memory_resource>
+#include <akari/common/bufferview.h>
+namespace akari {
+    template <typename T> using Buffer = std::vector<T, std::pmr::polymorphic_allocator<T>>;
+}

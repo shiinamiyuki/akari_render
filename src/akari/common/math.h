@@ -29,39 +29,6 @@
 #include <cstring>
 namespace akari {
     template <typename Float> struct Constants { static constexpr Float Inf = std::numeric_limits<Float>::infinity(); };
-    template <typename T, size_t N, int packed> constexpr int compute_padded_size() {
-        if constexpr (!std::is_fundamental_v<T>) {
-            return N;
-        }
-        if constexpr (packed || N <= 2) {
-            return N;
-        }
-        if constexpr (sizeof(T) == 1) {
-            // round to 128 bits
-            return (N + 15u) & ~15u;
-        } else if constexpr (sizeof(T) == 2) {
-            // round to 128 bits
-            return (N + 7u) & ~7u;
-        } else if constexpr (sizeof(T) == 4) {
-            // round to 128 bits
-            return (N + 3u) & ~3u;
-        } else if constexpr (sizeof(T) == 8) {
-            // round to 128 bits
-            return (N + 1u) & ~1u;
-        } else {
-            return N;
-        }
-    }
-    template <typename T, size_t N, int packed> constexpr int compute_align() {
-        if constexpr (!std::is_fundamental_v<T>) {
-            return alignof(T);
-        }
-        if constexpr (packed || N <= 2) {
-            return alignof(T);
-        }
-        return 128 / 32;
-    }
-    template <typename T, size_t N, int packed = 0> struct alignas(compute_align<T, N, packed>()) Array;
 
     template <typename T, size_t N, int packed> struct alignas(compute_align<T, N, packed>()) Array {
         static constexpr size_t padded_size = compute_padded_size<T, N, packed>();
@@ -123,7 +90,7 @@ namespace akari {
 #define GEN_ARITH_OP(op, assign_op)                                                                                    \
     Array operator op(const Array &rhs) const {                                                                        \
         Array self;                                                                                                    \
-        for (int i = 0; i < padded_size; i++) {                                                                                  \
+        for (int i = 0; i < padded_size; i++) {                                                                        \
             self[i] = (*this)[i] op rhs[i];                                                                            \
         }                                                                                                              \
         return self;                                                                                                   \
@@ -144,7 +111,7 @@ namespace akari {
 #define GEN_CMP_OP(op)                                                                                                 \
     Array<bool, N> operator op(const Array &rhs) const {                                                               \
         Array<bool, N> r;                                                                                              \
-        for (int i = 0; i < padded_size; i++) {                                                                                  \
+        for (int i = 0; i < padded_size; i++) {                                                                        \
             r[i] = (*this)[i] op rhs[i];                                                                               \
         }                                                                                                              \
         return r;                                                                                                      \
@@ -209,6 +176,11 @@ namespace akari {
         }
         return r;
     }
+    template <typename T, typename = std::enable_if_t<is_array_v<T>>> T load(const value_t<T> *p) {
+        T v;
+        std::memcpy(&v, p, sizeof(T));
+        return v;
+    }
     template <typename T, int N> T length(const Array<T, N> &a) { return sqrt(dot(a, a)); }
     template <typename T, int N> Array<T, N> normalize(const Array<T, N> &a) { return a / sqrt(dot(a, a)); }
     template <int... args, typename T, int N> auto shuffle(const Array<T, N> &a) {
@@ -258,7 +230,7 @@ namespace akari {
     FWD_MATH_FUNC2(pow)
     FWD_MATH_FUNC2(min)
     FWD_MATH_FUNC2(max)
-    template <typename V, int N, bool P> Array<V, N, P> pow(const Array<V, N, P> &v1, V p){
+    template <typename V, int N, bool P> Array<V, N, P> pow(const Array<V, N, P> &v1, V p) {
         return pow(v1, Array<V, N, P>(p));
     }
 #undef FWD_MATH_FUNC1
@@ -308,13 +280,14 @@ namespace akari {
         AKR_ARRAY_IMPORT(Base, Normal)
     };
 
-    template <typename Value, int N> Vector<Value, N> operator-(const Point<Value, N> &p1, const Point<Value, N> &p2) {
-        Vector<Value, N> v;
-        for (int i = 0; i < N; i++) {
-            v[i] = p1[i] - p2[i];
-        }
-        return v;
-    }
+    // template <typename Value, int N> Vector<Value, N> operator-(const Point<Value, N> &p1, const Point<Value, N> &p2)
+    // {
+    //     Vector<Value, N> v;
+    //     for (int i = 0; i < N; i++) {
+    //         v[i] = p1[i] - p2[i];
+    //     }
+    //     return v;
+    // }
     template <typename Value, int N> Point<Value, N> operator+(const Point<Value, N> &p1, const Vector<Value, N> &v) {
         Point<Value, N> p2;
         for (int i = 0; i < N; i++) {
@@ -344,7 +317,7 @@ namespace akari {
         Matrix(const Array<Array<Float, N>, N> &m) : rows(m) {}
         Matrix(Float m[N][N]) { std::memcpy(&rows, m, sizeof(Float) * N * N); }
         Matrix(Float m[N * N]) {
-            static_assert(sizeof(m) == sizeof(rows));
+            static_assert(sizeof(Float) * N * N == sizeof(rows));
             std::memcpy(&rows, m, sizeof(Float) * N * N);
         }
         const Float &operator()(int i, int j) const { return rows[i][j]; }
@@ -499,6 +472,7 @@ namespace akari {
         AKR_IMPORT_CORE_TYPES()
         Matrix4f m, minv;
         Matrix3f m3, m3inv;
+        Transform() = default;
         Transform(const Matrix4f &m) : Transform(m, m.inverse()) {}
         Transform(const Matrix4f &m, const Matrix4f &minv) : m(m), minv(minv) {
             for (int i = 0; i < 3; i++) {
@@ -531,7 +505,7 @@ namespace akari {
             return Ray3f(T * ray.o, d2, ray.tmin * scale, ray.tmax * scale);
         }
 
-        Transform translate(const Vector3f &v) {
+        static Transform translate(const Vector3f &v) {
             float m[] = {1, 0, 0, v.x(), 0, 1, 0, v.y(), 0, 0, 1, v.z(), 0, 0, 0, 1};
             return Transform(Matrix4f(m));
         }

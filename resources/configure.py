@@ -7,6 +7,9 @@ if __name__ == '__main__':
         config = eval(f.read())
     instantiate = []
     variants = config['variants']
+    for v in variants:
+        settings = variants[v]
+        settings['Spectrum'] = settings['Spectrum'].replace('Float', settings['Float'])
     with open(out, 'w') as f:
         def w(s):
             f.write(s)

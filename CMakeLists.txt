@@ -71,15 +71,16 @@ add_custom_command(OUTPUT ${AKR_CONFIG_H}
 
 file(GLOB AKR_COMMON_SRC src/akari/common/*.*)
 file(GLOB AKR_CORE_SRC ${AKR_COMMON_SRC} src/akari/core/*.* )
-add_library(akari_core SHARED ${AKR_CORE_SRC} ${AKR_CONFIG_H})
-target_link_libraries(akari_core  ${AKR_CORE_EXT_LIBS} ${Python_LIBRARIES})
+file(GLOB AKR_KERNEL_SRC src/akari/kernel/*.* src/akari/kernel/*/*.*)
+add_library(akari_core SHARED ${AKR_CORE_SRC} ${AKR_CONFIG_H} ${AKR_KERNEL_SRC})
+target_link_libraries(akari_core PUBLIC  ${AKR_CORE_EXT_LIBS} ${Python_LIBRARIES})
 target_compile_options(akari_core PUBLIC ${AKR_CXX_FLAGS})
 target_include_directories(akari_core PUBLIC src/)
 target_include_directories(akari_core PUBLIC external/pybind11/include)
 target_include_directories(akari_core PUBLIC ${Python_INCLUDE_DIRS})
 
-file(GLOB AKR_KERNEL_SRC src/akari/kernel/*.* src/akari/kernel/*/*.*)
-add_library(akari_kernel ${AKR_KERNEL_SRC})
+# file(GLOB AKR_KERNEL_SRC src/akari/kernel/*.* src/akari/kernel/*/*.*)
+# add_library(akari_kernel ${AKR_KERNEL_SRC})
 
 
 add_executable(akari src/akari/app/akari.cpp ${AKR_CONFIG_H})

@@ -20,54 +20,16 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef AKARIRENDER_AKARI_H
-#define AKARIRENDER_AKARI_H
-#include <akari/core/platform.h>
-#include <akari/common/diagnostic.h>
-#ifdef __GNUC__
-#if __GNUC__ >= 8
-
-#include <filesystem>
-namespace akari {
-    namespace fs = std::filesystem;
-}
-#else
-#include <experimental/filesystem>
-namespace akari {
-    namespace fs = std::experimental::filesystem;
-}
-#endif
-#else
-#include <filesystem>
-namespace akari {
-    namespace fs = std::filesystem;
-}
-
-#endif
-
-#include <functional>
-#include <string_view>
-#include <akari/common/panic.h>
+#pragma once
+#include <akari/common/math.h>
+#include <akari/core/buffer.h>
 
 namespace akari {
-    
 
-    struct CurrentPathGuard {
-        fs::path _cur;
-        CurrentPathGuard() : _cur(fs::current_path()) {}
-        ~CurrentPathGuard() { fs::current_path(_cur); }
-    };
-    struct NonCopyable {
-        NonCopyable() = default;
-        NonCopyable(const NonCopyable&) = delete;
-        NonCopyable & operator=(const NonCopyable&) = delete;
+    struct Mesh {
+        Buffer<float> vertices, normals, texcoords;
+        Buffer<int> indices;
+        Buffer<int> material_index;
     };
 
-
-    template<typename T, typename U>
-    std::shared_ptr<U> dyn_cast(const std::shared_ptr<T> & p){
-        return std::dynamic_pointer_cast<U>(p);
-    }
-//    using Float = float;
 } // namespace akari
-#endif // AKARIRENDER_AKARI_H

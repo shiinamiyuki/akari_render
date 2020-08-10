@@ -23,15 +23,48 @@
 #include <cstdint>
 #include <cstddef>
 #include <akari/common/config.h>
+#include <akari/common/diagnostic.h>
 #include "detail/macro.h"
 namespace akari {
     // AkariRender needs a bit of retargeting capability
     // like different types of Spectrum
     // float vs double
     // however vectorization is not supported
+    template <typename T, size_t N, int packed> constexpr int compute_padded_size() {
+        if constexpr (!std::is_fundamental_v<T>) {
+            return N;
+        }
+        if constexpr (packed || N <= 2) {
+            return N;
+        }
+        if constexpr (sizeof(T) == 1) {
+            // round to 128 bits
+            return (N + 15u) & ~15u;
+        } else if constexpr (sizeof(T) == 2) {
+            // round to 128 bits
+            return (N + 7u) & ~7u;
+        } else if constexpr (sizeof(T) == 4) {
+            // round to 128 bits
+            return (N + 3u) & ~3u;
+        } else if constexpr (sizeof(T) == 8) {
+            // round to 128 bits
+            return (N + 1u) & ~1u;
+        } else {
+            return N;
+        }
+    }
+    template <typename T, size_t N, int packed> constexpr int compute_align() {
+        if constexpr (!std::is_fundamental_v<T>) {
+            return alignof(T);
+        }
+        if constexpr (packed || N <= 2) {
+            return alignof(T);
+        }
+        return 128 / 32;
+    }
 
 #define AKR_VARIANT template <typename Float, typename Spectrum>
-
+    template <typename T, size_t N, int packed = 0> struct alignas(compute_align<T, N, packed>()) Array;
     template <typename Float, int N> struct Vector;
     template <typename Float, int N> struct Point;
     template <typename Float, int N> struct Normal;
@@ -43,6 +76,7 @@ namespace akari {
     template <typename Point> struct BoundingBox;
 
     template <typename T> struct value_ { using type = T; };
+    template <typename T, int N> struct value_<Array<T, N>> { using type = T; };
     template <typename T, int N> struct value_<Vector<T, N>> { using type = T; };
     template <typename T, int N> struct value_<Point<T, N>> { using type = T; };
     template <typename T, int N> struct value_<Normal<T, N>> { using type = T; };
@@ -56,9 +90,21 @@ namespace akari {
 
     template <typename T> struct array_size { static constexpr size_t value = 1; };
     template <typename T, int N> struct array_size<Point<T, N>> { static constexpr size_t value = N; };
+    template <typename T, int N> struct array_size<Array<T, N>> { static constexpr size_t value = N; };
     template <typename T, int N> struct array_size<Vector<T, N>> { static constexpr size_t value = N; };
     template <typename T, int N> struct array_size<Normal<T, N>> { static constexpr size_t value = N; };
     template <typename T> constexpr size_t array_size_v = array_size<T>::value;
+
+    template <typename T> struct is_array : std::false_type {};
+    template <typename T, int N> struct is_array<Array<T, N>> : std::true_type {};
+    template <typename T, int N> struct is_array<Point<T, N>> : std::true_type {};
+    template <typename T, int N> struct is_array<Vector<T, N>> : std::true_type {};
+    template <typename T, int N> struct is_array<Normal<T, N>> : std::true_type {};
+    template <typename T> constexpr size_t is_array_v = is_array<T>::value;
+    template <typename T> struct is_integer : std::is_integral<T> {};
+    template <typename T> struct is_float : std::is_floating_point<T> {};
+    template <typename T> constexpr static bool is_integer_v = is_integer<T>::value;
+    template <typename T> constexpr static bool is_float_v = is_float<T>::value;
     // template <typename T>
     // using int32_array_t = replace_scalar_t<T, int32_t>;
     // template <typename T>
@@ -212,13 +258,14 @@ namespace akari {
     AKR_VARIANT struct Tile;
     AKR_VARIANT class Material;
     AKR_VARIANT class BSDFClosure;
+    AKR_VARIANT class Scene;
     AKR_VARIANT struct sampling;
     AKR_VARIANT struct microfacet;
 
-    template <typename Float_, typename Spectrum_> struct RenderlAliases {
+    template <typename Float_, typename Spectrum_> struct RenderAliases {
         using Float = Float_;
         using Spectrum = Spectrum_;
-        using Ray3f = Ray<Float, Spectrum>;
+        using Ray = Ray<Float, Spectrum>;
         using Film = akari::Film<Float, Spectrum>;
         using Tile = akari::Tile<Float, Spectrum>;
         using Pixel = akari::Pixel<Float, Spectrum>;
@@ -226,13 +273,14 @@ namespace akari {
         using BSDFClosure = akari::BSDFClosure<Float, Spectrum>;
         using sampling = akari::sampling<Float, Spectrum>;
         using microfacet = akari::microfacet<Float, Spectrum>;
+        using Scene = akari::Scene<Float, Spectrum>;
     };
 #define AKR_IMPORT_BASIC_RENDER_TYPES()                                                                                \
     AKR_IMPORT_CORE_TYPES()                                                                                            \
-    using RenderAliases = akari::RenderlAliases<Float, Spectrum>;                                                      \
-    using Ray = typename RenderAliases::Ray3f;                                                                         \
+    using RenderAliases = akari::RenderAliases<Float, Spectrum>;                                                       \
     using sampling = typename RenderAliases::sampling;                                                                 \
-    using microfacet = typename RenderAliases::microfacet;
+    using microfacet = typename RenderAliases::microfacet;                                                             \
+    using Scene = typename RenderAliases::Scene;
 
 #define AKR_IMPORT_TYPES(...)                                                                                          \
     AKR_IMPORT_BASIC_RENDER_TYPES()                                                                                    \

@@ -20,16 +20,28 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#pragma once
+#include <akari/common/variant.h>
 #include <akari/common/math.h>
-#include <akari/common/buffer.h>
-
 namespace akari {
-    struct Mesh {
-        struct VertexData {
-            Buffer<float> data;
-            Buffer<int> index;
-        };        
-        VertexData position, normal, texcoords;
-        Buffer<int> material_index;
+    AKR_VARIANT class PerspectiveCamera {
+      public:
+        AKR_IMPORT_BASIC_RENDER_TYPES()
+      private:
+        Transform3f c2w, w2c, r2w;
+        Point2i resolution;
+        Float fov;
+        void preprocess();
+
+      public:
+        PerspectiveCamera(const Point2i &resolution, const Transform3f &c2w, Float fov)
+            : resolution(resolution), c2w(c2w), w2c(c2w.inverse()), fov(fov) {
+            preprocess();
+        }
+    };
+    AKR_VARIANT class Camera : Variant<PerspectiveCamera<Float, Spectrum>> {
+      public:
+        using Variant::Variant;
+        AKR_IMPORT_BASIC_RENDER_TYPES()
     };
 } // namespace akari

@@ -58,3 +58,13 @@
 #define AKR_USING_TYPES_2(base, peek, ...) AKR_EVAL(AKR_MAP_STMT_NEXT(peek, AKR_USING_TYPES_0)(base, peek, __VA_ARGS__))
 
 #define AKR_USING_TYPES(...) AKR_EVAL_0(AKR_USING_TYPES_2(__VA_ARGS__, (), 0))
+
+#define AKR_IMPORT_RENDER_TYPES_0(x, peek, ...)                                                                          \
+    using x = akari::x<Float, Spectrum>;                                                                                        \
+    AKR_MAP_STMT_NEXT(peek, AKR_IMPORT_RENDER_TYPES_1)(peek, __VA_ARGS__)
+#define AKR_IMPORT_RENDER_TYPES_1(x, peek, ...)                                                                          \
+    using x = akari::x<Float, Spectrum>;                                                                                        \
+    AKR_MAP_STMT_NEXT(peek, AKR_IMPORT_RENDER_TYPES_0)(peek, __VA_ARGS__)
+#define AKR_IMPORT_RENDER_TYPES_2(peek, ...) AKR_EVAL(AKR_MAP_STMT_NEXT(peek, AKR_IMPORT_RENDER_TYPES_0)(peek, __VA_ARGS__))
+
+#define AKR_IMPORT_RENDER_TYPES(...) AKR_EVAL_0(AKR_IMPORT_RENDER_TYPES_2(__VA_ARGS__, (), 0))

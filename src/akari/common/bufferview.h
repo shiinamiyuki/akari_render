@@ -19,55 +19,16 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-
-#ifndef AKARIRENDER_AKARI_H
-#define AKARIRENDER_AKARI_H
-#include <akari/core/platform.h>
-#include <akari/common/diagnostic.h>
-#ifdef __GNUC__
-#if __GNUC__ >= 8
-
-#include <filesystem>
+#pragma once
+#include <akari/common/fwd.h>
 namespace akari {
-    namespace fs = std::filesystem;
-}
-#else
-#include <experimental/filesystem>
-namespace akari {
-    namespace fs = std::experimental::filesystem;
-}
-#endif
-#else
-#include <filesystem>
-namespace akari {
-    namespace fs = std::filesystem;
-}
+    template <typename T> struct BufferView {
+        BufferView() = default;
+        BufferView(T *data, size_t size) : _data(data), _size(size) {}
+        T &operator[](uint32_t i) const { return _data[i]; }
 
-#endif
-
-#include <functional>
-#include <string_view>
-#include <akari/common/panic.h>
-
-namespace akari {
-    
-
-    struct CurrentPathGuard {
-        fs::path _cur;
-        CurrentPathGuard() : _cur(fs::current_path()) {}
-        ~CurrentPathGuard() { fs::current_path(_cur); }
+      private:
+        T *_data = nullptr;
+        size_t _size = 0;
     };
-    struct NonCopyable {
-        NonCopyable() = default;
-        NonCopyable(const NonCopyable&) = delete;
-        NonCopyable & operator=(const NonCopyable&) = delete;
-    };
-
-
-    template<typename T, typename U>
-    std::shared_ptr<U> dyn_cast(const std::shared_ptr<T> & p){
-        return std::dynamic_pointer_cast<U>(p);
-    }
-//    using Float = float;
 } // namespace akari
-#endif // AKARIRENDER_AKARI_H
