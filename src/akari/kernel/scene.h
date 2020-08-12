@@ -25,11 +25,18 @@
 #include <akari/kernel/meshview.h>
 #include <akari/kernel/cameras/camera.h>
 
+#ifdef AKR_ENABLE_EMBREE
+#    include <akari/kernel/embree.inl>
+#endif
+
 namespace akari {
+    AKR_VARIANT
+    class EmbreeAccelerator;
     AKR_VARIANT class Scene {
-    public:
+      public:
         using Camera = akari::Camera<Float, Spectrum>;
         BufferView<MeshView> meshes;
         Camera camera;
+        EmbreeAccelerator<Float, Spectrum> *embree_scene = nullptr;
     };
 } // namespace akari

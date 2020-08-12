@@ -51,7 +51,7 @@ namespace akari {
             RegisterArrayOp<Vector2f>()(c);
         }
         {
-            auto c = py::class_<Vector3f>(m, "Vector2f")
+            auto c = py::class_<Vector3f>(m, "Vector3f")
                          .def(py::init<>())
                          .def(py::init<Float>())
                          .def(py::init<Float, Float>())

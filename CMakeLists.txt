@@ -57,7 +57,7 @@ set(AKR_CORE_EXT_LIBS ${AKR_CORE_EXT_LIBS} fmt)
 
 
 # include(cmake/GUI.cmake)
-# include(cmake/Embree.cmake)
+include(cmake/Embree.cmake)
 # include(cmake/OIDN.cmake)
 # include(cmake/Vulkan.cmake)
 # include(cmake/LLVM.cmake)
@@ -77,7 +77,7 @@ target_link_libraries(akari_core PUBLIC  ${AKR_CORE_EXT_LIBS} ${Python_LIBRARIES
 target_compile_options(akari_core PUBLIC ${AKR_CXX_FLAGS})
 target_include_directories(akari_core PUBLIC src/)
 target_include_directories(akari_core PUBLIC external/pybind11/include)
-target_include_directories(akari_core PUBLIC ${Python_INCLUDE_DIRS})
+target_include_directories(akari_core PUBLIC ${Python_INCLUDE_DIRS} ${EMBREE_INCLUDE_DIRS})
 
 # file(GLOB AKR_KERNEL_SRC src/akari/kernel/*.* src/akari/kernel/*/*.*)
 # add_library(akari_kernel ${AKR_KERNEL_SRC})

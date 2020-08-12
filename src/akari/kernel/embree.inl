@@ -19,30 +19,23 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-#include <akari/core/akari.h>
-#include <akari/common/fwd.h>
-// #include <akari/kernel/materials/material.h>
-namespace akari {
-    AKR_VARIANT class SceneGraphNode {
-      public:
-        AKR_IMPORT_BASIC_RENDER_TYPES()
-        virtual void commit(Scene&) {}
-    };
-    AKR_VARIANT class CameraNode : public SceneGraphNode<Float, Spectrum> { public: };
-    AKR_VARIANT class FilmNode : public SceneGraphNode<Float, Spectrum> { public: };
-    AKR_VARIANT class MaterialNode : public SceneGraphNode<Float, Spectrum> { public: };
-    AKR_VARIANT class MeshNode : public SceneGraphNode<Float, Spectrum> {
-      public:
-    };
-    AKR_VARIANT class SceneNode : public SceneGraphNode<Float, Spectrum> {
-      public:
-        AKR_IMPORT_BASIC_RENDER_TYPES()
-        std::string variant;
-        std::shared_ptr<CameraNode<Float, Spectrum>> camera;
-        std::vector<std::shared_ptr<MeshNode<Float, Spectrum>>> shapes;
-        void commit(Scene& scene) {
-          for(auto & shape : shapes){}
-        }
-    };
 
+#pragma once
+
+#ifdef _MSC_VER
+#pragma warning(disable : 4324)
+
+
+#endif
+#include <embree3/rtcore.h>
+#include <akari/common/fwd.h>
+namespace akari {
+    AKR_VARIANT
+    class EmbreeAccelerator {
+        RTCScene rtcScene = nullptr;
+        RTCDevice device = nullptr;
+
+      public:
+        void build(Scene<Float, Spectrum> &scene);
+    };
 } // namespace akari
