@@ -6,4 +6,4 @@ compiler:
   - clang
 notifications:
   email: false
-script: ./scripts/build-linux-cpu.sh
+script: bash ./scripts/build-linux-cpu.sh
