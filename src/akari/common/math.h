@@ -39,7 +39,7 @@ namespace akari {
     inline bool any(bool a) { return a; }
     inline bool all(bool a) { return a; }
     template <typename T, int N, int packed> struct alignas(compute_align<T, N, packed>()) Array {
-        static constexpr size_t padded_size = compute_padded_size<T, N, packed>();
+        static constexpr int padded_size = (int)compute_padded_size<T, N, packed>();
         T _s[padded_size] = {};
         using value_t = T;
         const T &operator[](int i) const { return _s[i]; }

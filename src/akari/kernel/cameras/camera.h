@@ -39,7 +39,7 @@ namespace akari {
             preprocess();
         }
     };
-    AKR_VARIANT class Camera : Variant<PerspectiveCamera<Float, Spectrum>> {
+    AKR_VARIANT class Camera : public Variant<PerspectiveCamera<Float, Spectrum>> {
       public:
         using Variant<PerspectiveCamera<Float, Spectrum>>::Variant;
         AKR_IMPORT_BASIC_RENDER_TYPES()

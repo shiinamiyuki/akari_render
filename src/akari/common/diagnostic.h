@@ -18,6 +18,5 @@
 #pragma clang diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wattributes"
 #pragma clang diagnostic ignored "-Wattributes"
-#pragma GCC diagnostic ignored "-Wunused-local-typedef"
 #pragma clang diagnostic ignored "-Wunused-local-typedef"
 #endif
