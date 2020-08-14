@@ -1,16 +1,9 @@
 sudo: required
-dist: bionic
+dist: focal
 language: cpp
 compiler:
   - gcc
   - clang
 notifications:
   email: false
-addons:
-  apt:
-    sources:
-    packages:
-    - gcc-8
-    - g++-8
-    - cmake
-script: mkdir build && cd build && cmake ../ -DCMAKE_BUILD_TYPE=Release && make -r -j `nproc`
+script: ./scripts/build-linux-cpu.sh
