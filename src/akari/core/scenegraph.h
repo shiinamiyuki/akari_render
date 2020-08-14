@@ -21,27 +21,49 @@
 // SOFTWARE.
 #include <akari/core/akari.h>
 #include <akari/common/fwd.h>
+#include <akari/kernel/meshview.h>
 // #include <akari/kernel/materials/material.h>
 namespace akari {
     AKR_VARIANT class SceneGraphNode {
       public:
         AKR_IMPORT_BASIC_RENDER_TYPES()
-        virtual void commit(Scene&) {}
+        virtual void commit() {}
     };
-    AKR_VARIANT class CameraNode : public SceneGraphNode<Float, Spectrum> { public: };
+    AKR_VARIANT class SceneNode;
+    AKR_VARIANT class CameraNode : public SceneGraphNode<Float, Spectrum> {
+      public:
+        AKR_IMPORT_TYPES(Camera)
+        virtual Camera compile() = 0;
+    };
     AKR_VARIANT class FilmNode : public SceneGraphNode<Float, Spectrum> { public: };
     AKR_VARIANT class MaterialNode : public SceneGraphNode<Float, Spectrum> { public: };
     AKR_VARIANT class MeshNode : public SceneGraphNode<Float, Spectrum> {
       public:
+        AKR_IMPORT_RENDER_TYPES(SceneNode)
+        virtual MeshView compile(SceneNode &) = 0;
     };
     AKR_VARIANT class SceneNode : public SceneGraphNode<Float, Spectrum> {
       public:
         AKR_IMPORT_BASIC_RENDER_TYPES()
+        std::vector<MeshView> meshviews;
+        using CameraNode = CameraNode<Float, Spectrum>;
+        using MeshNode = MeshNode<Float, Spectrum>;
         std::string variant;
-        std::shared_ptr<CameraNode<Float, Spectrum>> camera;
-        std::vector<std::shared_ptr<MeshNode<Float, Spectrum>>> shapes;
-        void commit(Scene& scene) {
-          for(auto & shape : shapes){}
+        std::shared_ptr<CameraNode> camera;
+        std::vector<std::shared_ptr<MeshNode>> shapes;
+        void commit() override {
+            for (auto &shape : shapes) {
+                AKR_ASSERT_THROW(shape);
+                shape->commit();
+            }
+            AKR_ASSERT_THROW(camera);
+            camera->commit();
+        }
+        Scene compile() {
+            Scene scene;
+            scene.meshes = meshviews;
+            scene.camera = camera->compile();
+            return scene;
         }
     };
 

@@ -29,7 +29,7 @@ namespace akari {
     struct Mesh {
         Buffer<float> vertices, normals, texcoords;
         Buffer<int> indices;
-        Buffer<int> material_index;
+        Buffer<int> material_indices;
     };
 
 } // namespace akari

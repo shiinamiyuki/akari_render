@@ -257,6 +257,7 @@ namespace akari {
     AKR_VARIANT struct Pixel;
     AKR_VARIANT struct Tile;
     AKR_VARIANT class Material;
+    AKR_VARIANT class Camera;
     AKR_VARIANT class BSDFClosure;
     AKR_VARIANT class Scene;
     AKR_VARIANT struct sampling;
@@ -270,6 +271,7 @@ namespace akari {
         using Tile = akari::Tile<Float, Spectrum>;
         using Pixel = akari::Pixel<Float, Spectrum>;
         using Material = akari::Material<Float, Spectrum>;
+        using Camera = akari::Camera<Float, Spectrum>;
         using BSDFClosure = akari::BSDFClosure<Float, Spectrum>;
         using sampling = akari::sampling<Float, Spectrum>;
         using microfacet = akari::microfacet<Float, Spectrum>;

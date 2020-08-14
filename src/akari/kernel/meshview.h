@@ -26,8 +26,8 @@
 
 namespace akari {
     struct MeshView {
-        BufferView<float> position, normal, texcoords;
-        BufferView<int> index;
-        BufferView<int> material_index;
+        BufferView<float> vertices, normals, texcoords;
+        BufferView<int> indices;
+        BufferView<int> material_indices;
     };
 } // namespace akari

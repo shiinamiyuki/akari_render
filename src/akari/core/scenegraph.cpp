@@ -30,6 +30,7 @@
 #include <akari/common/config.h>
 #include <akari/core/mesh.h>
 #include <akari/kernel/scene.h>
+#include <akari/core/logger.h>
 namespace akari {
     namespace py = pybind11;
     std::vector<const char *> _get_enabled_variants() {
@@ -41,27 +42,50 @@ namespace akari {
         Point3f position;
         Vector3f rotation;
         Point2i resolution;
-        void commit(Scene &scene) override {
+        Float fov = radians(80.0f);
+        Camera compile() override {
             AKR_IMPORT_RENDER_TYPES(PerspectiveCamera)
             Transform3f c2w;
             c2w = Transform3f::rotate_z(rotation.z());
             c2w = Transform3f::rotate_x(rotation.y()) * c2w;
             c2w = Transform3f::rotate_y(rotation.x()) * c2w;
             c2w = Transform3f::translate(position) * c2w;
-            scene.camera = PerspectiveCamera(resolution, c2w, 1.0);
+            return PerspectiveCamera(resolution, c2w, 1.0);
         }
     };
     AKR_VARIANT class OBJMesh : public MeshNode<Float, Spectrum> {
+        std::string loaded;
+
       public:
         AKR_IMPORT_BASIC_RENDER_TYPES()
+        AKR_IMPORT_RENDER_TYPES(SceneNode)
+        OBJMesh() = default;
+        OBJMesh(const std::string &path) : path(path) {}
         using MaterialNode = akari::MaterialNode<Float, Spectrum>;
         std::string path;
         Mesh mesh;
         std::vector<std::shared_ptr<MaterialNode>> materials;
-        void commit(Scene &) { (void)load_wavefront_obj(path); }
+        void commit() {
+            if (loaded == path)
+                return;
+            (void)load_wavefront_obj(path);
+        }
+        MeshView compile(SceneNode &scene_node) {
+            commit();
+            MeshView view;
+            view.indices = mesh.indices;
+            view.material_indices = mesh.material_indices;
+            view.normals = mesh.normals;
+            view.texcoords = mesh.texcoords;
+            view.vertices = mesh.vertices;
+            scene_node.meshviews.push_back(view);
+            return view;
+        }
 
       private:
         bool load_wavefront_obj(const fs::path &obj) {
+            info("loading {}\n", fs::absolute(path).string());
+            loaded = obj.string();
             fs::path parent_path = fs::absolute(obj).parent_path();
             fs::path file = obj.filename();
             CurrentPathGuard _;
@@ -120,7 +144,7 @@ namespace akari {
             return true;
         }
     };
-   
+
     AKR_VARIANT void register_scene_graph(py::module &parent) {
         auto m = parent.def_submodule(get_variant_string<Float, Spectrum>());
         using SceneGraphNode = akari::SceneGraphNode<Float, Spectrum>;
@@ -135,19 +159,22 @@ namespace akari {
             .def("commit", &SceneGraphNode::commit);
         py::class_<SceneNode, SceneGraphNode, std::shared_ptr<SceneNode>>(m, "Scene")
             .def(py::init<>())
-            .def_readwrite("variant", &SceneNode::variant);
-        py::class_<CameraNode, SceneGraphNode, std::shared_ptr<CameraNode>>(m, "Camera").def(py::init<>());
+            .def_readwrite("variant", &SceneNode::variant)
+            .def_readwrite("camera", &SceneNode::camera)
+            .def_readwrite("shapes", &SceneNode::shapes)
+            .def("commit", &SceneNode::commit);
+        py::class_<CameraNode, SceneGraphNode, std::shared_ptr<CameraNode>>(m, "Camera");
         py::class_<PerspectiveCameraNode, CameraNode, std::shared_ptr<PerspectiveCameraNode>>(m, "PerspectiveCamera")
             .def(py::init<>())
             .def_readwrite("position", &PerspectiveCameraNode::position)
             .def_readwrite("rotation", &PerspectiveCameraNode::rotation)
+            .def_readwrite("fov", &PerspectiveCameraNode::fov)
             .def("commit", &PerspectiveCameraNode::commit);
-        py::class_<MaterialNode, SceneGraphNode, std::shared_ptr<MaterialNode>>(m, "Material").def(py::init<>());
-        py::class_<MeshNode, SceneGraphNode, std::shared_ptr<MeshNode>>(m, "Mesh")
-            .def(py::init<>())
-            .def("commit", &MeshNode::commit);
+        py::class_<MaterialNode, SceneGraphNode, std::shared_ptr<MaterialNode>>(m, "Material");
+        py::class_<MeshNode, SceneGraphNode, std::shared_ptr<MeshNode>>(m, "Mesh").def("commit", &MeshNode::commit);
         py::class_<OBJMesh, MeshNode, std::shared_ptr<OBJMesh>>(m, "OBJMesh")
             .def(py::init<>())
+            .def(py::init<const std::string &>())
             .def("commit", &OBJMesh::commit)
             .def_readwrite("path", &OBJMesh::path);
         register_math_functions<Float, Spectrum>(m);

@@ -25,7 +25,7 @@
 namespace akari {
     namespace py = pybind11;
     template <typename T> struct RegisterArrayOp {
-        template <typename Class> void operator()(Class &c) const {
+        template <typename Class> void operator()(py::module &m, Class &c) const {
             c.def("__add__", [](const T &a, const T &b) { return a + b; });
             c.def("__sub__", [](const T &a, const T &b) { return a - b; });
             c.def("__mul__", [](const T &a, const T &b) { return a * b; });
@@ -34,6 +34,8 @@ namespace akari {
             c.def("__mul__", [](const value_t<T> &a, const T &b) { return a * b; });
             c.def("__mul__", [](const T &a, const value_t<T> &b) { return a * b; });
             c.def("__div__", [](const T &a, const value_t<T> &b) { return a / b; });
+            m.def("degrees", [](const T &a) { return degrees(a); });
+            m.def("radians", [](const T &a) { return radians(a); });
             // if constexpr (is_integer_v<T>){
 
             // }
@@ -48,7 +50,7 @@ namespace akari {
                          .def(py::init<>())
                          .def(py::init<Float>())
                          .def(py::init<Float, Float>());
-            RegisterArrayOp<Vector2f>()(c);
+            RegisterArrayOp<Vector2f>()(m, c);
         }
         {
             auto c = py::class_<Vector3f>(m, "Vector3f")
@@ -56,21 +58,21 @@ namespace akari {
                          .def(py::init<Float>())
                          .def(py::init<Float, Float>())
                          .def(py::init<Float, Float, Float>());
-            RegisterArrayOp<Vector3f>()(c);
+            RegisterArrayOp<Vector3f>()(m, c);
         }
         {
             auto c = py::class_<Point2i>(m, "Point2i")
                          .def(py::init<>())
                          .def(py::init<Int32>())
                          .def(py::init<Int32, Int32>());
-            RegisterArrayOp<Point2i>()(c);
+            RegisterArrayOp<Point2i>()(m, c);
         }
         {
             auto c = py::class_<Point2f>(m, "Point2f")
                          .def(py::init<>())
                          .def(py::init<Float>())
                          .def(py::init<Float, Float>());
-            RegisterArrayOp<Point2f>()(c);
+            RegisterArrayOp<Point2f>()(m, c);
         }
         {
             auto c = py::class_<Point3f>(m, "Point3f")
@@ -78,7 +80,7 @@ namespace akari {
                          .def(py::init<Float>())
                          .def(py::init<Float, Float>())
                          .def(py::init<Float, Float, Float>());
-            RegisterArrayOp<Point3f>()(c);
+            RegisterArrayOp<Point3f>()(m, c);
         }
     }
 } // namespace akari

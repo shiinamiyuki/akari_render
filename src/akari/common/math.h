@@ -28,8 +28,16 @@
 #include <algorithm>
 #include <cstring>
 namespace akari {
-    template <typename Float> struct Constants { static constexpr Float Inf = std::numeric_limits<Float>::infinity(); };
-
+    template <typename Float> struct Constants {
+        static constexpr Float Inf = std::numeric_limits<Float>::infinity();
+        static constexpr Float Pi = 3.1415926535897932384f;
+        static constexpr Float InvPi = 1.0f / Pi;
+    };
+    inline bool select(bool c, float a, float b) { return c ? a : b; }
+    inline bool select(bool c, int a, int b) { return c ? a : b; }
+    inline bool select(bool c, double a, double b) { return c ? a : b; }
+    inline bool any(bool a) { return a; }
+    inline bool all(bool a) { return a; }
     template <typename T, size_t N, int packed> struct alignas(compute_align<T, N, packed>()) Array {
         static constexpr size_t padded_size = compute_padded_size<T, N, packed>();
         T _s[padded_size] = {};
@@ -160,10 +168,10 @@ namespace akari {
         return reduce(a, [](T acc, T b) { return max(acc, b); });
     }
     template <typename T, int N> bool any(const Array<T, N> &a) {
-        return reduce(a, [](T acc, T b) { return acc || (bool)b; });
+        return reduce(a, [](T acc, T b) { return acc || any(b); });
     }
     template <typename T, int N> bool all(const Array<T, N> &a) {
-        return reduce(a, [](T acc, T b) { return acc && (bool)b; });
+        return reduce(a, [](T acc, T b) { return acc && all(b); });
     }
     template <typename T, int N> Array<T, N> clamp(const Array<T, N> &x, const Array<T, N> &lo, const Array<T, N> &hi) {
         return max(min(x, hi), lo);
@@ -172,7 +180,7 @@ namespace akari {
     Array<T, N> select(const Array<bool, N> &x, const Array<T, N> &a, const Array<T, N> &b) {
         Array<T, N> r;
         for (int i = 0; i < N; i++) {
-            r[i] = x[i] ? a[i] : b[i];
+            r[i] = select(x[i], a[i], b[i]);
         }
         return r;
     }
@@ -577,4 +585,6 @@ namespace akari {
         }
     };
 
+    template <typename Float> inline Float degrees(Float x) { return x * Constants<value_t<Float>>::InvPi * 180.0f; }
+    template <typename Float> inline Float radians(Float x) { return x * Constants<value_t<Float>>::Pi / 180.0f; }
 } // namespace akari
