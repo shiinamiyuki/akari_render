@@ -28,6 +28,7 @@ namespace akari {
       public:
         AKR_IMPORT_BASIC_RENDER_TYPES()
         virtual void commit() {}
+        virtual ~SceneGraphNode() = default;
     };
     AKR_VARIANT class SceneNode;
     AKR_VARIANT class CameraNode : public SceneGraphNode<Float, Spectrum> {

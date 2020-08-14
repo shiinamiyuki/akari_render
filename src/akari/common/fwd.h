@@ -64,7 +64,7 @@ namespace akari {
     }
 
 #define AKR_VARIANT template <typename Float, typename Spectrum>
-    template <typename T, size_t N, int packed = 0> struct alignas(compute_align<T, N, packed>()) Array;
+    template <typename T, int N, int packed = 0> struct alignas(compute_align<T, N, packed>()) Array;
     template <typename Float, int N> struct Vector;
     template <typename Float, int N> struct Point;
     template <typename Float, int N> struct Normal;

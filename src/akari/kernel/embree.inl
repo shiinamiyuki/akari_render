@@ -21,14 +21,13 @@
 // SOFTWARE.
 
 #pragma once
+#ifdef AKR_ENABLE_EMBREE
+#    ifdef _MSC_VER
+#        pragma warning(disable : 4324)
 
-#ifdef _MSC_VER
-#pragma warning(disable : 4324)
-
-
-#endif
-#include <embree3/rtcore.h>
-#include <akari/common/fwd.h>
+#    endif
+#    include <embree3/rtcore.h>
+#    include <akari/common/fwd.h>
 namespace akari {
     AKR_VARIANT
     class EmbreeAccelerator {
@@ -39,3 +38,4 @@ namespace akari {
         void build(Scene<Float, Spectrum> &scene);
     };
 } // namespace akari
+#endif

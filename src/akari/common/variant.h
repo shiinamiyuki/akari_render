@@ -21,7 +21,8 @@
 // SOFTWARE.
 #pragma once
 #include <type_traits>
-
+#include <algorithm>
+#include <cstring>
 namespace akari {
     template <typename... T> struct TypeIndex {
         template <typename U, typename Tp, typename... Rest> struct GetIndex_ {

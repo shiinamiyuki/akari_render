@@ -23,7 +23,7 @@ if(MSVC)
     set(CMAKE_SHARED_LINKER_FLAGS   "${CMAKE_SHARED_LINKER_FLAGS} /LTCG:INCREMENTAL")
 else()
     set(CMAKE_CXX_FLAGS -fPIC)
-    set(AKR_CXX_FLAGS -mavx2)
+    set(AKR_CXX_FLAGS -mavx2 )
     set(AKR_CORE_EXT_LIBS ${AKR_CORE_EXT_LIBS} stdc++fs)
 endif()
 

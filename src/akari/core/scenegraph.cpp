@@ -38,7 +38,7 @@ namespace akari {
     }
     AKR_VARIANT class PerspectiveCameraNode : public CameraNode<Float, Spectrum> {
       public:
-        AKR_IMPORT_BASIC_RENDER_TYPES()
+        AKR_IMPORT_TYPES(Camera)
         Point3f position;
         Vector3f rotation;
         Point2i resolution;

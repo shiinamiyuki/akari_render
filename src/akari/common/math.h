@@ -38,7 +38,7 @@ namespace akari {
     inline bool select(bool c, double a, double b) { return c ? a : b; }
     inline bool any(bool a) { return a; }
     inline bool all(bool a) { return a; }
-    template <typename T, size_t N, int packed> struct alignas(compute_align<T, N, packed>()) Array {
+    template <typename T, int N, int packed> struct alignas(compute_align<T, N, packed>()) Array {
         static constexpr size_t padded_size = compute_padded_size<T, N, packed>();
         T _s[padded_size] = {};
         using value_t = T;
@@ -50,7 +50,7 @@ namespace akari {
                 _s[i] = x;
             }
         }
-        template <typename U, bool P> explicit Array(const Array<U, N, P> &rhs) {
+        template <typename U, int P> explicit Array(const Array<U, N, P> &rhs) {
             if (!P) {
                 for (int i = 0; i < padded_size; i++) {
                     _s[i] = rhs[i];
@@ -201,25 +201,27 @@ namespace akari {
         return s;
     }
 #define FWD_MATH_FUNC1(name)                                                                                           \
-    using std::name;                                                                                                   \
-    template <typename V, int N, bool P> Array<V, N, P> _##name(const Array<V, N, P> &v) {                             \
+                                                                                                                       \
+    template <typename V, int N, int P> Array<V, N, P> _##name(const Array<V, N, P> &v) {                             \
         Array<V, N, P> ans;                                                                                            \
+        using std::name;                                                                                               \
         for (int i = 0; i < N; i++) {                                                                                  \
             ans[i] = name(v[i]);                                                                                       \
         }                                                                                                              \
         return ans;                                                                                                    \
     }                                                                                                                  \
-    template <typename V, int N, bool P> Array<V, N, P> name(const Array<V, N, P> &v) { return _##name(v); }
+    template <typename V, int N, int P> Array<V, N, P> name(const Array<V, N, P> &v) { return _##name(v); }
 #define FWD_MATH_FUNC2(name)                                                                                           \
-    using std::name;                                                                                                   \
-    template <typename V, int N, bool P> Array<V, N, P> _##name(const Array<V, N, P> &v1, const Array<V, N, P> &v2) {  \
+                                                                                                                       \
+    template <typename V, int N, int P> Array<V, N, P> _##name(const Array<V, N, P> &v1, const Array<V, N, P> &v2) {  \
         Array<V, N, P> ans;                                                                                            \
+        using std::name;                                                                                               \
         for (int i = 0; i < N; i++) {                                                                                  \
             ans[i] = name(v1[i], v2[i]);                                                                               \
         }                                                                                                              \
         return ans;                                                                                                    \
     }                                                                                                                  \
-    template <typename V, int N, bool P> Array<V, N, P> name(const Array<V, N, P> &v1, const Array<V, N, P> &v2) {     \
+    template <typename V, int N, int P> Array<V, N, P> name(const Array<V, N, P> &v1, const Array<V, N, P> &v2) {     \
         return _##name(v1, v2);                                                                                        \
     }
     FWD_MATH_FUNC1(floor)
@@ -258,7 +260,7 @@ namespace akari {
     AKR_ARRAY_IMPORT_ARITH_OP(/, /=, Base, Self)                                                                       \
     AKR_ARRAY_IMPORT_ARITH_OP(%, %=, Base, Self)                                                                       \
     friend Self operator*(const Self::value_t &v, const Self &rhs) { return Self(v) * rhs; }                           \
-    friend Array operator/(const Self::value_t &v, const Self &rhs) { return Self(v) / rhs; }                          \
+    friend Self operator/(const Self::value_t &v, const Self &rhs) { return Self(v) / rhs; }                           \
     Self operator-() const { return Self(-static_cast<const Base &>(*this)); }                                         \
     Self &operator=(const Base &base) {                                                                                \
         static_cast<Base &>(*this) = base;                                                                             \
@@ -445,7 +447,7 @@ namespace akari {
         Point3f o;
         Vector3f d;
         Float tmin, tmax;
-        Ray(const Point3f &o, const Vector3f &d, Float tmin, Float tmax = = std::numeric_limits<Float>::infinity())
+        Ray(const Point3f &o, const Vector3f &d, Float tmin, Float tmax = std::numeric_limits<Float>::infinity())
             : o(o), d(d), tmin(tmin), tmax(tmax) {}
         Point3f operator()(Float t) const { return o + t * d; }
     };
@@ -561,9 +563,9 @@ namespace akari {
             pmax = max(pmax, p);
         }
         static BoundingBox merge(const BoundingBox &b1, const BoundingBox &b2) {
-            return BoundingBox(min(b1.pmin, b2.pmin), max(p1.pmax, b2.pmax));
+            return BoundingBox(min(b1.pmin, b2.pmin), max(b1.pmax, b2.pmax));
         }
-        Point centroid() const { return extents() * 0.5f + p_min; }
+        Point centroid() const { return extents() * 0.5f + pmin; }
         Float surface_area() const {
             if constexpr (N == 3) {
                 auto ext = extents();

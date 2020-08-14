@@ -52,17 +52,17 @@ namespace akari {
             return _texels[x + y * _resolution[0]];
         }
 
-        const T &operator()(float x, float y) const { return (*this)(vec2(x, y)); }
+        const T &operator()(float x, float y) const { return (*this)(Point3f(x, y)); }
 
-        T &operator()(float x, float y) { return (*this)(vec2(x, y)); }
+        T &operator()(float x, float y) { return (*this)(Point3f(x, y)); }
 
-        const T &operator()(const Point2i &p) const { return (*this)(p.x, p.y); }
+        const T &operator()(const Point2i &p) const { return (*this)(p.x(), p.y()); }
 
-        T &operator()(const Point2i &p) { return (*this)(p.x, p.y); }
+        T &operator()(const Point2i &p) { return (*this)(p.x(), p.y()); }
 
-        const T &operator()(const Point2f &p) const { return (*this)(ivec2(p * vec2(_resolution))); }
+        const T &operator()(const Point2f &p) const { return (*this)(Point2i(p * Point2f(_resolution))); }
 
-        T &operator()(const Point2f &p) { return (*this)(ivec2(p * vec2(_resolution))); }
+        T &operator()(const Point2f &p) { return (*this)(Point2i(p * Point2f(_resolution))); }
 
         [[nodiscard]] const std::vector<T> &texels() const { return _texels; }
 

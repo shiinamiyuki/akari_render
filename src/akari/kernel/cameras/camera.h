@@ -35,13 +35,13 @@ namespace akari {
 
       public:
         PerspectiveCamera(const Point2i &resolution, const Transform3f &c2w, Float fov)
-            : resolution(resolution), c2w(c2w), w2c(c2w.inverse()), fov(fov) {
+            :c2w(c2w), w2c(c2w.inverse()),  resolution(resolution), fov(fov) {
             preprocess();
         }
     };
     AKR_VARIANT class Camera : Variant<PerspectiveCamera<Float, Spectrum>> {
       public:
-        using Variant::Variant;
+        using Variant<PerspectiveCamera<Float, Spectrum>>::Variant;
         AKR_IMPORT_BASIC_RENDER_TYPES()
     };
 } // namespace akari

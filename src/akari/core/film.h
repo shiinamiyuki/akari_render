@@ -66,7 +66,7 @@ namespace akari {
         AKR_IMPORT_TYPES(Tile, Pixel)
       public:
         Float splatScale = 1.0f;
-        explicit Film(const Point2i &dimension) : radiance(dimension), weight(dimension), splat(dimension) {}
+        explicit Film(const Point2i &dimension) : radiance(dimension), weight(dimension) {}
         Tile tile(const Bounds2i &bounds) { return Tile(bounds); }
 
         [[nodiscard]] Point2i resolution() const { return radiance.resolution(); }
@@ -90,26 +90,16 @@ namespace akari {
                     radiance.resolution().y(),
                     [&](uint32_t y, uint32_t) {
                         for (int x = 0; x < radiance.resolution().x(); x++) {
-                            Spectrum s =
-                                    Spectrum(splat(x, y).color[0], splat(x, y).color[1], splat(x, y).color[2]) *
-                                    splatScale;
                             if (weight(x, y) != 0) {
-                                auto color = (radiance(x, y) + s) / weight(x, y);
+                                auto color = (radiance(x, y)) / weight(x, y);
                                 image(x, y) = std::make_pair(color, 1);
                             } else {
-                                image(x, y) = std::make_pair(s, 1);
+                                image(x, y) = std::make_pair(radiance(x, y), 1);
                             }
                         }
                     },
                     1024);
             default_image_writer()->write(image, path, postProcessor);
-        }
-
-        void add_splat(const Spectrum &L, const Point2f &p) {
-            ivec2 ip = ivec2(p);
-            splat(ip).color[0].add(L[0]);
-            splat(ip).color[1].add(L[1]);
-            splat(ip).color[2].add(L[2]);
         }
     };
 } // namespace akari
