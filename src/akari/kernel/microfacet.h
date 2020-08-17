@@ -26,7 +26,7 @@
 
 namespace akari {
     AKR_VARIANT
-    struct microfacet {
+    struct microfacet_ {
         AKR_IMPORT_CORE_TYPES()
         enum MicrofacetType {
             EGGX,

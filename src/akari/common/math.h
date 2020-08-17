@@ -53,11 +53,11 @@ namespace akari {
         template <typename U, int P> explicit Array(const Array<U, N, P> &rhs) {
             if (!P) {
                 for (int i = 0; i < padded_size; i++) {
-                    _s[i] = rhs[i];
+                    _s[i] = T(rhs[i]);
                 }
             } else {
                 for (int i = 0; i < N; i++) {
-                    _s[i] = rhs[i];
+                    _s[i] = T(rhs[i]);
                 }
             }
         }
@@ -184,11 +184,19 @@ namespace akari {
         }
         return r;
     }
-    template <typename T, typename = std::enable_if_t<is_array_v<T>>> T load(const value_t<T> *p) {
+    template <typename T, int N> using PackedArray = Array<T, N, 1>;
+
+#pragma GCC diagnostic push
+#if defined(__GNUG__) && !defined(__clang__)
+#    pragma GCC diagnostic ignored "-Wclass-memaccess"
+#endif
+    template <typename T, typename = std::enable_if_t<is_array_v<T>>> T load(const void *p) {
         T v;
         std::memcpy(&v, p, sizeof(T));
         return v;
     }
+    template <typename T, int N, int P> void store(void *p, const Array<T, N, P> &a) { std::memcpy(p, &a, sizeof(T)); }
+#pragma GCC diagnostic pop
     template <typename T, int N> T length(const Array<T, N> &a) { return sqrt(dot(a, a)); }
     template <typename T, int N> Array<T, N> normalize(const Array<T, N> &a) { return a / sqrt(dot(a, a)); }
     template <int... args, typename T, int N> auto shuffle(const Array<T, N> &a) {
@@ -202,7 +210,7 @@ namespace akari {
     }
 #define FWD_MATH_FUNC1(name)                                                                                           \
                                                                                                                        \
-    template <typename V, int N, int P> Array<V, N, P> _##name(const Array<V, N, P> &v) {                             \
+    template <typename V, int N, int P> Array<V, N, P> _##name(const Array<V, N, P> &v) {                              \
         Array<V, N, P> ans;                                                                                            \
         using std::name;                                                                                               \
         for (int i = 0; i < N; i++) {                                                                                  \
@@ -213,7 +221,7 @@ namespace akari {
     template <typename V, int N, int P> Array<V, N, P> name(const Array<V, N, P> &v) { return _##name(v); }
 #define FWD_MATH_FUNC2(name)                                                                                           \
                                                                                                                        \
-    template <typename V, int N, int P> Array<V, N, P> _##name(const Array<V, N, P> &v1, const Array<V, N, P> &v2) {  \
+    template <typename V, int N, int P> Array<V, N, P> _##name(const Array<V, N, P> &v1, const Array<V, N, P> &v2) {   \
         Array<V, N, P> ans;                                                                                            \
         using std::name;                                                                                               \
         for (int i = 0; i < N; i++) {                                                                                  \
@@ -221,7 +229,7 @@ namespace akari {
         }                                                                                                              \
         return ans;                                                                                                    \
     }                                                                                                                  \
-    template <typename V, int N, int P> Array<V, N, P> name(const Array<V, N, P> &v1, const Array<V, N, P> &v2) {     \
+    template <typename V, int N, int P> Array<V, N, P> name(const Array<V, N, P> &v1, const Array<V, N, P> &v2) {      \
         return _##name(v1, v2);                                                                                        \
     }
     FWD_MATH_FUNC1(floor)
@@ -325,10 +333,19 @@ namespace akari {
             }
         }
         Matrix(const Array<Array<Float, N>, N> &m) : rows(m) {}
-        Matrix(Float m[N][N]) { std::memcpy(&rows, m, sizeof(Float) * N * N); }
+        Matrix(Float m[N][N]) {
+            for (int i = 0; i < N; i++) {
+                for (int j = 0; j < N; j++) {
+                    rows[i][j] = m[i][j];
+                }
+            }
+        }
         Matrix(Float m[N * N]) {
-            static_assert(sizeof(Float) * N * N == sizeof(rows));
-            std::memcpy(&rows, m, sizeof(Float) * N * N);
+            for (int i = 0; i < N; i++) {
+                for (int j = 0; j < N; j++) {
+                    rows[i][j] = m[i * 4 + j];
+                }
+            }
         }
         const Float &operator()(int i, int j) const { return rows[i][j]; }
         Float &operator()(int i, int j) { return rows[i][j]; }
@@ -374,7 +391,8 @@ namespace akari {
             int indxc[N], indxr[N];
             int ipiv[N] = {0};
             Float minv[N][N];
-            memcpy(minv, &m.rows, N * N * sizeof(Float));
+            // memcpy(minv, &m.rows, N * N * sizeof(Float));
+            store(minv, m.rows);
             for (int i = 0; i < N; i++) {
                 int irow = 0, icol = 0;
                 Float big = 0.f;

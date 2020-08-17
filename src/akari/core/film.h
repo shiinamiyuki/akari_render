@@ -38,7 +38,7 @@ namespace akari {
         AKR_IMPORT_TYPES(Pixel)
         Bounds2i bounds{};
         Point2i _size;
-        std::vector<Pixel> pixels;
+        std::vector<APixel> pixels;
 
         explicit Tile(const Bounds2i &bounds)
             : bounds(bounds), _size(bounds.size() + Point2f(2, 2)), pixels(_size.x() * _size.y()) {}
@@ -67,12 +67,12 @@ namespace akari {
       public:
         Float splatScale = 1.0f;
         explicit Film(const Point2i &dimension) : radiance(dimension), weight(dimension) {}
-        Tile tile(const Bounds2i &bounds) { return Tile(bounds); }
+        ATile tile(const Bounds2i &bounds) { return Tile(bounds); }
 
         [[nodiscard]] Point2i resolution() const { return radiance.resolution(); }
 
         [[nodiscard]] Bounds2i bounds() const { return Bounds2i{Point2i(0), resolution()}; }
-        void merge_tile(const Tile &tile) {
+        void merge_tile(const ATile &tile) {
             const auto lo = max(tile.bounds.p_min - Point2i(1, 1), Point2i(0, 0));
             const auto hi = min(tile.bounds.p_max + Point2i(1, 1), radiance.resolution());
             for (int y = lo.y(); y < hi.y(); y++) {

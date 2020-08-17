@@ -51,7 +51,7 @@ namespace akari {
     AKR_VARIANT class BSDF {
         
         AKR_IMPORT_RENDER_TYPES(BSDFClosure)
-        std::array<BSDFClosure, 16> closures;
+        std::array<ABSDFClosure, 16> closures;
     };
 
     AKR_VARIANT class Material {};

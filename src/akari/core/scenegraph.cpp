@@ -43,14 +43,14 @@ namespace akari {
         Vector3f rotation;
         Point2i resolution;
         Float fov = radians(80.0f);
-        Camera compile() override {
+        ACamera compile() override {
             AKR_IMPORT_RENDER_TYPES(PerspectiveCamera)
             Transform3f c2w;
             c2w = Transform3f::rotate_z(rotation.z());
             c2w = Transform3f::rotate_x(rotation.y()) * c2w;
             c2w = Transform3f::rotate_y(rotation.x()) * c2w;
             c2w = Transform3f::translate(position) * c2w;
-            return PerspectiveCamera(resolution, c2w, 1.0);
+            return APerspectiveCamera(resolution, c2w, 1.0);
         }
     };
     AKR_VARIANT class OBJMesh : public MeshNode<Float, Spectrum> {
@@ -70,7 +70,7 @@ namespace akari {
                 return;
             (void)load_wavefront_obj(path);
         }
-        MeshView compile(SceneNode &scene_node) {
+        MeshView compile(ASceneNode &scene_node) {
             commit();
             MeshView view;
             view.indices = mesh.indices;
@@ -147,36 +147,31 @@ namespace akari {
 
     AKR_VARIANT void register_scene_graph(py::module &parent) {
         auto m = parent.def_submodule(get_variant_string<Float, Spectrum>());
-        using SceneGraphNode = akari::SceneGraphNode<Float, Spectrum>;
-        using CameraNode = akari::CameraNode<Float, Spectrum>;
-        using SceneNode = akari::SceneNode<Float, Spectrum>;
-        using OBJMesh = akari::OBJMesh<Float, Spectrum>;
-        using MeshNode = akari::MeshNode<Float, Spectrum>;
-        using MaterialNode = akari::MaterialNode<Float, Spectrum>;
-        using SceneNode = akari::SceneNode<Float, Spectrum>;
-        using PerspectiveCameraNode = akari::PerspectiveCameraNode<Float, Spectrum>;
-        py::class_<SceneGraphNode, std::shared_ptr<SceneGraphNode>>(m, "SceneGraphNode")
-            .def("commit", &SceneGraphNode::commit);
-        py::class_<SceneNode, SceneGraphNode, std::shared_ptr<SceneNode>>(m, "Scene")
+        AKR_IMPORT_RENDER_TYPES(SceneGraphNode, CameraNode, SceneNode, OBJMesh, MeshNode, MaterialNode, SceneNode,
+                                PerspectiveCameraNode);
+
+        py::class_<ASceneGraphNode, std::shared_ptr<ASceneGraphNode>>(m, "SceneGraphNode")
+            .def("commit", &ASceneGraphNode::commit);
+        py::class_<ASceneNode, ASceneGraphNode, std::shared_ptr<ASceneNode>>(m, "Scene")
             .def(py::init<>())
-            .def_readwrite("variant", &SceneNode::variant)
-            .def_readwrite("camera", &SceneNode::camera)
-            .def_readwrite("shapes", &SceneNode::shapes)
-            .def("commit", &SceneNode::commit);
-        py::class_<CameraNode, SceneGraphNode, std::shared_ptr<CameraNode>>(m, "Camera");
-        py::class_<PerspectiveCameraNode, CameraNode, std::shared_ptr<PerspectiveCameraNode>>(m, "PerspectiveCamera")
+            .def_readwrite("variant", &ASceneNode::variant)
+            .def_readwrite("camera", &ASceneNode::camera)
+            .def_readwrite("shapes", &ASceneNode::shapes)
+            .def("commit", &ASceneNode::commit);
+        py::class_<ACameraNode, ASceneGraphNode, std::shared_ptr<ACameraNode>>(m, "Camera");
+        py::class_<APerspectiveCameraNode, ACameraNode, std::shared_ptr<APerspectiveCameraNode>>(m, "PerspectiveCamera")
             .def(py::init<>())
-            .def_readwrite("position", &PerspectiveCameraNode::position)
-            .def_readwrite("rotation", &PerspectiveCameraNode::rotation)
-            .def_readwrite("fov", &PerspectiveCameraNode::fov)
-            .def("commit", &PerspectiveCameraNode::commit);
-        py::class_<MaterialNode, SceneGraphNode, std::shared_ptr<MaterialNode>>(m, "Material");
-        py::class_<MeshNode, SceneGraphNode, std::shared_ptr<MeshNode>>(m, "Mesh").def("commit", &MeshNode::commit);
-        py::class_<OBJMesh, MeshNode, std::shared_ptr<OBJMesh>>(m, "OBJMesh")
+            .def_readwrite("position", &APerspectiveCameraNode::position)
+            .def_readwrite("rotation", &APerspectiveCameraNode::rotation)
+            .def_readwrite("fov", &APerspectiveCameraNode::fov)
+            .def("commit", &APerspectiveCameraNode::commit);
+        py::class_<AMaterialNode, ASceneGraphNode, std::shared_ptr<AMaterialNode>>(m, "Material");
+        py::class_<AMeshNode, ASceneGraphNode, std::shared_ptr<AMeshNode>>(m, "Mesh").def("commit", &AMeshNode::commit);
+        py::class_<AOBJMesh, AMeshNode, std::shared_ptr<AOBJMesh>>(m, "OBJMesh")
             .def(py::init<>())
             .def(py::init<const std::string &>())
-            .def("commit", &OBJMesh::commit)
-            .def_readwrite("path", &OBJMesh::path);
+            .def("commit", &AOBJMesh::commit)
+            .def_readwrite("path", &AOBJMesh::path);
         register_math_functions<Float, Spectrum>(m);
     }
     PYBIND11_EMBEDDED_MODULE(akari, m) {

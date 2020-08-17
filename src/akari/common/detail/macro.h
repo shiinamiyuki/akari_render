@@ -22,6 +22,8 @@
 
 #pragma once
 
+#define AKR_ALIAS(Type, ...) using A##Type = Type<__VA_ARGS__>;
+
 // this macro is directly copied from https://github.com/mitsuba-renderer/enoki/blob/master/include/enoki/array_macro.h
 #define AKR_EVAL_0(...) __VA_ARGS__
 #define AKR_EVAL_1(...) AKR_EVAL_0(AKR_EVAL_0(AKR_EVAL_0(__VA_ARGS__)))
@@ -39,32 +41,24 @@
 #define AKR_EXTRACT_0(next, ...)        next
 
 #if defined(_MSC_VER) // MSVC is not as eager to expand macros, hence this workaround
-#define AKR_MAP_EXPR_NEXT_1(test, next) AKR_EVAL_0(AKR_MAP_NEXT_0(test, AKR_MAP_COMMA next, 0))
-#define AKR_MAP_STMT_NEXT_1(test, next) AKR_EVAL_0(AKR_MAP_NEXT_0(test, next, 0))
+#    define AKR_MAP_EXPR_NEXT_1(test, next) AKR_EVAL_0(AKR_MAP_NEXT_0(test, AKR_MAP_COMMA next, 0))
+#    define AKR_MAP_STMT_NEXT_1(test, next) AKR_EVAL_0(AKR_MAP_NEXT_0(test, next, 0))
 #else
-#define AKR_MAP_EXPR_NEXT_1(test, next) AKR_MAP_NEXT_0(test, AKR_MAP_COMMA next, 0)
-#define AKR_MAP_STMT_NEXT_1(test, next) AKR_MAP_NEXT_0(test, next, 0)
+#    define AKR_MAP_EXPR_NEXT_1(test, next) AKR_MAP_NEXT_0(test, AKR_MAP_COMMA next, 0)
+#    define AKR_MAP_STMT_NEXT_1(test, next) AKR_MAP_NEXT_0(test, next, 0)
 #endif
 
 #define AKR_MAP_EXPR_NEXT(test, next) AKR_MAP_EXPR_NEXT_1(AKR_MAP_GET_END test, next)
 #define AKR_MAP_STMT_NEXT(test, next) AKR_MAP_STMT_NEXT_1(AKR_MAP_GET_END test, next)
 
-#define AKR_USING_TYPES_0(base, x, peek, ...)                                                                          \
-    using x = typename base::x;                                                                                        \
-    AKR_MAP_STMT_NEXT(peek, AKR_USING_TYPES_1)(base, peek, __VA_ARGS__)
-#define AKR_USING_TYPES_1(base, x, peek, ...)                                                                          \
-    using x = typename base::x;                                                                                        \
-    AKR_MAP_STMT_NEXT(peek, AKR_USING_TYPES_0)(base, peek, __VA_ARGS__)
-#define AKR_USING_TYPES_2(base, peek, ...) AKR_EVAL(AKR_MAP_STMT_NEXT(peek, AKR_USING_TYPES_0)(base, peek, __VA_ARGS__))
 
-#define AKR_USING_TYPES(...) AKR_EVAL_0(AKR_USING_TYPES_2(__VA_ARGS__, (), 0))
-
-#define AKR_IMPORT_RENDER_TYPES_0(x, peek, ...)                                                                          \
-    using x = akari::x<Float, Spectrum>;                                                                                        \
+#define AKR_IMPORT_RENDER_TYPES_0(x, peek, ...)                                                                        \
+    using A##x = x<Float, Spectrum>;                                                                                   \
     AKR_MAP_STMT_NEXT(peek, AKR_IMPORT_RENDER_TYPES_1)(peek, __VA_ARGS__)
-#define AKR_IMPORT_RENDER_TYPES_1(x, peek, ...)                                                                          \
-    using x = akari::x<Float, Spectrum>;                                                                                        \
+#define AKR_IMPORT_RENDER_TYPES_1(x, peek, ...)                                                                        \
+    using A##x = x<Float, Spectrum>;                                                                                   \
     AKR_MAP_STMT_NEXT(peek, AKR_IMPORT_RENDER_TYPES_0)(peek, __VA_ARGS__)
-#define AKR_IMPORT_RENDER_TYPES_2(peek, ...) AKR_EVAL(AKR_MAP_STMT_NEXT(peek, AKR_IMPORT_RENDER_TYPES_0)(peek, __VA_ARGS__))
+#define AKR_IMPORT_RENDER_TYPES_2(peek, ...)                                                                           \
+    AKR_EVAL(AKR_MAP_STMT_NEXT(peek, AKR_IMPORT_RENDER_TYPES_0)(peek, __VA_ARGS__))
 
 #define AKR_IMPORT_RENDER_TYPES(...) AKR_EVAL_0(AKR_IMPORT_RENDER_TYPES_2(__VA_ARGS__, (), 0))

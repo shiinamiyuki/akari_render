@@ -260,32 +260,18 @@ namespace akari {
     AKR_VARIANT class Camera;
     AKR_VARIANT class BSDFClosure;
     AKR_VARIANT class Scene;
-    AKR_VARIANT struct sampling;
-    AKR_VARIANT struct microfacet;
+    AKR_VARIANT struct sampling_;
+    AKR_VARIANT struct microfacet_;
 
-    template <typename Float_, typename Spectrum_> struct RenderAliases {
-        using Float = Float_;
-        using Spectrum = Spectrum_;
-        using Ray = Ray<Float, Spectrum>;
-        using Film = akari::Film<Float, Spectrum>;
-        using Tile = akari::Tile<Float, Spectrum>;
-        using Pixel = akari::Pixel<Float, Spectrum>;
-        using Material = akari::Material<Float, Spectrum>;
-        using Camera = akari::Camera<Float, Spectrum>;
-        using BSDFClosure = akari::BSDFClosure<Float, Spectrum>;
-        using sampling = akari::sampling<Float, Spectrum>;
-        using microfacet = akari::microfacet<Float, Spectrum>;
-        using Scene = akari::Scene<Float, Spectrum>;
-    };
 #define AKR_IMPORT_BASIC_RENDER_TYPES()                                                                                \
     AKR_IMPORT_CORE_TYPES()                                                                                            \
-    using RenderAliases = akari::RenderAliases<Float, Spectrum>;                                                       \
-    using sampling = typename RenderAliases::sampling;                                                                 \
-    using microfacet = typename RenderAliases::microfacet;                                                             \
-    using Scene = typename RenderAliases::Scene;
+    using sampling = sampling_<Float, Spectrum>;                                                                       \
+    using microfacet = microfacet_<Float, Spectrum>;                                                                   \
+    using Ray3f = Ray<Float, Spectrum>;                                                                                \
+    AKR_IMPORT_RENDER_TYPES(Scene)
 
 #define AKR_IMPORT_TYPES(...)                                                                                          \
     AKR_IMPORT_BASIC_RENDER_TYPES()                                                                                    \
-    AKR_USING_TYPES(RenderAliases, __VA_ARGS__)
+    AKR_IMPORT_RENDER_TYPES(__VA_ARGS__)
 
 } // namespace akari
