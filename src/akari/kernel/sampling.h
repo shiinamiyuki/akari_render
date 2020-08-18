@@ -35,14 +35,14 @@ namespace akari {
                 return Point2f(0, 0);
 
             Float theta, r;
-            if (abs(uOffset.x()) > abs(uOffset.y())) {
+            if (std::abs(uOffset.x()) > std::abs(uOffset.y())) {
                 r = uOffset.x();
-                theta = Pi4 * (uOffset.y() / uOffset.x());
+                theta = Constants<Float>::Pi4 * (uOffset.y() / uOffset.x());
             } else {
                 r = uOffset.y();
-                theta = Pi2 - Pi4 * (uOffset.x() / uOffset.y());
+                theta = Constants<Float>::Pi2 - Constants<Float>::Pi4 * (uOffset.x() / uOffset.y());
             }
-            return r * Point2f(cos(theta), sin(theta));
+            return r * Point2f(std::cos(theta), std::sin(theta));
         }
 
         static inline Vector3f cosine_hemisphere_sampling(const Point2f &u) {
@@ -51,12 +51,12 @@ namespace akari {
             auto h = sqrt(max(0.0f, 1 - r));
             return Vector3f(uv.x(), h, uv.y());
         }
-        static inline Float cosine_hemisphere_pdf(Float cosTheta) { return cosTheta * InvPi; }
-        static inline Float uniform_sphere_pdf() { return 1.0f / (4 * Pi); }
+        static inline Float cosine_hemisphere_pdf(Float cosTheta) { return cosTheta * Constants<Float>::InvPi; }
+        static inline Float uniform_sphere_pdf() { return 1.0f / (4 * Constants<Float>::Pi); }
         static inline Vector3f uniform_sphere_sampling(const Point2f &u) {
             Float z = 1 - 2 * u[0];
             Float r = sqrt(max((Float)0, (Float)1 - z * z));
-            Float phi = 2 * Pi * u[1];
+            Float phi = 2 * Constants<Float>::Pi * u[1];
             return Vector3f(r * cos(phi), r * sin(phi), z);
         }
     };

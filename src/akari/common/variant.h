@@ -206,8 +206,8 @@ namespace akari {
             });
         }
 
-#define VAR_DISPATCH(method, ...)                                                                                      \
-    return accept([&, this](auto &&self) {                                                                             \
+#define AKR_VAR_DISPATCH(method, ...)                                                                                      \
+    return this->accept([&, this](auto &&self) {                                                                             \
         (void)this;                                                                                                    \
         return self.method(__VA_ARGS__);                                                                               \
     });

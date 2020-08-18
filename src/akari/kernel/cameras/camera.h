@@ -24,24 +24,38 @@
 #include <akari/common/variant.h>
 #include <akari/common/math.h>
 namespace akari {
+    AKR_VARIANT struct CameraSample {
+        AKR_IMPORT_BASIC_RENDER_TYPES()
+        Point2f p_lens;
+        Point2f p_film;
+        Float weight = 0.0f;
+        Normal3f normal;
+        Ray3f ray;
+    };
     AKR_VARIANT class PerspectiveCamera {
       public:
         AKR_IMPORT_BASIC_RENDER_TYPES()
       private:
-        Transform3f c2w, w2c, r2w;
+        Transform3f c2w, w2c, r2c, c2r;
         Point2i resolution;
         Float fov;
+        Float lens_radius = 0.0f;
+        Float focal_distance = 0.0f;
         void preprocess();
 
       public:
         PerspectiveCamera(const Point2i &resolution, const Transform3f &c2w, Float fov)
-            :c2w(c2w), w2c(c2w.inverse()),  resolution(resolution), fov(fov) {
+            : c2w(c2w), w2c(c2w.inverse()), resolution(resolution), fov(fov) {
             preprocess();
         }
+        void generate_ray(const Point2f &u1, const Point2f &u2, const Point2i &raster, ACameraSample *sample) const;
     };
     AKR_VARIANT class Camera : public Variant<PerspectiveCamera<Float, Spectrum>> {
       public:
-        using Variant<PerspectiveCamera<Float, Spectrum>>::Variant;
-        AKR_IMPORT_BASIC_RENDER_TYPES()
+        AKR_IMPORT_TYPES(PerspectiveCamera)
+        using Variant<APerspectiveCamera>::Variant;
+        void generate_ray(const Point2f &u1, const Point2f &u2, const Point2i &raster, ACameraSample *sample) const {
+            AKR_VAR_DISPATCH(generate_ray, u1, u2, raster, sample);
+        }
     };
 } // namespace akari

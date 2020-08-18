@@ -26,7 +26,7 @@
 #include <akari/common/fwd.h>
 #include <akari/core/image.hpp>
 #include <akari/core/parallel.h>
-
+#include <akari/core/buffer.h>
 
 namespace akari {
     AKR_VARIANT struct Pixel {
@@ -38,7 +38,7 @@ namespace akari {
         AKR_IMPORT_TYPES(Pixel)
         Bounds2i bounds{};
         Point2i _size;
-        std::vector<APixel> pixels;
+        Buffer<APixel> pixels;
 
         explicit Tile(const Bounds2i &bounds)
             : bounds(bounds), _size(bounds.size() + Point2f(2, 2)), pixels(_size.x() * _size.y()) {}
@@ -59,7 +59,12 @@ namespace akari {
             pix.radiance += radiance;
         }
     };
-
+    AKR_VARIANT struct TileView {
+         AKR_IMPORT_TYPES(Pixel)
+        Bounds2i bounds{};
+        Point2i _size;
+        BufferView<APixel> pixels;
+    };
     AKR_VARIANT class Film {
         TImage<Spectrum> radiance;
         TImage<Float> weight;

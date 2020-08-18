@@ -99,8 +99,11 @@ namespace akari {
             std::string err;
 
             std::string _file = file.string();
+
             bool ret = tinyobj::LoadObj(&attrib, &shapes, &obj_materials, &err, _file.c_str());
             (void)ret;
+            mesh.vertices.resize(attrib.vertices.size());
+            std::memcpy(&mesh.vertices[0], &attrib.vertices[0], sizeof(float) * mesh.vertices.size());
             for (size_t s = 0; s < shapes.size(); s++) {
                 // Loop over faces(polygon)
                 size_t index_offset = 0;
@@ -112,10 +115,7 @@ namespace akari {
                     for (int v = 0; v < fv; v++) {
                         tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
                         mesh.indices.push_back(idx.vertex_index);
-                        for (int i = 0; i < 3; i++) {
-                            mesh.vertices.push_back(attrib.vertices[3 * idx.vertex_index + i]);
-                        }
-                        triangle[v] = load<Point3f>(&mesh.vertices[mesh.vertices.size() - 3]);
+                        triangle[v] = load<Point3f>(&mesh.vertices[3 * idx.vertex_index]);
                     }
 
                     Normal3f ng =
@@ -141,6 +141,7 @@ namespace akari {
                     }
                 }
             }
+            info("loaded {} triangles, {} vertices\n", mesh.indices.size() / 3, mesh.vertices.size() / 3);
             return true;
         }
     };
@@ -157,7 +158,8 @@ namespace akari {
             .def_readwrite("variant", &ASceneNode::variant)
             .def_readwrite("camera", &ASceneNode::camera)
             .def_readwrite("shapes", &ASceneNode::shapes)
-            .def("commit", &ASceneNode::commit);
+            .def("commit", &ASceneNode::commit)
+            .def("render", &ASceneNode::render);
         py::class_<ACameraNode, ASceneGraphNode, std::shared_ptr<ACameraNode>>(m, "Camera");
         py::class_<APerspectiveCameraNode, ACameraNode, std::shared_ptr<APerspectiveCameraNode>>(m, "PerspectiveCamera")
             .def(py::init<>())
@@ -173,6 +175,8 @@ namespace akari {
             .def("commit", &AOBJMesh::commit)
             .def_readwrite("path", &AOBJMesh::path);
         register_math_functions<Float, Spectrum>(m);
+        m.def("set_device_cpu", &set_device_cpu);
+        m.def("set_device_gpu", &set_device_gpu);
     }
     PYBIND11_EMBEDDED_MODULE(akari, m) {
         m.def("enabled_variants", _get_enabled_variants);

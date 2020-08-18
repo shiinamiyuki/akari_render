@@ -29,13 +29,22 @@
 #    include <embree3/rtcore.h>
 #    include <akari/common/fwd.h>
 namespace akari {
+    AKR_VARIANT struct Intersection;
     AKR_VARIANT
     class EmbreeAccelerator {
         RTCScene rtcScene = nullptr;
         RTCDevice device = nullptr;
 
       public:
+        AKR_IMPORT_BASIC_RENDER_TYPES()
+        EmbreeAccelerator() { device = rtcNewDevice(nullptr); }
         void build(Scene<Float, Spectrum> &scene);
+        bool intersect(const Ray<Float, Spectrum> &ray, Intersection<Float, Spectrum> *isct) const;
+        ~EmbreeAccelerator() {
+            if (rtcScene)
+                rtcReleaseScene(rtcScene);
+            rtcReleaseDevice(device);
+        }
     };
 } // namespace akari
 #endif

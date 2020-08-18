@@ -65,6 +65,9 @@ namespace akari {
             scene.camera = camera->compile();
             return scene;
         }
+        void render() {
+          auto scene = compile();
+        }
     };
 
 } // namespace akari

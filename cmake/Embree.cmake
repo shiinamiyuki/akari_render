@@ -1,9 +1,9 @@
 option(AKR_ENABLE_EMBREE "Use Embree as ray intersection backend" OFF)
-option(AKR_BUILD_EMBREE "Compile embree from source" OFF)
+option(AKR_USE_PREBUILD_EMBREE "Use prebuilt binary" OFF)
 
 if(AKR_ENABLE_EMBREE)
     add_compile_definitions(AKR_ENABLE_EMBREE)
-    if(AKR_BUILD_EMBREE)
+    if(NOT AKR_USE_PREBUILD_EMBREE)
         set(EMBREE_ISPC_SUPPORT           OFF CACHE BOOL " " FORCE)
         set(EMBREE_TUTORIALS              OFF CACHE BOOL " " FORCE)
         set(EMBREE_FILTER_FUNCTION        OFF CACHE BOOL " " FORCE)

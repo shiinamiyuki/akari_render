@@ -29,7 +29,7 @@ namespace akari {
         template <typename Allocator>
         BufferView(std::vector<T, Allocator> &vec) : BufferView(vec.data(), vec.size()) {}
         T &operator[](uint32_t i) const { return _data[i]; }
-
+        size_t size()const{return _size;}
       private:
         T *_data = nullptr;
         size_t _size = 0;

@@ -31,7 +31,11 @@ namespace akari {
     template <typename Float> struct Constants {
         static constexpr Float Inf = std::numeric_limits<Float>::infinity();
         static constexpr Float Pi = 3.1415926535897932384f;
+        static constexpr Float Pi2 = Pi / Float(2.0f);
+        static constexpr Float Pi4 = Pi / Float(4.0f);
         static constexpr Float InvPi = 1.0f / Pi;
+        static constexpr Float Eps = Float(0.001f);
+        static constexpr Float ShadowEps = Float(0.0001f);
     };
     inline bool select(bool c, float a, float b) { return c ? a : b; }
     inline bool select(bool c, int a, int b) { return c ? a : b; }
@@ -203,7 +207,7 @@ namespace akari {
         constexpr int pack[] = {args...};
         static_assert(((args < N) && ...));
         Array<T, sizeof...(args)> s;
-        for (int i = 0; i < sizeof...(args); i++) {
+        for (size_t i = 0; i < sizeof...(args); i++) {
             s[i] = a[pack[i]];
         }
         return s;
@@ -465,7 +469,8 @@ namespace akari {
         Point3f o;
         Vector3f d;
         Float tmin, tmax;
-        Ray(const Point3f &o, const Vector3f &d, Float tmin, Float tmax = std::numeric_limits<Float>::infinity())
+        Ray(const Point3f &o, const Vector3f &d, Float tmin = Constants<Float>::Eps,
+            Float tmax = std::numeric_limits<Float>::infinity())
             : o(o), d(d), tmin(tmin), tmax(tmax) {}
         Point3f operator()(Float t) const { return o + t * d; }
     };

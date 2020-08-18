@@ -21,11 +21,57 @@
 // SOFTWARE.
 
 #include <akari/kernel/embree.inl>
+#include <akari/kernel/scene.h>
 #ifdef AKR_ENABLE_EMBREE
 namespace akari {
     AKR_VARIANT void EmbreeAccelerator<Float, Spectrum>::build(Scene<Float, Spectrum> &scene) {
-        using Scene = Scene<Float, Spectrum>;
-        
+        using AScene = Scene<Float, Spectrum>;
+        rtcScene = rtcNewScene(device);
+        for (const MeshView &mesh : scene.meshes) {
+            auto geometry = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);
+            rtcSetSharedGeometryBuffer(geometry, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, &mesh.vertices[0], 0,
+                                       sizeof(float) * 3, mesh.vertices.size() / 3);
+            rtcSetSharedGeometryBuffer(geometry, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, &mesh.indices[0], 0,
+                                       sizeof(int) * 3, mesh.indices.size() / 3);
+            rtcCommitGeometry(geometry);
+            rtcAttachGeometry(rtcScene, geometry);
+            rtcReleaseGeometry(geometry);
+        }
+        rtcCommitScene(rtcScene);
+    }
+    AKR_VARIANT static inline RTCRay toRTCRay(const Ray<Float, Spectrum> &_ray) {
+        RTCRay ray;
+        auto _o = _ray.o;
+        ray.dir_x = _ray.d.x();
+        ray.dir_y = _ray.d.y();
+        ray.dir_z = _ray.d.z();
+        ray.org_x = _o.x();
+        ray.org_y = _o.y();
+        ray.org_z = _o.z();
+        ray.tnear = _ray.tmin;
+        ray.tfar = _ray.tmax;
+        ray.flags = 0;
+        return ray;
+    }
+    AKR_VARIANT bool EmbreeAccelerator<Float, Spectrum>::intersect(const Ray<Float, Spectrum> &ray,
+                                                                   Intersection<Float, Spectrum> *intersection) const {
+        RTCRayHit rayHit;
+        rayHit.ray = toRTCRay(ray);
+        rayHit.ray.flags = 0;
+        rayHit.hit.geomID = RTC_INVALID_GEOMETRY_ID;
+        rayHit.hit.primID = RTC_INVALID_GEOMETRY_ID;
+        rayHit.hit.instID[0] = RTC_INVALID_GEOMETRY_ID;
+        RTCIntersectContext context;
+        rtcInitIntersectContext(&context);
+        rtcIntersect1(rtcScene, &context, &rayHit);
+        if (rayHit.hit.geomID == RTC_INVALID_GEOMETRY_ID || rayHit.hit.primID == RTC_INVALID_GEOMETRY_ID)
+            return false;
+        intersection->prim_id = rayHit.hit.primID;
+        intersection->geom_id = rayHit.hit.geomID;
+        intersection->ng = normalize(Normal3f(rayHit.hit.Ng_x, rayHit.hit.Ng_y, rayHit.hit.Ng_z));
+        intersection->uv = Point2f(rayHit.hit.u, rayHit.hit.v);
+        intersection->t = rayHit.ray.tfar;
+        return true;
     }
 } // namespace akari
 #endif

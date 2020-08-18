@@ -21,15 +21,10 @@
 // SOFTWARE.
 
 #pragma once
-#include <vector>
 #include <memory_resource>
-#include <akari/common/bufferview.h>
-#include <akari/core/mode.h>
 namespace akari {
+    void set_device_gpu();
+    void set_device_cpu();
+
     std::pmr::memory_resource *get_device_memory_resource();
-    // template <typename T> using Buffer = std::vector<T, std::pmr::polymorphic_allocator<T>>;
-    template <typename T> struct DeviceAllocator : std::pmr::polymorphic_allocator<T> {
-        DeviceAllocator() : std::pmr::polymorphic_allocator<T>(get_device_memory_resource()) {}
-    };
-    template <typename T> using Buffer = std::vector<T, DeviceAllocator<T>>;
 } // namespace akari

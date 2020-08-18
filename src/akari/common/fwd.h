@@ -262,16 +262,22 @@ namespace akari {
     AKR_VARIANT class Scene;
     AKR_VARIANT struct sampling_;
     AKR_VARIANT struct microfacet_;
+    AKR_VARIANT struct CameraSample;
 
 #define AKR_IMPORT_BASIC_RENDER_TYPES()                                                                                \
     AKR_IMPORT_CORE_TYPES()                                                                                            \
     using sampling = sampling_<Float, Spectrum>;                                                                       \
     using microfacet = microfacet_<Float, Spectrum>;                                                                   \
     using Ray3f = Ray<Float, Spectrum>;                                                                                \
-    AKR_IMPORT_RENDER_TYPES(Scene)
+    AKR_IMPORT_RENDER_TYPES(Scene, CameraSample)
 
 #define AKR_IMPORT_TYPES(...)                                                                                          \
     AKR_IMPORT_BASIC_RENDER_TYPES()                                                                                    \
     AKR_IMPORT_RENDER_TYPES(__VA_ARGS__)
 
+#ifdef AKR_ENABLE_EMBREE
+    static constexpr bool akari_enable_embree = true;
+#else
+    static constexpr bool akari_enable_embree = false;
+#endif
 } // namespace akari
