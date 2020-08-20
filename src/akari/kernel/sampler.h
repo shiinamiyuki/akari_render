@@ -21,30 +21,34 @@
 // SOFTWARE.
 
 #pragma once
-
-#include <type_traits>
-#include <string_view>
-
+#include <akari/common/fwd.h>
 namespace akari {
-    struct StaticAttribute {
-        std::string_view key, value;
-    };
-    struct StaticProperty {
-        const std::string_view name;
-        const StaticAttribute * const attributes;
-        const size_t attribute_count;
-        template<size_t N>
-        static constexpr StaticProperty make(std::string_view name, const StaticAttribute (&attributes) [N]) {
-            return StaticProperty{
-                name, attributes, N
-            };
+    AKR_VARIANT class RandomSampler {
+        uint64_t state = 0x4d595df4d0f33173; // Or something seed-dependent
+        static uint64_t const multiplier = 6364136223846793005u;
+        static uint64_t const increment = 1442695040888963407u; // Or an arbitrary odd constant
+        static uint32_t rotr32(uint32_t x, unsigned r) { return x >> r | x << (-r & 31); }
+        uint32_t pcg32(void) {
+            uint64_t x = state;
+            unsigned count = (unsigned)(x >> 59); // 59 = 64 - 5
+
+            state = x * multiplier + increment;
+            x ^= x >> 18;                              // 18 = (64 - 27)/2
+            return rotr32((uint32_t)(x >> 27), count); // 27 = 32 - 5
         }
+        void pcg32_init(uint64_t seed) {
+            state = seed + increment;
+            (void)pcg32();
+        }
+
+      public:
+        AKR_IMPORT_CORE_TYPES()
+        Float next1d() const { return Float(pcg32()) / 0xffffffff; }
+        Point2f next2d() const { return Point2f(next1d(), next1d()); }
+        RandomSampler(uint64_t seed = 0u) { pcg32_init(seed); }
     };
-    template<typename T>
-    struct StaticMeta {
-        template<class F>
-        static void foreach_property(T & object,F && f){}
-        static size_t property_count() {return 0;}
-        static size_t method_count() {return 0;}
+    AKR_VARIANT class Sampler : Variant<RandomSamlper>{
+    public:
+        
     };
-}
+} // namespace akari

@@ -21,30 +21,25 @@
 // SOFTWARE.
 
 #pragma once
-
-#include <type_traits>
-#include <string_view>
-
+#include <akari/common/fwd.h>
 namespace akari {
-    struct StaticAttribute {
-        std::string_view key, value;
+    struct AOV {
+        static constexpr uint32_t color = 0;
+        static constexpr uint32_t albedo = 1;
+        static constexpr uint32_t depth = 2;
+        static constexpr uint32_t normal = 3;
     };
-    struct StaticProperty {
-        const std::string_view name;
-        const StaticAttribute * const attributes;
-        const size_t attribute_count;
-        template<size_t N>
-        static constexpr StaticProperty make(std::string_view name, const StaticAttribute (&attributes) [N]) {
-            return StaticProperty{
-                name, attributes, N
-            };
-        }
-    };
-    template<typename T>
-    struct StaticMeta {
-        template<class F>
-        static void foreach_property(T & object,F && f){}
-        static size_t property_count() {return 0;}
-        static size_t method_count() {return 0;}
-    };
-}
+    namespace cpu {
+        AKR_VARIANT class AOVIntegrator {
+
+        };
+        AKR_VARIANT class AmbientOcclusion {
+        public:
+            
+        };
+        AKR_VARIANT class Integrator {
+        public:
+
+        };
+    } // namespace cpu
+} // namespace akari

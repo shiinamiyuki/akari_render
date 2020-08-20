@@ -60,10 +60,26 @@ namespace akari {
         }
     };
     AKR_VARIANT struct TileView {
-         AKR_IMPORT_TYPES(Pixel)
+        AKR_IMPORT_TYPES(Pixel)
         Bounds2i bounds{};
         Point2i _size;
-        BufferView<APixel> pixels;
+        BufferView<Pixel<Float, Spectrum>> pixels;
+        explicit TileView(Tile<Float, Spectrum> &tile) : bounds(tile.bounds), _size(tile._size), pixels(tile.pixels) {}
+        auto &operator()(const Point2f &p) {
+            auto q = Point2i(floor(p + Point2f(0.5) - Point2f(bounds.p_min) + Point2f(1)));
+            return pixels[q.x() + q.y() * _size.x()];
+        }
+
+        const auto &operator()(const Point2f &p) const {
+            auto q = Point2i(floor(p + Point2f(0.5) - Point2f(bounds.p_min) + Point2f(1)));
+            return pixels[q.x() + q.y() * _size.x()];
+        }
+
+        void add_sample(const Point2f &p, const Spectrum &radiance, Float weight) {
+            auto &pix = (*this)(p);
+            pix.weight += weight;
+            pix.radiance += radiance;
+        }
     };
     AKR_VARIANT class Film {
         TImage<Spectrum> radiance;
@@ -92,18 +108,18 @@ namespace akari {
         void write_image(const fs::path &path, const PostProcessor &postProcessor = GammaCorrection()) const {
             RGBAImage image(resolution());
             parallel_for(
-                    radiance.resolution().y(),
-                    [&](uint32_t y, uint32_t) {
-                        for (int x = 0; x < radiance.resolution().x(); x++) {
-                            if (weight(x, y) != 0) {
-                                auto color = (radiance(x, y)) / weight(x, y);
-                                image(x, y) = std::make_pair(color, 1);
-                            } else {
-                                image(x, y) = std::make_pair(radiance(x, y), 1);
-                            }
+                radiance.resolution().y(),
+                [&](uint32_t y, uint32_t) {
+                    for (int x = 0; x < radiance.resolution().x(); x++) {
+                        if (weight(x, y) != 0) {
+                            auto color = (radiance(x, y)) / weight(x, y);
+                            image(x, y) = std::make_pair(color, 1);
+                        } else {
+                            image(x, y) = std::make_pair(radiance(x, y), 1);
                         }
-                    },
-                    1024);
+                    }
+                },
+                1024);
             default_image_writer()->write(image, path, postProcessor);
         }
     };

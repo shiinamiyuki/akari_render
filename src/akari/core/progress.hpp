@@ -24,6 +24,7 @@
 #define AKARIRENDER_PROGRESS_HPP
 #include <atomic>
 #include <cstdio>
+#include <functional>
 namespace akari {
     inline void show_progress(double progress, size_t width) {
         printf("[");
