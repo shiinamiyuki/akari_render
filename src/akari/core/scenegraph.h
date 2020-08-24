@@ -22,6 +22,7 @@
 #include <akari/core/akari.h>
 #include <akari/common/fwd.h>
 #include <akari/kernel/meshview.h>
+#include <akari/kernel/integrators/cpu/integrator.h>
 // #include <akari/kernel/materials/material.h>
 namespace akari {
     AKR_VARIANT class SceneGraphNode {
@@ -51,6 +52,7 @@ namespace akari {
         std::string variant;
         std::shared_ptr<ACameraNode> camera;
         std::vector<std::shared_ptr<AMeshNode>> shapes;
+        std::string output;
         void commit() override {
             for (auto &shape : shapes) {
                 AKR_ASSERT_THROW(shape);
@@ -65,9 +67,7 @@ namespace akari {
             scene.camera = camera->compile();
             return scene;
         }
-        void render() {
-          auto scene = compile();
-        }
+        void render();
     };
 
 } // namespace akari

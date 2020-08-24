@@ -21,8 +21,19 @@
 // SOFTWARE.
 #pragma once
 #include <akari/common/math.h>
+#include <akari/kernel/materials/material.h>
+#include <akari/kernel/shape.h>
 namespace akari {
-    AKR_VARIANT struct SurfaceInteration {
+    AKR_VARIANT struct SurfaceInteraction {
+        AKR_IMPORT_TYPES(Material, BSDFClosure, BSDF, Triangle, Intersection)
+        Point3f p;
+        ATriangle triangle;
+        ABSDF bsdf;
+        Normal3f ng, ns;
+        Point2f texcoords;
 
+        SurfaceInteraction(const AIntersection &isct, const ATriangle &triangle)
+            : p(isct.p), triangle(triangle), ng(isct.ng), ns(triangle.ns(isct.uv)),
+              texcoords(triangle.texcoord(isct.uv)), bsdf(ns) {}
     };
-}
+} // namespace akari

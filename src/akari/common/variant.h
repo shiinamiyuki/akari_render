@@ -23,6 +23,7 @@
 #include <type_traits>
 #include <algorithm>
 #include <cstring>
+#include <akari/common/panic.h>
 namespace akari {
     template <typename... T> struct TypeIndex {
         template <typename U, typename Tp, typename... Rest> struct GetIndex_ {
@@ -169,7 +170,7 @@ namespace akari {
             if constexpr (std::is_same_v<void, Ret>) {
                 return;
             } else {
-                return Ret();
+                AKR_PANIC("No matching case");
             }
         }
 
@@ -188,7 +189,7 @@ namespace akari {
             if constexpr (std::is_same_v<void, Ret>) {
                 return;
             } else {
-                return Ret();
+                AKR_PANIC("No matching case");
             }
         }
 
@@ -206,8 +207,8 @@ namespace akari {
             });
         }
 
-#define AKR_VAR_DISPATCH(method, ...)                                                                                      \
-    return this->accept([&, this](auto &&self) {                                                                             \
+#define AKR_VAR_DISPATCH(method, ...)                                                                                  \
+    return this->accept([&, this](auto &&self) {                                                                       \
         (void)this;                                                                                                    \
         return self.method(__VA_ARGS__);                                                                               \
     });

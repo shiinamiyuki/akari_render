@@ -22,6 +22,7 @@
 #pragma once
 #include <akari/common/math.h>
 #include <pybind11/pybind11.h>
+#include <akari/core/logger.h>
 namespace akari {
     namespace py = pybind11;
     template <typename T> struct RegisterArrayOp {
@@ -29,11 +30,16 @@ namespace akari {
             c.def("__add__", [](const T &a, const T &b) { return a + b; });
             c.def("__sub__", [](const T &a, const T &b) { return a - b; });
             c.def("__mul__", [](const T &a, const T &b) { return a * b; });
-            c.def("__div__", [](const T &a, const T &b) { return a / b; });
-            c.def("__div__", [](const value_t<T> &a, const T &b) { return a / b; });
-            c.def("__mul__", [](const value_t<T> &a, const T &b) { return a * b; });
+            c.def("__truediv__", [](const T &a, const T &b) { return a / b; });
+            c.def("__add__", [](const T &a, const value_t<T> &b) { return a + b; });
+            c.def("__sub__", [](const T &a, const value_t<T> &b) { return a - b; });
             c.def("__mul__", [](const T &a, const value_t<T> &b) { return a * b; });
-            c.def("__div__", [](const T &a, const value_t<T> &b) { return a / b; });
+            c.def("__truediv__", [](const T &a, const value_t<T> &b) { return a / b; });
+            c.def("__add__", [](const value_t<T> &a, const T &b) { return a + b; });
+            c.def("__sub__", [](const value_t<T> &a, const T &b) { return a - b; });
+            c.def("__mul__", [](const value_t<T> &a, const T &b) { return a * b; });
+            c.def("__truediv__", [](const value_t<T> &a, const T &b) { return a / b; });
+            c.def("__str__", [](const T &a) -> std::string { return fmt::format("{}", a); });
             m.def("degrees", [](const T &a) { return degrees(a); });
             m.def("radians", [](const T &a) { return radians(a); });
             // if constexpr (is_integer_v<T>){

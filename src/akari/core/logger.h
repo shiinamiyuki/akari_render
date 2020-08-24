@@ -24,8 +24,63 @@
 #define AKARIRENDER_LOGGER_H
 
 #include <akari/core/platform.h>
+#include <akari/common/math.h>
 #include <fmt/format.h>
+template <typename T, int N> struct fmt::formatter<akari::Array<T, N>> {
+
+    template <typename FormatContext> auto format(const akari::Array<T, N> &a, FormatContext &ctx) {
+        // auto format(const point &p, FormatContext &ctx) -> decltype(ctx.out()) // c++11
+        // ctx.out() is an output iterator to write to.
+        auto it = format_to(ctx.out(), "[");
+        for (int i = 0; i < N; i++) {
+            it = format_to(it, "{}", a[i]);
+            if (i != N - 1) {
+                it = format_to(it, ", ");
+            }
+        }
+        it = format_to(it, "]");
+        return it;
+    }
+    constexpr auto parse(format_parse_context &ctx) {
+        // auto parse(format_parse_context &ctx) -> decltype(ctx.begin()) // c++11
+        // [ctx.begin(), ctx.end()) is a character range that contains a part of
+        // the format string starting from the format specifications to be parsed,
+        // e.g. in
+        //
+        //   fmt::format("{:f} - point of interest", point{1, 2});
+        //
+        // the range will contain "f} - point of interest". The formatter should
+        // parse specifiers until '}' or the end of the range. In this example
+        // the formatter should parse the 'f' specifier and return an iterator
+        // pointing to '}'.
+
+        // Parse the presentation format and store it in the formatter:
+        auto it = ctx.begin(), end = ctx.end();
+        // Check if reached the end of the range:
+        if (it != end && *it != '}')
+            throw format_error("invalid format");
+
+        // Return an iterator past the end of the parsed range:
+        return it;
+    }
+};
+template <typename T, int N> struct fmt::formatter<akari::Point<T, N>> : fmt::formatter<akari::Array<T, N>> {
+    template <typename FormatCtx> auto format(const akari::Point<T, N> &a, FormatCtx &ctx) {
+        return fmt::formatter<akari::Array<T, N>>::format(a, ctx);
+    }
+};
+template <typename T, int N> struct fmt::formatter<akari::Vector<T, N>> : fmt::formatter<akari::Array<T, N>> {
+    template <typename FormatCtx> auto format(const akari::Vector<T, N> &a, FormatCtx &ctx) {
+        return fmt::formatter<akari::Array<T, N>>::format(a, ctx);
+    }
+};
+template <typename T, int N> struct fmt::formatter<akari::Normal<T, N>> : fmt::formatter<akari::Array<T, N>> {
+    template <typename FormatCtx> auto format(const akari::Normal<T, N> &a, FormatCtx &ctx) {
+        return fmt::formatter<akari::Array<T, N>>::format(a, ctx);
+    }
+};
 namespace akari {
+
     enum class LogLevel { Info, Debug, Warning, Error, Fatal };
     class LogHandler {
       public:

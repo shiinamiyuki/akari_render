@@ -26,15 +26,15 @@
 namespace akari {
     AKR_VARIANT void PerspectiveCamera<Float, Spectrum>::preprocess() {
         Transform3f m;
-        m = Transform3f::scale(Vector3f(1.0f / resolution.x(), 1.0f / resolution.y(), 1)) * m;
+        m = Transform3f::scale(Vector3f(1.0f / _resolution.x(), 1.0f / _resolution.y(), 1)) * m;
         m = Transform3f::scale(Vector3f(2, 2, 1)) * m;
         m = Transform3f::translate(Point3f(-1, -1, 0)) * m;
         m = Transform3f::scale(Vector3f(1, -1, 1)) * m;
         auto s = std::atan(fov / 2);
-        if (resolution.x() > resolution.y()) {
-            m = Transform3f::scale(Vector3f(s, s * Float(resolution.y()) / resolution.x(), 1)) * m;
+        if (_resolution.x() > _resolution.y()) {
+            m = Transform3f::scale(Vector3f(s, s * Float(_resolution.y()) / _resolution.x(), 1)) * m;
         } else {
-            m = Transform3f::scale(Vector3f(s * Float(resolution.x()) / resolution.y(), s, 1)) * m;
+            m = Transform3f::scale(Vector3f(s * Float(_resolution.x()) / _resolution.y(), s, 1)) * m;
         }
         r2c = m;
         c2r = r2c.inverse();

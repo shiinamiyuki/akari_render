@@ -260,6 +260,7 @@ namespace akari {
     AKR_VARIANT class Camera;
     AKR_VARIANT class BSDFClosure;
     AKR_VARIANT class Scene;
+    AKR_VARIANT class Sampler;
     AKR_VARIANT struct sampling_;
     AKR_VARIANT struct microfacet_;
     AKR_VARIANT struct CameraSample;

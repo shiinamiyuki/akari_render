@@ -31,6 +31,7 @@
 #include <akari/core/mesh.h>
 #include <akari/kernel/scene.h>
 #include <akari/core/logger.h>
+#include <akari/core/film.h>
 namespace akari {
     namespace py = pybind11;
     std::vector<const char *> _get_enabled_variants() {
@@ -41,7 +42,7 @@ namespace akari {
         AKR_IMPORT_TYPES(Camera)
         Point3f position;
         Vector3f rotation;
-        Point2i resolution;
+        Point2i resolution = Point2i(512, 512);
         Float fov = radians(80.0f);
         ACamera compile() override {
             AKR_IMPORT_RENDER_TYPES(PerspectiveCamera)
@@ -145,7 +146,15 @@ namespace akari {
             return true;
         }
     };
-
+    AKR_VARIANT void SceneNode<Float, Spectrum>::render() {
+        auto scene = compile();
+        auto res = scene.camera.resolution();
+        auto film = Film<Float, Spectrum>(res);
+        scene.sampler = Sampler<Float, Spectrum>(RandomSampler<Float, Spectrum>());
+        auto integrator = cpu::Integrator<Float, Spectrum>(cpu::AmbientOcclusion<Float, Spectrum>());
+        integrator.render(scene, &film);
+        film.write_image(fs::path(output));
+    }
     AKR_VARIANT void register_scene_graph(py::module &parent) {
         auto m = parent.def_submodule(get_variant_string<Float, Spectrum>());
         AKR_IMPORT_RENDER_TYPES(SceneGraphNode, CameraNode, SceneNode, OBJMesh, MeshNode, MaterialNode, SceneNode,
@@ -158,6 +167,7 @@ namespace akari {
             .def_readwrite("variant", &ASceneNode::variant)
             .def_readwrite("camera", &ASceneNode::camera)
             .def_readwrite("shapes", &ASceneNode::shapes)
+            .def_readwrite("output", &ASceneNode::output)
             .def("commit", &ASceneNode::commit)
             .def("render", &ASceneNode::render);
         py::class_<ACameraNode, ASceneGraphNode, std::shared_ptr<ACameraNode>>(m, "Camera");
@@ -166,6 +176,7 @@ namespace akari {
             .def_readwrite("position", &APerspectiveCameraNode::position)
             .def_readwrite("rotation", &APerspectiveCameraNode::rotation)
             .def_readwrite("fov", &APerspectiveCameraNode::fov)
+            .def_readwrite("resolution", &APerspectiveCameraNode::resolution)
             .def("commit", &APerspectiveCameraNode::commit);
         py::class_<AMaterialNode, ASceneGraphNode, std::shared_ptr<AMaterialNode>>(m, "Material");
         py::class_<AMeshNode, ASceneGraphNode, std::shared_ptr<AMeshNode>>(m, "Mesh").def("commit", &AMeshNode::commit);

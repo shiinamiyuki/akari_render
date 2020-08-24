@@ -5,7 +5,8 @@ build-*/
 .vscode/
 .idea/
 data/*
-!data/cornell_box
+# !data/cornell_box
+# data/cornell_box/*.png
 old_data
 scenes/
 **/generated

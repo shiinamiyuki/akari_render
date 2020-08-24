@@ -22,6 +22,7 @@
 
 #pragma once
 #include <akari/common/fwd.h>
+#include <akari/common/variant.h>
 namespace akari {
     AKR_VARIANT class RandomSampler {
         uint64_t state = 0x4d595df4d0f33173; // Or something seed-dependent
@@ -43,12 +44,15 @@ namespace akari {
 
       public:
         AKR_IMPORT_CORE_TYPES()
-        Float next1d() const { return Float(pcg32()) / 0xffffffff; }
-        Point2f next2d() const { return Point2f(next1d(), next1d()); }
+        Float next1d() { return Float(pcg32()) / (float)0xffffffff; }
+        Point2f next2d() { return Point2f(next1d(), next1d()); }
         RandomSampler(uint64_t seed = 0u) { pcg32_init(seed); }
     };
-    AKR_VARIANT class Sampler : Variant<RandomSamlper>{
-    public:
-        
+    AKR_VARIANT class Sampler : Variant<RandomSampler<Float, Spectrum>> {
+      public:
+        AKR_IMPORT_CORE_TYPES()
+        using Variant<RandomSampler<Float, Spectrum>>::Variant;
+        Float next1d() { AKR_VAR_DISPATCH(next1d); }
+        Point2f next2d() { AKR_VAR_DISPATCH(next2d); }
     };
 } // namespace akari

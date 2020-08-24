@@ -21,35 +21,28 @@
 // SOFTWARE.
 
 #pragma once
-#include <akari/common/math.h>
-#include <akari/kernel/meshview.h>
-#include <akari/kernel/cameras/camera.h>
-#include <akari/kernel/sampler.h>
-#ifdef AKR_ENABLE_EMBREE
-#    include <akari/kernel/embree.inl>
-#endif
-
+#include <akari/common/fwd.h>
+#include <akari/common/variant.h>
 namespace akari {
-    AKR_VARIANT
-    class EmbreeAccelerator;
-    AKR_VARIANT struct Intersection {
-        AKR_IMPORT_BASIC_RENDER_TYPES()
-        Point3f p;
-        Float t;
-        Normal3f ng;
-        Point2f uv;
-        int geom_id = -1;
-        int prim_id = -1;
-        bool is_instance = false;
+    struct AOV {
+        static constexpr uint32_t color = 0;
+        static constexpr uint32_t albedo = 1;
+        static constexpr uint32_t depth = 2;
+        static constexpr uint32_t normal = 3;
     };
-    AKR_VARIANT class Scene {
-      public:
-        AKR_IMPORT_TYPES(Camera, Intersection, Sampler)
-        BufferView<MeshView> meshes;
-        ACamera camera;
-        ASampler sampler;
-        EmbreeAccelerator<Float, Spectrum> *embree_scene = nullptr;
-        bool intersect(const Ray3f &ray, AIntersection *isct) const;
-        void commit();
-    };
+    namespace cpu {
+        AKR_VARIANT class AmbientOcclusion {
+          public:
+            int spp = 16;
+            int tile_size = 16;
+            AKR_IMPORT_TYPES(Camera, Material, Film, Sampler)
+            void render(const AScene &scene, AFilm *out) const;
+        };
+        AKR_VARIANT class Integrator : public Variant<AmbientOcclusion<Float, Spectrum>> {
+          public:
+            AKR_IMPORT_TYPES(Camera, Material, Film, Sampler)
+            using Variant<AmbientOcclusion<Float, Spectrum>>::Variant;
+            void render(const AScene &scene, AFilm *out) const { AKR_VAR_DISPATCH(render, scene, out); }
+        };
+    } // namespace cpu
 } // namespace akari

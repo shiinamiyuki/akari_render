@@ -37,21 +37,23 @@ namespace akari {
         Normal3f ng, ns;
         Point3f p;
     };
-    AKR_VARIANT struct DiffuseClosure {
+    AKR_VARIANT struct DiffuseClosure {};
 
-    };
-
-    AKR_VARIANT struct SumBSDF {
-        int bsdfs[2];
-    };
-
+    AKR_VARIANT struct SumBSDF { int bsdfs[2]; };
 
     AKR_VARIANT class BSDFClosure {};
 
     AKR_VARIANT class BSDF {
-        
-        AKR_IMPORT_RENDER_TYPES(BSDFClosure)
+
+        AKR_IMPORT_TYPES(BSDFClosure)
         std::array<ABSDFClosure, 16> closures;
+        Normal3f ng, ns;
+        Frame3f frame;
+        int num_closures = 0;
+
+      public:
+        explicit BSDF(const Normal3f &ng, const Normal3f &ns) : ng(ng), ns(ns) { frame = Frame3f(ns); }
+        void add_closure(const ABSDFClosure &closure) { closures[num_closures++] = closure; }
     };
 
     AKR_VARIANT class Material {};

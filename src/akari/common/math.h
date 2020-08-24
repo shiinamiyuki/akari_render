@@ -41,7 +41,11 @@ namespace akari {
     inline bool select(bool c, int a, int b) { return c ? a : b; }
     inline bool select(bool c, double a, double b) { return c ? a : b; }
     inline bool any(bool a) { return a; }
+    inline bool any(float a) { return a; }
+    inline bool any(double a) { return a; }
     inline bool all(bool a) { return a; }
+    inline bool all(float a) { return a; }
+    inline bool all(double a) { return a; }
     template <typename T, int N, int packed> struct alignas(compute_align<T, N, packed>()) Array {
         static constexpr int padded_size = (int)compute_padded_size<T, N, packed>();
         T _s[padded_size] = {};
@@ -107,6 +111,13 @@ namespace akari {
         }                                                                                                              \
         return self;                                                                                                   \
     }                                                                                                                  \
+    Array operator op(const T &rhs) const {                                                                            \
+        Array self;                                                                                                    \
+        for (int i = 0; i < padded_size; i++) {                                                                        \
+            self[i] = (*this)[i] op rhs;                                                                               \
+        }                                                                                                              \
+        return self;                                                                                                   \
+    }                                                                                                                  \
     Array &operator assign_op(const Array &rhs) {                                                                      \
         *this = *this op rhs;                                                                                          \
         return *this;                                                                                                  \
@@ -135,6 +146,8 @@ namespace akari {
         GEN_CMP_OP(<)
         GEN_CMP_OP(>)
 #undef GEN_CMP_OP
+        friend Array operator+(const T &v, const Array &rhs) { return Array(v) + rhs; }
+        friend Array operator-(const T &v, const Array &rhs) { return Array(v) - rhs; }
         friend Array operator*(const T &v, const Array &rhs) { return Array(v) * rhs; }
         friend Array operator/(const T &v, const Array &rhs) { return Array(v) / rhs; }
         Array operator-() const {
@@ -145,39 +158,40 @@ namespace akari {
             return self;
         }
     }; // namespace detail
-    template <typename T, int N> T dot(const Array<T, N> &a1, const Array<T, N> &a2) {
+    template <typename T, int N, int P> T dot(const Array<T, N, P> &a1, const Array<T, N, P> &a2) {
         T s = a1[0] * a2[0];
         for (int i = 1; i < N; i++) {
             s += a1[i] * a2[i];
         }
         return s;
     }
-    template <typename T, int N, class F> T reduce(const Array<T, N> &a, F &&f) {
+    template <typename T, int N, int P, class F> T reduce(const Array<T, N, P> &a, F &&f) {
         T acc = a[0];
         for (int i = 1; i < N; i++) {
             acc = f(acc, a[i]);
         }
         return acc;
     }
-    template <typename T, int N> T hsum(const Array<T, N> &a) {
-        return reduce(a, [](T acc, T b) { return acc + b; });
+    template <typename T, int N, int P> T hsum(const Array<T, N, P> &a) {
+        return reduce(a, [](const T &acc, const T &b) { return acc + b; });
     }
-    template <typename T, int N> T hprod(const Array<T, N> &a) {
-        return reduce(a, [](T acc, T b) { return acc * b; });
+    template <typename T, int N, int P> T hprod(const Array<T, N, P> &a) {
+        return reduce(a, [](const T &acc, const T &b) { return acc * b; });
     }
-    template <typename T, int N> T hmin(const Array<T, N> &a) {
-        return reduce(a, [](T acc, T b) { return min(acc, b); });
+    template <typename T, int N, int P> T hmin(const Array<T, N, P> &a) {
+        return reduce(a, [](const T &acc, const T &b) { return min(acc, b); });
     }
-    template <typename T, int N> T hmax(const Array<T, N> &a) {
-        return reduce(a, [](T acc, T b) { return max(acc, b); });
+    template <typename T, int N, int P> T hmax(const Array<T, N, P> &a) {
+        return reduce(a, [](const T &acc, const T &b) { return max(acc, b); });
     }
-    template <typename T, int N> bool any(const Array<T, N> &a) {
-        return reduce(a, [](T acc, T b) { return acc || any(b); });
+    template <typename T, int N, int P> bool any(const Array<T, N, P> &a) {
+        return reduce(a, [](const T &acc, const T &b) { return acc || any(b); });
     }
-    template <typename T, int N> bool all(const Array<T, N> &a) {
-        return reduce(a, [](T acc, T b) { return acc && all(b); });
+    template <typename T, int N, int P> bool all(const Array<T, N, P> &a) {
+        return reduce(a, [](const T &acc, const T &b) { return acc && all(b); });
     }
-    template <typename T, int N> Array<T, N> clamp(const Array<T, N> &x, const Array<T, N> &lo, const Array<T, N> &hi) {
+    template <typename T, int N, int P>
+    Array<T, N, P> clamp(const Array<T, N, P> &x, const Array<T, N, P> &lo, const Array<T, N, P> &hi) {
         return max(min(x, hi), lo);
     }
     template <typename T, int N>
@@ -199,7 +213,9 @@ namespace akari {
         std::memcpy(&v, p, sizeof(T));
         return v;
     }
-    template <typename T, int N, int P> void store(void *p, const Array<T, N, P> &a) { std::memcpy(p, &a, sizeof(T)); }
+    template <typename T, int N, int P> void store(void *p, const Array<T, N, P> &a) {
+        std::memcpy(p, &a, sizeof(Array<T, N, P>));
+    }
 #pragma GCC diagnostic pop
     template <typename T, int N> T length(const Array<T, N> &a) { return sqrt(dot(a, a)); }
     template <typename T, int N> Array<T, N> normalize(const Array<T, N> &a) { return a / sqrt(dot(a, a)); }
@@ -259,10 +275,11 @@ namespace akari {
 #undef FWD_MATH_FUNC2
 #define AKR_ARRAY_IMPORT_ARITH_OP(op, assign_op, Base, Self)                                                           \
     Self operator op(const Self &rhs) const {                                                                          \
-        return Self(static_cast<const Base &>(*this) + static_cast<const Base &>(rhs));                                \
+        return Self(static_cast<const Base &>(*this) op static_cast<const Base &>(rhs));                               \
     }                                                                                                                  \
+    Self operator op(const Self::value_t &rhs) const { return Self(static_cast<const Base &>(*this) op rhs); }         \
     Self operator assign_op(const Self &rhs) {                                                                         \
-        *this = Self(static_cast<Base &>(*this) + static_cast<const Base &>(rhs));                                     \
+        *this = Self(static_cast<Base &>(*this) op static_cast<const Base &>(rhs));                                    \
         return *this;                                                                                                  \
     }
 #define AKR_ARRAY_IMPORT(Base, Self)                                                                                   \
@@ -271,6 +288,8 @@ namespace akari {
     AKR_ARRAY_IMPORT_ARITH_OP(*, *=, Base, Self)                                                                       \
     AKR_ARRAY_IMPORT_ARITH_OP(/, /=, Base, Self)                                                                       \
     AKR_ARRAY_IMPORT_ARITH_OP(%, %=, Base, Self)                                                                       \
+    friend Self operator+(const Self::value_t &v, const Self &rhs) { return Self(v) + rhs; }                           \
+    friend Self operator-(const Self::value_t &v, const Self &rhs) { return Self(v) - rhs; }                           \
     friend Self operator*(const Self::value_t &v, const Self &rhs) { return Self(v) * rhs; }                           \
     friend Self operator/(const Self::value_t &v, const Self &rhs) { return Self(v) / rhs; }                           \
     Self operator-() const { return Self(-static_cast<const Base &>(*this)); }                                         \
@@ -326,7 +345,7 @@ namespace akari {
     }
 
     template <typename V, typename V2> inline V lerp3(const V &v0, const V &v1, const V &v2, const V2 &uv) {
-        return (1.0f - uv.x() - uv.y()) * v0 + uv.x() * v1 + uv.y() * v2;
+        return (1.0f - uv[0] - uv[1]) * v0 + uv[0] * v1 + uv[1] * v2;
     }
 
     template <typename Float, int N> struct Matrix {
@@ -394,9 +413,7 @@ namespace akari {
             auto &m = *this;
             int indxc[N], indxr[N];
             int ipiv[N] = {0};
-            Float minv[N][N];
-            // memcpy(minv, &m.rows, N * N * sizeof(Float));
-            store(minv, m.rows);
+            auto minv = m.rows;
             for (int i = 0; i < N; i++) {
                 int irow = 0, icol = 0;
                 Float big = 0.f;
@@ -468,7 +485,8 @@ namespace akari {
         AKR_IMPORT_CORE_TYPES()
         Point3f o;
         Vector3f d;
-        Float tmin, tmax;
+        Float tmin = -1, tmax = -1;
+        Ray() = default;
         Ray(const Point3f &o, const Vector3f &d, Float tmin = Constants<Float>::Eps,
             Float tmax = std::numeric_limits<Float>::infinity())
             : o(o), d(d), tmin(tmin), tmax(tmax) {}
@@ -574,12 +592,13 @@ namespace akari {
         using Vector = akari::Vector<Float, N>;
         Point pmin, pmax;
         BoundingBox() { reset(); }
+        BoundingBox(const Point &pmin, const Point &pmax) : pmin(pmin), pmax(pmax) {}
         void reset() {
             pmin = Point(Constants<Float>::Inf);
             pmax = Point(-Constants<Float>::Inf);
         }
         Vector extents() const { return pmax - pmin; }
-        Vector skze() const { return extents(); }
+        Vector size() const { return extents(); }
         Vector offset(const Point &p) { return (p - pmin) / extents(); }
         void expand(const Point &p) {
             pmin = min(pmin, p);

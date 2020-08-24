@@ -41,15 +41,15 @@ namespace akari {
         Buffer<APixel> pixels;
 
         explicit Tile(const Bounds2i &bounds)
-            : bounds(bounds), _size(bounds.size() + Point2f(2, 2)), pixels(_size.x() * _size.y()) {}
+            : bounds(bounds), _size(bounds.size() + Point2i(2, 2)), pixels(_size.x() * _size.y()) {}
 
         auto &operator()(const Point2f &p) {
-            auto q = Point2i(floor(p + Point2f(0.5) - Point2f(bounds.p_min) + Point2f(1)));
+            auto q = Point2i(floor(p + Point2f(0.5) - Point2f(bounds.pmin) + Point2f(1)));
             return pixels[q.x() + q.y() * _size.x()];
         }
 
         const auto &operator()(const Point2f &p) const {
-            auto q = Point2i(floor(p + Point2f(0.5) - Point2f(bounds.p_min) + Point2f(1)));
+            auto q = Point2i(floor(p + Point2f(0.5) - Point2f(bounds.pmin) + Point2f(1)));
             return pixels[q.x() + q.y() * _size.x()];
         }
 
@@ -88,14 +88,14 @@ namespace akari {
       public:
         Float splatScale = 1.0f;
         explicit Film(const Point2i &dimension) : radiance(dimension), weight(dimension) {}
-        ATile tile(const Bounds2i &bounds) { return Tile(bounds); }
+        ATile tile(const Bounds2i &bounds) { return ATile(bounds); }
 
         [[nodiscard]] Point2i resolution() const { return radiance.resolution(); }
 
         [[nodiscard]] Bounds2i bounds() const { return Bounds2i{Point2i(0), resolution()}; }
         void merge_tile(const ATile &tile) {
-            const auto lo = max(tile.bounds.p_min - Point2i(1, 1), Point2i(0, 0));
-            const auto hi = min(tile.bounds.p_max + Point2i(1, 1), radiance.resolution());
+            const auto lo = max(tile.bounds.pmin - Point2i(1, 1), Point2i(0, 0));
+            const auto hi = min(tile.bounds.pmax + Point2i(1, 1), radiance.resolution());
             for (int y = lo.y(); y < hi.y(); y++) {
                 for (int x = lo.x(); x < hi.x(); x++) {
                     auto &pix = tile(Point2f(x, y));

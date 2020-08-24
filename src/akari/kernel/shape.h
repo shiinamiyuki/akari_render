@@ -21,25 +21,16 @@
 // SOFTWARE.
 
 #pragma once
-#include <akari/common/fwd.h>
+#include <akari/kernel/materials/material.h>
 namespace akari {
-    struct AOV {
-        static constexpr uint32_t color = 0;
-        static constexpr uint32_t albedo = 1;
-        static constexpr uint32_t depth = 2;
-        static constexpr uint32_t normal = 3;
+    AKR_VARIANT class Triangle {
+        AKR_IMPORT_TYPES(Material)
+        Array<Point3f, 3> vertices;
+        Array<Normal3f, 3> normals;
+        Array<Point2f, 3> texcoords;
+        AMaterial material;
+        Normal3f ng() const { return Normal3f(cross(vertices[1] - vertices[0], vertices[2] - vertices[1])); }
+        Normal3f ns(const Point2f &uv) const { return lerp3(normals[0], normals[1], normals[2], uv); }
+        Point2f texcoord(const Point2f &uv) const { return lerp3(texcoords[0], texcoords[1], texcoords[2], uv); }
     };
-    namespace cpu {
-        AKR_VARIANT class AOVIntegrator {
-
-        };
-        AKR_VARIANT class AmbientOcclusion {
-        public:
-            
-        };
-        AKR_VARIANT class Integrator {
-        public:
-
-        };
-    } // namespace cpu
 } // namespace akari
