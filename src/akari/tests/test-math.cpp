@@ -24,7 +24,7 @@
 #include <akari/common/color.h>
 #include "gtest/gtest.h"
 using namespace akari;
-TEST(TestMath, Select) {
+TEST(TestMath, Color) {
     using Float = float;
     AKR_IMPORT_CORE_TYPES()
     Color3f L(0.02, 0.4, 0.8);
@@ -32,4 +32,15 @@ TEST(TestMath, Select) {
     ASSERT_LT(x[0], 1.0f);
     ASSERT_LT(x[1], 1.0f);
     ASSERT_LT(x[2], 1.0f);
+}
+TEST(TestMath, Frame) {
+    using Float = float;
+    AKR_IMPORT_CORE_TYPES()
+    Frame3f frame(normalize(Vector3f(0.2, 0.7, 0.4)));
+    Vector3f w = normalize(Vector3f(0.6, 0.3, 0.2));
+    auto u = frame.local_to_world(w);
+    auto v = frame.world_to_local(u);
+    ASSERT_FLOAT_EQ(w[0], v[0]);
+    ASSERT_FLOAT_EQ(w[1], v[1]);
+    ASSERT_FLOAT_EQ(w[2], v[2]);
 }

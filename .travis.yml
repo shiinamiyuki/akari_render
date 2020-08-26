@@ -3,7 +3,7 @@ dist: focal
 language: cpp
 compiler:
   - gcc
-  - clang
+  # - clang
 notifications:
   email: false
 addons:
@@ -14,5 +14,5 @@ addons:
       - sourceline: 'ppa:ubuntu-toolchain-r/test'
     packages:
       - ninja-build
-      - clang-10
+      # - clang-10
 script: bash ./scripts/build-linux-cpu.sh

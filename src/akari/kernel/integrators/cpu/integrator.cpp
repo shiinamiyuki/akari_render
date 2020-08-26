@@ -27,18 +27,26 @@
 #include <akari/core/logger.h>
 #include <akari/kernel/scene.h>
 #include <akari/kernel/interaction.h>
+#include <akari/kernel/sampling.h>
 namespace akari {
     namespace cpu {
         AKR_VARIANT void AmbientOcclusion<Float, Spectrum>::render(const AScene &scene, AFilm *film) const {
             AKR_ASSERT_THROW(all(film->resolution() == scene.camera.resolution()));
             AKR_IMPORT_RENDER_TYPES(Intersection, SurfaceInteraction)
             auto n_tiles = Point2i(film->resolution() + Point2i(tile_size - 1)) / Point2i(tile_size);
-            auto Li = [=, &scene](const Ray3f &ray, ASampler &sampler) -> Spectrum {
+            auto Li = [=, &scene](Ray3f ray, ASampler &sampler) -> Spectrum {
                 (void)scene;
                 AIntersection intersection;
                 if (scene.intersect(ray, &intersection)) {
-                    // debug("{}\n", intersection.t / 20.0f);
-                    return Spectrum(intersection.ng);
+                    Frame3f frame(intersection.ng);
+                    // return Spectrum(intersection.ng);
+                    auto w = sampling::cosine_hemisphere_sampling(sampler.next2d());
+                    w = frame.local_to_world(w);
+                    ray = Ray3f(intersection.p, w);
+                    intersection = AIntersection();
+                    if (scene.intersect(ray, &intersection))
+                        return Spectrum(0);
+                    return Spectrum(1);
                 }
                 return Spectrum(0);
                 // debug("{}\n", ray.d);
@@ -55,7 +63,7 @@ namespace akari {
                 for (int y = tile.bounds.pmin.y(); y < tile.bounds.pmax.y(); y++) {
                     for (int x = tile.bounds.pmin.x(); x < tile.bounds.pmax.x(); x++) {
                         sampler.set_sample_index(x + y * film->resolution().x());
-                        for (int s = 0; s < 1; s++) {
+                        for (int s = 0; s < 16; s++) {
                             sampler.start_next_sample();
                             ACameraSample sample;
                             camera.generate_ray(sampler.next2d(), sampler.next2d(), Point2i(x, y), &sample);

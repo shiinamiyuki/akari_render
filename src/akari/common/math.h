@@ -134,7 +134,7 @@ namespace akari {
 #define GEN_CMP_OP(op)                                                                                                 \
     Array<bool, N> operator op(const Array &rhs) const {                                                               \
         Array<bool, N> r;                                                                                              \
-        for (int i = 0; i < N; i++) {                                                                        \
+        for (int i = 0; i < N; i++) {                                                                                  \
             r[i] = (*this)[i] op rhs[i];                                                                               \
         }                                                                                                              \
         return r;                                                                                                      \
@@ -249,7 +249,29 @@ namespace akari {
         }                                                                                                              \
         return ans;                                                                                                    \
     }                                                                                                                  \
+    template <typename V, int N, int P> Array<V, N, P> _##name(const V &v1, const Array<V, N, P> &v2) {                \
+        Array<V, N, P> ans;                                                                                            \
+        using std::name;                                                                                               \
+        for (int i = 0; i < N; i++) {                                                                                  \
+            ans[i] = name(v1, v2[i]);                                                                                  \
+        }                                                                                                              \
+        return ans;                                                                                                    \
+    }                                                                                                                  \
+    template <typename V, int N, int P> Array<V, N, P> _##name(const Array<V, N, P> &v1, const V &v2) {                \
+        Array<V, N, P> ans;                                                                                            \
+        using std::name;                                                                                               \
+        for (int i = 0; i < N; i++) {                                                                                  \
+            ans[i] = name(v1[i], v2);                                                                                  \
+        }                                                                                                              \
+        return ans;                                                                                                    \
+    }                                                                                                                  \
     template <typename V, int N, int P> Array<V, N, P> name(const Array<V, N, P> &v1, const Array<V, N, P> &v2) {      \
+        return _##name(v1, v2);                                                                                        \
+    }                                                                                                                  \
+    template <typename V, int N, int P> Array<V, N, P> name(const V &v1, const Array<V, N, P> &v2) {                   \
+        return _##name(v1, v2);                                                                                        \
+    }                                                                                                                  \
+    template <typename V, int N, int P> Array<V, N, P> name(const Array<V, N, P> &v1, const V &v2) {                   \
         return _##name(v1, v2);                                                                                        \
     }
     FWD_MATH_FUNC1(floor)
@@ -268,9 +290,6 @@ namespace akari {
     FWD_MATH_FUNC2(pow)
     FWD_MATH_FUNC2(min)
     FWD_MATH_FUNC2(max)
-    template <typename V, int N, int P> Array<V, N, P> pow(const Array<V, N, P> &v1, V p) {
-        return pow(v1, Array<V, N, P>(p));
-    }
 #undef FWD_MATH_FUNC1
 #undef FWD_MATH_FUNC2
 #define AKR_ARRAY_IMPORT_ARITH_OP(op, assign_op, Base, Self)                                                           \

@@ -25,11 +25,16 @@
 namespace akari {
     AKR_VARIANT bool Scene<Float, Spectrum>::intersect(const Ray<Float, Spectrum> &ray,
                                                        Intersection<Float, Spectrum> *intersection) const {
+        bool hit = false;
         if constexpr (akari_enable_embree) {
-            return embree_scene->intersect(ray, intersection);
+            hit = embree_scene->intersect(ray, intersection);
         } else {
             std::abort();
         }
+        if(hit){
+            intersection->p = ray(intersection->t);
+        }
+        return hit;
     }
     AKR_VARIANT void Scene<Float, Spectrum>::commit() {
         if constexpr (akari_enable_embree) {

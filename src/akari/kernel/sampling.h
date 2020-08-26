@@ -48,7 +48,7 @@ namespace akari {
         static inline Vector3f cosine_hemisphere_sampling(const Point2f &u) {
             auto uv = concentric_disk_sampling(u);
             auto r = dot(uv, uv);
-            auto h = sqrt(max(0.0f, 1 - r));
+            auto h = std::sqrt(std::max(0.0f, 1.0f - r));
             return Vector3f(uv.x(), h, uv.y());
         }
         static inline Float cosine_hemisphere_pdf(Float cosTheta) { return cosTheta * Constants<Float>::InvPi; }
