@@ -87,3 +87,11 @@ target_include_directories(akari_core PUBLIC ${Python_INCLUDE_DIRS} ${EMBREE_INC
 add_executable(akari src/akari/app/akari.cpp ${AKR_CONFIG_H})
 target_include_directories(akari PUBLIC src/)
 target_link_libraries(akari akari_core)
+
+
+add_subdirectory(external/googletest EXCLUDE_FROM_ALL)
+file(GLOB AKR_TEST src/akari/tests/*.*)
+add_executable(akari-test ${AKR_TEST} src/akari/app/akari-test.cpp)
+target_link_libraries(akari-test gtest akari_core)
+add_test(NAME akari COMMAND akari-test)
+

@@ -37,9 +37,9 @@ namespace akari {
         static constexpr Float Eps = Float(0.001f);
         static constexpr Float ShadowEps = Float(0.0001f);
     };
-    inline bool select(bool c, float a, float b) { return c ? a : b; }
-    inline bool select(bool c, int a, int b) { return c ? a : b; }
-    inline bool select(bool c, double a, double b) { return c ? a : b; }
+    inline float select(bool c, float a, float b) { return c ? a : b; }
+    inline int select(bool c, int a, int b) { return c ? a : b; }
+    inline double select(bool c, double a, double b) { return c ? a : b; }
     inline bool any(bool a) { return a; }
     inline bool any(float a) { return a; }
     inline bool any(double a) { return a; }
@@ -134,7 +134,7 @@ namespace akari {
 #define GEN_CMP_OP(op)                                                                                                 \
     Array<bool, N> operator op(const Array &rhs) const {                                                               \
         Array<bool, N> r;                                                                                              \
-        for (int i = 0; i < padded_size; i++) {                                                                        \
+        for (int i = 0; i < N; i++) {                                                                        \
             r[i] = (*this)[i] op rhs[i];                                                                               \
         }                                                                                                              \
         return r;                                                                                                      \
@@ -268,7 +268,7 @@ namespace akari {
     FWD_MATH_FUNC2(pow)
     FWD_MATH_FUNC2(min)
     FWD_MATH_FUNC2(max)
-    template <typename V, int N, bool P> Array<V, N, P> pow(const Array<V, N, P> &v1, V p) {
+    template <typename V, int N, int P> Array<V, N, P> pow(const Array<V, N, P> &v1, V p) {
         return pow(v1, Array<V, N, P>(p));
     }
 #undef FWD_MATH_FUNC1

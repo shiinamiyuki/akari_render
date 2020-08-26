@@ -21,6 +21,7 @@
 // SOFTWARE.
 #include <akari/core/akari.h>
 #include <akari/common/fwd.h>
+#include <akari/core/buffer.h>
 #include <akari/kernel/meshview.h>
 #include <akari/kernel/integrators/cpu/integrator.h>
 // #include <akari/kernel/materials/material.h>
@@ -42,12 +43,12 @@ namespace akari {
     AKR_VARIANT class MeshNode : public SceneGraphNode<Float, Spectrum> {
       public:
         AKR_IMPORT_RENDER_TYPES(SceneNode)
-        virtual MeshView compile(ASceneNode &) = 0;
+        virtual MeshView compile() = 0;
     };
     AKR_VARIANT class SceneNode : public SceneGraphNode<Float, Spectrum> {
       public:
         AKR_IMPORT_BASIC_RENDER_TYPES()
-        std::vector<MeshView> meshviews;
+        Buffer<MeshView> meshviews;
         AKR_IMPORT_RENDER_TYPES(CameraNode, MeshNode)
         std::string variant;
         std::shared_ptr<ACameraNode> camera;
@@ -63,6 +64,9 @@ namespace akari {
         }
         AScene compile() {
             AScene scene;
+            for (auto &shape : shapes) {
+                meshviews.emplace_back(shape->compile());
+            }
             scene.meshes = meshviews;
             scene.camera = camera->compile();
             return scene;

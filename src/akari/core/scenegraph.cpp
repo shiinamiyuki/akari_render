@@ -51,7 +51,7 @@ namespace akari {
             c2w = Transform3f::rotate_x(rotation.y()) * c2w;
             c2w = Transform3f::rotate_y(rotation.x()) * c2w;
             c2w = Transform3f::translate(position) * c2w;
-            return APerspectiveCamera(resolution, c2w, 1.0);
+            return APerspectiveCamera(resolution, c2w, fov);
         }
     };
     AKR_VARIANT class OBJMesh : public MeshNode<Float, Spectrum> {
@@ -71,7 +71,7 @@ namespace akari {
                 return;
             (void)load_wavefront_obj(path);
         }
-        MeshView compile(ASceneNode &scene_node) {
+        MeshView compile() {
             commit();
             MeshView view;
             view.indices = mesh.indices;
@@ -79,7 +79,6 @@ namespace akari {
             view.normals = mesh.normals;
             view.texcoords = mesh.texcoords;
             view.vertices = mesh.vertices;
-            scene_node.meshviews.push_back(view);
             return view;
         }
 
@@ -116,11 +115,11 @@ namespace akari {
                     for (int v = 0; v < fv; v++) {
                         tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
                         mesh.indices.push_back(idx.vertex_index);
-                        triangle[v] = load<Point3f>(&mesh.vertices[3 * idx.vertex_index]);
+                        triangle[v] = Point3f(load<PackedArray<Float, 3>>(&mesh.vertices[3 * idx.vertex_index]));
                     }
 
                     Normal3f ng =
-                        normalize(cross(Vector3f(triangle[1] - triangle[0]), Vector3f(triangle[2] - triangle[1])));
+                        normalize(cross(Vector3f(triangle[1] - triangle[0]), Vector3f(triangle[2] - triangle[0])));
                     for (int v = 0; v < fv; v++) {
                         tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
                         if (idx.normal_index < 0) {
@@ -140,6 +139,8 @@ namespace akari {
                             mesh.texcoords.emplace_back(attrib.texcoords[2 * idx.texcoord_index + 1]);
                         }
                     }
+
+                    index_offset += fv;
                 }
             }
             info("loaded {} triangles, {} vertices\n", mesh.indices.size() / 3, mesh.vertices.size() / 3);
@@ -151,6 +152,9 @@ namespace akari {
         auto res = scene.camera.resolution();
         auto film = Film<Float, Spectrum>(res);
         scene.sampler = Sampler<Float, Spectrum>(RandomSampler<Float, Spectrum>());
+        auto embree_scene = EmbreeAccelerator<Float, Spectrum>();
+        scene.embree_scene = &embree_scene;
+        scene.commit();
         auto integrator = cpu::Integrator<Float, Spectrum>(cpu::AmbientOcclusion<Float, Spectrum>());
         integrator.render(scene, &film);
         film.write_image(fs::path(output));

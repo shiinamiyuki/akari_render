@@ -20,6 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <mutex>
 #include <akari/core/parallel.h>
 #include <akari/kernel/integrators/cpu/integrator.h>
 #include <akari/core/film.h>
@@ -32,21 +33,30 @@ namespace akari {
             AKR_ASSERT_THROW(all(film->resolution() == scene.camera.resolution()));
             AKR_IMPORT_RENDER_TYPES(Intersection, SurfaceInteraction)
             auto n_tiles = Point2i(film->resolution() + Point2i(tile_size - 1)) / Point2i(tile_size);
-            auto Li = [=](const Ray3f &ray, ASampler &sampler) -> Spectrum {
+            auto Li = [=, &scene](const Ray3f &ray, ASampler &sampler) -> Spectrum {
+                (void)scene;
+                AIntersection intersection;
+                if (scene.intersect(ray, &intersection)) {
+                    // debug("{}\n", intersection.t / 20.0f);
+                    return Spectrum(intersection.ng);
+                }
                 return Spectrum(0);
+                // debug("{}\n", ray.d);
+                // return Spectrum(ray.d * 0.5f + 0.5f);
             };
             debug("resolution: {}, tile size: {}, tiles: {}\n", film->resolution(), tile_size, n_tiles);
-            parallel_for_2d(n_tiles, [=](const Point2i &tile_pos, int tid) {
+            std::mutex mutex;
+            parallel_for_2d(n_tiles, [=, &scene, &mutex](const Point2i &tile_pos, int tid) {
                 (void)tid;
                 Bounds2i tileBounds = Bounds2i{tile_pos * (int)tile_size, (tile_pos + Vector2i(1)) * (int)tile_size};
                 auto tile = film->tile(tileBounds);
                 auto sampler = scene.sampler;
-                auto & camera = scene.camera;
+                auto &camera = scene.camera;
                 for (int y = tile.bounds.pmin.y(); y < tile.bounds.pmax.y(); y++) {
                     for (int x = tile.bounds.pmin.x(); x < tile.bounds.pmax.x(); x++) {
-                        // sampler->set_sample_index(x + y * film->resolution().x());
-                        for (int s = 0; s < spp; s++) {
-                            // sampler->start_next_sample();
+                        sampler.set_sample_index(x + y * film->resolution().x());
+                        for (int s = 0; s < 1; s++) {
+                            sampler.start_next_sample();
                             ACameraSample sample;
                             camera.generate_ray(sampler.next2d(), sampler.next2d(), Point2i(x, y), &sample);
                             auto L = Li(sample.ray, sampler);
@@ -54,6 +64,7 @@ namespace akari {
                         }
                     }
                 }
+                std::lock_guard<std::mutex> _(mutex);
                 film->merge_tile(tile);
             });
         }

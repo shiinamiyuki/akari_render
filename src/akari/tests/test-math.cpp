@@ -9,8 +9,8 @@
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
 //
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
 //
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -20,23 +20,16 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/kernel/scene.h>
-
-namespace akari {
-    AKR_VARIANT bool Scene<Float, Spectrum>::intersect(const Ray<Float, Spectrum> &ray,
-                                                       Intersection<Float, Spectrum> *intersection) const {
-        if constexpr (akari_enable_embree) {
-            return embree_scene->intersect(ray, intersection);
-        } else {
-            std::abort();
-        }
-    }
-    AKR_VARIANT void Scene<Float, Spectrum>::commit() {
-        if constexpr (akari_enable_embree) {
-            embree_scene->build(*this);
-        } else {
-        }
-    }
-
-    AKR_RENDER_CLASS(Scene)
-} // namespace akari
+#include <akari/common/math.h>
+#include <akari/common/color.h>
+#include "gtest/gtest.h"
+using namespace akari;
+TEST(TestMath, Select) {
+    using Float = float;
+    AKR_IMPORT_CORE_TYPES()
+    Color3f L(0.02, 0.4, 0.8);
+    auto x = linear_to_srgb(L);
+    ASSERT_LT(x[0], 1.0f);
+    ASSERT_LT(x[1], 1.0f);
+    ASSERT_LT(x[2], 1.0f);
+}

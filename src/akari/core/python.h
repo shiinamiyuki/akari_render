@@ -50,7 +50,8 @@ namespace akari {
 
     AKR_VARIANT void register_math_functions(py::module &m) {
         AKR_IMPORT_CORE_TYPES()
-
+        m.def("degrees", [](const Float &a) { return degrees(a); });
+        m.def("radians", [](const Float &a) { return radians(a); });
         {
             auto c = py::class_<Vector2f>(m, "Vector2f")
                          .def(py::init<>())

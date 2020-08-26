@@ -24,7 +24,7 @@
 #define AKARIRENDER_LOGGER_H
 
 #include <akari/core/platform.h>
-#include <akari/common/math.h>
+#include <akari/common/color.h>
 #include <fmt/format.h>
 template <typename T, int N> struct fmt::formatter<akari::Array<T, N>> {
 
@@ -76,6 +76,11 @@ template <typename T, int N> struct fmt::formatter<akari::Vector<T, N>> : fmt::f
 };
 template <typename T, int N> struct fmt::formatter<akari::Normal<T, N>> : fmt::formatter<akari::Array<T, N>> {
     template <typename FormatCtx> auto format(const akari::Normal<T, N> &a, FormatCtx &ctx) {
+        return fmt::formatter<akari::Array<T, N>>::format(a, ctx);
+    }
+};
+template <typename T, int N> struct fmt::formatter<akari::Color<T, N>> : fmt::formatter<akari::Array<T, N>> {
+    template <typename FormatCtx> auto format(const akari::Color<T, N> &a, FormatCtx &ctx) {
         return fmt::formatter<akari::Array<T, N>>::format(a, ctx);
     }
 };

@@ -16,3 +16,6 @@
 [submodule "external/embree"]
 	path = external/embree
 	url = https://github.com/embree/embree
+[submodule "external/googletest"]
+	path = external/googletest
+	url = https://github.com/google/googletest

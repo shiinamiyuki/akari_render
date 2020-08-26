@@ -22,6 +22,7 @@
 
 #include <akari/kernel/embree.inl>
 #include <akari/kernel/scene.h>
+#include <akari/core/logger.h>
 #ifdef AKR_ENABLE_EMBREE
 namespace akari {
     AKR_VARIANT void EmbreeAccelerator<Float, Spectrum>::build(Scene<Float, Spectrum> &scene) {
@@ -31,13 +32,17 @@ namespace akari {
             auto geometry = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);
             rtcSetSharedGeometryBuffer(geometry, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, &mesh.vertices[0], 0,
                                        sizeof(float) * 3, mesh.vertices.size() / 3);
+            AKR_ASSERT_THROW(rtcGetDeviceError(device) == RTC_ERROR_NONE);
+            AKR_ASSERT(mesh.indices.size() % 3 == 0);
             rtcSetSharedGeometryBuffer(geometry, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, &mesh.indices[0], 0,
                                        sizeof(int) * 3, mesh.indices.size() / 3);
+            AKR_ASSERT_THROW(rtcGetDeviceError(device) == RTC_ERROR_NONE);
             rtcCommitGeometry(geometry);
             rtcAttachGeometry(rtcScene, geometry);
             rtcReleaseGeometry(geometry);
         }
         rtcCommitScene(rtcScene);
+        AKR_ASSERT_THROW(rtcGetDeviceError(device) == RTC_ERROR_NONE);
     }
     AKR_VARIANT static inline RTCRay toRTCRay(const Ray<Float, Spectrum> &_ray) {
         RTCRay ray;
@@ -73,5 +78,6 @@ namespace akari {
         intersection->t = rayHit.ray.tfar;
         return true;
     }
+    AKR_RENDER_CLASS(EmbreeAccelerator)
 } // namespace akari
 #endif

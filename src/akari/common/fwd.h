@@ -96,7 +96,7 @@ namespace akari {
     template <typename T> constexpr size_t array_size_v = array_size<T>::value;
 
     template <typename T> struct is_array : std::false_type {};
-    template <typename T, int N> struct is_array<Array<T, N>> : std::true_type {};
+    template <typename T, int N, int P> struct is_array<Array<T, N, P>> : std::true_type {};
     template <typename T, int N> struct is_array<Point<T, N>> : std::true_type {};
     template <typename T, int N> struct is_array<Vector<T, N>> : std::true_type {};
     template <typename T, int N> struct is_array<Normal<T, N>> : std::true_type {};

@@ -22,6 +22,7 @@
 
 #include <fstream>
 #include <cxxopts.hpp>
+#include <akari/common/color.h>
 #include <akari/core/application.h>
 #include <akari/core/logger.h>
 #include <akari/core/scenegraph.h>
@@ -31,7 +32,7 @@ using namespace akari;
 namespace py = pybind11;
 static std::string inputFilename;
 
-void parse(int argc, char **argv) {
+void parse(int argc, const char **argv) {
     try {
         cxxopts::Options options("akari", " - AkariRender Command Line Interface");
         options.positional_help("input output").show_positional_help();
@@ -57,7 +58,7 @@ void parse(int argc, char **argv) {
         exit(1);
     }
 }
-int main(int argc, char **argv) {
+int main(int argc, const char **argv) {
     Application app;
     parse(argc, argv);
     try {
