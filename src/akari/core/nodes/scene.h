@@ -37,6 +37,7 @@ namespace akari {
         void commit() override;
         AScene compile();
         void render();
+        void add_mesh(const std::shared_ptr<AMeshNode> &mesh) { shapes.emplace_back(mesh); }
     };
-    AKR_VARIANT struct RegisterSceneNode {static void register_nodes(py::module &m); };
+    AKR_VARIANT struct RegisterSceneNode { static void register_nodes(py::module &m); };
 } // namespace akari

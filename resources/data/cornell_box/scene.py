@@ -4,9 +4,10 @@ print(enabled_variants())
 scene = Scene()
 scene.output = "out.png"
 cbox = OBJMesh("CornellBox-Original.obj")
-cbox.commit()
-scene.camera = PerspectiveCamera()
-scene.shapes.append(cbox)
-scene.commit()
+camera = PerspectiveCamera()
+camera.fov = radians(15)
+camera.position = Point3f(0, 1, 9)
+scene.camera = camera
+scene.add_mesh(cbox)
 scene.render()
 

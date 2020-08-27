@@ -45,6 +45,7 @@ namespace akari {
         return scene;
     }
     AKR_VARIANT void SceneNode<Float, Spectrum>::render() {
+        commit();
         auto scene = compile();
         auto res = scene.camera.resolution();
         auto film = Film<Float, Spectrum>(res);
@@ -62,10 +63,9 @@ namespace akari {
             .def(py::init<>())
             .def_readwrite("variant", &ASceneNode::variant)
             .def_readwrite("camera", &ASceneNode::camera)
-            .def_readwrite("shapes", &ASceneNode::shapes)
             .def_readwrite("output", &ASceneNode::output)
-            .def("commit", &ASceneNode::commit)
-            .def("render", &ASceneNode::render);
+            .def("render", &ASceneNode::render)
+            .def("add_mesh", &ASceneNode::add_mesh);
     }
     AKR_RENDER_CLASS(SceneNode)
     AKR_RENDER_STRUCT(RegisterSceneNode)
