@@ -25,69 +25,10 @@
 #include <akari/core/logger.h>
 namespace akari {
     namespace py = pybind11;
-    template <typename T> struct RegisterArrayOp {
-        template <typename Class> void operator()(py::module &m, Class &c) const {
-            c.def("__add__", [](const T &a, const T &b) { return a + b; });
-            c.def("__sub__", [](const T &a, const T &b) { return a - b; });
-            c.def("__mul__", [](const T &a, const T &b) { return a * b; });
-            c.def("__truediv__", [](const T &a, const T &b) { return a / b; });
-            c.def("__add__", [](const T &a, const value_t<T> &b) { return a + b; });
-            c.def("__sub__", [](const T &a, const value_t<T> &b) { return a - b; });
-            c.def("__mul__", [](const T &a, const value_t<T> &b) { return a * b; });
-            c.def("__truediv__", [](const T &a, const value_t<T> &b) { return a / b; });
-            c.def("__add__", [](const value_t<T> &a, const T &b) { return a + b; });
-            c.def("__sub__", [](const value_t<T> &a, const T &b) { return a - b; });
-            c.def("__mul__", [](const value_t<T> &a, const T &b) { return a * b; });
-            c.def("__truediv__", [](const value_t<T> &a, const T &b) { return a / b; });
-            c.def("__str__", [](const T &a) -> std::string { return fmt::format("{}", a); });
-            m.def("degrees", [](const T &a) { return degrees(a); });
-            m.def("radians", [](const T &a) { return radians(a); });
-            // if constexpr (is_integer_v<T>){
-
-            // }
-        }
+   
+    AKR_VARIANT
+    struct RegisterMathFunction {
+        static void register_math_functions(py::module &m) ;
     };
-
-    AKR_VARIANT void register_math_functions(py::module &m) {
-        AKR_IMPORT_CORE_TYPES()
-        m.def("degrees", [](const Float &a) { return degrees(a); });
-        m.def("radians", [](const Float &a) { return radians(a); });
-        {
-            auto c = py::class_<Vector2f>(m, "Vector2f")
-                         .def(py::init<>())
-                         .def(py::init<Float>())
-                         .def(py::init<Float, Float>());
-            RegisterArrayOp<Vector2f>()(m, c);
-        }
-        {
-            auto c = py::class_<Vector3f>(m, "Vector3f")
-                         .def(py::init<>())
-                         .def(py::init<Float>())
-                         .def(py::init<Float, Float>())
-                         .def(py::init<Float, Float, Float>());
-            RegisterArrayOp<Vector3f>()(m, c);
-        }
-        {
-            auto c = py::class_<Point2i>(m, "Point2i")
-                         .def(py::init<>())
-                         .def(py::init<Int32>())
-                         .def(py::init<Int32, Int32>());
-            RegisterArrayOp<Point2i>()(m, c);
-        }
-        {
-            auto c = py::class_<Point2f>(m, "Point2f")
-                         .def(py::init<>())
-                         .def(py::init<Float>())
-                         .def(py::init<Float, Float>());
-            RegisterArrayOp<Point2f>()(m, c);
-        }
-        {
-            auto c = py::class_<Point3f>(m, "Point3f")
-                         .def(py::init<>())
-                         .def(py::init<Float>())
-                         .def(py::init<Float, Float>())
-                         .def(py::init<Float, Float, Float>());
-            RegisterArrayOp<Point3f>()(m, c);
-        }
-    }
+    
 } // namespace akari

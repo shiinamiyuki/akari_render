@@ -19,28 +19,15 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+
 #pragma once
+#include <akari/core/scenegraph.h>
 
-#include <akari/core/akari.h>
-#include <akari/common/fwd.h>
-#include <akari/core/buffer.h>
-#include <akari/kernel/meshview.h>
-#include <akari/kernel/integrators/cpu/integrator.h>
-// #include <akari/kernel/materials/material.h>
-namespace pybind11 {
-    class module;
-}
 namespace akari {
-    namespace py = pybind11;
-    AKR_VARIANT class SceneGraphNode {
+    AKR_VARIANT class CameraNode : public SceneGraphNode<Float, Spectrum> {
       public:
-        AKR_IMPORT_BASIC_RENDER_TYPES()
-        virtual void commit() {}
-        virtual ~SceneGraphNode() = default;
+        AKR_IMPORT_TYPES(Camera)
+        virtual ACamera compile() = 0;
     };
-    AKR_VARIANT class SceneNode;
-
-    AKR_VARIANT class FilmNode : public SceneGraphNode<Float, Spectrum> { public: };
-    AKR_VARIANT class MaterialNode : public SceneGraphNode<Float, Spectrum> { public: };
-
+     AKR_VARIANT struct RegisterCameraNode {static void register_nodes(py::module &m); };
 } // namespace akari

@@ -80,6 +80,7 @@ namespace akari {
     template <typename T, int N> struct value_<Vector<T, N>> { using type = T; };
     template <typename T, int N> struct value_<Point<T, N>> { using type = T; };
     template <typename T, int N> struct value_<Normal<T, N>> { using type = T; };
+    template <typename T, int N> struct value_<Color<T, N>> { using type = T; };
     template <typename T> using value_t = typename value_<T>::type;
     template <typename T, typename S> struct replace_scalar_ { using type = S; };
     template <typename T, int N, typename S> struct replace_scalar_<Vector<T, N>, S> { using type = Vector<S, N>; };
@@ -93,6 +94,7 @@ namespace akari {
     template <typename T, int N> struct array_size<Array<T, N>> { static constexpr size_t value = N; };
     template <typename T, int N> struct array_size<Vector<T, N>> { static constexpr size_t value = N; };
     template <typename T, int N> struct array_size<Normal<T, N>> { static constexpr size_t value = N; };
+    template <typename T, int N> struct array_size<Color<T, N>> { static constexpr size_t value = N; };
     template <typename T> constexpr size_t array_size_v = array_size<T>::value;
 
     template <typename T> struct is_array : std::false_type {};
@@ -100,6 +102,7 @@ namespace akari {
     template <typename T, int N> struct is_array<Point<T, N>> : std::true_type {};
     template <typename T, int N> struct is_array<Vector<T, N>> : std::true_type {};
     template <typename T, int N> struct is_array<Normal<T, N>> : std::true_type {};
+    template <typename T, int N> struct is_array<Color<T, N>> : std::true_type {};
     template <typename T> constexpr size_t is_array_v = is_array<T>::value;
     template <typename T> struct is_integer : std::is_integral<T> {};
     template <typename T> struct is_float : std::is_floating_point<T> {};
@@ -128,6 +131,18 @@ namespace akari {
         using UInt64 = uint64_t;
         using Float32 = float;
         using Float64 = double;
+
+        using Array2b = Array<bool, 2>;
+        using Array3b = Array<bool, 3>;
+        using Array4b = Array<bool, 4>;
+
+        using Array2f = Array<Float, 2>;
+        using Array3f = Array<Float, 3>;
+        using Array4f = Array<Float, 4>;
+
+        using Array2i = Array<Int32, 2>;
+        using Array3i = Array<Int32, 3>;
+        using Array4i = Array<Int32, 4>;
 
         using Color1f = Color<Float, 1>;
         using Color3f = Color<Float, 3>;
@@ -199,6 +214,15 @@ namespace akari {
     using prefix##UInt64 = typename prefix##CoreAliases::UInt64;                                                       \
     using prefix##Float32 = typename prefix##CoreAliases::Float32;                                                     \
     using prefix##Float64 = typename prefix##CoreAliases::Float64;                                                     \
+    using prefix##Array2b = typename prefix##CoreAliases::Array2b;                                                     \
+    using prefix##Array3b = typename prefix##CoreAliases::Array3b;                                                     \
+    using prefix##Array4b = typename prefix##CoreAliases::Array4b;                                                     \
+    using prefix##Array2f = typename prefix##CoreAliases::Array2f;                                                     \
+    using prefix##Array3f = typename prefix##CoreAliases::Array3f;                                                     \
+    using prefix##Array4f = typename prefix##CoreAliases::Array4f;                                                     \
+    using prefix##Array2i = typename prefix##CoreAliases::Array2i;                                                     \
+    using prefix##Array3i = typename prefix##CoreAliases::Array3i;                                                     \
+    using prefix##Array4i = typename prefix##CoreAliases::Array4i;                                                     \
     using prefix##Vector1i = typename prefix##CoreAliases::Vector1i;                                                   \
     using prefix##Vector2i = typename prefix##CoreAliases::Vector2i;                                                   \
     using prefix##Vector3i = typename prefix##CoreAliases::Vector3i;                                                   \

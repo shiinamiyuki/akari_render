@@ -20,27 +20,23 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 #pragma once
-
-#include <akari/core/akari.h>
-#include <akari/common/fwd.h>
-#include <akari/core/buffer.h>
-#include <akari/kernel/meshview.h>
-#include <akari/kernel/integrators/cpu/integrator.h>
-// #include <akari/kernel/materials/material.h>
-namespace pybind11 {
-    class module;
-}
+#include <akari/core/scenegraph.h>
+#include <akari/core/nodes/camera.h>
+#include <akari/core/nodes/mesh.h>
+#include <akari/kernel/scene.h>
 namespace akari {
-    namespace py = pybind11;
-    AKR_VARIANT class SceneGraphNode {
+    AKR_VARIANT class SceneNode : public SceneGraphNode<Float, Spectrum> {
       public:
         AKR_IMPORT_BASIC_RENDER_TYPES()
-        virtual void commit() {}
-        virtual ~SceneGraphNode() = default;
+        Buffer<MeshView> meshviews;
+        AKR_IMPORT_RENDER_TYPES(CameraNode, MeshNode)
+        std::string variant;
+        std::shared_ptr<ACameraNode> camera;
+        std::vector<std::shared_ptr<AMeshNode>> shapes;
+        std::string output;
+        void commit() override;
+        AScene compile();
+        void render();
     };
-    AKR_VARIANT class SceneNode;
-
-    AKR_VARIANT class FilmNode : public SceneGraphNode<Float, Spectrum> { public: };
-    AKR_VARIANT class MaterialNode : public SceneGraphNode<Float, Spectrum> { public: };
-
+    AKR_VARIANT struct RegisterSceneNode {static void register_nodes(py::module &m); };
 } // namespace akari
