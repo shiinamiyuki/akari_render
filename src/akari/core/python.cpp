@@ -26,18 +26,27 @@ namespace akari {
         template <typename Class> void operator()(py::module &m, Class &c) const {
             AKR_IMPORT_CORE_TYPES()
             constexpr auto N = array_size_v<T>;
-            c.def("__add__", [](const T &a, const T &b) { return a + b; });
-            c.def("__sub__", [](const T &a, const T &b) { return a - b; });
-            c.def("__mul__", [](const T &a, const T &b) { return a * b; });
-            c.def("__truediv__", [](const T &a, const T &b) { return a / b; });
-            c.def("__add__", [](const T &a, const value_t<T> &b) { return a + b; });
-            c.def("__sub__", [](const T &a, const value_t<T> &b) { return a - b; });
-            c.def("__mul__", [](const T &a, const value_t<T> &b) { return a * b; });
-            c.def("__truediv__", [](const T &a, const value_t<T> &b) { return a / b; });
-            c.def("__add__", [](const value_t<T> &a, const T &b) { return a + b; });
-            c.def("__sub__", [](const value_t<T> &a, const T &b) { return a - b; });
-            c.def("__mul__", [](const value_t<T> &a, const T &b) { return a * b; });
-            c.def("__truediv__", [](const value_t<T> &a, const T &b) { return a / b; });
+            if constexpr (!std::is_same_v<bool, value_t<T>>) {
+                c.def("__add__", [](const T &a, const T &b) { return a + b; });
+                c.def("__sub__", [](const T &a, const T &b) { return a - b; });
+                c.def("__mul__", [](const T &a, const T &b) { return a * b; });
+                c.def("__truediv__", [](const T &a, const T &b) { return a / b; });
+                c.def("__add__", [](const T &a, const value_t<T> &b) { return a + b; });
+                c.def("__sub__", [](const T &a, const value_t<T> &b) { return a - b; });
+                c.def("__mul__", [](const T &a, const value_t<T> &b) { return a * b; });
+                c.def("__truediv__", [](const T &a, const value_t<T> &b) { return a / b; });
+                c.def("__add__", [](const value_t<T> &a, const T &b) { return a + b; });
+                c.def("__sub__", [](const value_t<T> &a, const T &b) { return a - b; });
+                c.def("__mul__", [](const value_t<T> &a, const T &b) { return a * b; });
+                c.def("__truediv__", [](const value_t<T> &a, const T &b) { return a / b; });
+#define REGISTER_MATH_OP(name, op) c.def(#name, [](const T &a, const T &b) { return a op b; });
+                REGISTER_MATH_OP("__lt__", <)
+                REGISTER_MATH_OP("__gt__", >)
+                REGISTER_MATH_OP("__le__", <=)
+                REGISTER_MATH_OP("__ge__", >=)
+                REGISTER_MATH_OP("__eq__", ==)
+                REGISTER_MATH_OP("__ne__", !=)
+            }
             c.def("__str__", [](const T &a) -> std::string { return fmt::format("{}", a); });
             if constexpr (!std::is_same_v<bool, value_t<T>>) {
                 m.def("degrees", [](const T &a) { return degrees(a); });
@@ -54,6 +63,7 @@ namespace akari {
             }
             c.def(py::init<Array<int, N>>());
             c.def(py::init<Array<float, N>>());
+            c.def(py::init<Array<double, N>>());
             c.def(py::init<Array<bool, N>>());
             c.def(py::init<>());
             if constexpr (N >= 1) {

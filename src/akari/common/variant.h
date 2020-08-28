@@ -206,7 +206,6 @@ namespace akari {
                 that->template get<U>()->~U();
             });
         }
-
 #define AKR_VAR_DISPATCH(method, ...)                                                                                  \
     return this->accept([&, this](auto &&self) {                                                                       \
         (void)this;                                                                                                    \

@@ -60,7 +60,8 @@ namespace akari {
         if constexpr (packed || N <= 2) {
             return alignof(T);
         }
-        return 128 / 32;
+        // align to 128 bits (16 bytes)
+        return (alignof(T) + 15u) & ~15u;
     }
 
 #define AKR_VARIANT template <typename Float, typename Spectrum>
@@ -287,6 +288,7 @@ namespace akari {
     AKR_VARIANT class Sampler;
     AKR_VARIANT struct sampling_;
     AKR_VARIANT struct microfacet_;
+    AKR_VARIANT struct bsdf_;
     AKR_VARIANT struct CameraSample;
 
 #define AKR_IMPORT_BASIC_RENDER_TYPES()                                                                                \
@@ -294,6 +296,7 @@ namespace akari {
     using sampling = sampling_<Float, Spectrum>;                                                                       \
     using microfacet = microfacet_<Float, Spectrum>;                                                                   \
     using Ray3f = Ray<Float, Spectrum>;                                                                                \
+    using bsdf_math = bsdf_<Float, Spectrum>;                                                                          \
     AKR_IMPORT_RENDER_TYPES(Scene, CameraSample)
 
 #define AKR_IMPORT_TYPES(...)                                                                                          \
@@ -305,4 +308,7 @@ namespace akari {
 #else
     static constexpr bool akari_enable_embree = false;
 #endif
+
+    template<typename T>
+    using device_ptr = T *;
 } // namespace akari

@@ -22,6 +22,7 @@
 
 #pragma once
 #include <cstdio>
+#include <cstdlib>
 namespace akari {
     [[noreturn]] inline void panic(const char *file, int line, const char *msg) {
         fprintf(stderr, "PANIC at %s:%d: %s\n", file, line, msg);

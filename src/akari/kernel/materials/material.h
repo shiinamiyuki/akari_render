@@ -26,6 +26,62 @@
 #include <akari/common/math.h>
 
 namespace akari {
+    enum BSDFType : int {
+        BSDF_NONE = 0u,
+        BSDF_REFLECTION = 1u << 0u,
+        BSDF_TRANSMISSION = 1u << 1u,
+        BSDF_DIFFUSE = 1u << 2u,
+        BSDF_GLOSSY = 1u << 3u,
+        BSDF_SPECULAR = 1u << 4u,
+        BSDF_ALL = BSDF_DIFFUSE | BSDF_GLOSSY | BSDF_SPECULAR | BSDF_REFLECTION | BSDF_TRANSMISSION,
+    };
+    AKR_VARIANT struct bsdf_ {
+        AKR_IMPORT_CORE_TYPES()
+        static inline Float cos_theta(const Vector3f &w) { return w.y(); }
+
+        static inline Float abs_cos_theta(const Vector3f &w) { return std::abs(cos_theta(w)); }
+
+        static inline Float cos2_theta(const Vector3f &w) { return w.y() * w.y(); }
+
+        static inline Float sin2_theta(const Vector3f &w) { return 1 - cos2_theta(w); }
+
+        static inline Float sin_theta(const Vector3f &w) { return std::sqrt(std::fmax(0.0f, sin2_theta(w))); }
+
+        static inline Float tan2_theta(const Vector3f &w) { return sin2_theta(w) / cos2_theta(w); }
+
+        static inline Float tan_theta(const Vector3f &w) { return std::sqrt(std::fmax(0.0f, tan2_theta(w))); }
+
+        static inline Float cos_phi(const Vector3f &w) {
+            Float sinTheta = sin_theta(w);
+            return (sinTheta == 0) ? 1 : std::clamp<Float>(w.x / sinTheta, -1, 1);
+        }
+        static inline Float sin_phi(const Vector3f &w) {
+            Float sinTheta = sin_theta(w);
+            return (sinTheta == 0) ? 0 : std::clamp<Float>(w.z / sinTheta, -1, 1);
+        }
+
+        static inline Float cos2_phi(const Vector3f &w) { return cos_phi(w) * cos_phi(w); }
+        static inline Float sin2_phi(const Vector3f &w) { return sin_phi(w) * sin_phi(w); }
+
+        static inline bool same_hemisphere(const Vector3f &wo, const Vector3f &wi) { return wo.y() * wi.y() >= 0; }
+
+        static inline Vector3f reflect(const Vector3f &w, const Normal3f &n) {
+            return -1.0f * w + 2.0f * dot(w, n) * n;
+        }
+
+        static inline bool refract(const Vector3f &wi, const Normal3f &n, Float eta, Vector3f *wt) {
+            Float cosThetaI = dot(n, wi);
+            Float sin2ThetaI = std::fmax(0.0f, 1.0f - cosThetaI * cosThetaI);
+            Float sin2ThetaT = eta * eta * sin2ThetaI;
+            if (sin2ThetaT >= 1)
+                return false;
+
+            Float cosThetaT = std::sqrt(1 - sin2ThetaT);
+
+            *wt = eta * -wi + (eta * cosThetaI - cosThetaT) * n;
+            return true;
+        }
+    };
     AKR_VARIANT struct BSDFSample {
         AKR_IMPORT_CORE_TYPES()
         Vector3f wi = Vector3f(0);
@@ -39,9 +95,15 @@ namespace akari {
     };
     AKR_VARIANT struct DiffuseClosure {};
 
-    AKR_VARIANT struct SumBSDF { int bsdfs[2]; };
-
-    AKR_VARIANT class BSDFClosure {};
+    AKR_VARIANT class BSDFClosure {
+      public:
+        AKR_IMPORT_CORE_TYPES();
+        [[nodiscard]] Float evaluate_pdf(const Vector3f &wo, const Vector3f &wi) const;
+        [[nodiscard]] Spectrum evaluate(const Vector3f &wo, const Vector3f &wi) const;
+        [[nodiscard]] BSDFType type() const;
+        [[nodiscard]] bool is_delta() const { return ((uint32_t)type() & (uint32_t)BSDF_SPECULAR) != 0; }
+        [[nodiscard]] bool match_flags(BSDFType flag) const { return ((uint32_t)type() & (uint32_t)flag) != 0; }
+    };
 
     AKR_VARIANT class BSDF {
 
@@ -53,9 +115,14 @@ namespace akari {
 
       public:
         explicit BSDF(const Normal3f &ng, const Normal3f &ns) : ng(ng), ns(ns) { frame = Frame3f(ns); }
-        void add_closure(const ABSDFClosure &closure) { closures[num_closures++] = closure; }
+        void add_closure(ABSDFClosure closure) { closures[num_closures++] = closure; }
     };
+    AKR_VARIANT struct MaterialEvaluationStackFrame {
+        
+    };
+    AKR_VARIANT struct MaterialEvaluationStack {
 
+    };
     AKR_VARIANT class Material {};
 
 } // namespace akari

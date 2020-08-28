@@ -25,17 +25,16 @@
 #include <cstddef>
 #include <cstdint>
 #include <list>
+#include <akari/core/buffer.h>
 namespace akari {
-    class MemoryArena {
+    class DeviceMemoryArena {
         static constexpr size_t align16(size_t x) { return (x + 15ULL) & (~15ULL); }
 
         struct Block {
             size_t size;
             uint8_t *data;
 
-            Block(uint8_t *data, size_t size) : size(size), data(data) {
-                //                log::log("???\n");
-            }
+            Block(size_t size) : size(size) { data = (uint8_t *)get_device_memory_resource()->allocate(size); }
 
             ~Block() = default;
         };
@@ -47,7 +46,7 @@ namespace akari {
 
       public:
         static constexpr size_t DEFAULT_BLOCK_SIZE = 262144ull;
-        MemoryArena() : currentBlock(new uint8_t[DEFAULT_BLOCK_SIZE], DEFAULT_BLOCK_SIZE) {}
+        DeviceMemoryArena() : currentBlock(DEFAULT_BLOCK_SIZE) {}
 
         template <typename T, typename... Args> T *allocN(size_t count, Args &&... args) {
             typename std::list<Block>::iterator iter;
@@ -67,7 +66,7 @@ namespace akari {
                 }
                 if (iter == availableBlocks.end()) {
                     auto sz = std::max<size_t>(allocSize, DEFAULT_BLOCK_SIZE);
-                    currentBlock = Block(new uint8_t[sz], sz);
+                    currentBlock = Block(sz);
                 }
             }
             p = currentBlock.data + currentBlockPos;
@@ -89,13 +88,13 @@ namespace akari {
             availableBlocks.splice(availableBlocks.begin(), usedBlocks);
         }
 
-        ~MemoryArena() {
-            delete[] currentBlock.data;
+        ~DeviceMemoryArena() {
+            get_device_memory_resource()->deallocate(currentBlock.data);
             for (auto i : availableBlocks) {
-                delete[] i.data;
+                get_device_memory_resource()->deallocate(i.data);
             }
             for (auto i : usedBlocks) {
-                delete[] i.data;
+                get_device_memory_resource()->deallocate(i.data);
             }
         }
     };
