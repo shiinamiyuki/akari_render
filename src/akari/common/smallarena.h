@@ -32,11 +32,16 @@ namespace akari {
     class SmallArena {
         device_ptr<uint8_t> buffer = nullptr;
         size_t size;
-        std::atomic<size_t> allocated(0);
+        std::atomic<size_t> allocated;
         static constexpr size_t align16(size_t x) { return (x + 15ULL) & (~15ULL); }
 
       public:
-        SmallArena(device_ptr<uint8_t> buffer, size_t size) : buffer(buffer), size(size) {}
+        SmallArena(SmallArena &&rhs) : buffer(rhs.buffer), size(rhs.size), allocated(rhs.allocated.load()) {
+            rhs.buffer = nullptr;
+            rhs.size = 0u;
+            rhs.allocated = 0;
+        }
+        SmallArena(device_ptr<uint8_t> buffer, size_t size) : buffer(buffer), size(size), allocated(0) {}
         template <typename T, typename... Args> device_ptr<T> alloc(Args &&... args) {
             size_t bytes_needed = align16(sizeof(T));
             size_t cur = allocated.fetch_add(bytes_needed);
@@ -44,7 +49,7 @@ namespace akari {
                 return nullptr;
             }
             device_ptr<T> p = reinterpret_cast<device_ptr<T>>(buffer + cur);
-            new (*p)(std::forward<Args>(args)...);
+            new (p) T(std::forward<Args>(args)...);
             return p;
         }
         void reset() { allocated = 0; }

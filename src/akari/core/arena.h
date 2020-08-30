@@ -47,30 +47,32 @@ namespace akari {
       public:
         static constexpr size_t DEFAULT_BLOCK_SIZE = 262144ull;
         MemoryArena() : currentBlock(DEFAULT_BLOCK_SIZE) {}
-
-        template <typename T, typename... Args> T *allocN(size_t count, Args &&... args) {
+        uint8_t *alloc_bytes(size_t bytes) {
             typename std::list<Block>::iterator iter;
-            auto allocSize = sizeof(T) * count;
-
             uint8_t *p = nullptr;
-            if (currentBlockPos + allocSize > currentBlock.size) {
+            if (currentBlockPos + bytes > currentBlock.size) {
                 usedBlocks.emplace_front(currentBlock);
                 currentBlockPos = 0;
                 for (iter = availableBlocks.begin(); iter != availableBlocks.end(); iter++) {
-                    if (iter->size >= allocSize) {
-                        currentBlockPos = allocSize;
+                    if (iter->size >= bytes) {
+                        currentBlockPos = bytes;
                         currentBlock = *iter;
                         availableBlocks.erase(iter);
                         break;
                     }
                 }
                 if (iter == availableBlocks.end()) {
-                    auto sz = std::max<size_t>(allocSize, DEFAULT_BLOCK_SIZE);
+                    auto sz = std::max<size_t>(bytes, DEFAULT_BLOCK_SIZE);
                     currentBlock = Block(sz);
                 }
             }
             p = currentBlock.data + currentBlockPos;
-            currentBlockPos += allocSize;
+            currentBlockPos += bytes;
+            return p;
+        }
+        template <typename T, typename... Args> T *allocN(size_t count, Args &&... args) {
+            auto allocSize = sizeof(T) * count;
+            auto p = alloc_bytes(allocSize);
             if constexpr (!std::is_trivially_constructible_v<T>) {
                 for (size_t i = 0; i < count; i++) {
                     new (p + i * sizeof(T)) T(std::forward<Args>(args)...);

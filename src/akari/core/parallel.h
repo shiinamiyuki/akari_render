@@ -56,7 +56,7 @@ namespace akari {
     };
 
     AKR_EXPORT void parallel_for(int count, const std::function<void(uint32_t, uint32_t)> &func, size_t chunkSize = 1);
-
+    AKR_EXPORT size_t num_work_threads();
     inline void parallel_for_2d(const Point<int, 2> &dim, const std::function<void(Point<int, 2>, uint32_t)> &func,
                                 size_t chunkSize = 1) {
         parallel_for(
