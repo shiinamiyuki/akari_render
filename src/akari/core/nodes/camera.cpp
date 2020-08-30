@@ -32,14 +32,14 @@ namespace akari {
         Vector3f rotation;
         Point2i resolution = Point2i(512, 512);
         Float fov = radians(80.0f);
-        ACamera compile() override {
+        ACamera compile(MemoryArena *arena) override {
             AKR_IMPORT_RENDER_TYPES(PerspectiveCamera)
             Transform3f c2w;
             c2w = Transform3f::rotate_z(rotation.z());
             c2w = Transform3f::rotate_x(rotation.y()) * c2w;
             c2w = Transform3f::rotate_y(rotation.x()) * c2w;
             c2w = Transform3f::translate(position) * c2w;
-            return APerspectiveCamera(resolution, c2w, fov);
+            return arena->alloc<APerspectiveCamera>(resolution, c2w, fov);
         }
     };
     AKR_VARIANT void RegisterCameraNode<Float, Spectrum>::register_nodes(py::module &m) {

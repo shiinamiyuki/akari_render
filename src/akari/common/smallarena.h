@@ -21,28 +21,32 @@
 // SOFTWARE.
 
 #pragma once
+#include <cstddef>
+#include <cstdint>
+#include <atomic>
 #include <akari/common/fwd.h>
-#include <akari/common/taggedpointer.h>
+
 namespace akari {
-    struct AOV {
-        static constexpr uint32_t color = 0;
-        static constexpr uint32_t albedo = 1;
-        static constexpr uint32_t depth = 2;
-        static constexpr uint32_t normal = 3;
+    // A very fast memory arena for device
+    // Can allocate concurrently
+    class SmallArena {
+        device_ptr<uint8_t> buffer = nullptr;
+        size_t size;
+        std::atomic<size_t> allocated(0);
+        static constexpr size_t align16(size_t x) { return (x + 15ULL) & (~15ULL); }
+
+      public:
+        SmallArena(device_ptr<uint8_t> buffer, size_t size) : buffer(buffer), size(size) {}
+        template <typename T, typename... Args> device_ptr<T> alloc(Args &&... args) {
+            size_t bytes_needed = align16(sizeof(T));
+            size_t cur = allocated.fetch_add(bytes_needed);
+            if (cur >= size) {
+                return nullptr;
+            }
+            device_ptr<T> p = reinterpret_cast<device_ptr<T>>(buffer + cur);
+            new (*p)(std::forward<Args>(args)...);
+            return p;
+        }
+        void reset() { allocated = 0; }
     };
-    namespace cpu {
-        AKR_VARIANT class AmbientOcclusion {
-          public:
-            int spp = 16;
-            int tile_size = 16;
-            AKR_IMPORT_TYPES(Camera, Material, Film, Sampler)
-            void render(const AScene &scene, AFilm *out) const;
-        };
-        AKR_VARIANT class Integrator : public TaggedPointer<AmbientOcclusion<Float, Spectrum>> {
-          public:
-            AKR_IMPORT_TYPES(Camera, Material, Film, Sampler)
-            using TaggedPointer<AmbientOcclusion<Float, Spectrum>>::TaggedPointer;
-            void render(const AScene &scene, AFilm *out) const { AKR_TAGGED_DISPATCH(render, scene, out); }
-        };
-    } // namespace cpu
 } // namespace akari

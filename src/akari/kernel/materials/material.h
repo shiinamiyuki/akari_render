@@ -22,7 +22,7 @@
 
 #pragma once
 
-#include <akari/common/variant.h>
+#include <akari/common/taggedpointer.h>
 #include <akari/common/math.h>
 
 namespace akari {

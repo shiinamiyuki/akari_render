@@ -45,7 +45,7 @@ namespace akari {
                 return;
             (void)load_wavefront_obj(path);
         }
-        MeshView compile() {
+        MeshView compile(MemoryArena *) {
             commit();
             MeshView view;
             view.indices = mesh.indices;

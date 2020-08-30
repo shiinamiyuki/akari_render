@@ -35,7 +35,7 @@ namespace akari {
         std::vector<std::shared_ptr<AMeshNode>> shapes;
         std::string output;
         void commit() override;
-        AScene compile();
+        AScene compile(MemoryArena *arena);
         void render();
         void add_mesh(const std::shared_ptr<AMeshNode> &mesh) { shapes.emplace_back(mesh); }
     };

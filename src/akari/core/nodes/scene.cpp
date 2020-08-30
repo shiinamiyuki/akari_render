@@ -35,25 +35,26 @@ namespace akari {
         AKR_ASSERT_THROW(camera);
         camera->commit();
     }
-    AKR_VARIANT Scene<Float, Spectrum> SceneNode<Float, Spectrum>::compile() {
+    AKR_VARIANT Scene<Float, Spectrum> SceneNode<Float, Spectrum>::compile(MemoryArena *arena) {
         AScene scene;
         for (auto &shape : shapes) {
-            meshviews.emplace_back(shape->compile());
+            meshviews.emplace_back(shape->compile(arena));
         }
         scene.meshes = meshviews;
-        scene.camera = camera->compile();
+        scene.camera = camera->compile(arena);
         return scene;
     }
     AKR_VARIANT void SceneNode<Float, Spectrum>::render() {
         commit();
-        auto scene = compile();
+        MemoryArena arena;
+        auto scene = compile(&arena);
         auto res = scene.camera.resolution();
         auto film = Film<Float, Spectrum>(res);
-        scene.sampler = Sampler<Float, Spectrum>(RandomSampler<Float, Spectrum>());
+        scene.sampler = Sampler<Float, Spectrum>(arena.alloc<RandomSampler<Float, Spectrum>>());
         auto embree_scene = EmbreeAccelerator<Float, Spectrum>();
         scene.embree_scene = &embree_scene;
         scene.commit();
-        auto integrator = cpu::Integrator<Float, Spectrum>(cpu::AmbientOcclusion<Float, Spectrum>());
+        auto integrator = cpu::Integrator<Float, Spectrum>(arena.alloc<cpu::AmbientOcclusion<Float, Spectrum>>());
         integrator.render(scene, &film);
         film.write_image(fs::path(output));
     }

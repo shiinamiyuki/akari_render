@@ -27,7 +27,7 @@
 #include <list>
 #include <akari/core/buffer.h>
 namespace akari {
-    class DeviceMemoryArena {
+    class MemoryArena {
         static constexpr size_t align16(size_t x) { return (x + 15ULL) & (~15ULL); }
 
         struct Block {
@@ -46,7 +46,7 @@ namespace akari {
 
       public:
         static constexpr size_t DEFAULT_BLOCK_SIZE = 262144ull;
-        DeviceMemoryArena() : currentBlock(DEFAULT_BLOCK_SIZE) {}
+        MemoryArena() : currentBlock(DEFAULT_BLOCK_SIZE) {}
 
         template <typename T, typename... Args> T *allocN(size_t count, Args &&... args) {
             typename std::list<Block>::iterator iter;
@@ -88,13 +88,13 @@ namespace akari {
             availableBlocks.splice(availableBlocks.begin(), usedBlocks);
         }
 
-        ~DeviceMemoryArena() {
-            get_device_memory_resource()->deallocate(currentBlock.data);
+        ~MemoryArena() {
+            get_device_memory_resource()->deallocate(currentBlock.data, currentBlock.size);
             for (auto i : availableBlocks) {
-                get_device_memory_resource()->deallocate(i.data);
+                get_device_memory_resource()->deallocate(i.data, i.size);
             }
             for (auto i : usedBlocks) {
-                get_device_memory_resource()->deallocate(i.data);
+                get_device_memory_resource()->deallocate(i.data, i.size);
             }
         }
     };

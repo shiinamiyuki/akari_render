@@ -22,7 +22,7 @@
 
 #pragma once
 #include <akari/common/fwd.h>
-#include <akari/common/variant.h>
+#include <akari/common/taggedpointer.h>
 namespace akari {
     AKR_VARIANT class RandomSampler {
         uint64_t state = 0x4d595df4d0f33173; // Or something seed-dependent
@@ -50,13 +50,13 @@ namespace akari {
         void start_next_sample() {}
         RandomSampler(uint64_t seed = 0u) { pcg32_init(seed); }
     };
-    AKR_VARIANT class Sampler : Variant<RandomSampler<Float, Spectrum>> {
+    AKR_VARIANT class Sampler : TaggedPointer<RandomSampler<Float, Spectrum>> {
       public:
         AKR_IMPORT_CORE_TYPES()
-        using Variant<RandomSampler<Float, Spectrum>>::Variant;
-        Float next1d() { AKR_VAR_DISPATCH(next1d); }
-        Point2f next2d() { AKR_VAR_DISPATCH(next2d); }
-        void start_next_sample() { AKR_VAR_DISPATCH(start_next_sample); }
-        void set_sample_index(uint64_t idx) { AKR_VAR_DISPATCH(set_sample_index, idx); }
+        using TaggedPointer<RandomSampler<Float, Spectrum>>::TaggedPointer;
+        Float next1d() { AKR_TAGGED_DISPATCH(next1d); }
+        Point2f next2d() { AKR_TAGGED_DISPATCH(next2d); }
+        void start_next_sample() { AKR_TAGGED_DISPATCH(start_next_sample); }
+        void set_sample_index(uint64_t idx) { AKR_TAGGED_DISPATCH(set_sample_index, idx); }
     };
 } // namespace akari

@@ -27,7 +27,7 @@ namespace akari {
     AKR_VARIANT class CameraNode : public SceneGraphNode<Float, Spectrum> {
       public:
         AKR_IMPORT_TYPES(Camera)
-        virtual ACamera compile() = 0;
+        virtual ACamera compile(MemoryArena* arena) = 0;
     };
      AKR_VARIANT struct RegisterCameraNode {static void register_nodes(py::module &m); };
 } // namespace akari

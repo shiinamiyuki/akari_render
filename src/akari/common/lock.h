@@ -21,28 +21,17 @@
 // SOFTWARE.
 
 #pragma once
-#include <akari/common/fwd.h>
-#include <akari/common/taggedpointer.h>
+#include <atomic>
 namespace akari {
-    struct AOV {
-        static constexpr uint32_t color = 0;
-        static constexpr uint32_t albedo = 1;
-        static constexpr uint32_t depth = 2;
-        static constexpr uint32_t normal = 3;
+    struct RwLock {
+        void lock() {
+            while (locked.test_and_set(std::memory_order_acquire)) {
+                ;
+            }
+        }
+        void unlock() { locked.clear(std::memory_order_release); }
+
+      private:
+        std::atomic_flag locked = ATOMIC_FLAG_INIT;
     };
-    namespace cpu {
-        AKR_VARIANT class AmbientOcclusion {
-          public:
-            int spp = 16;
-            int tile_size = 16;
-            AKR_IMPORT_TYPES(Camera, Material, Film, Sampler)
-            void render(const AScene &scene, AFilm *out) const;
-        };
-        AKR_VARIANT class Integrator : public TaggedPointer<AmbientOcclusion<Float, Spectrum>> {
-          public:
-            AKR_IMPORT_TYPES(Camera, Material, Film, Sampler)
-            using TaggedPointer<AmbientOcclusion<Float, Spectrum>>::TaggedPointer;
-            void render(const AScene &scene, AFilm *out) const { AKR_TAGGED_DISPATCH(render, scene, out); }
-        };
-    } // namespace cpu
 } // namespace akari

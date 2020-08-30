@@ -70,7 +70,7 @@ add_custom_command(OUTPUT ${AKR_CONFIG_H}
     DEPENDS akari.conf resources/configure.py)
 
 file(GLOB AKR_COMMON_SRC src/akari/common/*.*)
-file(GLOB AKR_CORE_SRC ${AKR_COMMON_SRC} src/akari/core/*.* )
+file(GLOB AKR_CORE_SRC ${AKR_COMMON_SRC} src/akari/core/*.* src/akari/core/*/*.*)
 file(GLOB AKR_KERNEL_SRC src/akari/kernel/*.* src/akari/kernel/*/*.*)
 file(GLOB AKR_KERNEL_CPU_SRC src/akari/kernel/integrators/cpu/*.*)
 add_library(akari_core SHARED ${AKR_CORE_SRC} ${AKR_CONFIG_H} ${AKR_KERNEL_SRC} ${AKR_KERNEL_CPU_SRC})

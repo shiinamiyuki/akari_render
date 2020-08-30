@@ -21,7 +21,7 @@
 // SOFTWARE.
 
 #pragma once
-#include <akari/common/variant.h>
+#include <akari/common/taggedpointer.h>
 #include <akari/common/math.h>
 namespace akari {
     AKR_VARIANT struct CameraSample {
@@ -51,13 +51,13 @@ namespace akari {
         Point2i resolution() const { return _resolution; }
         void generate_ray(const Point2f &u1, const Point2f &u2, const Point2i &raster, ACameraSample *sample) const;
     };
-    AKR_VARIANT class Camera : public Variant<PerspectiveCamera<Float, Spectrum>> {
+    AKR_VARIANT class Camera : public TaggedPointer<PerspectiveCamera<Float, Spectrum>> {
       public:
         AKR_IMPORT_TYPES(PerspectiveCamera)
-        using Variant<APerspectiveCamera>::Variant;
+        using TaggedPointer<APerspectiveCamera>::TaggedPointer;
         void generate_ray(const Point2f &u1, const Point2f &u2, const Point2i &raster, ACameraSample *sample) const {
-            AKR_VAR_DISPATCH(generate_ray, u1, u2, raster, sample);
+            AKR_TAGGED_DISPATCH(generate_ray, u1, u2, raster, sample);
         }
-        Point2i resolution() const { AKR_VAR_DISPATCH(resolution); }
+        Point2i resolution() const { AKR_TAGGED_DISPATCH(resolution); }
     };
 } // namespace akari

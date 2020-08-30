@@ -72,7 +72,7 @@ namespace akari {
             }
             return reinterpret_cast<U *>(get_ptr());
         }
-        template <typename Visitor> void dispatch(Visitor &&f) const {
+        template <typename Visitor> auto dispatch(Visitor &&f) const {
 #define _GEN_CASE_N(N)                                                                                                 \
     case N:                                                                                                            \
         if constexpr (N < nTypes) {                                                                                    \
@@ -128,4 +128,8 @@ namespace akari {
         uintptr_t bits = 0;
         static_assert(sizeof(void *) == 8);
     };
+#define AKR_TAGGED_DISPATCH(method, ...)                                                                               \
+    {                                                                                                                  \
+        return this->dispatch([&](auto &&arg) { return arg.method(__VA_ARGS__); });                                   \
+    }
 } // namespace akari
