@@ -44,7 +44,7 @@ namespace akari {
         }
 
       public:
-        AKR_IMPORT_CORE_TYPES()
+        AKR_IMPORT_TYPES()
         void set_sample_index(uint64_t idx) { pcg32_init(idx); }
         Float next1d() { return Float(pcg32()) / (float)0xffffffff; }
         Point2f next2d() { return Point2f(next1d(), next1d()); }
@@ -52,10 +52,10 @@ namespace akari {
         RandomSampler(uint64_t seed = 0u) { pcg32_init(seed); }
         RandomSampler *clone(SmallArena *arena) const { return arena->alloc<RandomSampler>(*this); }
     };
-    AKR_VARIANT class Sampler : TaggedPointer<RandomSampler<Float, Spectrum>> {
+    AKR_VARIANT class Sampler : TaggedPointer<RandomSampler<C>> {
       public:
-        AKR_IMPORT_CORE_TYPES()
-        using TaggedPointer<RandomSampler<Float, Spectrum>>::TaggedPointer;
+        AKR_IMPORT_TYPES()
+        using TaggedPointer<RandomSampler<C>>::TaggedPointer;
         Float next1d() { AKR_TAGGED_DISPATCH(next1d); }
         Point2f next2d() { AKR_TAGGED_DISPATCH(next2d); }
         void start_next_sample() { AKR_TAGGED_DISPATCH(start_next_sample); }

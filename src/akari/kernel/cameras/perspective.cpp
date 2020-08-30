@@ -24,7 +24,7 @@
 #include <akari/kernel/sampling.h>
 
 namespace akari {
-    AKR_VARIANT void PerspectiveCamera<Float, Spectrum>::preprocess() {
+    AKR_VARIANT void PerspectiveCamera<C>::preprocess() {
         Transform3f m;
         m = Transform3f::scale(Vector3f(1.0f / _resolution.x(), 1.0f / _resolution.y(), 1)) * m;
         m = Transform3f::scale(Vector3f(2, 2, 1)) * m;
@@ -39,10 +39,10 @@ namespace akari {
         r2c = m;
         c2r = r2c.inverse();
     }
-    AKR_VARIANT void PerspectiveCamera<Float, Spectrum>::generate_ray(const Point2f &u1, const Point2f &u2,
+    AKR_VARIANT void PerspectiveCamera<C>::generate_ray(const Point2f &u1, const Point2f &u2,
                                                                       const Point2i &raster,
-                                                                      ACameraSample *sample) const {
-        sample->p_lens = sampling::concentric_disk_sampling(u1) * lens_radius;
+                                                                      CameraSample<C> *sample) const {
+        sample->p_lens = sampling<C>::concentric_disk_sampling(u1) * lens_radius;
         sample->p_film = Point2f(raster) + (u2 - 0.5f);
         sample->weight = 1;
 

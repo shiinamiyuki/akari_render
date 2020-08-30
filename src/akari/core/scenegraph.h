@@ -35,13 +35,14 @@ namespace akari {
     namespace py = pybind11;
     AKR_VARIANT class SceneGraphNode {
       public:
-        AKR_IMPORT_BASIC_RENDER_TYPES()
+        using Float = typename C::Float;
+        AKR_IMPORT_CORE_TYPES()
         virtual void commit() {}
         virtual ~SceneGraphNode() = default;
     };
     AKR_VARIANT class SceneNode;
 
-    AKR_VARIANT class FilmNode : public SceneGraphNode<Float, Spectrum> { public: };
-    AKR_VARIANT class MaterialNode : public SceneGraphNode<Float, Spectrum> { public: };
+    AKR_VARIANT class FilmNode : public SceneGraphNode<C> { public: };
+    AKR_VARIANT class MaterialNode : public SceneGraphNode<C> { public: };
 
 } // namespace akari

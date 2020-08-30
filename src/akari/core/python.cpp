@@ -77,8 +77,8 @@ namespace akari {
             }
         }
     };
-    AKR_VARIANT void RegisterMathFunction<Float, Spectrum>::register_math_functions(py::module &m) {
-        AKR_IMPORT_CORE_TYPES()
+    AKR_VARIANT void RegisterMathFunction<C>::register_math_functions(py::module &m) {
+        AKR_IMPORT_TYPES()
         m.def("degrees", [](const Float &a) { return degrees(a); });
         m.def("radians", [](const Float &a) { return radians(a); });
         {

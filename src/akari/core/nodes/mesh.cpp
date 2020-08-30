@@ -28,15 +28,14 @@
 #include <pybind11/stl.h>
 #include <akari/core/logger.h>
 namespace akari {
-    AKR_VARIANT class OBJMesh : public MeshNode<Float, Spectrum> {
+    AKR_VARIANT class OBJMesh : public MeshNode<C> {
         std::string loaded;
 
       public:
-        AKR_IMPORT_BASIC_RENDER_TYPES()
-        AKR_IMPORT_RENDER_TYPES(SceneNode)
+        AKR_IMPORT_TYPES()
         OBJMesh() = default;
         OBJMesh(const std::string &path) : path(path) {}
-        using MaterialNode = akari::MaterialNode<Float, Spectrum>;
+        using MaterialNode = akari::MaterialNode<C>;
         std::string path;
         Mesh mesh;
         std::vector<std::shared_ptr<MaterialNode>> materials;
@@ -121,14 +120,14 @@ namespace akari {
             return true;
         }
     };
-    AKR_VARIANT void RegisterMeshNode<Float, Spectrum>::register_nodes(py::module &m) {
-        AKR_IMPORT_RENDER_TYPES(OBJMesh, MeshNode, SceneGraphNode);
-        py::class_<AMeshNode, ASceneGraphNode, std::shared_ptr<AMeshNode>>(m, "Mesh").def("commit", &AMeshNode::commit);
-        py::class_<AOBJMesh, AMeshNode, std::shared_ptr<AOBJMesh>>(m, "OBJMesh")
+    AKR_VARIANT void RegisterMeshNode<C>::register_nodes(py::module &m) {
+        AKR_IMPORT_TYPES();
+        py::class_<MeshNode<C>, SceneGraphNode<C>, std::shared_ptr<MeshNode<C>>>(m, "Mesh").def("commit", &MeshNode<C>::commit);
+        py::class_<OBJMesh<C>, MeshNode<C>, std::shared_ptr<OBJMesh<C>>>(m, "OBJMesh")
             .def(py::init<>())
             .def(py::init<const std::string &>())
-            .def("commit", &AOBJMesh::commit)
-            .def_readwrite("path", &AOBJMesh::path);
+            .def("commit", &OBJMesh<C>::commit)
+            .def_readwrite("path", &OBJMesh<C>::path);
     }
     AKR_RENDER_STRUCT(RegisterMeshNode)
 } // namespace akari

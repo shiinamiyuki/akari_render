@@ -27,7 +27,7 @@
 #include <akari/core/film.h>
 
 namespace akari {
-    AKR_VARIANT void SceneNode<Float, Spectrum>::commit() {
+    AKR_VARIANT void SceneNode<C>::commit() {
         for (auto &shape : shapes) {
             AKR_ASSERT_THROW(shape);
             shape->commit();
@@ -35,8 +35,8 @@ namespace akari {
         AKR_ASSERT_THROW(camera);
         camera->commit();
     }
-    AKR_VARIANT Scene<Float, Spectrum> SceneNode<Float, Spectrum>::compile(MemoryArena *arena) {
-        AScene scene;
+    AKR_VARIANT Scene<C> SceneNode<C>::compile(MemoryArena *arena) {
+        Scene<C> scene;
         for (auto &shape : shapes) {
             meshviews.emplace_back(shape->compile(arena));
         }
@@ -44,29 +44,29 @@ namespace akari {
         scene.camera = camera->compile(arena);
         return scene;
     }
-    AKR_VARIANT void SceneNode<Float, Spectrum>::render() {
+    AKR_VARIANT void SceneNode<C>::render() {
         commit();
         MemoryArena arena;
         auto scene = compile(&arena);
         auto res = scene.camera.resolution();
-        auto film = Film<Float, Spectrum>(res);
-        scene.sampler = Sampler<Float, Spectrum>(arena.alloc<RandomSampler<Float, Spectrum>>());
-        auto embree_scene = EmbreeAccelerator<Float, Spectrum>();
+        auto film = Film<C>(res);
+        scene.sampler = Sampler<C>(arena.alloc<RandomSampler<C>>());
+        auto embree_scene = EmbreeAccelerator<C>();
         scene.embree_scene = &embree_scene;
         scene.commit();
-        auto integrator = cpu::Integrator<Float, Spectrum>(arena.alloc<cpu::AmbientOcclusion<Float, Spectrum>>());
+        auto integrator = cpu::Integrator<C>(arena.alloc<cpu::AmbientOcclusion<C>>());
         integrator.render(scene, &film);
         film.write_image(fs::path(output));
     }
-    AKR_VARIANT void RegisterSceneNode<Float, Spectrum>::register_nodes(py::module &m) {
-        AKR_IMPORT_RENDER_TYPES(SceneNode, SceneGraphNode);
-        py::class_<ASceneNode, ASceneGraphNode, std::shared_ptr<ASceneNode>>(m, "Scene")
+    AKR_VARIANT void RegisterSceneNode<C>::register_nodes(py::module &m) {
+        AKR_IMPORT_TYPES()
+        py::class_<SceneNode<C>, SceneGraphNode<C>, std::shared_ptr<SceneNode<C>>>(m, "Scene")
             .def(py::init<>())
-            .def_readwrite("variant", &ASceneNode::variant)
-            .def_readwrite("camera", &ASceneNode::camera)
-            .def_readwrite("output", &ASceneNode::output)
-            .def("render", &ASceneNode::render)
-            .def("add_mesh", &ASceneNode::add_mesh);
+            .def_readwrite("variant", &SceneNode<C>::variant)
+            .def_readwrite("camera", &SceneNode<C>::camera)
+            .def_readwrite("output", &SceneNode<C>::output)
+            .def("render", &SceneNode<C>::render)
+            .def("add_mesh", &SceneNode<C>::add_mesh);
     }
     AKR_RENDER_CLASS(SceneNode)
     AKR_RENDER_STRUCT(RegisterSceneNode)

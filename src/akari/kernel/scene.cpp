@@ -23,8 +23,8 @@
 #include <akari/kernel/scene.h>
 
 namespace akari {
-    AKR_VARIANT bool Scene<Float, Spectrum>::intersect(const Ray<Float, Spectrum> &ray,
-                                                       Intersection<Float, Spectrum> *intersection) const {
+    AKR_VARIANT bool Scene<C>::intersect(const Ray<C> &ray,
+                                                       Intersection<C> *intersection) const {
         bool hit = false;
         if constexpr (akari_enable_embree) {
             hit = embree_scene->intersect(ray, intersection);
@@ -36,7 +36,7 @@ namespace akari {
         }
         return hit;
     }
-    AKR_VARIANT void Scene<Float, Spectrum>::commit() {
+    AKR_VARIANT void Scene<C>::commit() {
         if constexpr (akari_enable_embree) {
             embree_scene->build(*this);
         } else {

@@ -42,16 +42,16 @@ namespace akari {
     }
 
     AKR_VARIANT void register_scene_graph(py::module &parent) {
-        auto m = parent.def_submodule(get_variant_string<Float, Spectrum>());
-        AKR_IMPORT_RENDER_TYPES(SceneGraphNode, CameraNode, SceneNode, MeshNode, MaterialNode, SceneNode);
+        auto m = parent.def_submodule(get_variant_string<C>());
+        AKR_IMPORT_TYPES();
 
-        RegisterMathFunction<Float, Spectrum>::register_math_functions(m);
-        py::class_<ASceneGraphNode, std::shared_ptr<ASceneGraphNode>>(m, "SceneGraphNode")
-            .def("commit", &ASceneGraphNode::commit);
-        py::class_<AMaterialNode, ASceneGraphNode, std::shared_ptr<AMaterialNode>>(m, "Material");
-        RegisterSceneNode<Float, Spectrum>::register_nodes(m);
-        RegisterCameraNode<Float, Spectrum>::register_nodes(m);
-        RegisterMeshNode<Float, Spectrum>::register_nodes(m);
+        RegisterMathFunction<C>::register_math_functions(m);
+        py::class_<SceneGraphNode<C>, std::shared_ptr<SceneGraphNode<C>>>(m, "SceneGraphNode")
+            .def("commit", &SceneGraphNode<C>::commit);
+        py::class_<MaterialNode<C>, SceneGraphNode<C>, std::shared_ptr<MaterialNode<C>>>(m, "Material");
+        RegisterSceneNode<C>::register_nodes(m);
+        RegisterCameraNode<C>::register_nodes(m);
+        RegisterMeshNode<C>::register_nodes(m);
 
         m.def("set_device_cpu", &set_device_cpu);
         m.def("set_device_gpu", &set_device_gpu);

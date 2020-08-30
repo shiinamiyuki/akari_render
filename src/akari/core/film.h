@@ -30,15 +30,16 @@
 
 namespace akari {
     AKR_VARIANT struct Pixel {
+        AKR_IMPORT_TYPES()
         Spectrum radiance = Spectrum(0);
         Float weight = 0;
     };
     constexpr size_t TileSize = 16;
     AKR_VARIANT struct Tile {
-        AKR_IMPORT_TYPES(Pixel)
+        AKR_IMPORT_TYPES()
         Bounds2i bounds{};
         Point2i _size;
-        Buffer<APixel> pixels;
+        Buffer<Pixel<C>> pixels;
 
         explicit Tile(const Bounds2i &bounds)
             : bounds(bounds), _size(bounds.size() + Point2i(2, 2)), pixels(_size.x() * _size.y()) {}
@@ -60,11 +61,11 @@ namespace akari {
         }
     };
     AKR_VARIANT struct TileView {
-        AKR_IMPORT_TYPES(Pixel)
+        AKR_IMPORT_TYPES()
         Bounds2i bounds{};
         Point2i _size;
-        BufferView<Pixel<Float, Spectrum>> pixels;
-        explicit TileView(Tile<Float, Spectrum> &tile) : bounds(tile.bounds), _size(tile._size), pixels(tile.pixels) {}
+        BufferView<Pixel<C>> pixels;
+        explicit TileView(Tile<C> &tile) : bounds(tile.bounds), _size(tile._size), pixels(tile.pixels) {}
         auto &operator()(const Point2f &p) {
             auto q = Point2i(floor(p + Point2f(0.5) - Point2f(bounds.p_min) + Point2f(1)));
             return pixels[q.x() + q.y() * _size.x()];
@@ -82,18 +83,19 @@ namespace akari {
         }
     };
     AKR_VARIANT class Film {
+        AKR_IMPORT_TYPES()
         TImage<Spectrum> radiance;
         TImage<Float> weight;
-        AKR_IMPORT_TYPES(Tile, Pixel)
+
       public:
         Float splatScale = 1.0f;
         explicit Film(const Point2i &dimension) : radiance(dimension), weight(dimension) {}
-        ATile tile(const Bounds2i &bounds) { return ATile(bounds); }
+        Tile<C> tile(const Bounds2i &bounds) { return Tile<C>(bounds); }
 
         [[nodiscard]] Point2i resolution() const { return radiance.resolution(); }
 
         [[nodiscard]] Bounds2i bounds() const { return Bounds2i{Point2i(0), resolution()}; }
-        void merge_tile(const ATile &tile) {
+        void merge_tile(const Tile<C> &tile) {
             const auto lo = max(tile.bounds.pmin - Point2i(1, 1), Point2i(0, 0));
             const auto hi = min(tile.bounds.pmax + Point2i(1, 1), radiance.resolution());
             for (int y = lo.y(); y < hi.y(); y++) {

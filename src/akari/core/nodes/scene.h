@@ -25,19 +25,18 @@
 #include <akari/core/nodes/mesh.h>
 #include <akari/kernel/scene.h>
 namespace akari {
-    AKR_VARIANT class SceneNode : public SceneGraphNode<Float, Spectrum> {
+    AKR_VARIANT class SceneNode : public SceneGraphNode<C> {
       public:
-        AKR_IMPORT_BASIC_RENDER_TYPES()
+        AKR_IMPORT_TYPES()
         Buffer<MeshView> meshviews;
-        AKR_IMPORT_RENDER_TYPES(CameraNode, MeshNode)
         std::string variant;
-        std::shared_ptr<ACameraNode> camera;
-        std::vector<std::shared_ptr<AMeshNode>> shapes;
+        std::shared_ptr<CameraNode<C>> camera;
+        std::vector<std::shared_ptr<MeshNode<C>>> shapes;
         std::string output;
         void commit() override;
-        AScene compile(MemoryArena *arena);
+        Scene<C> compile(MemoryArena *arena);
         void render();
-        void add_mesh(const std::shared_ptr<AMeshNode> &mesh) { shapes.emplace_back(mesh); }
+        void add_mesh(const std::shared_ptr<MeshNode<C>> &mesh) { shapes.emplace_back(mesh); }
     };
     AKR_VARIANT struct RegisterSceneNode { static void register_nodes(py::module &m); };
 } // namespace akari

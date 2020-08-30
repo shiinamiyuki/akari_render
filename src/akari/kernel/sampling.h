@@ -27,8 +27,8 @@
 
 namespace akari {
     AKR_VARIANT
-    struct sampling_ {
-        AKR_IMPORT_CORE_TYPES()
+    struct sampling {
+        AKR_IMPORT_TYPES()
         static inline Point2f concentric_disk_sampling(const Point2f &u) {
             Point2f uOffset = 2.f * u - Point2f(1, 1);
             if (uOffset.x() == 0 && uOffset.y() == 0)

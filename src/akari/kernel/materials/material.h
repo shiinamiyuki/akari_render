@@ -35,8 +35,8 @@ namespace akari {
         BSDF_SPECULAR = 1u << 4u,
         BSDF_ALL = BSDF_DIFFUSE | BSDF_GLOSSY | BSDF_SPECULAR | BSDF_REFLECTION | BSDF_TRANSMISSION,
     };
-    AKR_VARIANT struct bsdf_ {
-        AKR_IMPORT_CORE_TYPES()
+    AKR_VARIANT struct bsdf {
+        AKR_IMPORT_TYPES()
         static inline Float cos_theta(const Vector3f &w) { return w.y(); }
 
         static inline Float abs_cos_theta(const Vector3f &w) { return std::abs(cos_theta(w)); }
@@ -83,12 +83,12 @@ namespace akari {
         }
     };
     AKR_VARIANT struct BSDFSample {
-        AKR_IMPORT_CORE_TYPES()
+        AKR_IMPORT_TYPES()
         Vector3f wi = Vector3f(0);
         Float pdf = 0.0;
     };
     AKR_VARIANT struct BSDFSampleContext {
-        AKR_IMPORT_CORE_TYPES()
+        AKR_IMPORT_TYPES()
         Vector3f wi;
         Normal3f ng, ns;
         Point3f p;
@@ -97,7 +97,7 @@ namespace akari {
 
     AKR_VARIANT class BSDFClosure {
       public:
-        AKR_IMPORT_CORE_TYPES();
+        AKR_IMPORT_TYPES();
         [[nodiscard]] Float evaluate_pdf(const Vector3f &wo, const Vector3f &wi) const;
         [[nodiscard]] Spectrum evaluate(const Vector3f &wo, const Vector3f &wi) const;
         [[nodiscard]] BSDFType type() const;
@@ -106,23 +106,18 @@ namespace akari {
     };
 
     AKR_VARIANT class BSDF {
-
-        AKR_IMPORT_TYPES(BSDFClosure)
-        std::array<ABSDFClosure, 16> closures;
+        AKR_IMPORT_TYPES()
+        std::array<BSDFClosure<C>, 16> closures;
         Normal3f ng, ns;
         Frame3f frame;
         int num_closures = 0;
 
       public:
         explicit BSDF(const Normal3f &ng, const Normal3f &ns) : ng(ng), ns(ns) { frame = Frame3f(ns); }
-        void add_closure(ABSDFClosure closure) { closures[num_closures++] = closure; }
+        void add_closure(BSDFClosure<C> closure) { closures[num_closures++] = closure; }
     };
-    AKR_VARIANT struct MaterialEvaluationStackFrame {
-        
-    };
-    AKR_VARIANT struct MaterialEvaluationStack {
-
-    };
+    AKR_VARIANT struct MaterialEvaluationStackFrame {};
+    AKR_VARIANT struct MaterialEvaluationStack {};
     AKR_VARIANT class Material {};
 
 } // namespace akari

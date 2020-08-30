@@ -25,33 +25,32 @@
 #include <pybind11/embed.h>
 #include <pybind11/stl.h>
 namespace akari {
-    AKR_VARIANT class PerspectiveCameraNode : public CameraNode<Float, Spectrum> {
+    AKR_VARIANT class PerspectiveCameraNode : public CameraNode<C> {
       public:
-        AKR_IMPORT_TYPES(Camera)
+        AKR_IMPORT_TYPES()
         Point3f position;
         Vector3f rotation;
         Point2i resolution = Point2i(512, 512);
         Float fov = radians(80.0f);
-        ACamera compile(MemoryArena *arena) override {
-            AKR_IMPORT_RENDER_TYPES(PerspectiveCamera)
+        Camera<C> compile(MemoryArena *arena) override {
             Transform3f c2w;
             c2w = Transform3f::rotate_z(rotation.z());
             c2w = Transform3f::rotate_x(rotation.y()) * c2w;
             c2w = Transform3f::rotate_y(rotation.x()) * c2w;
             c2w = Transform3f::translate(position) * c2w;
-            return arena->alloc<APerspectiveCamera>(resolution, c2w, fov);
+            return arena->alloc<PerspectiveCamera<C>>(resolution, c2w, fov);
         }
     };
-    AKR_VARIANT void RegisterCameraNode<Float, Spectrum>::register_nodes(py::module &m) {
-        AKR_IMPORT_RENDER_TYPES(CameraNode, SceneGraphNode, SceneGraphNode, PerspectiveCameraNode);
-        py::class_<ACameraNode, ASceneGraphNode, std::shared_ptr<ACameraNode>>(m, "Camera");
-        py::class_<APerspectiveCameraNode, ACameraNode, std::shared_ptr<APerspectiveCameraNode>>(m, "PerspectiveCamera")
+    AKR_VARIANT void RegisterCameraNode<C>::register_nodes(py::module &m) {
+       AKR_IMPORT_TYPES()
+        py::class_<CameraNode<C>, SceneGraphNode<C>, std::shared_ptr<CameraNode<C>>>(m, "Camera");
+        py::class_<PerspectiveCameraNode<C>, CameraNode<C>, std::shared_ptr<PerspectiveCameraNode<C>>>(m, "PerspectiveCamera")
             .def(py::init<>())
-            .def_readwrite("position", &APerspectiveCameraNode::position)
-            .def_readwrite("rotation", &APerspectiveCameraNode::rotation)
-            .def_readwrite("fov", &APerspectiveCameraNode::fov)
-            .def_readwrite("resolution", &APerspectiveCameraNode::resolution)
-            .def("commit", &APerspectiveCameraNode::commit);
+            .def_readwrite("position", &PerspectiveCameraNode<C>::position)
+            .def_readwrite("rotation", &PerspectiveCameraNode<C>::rotation)
+            .def_readwrite("fov", &PerspectiveCameraNode<C>::fov)
+            .def_readwrite("resolution", &PerspectiveCameraNode<C>::resolution)
+            .def("commit", &PerspectiveCameraNode<C>::commit);
     }
     AKR_RENDER_STRUCT(RegisterCameraNode)
 } // namespace akari

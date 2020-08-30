@@ -18,6 +18,7 @@ if __name__ == '__main__':
 #include <type_traits>
 namespace akari {
     template<typename Float, int N> struct Color;
+    template <typename Float_, typename Spectrum_> struct Config;
 ''')
         w('#define AKR_CORE_STRUCT(Name) ')
         for enabled in config['enabled']:
@@ -29,23 +30,23 @@ namespace akari {
         w('\n')
         w('#define AKR_RENDER_STRUCT(Name) ')
         for enabled in config['enabled']:
-            w('template struct Name<{0},{1}>;'.format(
+            w('template struct Name<Config<{0},{1}>>;'.format(
                 variants[enabled]['Float'], variants[enabled]['Spectrum']))
         w('\n')
         w('#define AKR_RENDER_CLASS(Name) ')
         for enabled in config['enabled']:
-            w('template class Name<{0},{1}>;'.format(
+            w('template class Name<Config<{0},{1}>>;'.format(
                 variants[enabled]['Float'], variants[enabled]['Spectrum']))
         w('\n')
-        w('template<typename Float, typename Spectrum>constexpr const char * get_variant_string(){\n')
+        w('template<typename C>constexpr const char * get_variant_string(){\n')
         for enabled in config['enabled']:
-            w('    if constexpr(std::is_same_v<Float, {0}> && std::is_same_v<Spectrum, {1}>)return "{2}";'.format(
+            w('    if constexpr(std::is_same_v<Config<{0},{1}>, C>)return "{2}";'.format(
                 variants[enabled]['Float'], variants[enabled]['Spectrum'], enabled))
         w('\n    return "unknown";\n}\n')
         w('#define AKR_INVOKE_VARIANT(variant, func, ...) ([&](){\\\n')
         for enabled in config['enabled']:
             w('    if (variant == "{}")\\\n'.format(enabled))
-            w('        return func<{}, {}>(__VA_ARGS__);\\\n'.format(variants[enabled]['Float'], variants[enabled]['Spectrum']))
+            w('        return func<Config<{}, {}>>(__VA_ARGS__);\\\n'.format(variants[enabled]['Float'], variants[enabled]['Spectrum']))
         w('    throw std::runtime_error("unsupported variant");\\\n')
         w('})()\n')
         w('constexpr const char * enabled_variants[] = {')

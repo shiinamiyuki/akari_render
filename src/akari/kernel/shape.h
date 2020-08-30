@@ -24,11 +24,11 @@
 #include <akari/kernel/materials/material.h>
 namespace akari {
     AKR_VARIANT class Triangle {
-        AKR_IMPORT_TYPES(Material)
+        AKR_IMPORT_TYPES()
         Array<Point3f, 3> vertices;
         Array<Normal3f, 3> normals;
         Array<Point2f, 3> texcoords;
-        AMaterial material;
+        Material<C> material;
         Normal3f ng() const { return Normal3f(cross(vertices[1] - vertices[0], vertices[2] - vertices[1])); }
         Normal3f ns(const Point2f &uv) const { return lerp3(normals[0], normals[1], normals[2], uv); }
         Point2f texcoord(const Point2f &uv) const { return lerp3(texcoords[0], texcoords[1], texcoords[2], uv); }

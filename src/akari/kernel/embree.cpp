@@ -25,8 +25,7 @@
 #include <akari/core/logger.h>
 #ifdef AKR_ENABLE_EMBREE
 namespace akari {
-    AKR_VARIANT void EmbreeAccelerator<Float, Spectrum>::build(Scene<Float, Spectrum> &scene) {
-        using AScene = Scene<Float, Spectrum>;
+    AKR_VARIANT void EmbreeAccelerator<C>::build(Scene<C> &scene) {
         rtcScene = rtcNewScene(device);
         for (const MeshView &mesh : scene.meshes) {
             auto geometry = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);
@@ -44,7 +43,7 @@ namespace akari {
         rtcCommitScene(rtcScene);
         AKR_ASSERT_THROW(rtcGetDeviceError(device) == RTC_ERROR_NONE);
     }
-    AKR_VARIANT static inline RTCRay toRTCRay(const Ray<Float, Spectrum> &_ray) {
+    AKR_VARIANT static inline RTCRay toRTCRay(const Ray<C> &_ray) {
         RTCRay ray;
         auto _o = _ray.o;
         ray.dir_x = _ray.d.x();
@@ -58,8 +57,8 @@ namespace akari {
         ray.flags = 0;
         return ray;
     }
-    AKR_VARIANT bool EmbreeAccelerator<Float, Spectrum>::intersect(const Ray<Float, Spectrum> &ray,
-                                                                   Intersection<Float, Spectrum> *intersection) const {
+    AKR_VARIANT bool EmbreeAccelerator<C>::intersect(const Ray<C> &ray,
+                                                                   Intersection<C> *intersection) const {
         RTCRayHit rayHit;
         rayHit.ray = toRTCRay(ray);
         rayHit.ray.flags = 0;

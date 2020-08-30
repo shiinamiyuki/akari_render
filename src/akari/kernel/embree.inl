@@ -36,10 +36,11 @@ namespace akari {
         RTCDevice device = nullptr;
 
       public:
-        AKR_IMPORT_BASIC_RENDER_TYPES()
+        using Float = typename C::Float;
+        AKR_IMPORT_CORE_TYPES()
         EmbreeAccelerator() { device = rtcNewDevice(nullptr); }
-        void build(Scene<Float, Spectrum> &scene);
-        bool intersect(const Ray<Float, Spectrum> &ray, Intersection<Float, Spectrum> *isct) const;
+        void build(Scene<C> &scene);
+        bool intersect(const Ray<C> &ray, Intersection<C> *isct) const;
         ~EmbreeAccelerator() {
             if (rtcScene)
                 rtcReleaseScene(rtcScene);

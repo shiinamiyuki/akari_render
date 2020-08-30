@@ -35,14 +35,14 @@ namespace akari {
           public:
             int spp = 16;
             int tile_size = 16;
-            AKR_IMPORT_TYPES(Camera, Material, Film, Sampler)
-            void render(const AScene &scene, AFilm *out) const;
+            AKR_IMPORT_TYPES()
+            void render(const Scene<C> &scene, Film<C> *out) const;
         };
-        AKR_VARIANT class Integrator : public TaggedPointer<AmbientOcclusion<Float, Spectrum>> {
+        AKR_VARIANT class Integrator : public TaggedPointer<AmbientOcclusion<C>> {
           public:
-            AKR_IMPORT_TYPES(Camera, Material, Film, Sampler)
-            using TaggedPointer<AmbientOcclusion<Float, Spectrum>>::TaggedPointer;
-            void render(const AScene &scene, AFilm *out) const { AKR_TAGGED_DISPATCH(render, scene, out); }
+            AKR_IMPORT_TYPES()
+            using TaggedPointer<AmbientOcclusion<C>>::TaggedPointer;
+            void render(const Scene<C> &scene, Film<C> *out) const { AKR_TAGGED_DISPATCH(render, scene, out); }
         };
     } // namespace cpu
 } // namespace akari

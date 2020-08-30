@@ -24,10 +24,10 @@
 #include <akari/core/scenegraph.h>
 
 namespace akari {
-    AKR_VARIANT class CameraNode : public SceneGraphNode<Float, Spectrum> {
+    AKR_VARIANT class CameraNode : public SceneGraphNode<C> {
       public:
-        AKR_IMPORT_TYPES(Camera)
-        virtual ACamera compile(MemoryArena* arena) = 0;
+        AKR_IMPORT_TYPES()
+        virtual Camera<C> compile(MemoryArena* arena) = 0;
     };
      AKR_VARIANT struct RegisterCameraNode {static void register_nodes(py::module &m); };
 } // namespace akari

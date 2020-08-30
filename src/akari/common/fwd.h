@@ -24,7 +24,7 @@
 #include <cstddef>
 #include <akari/common/config.h>
 #include <akari/common/diagnostic.h>
-#include "detail/macro.h"
+
 namespace akari {
     // AkariRender needs a bit of retargeting capability
     // like different types of Spectrum
@@ -63,8 +63,11 @@ namespace akari {
         // align to 128 bits (16 bytes)
         return (alignof(T) + 15u) & ~15u;
     }
-
-#define AKR_VARIANT template <typename Float, typename Spectrum>
+    template <typename Float_, typename Spectrum_> struct Config {
+        using Float = Float_;
+        using Spectrum = Spectrum_;
+    };
+#define AKR_VARIANT template <class C>
     template <typename T, int N, int packed = 0> struct alignas(compute_align<T, N, packed>()) Array;
     template <typename Float, int N> struct Vector;
     template <typename Float, int N> struct Point;
@@ -205,7 +208,6 @@ namespace akari {
         using Bounds2f = BoundingBox<Point2f>;
         using Bounds3f = BoundingBox<Point3f>;
     };
-
 #define AKR_IMPORT_CORE_TYPES_PREFIX(Float_, prefix)                                                                   \
     using prefix##CoreAliases = akari::CoreAliases<Float_>;                                                            \
     using prefix##Int8 = typename prefix##CoreAliases::Int8;                                                           \
@@ -286,29 +288,20 @@ namespace akari {
     AKR_VARIANT class BSDFClosure;
     AKR_VARIANT class Scene;
     AKR_VARIANT class Sampler;
-    AKR_VARIANT struct sampling_;
-    AKR_VARIANT struct microfacet_;
-    AKR_VARIANT struct bsdf_;
+    AKR_VARIANT struct sampling;
+    AKR_VARIANT struct microfacet;
+    AKR_VARIANT struct bsdf;
     AKR_VARIANT struct CameraSample;
-
-#define AKR_IMPORT_BASIC_RENDER_TYPES()                                                                                \
-    AKR_IMPORT_CORE_TYPES()                                                                                            \
-    using sampling = sampling_<Float, Spectrum>;                                                                       \
-    using microfacet = microfacet_<Float, Spectrum>;                                                                   \
-    using Ray3f = Ray<Float, Spectrum>;                                                                                \
-    using bsdf_math = bsdf_<Float, Spectrum>;                                                                          \
-    AKR_IMPORT_RENDER_TYPES(Scene, CameraSample)
-
-#define AKR_IMPORT_TYPES(...)                                                                                          \
-    AKR_IMPORT_BASIC_RENDER_TYPES()                                                                                    \
-    AKR_IMPORT_RENDER_TYPES(__VA_ARGS__)
-
+#define AKR_IMPORT_TYPES()                                                                                             \
+    using Float = typename C::Float;                                                                                   \
+    using Spectrum = typename C::Spectrum;                                                                             \
+    using Ray3f = Ray<C>;                                                                                              \
+    AKR_IMPORT_CORE_TYPES()
 #ifdef AKR_ENABLE_EMBREE
     static constexpr bool akari_enable_embree = true;
 #else
     static constexpr bool akari_enable_embree = false;
 #endif
 
-    template<typename T>
-    using device_ptr = T *;
+    template <typename T> using device_ptr = T *;
 } // namespace akari

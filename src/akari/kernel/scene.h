@@ -33,7 +33,7 @@ namespace akari {
     AKR_VARIANT
     class EmbreeAccelerator;
     AKR_VARIANT struct Intersection {
-        AKR_IMPORT_BASIC_RENDER_TYPES()
+        AKR_IMPORT_TYPES()
         Point3f p;
         Float t;
         Normal3f ng;
@@ -44,12 +44,12 @@ namespace akari {
     };
     AKR_VARIANT class Scene {
       public:
-        AKR_IMPORT_TYPES(Camera, Intersection, Sampler)
+        AKR_IMPORT_TYPES()
         BufferView<MeshView> meshes;
-        ACamera camera;
-        ASampler sampler;
-        EmbreeAccelerator<Float, Spectrum> *embree_scene = nullptr;
-        bool intersect(const Ray3f &ray, AIntersection *isct) const;
+        Camera<C> camera;
+        Sampler<C> sampler;
+        EmbreeAccelerator<C> *embree_scene = nullptr;
+        bool intersect(const Ray3f &ray, Intersection<C> *isct) const;
         void commit();
     };
 } // namespace akari

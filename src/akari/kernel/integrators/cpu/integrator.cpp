@@ -32,20 +32,19 @@
 #include <akari/common/smallarena.h>
 namespace akari {
     namespace cpu {
-        AKR_VARIANT void AmbientOcclusion<Float, Spectrum>::render(const AScene &scene, AFilm *film) const {
+        AKR_VARIANT void AmbientOcclusion<C>::render(const Scene<C> &scene, Film<C> *film) const {
             AKR_ASSERT_THROW(all(film->resolution() == scene.camera.resolution()));
-            AKR_IMPORT_RENDER_TYPES(Intersection, SurfaceInteraction)
             auto n_tiles = Point2i(film->resolution() + Point2i(tile_size - 1)) / Point2i(tile_size);
-            auto Li = [=, &scene](Ray3f ray, ASampler &sampler) -> Spectrum {
+            auto Li = [=, &scene](Ray3f ray, Sampler<C> &sampler) -> Spectrum {
                 (void)scene;
-                AIntersection intersection;
+                Intersection<C> intersection;
                 if (scene.intersect(ray, &intersection)) {
                     Frame3f frame(intersection.ng);
                     // return Spectrum(intersection.ng);
-                    auto w = sampling::cosine_hemisphere_sampling(sampler.next2d());
+                    auto w = sampling<C>::cosine_hemisphere_sampling(sampler.next2d());
                     w = frame.local_to_world(w);
                     ray = Ray3f(intersection.p, w);
-                    intersection = AIntersection();
+                    intersection = Intersection<C>();
                     if (scene.intersect(ray, &intersection))
                         return Spectrum(0);
                     return Spectrum(1);
@@ -75,7 +74,7 @@ namespace akari {
                         sampler.set_sample_index(x + y * film->resolution().x());
                         for (int s = 0; s < 16; s++) {
                             sampler.start_next_sample();
-                            ACameraSample sample;
+                            CameraSample<C> sample;
                             camera.generate_ray(sampler.next2d(), sampler.next2d(), Point2i(x, y), &sample);
                             auto L = Li(sample.ray, sampler);
                             tile.add_sample(Point2f(x, y), L, 1.0f);

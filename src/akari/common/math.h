@@ -501,6 +501,7 @@ namespace akari {
     }
     AKR_VARIANT struct Ray {
         // Float time = 0.0f;
+        using Float = typename C::Float;
         AKR_IMPORT_CORE_TYPES()
         Point3f o;
         Vector3f d;
@@ -565,8 +566,8 @@ namespace akari {
         Transform operator*(const Transform &t) const { return Transform(m * t.m); }
         Vector3f operator*(const Vector3f &v) const { return m3 * v; }
         Normal3f operator*(const Normal3f &n) const { return m3inv.transpose() * n; }
-        template <typename Spectrum> Ray<Float, Spectrum> operator*(const Ray<Float, Spectrum> &ray) const {
-            using Ray3f = Ray<Float, Spectrum>;
+        template <typename Spectrum, typename C = Config<Float, Spectrum>> Ray<C> operator*(const Ray<C> &ray) const {
+            using Ray3f = Ray<C>;
             auto &T = *this;
             auto d2 = T * ray.d;
             auto len1 = dot(ray.d, ray.d);

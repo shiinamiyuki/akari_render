@@ -25,16 +25,17 @@
 #include <akari/common/math.h>
 namespace akari {
     AKR_VARIANT struct CameraSample {
-        AKR_IMPORT_BASIC_RENDER_TYPES()
+        using Float = typename C::Float;
+        AKR_IMPORT_CORE_TYPES()
         Point2f p_lens;
         Point2f p_film;
         Float weight = 0.0f;
         Normal3f normal;
-        Ray3f ray;
+        Ray<C> ray;
     };
     AKR_VARIANT class PerspectiveCamera {
       public:
-        AKR_IMPORT_BASIC_RENDER_TYPES()
+        AKR_IMPORT_TYPES()
       private:
         Transform3f c2w, w2c, r2c, c2r;
         Point2i _resolution;
@@ -49,13 +50,13 @@ namespace akari {
             preprocess();
         }
         Point2i resolution() const { return _resolution; }
-        void generate_ray(const Point2f &u1, const Point2f &u2, const Point2i &raster, ACameraSample *sample) const;
+        void generate_ray(const Point2f &u1, const Point2f &u2, const Point2i &raster, CameraSample<C> *sample) const;
     };
-    AKR_VARIANT class Camera : public TaggedPointer<PerspectiveCamera<Float, Spectrum>> {
+    AKR_VARIANT class Camera : public TaggedPointer<PerspectiveCamera<C>> {
       public:
-        AKR_IMPORT_TYPES(PerspectiveCamera)
-        using TaggedPointer<APerspectiveCamera>::TaggedPointer;
-        void generate_ray(const Point2f &u1, const Point2f &u2, const Point2i &raster, ACameraSample *sample) const {
+        AKR_IMPORT_TYPES()
+        using TaggedPointer<PerspectiveCamera<C>>::TaggedPointer;
+        void generate_ray(const Point2f &u1, const Point2f &u2, const Point2i &raster, CameraSample<C> *sample) const {
             AKR_TAGGED_DISPATCH(generate_ray, u1, u2, raster, sample);
         }
         Point2i resolution() const { AKR_TAGGED_DISPATCH(resolution); }
