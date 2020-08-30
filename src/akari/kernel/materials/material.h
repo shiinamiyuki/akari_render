@@ -82,10 +82,15 @@ namespace akari {
             return true;
         }
     };
+
     AKR_VARIANT struct BSDFSample {
         AKR_IMPORT_TYPES()
+        const Point2f u1;
+        const Vector3f wo;
         Vector3f wi = Vector3f(0);
         Float pdf = 0.0;
+        Spectrum f = Spectrum(0.0f);
+        BSDFType sampled = BSDF_NONE;
     };
     AKR_VARIANT struct BSDFSampleContext {
         AKR_IMPORT_TYPES()
@@ -93,7 +98,6 @@ namespace akari {
         Normal3f ng, ns;
         Point3f p;
     };
-    AKR_VARIANT struct DiffuseClosure {};
 
     AKR_VARIANT class BSDFClosure {
       public:
@@ -103,21 +107,39 @@ namespace akari {
         [[nodiscard]] BSDFType type() const;
         [[nodiscard]] bool is_delta() const { return ((uint32_t)type() & (uint32_t)BSDF_SPECULAR) != 0; }
         [[nodiscard]] bool match_flags(BSDFType flag) const { return ((uint32_t)type() & (uint32_t)flag) != 0; }
+        Spectrum sample(const Point2f &u, const Vector3f &wo, Vector3f *wi, Float *pdf, BSDFType *sampledType);
     };
 
     AKR_VARIANT class BSDF {
         AKR_IMPORT_TYPES()
-        std::array<BSDFClosure<C>, 16> closures;
+        BSDFClosure<C> closure_ = nullptr;
         Normal3f ng, ns;
         Frame3f frame;
-        int num_closures = 0;
 
       public:
         explicit BSDF(const Normal3f &ng, const Normal3f &ns) : ng(ng), ns(ns) { frame = Frame3f(ns); }
-        void add_closure(BSDFClosure<C> closure) { closures[num_closures++] = closure; }
+        void set_closure(BSDFClosure<C> closure) { closure_ = closure; }
+        [[nodiscard]] BSDFClosure<C> closure() const { return closure_; }
+        [[nodiscard]] Float evaluate_pdf(const Vector3f &wo, const Vector3f &wi) const {
+            auto pdf = closure_.evaluate_pdf(frame.world_to_local(wo), frame.world_to_local(wi));
+            return pdf;
+        }
+        [[nodiscard]] Spectrum evaluate(const Vector3f &wo, const Vector3f &wi) const {
+            auto f = closure_.evaluate(frame.world_to_local(wo), frame.world_to_local(wi));
+            return f;
+        }
+
+        [[nodiscard]] BSDFType type() const { return closure_.type(); }
+        [[nodiscard]] bool is_delta() const { return closure_.is_delta(); }
+        [[nodiscard]] bool match_flags(BSDFType flag) const { closure_.match_flags(flag); }
+        void sample(BSDFSample<C> *sample) {
+            auto wo = frame.world_to_local(sample->wo);
+            Vector3f wi;
+            sample->f = closure().sample(sample->u1, wo, &wi, sample->pdf, sample->sampled);
+            sample->wi = frame.local_to_world(wi);
+        }
     };
-    AKR_VARIANT struct MaterialEvaluationStackFrame {};
-    AKR_VARIANT struct MaterialEvaluationStack {};
+
     AKR_VARIANT class Material {};
 
 } // namespace akari
