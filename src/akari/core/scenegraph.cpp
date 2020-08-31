@@ -37,11 +37,8 @@
 #include <akari/core/nodes/scene.h>
 namespace akari {
     namespace py = pybind11;
-    std::vector<const char *> _get_enabled_variants() {
-        return std::vector<const char *>(std::begin(enabled_variants), std::end(enabled_variants));
-    }
 
-    AKR_VARIANT void register_scene_graph(py::module &parent) {
+    AKR_VARIANT void RegisterSceneGraph<C>::register_scene_graph(py::module &parent) {
         auto m = parent.def_submodule(get_variant_string<C>());
         AKR_IMPORT_TYPES();
 
@@ -56,10 +53,5 @@ namespace akari {
         m.def("set_device_cpu", &set_device_cpu);
         m.def("set_device_gpu", &set_device_gpu);
     }
-    PYBIND11_EMBEDDED_MODULE(akari, m) {
-        m.def("enabled_variants", _get_enabled_variants);
-        for (auto &variant : enabled_variants) {
-            AKR_INVOKE_VARIANT(std::string_view(variant), register_scene_graph, m);
-        }
-    }
+    AKR_RENDER_STRUCT(RegisterSceneGraph)
 } // namespace akari

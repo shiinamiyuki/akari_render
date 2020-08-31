@@ -3,7 +3,8 @@ from akari.rgb import *
 print(enabled_variants())
 scene = Scene()
 scene.output = "out.png"
-cbox = OBJMesh("CornellBox-Original.obj")
+cbox = load_fragment("cornell-box.py")
+# cbox = OBJMesh('CornellBox-Original.obj')
 camera = PerspectiveCamera()
 camera.fov = radians(15)
 camera.position = Point3f(0, 1, 9)

@@ -54,8 +54,9 @@ namespace akari {
             auto exp = res->load(path);
             if (exp) {
                 cache_resource(path, res);
+                return res;
             }
-            return res;
+            return exp.extract_error();
         }
         virtual ~ResourceManager() = default;
     };

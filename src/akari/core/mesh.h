@@ -23,13 +23,23 @@
 #pragma once
 #include <akari/common/math.h>
 #include <akari/core/buffer.h>
-
+#include <akari/core/resource.h>
 namespace akari {
-
+    
     struct Mesh {
         Buffer<float> vertices, normals, texcoords;
         Buffer<int> indices;
         Buffer<int> material_indices;
     };
 
+    class AKR_EXPORT BinaryGeometry : public Resource {
+        std::shared_ptr<Mesh> _mesh;
+
+      public:
+        BinaryGeometry() = default;
+        BinaryGeometry(std::shared_ptr<Mesh> mesh) : _mesh(std::move(mesh)) {}
+        Expected<bool> load(const fs::path &) override;
+        const std::shared_ptr<Mesh> &mesh() const { return _mesh; }
+        Expected<bool> save(const fs::path &path) const;
+    };
 } // namespace akari

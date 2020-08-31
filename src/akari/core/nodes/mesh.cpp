@@ -20,6 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 #include <akari/core/nodes/mesh.h>
+#include <akari/core/resource.h>
 #include <akari/core/mesh.h>
 // #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
@@ -27,7 +28,36 @@
 #include <pybind11/embed.h>
 #include <pybind11/stl.h>
 #include <akari/core/logger.h>
+
 namespace akari {
+    AKR_VARIANT class AkariMesh : public MeshNode<C> {
+      public:
+        std::string path;
+        AkariMesh() = default;
+        AkariMesh(std::string path) : path(path) {}
+        std::shared_ptr<Mesh> mesh;
+        std::vector<std::shared_ptr<MaterialNode<C>>> materials;
+        void commit() override {
+            auto exp = resource_manager()->load_path<BinaryGeometry>(path);
+            if (exp) {
+                mesh = exp.extract_value()->mesh();
+            } else {
+                auto err = exp.extract_error();
+                error("error loading {}: {}\n", path, err.what());
+                std::abort();
+            }
+        }
+        MeshView compile(MemoryArena *) override {
+            commit();
+            MeshView view;
+            view.indices = mesh->indices;
+            view.material_indices = mesh->material_indices;
+            view.normals = mesh->normals;
+            view.texcoords = mesh->texcoords;
+            view.vertices = mesh->vertices;
+            return view;
+        }
+    };
     AKR_VARIANT class OBJMesh : public MeshNode<C> {
         std::string loaded;
 
@@ -39,12 +69,12 @@ namespace akari {
         std::string path;
         Mesh mesh;
         std::vector<std::shared_ptr<MaterialNode>> materials;
-        void commit() {
+        void commit() override {
             if (loaded == path)
                 return;
             (void)load_wavefront_obj(path);
         }
-        MeshView compile(MemoryArena *) {
+        MeshView compile(MemoryArena *) override {
             commit();
             MeshView view;
             view.indices = mesh.indices;
@@ -57,7 +87,7 @@ namespace akari {
 
       private:
         bool load_wavefront_obj(const fs::path &obj) {
-            info("loading {}\n", fs::absolute(path).string());
+            info("loading {}\n", fs::absolute(obj).string());
             loaded = obj.string();
             fs::path parent_path = fs::absolute(obj).parent_path();
             fs::path file = obj.filename();
@@ -122,12 +152,19 @@ namespace akari {
     };
     AKR_VARIANT void RegisterMeshNode<C>::register_nodes(py::module &m) {
         AKR_IMPORT_TYPES();
-        py::class_<MeshNode<C>, SceneGraphNode<C>, std::shared_ptr<MeshNode<C>>>(m, "Mesh").def("commit", &MeshNode<C>::commit);
+        py::class_<MeshNode<C>, SceneGraphNode<C>, std::shared_ptr<MeshNode<C>>>(m, "Mesh").def("commit",
+                                                                                                &MeshNode<C>::commit);
         py::class_<OBJMesh<C>, MeshNode<C>, std::shared_ptr<OBJMesh<C>>>(m, "OBJMesh")
             .def(py::init<>())
             .def(py::init<const std::string &>())
             .def("commit", &OBJMesh<C>::commit)
             .def_readwrite("path", &OBJMesh<C>::path);
+        py::class_<AkariMesh<C>, MeshNode<C>, std::shared_ptr<AkariMesh<C>>>(m, "AkariMesh")
+            .def(py::init<>())
+            .def(py::init<const std::string &>())
+            .def("commit", &AkariMesh<C>::commit)
+            .def_readwrite("path", &AkariMesh<C>::path);
+        m.def("load_mesh", [](const std::string &path) { return std::make_shared<AkariMesh<C>>(path); });
     }
     AKR_RENDER_STRUCT(RegisterMeshNode)
 } // namespace akari

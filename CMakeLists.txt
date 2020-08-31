@@ -89,6 +89,10 @@ target_include_directories(akari PUBLIC src/)
 target_link_libraries(akari akari_core)
 
 
+add_executable(akari-import src/akari/cmd/akari-import.cpp ${AKR_CONFIG_H})
+target_include_directories(akari-import PUBLIC src/)
+target_link_libraries(akari-import akari_core)
+
 add_subdirectory(external/googletest EXCLUDE_FROM_ALL)
 file(GLOB AKR_TEST src/akari/tests/*.*)
 add_executable(akari-test ${AKR_TEST} src/akari/cmd/akari-test.cpp)

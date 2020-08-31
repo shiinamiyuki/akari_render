@@ -20,7 +20,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <akari/common/fwd.h>
 #include <akari/core/python.h>
+#include <pybind11/embed.h>
+#include <pybind11/stl.h>
+#include <akari/core/scenegraph.h>
 namespace akari {
     template <typename Float, typename T> struct RegisterArrayOp {
         template <typename Class> void operator()(py::module &m, Class &c) const {
@@ -147,4 +151,28 @@ namespace akari {
         }
     }
     AKR_RENDER_STRUCT(RegisterMathFunction)
+
+    static py::object exported;
+    py::object load_fragment(const std::string &path) {
+        py::eval_file(py::str(path));
+        auto ret = exported;
+        exported = py::none();
+        return ret;
+    }
+    void py_export(py::object obj) { exported = obj; }
+    void register_utility(py::module &m) {
+        m.def("load_fragment", &load_fragment);
+        m.def("export", &py_export);
+    }
+    std::vector<const char *> _get_enabled_variants() {
+        return std::vector<const char *>(std::begin(enabled_variants), std::end(enabled_variants));
+    }
+    AKR_VARIANT void register_scene_graph(py::module &m) { RegisterSceneGraph<C>::register_scene_graph(m); }
+    PYBIND11_EMBEDDED_MODULE(akari, m) {
+        register_utility(m);
+        m.def("enabled_variants", _get_enabled_variants);
+        for (auto &variant : enabled_variants) {
+            AKR_INVOKE_VARIANT(std::string_view(variant), register_scene_graph, m);
+        }
+    }
 } // namespace akari

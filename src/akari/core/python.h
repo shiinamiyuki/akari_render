@@ -30,5 +30,5 @@ namespace akari {
     struct RegisterMathFunction {
         static void register_math_functions(py::module &m) ;
     };
-    
+    void register_utility(py::module &m);
 } // namespace akari
