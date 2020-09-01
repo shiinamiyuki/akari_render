@@ -24,7 +24,8 @@
 
 #include <akari/common/taggedpointer.h>
 #include <akari/common/math.h>
-
+#include <akari/kernel/textures/texture.h>
+#include <akari/kernel/sampler.h>
 namespace akari {
     enum BSDFType : int {
         BSDF_NONE = 0u,
@@ -98,16 +99,41 @@ namespace akari {
         Normal3f ng, ns;
         Point3f p;
     };
-
-    AKR_VARIANT class BSDFClosure {
-      public:
+    AKR_VARIANT class DiffuseBSDF {
         AKR_IMPORT_TYPES();
-        [[nodiscard]] Float evaluate_pdf(const Vector3f &wo, const Vector3f &wi) const;
-        [[nodiscard]] Spectrum evaluate(const Vector3f &wo, const Vector3f &wi) const;
-        [[nodiscard]] BSDFType type() const;
+        Spectrum R;
+
+      public:
+        DiffuseBSDF(const Spectrum &R) : R(R) {}
+        [[nodiscard]] Float evaluate_pdf(const Vector3f &wo, const Vector3f &wi) const {
+            return sampling<C>::cosine_hemisphere_pdf(bsdf<C>::cos_theta(wi));
+        }
+        [[nodiscard]] Spectrum evaluate(const Vector3f &wo, const Vector3f &wi) const {
+            return R * Constants<Float>::InvPi;
+        }
+        [[nodiscard]] BSDFType type() const { return BSDFType(BSDF_DIFFUSE | BSDF_REFLECTION); }
+        Spectrum sample(const Point2f &u, const Vector3f &wo, Vector3f *wi, Float *pdf, BSDFType *sampledType) {
+            *wi = sampling<C>::cosine_hemisphere_sampling(u);
+            *sampledType = type();
+        }
+    };
+
+    AKR_VARIANT class BSDFClosure : TaggedPointer<DiffuseBSDF<C>> {
+      public:
+        using TaggedPointer<DiffuseBSDF<C>>::TaggedPointer;
+        AKR_IMPORT_TYPES();
+        [[nodiscard]] Float evaluate_pdf(const Vector3f &wo, const Vector3f &wi) const {
+            AKR_TAGGED_DISPATCH(evaluate_pdf, wo, wi);
+        }
+        [[nodiscard]] Spectrum evaluate(const Vector3f &wo, const Vector3f &wi) const {
+            AKR_TAGGED_DISPATCH(evaluate, wo, wi);
+        }
+        [[nodiscard]] BSDFType type() const { AKR_TAGGED_DISPATCH(type); }
         [[nodiscard]] bool is_delta() const { return ((uint32_t)type() & (uint32_t)BSDF_SPECULAR) != 0; }
         [[nodiscard]] bool match_flags(BSDFType flag) const { return ((uint32_t)type() & (uint32_t)flag) != 0; }
-        Spectrum sample(const Point2f &u, const Vector3f &wo, Vector3f *wi, Float *pdf, BSDFType *sampledType);
+        Spectrum sample(const Point2f &u, const Vector3f &wo, Vector3f *wi, Float *pdf, BSDFType *sampledType) {
+            AKR_TAGGED_DISPATCH(sample, u, wo, wi, pdf, sampledType);
+        }
     };
 
     AKR_VARIANT class BSDF {
@@ -117,7 +143,9 @@ namespace akari {
         Frame3f frame;
 
       public:
+        BSDF() = default;
         explicit BSDF(const Normal3f &ng, const Normal3f &ns) : ng(ng), ns(ns) { frame = Frame3f(ns); }
+        bool null() const { return closure().null(); }
         void set_closure(BSDFClosure<C> closure) { closure_ = closure; }
         [[nodiscard]] BSDFClosure<C> closure() const { return closure_; }
         [[nodiscard]] Float evaluate_pdf(const Vector3f &wo, const Vector3f &wi) const {
@@ -139,7 +167,62 @@ namespace akari {
             sample->wi = frame.local_to_world(wi);
         }
     };
+    AKR_VARIANT struct MaterialEvalContext {
+        AKR_IMPORT_TYPES()
+        Point2f u1, u2;
+        Point2f texcoords;
+        Normal3f ng, ns;
+        SmallArena *arena;
+        MaterialEvalContext() = default;
+        MaterialEvalContext(Sampler<C> sampler, const Point2f &texcoords)
+            : u1(sampler.next2d()), u2(sampler.next2d()), texcoords(texcoords) {}
+    };
+    AKR_VARIANT class DiffuseMaterial {
+      public:
+        AKR_IMPORT_TYPES()
+        Texture<C> color;
+        BSDF<C> get_bsdf(MaterialEvalContext<C> &ctx) const {
+            auto R = color.evaluate(ctx.texcoords);
+            BSDFClosure<C> closure = ctx.arena->template alloc<DiffuseBSDF<C>>(R);
+            BSDF<C> bsdf(ctx.ng, ctx.ns);
+            bsdf.set_closure(closure);
+            return bsdf;
+        }
+    };
+    AKR_VARIANT class MixMaterial;
+    AKR_VARIANT class MixMaterial {
+      public:
+        AKR_IMPORT_TYPES()
+        Texture<C> fration;
+        Material<C> material_A, material_B;
+    };
+    AKR_VARIANT class Material : TaggedPointer<DiffuseMaterial<C>, MixMaterial<C>> {
+        AKR_IMPORT_TYPES()
+        Material<C> select_material(Float &u, const Point2f &texcoords, Float *choice_pdf) {
+            *choice_pdf = 1.0f;
+            auto ptr = *this;
+            while (ptr.template isa<MixMaterial<C>>()) {
+                auto frac = ptr.template cast<MixMaterial<C>>()->fraction.evaluate(texcoords).x();
+                if (u < frac) {
+                    u = u / frac;
+                    ptr = ptr.template cast<MixMaterial<C>>()->material_A;
+                    *choice_pdf *= 1.0f / frac;
+                } else {
+                    u = (u - frac) / (1.0f - frac);
+                    ptr = ptr.template cast<MixMaterial<C>>()->material_B;
+                    *choice_pdf *= 1.0f / (1.0f - frac);
+                }
+            }
+            return ptr;
+        }
 
-    AKR_VARIANT class Material {};
+      public:
+        using TaggedPointer<DiffuseMaterial<C>, MixMaterial<C>>::TaggedPointer;
+        BSDF<C> get_bsdf(MaterialEvalContext<C> &ctx) const {
+            Float choice_pdf = 0.0f;
+            auto mat = select_material(ctx.u1[0], ctx.texcoords, &choice_pdf);
+            return mat.get_bsdf(ctx);
+        }
+    };
 
 } // namespace akari

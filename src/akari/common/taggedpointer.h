@@ -60,6 +60,8 @@ namespace akari {
             bits = (index << tag_shift) | (iptr & ptr_mask);
         }
         TaggedPointer() = default;
+        bool null() const { return (bits & ptr_mask) == 0u; }
+        operator bool() const { return !null(); }
         template <typename U> bool isa() const {
             static_assert(Index::template GetIndex<U>::value != -1);
             constexpr uint64_t index = Index::template GetIndex<U>::value;
@@ -130,6 +132,6 @@ namespace akari {
     };
 #define AKR_TAGGED_DISPATCH(method, ...)                                                                               \
     {                                                                                                                  \
-        return this->dispatch([&](auto &&arg) { return arg.method(__VA_ARGS__); });                                   \
+        return this->dispatch([&](auto &&arg) { return arg.method(__VA_ARGS__); });                                    \
     }
 } // namespace akari
