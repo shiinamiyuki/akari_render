@@ -21,7 +21,7 @@
 // SOFTWARE.
 
 #pragma once
-#include <akari/kernel/materials/material.h>
+#include <akari/kernel/material.h>
 namespace akari {
     AKR_VARIANT class Triangle {
         AKR_IMPORT_TYPES()

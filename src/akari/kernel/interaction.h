@@ -21,7 +21,7 @@
 // SOFTWARE.
 #pragma once
 #include <akari/common/math.h>
-#include <akari/kernel/materials/material.h>
+#include <akari/kernel/material.h>
 #include <akari/kernel/shape.h>
 namespace akari {
     AKR_VARIANT struct SurfaceInteraction {

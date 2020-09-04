@@ -24,7 +24,7 @@
 
 #include <akari/common/variant.h>
 #include <akari/common/math.h>
-#include <akari/kernel/textures/texture.h>
+#include <akari/kernel/texture.h>
 #include <akari/kernel/sampler.h>
 namespace akari {
     enum BSDFType : int {

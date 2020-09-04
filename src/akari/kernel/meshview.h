@@ -24,7 +24,7 @@
 #include <akari/common/math.h>
 #include <akari/common/bufferview.h>
 #include <akari/common/fwd.h>
-#include <akari/kernel/materials/material.h>
+#include <akari/kernel/material.h>
 namespace akari {
     AKR_VARIANT struct MeshView {
         BufferView<float> vertices, normals, texcoords;

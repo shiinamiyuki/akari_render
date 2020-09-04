@@ -23,7 +23,7 @@
 #pragma once
 #include <akari/common/math.h>
 #include <akari/kernel/meshview.h>
-#include <akari/kernel/cameras/camera.h>
+#include <akari/kernel/camera.h>
 #include <akari/kernel/sampler.h>
 #ifdef AKR_ENABLE_EMBREE
 #    include <akari/kernel/embree.inl>
