@@ -25,6 +25,7 @@
 #include <akari/kernel/meshview.h>
 #include <akari/kernel/camera.h>
 #include <akari/kernel/sampler.h>
+#include <akari/kernel/shape.h>
 #ifdef AKR_ENABLE_EMBREE
 #    include <akari/kernel/embree.inl>
 #endif
@@ -51,5 +52,19 @@ namespace akari {
         EmbreeAccelerator<C> *embree_scene = nullptr;
         bool intersect(const Ray3f &ray, Intersection<C> *isct) const;
         void commit();
+        Triangle<C> get_triangle(int mesh_id, int prim_id)const {
+            Triangle<C> trig;
+            auto &mesh = meshes[mesh_id];
+            for (int i = 0; i < 3; i++) {
+                int idx = mesh.indices[3 * prim_id + i];
+                trig.vertices[i] =
+                    Point3f(mesh.vertices[3 * idx + 0], mesh.vertices[3 * idx + 1], mesh.vertices[3 * idx + 2]);
+                idx = 3 * prim_id + i;
+                trig.normals[i] =
+                    Normal3f(mesh.normals[3 * idx + 0], mesh.normals[3 * idx + 1], mesh.normals[3 * idx + 2]);
+                trig.texcoords[i] = Point2f(mesh.texcoords[2 * idx + 0], mesh.texcoords[2 * idx + 1]);
+            }
+            return trig;
+        }
     };
 } // namespace akari

@@ -24,6 +24,8 @@
 #include <akari/kernel/material.h>
 #include <akari/kernel/shape.h>
 namespace akari {
+    AKR_VARIANT class BSDF;
+    AKR_VARIANT struct Intersection;
     AKR_VARIANT struct SurfaceInteraction {
         AKR_IMPORT_TYPES()
         Point3f p;
@@ -34,6 +36,6 @@ namespace akari {
 
         SurfaceInteraction(const Intersection<C> &isct, const Triangle<C> &triangle)
             : p(isct.p), triangle(triangle), ng(isct.ng), ns(triangle.ns(isct.uv)),
-              texcoords(triangle.texcoord(isct.uv)), bsdf(ns) {}
+              texcoords(triangle.texcoord(isct.uv)) {}
     };
 } // namespace akari

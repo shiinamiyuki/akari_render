@@ -111,7 +111,7 @@ namespace akari {
             index = Index::template GetIndex<U>::value;
             return *this;
         }
-
+        template <typename U> bool isa() const { return Index::template GetIndex<U>::value == index; }
         template <typename U> U *get() {
             static_assert(Index::template GetIndex<U>::value != -1, "U is not in T...");
             return Index::template GetIndex<U>::value != index ? nullptr : reinterpret_cast<U *>(&data);
@@ -119,7 +119,7 @@ namespace akari {
 
         template <typename U> const U *get() const {
             static_assert(Index::template GetIndex<U>::value != -1, "U is not in T...");
-            return Index::template GetIndex<U>::value != index ? nullptr : reinterpret_cast<U *>(&data);
+            return Index::template GetIndex<U>::value != index ? nullptr : reinterpret_cast<const U *>(&data);
         }
 
 #define _GEN_CASE_N(N)                                                                                                 \
@@ -206,7 +206,7 @@ namespace akari {
                 that->template get<U>()->~U();
             });
         }
-#define AKR_TAGGED_DISPATCH(method, ...)                                                                                  \
+#define AKR_TAGGED_DISPATCH(method, ...)                                                                               \
     return this->accept([&, this](auto &&self) {                                                                       \
         (void)this;                                                                                                    \
         return self.method(__VA_ARGS__);                                                                               \

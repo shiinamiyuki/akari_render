@@ -23,7 +23,7 @@
 #pragma once
 #include <akari/kernel/material.h>
 namespace akari {
-    AKR_VARIANT class Triangle {
+    AKR_VARIANT struct Triangle {
         AKR_IMPORT_TYPES()
         Array<Point3f, 3> vertices;
         Array<Normal3f, 3> normals;
