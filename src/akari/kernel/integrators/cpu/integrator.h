@@ -22,7 +22,7 @@
 
 #pragma once
 #include <akari/common/fwd.h>
-#include <akari/common/taggedpointer.h>
+#include <akari/common/variant.h>
 namespace akari {
     struct AOV {
         static constexpr uint32_t color = 0;
@@ -36,12 +36,23 @@ namespace akari {
             int spp = 16;
             int tile_size = 16;
             AKR_IMPORT_TYPES()
+            AmbientOcclusion() = default;
+            AmbientOcclusion(int spp) : spp(spp) {}
             void render(const Scene<C> &scene, Film<C> *out) const;
         };
-        AKR_VARIANT class Integrator : public TaggedPointer<AmbientOcclusion<C>> {
+        AKR_VARIANT class PathTracer {
+          public:
+            int spp = 16;
+            int tile_size = 16;
+            AKR_IMPORT_TYPES()
+            PathTracer() = default;
+            PathTracer(int spp) : spp(spp) {}
+            void render(const Scene<C> &scene, Film<C> *out) const;
+        };
+        AKR_VARIANT class Integrator : public Variant<AmbientOcclusion<C>,PathTracer<C>> {
           public:
             AKR_IMPORT_TYPES()
-            using TaggedPointer<AmbientOcclusion<C>>::TaggedPointer;
+            using Variant<AmbientOcclusion<C>,PathTracer<C>>::Variant;
             void render(const Scene<C> &scene, Film<C> *out) const { AKR_TAGGED_DISPATCH(render, scene, out); }
         };
     } // namespace cpu

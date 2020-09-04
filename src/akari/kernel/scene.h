@@ -45,7 +45,7 @@ namespace akari {
     AKR_VARIANT class Scene {
       public:
         AKR_IMPORT_TYPES()
-        BufferView<MeshView> meshes;
+        BufferView<MeshView<C>> meshes;
         Camera<C> camera;
         Sampler<C> sampler;
         EmbreeAccelerator<C> *embree_scene = nullptr;

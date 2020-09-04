@@ -27,7 +27,7 @@
 namespace akari {
     AKR_VARIANT void EmbreeAccelerator<C>::build(Scene<C> &scene) {
         rtcScene = rtcNewScene(device);
-        for (const MeshView &mesh : scene.meshes) {
+        for (const MeshView<C> &mesh : scene.meshes) {
             auto geometry = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);
             rtcSetSharedGeometryBuffer(geometry, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, &mesh.vertices[0], 0,
                                        sizeof(float) * 3, mesh.vertices.size() / 3);
@@ -57,8 +57,7 @@ namespace akari {
         ray.flags = 0;
         return ray;
     }
-    AKR_VARIANT bool EmbreeAccelerator<C>::intersect(const Ray<C> &ray,
-                                                                   Intersection<C> *intersection) const {
+    AKR_VARIANT bool EmbreeAccelerator<C>::intersect(const Ray<C> &ray, Intersection<C> *intersection) const {
         RTCRayHit rayHit;
         rayHit.ray = toRTCRay(ray);
         rayHit.ray.flags = 0;

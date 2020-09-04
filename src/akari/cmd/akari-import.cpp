@@ -26,7 +26,7 @@
 #include <akari/core/mesh.h>
 #include <tiny_obj_loader.h>
 using namespace akari;
-std::shared_ptr<Mesh> load_wavefront_obj(const fs::path &path) {
+std::shared_ptr<Mesh> load_wavefront_obj(const fs::path &path, std::string &generated) {
     AKR_IMPORT_CORE_TYPES_WITH(float)
     info("loading {}\n", fs::absolute(path).string());
     std::shared_ptr<Mesh> mesh;
@@ -43,12 +43,13 @@ std::shared_ptr<Mesh> load_wavefront_obj(const fs::path &path) {
     std::string err;
 
     std::string _file = file.string();
-
+    std::ostringstream os;
     bool ret = tinyobj::LoadObj(&attrib, &shapes, &obj_materials, &err, _file.c_str());
     if (!ret) {
         error("error: {}\n", err);
         return nullptr;
     }
+    os << "mesh = AkariMesh(" << path.filename().concat(".mesh") << ")\n";
     mesh = std::make_shared<Mesh>();
     mesh->vertices.resize(attrib.vertices.size());
     std::memcpy(&mesh->vertices[0], &attrib.vertices[0], sizeof(float) * mesh->vertices.size());
@@ -65,7 +66,7 @@ std::shared_ptr<Mesh> load_wavefront_obj(const fs::path &path) {
                 mesh->indices.push_back(idx.vertex_index);
                 triangle[v] = Point3f(load<PackedArray<Float, 3>>(&mesh->vertices[3 * idx.vertex_index]));
             }
-            mesh->material_indices.emplace_back(-1);
+            mesh->material_indices.emplace_back(shapes[s].mesh.material_ids[f]);
             Normal3f ng = normalize(cross(Vector3f(triangle[1] - triangle[0]), Vector3f(triangle[2] - triangle[0])));
             for (int v = 0; v < fv; v++) {
                 tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
@@ -86,12 +87,26 @@ std::shared_ptr<Mesh> load_wavefront_obj(const fs::path &path) {
                     mesh->texcoords.emplace_back(attrib.texcoords[2 * idx.texcoord_index + 1]);
                 }
             }
-
             index_offset += fv;
         }
-        
+    }
+    os << "materials = dict()\n";
+    for (auto &obj_mat : obj_materials) {
+        os << "# OBJ Material: " << obj_mat.name << "\n";
+        os << "mat = DiffuseMaterial()\n";
+        os << "mat.color = Color3f(" << obj_mat.diffuse[0] << "," << obj_mat.diffuse[1] << "," << obj_mat.diffuse[2]
+           << ")\n";
+        os << "materials['" << obj_mat.name << "'] = mat\n";
+        os << "# ======================================== \n";
+    }
+    int idx = 0;
+    for (auto &obj_mat : obj_materials) {
+        os << "mesh.set_material(" << (idx) << ", materials['" << obj_mat.name << "'])\n";
+        idx++;
     }
     info("loaded {} triangles, {} vertices\n", mesh->indices.size() / 3, mesh->vertices.size() / 3);
+    os << "export(mesh)\n";
+    generated = os.str();
     return mesh;
 }
 
@@ -123,14 +138,14 @@ int main(int argc, const char **argv) {
         }
         auto inputFilename = result["input"].as<std::string>();
         auto outputFilename = result["output"].as<std::string>();
-        auto mesh = load_wavefront_obj(fs::path(inputFilename));
+        auto generated = std::string();
+        auto mesh = load_wavefront_obj(fs::path(inputFilename), generated);
         auto res = std::make_shared<BinaryGeometry>(mesh);
         auto mesh_file = fs::path(inputFilename).filename().concat(".mesh");
         auto out_dir = fs::absolute(outputFilename).parent_path();
         res->save(fs::path(out_dir / mesh_file));
         std::ofstream os(outputFilename);
-        os << "mesh = load_mesh(" << mesh_file << ")\n";
-        os << "export(mesh)";
+        os << generated;
     } catch (std::exception &e) {
         fatal("Exception: {}\n", e.what());
         exit(1);

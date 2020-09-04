@@ -20,39 +20,15 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/common/taggedpointer.h>
-#include <akari/common/color.h>
-#include "gtest/gtest.h"
+#pragma once
+#include <akari/core/scenegraph.h>
 
-using namespace akari;
-TEST(TestTaggedPointer, Type) {
-    using P = TaggedPointer<int, float, double>;
-    int *i = new int(123);
-    P p(i);
-    ASSERT_TRUE(p.isa<int>());
-    ASSERT_FALSE(p.isa<float>());
-    ASSERT_EQ(p.get_ptr(), i);
-    ASSERT_EQ(*p.cast<int>(), *i);
-    float *f = new float(1.23);
-    p = f;
-    ASSERT_FALSE(p.isa<int>());
-    ASSERT_TRUE(p.isa<float>());
-    ASSERT_EQ(p.get_ptr(), f);
-    ASSERT_EQ(*p.cast<float>(), *f);
-    delete i;
-    delete f;
-}
-
-TEST(TestTaggedPointer, Dispatch) {
-    using P = TaggedPointer<int, float, double>;
-    float *i = new float(123);
-    P p(i);
-    p.dispatch([=](auto &&arg) {
-        using T = std::decay_t<decltype(arg)>;
-        if constexpr (std::is_same_v<T, float>) {
-            ASSERT_EQ(arg, *i);
-        } else {
-            ASSERT_TRUE(false);
-        }
-    });
-}
+namespace akari {
+    AKR_VARIANT class Material;
+    AKR_VARIANT class MaterialNode : public SceneGraphNode<C> {
+      public:
+        AKR_IMPORT_TYPES()
+        virtual Material<C>* compile(MemoryArena* arena) = 0;
+    };
+     AKR_VARIANT struct RegisterMaterialNode {static void register_nodes(py::module &m); };
+} // namespace akari

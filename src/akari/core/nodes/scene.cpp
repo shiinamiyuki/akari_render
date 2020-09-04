@@ -50,12 +50,12 @@ namespace akari {
         auto scene = compile(&arena);
         auto res = scene.camera.resolution();
         auto film = Film<C>(res);
-        scene.sampler = Sampler<C>(arena.alloc<RandomSampler<C>>());
+        scene.sampler = RandomSampler<C>();
         auto embree_scene = EmbreeAccelerator<C>();
         scene.embree_scene = &embree_scene;
         scene.commit();
-        auto integrator = cpu::Integrator<C>(arena.alloc<cpu::AmbientOcclusion<C>>());
-        integrator.render(scene, &film);
+        auto integrator_ = integrator->compile(&arena);
+        integrator_->render(scene, &film);
         film.write_image(fs::path(output));
     }
     AKR_VARIANT void RegisterSceneNode<C>::register_nodes(py::module &m) {
@@ -65,6 +65,7 @@ namespace akari {
             .def_readwrite("variant", &SceneNode<C>::variant)
             .def_readwrite("camera", &SceneNode<C>::camera)
             .def_readwrite("output", &SceneNode<C>::output)
+            .def_readwrite("integrator", &SceneNode<C>::integrator)
             .def("render", &SceneNode<C>::render)
             .def("add_mesh", &SceneNode<C>::add_mesh);
     }

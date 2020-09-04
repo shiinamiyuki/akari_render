@@ -22,7 +22,7 @@
 
 #pragma once
 #include <akari/common/fwd.h>
-#include <akari/common/taggedpointer.h>
+#include <akari/common/variant.h>
 #include <akari/common/smallarena.h>
 namespace akari {
     AKR_VARIANT class RandomSampler {
@@ -50,16 +50,14 @@ namespace akari {
         Point2f next2d() { return Point2f(next1d(), next1d()); }
         void start_next_sample() {}
         RandomSampler(uint64_t seed = 0u) { pcg32_init(seed); }
-        RandomSampler *clone(SmallArena *arena) const { return arena->alloc<RandomSampler>(*this); }
     };
-    AKR_VARIANT class Sampler : TaggedPointer<RandomSampler<C>> {
+    AKR_VARIANT class Sampler : Variant<RandomSampler<C>> {
       public:
         AKR_IMPORT_TYPES()
-        using TaggedPointer<RandomSampler<C>>::TaggedPointer;
+        using Variant<RandomSampler<C>>::Variant;
         Float next1d() { AKR_TAGGED_DISPATCH(next1d); }
         Point2f next2d() { AKR_TAGGED_DISPATCH(next2d); }
         void start_next_sample() { AKR_TAGGED_DISPATCH(start_next_sample); }
         void set_sample_index(uint64_t idx) { AKR_TAGGED_DISPATCH(set_sample_index, idx); }
-        Sampler clone(SmallArena *arena) const { AKR_TAGGED_DISPATCH(clone, arena); }
     };
 } // namespace akari

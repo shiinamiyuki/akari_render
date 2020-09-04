@@ -22,13 +22,13 @@
 
 #pragma once
 #include <akari/core/scenegraph.h>
-
+#include <akari/core/nodes/material.h>
 namespace akari {
 
     AKR_VARIANT class MeshNode : public SceneGraphNode<C> {
       public:
         AKR_IMPORT_TYPES()
-        virtual MeshView compile(MemoryArena* arena) = 0;
+        virtual MeshView<C> compile(MemoryArena* arena) = 0;
     };
     AKR_VARIANT struct RegisterMeshNode { static void register_nodes(py::module &m); };
 } // namespace akari

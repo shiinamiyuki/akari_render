@@ -20,6 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 #include <akari/core/nodes/mesh.h>
+#include <akari/core/nodes/material.h>
 #include <akari/core/resource.h>
 #include <akari/core/mesh.h>
 // #define TINYOBJLOADER_IMPLEMENTATION
@@ -37,6 +38,7 @@ namespace akari {
         AkariMesh(std::string path) : path(path) {}
         std::shared_ptr<Mesh> mesh;
         std::vector<std::shared_ptr<MaterialNode<C>>> materials;
+        Buffer<Material<C> *> compiled_materials;
         void commit() override {
             auto exp = resource_manager()->load_path<BinaryGeometry>(path);
             if (exp) {
@@ -47,15 +49,26 @@ namespace akari {
                 std::abort();
             }
         }
-        MeshView compile(MemoryArena *) override {
+        MeshView<C> compile(MemoryArena *arena) override {
             commit();
-            MeshView view;
+            MeshView<C> view;
             view.indices = mesh->indices;
             view.material_indices = mesh->material_indices;
             view.normals = mesh->normals;
             view.texcoords = mesh->texcoords;
             view.vertices = mesh->vertices;
+            compiled_materials.clear();
+            for (auto &mat : materials) {
+                compiled_materials.push_back(mat->compile(arena));
+            }
+            view.materials = compiled_materials;
             return view;
+        }
+        void set_material(uint32_t index, const std::shared_ptr<MaterialNode<C>> &mat) {
+            if (index >= materials.size()) {
+                materials.resize(index + 1);
+            }
+            materials[index] = mat;
         }
     };
     AKR_VARIANT class OBJMesh : public MeshNode<C> {
@@ -74,9 +87,9 @@ namespace akari {
                 return;
             (void)load_wavefront_obj(path);
         }
-        MeshView compile(MemoryArena *) override {
+        MeshView<C> compile(MemoryArena *) override {
             commit();
-            MeshView view;
+            MeshView<C> view;
             view.indices = mesh.indices;
             view.material_indices = mesh.material_indices;
             view.normals = mesh.normals;
@@ -163,6 +176,7 @@ namespace akari {
             .def(py::init<>())
             .def(py::init<const std::string &>())
             .def("commit", &AkariMesh<C>::commit)
+            .def("set_material", &AkariMesh<C>::set_material)
             .def_readwrite("path", &AkariMesh<C>::path);
         m.def("load_mesh", [](const std::string &path) { return std::make_shared<AkariMesh<C>>(path); });
     }

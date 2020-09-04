@@ -34,6 +34,8 @@
 #include <akari/core/film.h>
 #include <akari/core/nodes/camera.h>
 #include <akari/core/nodes/mesh.h>
+#include <akari/core/nodes/material.h>
+#include <akari/core/nodes/integrator.h>
 #include <akari/core/nodes/scene.h>
 namespace akari {
     namespace py = pybind11;
@@ -45,11 +47,11 @@ namespace akari {
         RegisterMathFunction<C>::register_math_functions(m);
         py::class_<SceneGraphNode<C>, std::shared_ptr<SceneGraphNode<C>>>(m, "SceneGraphNode")
             .def("commit", &SceneGraphNode<C>::commit);
-        py::class_<MaterialNode<C>, SceneGraphNode<C>, std::shared_ptr<MaterialNode<C>>>(m, "Material");
         RegisterSceneNode<C>::register_nodes(m);
         RegisterCameraNode<C>::register_nodes(m);
         RegisterMeshNode<C>::register_nodes(m);
-
+        RegisterMaterialNode<C>::register_nodes(m);
+        RegisterIntegratorNode<C>::register_nodes(m);
         m.def("set_device_cpu", &set_device_cpu);
         m.def("set_device_gpu", &set_device_gpu);
     }

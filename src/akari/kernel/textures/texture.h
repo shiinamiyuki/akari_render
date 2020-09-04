@@ -22,19 +22,21 @@
 
 #pragma once
 
-#include <akari/common/taggedpointer.h>
+#include <akari/common/variant.h>
 #include <akari/common/color.h>
 
 namespace akari {
     AKR_VARIANT class ConstantTexture {
       public:
         AKR_IMPORT_TYPES()
+        ConstantTexture(Spectrum v) : value(v) {}
         Spectrum value;
         Spectrum evaluate(const Point2f &texcoords) const { return value; }
     };
-    AKR_VARIANT class Texture : public TaggedPointer<ConstantTexture<C>> {
+    AKR_VARIANT class Texture : public Variant<ConstantTexture<C>> {
       public:
         AKR_IMPORT_TYPES()
+        using Variant<ConstantTexture<C>>::Variant;
         Spectrum evaluate(const Point2f &texcoords) const { AKR_TAGGED_DISPATCH(evaluate, texcoords); }
     };
 } // namespace akari

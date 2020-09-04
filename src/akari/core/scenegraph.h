@@ -43,10 +43,6 @@ namespace akari {
     AKR_VARIANT class SceneNode;
 
     AKR_VARIANT class FilmNode : public SceneGraphNode<C> { public: };
-    AKR_VARIANT class MaterialNode : public SceneGraphNode<C> { public: };
-
-    AKR_VARIANT struct RegisterSceneGraph {
-        static void register_scene_graph(py::module &parent);
-    };
+    AKR_VARIANT struct RegisterSceneGraph { static void register_scene_graph(py::module &parent); };
 
 } // namespace akari

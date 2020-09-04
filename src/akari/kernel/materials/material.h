@@ -22,7 +22,7 @@
 
 #pragma once
 
-#include <akari/common/taggedpointer.h>
+#include <akari/common/variant.h>
 #include <akari/common/math.h>
 #include <akari/kernel/textures/texture.h>
 #include <akari/kernel/sampler.h>
@@ -118,9 +118,9 @@ namespace akari {
         }
     };
 
-    AKR_VARIANT class BSDFClosure : TaggedPointer<DiffuseBSDF<C>> {
+    AKR_VARIANT class BSDFClosure : Variant<DiffuseBSDF<C>> {
       public:
-        using TaggedPointer<DiffuseBSDF<C>>::TaggedPointer;
+        using Variant<DiffuseBSDF<C>>::Variant;
         AKR_IMPORT_TYPES();
         [[nodiscard]] Float evaluate_pdf(const Vector3f &wo, const Vector3f &wi) const {
             AKR_TAGGED_DISPATCH(evaluate_pdf, wo, wi);
@@ -172,17 +172,19 @@ namespace akari {
         Point2f u1, u2;
         Point2f texcoords;
         Normal3f ng, ns;
-        SmallArena *arena;
+        SmallArena *arena = nullptr;
         MaterialEvalContext() = default;
-        MaterialEvalContext(Sampler<C> sampler, const Point2f &texcoords)
-            : u1(sampler.next2d()), u2(sampler.next2d()), texcoords(texcoords) {}
+        MaterialEvalContext(Sampler<C> sampler, const Point2f &texcoords, const Normal3f &ng, const Normal3f &ns,
+                            SmallArena *arena)
+            : u1(sampler.next2d()), u2(sampler.next2d()), texcoords(texcoords), ng(ng), ns(ns), arena(arena) {}
     };
     AKR_VARIANT class DiffuseMaterial {
       public:
+        DiffuseMaterial(Texture<C> *color) : color(color) {}
         AKR_IMPORT_TYPES()
-        Texture<C> color;
+        Texture<C> *color;
         BSDF<C> get_bsdf(MaterialEvalContext<C> &ctx) const {
-            auto R = color.evaluate(ctx.texcoords);
+            auto R = color->evaluate(ctx.texcoords);
             BSDFClosure<C> closure = ctx.arena->template alloc<DiffuseBSDF<C>>(R);
             BSDF<C> bsdf(ctx.ng, ctx.ns);
             bsdf.set_closure(closure);
@@ -194,13 +196,13 @@ namespace akari {
       public:
         AKR_IMPORT_TYPES()
         Texture<C> fration;
-        Material<C> material_A, material_B;
+        Material<C> *material_A, *material_B;
     };
-    AKR_VARIANT class Material : TaggedPointer<DiffuseMaterial<C>, MixMaterial<C>> {
+    AKR_VARIANT class Material : Variant<DiffuseMaterial<C>, MixMaterial<C>> {
         AKR_IMPORT_TYPES()
-        Material<C> select_material(Float &u, const Point2f &texcoords, Float *choice_pdf) {
+        const Material<C> *select_material(Float &u, const Point2f &texcoords, Float *choice_pdf) const {
             *choice_pdf = 1.0f;
-            auto ptr = *this;
+            auto ptr = this;
             while (ptr.template isa<MixMaterial<C>>()) {
                 auto frac = ptr.template cast<MixMaterial<C>>()->fraction.evaluate(texcoords).x();
                 if (u < frac) {
@@ -217,7 +219,7 @@ namespace akari {
         }
 
       public:
-        using TaggedPointer<DiffuseMaterial<C>, MixMaterial<C>>::TaggedPointer;
+        using Variant<DiffuseMaterial<C>, MixMaterial<C>>::Variant;
         BSDF<C> get_bsdf(MaterialEvalContext<C> &ctx) const {
             Float choice_pdf = 0.0f;
             auto mat = select_material(ctx.u1[0], ctx.texcoords, &choice_pdf);

@@ -19,27 +19,15 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+
 #pragma once
 #include <akari/core/scenegraph.h>
-#include <akari/core/nodes/camera.h>
-#include <akari/core/nodes/mesh.h>
-#include <akari/core/nodes/material.h>
-#include <akari/core/nodes/integrator.h>
-#include <akari/kernel/scene.h>
+#include <akari/kernel/integrators/cpu/integrator.h>
 namespace akari {
-    AKR_VARIANT class SceneNode : public SceneGraphNode<C> {
+    AKR_VARIANT class IntegratorNode : public SceneGraphNode<C> {
       public:
         AKR_IMPORT_TYPES()
-        Buffer<MeshView<C>> meshviews;
-        std::string variant;
-        std::shared_ptr<CameraNode<C>> camera;
-        std::vector<std::shared_ptr<MeshNode<C>>> shapes;
-        std::string output;
-        std::shared_ptr<IntegratorNode<C>> integrator;
-        void commit() override;
-        Scene<C> compile(MemoryArena *arena);
-        void render();
-        void add_mesh(const std::shared_ptr<MeshNode<C>> &mesh) { shapes.emplace_back(mesh); }
+        virtual cpu::Integrator<C> *compile(MemoryArena *arena) = 0;
     };
-    AKR_VARIANT struct RegisterSceneNode { static void register_nodes(py::module &m); };
+    AKR_VARIANT struct RegisterIntegratorNode { static void register_nodes(py::module &m); };
 } // namespace akari

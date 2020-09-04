@@ -38,7 +38,7 @@ namespace akari {
             c2w = Transform3f::rotate_x(rotation.y()) * c2w;
             c2w = Transform3f::rotate_y(rotation.x()) * c2w;
             c2w = Transform3f::translate(position) * c2w;
-            return arena->alloc<PerspectiveCamera<C>>(resolution, c2w, fov);
+            return PerspectiveCamera<C>(resolution, c2w, fov);
         }
     };
     AKR_VARIANT void RegisterCameraNode<C>::register_nodes(py::module &m) {

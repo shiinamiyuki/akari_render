@@ -23,11 +23,13 @@
 #pragma once
 #include <akari/common/math.h>
 #include <akari/common/bufferview.h>
-
+#include <akari/common/fwd.h>
+#include <akari/kernel/materials/material.h>
 namespace akari {
-    struct MeshView {
+    AKR_VARIANT struct MeshView {
         BufferView<float> vertices, normals, texcoords;
         BufferView<int> indices;
         BufferView<int> material_indices;
+        BufferView<Material<C> *> materials;
     };
 } // namespace akari

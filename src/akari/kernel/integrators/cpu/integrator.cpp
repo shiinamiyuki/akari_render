@@ -50,6 +50,57 @@ namespace akari {
                     return Spectrum(1);
                 }
                 return Spectrum(0);
+            };
+            debug("resolution: {}, tile size: {}, tiles: {}\n", film->resolution(), tile_size, n_tiles);
+            std::mutex mutex;
+            auto num_threads = num_work_threads();
+            MemoryArena _arena;
+            std::vector<SmallArena> small_arenas;
+            for (auto i = 0u; i < num_threads; i++) {
+                size_t size = 256 * 1024;
+                small_arenas.emplace_back(_arena.alloc_bytes(size), size);
+            }
+            parallel_for_2d(n_tiles, [=, &scene, &mutex, &small_arenas](const Point2i &tile_pos, int tid) {
+                (void)tid;
+                Bounds2i tileBounds = Bounds2i{tile_pos * (int)tile_size, (tile_pos + Vector2i(1)) * (int)tile_size};
+                auto tile = film->tile(tileBounds);
+                auto &camera = scene.camera;
+                auto &arena = small_arenas[tid];
+                auto sampler = scene.sampler;
+                for (int y = tile.bounds.pmin.y(); y < tile.bounds.pmax.y(); y++) {
+                    for (int x = tile.bounds.pmin.x(); x < tile.bounds.pmax.x(); x++) {
+                        sampler.set_sample_index(x + y * film->resolution().x());
+                        for (int s = 0; s < spp; s++) {
+                            sampler.start_next_sample();
+                            CameraSample<C> sample;
+                            camera.generate_ray(sampler.next2d(), sampler.next2d(), Point2i(x, y), &sample);
+                            auto L = Li(sample.ray, sampler);
+                            tile.add_sample(Point2f(x, y), L, 1.0f);
+                        }
+                    }
+                }
+                std::lock_guard<std::mutex> _(mutex);
+                film->merge_tile(tile);
+            });
+        }
+        AKR_VARIANT void PathTracer<C>::render(const Scene<C> &scene, Film<C> *film) const {
+            AKR_ASSERT_THROW(all(film->resolution() == scene.camera.resolution()));
+            auto n_tiles = Point2i(film->resolution() + Point2i(tile_size - 1)) / Point2i(tile_size);
+            auto Li = [=, &scene](Ray3f ray, Sampler<C> &sampler) -> Spectrum {
+                (void)scene;
+                Intersection<C> intersection;
+                if (scene.intersect(ray, &intersection)) {
+                    Frame3f frame(intersection.ng);
+                    // return Spectrum(intersection.ng);
+                    auto w = sampling<C>::cosine_hemisphere_sampling(sampler.next2d());
+                    w = frame.local_to_world(w);
+                    ray = Ray3f(intersection.p, w);
+                    intersection = Intersection<C>();
+                    if (scene.intersect(ray, &intersection))
+                        return Spectrum(0);
+                    return Spectrum(1);
+                }
+                return Spectrum(0);
                 // debug("{}\n", ray.d);
                 // return Spectrum(ray.d * 0.5f + 0.5f);
             };
@@ -68,11 +119,11 @@ namespace akari {
                 auto tile = film->tile(tileBounds);
                 auto &camera = scene.camera;
                 auto &arena = small_arenas[tid];
-                auto sampler = scene.sampler.clone(&arena);
+                auto sampler = scene.sampler;
                 for (int y = tile.bounds.pmin.y(); y < tile.bounds.pmax.y(); y++) {
                     for (int x = tile.bounds.pmin.x(); x < tile.bounds.pmax.x(); x++) {
                         sampler.set_sample_index(x + y * film->resolution().x());
-                        for (int s = 0; s < 16; s++) {
+                        for (int s = 0; s < spp; s++) {
                             sampler.start_next_sample();
                             CameraSample<C> sample;
                             camera.generate_ray(sampler.next2d(), sampler.next2d(), Point2i(x, y), &sample);
@@ -86,5 +137,6 @@ namespace akari {
             });
         }
         AKR_RENDER_CLASS(AmbientOcclusion)
+        AKR_RENDER_CLASS(PathTracer)
     } // namespace cpu
 } // namespace akari

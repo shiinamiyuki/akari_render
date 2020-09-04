@@ -24,6 +24,7 @@
 #include <akari/common/math.h>
 #include <akari/core/buffer.h>
 #include <akari/core/resource.h>
+#include <akari/common/variant.h>
 namespace akari {
     
     struct Mesh {
