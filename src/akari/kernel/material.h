@@ -145,16 +145,18 @@ namespace akari {
         BSDFClosure<C> *closure_ = nullptr;
         Normal3f ng, ns;
         Frame3f frame;
+        Float choice_pdf = 1.0f;
 
       public:
         BSDF() = default;
         explicit BSDF(const Normal3f &ng, const Normal3f &ns) : ng(ng), ns(ns) { frame = Frame3f(ns); }
         bool null() const { return closure().null(); }
         void set_closure(BSDFClosure<C> *closure) { closure_ = closure; }
+        void set_choice_pdf(Float pdf) { choice_pdf = pdf; }
         [[nodiscard]] BSDFClosure<C> *closure() const { return closure_; }
         [[nodiscard]] Float evaluate_pdf(const Vector3f &wo, const Vector3f &wi) const {
             auto pdf = closure_->evaluate_pdf(frame.world_to_local(wo), frame.world_to_local(wi));
-            return pdf;
+            return pdf * choice_pdf;
         }
         [[nodiscard]] Spectrum evaluate(const Vector3f &wo, const Vector3f &wi) const {
             auto f = closure_->evaluate(frame.world_to_local(wo), frame.world_to_local(wi));
@@ -163,12 +165,13 @@ namespace akari {
 
         [[nodiscard]] BSDFType type() const { return closure_->type(); }
         [[nodiscard]] bool is_delta() const { return closure_->is_delta(); }
-        [[nodiscard]] bool match_flags(BSDFType flag) const { closure_->match_flags(flag); }
+        [[nodiscard]] bool match_flags(BSDFType flag) const { return closure_->match_flags(flag); }
         void sample(BSDFSample<C> *sample) {
             auto wo = frame.world_to_local(sample->wo);
             Vector3f wi;
             sample->f = closure()->sample(sample->u1, wo, &wi, &sample->pdf, &sample->sampled);
             sample->wi = frame.local_to_world(wi);
+            sample->pdf *= choice_pdf;
         }
     };
     AKR_VARIANT struct MaterialEvalContext {
@@ -238,7 +241,9 @@ namespace akari {
         BSDF<C> get_bsdf(MaterialEvalContext<C> &ctx) const {
             Float choice_pdf = 0.0f;
             auto mat = select_material(ctx.u1[0], ctx.texcoords, &choice_pdf);
-            return mat->get_bsdf0(ctx);
+            auto bsdf = mat->get_bsdf0(ctx);
+            bsdf.set_choice_pdf(choice_pdf);
+            return bsdf;
         }
     };
 
