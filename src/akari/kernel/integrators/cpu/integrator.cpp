@@ -97,26 +97,39 @@ namespace akari {
                 int max_depth = 5;
                 Spectrum beta(1.0f);
                 Spectrum L(0.0f);
-                while (depth < max_depth) {
+                while (true) {
                     Intersection<C> intersection;
                     if (scene.intersect(ray, &intersection)) {
                         auto trig = scene.get_triangle(intersection.geom_id, intersection.prim_id);
                         auto &mesh = scene.meshes[intersection.geom_id];
                         SurfaceInteraction<C> si(intersection, trig);
-                        int mat_idx = mesh.material_indices[intersection.prim_id];
-                        auto *material = mesh.materials[mat_idx];
                         MaterialEvalContext<C> ctx(sampler, si, arena);
+                        int mat_idx = mesh.material_indices[intersection.prim_id];
+                        if (mat_idx == -1) {
+                            break;
+                        }
+                        auto *material = mesh.materials[mat_idx];
+                        if (material->template isa<EmissiveMaterial<C>>()) {
+                            auto *emission = material->template get<EmissiveMaterial<C>>();
+                            bool face_front = dot(ray.d, si.ng) < 0.0f;
+                            if (emission->double_sided || face_front) {
+                                L += beta * emission->color->evaluate(ctx.texcoords);
+                            }
+                            break;
+                        }
+                        if (depth >= max_depth) {
+                            break;
+                        }
+                        depth++;
+
                         si.bsdf = material->get_bsdf(ctx);
                         BSDFSample<C> sample(sampler.next2d(), -ray.d);
                         si.bsdf.sample(&sample);
                         beta *= sample.f * std::abs(dot(si.ng, sample.wi)) / sample.pdf;
                         ray = Ray3f(intersection.p, sample.wi);
-                        if (depth >= max_depth) {
-                            break;
-                        }
-                        depth++;
+
                     } else {
-                        L += beta * Spectrum(1);
+                        L += beta * Spectrum(0);
                         break;
                     }
                 }

@@ -55,9 +55,9 @@ namespace akari {
       public:
         AKR_IMPORT_TYPES()
         using Variant<RandomSampler<C>>::Variant;
-        Float next1d() { AKR_TAGGED_DISPATCH(next1d); }
-        Point2f next2d() { AKR_TAGGED_DISPATCH(next2d); }
-        void start_next_sample() { AKR_TAGGED_DISPATCH(start_next_sample); }
-        void set_sample_index(uint64_t idx) { AKR_TAGGED_DISPATCH(set_sample_index, idx); }
+        Float next1d() { AKR_VAR_DISPATCH(next1d); }
+        Point2f next2d() { AKR_VAR_DISPATCH(next2d); }
+        void start_next_sample() { AKR_VAR_DISPATCH(start_next_sample); }
+        void set_sample_index(uint64_t idx) { AKR_VAR_DISPATCH(set_sample_index, idx); }
     };
 } // namespace akari

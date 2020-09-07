@@ -53,7 +53,7 @@ namespace akari {
           public:
             AKR_IMPORT_TYPES()
             using Variant<AmbientOcclusion<C>, PathTracer<C>>::Variant;
-            void render(const Scene<C> &scene, Film<C> *out) const { AKR_TAGGED_DISPATCH(render, scene, out); }
+            void render(const Scene<C> &scene, Film<C> *out) const { AKR_VAR_DISPATCH(render, scene, out); }
         };
     } // namespace cpu
 } // namespace akari

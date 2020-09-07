@@ -37,6 +37,6 @@ namespace akari {
       public:
         AKR_IMPORT_TYPES()
         using Variant<ConstantTexture<C>>::Variant;
-        Spectrum evaluate(const Point2f &texcoords) const { AKR_TAGGED_DISPATCH(evaluate, texcoords); }
+        Spectrum evaluate(const Point2f &texcoords) const { AKR_VAR_DISPATCH(evaluate, texcoords); }
     };
 } // namespace akari

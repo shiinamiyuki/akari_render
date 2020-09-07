@@ -36,8 +36,8 @@ mat.color = Color3f(0.725,0.71,0.68)
 materials['tallBox'] = mat
 # ======================================== 
 # OBJ Material: light
-mat = DiffuseMaterial()
-mat.color = Color3f(0.78,0.78,0.78)
+mat = EmissiveMaterial()
+mat.color = Color3f(17, 12, 4)
 materials['light'] = mat
 # ======================================== 
 mesh.set_material(0, materials['leftWall'])

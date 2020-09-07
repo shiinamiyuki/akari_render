@@ -133,6 +133,7 @@ namespace akari {
         }
         template <typename U>
         bool isa() const {
+            static_assert(Index::template GetIndex<U>::value != -1, "U is not in T...");
             return Index::template GetIndex<U>::value == index;
         }
         template <typename U>
@@ -233,7 +234,7 @@ namespace akari {
                 that->template get<U>()->~U();
             });
         }
-#define AKR_TAGGED_DISPATCH(method, ...)                                                                               \
+#define AKR_VAR_DISPATCH(method, ...)                                                                                  \
     return this->accept([&, this](auto &&self) {                                                                       \
         (void)this;                                                                                                    \
         return self.method(__VA_ARGS__);                                                                               \

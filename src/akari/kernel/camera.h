@@ -88,8 +88,8 @@ namespace akari {
         AKR_IMPORT_TYPES()
         using Variant<PerspectiveCamera<C>>::Variant;
         void generate_ray(const Point2f &u1, const Point2f &u2, const Point2i &raster, CameraSample<C> *sample) const {
-            AKR_TAGGED_DISPATCH(generate_ray, u1, u2, raster, sample);
+            AKR_VAR_DISPATCH(generate_ray, u1, u2, raster, sample);
         }
-        Point2i resolution() const { AKR_TAGGED_DISPATCH(resolution); }
+        Point2i resolution() const { AKR_VAR_DISPATCH(resolution); }
     };
 } // namespace akari

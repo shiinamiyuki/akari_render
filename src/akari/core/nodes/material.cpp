@@ -34,6 +34,16 @@ namespace akari {
             return arena->alloc<Material<C>>(DiffuseMaterial<C>(tex));
         }
     };
+    AKR_VARIANT class EmissiveMaterialNode : public MaterialNode<C> {
+      public:
+        AKR_IMPORT_TYPES()
+        bool double_sided = false;
+        Color3f color;
+        Material<C> *compile(MemoryArena *arena) override {
+            auto tex = arena->alloc<Texture<C>>(ConstantTexture<C>(color));
+            return arena->alloc<Material<C>>(EmissiveMaterial<C>(tex));
+        }
+    };
     AKR_VARIANT void RegisterMaterialNode<C>::register_nodes(py::module &m) {
         AKR_IMPORT_TYPES()
         py::class_<MaterialNode<C>, SceneGraphNode<C>, std::shared_ptr<MaterialNode<C>>>(m, "Material");
@@ -42,6 +52,12 @@ namespace akari {
             .def(py::init<>())
             .def_readwrite("color", &DiffuseMaterialNode<C>::color)
             .def("commit", &DiffuseMaterialNode<C>::commit);
+        py::class_<EmissiveMaterialNode<C>, MaterialNode<C>, std::shared_ptr<EmissiveMaterialNode<C>>>(
+            m, "EmissiveMaterial")
+            .def(py::init<>())
+            .def_readwrite("color", &EmissiveMaterialNode<C>::color)
+            .def_readwrite("double_sided", &EmissiveMaterialNode<C>::double_sided)
+            .def("commit", &EmissiveMaterialNode<C>::commit);
     }
     AKR_RENDER_STRUCT(RegisterMaterialNode)
 } // namespace akari

@@ -127,16 +127,16 @@ namespace akari {
         using Variant<DiffuseBSDF<C>>::Variant;
         AKR_IMPORT_TYPES();
         [[nodiscard]] Float evaluate_pdf(const Vector3f &wo, const Vector3f &wi) const {
-            AKR_TAGGED_DISPATCH(evaluate_pdf, wo, wi);
+            AKR_VAR_DISPATCH(evaluate_pdf, wo, wi);
         }
         [[nodiscard]] Spectrum evaluate(const Vector3f &wo, const Vector3f &wi) const {
-            AKR_TAGGED_DISPATCH(evaluate, wo, wi);
+            AKR_VAR_DISPATCH(evaluate, wo, wi);
         }
-        [[nodiscard]] BSDFType type() const { AKR_TAGGED_DISPATCH(type); }
+        [[nodiscard]] BSDFType type() const { AKR_VAR_DISPATCH(type); }
         [[nodiscard]] bool is_delta() const { return ((uint32_t)type() & (uint32_t)BSDF_SPECULAR) != 0; }
         [[nodiscard]] bool match_flags(BSDFType flag) const { return ((uint32_t)type() & (uint32_t)flag) != 0; }
         Spectrum sample(const Point2f &u, const Vector3f &wo, Vector3f *wi, Float *pdf, BSDFType *sampledType) {
-            AKR_TAGGED_DISPATCH(sample, u, wo, wi, pdf, sampledType);
+            AKR_VAR_DISPATCH(sample, u, wo, wi, pdf, sampledType);
         }
     };
 
@@ -203,7 +203,9 @@ namespace akari {
     AKR_VARIANT class EmissiveMaterial {
       public:
         AKR_IMPORT_TYPES()
-        Texture<C> emission;
+        Texture<C> *color;
+        bool double_sided = false;
+        EmissiveMaterial(Texture<C> *color, bool double_sided = false) : color(color), double_sided(double_sided) {}
     };
     AKR_VARIANT class MixMaterial;
     AKR_VARIANT class MixMaterial {
@@ -212,8 +214,12 @@ namespace akari {
         Texture<C> fraction;
         Material<C> *material_A, *material_B;
     };
-    AKR_VARIANT class Material : Variant<DiffuseMaterial<C>, MixMaterial<C>> {
+    AKR_VARIANT class Material : public Variant<DiffuseMaterial<C>, MixMaterial<C>, EmissiveMaterial<C>> {
+      public:
         AKR_IMPORT_TYPES()
+        using Variant<DiffuseMaterial<C>, MixMaterial<C>, EmissiveMaterial<C>>::Variant;
+
+      private:
         const Material<C> *select_material(Float &u, const Point2f &texcoords, Float *choice_pdf) const {
             if (this->template isa<EmissiveMaterial<C>>()) {
                 return nullptr;
@@ -245,7 +251,6 @@ namespace akari {
         }
 
       public:
-        using Variant<DiffuseMaterial<C>, MixMaterial<C>>::Variant;
         BSDF<C> get_bsdf(MaterialEvalContext<C> &ctx) const {
             Float choice_pdf = 0.0f;
             auto mat = select_material(ctx.u1[0], ctx.texcoords, &choice_pdf);
