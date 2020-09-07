@@ -38,7 +38,7 @@ namespace akari {
         AkariMesh(std::string path) : path(path) {}
         std::shared_ptr<Mesh> mesh;
         std::vector<std::shared_ptr<MaterialNode<C>>> materials;
-        Buffer<Material<C> *> compiled_materials;
+        Buffer<const Material<C> *> compiled_materials;
         void commit() override {
             auto exp = resource_manager()->load_path<BinaryGeometry>(path);
             if (exp) {

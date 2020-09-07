@@ -25,25 +25,25 @@
 #include <akari/core/resource.h>
 #include <akari/core/image.hpp>
 
-namespace akari{
+namespace akari {
 
     class ResourceManagerImpl : public ResourceManager {
         std::mutex mutex;
         struct Record {
             std::shared_ptr<Resource> resouce;
             //            std::filesystem::file_time_type lwt;
-            
         };
         std::unordered_map<std::string, Record> cache;
-    public:
-        void cache_resource(const fs::path & path, const std::shared_ptr<Resource> &resource) override {
+
+      public:
+        void cache_resource(const fs::path &path, const std::shared_ptr<Resource> &resource) override {
             std::lock_guard<std::mutex> _(mutex);
             cache.emplace(fs::absolute(path).string(), Record{resource});
         }
-        std::shared_ptr<Resource> lookup(const fs::path & path) override {
+        std::shared_ptr<Resource> lookup(const fs::path &path) override {
             std::lock_guard<std::mutex> _(mutex);
             auto it = cache.find(fs::absolute(path).string());
-            if(it != cache.end()){
+            if (it != cache.end()) {
                 return it->second.resouce;
             }
             return nullptr;
@@ -56,13 +56,13 @@ namespace akari{
         return mgr;
     }
 
-    Expected<bool> ImageResource::load(const fs::path & path){
+    Expected<bool> ImageResource::load(const fs::path &path) {
         auto reader = default_image_reader();
         _image = reader->read(path);
-        if(_image)
+        if (_image)
             return true;
-        else{
+        else {
             return Error(fmt::format("failed to read {}", path.string()));
         }
     }
-}
+} // namespace akari

@@ -42,7 +42,8 @@ namespace akari {
             rhs.allocated = 0;
         }
         SmallArena(device_ptr<uint8_t> buffer, size_t size) : buffer(buffer), size(size), allocated(0) {}
-        template <typename T, typename... Args> device_ptr<T> alloc(Args &&... args) {
+        template <typename T, typename... Args>
+        device_ptr<T> alloc(Args &&... args) {
             size_t bytes_needed = align16(sizeof(T));
             size_t cur = allocated.fetch_add(bytes_needed);
             if (cur >= size) {

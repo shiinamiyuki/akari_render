@@ -4,7 +4,9 @@ project(AkariRender)
 set(CMAKE_CXX_STANDARD 17)
 option(AKR_BUILD_GUI "Build Gui / Editor" OFF)
 option(AKR_PYTHON_SUPPORT "Enable Python Support" OFF)
-
+option(AKR_ENABLE_EMBREE "Use Embree as ray intersection backend" OFF)
+option(AKR_USE_PREBUILD_EMBREE "Use prebuilt binary" OFF)
+option(AKR_ENABLE_ASL "Enable Akari Shading Language for procedural shading" OFF)
 
 include_directories(${CMAKE_SOURCE_DIR}/external/glm)
 include_directories(${CMAKE_SOURCE_DIR}/external/misc)
@@ -70,10 +72,11 @@ add_custom_command(OUTPUT ${AKR_CONFIG_H}
     DEPENDS akari.conf resources/configure.py)
 
 file(GLOB AKR_COMMON_SRC src/akari/common/*.*)
+file(GLOB AKR_SHADING_SRC src/akari/shading/*.*)
 file(GLOB AKR_CORE_SRC ${AKR_COMMON_SRC} src/akari/core/*.* src/akari/core/*/*.*)
 file(GLOB AKR_KERNEL_SRC src/akari/kernel/*.* src/akari/kernel/*/*.*)
 file(GLOB AKR_KERNEL_CPU_SRC src/akari/kernel/integrators/cpu/*.*)
-add_library(akari_core SHARED ${AKR_CORE_SRC} ${AKR_CONFIG_H} ${AKR_KERNEL_SRC} ${AKR_KERNEL_CPU_SRC})
+add_library(akari_core SHARED ${AKR_CORE_SRC} ${AKR_CONFIG_H} ${AKR_KERNEL_SRC} ${AKR_KERNEL_CPU_SRC} ${AKR_SHADING_SRC})
 target_link_libraries(akari_core PUBLIC  ${AKR_CORE_EXT_LIBS} ${Python_LIBRARIES} ${EMBREE_LIBRARY})
 target_compile_options(akari_core PUBLIC ${AKR_CXX_FLAGS})
 target_include_directories(akari_core PUBLIC src/)

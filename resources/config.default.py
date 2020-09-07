@@ -5,7 +5,7 @@
             "Spectrum": "Color<Float, 1>"
         },
         "mono_double": {
-            "Float": "float",
+            "Float": "double",
             "Spectrum": "Color<Float, 1>"
         },
         "rgb": {

@@ -21,14 +21,24 @@
 // SOFTWARE.
 
 #pragma once
-#include <akari/core/scenegraph.h>
-#include <akari/core/nodes/material.h>
-namespace akari {
-
-    AKR_VARIANT class MeshNode : public SceneGraphNode<C> {
+#include <memory>
+#include <type_traits>
+namespace akari::shading {
+    class Base : public std::enable_shared_from_this<Base> {
       public:
-        AKR_IMPORT_TYPES()
-        virtual MeshView<C> compile(MemoryArena *arena) = 0;
+        template <typename T>
+        bool isa() const {
+            return dynamic_cast<T *>(this) != nullptr;
+        }
+        template <typename T, typename = std::enable_if_t<std::is_const_v<T>>>
+        std::shared_ptr<T> cast() const {
+            return std::dynamic_pointer_cast<T>(shared_from_this());
+        }
+        template <typename T, typename = std::enable_if_t<!std::is_const_v<T>>>
+        std::shared_ptr<T> cast() {
+            return std::dynamic_pointer_cast<T>(shared_from_this());
+        }
     };
-    AKR_VARIANT struct RegisterMeshNode { static void register_nodes(py::module &m); };
-} // namespace akari
+    class Type : public Base {};
+    class PrimitiveType : public Type {};
+} // namespace akari::shading

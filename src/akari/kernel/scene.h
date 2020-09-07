@@ -52,7 +52,7 @@ namespace akari {
         EmbreeAccelerator<C> *embree_scene = nullptr;
         bool intersect(const Ray3f &ray, Intersection<C> *isct) const;
         void commit();
-        Triangle<C> get_triangle(int mesh_id, int prim_id)const {
+        Triangle<C> get_triangle(int mesh_id, int prim_id) const {
             Triangle<C> trig;
             auto &mesh = meshes[mesh_id];
             for (int i = 0; i < 3; i++) {

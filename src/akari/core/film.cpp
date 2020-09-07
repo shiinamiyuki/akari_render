@@ -22,7 +22,4 @@
 
 #include <akari/core/film.h>
 
-namespace akari {
-
-
-}
+namespace akari {}

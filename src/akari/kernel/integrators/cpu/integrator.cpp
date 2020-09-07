@@ -122,7 +122,6 @@ namespace akari {
                 }
                 return L;
             };
-            debug("resolution: {}, tile size: {}, tiles: {}\n", film->resolution(), tile_size, n_tiles);
             std::mutex mutex;
             auto num_threads = num_work_threads();
             MemoryArena _arena;

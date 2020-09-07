@@ -41,10 +41,10 @@ namespace akari {
             AKR_PANIC(#expr " not satisfied");                                                                         \
         }                                                                                                              \
     } while (0)
-#define AKR_ASSERT_THROW(expr)                                                                                               \
+#define AKR_ASSERT_THROW(expr)                                                                                         \
     do {                                                                                                               \
         if (!(expr)) {                                                                                                 \
-            throw std::runtime_error(#expr " not satisfied");                                                                         \
+            throw std::runtime_error(#expr " not satisfied");                                                          \
         }                                                                                                              \
     } while (0)
 } // namespace akari

@@ -25,20 +25,20 @@
 #include <akari/core/platform.h>
 #include <akari/common/diagnostic.h>
 #ifdef __GNUC__
-#if __GNUC__ >= 8
+#    if __GNUC__ >= 8
 
-#include <filesystem>
+#        include <filesystem>
 namespace akari {
     namespace fs = std::filesystem;
 }
-#else
-#include <experimental/filesystem>
+#    else
+#        include <experimental/filesystem>
 namespace akari {
     namespace fs = std::experimental::filesystem;
 }
-#endif
+#    endif
 #else
-#include <filesystem>
+#    include <filesystem>
 namespace akari {
     namespace fs = std::filesystem;
 }
@@ -50,7 +50,6 @@ namespace akari {
 #include <akari/common/panic.h>
 
 namespace akari {
-    
 
     struct CurrentPathGuard {
         fs::path _cur;
@@ -59,15 +58,14 @@ namespace akari {
     };
     struct NonCopyable {
         NonCopyable() = default;
-        NonCopyable(const NonCopyable&) = delete;
-        NonCopyable & operator=(const NonCopyable&) = delete;
+        NonCopyable(const NonCopyable &) = delete;
+        NonCopyable &operator=(const NonCopyable &) = delete;
     };
 
-
-    template<typename U, typename T>
-    std::shared_ptr<U> dyn_cast(const std::shared_ptr<T> & p){
+    template <typename U, typename T>
+    std::shared_ptr<U> dyn_cast(const std::shared_ptr<T> &p) {
         return std::dynamic_pointer_cast<U>(p);
     }
-//    using Float = float;
+    //    using Float = float;
 } // namespace akari
 #endif // AKARIRENDER_AKARI_H

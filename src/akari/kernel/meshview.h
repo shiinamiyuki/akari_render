@@ -30,6 +30,6 @@ namespace akari {
         BufferView<float> vertices, normals, texcoords;
         BufferView<int> indices;
         BufferView<int> material_indices;
-        BufferView<Material<C> *> materials;
+        BufferView<const Material<C> *> materials;
     };
 } // namespace akari

@@ -26,7 +26,7 @@
 #include <akari/core/resource.h>
 #include <akari/common/variant.h>
 namespace akari {
-    
+
     struct Mesh {
         Buffer<float> vertices, normals, texcoords;
         Buffer<int> indices;

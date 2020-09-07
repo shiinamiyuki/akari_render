@@ -42,9 +42,10 @@ namespace akari {
         }
     };
     AKR_VARIANT void RegisterCameraNode<C>::register_nodes(py::module &m) {
-       AKR_IMPORT_TYPES()
+        AKR_IMPORT_TYPES()
         py::class_<CameraNode<C>, SceneGraphNode<C>, std::shared_ptr<CameraNode<C>>>(m, "Camera");
-        py::class_<PerspectiveCameraNode<C>, CameraNode<C>, std::shared_ptr<PerspectiveCameraNode<C>>>(m, "PerspectiveCamera")
+        py::class_<PerspectiveCameraNode<C>, CameraNode<C>, std::shared_ptr<PerspectiveCameraNode<C>>>(
+            m, "PerspectiveCamera")
             .def(py::init<>())
             .def_readwrite("position", &PerspectiveCameraNode<C>::position)
             .def_readwrite("rotation", &PerspectiveCameraNode<C>::rotation)

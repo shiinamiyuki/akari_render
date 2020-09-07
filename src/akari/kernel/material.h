@@ -166,7 +166,7 @@ namespace akari {
         [[nodiscard]] BSDFType type() const { return closure_->type(); }
         [[nodiscard]] bool is_delta() const { return closure_->is_delta(); }
         [[nodiscard]] bool match_flags(BSDFType flag) const { return closure_->match_flags(flag); }
-        void sample(BSDFSample<C> *sample) {
+        void sample(BSDFSample<C> *sample) const {
             auto wo = frame.world_to_local(sample->wo);
             Vector3f wi;
             sample->f = closure()->sample(sample->u1, wo, &wi, &sample->pdf, &sample->sampled);

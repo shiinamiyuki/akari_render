@@ -49,10 +49,10 @@ namespace akari {
             PathTracer(int spp) : spp(spp) {}
             void render(const Scene<C> &scene, Film<C> *out) const;
         };
-        AKR_VARIANT class Integrator : public Variant<AmbientOcclusion<C>,PathTracer<C>> {
+        AKR_VARIANT class Integrator : public Variant<AmbientOcclusion<C>, PathTracer<C>> {
           public:
             AKR_IMPORT_TYPES()
-            using Variant<AmbientOcclusion<C>,PathTracer<C>>::Variant;
+            using Variant<AmbientOcclusion<C>, PathTracer<C>>::Variant;
             void render(const Scene<C> &scene, Film<C> *out) const { AKR_TAGGED_DISPATCH(render, scene, out); }
         };
     } // namespace cpu

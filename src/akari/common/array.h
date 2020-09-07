@@ -38,7 +38,8 @@ namespace akari {
     inline bool all(bool a) { return a; }
     inline bool all(float a) { return a; }
     inline bool all(double a) { return a; }
-    template <typename T, int N, int packed> struct alignas(compute_align<T, N, packed>()) Array {
+    template <typename T, int N, int packed>
+    struct alignas(compute_align<T, N, packed>()) Array {
         static constexpr int padded_size = (int)compute_padded_size<T, N, packed>();
         T _s[padded_size] = {};
         using value_t = T;
@@ -50,7 +51,8 @@ namespace akari {
                 _s[i] = x;
             }
         }
-        template <typename U, int P> explicit Array(const Array<U, N, P> &rhs) {
+        template <typename U, int P>
+        explicit Array(const Array<U, N, P> &rhs) {
             if (!P) {
                 for (int i = 0; i < padded_size; i++) {
                     _s[i] = T(rhs[i]);
@@ -150,36 +152,44 @@ namespace akari {
             return self;
         }
     }; // namespace detail
-    template <typename T, int N, int P> T dot(const Array<T, N, P> &a1, const Array<T, N, P> &a2) {
+    template <typename T, int N, int P>
+    T dot(const Array<T, N, P> &a1, const Array<T, N, P> &a2) {
         T s = a1[0] * a2[0];
         for (int i = 1; i < N; i++) {
             s += a1[i] * a2[i];
         }
         return s;
     }
-    template <typename T, int N, int P, class F> T reduce(const Array<T, N, P> &a, F &&f) {
+    template <typename T, int N, int P, class F>
+    T reduce(const Array<T, N, P> &a, F &&f) {
         T acc = a[0];
         for (int i = 1; i < N; i++) {
             acc = f(acc, a[i]);
         }
         return acc;
     }
-    template <typename T, int N, int P> T hsum(const Array<T, N, P> &a) {
+    template <typename T, int N, int P>
+    T hsum(const Array<T, N, P> &a) {
         return reduce(a, [](const T &acc, const T &b) { return acc + b; });
     }
-    template <typename T, int N, int P> T hprod(const Array<T, N, P> &a) {
+    template <typename T, int N, int P>
+    T hprod(const Array<T, N, P> &a) {
         return reduce(a, [](const T &acc, const T &b) { return acc * b; });
     }
-    template <typename T, int N, int P> T hmin(const Array<T, N, P> &a) {
+    template <typename T, int N, int P>
+    T hmin(const Array<T, N, P> &a) {
         return reduce(a, [](const T &acc, const T &b) { return min(acc, b); });
     }
-    template <typename T, int N, int P> T hmax(const Array<T, N, P> &a) {
+    template <typename T, int N, int P>
+    T hmax(const Array<T, N, P> &a) {
         return reduce(a, [](const T &acc, const T &b) { return max(acc, b); });
     }
-    template <typename T, int N, int P> bool any(const Array<T, N, P> &a) {
+    template <typename T, int N, int P>
+    bool any(const Array<T, N, P> &a) {
         return reduce(a, [](const T &acc, const T &b) { return acc || any(b); });
     }
-    template <typename T, int N, int P> bool all(const Array<T, N, P> &a) {
+    template <typename T, int N, int P>
+    bool all(const Array<T, N, P> &a) {
         return reduce(a, [](const T &acc, const T &b) { return acc && all(b); });
     }
     template <typename T, int N, int P>
@@ -194,5 +204,6 @@ namespace akari {
         }
         return r;
     }
-    template <typename T, int N> using PackedArray = Array<T, N, 1>;
+    template <typename T, int N>
+    using PackedArray = Array<T, N, 1>;
 } // namespace akari

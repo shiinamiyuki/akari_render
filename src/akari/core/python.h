@@ -25,10 +25,10 @@
 #include <akari/core/logger.h>
 namespace akari {
     namespace py = pybind11;
-   
+
     AKR_VARIANT
     struct RegisterMathFunction {
-        static void register_math_functions(py::module &m) ;
+        static void register_math_functions(py::module &m);
     };
     void register_utility(py::module &m);
 } // namespace akari

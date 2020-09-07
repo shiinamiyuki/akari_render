@@ -29,9 +29,7 @@
 #include <thread>
 
 namespace akari {
-    size_t num_work_threads(){
-        return std::thread::hardware_concurrency();
-    }
+    size_t num_work_threads() { return std::thread::hardware_concurrency(); }
     struct ParallelForContext {
         std::atomic_uint32_t workIndex;
         size_t count = 0;

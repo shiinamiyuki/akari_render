@@ -51,7 +51,6 @@
 #define AKR_MAP_EXPR_NEXT(test, next) AKR_MAP_EXPR_NEXT_1(AKR_MAP_GET_END test, next)
 #define AKR_MAP_STMT_NEXT(test, next) AKR_MAP_STMT_NEXT_1(AKR_MAP_GET_END test, next)
 
-
 #define AKR_IMPORT_RENDER_TYPES_0(x, peek, ...)                                                                        \
     using A##x = x<Float, Spectrum>;                                                                                   \
     AKR_MAP_STMT_NEXT(peek, AKR_IMPORT_RENDER_TYPES_1)(peek, __VA_ARGS__)

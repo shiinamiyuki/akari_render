@@ -1,6 +1,3 @@
-option(AKR_ENABLE_EMBREE "Use Embree as ray intersection backend" OFF)
-option(AKR_USE_PREBUILD_EMBREE "Use prebuilt binary" OFF)
-
 if(AKR_ENABLE_EMBREE)
     add_compile_definitions(AKR_ENABLE_EMBREE)
     if(NOT AKR_USE_PREBUILD_EMBREE)

@@ -23,15 +23,14 @@
 #include <akari/kernel/scene.h>
 
 namespace akari {
-    AKR_VARIANT bool Scene<C>::intersect(const Ray<C> &ray,
-                                                       Intersection<C> *intersection) const {
+    AKR_VARIANT bool Scene<C>::intersect(const Ray<C> &ray, Intersection<C> *intersection) const {
         bool hit = false;
         if constexpr (akari_enable_embree) {
             hit = embree_scene->intersect(ray, intersection);
         } else {
             std::abort();
         }
-        if(hit){
+        if (hit) {
             intersection->p = ray(intersection->t);
         }
         return hit;

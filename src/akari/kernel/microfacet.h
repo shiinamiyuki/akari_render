@@ -21,8 +21,8 @@
 // SOFTWARE.
 
 #ifndef AKARIRENDER_SAMPLING_HPP
-#define AKARIRENDER_SAMPLING_HPP
-#include <akari/common/math.h>
+#    define AKARIRENDER_SAMPLING_HPP
+#    include <akari/common/math.h>
 
 namespace akari {
     AKR_VARIANT

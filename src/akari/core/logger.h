@@ -26,9 +26,11 @@
 #include <akari/core/platform.h>
 #include <akari/common/color.h>
 #include <fmt/format.h>
-template <typename T, int N> struct fmt::formatter<akari::Array<T, N>> {
+template <typename T, int N>
+struct fmt::formatter<akari::Array<T, N>> {
 
-    template <typename FormatContext> auto format(const akari::Array<T, N> &a, FormatContext &ctx) {
+    template <typename FormatContext>
+    auto format(const akari::Array<T, N> &a, FormatContext &ctx) {
         // auto format(const point &p, FormatContext &ctx) -> decltype(ctx.out()) // c++11
         // ctx.out() is an output iterator to write to.
         auto it = format_to(ctx.out(), "[");
@@ -64,23 +66,31 @@ template <typename T, int N> struct fmt::formatter<akari::Array<T, N>> {
         return it;
     }
 };
-template <typename T, int N> struct fmt::formatter<akari::Point<T, N>> : fmt::formatter<akari::Array<T, N>> {
-    template <typename FormatCtx> auto format(const akari::Point<T, N> &a, FormatCtx &ctx) {
+template <typename T, int N>
+struct fmt::formatter<akari::Point<T, N>> : fmt::formatter<akari::Array<T, N>> {
+    template <typename FormatCtx>
+    auto format(const akari::Point<T, N> &a, FormatCtx &ctx) {
         return fmt::formatter<akari::Array<T, N>>::format(a, ctx);
     }
 };
-template <typename T, int N> struct fmt::formatter<akari::Vector<T, N>> : fmt::formatter<akari::Array<T, N>> {
-    template <typename FormatCtx> auto format(const akari::Vector<T, N> &a, FormatCtx &ctx) {
+template <typename T, int N>
+struct fmt::formatter<akari::Vector<T, N>> : fmt::formatter<akari::Array<T, N>> {
+    template <typename FormatCtx>
+    auto format(const akari::Vector<T, N> &a, FormatCtx &ctx) {
         return fmt::formatter<akari::Array<T, N>>::format(a, ctx);
     }
 };
-template <typename T, int N> struct fmt::formatter<akari::Normal<T, N>> : fmt::formatter<akari::Array<T, N>> {
-    template <typename FormatCtx> auto format(const akari::Normal<T, N> &a, FormatCtx &ctx) {
+template <typename T, int N>
+struct fmt::formatter<akari::Normal<T, N>> : fmt::formatter<akari::Array<T, N>> {
+    template <typename FormatCtx>
+    auto format(const akari::Normal<T, N> &a, FormatCtx &ctx) {
         return fmt::formatter<akari::Array<T, N>>::format(a, ctx);
     }
 };
-template <typename T, int N> struct fmt::formatter<akari::Color<T, N>> : fmt::formatter<akari::Array<T, N>> {
-    template <typename FormatCtx> auto format(const akari::Color<T, N> &a, FormatCtx &ctx) {
+template <typename T, int N>
+struct fmt::formatter<akari::Color<T, N>> : fmt::formatter<akari::Array<T, N>> {
+    template <typename FormatCtx>
+    auto format(const akari::Color<T, N> &a, FormatCtx &ctx) {
         return fmt::formatter<akari::Array<T, N>>::format(a, ctx);
     }
 };
@@ -105,27 +115,32 @@ namespace akari {
 
     AKR_EXPORT Logger *GetDefaultLogger();
 
-    template <typename... Args> void warning(const char *fmt, Args &&... args) {
+    template <typename... Args>
+    void warning(const char *fmt, Args &&... args) {
         auto logger = GetDefaultLogger();
         logger->Warning(fmt::format(fmt, std::forward<Args>(args)...));
     }
 
-    template <typename... Args> void error(const char *fmt, Args &&... args) {
+    template <typename... Args>
+    void error(const char *fmt, Args &&... args) {
         auto logger = GetDefaultLogger();
         logger->Error(fmt::format(fmt, std::forward<Args>(args)...));
     }
 
-    template <typename... Args> void info(const char *fmt, Args &&... args) {
+    template <typename... Args>
+    void info(const char *fmt, Args &&... args) {
         auto logger = GetDefaultLogger();
         logger->Info(fmt::format(fmt, std::forward<Args>(args)...));
     }
 
-    template <typename... Args> void debug(const char *fmt, Args &&... args) {
+    template <typename... Args>
+    void debug(const char *fmt, Args &&... args) {
         auto logger = GetDefaultLogger();
         logger->Debug(fmt::format(fmt, std::forward<Args>(args)...));
     }
 
-    template <typename... Args> void fatal(const char *fmt, Args &&... args) {
+    template <typename... Args>
+    void fatal(const char *fmt, Args &&... args) {
         auto logger = GetDefaultLogger();
         logger->Fatal(fmt::format(fmt, std::forward<Args>(args)...));
     }

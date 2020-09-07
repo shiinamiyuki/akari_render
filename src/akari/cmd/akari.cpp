@@ -63,10 +63,10 @@ int main(int argc, const char **argv) {
     parse(argc, argv);
     try {
         CurrentPathGuard _guard;
-        py::scoped_interpreter py_guard{}; 
+        py::scoped_interpreter py_guard{};
         py::module::import("akari");
         auto parent = fs::absolute(fs::path(inputFilename)).parent_path();
-        if(!parent.empty())
+        if (!parent.empty())
             fs::current_path(parent);
         inputFilename = fs::path(inputFilename).filename().string();
 
@@ -76,7 +76,7 @@ int main(int argc, const char **argv) {
             std::string str((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
             py::exec(str);
         }
-        
+
     } catch (std::exception &e) {
         fatal("Exception: {}", e.what());
         exit(1);

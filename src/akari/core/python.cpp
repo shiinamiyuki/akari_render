@@ -26,8 +26,10 @@
 #include <pybind11/stl.h>
 #include <akari/core/scenegraph.h>
 namespace akari {
-    template <typename Float, typename T> struct RegisterArrayOp {
-        template <typename Class> void operator()(py::module &m, Class &c) const {
+    template <typename Float, typename T>
+    struct RegisterArrayOp {
+        template <typename Class>
+        void operator()(py::module &m, Class &c) const {
             AKR_IMPORT_CORE_TYPES()
             constexpr auto N = array_size_v<T>;
             if constexpr (!std::is_same_v<bool, value_t<T>>) {

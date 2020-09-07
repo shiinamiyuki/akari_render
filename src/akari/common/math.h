@@ -30,7 +30,8 @@
 #include <cstring>
 
 namespace akari {
-    template <typename Float> struct Constants {
+    template <typename Float>
+    struct Constants {
         static constexpr Float Inf = std::numeric_limits<Float>::infinity();
         static constexpr Float Pi = 3.1415926535897932384f;
         static constexpr Float Pi2 = Pi / Float(2.0f);
@@ -44,18 +45,27 @@ namespace akari {
 #if defined(__GNUG__) && !defined(__clang__)
 #    pragma GCC diagnostic ignored "-Wclass-memaccess"
 #endif
-    template <typename T, typename = std::enable_if_t<is_array_v<T>>> T load(const void *p) {
+    template <typename T, typename = std::enable_if_t<is_array_v<T>>>
+    T load(const void *p) {
         T v;
         std::memcpy(&v, p, sizeof(T));
         return v;
     }
-    template <typename T, int N, int P> void store(void *p, const Array<T, N, P> &a) {
+    template <typename T, int N, int P>
+    void store(void *p, const Array<T, N, P> &a) {
         std::memcpy(p, &a, sizeof(Array<T, N, P>));
     }
 #pragma GCC diagnostic pop
-    template <typename T, int N> T length(const Array<T, N> &a) { return sqrt(dot(a, a)); }
-    template <typename T, int N> Array<T, N> normalize(const Array<T, N> &a) { return a / sqrt(dot(a, a)); }
-    template <int... args, typename T, int N> auto shuffle(const Array<T, N> &a) {
+    template <typename T, int N>
+    T length(const Array<T, N> &a) {
+        return sqrt(dot(a, a));
+    }
+    template <typename T, int N>
+    Array<T, N> normalize(const Array<T, N> &a) {
+        return a / sqrt(dot(a, a));
+    }
+    template <int... args, typename T, int N>
+    auto shuffle(const Array<T, N> &a) {
         constexpr int pack[] = {args...};
         static_assert(((args < N) && ...));
         Array<T, sizeof...(args)> s;
@@ -66,7 +76,8 @@ namespace akari {
     }
 #define FWD_MATH_FUNC1(name)                                                                                           \
                                                                                                                        \
-    template <typename V, int N, int P> Array<V, N, P> _##name(const Array<V, N, P> &v) {                              \
+    template <typename V, int N, int P>                                                                                \
+    Array<V, N, P> _##name(const Array<V, N, P> &v) {                                                                  \
         Array<V, N, P> ans;                                                                                            \
         using std::name;                                                                                               \
         for (int i = 0; i < N; i++) {                                                                                  \
@@ -74,10 +85,14 @@ namespace akari {
         }                                                                                                              \
         return ans;                                                                                                    \
     }                                                                                                                  \
-    template <typename V, int N, int P> Array<V, N, P> name(const Array<V, N, P> &v) { return _##name(v); }
+    template <typename V, int N, int P>                                                                                \
+    Array<V, N, P> name(const Array<V, N, P> &v) {                                                                     \
+        return _##name(v);                                                                                             \
+    }
 #define FWD_MATH_FUNC2(name)                                                                                           \
                                                                                                                        \
-    template <typename V, int N, int P> Array<V, N, P> _##name(const Array<V, N, P> &v1, const Array<V, N, P> &v2) {   \
+    template <typename V, int N, int P>                                                                                \
+    Array<V, N, P> _##name(const Array<V, N, P> &v1, const Array<V, N, P> &v2) {                                       \
         Array<V, N, P> ans;                                                                                            \
         using std::name;                                                                                               \
         for (int i = 0; i < N; i++) {                                                                                  \
@@ -85,7 +100,8 @@ namespace akari {
         }                                                                                                              \
         return ans;                                                                                                    \
     }                                                                                                                  \
-    template <typename V, int N, int P> Array<V, N, P> _##name(const V &v1, const Array<V, N, P> &v2) {                \
+    template <typename V, int N, int P>                                                                                \
+    Array<V, N, P> _##name(const V &v1, const Array<V, N, P> &v2) {                                                    \
         Array<V, N, P> ans;                                                                                            \
         using std::name;                                                                                               \
         for (int i = 0; i < N; i++) {                                                                                  \
@@ -93,7 +109,8 @@ namespace akari {
         }                                                                                                              \
         return ans;                                                                                                    \
     }                                                                                                                  \
-    template <typename V, int N, int P> Array<V, N, P> _##name(const Array<V, N, P> &v1, const V &v2) {                \
+    template <typename V, int N, int P>                                                                                \
+    Array<V, N, P> _##name(const Array<V, N, P> &v1, const V &v2) {                                                    \
         Array<V, N, P> ans;                                                                                            \
         using std::name;                                                                                               \
         for (int i = 0; i < N; i++) {                                                                                  \
@@ -101,13 +118,16 @@ namespace akari {
         }                                                                                                              \
         return ans;                                                                                                    \
     }                                                                                                                  \
-    template <typename V, int N, int P> Array<V, N, P> name(const Array<V, N, P> &v1, const Array<V, N, P> &v2) {      \
+    template <typename V, int N, int P>                                                                                \
+    Array<V, N, P> name(const Array<V, N, P> &v1, const Array<V, N, P> &v2) {                                          \
         return _##name(v1, v2);                                                                                        \
     }                                                                                                                  \
-    template <typename V, int N, int P> Array<V, N, P> name(const V &v1, const Array<V, N, P> &v2) {                   \
+    template <typename V, int N, int P>                                                                                \
+    Array<V, N, P> name(const V &v1, const Array<V, N, P> &v2) {                                                       \
         return _##name(v1, v2);                                                                                        \
     }                                                                                                                  \
-    template <typename V, int N, int P> Array<V, N, P> name(const Array<V, N, P> &v1, const V &v2) {                   \
+    template <typename V, int N, int P>                                                                                \
+    Array<V, N, P> name(const Array<V, N, P> &v1, const V &v2) {                                                       \
         return _##name(v1, v2);                                                                                        \
     }
     FWD_MATH_FUNC1(floor)
@@ -154,21 +174,24 @@ namespace akari {
     }                                                                                                                  \
     Self(const Base &base) : Base(base) {}
 
-    template <typename Value, int N> struct Vector : Array<Value, N> {
+    template <typename Value, int N>
+    struct Vector : Array<Value, N> {
         using Base = Array<Value, N>;
         using Base::Base;
         using value_t = Value;
         static constexpr size_t size = N;
         AKR_ARRAY_IMPORT(Base, Vector)
     };
-    template <typename Value, int N> struct Point : Array<Value, N> {
+    template <typename Value, int N>
+    struct Point : Array<Value, N> {
         using Base = Array<Value, N>;
         using Base::Base;
         using value_t = Value;
         static constexpr size_t size = N;
         AKR_ARRAY_IMPORT(Base, Point)
     };
-    template <typename Value, int N> struct Normal : Array<Value, N> {
+    template <typename Value, int N>
+    struct Normal : Array<Value, N> {
         using Base = Array<Value, N>;
         using Base::Base;
         using value_t = Value;
@@ -184,14 +207,16 @@ namespace akari {
     //     }
     //     return v;
     // }
-    template <typename Value, int N> Point<Value, N> operator+(const Point<Value, N> &p1, const Vector<Value, N> &v) {
+    template <typename Value, int N>
+    Point<Value, N> operator+(const Point<Value, N> &p1, const Vector<Value, N> &v) {
         Point<Value, N> p2;
         for (int i = 0; i < N; i++) {
             p2[i] = p1[i] + v[i];
         }
         return p2;
     }
-    template <typename Value, int N> Point<Value, N> operator+(const Vector<Value, N> &v, const Point<Value, N> &p1) {
+    template <typename Value, int N>
+    Point<Value, N> operator+(const Vector<Value, N> &v, const Point<Value, N> &p1) {
         Point<Value, N> p2;
         for (int i = 0; i < N; i++) {
             p2[i] = p1[i] + v[i];
@@ -199,11 +224,13 @@ namespace akari {
         return p2;
     }
 
-    template <typename V, typename V2> inline V lerp3(const V &v0, const V &v1, const V &v2, const V2 &uv) {
+    template <typename V, typename V2>
+    inline V lerp3(const V &v0, const V &v1, const V &v2, const V2 &uv) {
         return (1.0f - uv[0] - uv[1]) * v0 + uv[0] * v1 + uv[1] * v2;
     }
 
-    template <typename Float, int N> struct Matrix {
+    template <typename Float, int N>
+    struct Matrix {
         Array<Array<Float, N>, N> rows;
         Matrix(Float v = 1.0) {
             for (int i = 0; i < N; i++) {
@@ -325,12 +352,14 @@ namespace akari {
         }
     };
 
-    template <typename T> Vector<T, 3> cross(const Vector<T, 3> &v1, const Vector<T, 3> &v2) {
+    template <typename T>
+    Vector<T, 3> cross(const Vector<T, 3> &v1, const Vector<T, 3> &v2) {
         T v1x = v1.x(), v1y = v1.y(), v1z = v1.z();
         T v2x = v2.x(), v2y = v2.y(), v2z = v2.z();
         return Vector<T, 3>((v1y * v2z) - (v1z * v2y), (v1z * v2x) - (v1x * v2z), (v1x * v2y) - (v1y * v2x));
     }
-    template <typename T> Normal<T, 3> cross(const Normal<T, 3> &v1, const Normal<T, 3> &v2) {
+    template <typename T>
+    Normal<T, 3> cross(const Normal<T, 3> &v1, const Normal<T, 3> &v2) {
         T v1x = v1.x(), v1y = v1.y(), v1z = v1.z();
         T v2x = v2.x(), v2y = v2.y(), v2z = v2.z();
         return Normal<T, 3>((v1y * v2z) - (v1z * v2y), (v1z * v2x) - (v1x * v2z), (v1x * v2y) - (v1y * v2x));
@@ -349,7 +378,8 @@ namespace akari {
         Point3f operator()(Float t) const { return o + t * d; }
     };
 
-    template <typename Vector> struct Frame {
+    template <typename Vector>
+    struct Frame {
         using Value = typename Vector::value_t;
         using Vector3f = Vector;
         using Normal3f = Normal<Value, 3>;
@@ -375,7 +405,8 @@ namespace akari {
         Vector3f T, B;
     };
 
-    template <typename Float> struct Transform {
+    template <typename Float>
+    struct Transform {
         AKR_IMPORT_CORE_TYPES()
         Matrix4f m, minv;
         Matrix3f m3, m3inv;
@@ -402,7 +433,8 @@ namespace akari {
         Transform operator*(const Transform &t) const { return Transform(m * t.m); }
         Vector3f operator*(const Vector3f &v) const { return m3 * v; }
         Normal3f operator*(const Normal3f &n) const { return m3inv.transpose() * n; }
-        template <typename Spectrum, typename C = Config<Float, Spectrum>> Ray<C> operator*(const Ray<C> &ray) const {
+        template <typename Spectrum, typename C = Config<Float, Spectrum>>
+        Ray<C> operator*(const Ray<C> &ray) const {
             using Ray3f = Ray<C>;
             auto &T = *this;
             auto d2 = T * ray.d;
@@ -442,7 +474,8 @@ namespace akari {
         }
     };
 
-    template <typename Point> struct BoundingBox {
+    template <typename Point>
+    struct BoundingBox {
         using Float = value_t<Point>;
         static constexpr auto N = array_size_v<Point>;
         using Vector = akari::Vector<Float, N>;
@@ -485,6 +518,12 @@ namespace akari {
         }
     };
 
-    template <typename Float> inline Float degrees(Float x) { return x * Constants<value_t<Float>>::InvPi * 180.0f; }
-    template <typename Float> inline Float radians(Float x) { return x * Constants<value_t<Float>>::Pi / 180.0f; }
+    template <typename Float>
+    inline Float degrees(Float x) {
+        return x * Constants<value_t<Float>>::InvPi * 180.0f;
+    }
+    template <typename Float>
+    inline Float radians(Float x) {
+        return x * Constants<value_t<Float>>::Pi / 180.0f;
+    }
 } // namespace akari

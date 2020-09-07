@@ -31,6 +31,7 @@
 namespace akari {
     class AtomicFloat {
         std::atomic<float> val;
+
       public:
         using Float = float;
         explicit AtomicFloat(Float v = 0) : val(v) {}
@@ -39,20 +40,15 @@ namespace akari {
 
         void add(Float v) {
             auto current = val.load();
-            while (!val.compare_exchange_weak(current, current + v)){}
+            while (!val.compare_exchange_weak(current, current + v)) {
+            }
         }
 
-        [[nodiscard]] float value() const {
-            return val.load();
-        }
+        [[nodiscard]] float value() const { return val.load(); }
 
-        explicit operator float() const {
-            return value();
-        }
+        explicit operator float() const { return value(); }
 
-        void set(Float v){
-            val = v;
-        }
+        void set(Float v) { val = v; }
     };
 
     AKR_EXPORT void parallel_for(int count, const std::function<void(uint32_t, uint32_t)> &func, size_t chunkSize = 1);
@@ -60,13 +56,13 @@ namespace akari {
     inline void parallel_for_2d(const Point<int, 2> &dim, const std::function<void(Point<int, 2>, uint32_t)> &func,
                                 size_t chunkSize = 1) {
         parallel_for(
-                dim.x() * dim.y(),
-                [&](uint32_t idx, int tid) {
-                    auto x = idx % dim.x();
-                    auto y = idx / dim.x();
-                    func(Point<int, 2>(x, y), tid);
-                },
-                chunkSize);
+            dim.x() * dim.y(),
+            [&](uint32_t idx, int tid) {
+                auto x = idx % dim.x();
+                auto y = idx / dim.x();
+                func(Point<int, 2>(x, y), tid);
+            },
+            chunkSize);
     }
 
     AKR_EXPORT void ThreadPoolFinalize();

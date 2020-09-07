@@ -19,16 +19,17 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-
-#pragma once
-#include <akari/core/scenegraph.h>
-#include <akari/core/nodes/material.h>
+#include <type_traits>
 namespace akari {
-
-    AKR_VARIANT class MeshNode : public SceneGraphNode<C> {
-      public:
-        AKR_IMPORT_TYPES()
-        virtual MeshView<C> compile(MemoryArena *arena) = 0;
-    };
-    AKR_VARIANT struct RegisterMeshNode { static void register_nodes(py::module &m); };
+    namespace astd {
+        template <typename T1, typename T2>
+        struct pair {
+            T1 first;
+            T2 second;
+        };
+        template <typename T1, typename T2>
+        pair<T1, T2> make_pair(T1 &&a, T2 &&b) {
+            return pair{a, b};
+        }
+    } // namespace astd
 } // namespace akari

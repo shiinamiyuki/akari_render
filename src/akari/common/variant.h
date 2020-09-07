@@ -25,33 +25,52 @@
 #include <cstring>
 #include <akari/common/panic.h>
 namespace akari {
-    template <typename... T> struct TypeIndex {
-        template <typename U, typename Tp, typename... Rest> struct GetIndex_ {
+    template <typename... T>
+    struct TypeIndex {
+        template <typename U, typename Tp, typename... Rest>
+        struct GetIndex_ {
             static const int value = std::is_same<Tp, U>::value ? 0 : 1 + GetIndex_<U, Rest...>::value;
         };
-        template <typename U, typename Tp> struct GetIndex_<U, Tp> {
+        template <typename U, typename Tp>
+        struct GetIndex_<U, Tp> {
             static const int value = std::is_same<Tp, U>::value ? 0 : -1;
         };
-        template <int I, typename Tp, typename... Rest> struct GetType_ {
+        template <int I, typename Tp, typename... Rest>
+        struct GetType_ {
             using type = typename std::conditional<I == 0, Tp, typename GetType_<I - 1, Rest...>::type>::type;
         };
 
-        template <int I, typename Tp> struct GetType_<I, Tp> {
+        template <int I, typename Tp>
+        struct GetType_<I, Tp> {
             using type = typename std::conditional<I == 0, Tp, void>::type;
         };
 
-        template <typename U> struct GetIndex { static const int value = GetIndex_<U, T...>::value; };
+        template <typename U>
+        struct GetIndex {
+            static const int value = GetIndex_<U, T...>::value;
+        };
 
-        template <int N> struct GetType { using type = typename GetType_<N, T...>::type; };
+        template <int N>
+        struct GetType {
+            using type = typename GetType_<N, T...>::type;
+        };
     };
-    template <class T, class... Rest> struct FirstOf { using type = T; };
+    template <class T, class... Rest>
+    struct FirstOf {
+        using type = T;
+    };
 
-    template <typename U, typename... T> struct SizeOf {
+    template <typename U, typename... T>
+    struct SizeOf {
         static constexpr int value = std::max<int>(sizeof(U), SizeOf<T...>::value);
     };
-    template <typename T> struct SizeOf<T> { static constexpr int value = sizeof(T); };
+    template <typename T>
+    struct SizeOf<T> {
+        static constexpr int value = sizeof(T);
+    };
 
-    template <typename... T> struct Variant {
+    template <typename... T>
+    struct Variant {
         static constexpr int nTypes = sizeof...(T);
         static constexpr std::size_t alignment_value = std::max({alignof(T)...});
         typename std::aligned_storage<SizeOf<T...>::value, alignment_value>::type data;
@@ -102,7 +121,8 @@ namespace akari {
             return *this;
         }
 
-        template <typename U> Variant &operator=(const U &u) {
+        template <typename U>
+        Variant &operator=(const U &u) {
             if (index != -1) {
                 _drop();
             }
@@ -111,13 +131,18 @@ namespace akari {
             index = Index::template GetIndex<U>::value;
             return *this;
         }
-        template <typename U> bool isa() const { return Index::template GetIndex<U>::value == index; }
-        template <typename U> U *get() {
+        template <typename U>
+        bool isa() const {
+            return Index::template GetIndex<U>::value == index;
+        }
+        template <typename U>
+        U *get() {
             static_assert(Index::template GetIndex<U>::value != -1, "U is not in T...");
             return Index::template GetIndex<U>::value != index ? nullptr : reinterpret_cast<U *>(&data);
         }
 
-        template <typename U> const U *get() const {
+        template <typename U>
+        const U *get() const {
             static_assert(Index::template GetIndex<U>::value != -1, "U is not in T...");
             return Index::template GetIndex<U>::value != index ? nullptr : reinterpret_cast<const U *>(&data);
         }
@@ -155,7 +180,8 @@ namespace akari {
     _GEN_CASE_N(14)                                                                                                    \
     _GEN_CASE_N(15)
 
-        template <class Visitor> auto accept(Visitor &&visitor) {
+        template <class Visitor>
+        auto accept(Visitor &&visitor) {
             using Ret = std::invoke_result_t<Visitor, typename FirstOf<T...>::type &>;
             static_assert(nTypes <= 16, "too many types");
             if constexpr (nTypes <= 2) {
@@ -174,7 +200,8 @@ namespace akari {
             }
         }
 
-        template <class Visitor> auto accept(Visitor &&visitor) const {
+        template <class Visitor>
+        auto accept(Visitor &&visitor) const {
             using Ret = std::invoke_result_t<Visitor, const typename FirstOf<T...>::type &>;
             static_assert(nTypes <= 16, "too many types");
             if constexpr (nTypes <= 2) {

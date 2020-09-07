@@ -24,7 +24,6 @@
 #include <akari/core/application.h>
 #include <akari/core/parallel.h>
 
-
 namespace akari {
     Application::Application() {}
     Application::~Application() { ThreadPoolFinalize(); }

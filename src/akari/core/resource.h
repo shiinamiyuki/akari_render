@@ -39,7 +39,8 @@ namespace akari {
 
       public:
         Expected<std::shared_ptr<Resource>> load_resource(const fs::path &);
-        template <typename T> Expected<std::shared_ptr<T>> load_path(const fs::path &path, bool force_reload = false) {
+        template <typename T>
+        Expected<std::shared_ptr<T>> load_path(const fs::path &path, bool force_reload = false) {
             if (!force_reload) {
                 auto cache = lookup(path);
                 if (cache) {

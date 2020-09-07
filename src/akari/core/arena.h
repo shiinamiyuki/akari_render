@@ -70,7 +70,8 @@ namespace akari {
             currentBlockPos += bytes;
             return p;
         }
-        template <typename T, typename... Args> T *allocN(size_t count, Args &&... args) {
+        template <typename T, typename... Args>
+        T *allocN(size_t count, Args &&... args) {
             auto allocSize = sizeof(T) * count;
             auto p = alloc_bytes(allocSize);
             if constexpr (!std::is_trivially_constructible_v<T>) {
@@ -81,7 +82,8 @@ namespace akari {
             return reinterpret_cast<T *>(p);
         }
 
-        template <typename T, typename... Args> T *alloc(Args &&... args) {
+        template <typename T, typename... Args>
+        T *alloc(Args &&... args) {
             return allocN<T>(1, std::forward<Args>(args)...);
         }
 

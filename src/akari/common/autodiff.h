@@ -23,15 +23,16 @@
 #pragma once
 
 namespace akari {
-    template<typename ADFloat>
-    struct Tape{
-        static Tape& with_local();
+    template <typename ADFloat>
+    struct Tape {
+        static Tape &with_local();
     };
-    #define AKR_AD_INSTATIATE(T) template struct Tape<ADFloat<T>>;
-    template<typename T>
+#define AKR_AD_INSTATIATE(T) template struct Tape<ADFloat<T>>;
+    template <typename T>
     struct ADFloat {
-        ADFloat()=default;
-    private:
+        ADFloat() = default;
+
+      private:
         T value;
     };
-}
+} // namespace akari
