@@ -200,6 +200,11 @@ namespace akari {
             return bsdf;
         }
     };
+    AKR_VARIANT class EmissiveMaterial {
+      public:
+        AKR_IMPORT_TYPES()
+        Texture<C> emission;
+    };
     AKR_VARIANT class MixMaterial;
     AKR_VARIANT class MixMaterial {
       public:
@@ -210,6 +215,9 @@ namespace akari {
     AKR_VARIANT class Material : Variant<DiffuseMaterial<C>, MixMaterial<C>> {
         AKR_IMPORT_TYPES()
         const Material<C> *select_material(Float &u, const Point2f &texcoords, Float *choice_pdf) const {
+            if (this->template isa<EmissiveMaterial<C>>()) {
+                return nullptr;
+            }
             *choice_pdf = 1.0f;
             auto ptr = this;
             while (ptr->template isa<MixMaterial<C>>()) {
@@ -229,7 +237,7 @@ namespace akari {
         BSDF<C> get_bsdf0(MaterialEvalContext<C> &ctx) const {
             return this->accept([&](auto &&arg) {
                 using T = std::decay_t<decltype(arg)>;
-                if constexpr (std::is_same_v<T, MixMaterial<C>>) {
+                if constexpr (std::is_same_v<T, MixMaterial<C>> || std::is_same_v<T, EmissiveMaterial<C>>) {
                     return BSDF<C>();
                 } else
                     return arg.get_bsdf(ctx);
