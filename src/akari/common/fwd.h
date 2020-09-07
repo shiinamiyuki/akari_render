@@ -22,6 +22,7 @@
 #pragma once
 #include <cstdint>
 #include <cstddef>
+#include <akari/common/def.h>
 #include <akari/common/config.h>
 #include <akari/common/diagnostic.h>
 

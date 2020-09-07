@@ -71,6 +71,7 @@ add_custom_command(OUTPUT ${AKR_CONFIG_H}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     DEPENDS akari.conf resources/configure.py)
 
+file(GLOB PYBIND11_HEADERS external/pybind11/include/pybind11.h external/pybind11/include/stl.h)
 file(GLOB AKR_COMMON_SRC src/akari/common/*.*)
 file(GLOB AKR_SHADING_SRC src/akari/shading/*.*)
 file(GLOB AKR_CORE_SRC ${AKR_COMMON_SRC} src/akari/core/*.* src/akari/core/*/*.*)
@@ -82,6 +83,8 @@ target_compile_options(akari_core PUBLIC ${AKR_CXX_FLAGS})
 target_include_directories(akari_core PUBLIC src/)
 target_include_directories(akari_core PUBLIC external/pybind11/include)
 target_include_directories(akari_core PUBLIC ${Python_INCLUDE_DIRS} ${EMBREE_INCLUDE_DIRS})
+target_precompile_headers(akari_core PUBLIC ${PYBIND11_HEADERS})
+set_target_properties(akari_core PROPERTIES UNITY_BUILD ON)
 
 # file(GLOB AKR_KERNEL_SRC src/akari/kernel/*.* src/akari/kernel/*/*.*)
 # add_library(akari_kernel ${AKR_KERNEL_SRC})

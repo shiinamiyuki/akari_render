@@ -28,13 +28,13 @@ namespace akari {
         BufferView() = default;
         BufferView(T *data, size_t size) : _data(data), _size(size) {}
         template <typename Allocator>
-        BufferView(std::vector<T, Allocator> &vec) : BufferView(vec.data(), vec.size()) {}
-        T &operator[](uint32_t i) const { return _data[i]; }
-        size_t size() const { return _size; }
-        T *begin() const { return _data; }
-        T *end() const { return _data + _size; }
-        const T *cbegin() const { return _data; }
-        const T *cend() const { return _data + _size; }
+        AKR_CPU BufferView(std::vector<T, Allocator> &vec) : BufferView(vec.data(), vec.size()) {}
+        AKR_XPU T &operator[](uint32_t i) const { return _data[i]; }
+        AKR_XPU size_t size() const { return _size; }
+        AKR_XPU T *begin() const { return _data; }
+        AKR_XPU T *end() const { return _data + _size; }
+        AKR_XPU const T *cbegin() const { return _data; }
+        AKR_XPU const T *cend() const { return _data + _size; }
 
       private:
         T *_data = nullptr;
