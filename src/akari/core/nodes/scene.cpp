@@ -37,11 +37,28 @@ namespace akari {
     }
     AKR_VARIANT Scene<C> SceneNode<C>::compile(MemoryArena *arena) {
         Scene<C> scene;
+
+        scene.camera = camera->compile(arena);
         for (auto &shape : shapes) {
             meshviews.emplace_back(shape->compile(arena));
         }
         scene.meshes = meshviews;
-        scene.camera = camera->compile(arena);
+        area_lights.clear();
+        for (uint32_t mesh_id = 0; mesh_id < scene.meshes.size(); mesh_id++) {
+            MeshView<C> &mesh = scene.meshes[mesh_id];
+            for (uint32_t prim_id = 0; prim_id < mesh.indices.size() / 3; prim_id++) {
+                auto triangle = scene.get_triangle(mesh_id, prim_id);
+                auto material = triangle.material;
+                if (!material)
+                    continue;
+                if (material->template isa<EmissiveMaterial<C>>()) {
+                    const EmissiveMaterial<C> *e = material->template get<EmissiveMaterial<C>>();
+                    area_lights.emplace_back(triangle);
+                }
+            }
+        }
+        scene.area_lights = area_lights;
+
         return scene;
     }
     AKR_VARIANT void SceneNode<C>::render() {

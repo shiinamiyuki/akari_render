@@ -25,6 +25,7 @@
 #include <akari/common/def.h>
 #include <akari/common/config.h>
 #include <akari/common/diagnostic.h>
+#include <akari/common/astd.h>
 
 namespace akari {
     // AkariRender needs a bit of retargeting capability

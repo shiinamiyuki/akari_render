@@ -35,6 +35,13 @@ namespace akari {
         }
         return hit;
     }
+    AKR_VARIANT bool Scene<C>::occlude(const Ray<C> &ray) const {
+        if constexpr (akari_enable_embree) {
+            return embree_scene->occlude(ray);
+        } else {
+            std::abort();
+        }
+        }
     AKR_VARIANT void Scene<C>::commit() {
         if constexpr (akari_enable_embree) {
             embree_scene->build(*this);

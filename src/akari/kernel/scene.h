@@ -26,6 +26,7 @@
 #include <akari/kernel/camera.h>
 #include <akari/kernel/sampler.h>
 #include <akari/kernel/shape.h>
+#include <akari/kernel/light.h>
 #ifdef AKR_ENABLE_EMBREE
 #    include <akari/kernel/embree.inl>
 #endif
@@ -49,10 +50,14 @@ namespace akari {
         BufferView<MeshView<C>> meshes;
         Camera<C> camera;
         Sampler<C> sampler;
+        BufferView<AreaLight<C>> area_lights;
         EmbreeAccelerator<C> *embree_scene = nullptr;
-        bool intersect(const Ray3f &ray, Intersection<C> *isct) const;
+
+        AKR_CPU bool intersect(const Ray3f &ray, Intersection<C> *isct) const;
+        AKR_CPU bool occlude(const Ray3f &ray) const;
+        
         void commit();
-        Triangle<C> get_triangle(int mesh_id, int prim_id) const {
+        AKR_XPU Triangle<C> get_triangle(int mesh_id, int prim_id) const {
             Triangle<C> trig;
             auto &mesh = meshes[mesh_id];
             for (int i = 0; i < 3; i++) {
@@ -64,7 +69,21 @@ namespace akari {
                     Normal3f(mesh.normals[3 * idx + 0], mesh.normals[3 * idx + 1], mesh.normals[3 * idx + 2]);
                 trig.texcoords[i] = Point2f(mesh.texcoords[2 * idx + 0], mesh.texcoords[2 * idx + 1]);
             }
+            auto mat_idx = mesh.material_indices[prim_id];
+            if (mat_idx != -1) {
+                trig.material = mesh.materials[mat_idx];
+            }
             return trig;
+        }
+        AKR_XPU astd::pair<const AreaLight<C> *, Float> select_light(const Point2f &u) const {
+            if (area_lights.size() == 0) {
+                return {nullptr, Float(0.0f)};
+            }
+            size_t idx = area_lights.size() * u[0];
+            if (idx == area_lights.size()) {
+                idx -= 1;
+            }
+            return {&area_lights[idx], Float(1.0 / area_lights.size())};
         }
     };
 } // namespace akari

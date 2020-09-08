@@ -21,8 +21,10 @@
 // SOFTWARE.
 
 #include <type_traits>
+#include <new>
 #include <akari/common/panic.h>
 #include <akari/common/def.h>
+#include <math.h>
 namespace akari {
     // port some nessary stl class to CUDA
     namespace astd {
@@ -160,6 +162,20 @@ namespace akari {
                 return p.second;
             }
         }
-
+        template <typename T, int N>
+        class array {
+            T _data[N] = {};
+          public:
+            AKR_XPU array() = default;
+            AKR_XPU T *data() { return _data; }
+            AKR_XPU const T *data() const { return _data; }
+            AKR_XPU T &operator[](int i) { return _data[i]; }
+            AKR_XPU const T &operator[](int i) const { return _data[i]; }
+            AKR_XPU size_t size() const { return N; }
+            AKR_XPU T *begin() const { return _data; }
+            AKR_XPU T *end() const { return _data + size(); }
+            AKR_XPU const T *cbegin() const { return _data; }
+            AKR_XPU const T *cend() const { return _data + size(); }
+        };
     } // namespace astd
 } // namespace akari

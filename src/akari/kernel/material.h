@@ -27,6 +27,7 @@
 #include <akari/kernel/texture.h>
 #include <akari/kernel/sampler.h>
 #include <akari/kernel/interaction.h>
+
 namespace akari {
     enum BSDFType : int {
         BSDF_NONE = 0u,
@@ -87,19 +88,16 @@ namespace akari {
 
     AKR_VARIANT struct BSDFSample {
         AKR_IMPORT_TYPES()
-        const Point2f u1;
-        const Vector3f wo;
         Vector3f wi = Vector3f(0);
         Float pdf = 0.0;
         Spectrum f = Spectrum(0.0f);
         BSDFType sampled = BSDF_NONE;
-        BSDFSample(const Point2f &u1, const Vector3f &wo) : u1(u1), wo(wo) {}
     };
     AKR_VARIANT struct BSDFSampleContext {
         AKR_IMPORT_TYPES()
-        Vector3f wi;
-        Normal3f ng, ns;
-        Point3f p;
+        const Point2f u1;
+        const Vector3f wo;
+        BSDFSampleContext(const Point2f &u1, const Vector3f &wo) : u1(u1), wo(wo) {}
     };
     AKR_VARIANT class DiffuseBSDF {
         AKR_IMPORT_TYPES();
@@ -108,16 +106,25 @@ namespace akari {
       public:
         DiffuseBSDF(const Spectrum &R) : R(R) {}
         [[nodiscard]] Float evaluate_pdf(const Vector3f &wo, const Vector3f &wi) const {
-            return sampling<C>::cosine_hemisphere_pdf(bsdf<C>::cos_theta(wi));
+            if (bsdf<C>::same_hemisphere(wo, wi)) {
+                return sampling<C>::cosine_hemisphere_pdf(std::abs(bsdf<C>::cos_theta(wi)));
+            }
+            return 0.0f;
         }
         [[nodiscard]] Spectrum evaluate(const Vector3f &wo, const Vector3f &wi) const {
-            return R * Constants<Float>::InvPi;
+            if (bsdf<C>::same_hemisphere(wo, wi)) {
+                return R * Constants<Float>::InvPi;
+            }
+            return Spectrum(0.0f);
         }
         [[nodiscard]] BSDFType type() const { return BSDFType(BSDF_DIFFUSE | BSDF_REFLECTION); }
         Spectrum sample(const Point2f &u, const Vector3f &wo, Vector3f *wi, Float *pdf, BSDFType *sampledType) {
             *wi = sampling<C>::cosine_hemisphere_sampling(u);
+            if (!bsdf<C>::same_hemisphere(wo, *wi)) {
+                wi->y() = -wi->y();
+            }
             *sampledType = type();
-            *pdf = bsdf<C>::abs_cos_theta(*wi);
+            *pdf = sampling<C>::cosine_hemisphere_pdf(std::abs(bsdf<C>::cos_theta(*wi)));
             return R * Constants<Float>::InvPi;
         }
     };
@@ -166,12 +173,14 @@ namespace akari {
         [[nodiscard]] BSDFType type() const { return closure_->type(); }
         [[nodiscard]] bool is_delta() const { return closure_->is_delta(); }
         [[nodiscard]] bool match_flags(BSDFType flag) const { return closure_->match_flags(flag); }
-        void sample(BSDFSample<C> *sample) const {
-            auto wo = frame.world_to_local(sample->wo);
+        BSDFSample<C> sample(const BSDFSampleContext<C> &ctx) const {
+            auto wo = frame.world_to_local(ctx.wo);
             Vector3f wi;
-            sample->f = closure()->sample(sample->u1, wo, &wi, &sample->pdf, &sample->sampled);
-            sample->wi = frame.local_to_world(wi);
-            sample->pdf *= choice_pdf;
+            BSDFSample<C> sample;
+            sample.f = closure()->sample(ctx.u1, wo, &wi, &sample.pdf, &sample.sampled);
+            sample.wi = frame.local_to_world(wi);
+            sample.pdf *= choice_pdf;
+            return sample;
         }
     };
     AKR_VARIANT struct MaterialEvalContext {

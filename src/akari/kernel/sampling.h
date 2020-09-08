@@ -55,9 +55,15 @@ namespace akari {
         static inline Float uniform_sphere_pdf() { return 1.0f / (4 * Constants<Float>::Pi); }
         static inline Vector3f uniform_sphere_sampling(const Point2f &u) {
             Float z = 1 - 2 * u[0];
-            Float r = sqrt(max((Float)0, (Float)1 - z * z));
+            Float r = std::sqrt(max((Float)0, (Float)1 - z * z));
             Float phi = 2 * Constants<Float>::Pi * u[1];
             return Vector3f(r * cos(phi), r * sin(phi), z);
+        }
+        static inline Point2f uniform_sample_triangle(const Point2f &u) {
+            Float su0 = std::sqrt(u[0]);
+            Float b0 = 1 - su0;
+            Float b1 = u[1] * su0;
+            return Point2f(b0, b1);
         }
     };
 } // namespace akari

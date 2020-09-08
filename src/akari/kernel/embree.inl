@@ -41,6 +41,7 @@ namespace akari {
         EmbreeAccelerator() { device = rtcNewDevice(nullptr); }
         void build(Scene<C> &scene);
         bool intersect(const Ray<C> &ray, Intersection<C> *isct) const;
+        bool occlude(const Ray<C> &ray) const;
         ~EmbreeAccelerator() {
             if (rtcScene)
                 rtcReleaseScene(rtcScene);

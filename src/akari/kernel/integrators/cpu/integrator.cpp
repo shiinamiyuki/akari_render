@@ -104,16 +104,17 @@ namespace akari {
                         auto &mesh = scene.meshes[intersection.geom_id];
                         SurfaceInteraction<C> si(intersection, trig);
                         MaterialEvalContext<C> ctx(sampler, si, arena);
-                        int mat_idx = mesh.material_indices[intersection.prim_id];
-                        if (mat_idx == -1) {
+                        auto wo = -ray.d;
+                        auto *material = trig.material;
+                        if (!material)
                             break;
-                        }
-                        auto *material = mesh.materials[mat_idx];
                         if (material->template isa<EmissiveMaterial<C>>()) {
-                            auto *emission = material->template get<EmissiveMaterial<C>>();
-                            bool face_front = dot(ray.d, si.ng) < 0.0f;
-                            if (emission->double_sided || face_front) {
-                                L += beta * emission->color->evaluate(ctx.texcoords);
+                            if (depth == 0) {
+                                auto *emission = material->template get<EmissiveMaterial<C>>();
+                                bool face_front = dot(ray.d, si.ng) < 0.0f;
+                                if (emission->double_sided || face_front) {
+                                    L += beta * emission->color->evaluate(ctx.texcoords);
+                                }
                             }
                             break;
                         }
@@ -123,10 +124,27 @@ namespace akari {
                         depth++;
 
                         si.bsdf = material->get_bsdf(ctx);
-                        BSDFSample<C> sample(sampler.next2d(), -ray.d);
-                        si.bsdf.sample(&sample);
+                        {
+                            auto [light, light_pdf] = scene.select_light(sampler.next2d());
+                            if (light) {
+                                LightSampleContext<C> light_ctx;
+                                light_ctx.u = sampler.next2d();
+                                light_ctx.p = si.p;
+                                LightSample<C> light_sample = light->sample(light_ctx);
+                                light_pdf *= light_sample.pdf;
+                                auto f = light_sample.L * si.bsdf.evaluate(wo, light_sample.wi) *
+                                         std::abs(dot(si.ns, light_sample.wi));
+                                if (!f.is_black()) {
+                                    if (!scene.occlude(light_sample.test.ray)) {
+                                        L += beta * f / light_pdf;
+                                    }
+                                }
+                            }
+                        }
+                        BSDFSampleContext<C> sample_ctx(sampler.next2d(), -ray.d);
+                        auto sample = si.bsdf.sample(sample_ctx);
                         beta *= sample.f * std::abs(dot(si.ng, sample.wi)) / sample.pdf;
-                        ray = Ray3f(intersection.p, sample.wi);
+                        ray = Ray3f(intersection.p, sample.wi, Constants<Float>::Eps / std::abs(dot(si.ng, sample.wi)));
 
                     } else {
                         L += beta * Spectrum(0);

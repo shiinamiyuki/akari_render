@@ -28,9 +28,17 @@ namespace akari {
         Array<Point3f, 3> vertices;
         Array<Normal3f, 3> normals;
         Array<Point2f, 3> texcoords;
-        Material<C> material;
-        Normal3f ng() const { return Normal3f(cross(vertices[1] - vertices[0], vertices[2] - vertices[1])); }
-        Normal3f ns(const Point2f &uv) const { return lerp3(normals[0], normals[1], normals[2], uv); }
-        Point2f texcoord(const Point2f &uv) const { return lerp3(texcoords[0], texcoords[1], texcoords[2], uv); }
+        const Material<C> *material = nullptr;
+        AKR_XPU Point3f p(const Point2f &uv) const { return lerp3(vertices[0], vertices[1], vertices[2], uv); }
+        AKR_XPU Float area() const {
+            return length(cross(Vector3f(vertices[1] - vertices[0]), Vector3f(vertices[2] - vertices[0]))) * 0.5f;
+        }
+        AKR_XPU Normal3f ng() const {
+            return Normal3f(normalize(cross(Vector3f(vertices[1] - vertices[0]), Vector3f(vertices[2] - vertices[0]))));
+        }
+        AKR_XPU Normal3f ns(const Point2f &uv) const { return lerp3(normals[0], normals[1], normals[2], uv); }
+        AKR_XPU Point2f texcoord(const Point2f &uv) const {
+            return lerp3(texcoords[0], texcoords[1], texcoords[2], uv);
+        }
     };
 } // namespace akari

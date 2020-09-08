@@ -375,6 +375,10 @@ namespace akari {
         Ray(const Point3f &o, const Vector3f &d, Float tmin = Constants<Float>::Eps,
             Float tmax = std::numeric_limits<Float>::infinity())
             : o(o), d(d), tmin(tmin), tmax(tmax) {}
+        static Ray spawn_to(const Point3f &p0, const Point3f &p1) {
+            Vector3f dir = p1 - p0;
+            return Ray(p0, dir, Constants<Float>::Eps, Float(1.0f) - Constants<Float>::ShadowEps());
+        }
         Point3f operator()(Float t) const { return o + t * d; }
     };
 

@@ -45,6 +45,9 @@ namespace akari {
             }
             return c;
         }
+        bool is_black() const {
+            return !reduce(*this, [](bool acc, Float f) { return acc || (f > 0.0f); });
+        }
     };
 
     template <typename Float>
