@@ -83,57 +83,15 @@ namespace akari {
             }
         }
     };
-    AKR_VARIANT void RegisterMathFunction<C>::register_math_functions(py::module &m) {
-        AKR_IMPORT_TYPES()
-        m.def("degrees", [](const Float &a) { return degrees(a); });
-        m.def("radians", [](const Float &a) { return radians(a); });
-        {
-            auto c = py::class_<Vector2f>(m, "Vector2f");
-            RegisterArrayOp<Float, Vector2f>()(m, c);
-        }
-        {
-            auto c = py::class_<Vector3f>(m, "Vector3f");
-            RegisterArrayOp<Float, Vector3f>()(m, c);
-        }
+    void register_invariant_math_functions(py::module &m) {
+        AKR_IMPORT_CORE_TYPES_WITH(float)
         {
             auto c = py::class_<Point2i>(m, "Point2i");
             RegisterArrayOp<Float, Point2i>()(m, c);
         }
         {
-            auto c = py::class_<Point2f>(m, "Point2f");
-            RegisterArrayOp<Float, Point2f>()(m, c);
-        }
-        {
-            auto c = py::class_<Point3f>(m, "Point3f");
-            RegisterArrayOp<Float, Point3f>()(m, c);
-        }
-        {
             auto c = py::class_<Point3i>(m, "Point3i");
             RegisterArrayOp<Float, Point3i>()(m, c);
-        }
-        {
-            auto c = py::class_<Array2b>(m, "Array2b");
-            RegisterArrayOp<Float, Array2b>()(m, c);
-        }
-        {
-            auto c = py::class_<Array3b>(m, "Array3b");
-            RegisterArrayOp<Float, Array3b>()(m, c);
-        }
-        {
-            auto c = py::class_<Array4b>(m, "Array4b");
-            RegisterArrayOp<Float, Array4b>()(m, c);
-        }
-        {
-            auto c = py::class_<Array2f>(m, "Array2f");
-            RegisterArrayOp<Float, Array2f>()(m, c);
-        }
-        {
-            auto c = py::class_<Array3f>(m, "Array3f");
-            RegisterArrayOp<Float, Array3f>()(m, c);
-        }
-        {
-            auto c = py::class_<Array4f>(m, "Array4f");
-            RegisterArrayOp<Float, Array4f>()(m, c);
         }
         {
             auto c = py::class_<Array2i>(m, "Array2i");
@@ -148,8 +106,54 @@ namespace akari {
             RegisterArrayOp<Float, Array4i>()(m, c);
         }
         {
+            auto c = py::class_<Array2b>(m, "Array2b");
+            RegisterArrayOp<Float, Array2b>()(m, c);
+        }
+        {
+            auto c = py::class_<Array3b>(m, "Array3b");
+            RegisterArrayOp<Float, Array3b>()(m, c);
+        }
+        {
+            auto c = py::class_<Array4b>(m, "Array4b");
+            RegisterArrayOp<Float, Array4b>()(m, c);
+        }
+    }
+    AKR_VARIANT void RegisterMathFunction<C>::register_math_functions(py::module &m) {
+        AKR_IMPORT_TYPES()
+        m.def("degrees", [](const Float &a) { return degrees(a); });
+        m.def("radians", [](const Float &a) { return radians(a); });
+        {
+            auto c = py::class_<Vector2f>(m, "Vector2f");
+            RegisterArrayOp<Float, Vector2f>()(m, c);
+        }
+        {
+            auto c = py::class_<Vector3f>(m, "Vector3f");
+            RegisterArrayOp<Float, Vector3f>()(m, c);
+        }
+
+        {
+            auto c = py::class_<Point2f>(m, "Point2f");
+            RegisterArrayOp<Float, Point2f>()(m, c);
+        }
+        {
+            auto c = py::class_<Point3f>(m, "Point3f");
+            RegisterArrayOp<Float, Point3f>()(m, c);
+        }
+        {
             auto c = py::class_<Color3f>(m, "Color3f");
             RegisterArrayOp<Float, Color3f>()(m, c);
+        }
+        {
+            auto c = py::class_<Array2f>(m, "Array2f");
+            RegisterArrayOp<Float, Array2f>()(m, c);
+        }
+        {
+            auto c = py::class_<Array3f>(m, "Array3f");
+            RegisterArrayOp<Float, Array3f>()(m, c);
+        }
+        {
+            auto c = py::class_<Array4f>(m, "Array4f");
+            RegisterArrayOp<Float, Array4f>()(m, c);
         }
     }
     AKR_RENDER_STRUCT(RegisterMathFunction)
@@ -172,6 +176,7 @@ namespace akari {
     AKR_VARIANT void register_scene_graph(py::module &m) { RegisterSceneGraph<C>::register_scene_graph(m); }
     PYBIND11_EMBEDDED_MODULE(akari, m) {
         register_utility(m);
+        register_invariant_math_functions(m);
         m.def("enabled_variants", _get_enabled_variants);
         for (auto &variant : enabled_variants) {
             AKR_INVOKE_VARIANT(std::string_view(variant), register_scene_graph, m);

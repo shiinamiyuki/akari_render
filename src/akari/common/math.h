@@ -449,31 +449,31 @@ namespace akari {
         }
 
         static Transform translate(const Vector3f &v) {
-            float m[] = {1, 0, 0, v.x(), 0, 1, 0, v.y(), 0, 0, 1, v.z(), 0, 0, 0, 1};
+            Float m[] = {1, 0, 0, v.x(), 0, 1, 0, v.y(), 0, 0, 1, v.z(), 0, 0, 0, 1};
             return Transform(Matrix4f(m));
         }
         static Transform scale(const Vector3f &s) {
-            float m[] = {s.x(), 0, 0, 0, 0, s.y(), 0, 0, 0, 0, s.z(), 0, 0, 0, 0, 1};
+            Float m[] = {s.x(), 0, 0, 0, 0, s.y(), 0, 0, 0, 0, s.z(), 0, 0, 0, 0, 1};
             return Transform(Matrix4f(m));
         }
         static Transform rotate_x(Float theta) {
             Float sinTheta = std::sin(theta);
             Float cosTheta = std::cos(theta);
-            float m[] = {1, 0, 0, 0, 0, cosTheta, -sinTheta, 0, 0, sinTheta, cosTheta, 0, 0, 0, 0, 1};
+            Float m[] = {1, 0, 0, 0, 0, cosTheta, -sinTheta, 0, 0, sinTheta, cosTheta, 0, 0, 0, 0, 1};
             return Transform(m, Matrix4f(m).transpose());
         }
 
         static Transform rotate_y(Float theta) {
             Float sinTheta = std::sin(theta);
             Float cosTheta = std::cos(theta);
-            float m[] = {cosTheta, 0, sinTheta, 0, 0, 1, 0, 0, -sinTheta, 0, cosTheta, 0, 0, 0, 0, 1};
+            Float m[] = {cosTheta, 0, sinTheta, 0, 0, 1, 0, 0, -sinTheta, 0, cosTheta, 0, 0, 0, 0, 1};
             return Transform(m, Matrix4f(m).transpose());
         }
 
         static Transform rotate_z(Float theta) {
             Float sinTheta = std::sin(theta);
             Float cosTheta = std::cos(theta);
-            float m[] = {cosTheta, -sinTheta, 0, 0, sinTheta, cosTheta, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+            Float m[] = {cosTheta, -sinTheta, 0, 0, sinTheta, cosTheta, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
             return Transform(m, Matrix4f(m).transpose());
         }
     };
