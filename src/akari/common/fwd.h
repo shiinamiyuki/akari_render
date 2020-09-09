@@ -340,9 +340,9 @@ namespace akari {
     using Ray3f = Ray<C>;                                                                                              \
     AKR_IMPORT_CORE_TYPES()
 #ifdef AKR_ENABLE_EMBREE
-    static constexpr bool akari_enable_embree = true;
+#    define akari_enable_embree true
 #else
-    static constexpr bool akari_enable_embree = false;
+#    define akari_enable_embree false
 #endif
 
     template <typename T>

@@ -60,11 +60,11 @@ namespace akari {
             sample.ng = triangle.ng();
             sample.wi = p - ctx.p;
             auto dist_sqr = dot(sample.wi, sample.wi);
-            sample.wi /= std::sqrt(dist_sqr);
+            sample.wi /= sqrt(dist_sqr);
             sample.L = color->evaluate(triangle.texcoord(coords));
             sample.pdf = dist_sqr / (std::abs(dot(sample.wi, sample.ng))) / triangle.area();
             sample.test.ray = Ray3f(p, -sample.wi, Constants<Float>::Eps() / std::abs(dot(sample.wi, sample.ng)),
-                                    std::sqrt(dist_sqr) * (Float(1.0f) - Constants<Float>::ShadowEps()));
+                                    sqrt(dist_sqr) * (Float(1.0f) - Constants<Float>::ShadowEps()));
             return sample;
         }
     };

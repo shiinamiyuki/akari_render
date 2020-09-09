@@ -33,11 +33,11 @@ namespace akari {
 
         static inline Float sin2_theta(const Vector3f &w) { return 1 - cos2_theta(w); }
 
-        static inline Float sin_theta(const Vector3f &w) { return std::sqrt(std::fmax(0.0f, sin2_theta(w))); }
+        static inline Float sin_theta(const Vector3f &w) { return sqrt(std::fmax(0.0f, sin2_theta(w))); }
 
         static inline Float tan2_theta(const Vector3f &w) { return sin2_theta(w) / cos2_theta(w); }
 
-        static inline Float tan_theta(const Vector3f &w) { return std::sqrt(std::fmax(0.0f, tan2_theta(w))); }
+        static inline Float tan_theta(const Vector3f &w) { return sqrt(std::fmax(0.0f, tan2_theta(w))); }
 
         static inline Float cos_phi(const Vector3f &w) {
             Float sinTheta = sin_theta(w);
@@ -64,10 +64,50 @@ namespace akari {
             if (sin2ThetaT >= 1)
                 return false;
 
-            Float cosThetaT = std::sqrt(1 - sin2ThetaT);
+            Float cosThetaT = sqrt(1 - sin2ThetaT);
 
             *wt = eta * -wi + (eta * cosThetaI - cosThetaT) * n;
             return true;
+        }
+        static inline Float fr_dielectric(Float cosThetaI, Float etaI, Float etaT) {
+            bool entering = cosThetaI > 0.f;
+            if (!entering) {
+                std::swap(etaI, etaT);
+                cosThetaI = std::abs(cosThetaI);
+            }
+            Float sinThetaI = sqrt(max(0.0f, 1 - cosThetaI * cosThetaI));
+            Float sinThetaT = etaI / etaT * sinThetaI;
+            if (sinThetaT >= 1)
+                return 1;
+            Float cosThetaT = sqrt(max(0.0f, 1 - sinThetaT * sinThetaT));
+
+            Float Rpar = ((etaT * cosThetaI) - (etaI * cosThetaT)) / ((etaT * cosThetaI) + (etaI * cosThetaT));
+            Float Rper = ((etaI * cosThetaI) - (etaT * cosThetaT)) / ((etaI * cosThetaI) + (etaT * cosThetaT));
+            return 0.5 * (Rpar * Rpar + Rper * Rper);
+        }
+
+        // https://seblagarde.wordpress.com/2013/04/29/memo-on-fresnel-equations/
+        static inline Spectrum fr_conductor(Float cosThetaI, const Spectrum &etaI, const Spectrum &etaT,
+                                            const Spectrum &k) {
+            Float CosTheta2 = cosThetaI * cosThetaI;
+            Float SinTheta2 = 1 - CosTheta2;
+            Spectrum Eta = etaT / etaI;
+            Spectrum Etak = k / etaI;
+            Spectrum Eta2 = Eta * Eta;
+            Spectrum Etak2 = Etak * Etak;
+
+            Spectrum t0 = Eta2 - Etak2 - SinTheta2;
+            Spectrum a2plusb2 = sqrt(t0 * t0 + 4.0f * Eta2 * Etak2);
+            Spectrum t1 = a2plusb2 + CosTheta2;
+            Spectrum a = sqrt(0.5f * (a2plusb2 + t0));
+            Spectrum t2 = 2.0f * a * cosThetaI;
+            Spectrum Rs = (t1 - t2) / (t1 + t2);
+
+            Spectrum t3 = CosTheta2 * a2plusb2 + SinTheta2 * SinTheta2;
+            Spectrum t4 = t2 * SinTheta2;
+            Spectrum Rp = Rs * (t3 - t4) / (t3 + t4);
+
+            return 0.5 * (Rp + Rs);
         }
     };
 } // namespace akari

@@ -203,9 +203,9 @@ namespace akari {
         Frame() = default;
         static inline void compute_local_frame(const Normal3f &v1, Vector3f *v2, Vector3f *v3) {
             if (std::abs(v1.x()) > std::abs(v1.y()))
-                *v2 = Vector3f(-v1.z(), (0), v1.x()) / std::sqrt(v1.x() * v1.x() + v1.z() * v1.z());
+                *v2 = Vector3f(-v1.z(), (0), v1.x()) / sqrt(v1.x() * v1.x() + v1.z() * v1.z());
             else
-                *v2 = Vector3f((0), v1.z(), -v1.y()) / std::sqrt(v1.y() * v1.y() + v1.z() * v1.z());
+                *v2 = Vector3f((0), v1.z(), -v1.y()) / sqrt(v1.y() * v1.y() + v1.z() * v1.z());
             *v3 = normalize(cross(Vector3f(v1), *v2));
         }
         explicit Frame(const Normal3f &v) : normal(v) { compute_local_frame(v, &T, &B); }
@@ -270,22 +270,22 @@ namespace akari {
             return Transform(Matrix4f(m));
         }
         static Transform rotate_x(Float theta) {
-            Float sinTheta = std::sin(theta);
-            Float cosTheta = std::cos(theta);
+            Float sinTheta = sin(theta);
+            Float cosTheta = cos(theta);
             Float m[] = {1, 0, 0, 0, 0, cosTheta, -sinTheta, 0, 0, sinTheta, cosTheta, 0, 0, 0, 0, 1};
             return Transform(m, Matrix4f(m).transpose());
         }
 
         static Transform rotate_y(Float theta) {
-            Float sinTheta = std::sin(theta);
-            Float cosTheta = std::cos(theta);
+            Float sinTheta = sin(theta);
+            Float cosTheta = cos(theta);
             Float m[] = {cosTheta, 0, sinTheta, 0, 0, 1, 0, 0, -sinTheta, 0, cosTheta, 0, 0, 0, 0, 1};
             return Transform(m, Matrix4f(m).transpose());
         }
 
         static Transform rotate_z(Float theta) {
-            Float sinTheta = std::sin(theta);
-            Float cosTheta = std::cos(theta);
+            Float sinTheta = sin(theta);
+            Float cosTheta = cos(theta);
             Float m[] = {cosTheta, -sinTheta, 0, 0, sinTheta, cosTheta, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
             return Transform(m, Matrix4f(m).transpose());
         }

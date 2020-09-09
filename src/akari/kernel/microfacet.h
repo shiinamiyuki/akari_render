@@ -57,7 +57,7 @@ namespace akari {
             if (dot(v, m) * v.y() <= 0) {
                 return 0.0f;
             }
-            auto a = std::sqrt(0.5f * alpha + 1.0f) / bsdf<C>::tan_theta(v);
+            auto a = sqrt(0.5f * alpha + 1.0f) / bsdf<C>::tan_theta(v);
             if (a < 1.6) {
                 return (3.535 * a + 2.181 * a * a) / (1.0f + 2.276 * a + 2.577 * a * a);
             } else {
@@ -68,7 +68,7 @@ namespace akari {
         static inline Float PhongD(Float alpha, const Normal3f &m) {
             if (m.y() <= 0.0f)
                 return 0.0f;
-            return (alpha + 2.0) / (2.0 * Constants<Float>::Pi()) * std::pow(m.y(), alpha);
+            return (alpha + 2.0) / (2.0 * Constants<Float>::Pi()) * pow(m.y(), alpha);
         }
 
         static inline Float GGX_D(Float alpha, const Normal3f &m) {
@@ -85,7 +85,7 @@ namespace akari {
             if (dot(v, m) * v.y() <= 0) {
                 return 0.0f;
             }
-            return 2.0 / (1.0 + std::sqrt(1.0 + alpha * alpha * bsdf<C>::tan2_theta(m)));
+            return 2.0 / (1.0 + sqrt(1.0 + alpha * alpha * bsdf<C>::tan2_theta(m)));
         }
         // see https://www.cs.cornell.edu/~srm/publications/EGSR07-btdf.pdf
         struct MicrofacetModel {
@@ -128,21 +128,21 @@ namespace akari {
                 switch (type) {
                 case EBeckmann: {
                     Float t2 = -alpha * alpha * std::log(1 - u[0]);
-                    cosTheta = 1.0f / std::sqrt(1 + t2);
+                    cosTheta = 1.0f / sqrt(1 + t2);
                     break;
                 }
                 case EPhong: {
-                    cosTheta = std::pow((Float64)u[0], 1.0 / ((Float64)alpha + 2.0f));
+                    cosTheta = pow((Float64)u[0], 1.0 / ((Float64)alpha + 2.0f));
                     break;
                 }
                 case EGGX: {
                     Float t2 = alpha * alpha * u[0] / (1 - u[0]);
-                    cosTheta = 1.0f / std::sqrt(1 + t2);
+                    cosTheta = 1.0f / sqrt(1 + t2);
                     break;
                 }
                 }
-                auto sinTheta = std::sqrt(std::max(0.0f, 1 - cosTheta * cosTheta));
-                auto wh = Normal3f(std::cos(phi) * sinTheta, cosTheta, std::sin(phi) * sinTheta);
+                auto sinTheta = sqrt(std::max(0.0f, 1 - cosTheta * cosTheta));
+                auto wh = Normal3f(cos(phi) * sinTheta, cosTheta, sin(phi) * sinTheta);
                 if (!bsdf<C>::same_hemisphere(wo, wh))
                     wh = -wh;
                 return wh;

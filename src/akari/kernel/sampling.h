@@ -42,25 +42,25 @@ namespace akari {
                 r = uOffset.y();
                 theta = Constants<Float>::Pi2() - Constants<Float>::Pi4() * (uOffset.x() / uOffset.y());
             }
-            return r * Point2f(std::cos(theta), std::sin(theta));
+            return r * Point2f(cos(theta), sin(theta));
         }
 
         static inline Vector3f cosine_hemisphere_sampling(const Point2f &u) {
             auto uv = concentric_disk_sampling(u);
             auto r = dot(uv, uv);
-            auto h = std::sqrt(std::max(Float(0.0f), Float(1.0f - r)));
+            auto h = sqrt(std::max(Float(0.0f), Float(1.0f - r)));
             return Vector3f(uv.x(), h, uv.y());
         }
         static inline Float cosine_hemisphere_pdf(Float cosTheta) { return cosTheta * Constants<Float>::InvPi(); }
         static inline Float uniform_sphere_pdf() { return 1.0f / (4 * Constants<Float>::Pi()); }
         static inline Vector3f uniform_sphere_sampling(const Point2f &u) {
             Float z = 1 - 2 * u[0];
-            Float r = std::sqrt(max((Float)0, (Float)1 - z * z));
+            Float r = sqrt(max((Float)0, (Float)1 - z * z));
             Float phi = 2 * Constants<Float>::Pi * u[1];
             return Vector3f(r * cos(phi), r * sin(phi), z);
         }
         static inline Point2f uniform_sample_triangle(const Point2f &u) {
-            Float su0 = std::sqrt(u[0]);
+            Float su0 = sqrt(u[0]);
             Float b0 = 1 - su0;
             Float b1 = u[1] * su0;
             return Point2f(b0, b1);

@@ -39,7 +39,7 @@ namespace akari {
                 if (std::isnan(x)) {
                     x = 0;
                 } else {
-                    x = std::max<Float>(0.0f, x);
+                    x = max(Float(0.0f), x);
                 }
                 c[i] = x;
             }

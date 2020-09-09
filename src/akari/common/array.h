@@ -22,7 +22,7 @@
 
 #pragma once
 #include <type_traits>
-#include <cmath>
+#include <math.h>
 #include <akari/common/fwd.h>
 #include <akari/common/panic.h>
 #include <algorithm>
@@ -296,6 +296,19 @@ namespace akari {
     Array<V, N, P> name(const Array<V, N, P> &v1, const V &v2) {                                                       \
         return _##name(v1, v2);                                                                                        \
     }
+    using std::abs;
+    using std::acos;
+    using std::asin;
+    using std::atan;
+    using std::atan2;
+    using std::ceil;
+    using std::cos;
+    using std::exp;
+    using std::floor;
+    using std::log;
+    using std::sin;
+    using std::sqrt;
+    using std::tan;
     FWD_MATH_FUNC1(floor)
     FWD_MATH_FUNC1(ceil)
     FWD_MATH_FUNC1(abs)

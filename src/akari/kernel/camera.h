@@ -48,7 +48,7 @@ namespace akari {
             m = Transform3f::scale(Vector3f(2, 2, 1)) * m;
             m = Transform3f::translate(Point3f(-1, -1, 0)) * m;
             m = Transform3f::scale(Vector3f(1, -1, 1)) * m;
-            auto s = std::atan(fov / 2);
+            auto s = atan(fov / 2);
             if (_resolution.x() > _resolution.y()) {
                 m = Transform3f::scale(Vector3f(s, s * Float(_resolution.y()) / _resolution.x(), 1)) * m;
             } else {
