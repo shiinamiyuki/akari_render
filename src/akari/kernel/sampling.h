@@ -37,10 +37,10 @@ namespace akari {
             Float theta, r;
             if (std::abs(uOffset.x()) > std::abs(uOffset.y())) {
                 r = uOffset.x();
-                theta = Constants<Float>::Pi4 * (uOffset.y() / uOffset.x());
+                theta = Constants<Float>::Pi4() * (uOffset.y() / uOffset.x());
             } else {
                 r = uOffset.y();
-                theta = Constants<Float>::Pi2 - Constants<Float>::Pi4 * (uOffset.x() / uOffset.y());
+                theta = Constants<Float>::Pi2() - Constants<Float>::Pi4() * (uOffset.x() / uOffset.y());
             }
             return r * Point2f(std::cos(theta), std::sin(theta));
         }
@@ -51,8 +51,8 @@ namespace akari {
             auto h = std::sqrt(std::max(Float(0.0f), Float(1.0f - r)));
             return Vector3f(uv.x(), h, uv.y());
         }
-        static inline Float cosine_hemisphere_pdf(Float cosTheta) { return cosTheta * Constants<Float>::InvPi; }
-        static inline Float uniform_sphere_pdf() { return 1.0f / (4 * Constants<Float>::Pi); }
+        static inline Float cosine_hemisphere_pdf(Float cosTheta) { return cosTheta * Constants<Float>::InvPi(); }
+        static inline Float uniform_sphere_pdf() { return 1.0f / (4 * Constants<Float>::Pi()); }
         static inline Vector3f uniform_sphere_sampling(const Point2f &u) {
             Float z = 1 - 2 * u[0];
             Float r = std::sqrt(max((Float)0, (Float)1 - z * z));

@@ -46,7 +46,7 @@ namespace akari {
     AKR_VARIANT class AreaLight {
       public:
         AKR_IMPORT_TYPES()
-        Texture<C> *color;
+        const Texture<C> *color;
         bool double_sided = false;
         Triangle<C> triangle;
         AKR_XPU AreaLight(Triangle<C> triangle) : triangle(triangle) {
@@ -63,8 +63,8 @@ namespace akari {
             sample.wi /= std::sqrt(dist_sqr);
             sample.L = color->evaluate(triangle.texcoord(coords));
             sample.pdf = dist_sqr / (std::abs(dot(sample.wi, sample.ng))) / triangle.area();
-            sample.test.ray = Ray3f(p, -sample.wi, Constants<Float>::Eps / std::abs(dot(sample.wi, sample.ng)),
-                                    std::sqrt(dist_sqr) * (Float(1.0f) - Constants<Float>::ShadowEps));
+            sample.test.ray = Ray3f(p, -sample.wi, Constants<Float>::Eps() / std::abs(dot(sample.wi, sample.ng)),
+                                    std::sqrt(dist_sqr) * (Float(1.0f) - Constants<Float>::ShadowEps()));
             return sample;
         }
     };

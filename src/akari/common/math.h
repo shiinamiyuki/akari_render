@@ -32,147 +32,14 @@
 namespace akari {
     template <typename Float>
     struct Constants {
-        static constexpr Float Inf = std::numeric_limits<Float>::infinity();
-        static constexpr Float Pi = 3.1415926535897932384f;
-        static constexpr Float Pi2 = Pi / Float(2.0f);
-        static constexpr Float Pi4 = Pi / Float(4.0f);
-        static constexpr Float InvPi = 1.0f / Pi;
-        static constexpr Float Eps = Float(0.001f);
-        static constexpr Float ShadowEps = Float(0.0001f);
+        static constexpr Float Inf() { return std::numeric_limits<Float>::infinity(); }
+        static constexpr Float Pi() { return Float(3.1415926535897932384f); }
+        static constexpr Float Pi2() { return Pi() / Float(2.0f); }
+        static constexpr Float Pi4() { return Pi() / Float(4.0f); }
+        static constexpr Float InvPi() { return Float(1.0f) / Pi(); }
+        static constexpr Float Eps() { return Float(0.001f); }
+        static constexpr Float ShadowEps() { return Float(0.0001f); }
     };
-
-#pragma GCC diagnostic push
-#if defined(__GNUG__) && !defined(__clang__)
-#    pragma GCC diagnostic ignored "-Wclass-memaccess"
-#endif
-    template <typename T, typename = std::enable_if_t<is_array_v<T>>>
-    T load(const void *p) {
-        T v;
-        std::memcpy(&v, p, sizeof(T));
-        return v;
-    }
-    template <typename T, int N, int P>
-    void store(void *p, const Array<T, N, P> &a) {
-        std::memcpy(p, &a, sizeof(Array<T, N, P>));
-    }
-#pragma GCC diagnostic pop
-    template <typename T, int N>
-    T length(const Array<T, N> &a) {
-        return sqrt(dot(a, a));
-    }
-    template <typename T, int N>
-    Array<T, N> normalize(const Array<T, N> &a) {
-        return a / sqrt(dot(a, a));
-    }
-    template <int... args, typename T, int N>
-    auto shuffle(const Array<T, N> &a) {
-        constexpr int pack[] = {args...};
-        static_assert(((args < N) && ...));
-        Array<T, sizeof...(args)> s;
-        for (size_t i = 0; i < sizeof...(args); i++) {
-            s[i] = a[pack[i]];
-        }
-        return s;
-    }
-#define FWD_MATH_FUNC1(name)                                                                                           \
-                                                                                                                       \
-    template <typename V, int N, int P>                                                                                \
-    Array<V, N, P> _##name(const Array<V, N, P> &v) {                                                                  \
-        Array<V, N, P> ans;                                                                                            \
-        using std::name;                                                                                               \
-        for (int i = 0; i < N; i++) {                                                                                  \
-            ans[i] = name(v[i]);                                                                                       \
-        }                                                                                                              \
-        return ans;                                                                                                    \
-    }                                                                                                                  \
-    template <typename V, int N, int P>                                                                                \
-    Array<V, N, P> name(const Array<V, N, P> &v) {                                                                     \
-        return _##name(v);                                                                                             \
-    }
-#define FWD_MATH_FUNC2(name)                                                                                           \
-                                                                                                                       \
-    template <typename V, int N, int P>                                                                                \
-    Array<V, N, P> _##name(const Array<V, N, P> &v1, const Array<V, N, P> &v2) {                                       \
-        Array<V, N, P> ans;                                                                                            \
-        using std::name;                                                                                               \
-        for (int i = 0; i < N; i++) {                                                                                  \
-            ans[i] = name(v1[i], v2[i]);                                                                               \
-        }                                                                                                              \
-        return ans;                                                                                                    \
-    }                                                                                                                  \
-    template <typename V, int N, int P>                                                                                \
-    Array<V, N, P> _##name(const V &v1, const Array<V, N, P> &v2) {                                                    \
-        Array<V, N, P> ans;                                                                                            \
-        using std::name;                                                                                               \
-        for (int i = 0; i < N; i++) {                                                                                  \
-            ans[i] = name(v1, v2[i]);                                                                                  \
-        }                                                                                                              \
-        return ans;                                                                                                    \
-    }                                                                                                                  \
-    template <typename V, int N, int P>                                                                                \
-    Array<V, N, P> _##name(const Array<V, N, P> &v1, const V &v2) {                                                    \
-        Array<V, N, P> ans;                                                                                            \
-        using std::name;                                                                                               \
-        for (int i = 0; i < N; i++) {                                                                                  \
-            ans[i] = name(v1[i], v2);                                                                                  \
-        }                                                                                                              \
-        return ans;                                                                                                    \
-    }                                                                                                                  \
-    template <typename V, int N, int P>                                                                                \
-    Array<V, N, P> name(const Array<V, N, P> &v1, const Array<V, N, P> &v2) {                                          \
-        return _##name(v1, v2);                                                                                        \
-    }                                                                                                                  \
-    template <typename V, int N, int P>                                                                                \
-    Array<V, N, P> name(const V &v1, const Array<V, N, P> &v2) {                                                       \
-        return _##name(v1, v2);                                                                                        \
-    }                                                                                                                  \
-    template <typename V, int N, int P>                                                                                \
-    Array<V, N, P> name(const Array<V, N, P> &v1, const V &v2) {                                                       \
-        return _##name(v1, v2);                                                                                        \
-    }
-    FWD_MATH_FUNC1(floor)
-    FWD_MATH_FUNC1(ceil)
-    FWD_MATH_FUNC1(abs)
-    FWD_MATH_FUNC1(log)
-    FWD_MATH_FUNC1(sin)
-    FWD_MATH_FUNC1(cos)
-    FWD_MATH_FUNC1(tan)
-    FWD_MATH_FUNC1(exp)
-    FWD_MATH_FUNC1(sqrt)
-    FWD_MATH_FUNC1(asin)
-    FWD_MATH_FUNC1(acos)
-    FWD_MATH_FUNC1(atan)
-    FWD_MATH_FUNC2(atan2)
-    FWD_MATH_FUNC2(pow)
-    FWD_MATH_FUNC2(min)
-    FWD_MATH_FUNC2(max)
-#undef FWD_MATH_FUNC1
-#undef FWD_MATH_FUNC2
-#define AKR_ARRAY_IMPORT_ARITH_OP(op, assign_op, Base, Self)                                                           \
-    Self operator op(const Self &rhs) const {                                                                          \
-        return Self(static_cast<const Base &>(*this) op static_cast<const Base &>(rhs));                               \
-    }                                                                                                                  \
-    Self operator op(const Self::value_t &rhs) const { return Self(static_cast<const Base &>(*this) op rhs); }         \
-    Self operator assign_op(const Self &rhs) {                                                                         \
-        *this = Self(static_cast<Base &>(*this) op static_cast<const Base &>(rhs));                                    \
-        return *this;                                                                                                  \
-    }
-#define AKR_ARRAY_IMPORT(Base, Self)                                                                                   \
-    AKR_ARRAY_IMPORT_ARITH_OP(+, +=, Base, Self)                                                                       \
-    AKR_ARRAY_IMPORT_ARITH_OP(-, -=, Base, Self)                                                                       \
-    AKR_ARRAY_IMPORT_ARITH_OP(*, *=, Base, Self)                                                                       \
-    AKR_ARRAY_IMPORT_ARITH_OP(/, /=, Base, Self)                                                                       \
-    AKR_ARRAY_IMPORT_ARITH_OP(%, %=, Base, Self)                                                                       \
-    friend Self operator+(const Self::value_t &v, const Self &rhs) { return Self(v) + rhs; }                           \
-    friend Self operator-(const Self::value_t &v, const Self &rhs) { return Self(v) - rhs; }                           \
-    friend Self operator*(const Self::value_t &v, const Self &rhs) { return Self(v) * rhs; }                           \
-    friend Self operator/(const Self::value_t &v, const Self &rhs) { return Self(v) / rhs; }                           \
-    Self operator-() const { return Self(-static_cast<const Base &>(*this)); }                                         \
-    Self &operator=(const Base &base) {                                                                                \
-        static_cast<Base &>(*this) = base;                                                                             \
-        return *this;                                                                                                  \
-    }                                                                                                                  \
-    Self(const Base &base) : Base(base) {}
 
     template <typename Value, int N>
     struct Vector : Array<Value, N> {
@@ -199,7 +66,8 @@ namespace akari {
         AKR_ARRAY_IMPORT(Base, Normal)
     };
 
-    // template <typename Value, int N> Vector<Value, N> operator-(const Point<Value, N> &p1, const Point<Value, N> &p2)
+    // template <typename Value, int N> Vector<Value, N> operator-(const Point<Value, N> &p1, const Point<Value, N>
+    // &p2)
     // {
     //     Vector<Value, N> v;
     //     for (int i = 0; i < N; i++) {
@@ -372,12 +240,12 @@ namespace akari {
         Vector3f d;
         Float tmin = -1, tmax = -1;
         Ray() = default;
-        Ray(const Point3f &o, const Vector3f &d, Float tmin = Constants<Float>::Eps,
+        Ray(const Point3f &o, const Vector3f &d, Float tmin = Constants<Float>::Eps(),
             Float tmax = std::numeric_limits<Float>::infinity())
             : o(o), d(d), tmin(tmin), tmax(tmax) {}
         static Ray spawn_to(const Point3f &p0, const Point3f &p1) {
             Vector3f dir = p1 - p0;
-            return Ray(p0, dir, Constants<Float>::Eps, Float(1.0f) - Constants<Float>::ShadowEps());
+            return Ray(p0, dir, Constants<Float>::Eps(), Float(1.0f) - Constants<Float>::ShadowEps());
         }
         Point3f operator()(Float t) const { return o + t * d; }
     };
@@ -487,8 +355,8 @@ namespace akari {
         BoundingBox() { reset(); }
         BoundingBox(const Point &pmin, const Point &pmax) : pmin(pmin), pmax(pmax) {}
         void reset() {
-            pmin = Point(Constants<Float>::Inf);
-            pmax = Point(-Constants<Float>::Inf);
+            pmin = Point(Constants<Float>::Inf());
+            pmax = Point(-Constants<Float>::Inf());
         }
         Vector extents() const { return pmax - pmin; }
         Vector size() const { return extents(); }
@@ -524,10 +392,10 @@ namespace akari {
 
     template <typename Float>
     inline Float degrees(Float x) {
-        return x * Constants<value_t<Float>>::InvPi * 180.0f;
+        return x * Constants<value_t<Float>>::InvPi() * 180.0f;
     }
     template <typename Float>
     inline Float radians(Float x) {
-        return x * Constants<value_t<Float>>::Pi / 180.0f;
+        return x * Constants<value_t<Float>>::Pi() / 180.0f;
     }
 } // namespace akari

@@ -68,7 +68,7 @@ namespace akari {
         }
         [[nodiscard]] Spectrum evaluate(const Vector3f &wo, const Vector3f &wi) const {
             if (bsdf<C>::same_hemisphere(wo, wi)) {
-                return R * Constants<Float>::InvPi;
+                return R * Constants<Float>::InvPi();
             }
             return Spectrum(0.0f);
         }
@@ -80,7 +80,7 @@ namespace akari {
             }
             *sampledType = type();
             *pdf = sampling<C>::cosine_hemisphere_pdf(std::abs(bsdf<C>::cos_theta(*wi)));
-            return R * Constants<Float>::InvPi;
+            return R * Constants<Float>::InvPi();
         }
     };
 
@@ -196,7 +196,7 @@ namespace akari {
             *choice_pdf = 1.0f;
             auto ptr = this;
             while (ptr->template isa<MixMaterial<C>>()) {
-                auto frac = ptr->template get<MixMaterial<C>>()->fraction.evaluate(texcoords).x();
+                auto frac = ptr->template get<MixMaterial<C>>()->fraction->evaluate(texcoords).x();
                 if (u < frac) {
                     u = u / frac;
                     ptr = ptr->template get<MixMaterial<C>>()->material_A;

@@ -144,7 +144,7 @@ namespace akari {
                         BSDFSampleContext<C> sample_ctx(sampler.next2d(), -ray.d);
                         auto sample = si.bsdf.sample(sample_ctx);
                         beta *= sample.f * std::abs(dot(si.ng, sample.wi)) / sample.pdf;
-                        ray = Ray3f(intersection.p, sample.wi, Constants<Float>::Eps / std::abs(dot(si.ng, sample.wi)));
+                        ray = Ray3f(intersection.p, sample.wi, Constants<Float>::Eps() / std::abs(dot(si.ng, sample.wi)));
 
                     } else {
                         L += beta * Spectrum(0);

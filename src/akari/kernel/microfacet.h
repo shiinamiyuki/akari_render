@@ -39,7 +39,7 @@ namespace akari {
             auto c = bsdf<C>::cos2_theta(m);
             auto t = bsdf<C>::tan2_theta(m);
             auto a2 = alpha * alpha;
-            return std::exp(-t / a2) / (Constants<Float>::Pi * a2 * c * c);
+            return std::exp(-t / a2) / (Constants<Float>::Pi() * a2 * c * c);
         }
 
         static inline Float BeckmannG1(Float alpha, const Vector3f &v, const Normal3f &m) {
@@ -68,7 +68,7 @@ namespace akari {
         static inline Float PhongD(Float alpha, const Normal3f &m) {
             if (m.y() <= 0.0f)
                 return 0.0f;
-            return (alpha + 2.0) / (2.0 * Constants<Float>::Pi) * std::pow(m.y(), alpha);
+            return (alpha + 2.0) / (2.0 * Constants<Float>::Pi()) * std::pow(m.y(), alpha);
         }
 
         static inline Float GGX_D(Float alpha, const Normal3f &m) {
@@ -78,7 +78,7 @@ namespace akari {
             auto c2 = bsdf<C>::cos2_theta(m);
             auto t2 = bsdf<C>::tan2_theta(m);
             auto at = (a2 + t2);
-            return a2 / (Constants<Float>::Pi * c2 * c2 * at * at);
+            return a2 / (Constants<Float>::Pi() * c2 * c2 * at * at);
         }
 
         static inline Float GGX_G1(Float alpha, const Vector3f &v, const Normal3f &m) {
@@ -123,7 +123,7 @@ namespace akari {
                 return G1(i, m) * G1(o, m);
             }
             [[nodiscard]] Normal3f sample_wh(const Vector3f &wo, const Point2f &u) const {
-                Float phi = 2 * Constants<Float>::Pi * u[1];
+                Float phi = 2 * Constants<Float>::Pi() * u[1];
                 Float cosTheta = 0;
                 switch (type) {
                 case EBeckmann: {

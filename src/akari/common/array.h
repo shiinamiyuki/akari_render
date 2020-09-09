@@ -206,4 +206,137 @@ namespace akari {
     }
     template <typename T, int N>
     using PackedArray = Array<T, N, 1>;
+
+#pragma GCC diagnostic push
+#if defined(__GNUG__) && !defined(__clang__)
+#    pragma GCC diagnostic ignored "-Wclass-memaccess"
+#endif
+    template <typename T, typename = std::enable_if_t<is_array_v<T>>>
+    T load(const void *p) {
+        T v;
+        std::memcpy(&v, p, sizeof(T));
+        return v;
+    }
+    template <typename T, int N, int P>
+    void store(void *p, const Array<T, N, P> &a) {
+        std::memcpy(p, &a, sizeof(Array<T, N, P>));
+    }
+#pragma GCC diagnostic pop
+    template <typename T, int N>
+    T length(const Array<T, N> &a) {
+        return sqrt(dot(a, a));
+    }
+    template <typename T, int N>
+    Array<T, N> normalize(const Array<T, N> &a) {
+        return a / sqrt(dot(a, a));
+    }
+    template <int... args, typename T, int N>
+    auto shuffle(const Array<T, N> &a) {
+        constexpr int pack[] = {args...};
+        static_assert(((args < N) && ...));
+        Array<T, sizeof...(args)> s;
+        for (size_t i = 0; i < sizeof...(args); i++) {
+            s[i] = a[pack[i]];
+        }
+        return s;
+    }
+#define FWD_MATH_FUNC1(name)                                                                                           \
+                                                                                                                       \
+    template <typename V, int N, int P>                                                                                \
+    Array<V, N, P> _##name(const Array<V, N, P> &v) {                                                                  \
+        Array<V, N, P> ans;                                                                                            \
+        using std::name;                                                                                               \
+        for (int i = 0; i < N; i++) {                                                                                  \
+            ans[i] = name(v[i]);                                                                                       \
+        }                                                                                                              \
+        return ans;                                                                                                    \
+    }                                                                                                                  \
+    template <typename V, int N, int P>                                                                                \
+    Array<V, N, P> name(const Array<V, N, P> &v) {                                                                     \
+        return _##name(v);                                                                                             \
+    }
+#define FWD_MATH_FUNC2(name)                                                                                           \
+                                                                                                                       \
+    template <typename V, int N, int P>                                                                                \
+    Array<V, N, P> _##name(const Array<V, N, P> &v1, const Array<V, N, P> &v2) {                                       \
+        Array<V, N, P> ans;                                                                                            \
+        using std::name;                                                                                               \
+        for (int i = 0; i < N; i++) {                                                                                  \
+            ans[i] = name(v1[i], v2[i]);                                                                               \
+        }                                                                                                              \
+        return ans;                                                                                                    \
+    }                                                                                                                  \
+    template <typename V, int N, int P>                                                                                \
+    Array<V, N, P> _##name(const V &v1, const Array<V, N, P> &v2) {                                                    \
+        Array<V, N, P> ans;                                                                                            \
+        using std::name;                                                                                               \
+        for (int i = 0; i < N; i++) {                                                                                  \
+            ans[i] = name(v1, v2[i]);                                                                                  \
+        }                                                                                                              \
+        return ans;                                                                                                    \
+    }                                                                                                                  \
+    template <typename V, int N, int P>                                                                                \
+    Array<V, N, P> _##name(const Array<V, N, P> &v1, const V &v2) {                                                    \
+        Array<V, N, P> ans;                                                                                            \
+        using std::name;                                                                                               \
+        for (int i = 0; i < N; i++) {                                                                                  \
+            ans[i] = name(v1[i], v2);                                                                                  \
+        }                                                                                                              \
+        return ans;                                                                                                    \
+    }                                                                                                                  \
+    template <typename V, int N, int P>                                                                                \
+    Array<V, N, P> name(const Array<V, N, P> &v1, const Array<V, N, P> &v2) {                                          \
+        return _##name(v1, v2);                                                                                        \
+    }                                                                                                                  \
+    template <typename V, int N, int P>                                                                                \
+    Array<V, N, P> name(const V &v1, const Array<V, N, P> &v2) {                                                       \
+        return _##name(v1, v2);                                                                                        \
+    }                                                                                                                  \
+    template <typename V, int N, int P>                                                                                \
+    Array<V, N, P> name(const Array<V, N, P> &v1, const V &v2) {                                                       \
+        return _##name(v1, v2);                                                                                        \
+    }
+    FWD_MATH_FUNC1(floor)
+    FWD_MATH_FUNC1(ceil)
+    FWD_MATH_FUNC1(abs)
+    FWD_MATH_FUNC1(log)
+    FWD_MATH_FUNC1(sin)
+    FWD_MATH_FUNC1(cos)
+    FWD_MATH_FUNC1(tan)
+    FWD_MATH_FUNC1(exp)
+    FWD_MATH_FUNC1(sqrt)
+    FWD_MATH_FUNC1(asin)
+    FWD_MATH_FUNC1(acos)
+    FWD_MATH_FUNC1(atan)
+    FWD_MATH_FUNC2(atan2)
+    FWD_MATH_FUNC2(pow)
+    FWD_MATH_FUNC2(min)
+    FWD_MATH_FUNC2(max)
+#undef FWD_MATH_FUNC1
+#undef FWD_MATH_FUNC2
+#define AKR_ARRAY_IMPORT_ARITH_OP(op, assign_op, Base, Self)                                                           \
+    Self operator op(const Self &rhs) const {                                                                          \
+        return Self(static_cast<const Base &>(*this) op static_cast<const Base &>(rhs));                               \
+    }                                                                                                                  \
+    Self operator op(const Self::value_t &rhs) const { return Self(static_cast<const Base &>(*this) op rhs); }         \
+    Self operator assign_op(const Self &rhs) {                                                                         \
+        *this = Self(static_cast<Base &>(*this) op static_cast<const Base &>(rhs));                                    \
+        return *this;                                                                                                  \
+    }
+#define AKR_ARRAY_IMPORT(Base, Self)                                                                                   \
+    AKR_ARRAY_IMPORT_ARITH_OP(+, +=, Base, Self)                                                                       \
+    AKR_ARRAY_IMPORT_ARITH_OP(-, -=, Base, Self)                                                                       \
+    AKR_ARRAY_IMPORT_ARITH_OP(*, *=, Base, Self)                                                                       \
+    AKR_ARRAY_IMPORT_ARITH_OP(/, /=, Base, Self)                                                                       \
+    AKR_ARRAY_IMPORT_ARITH_OP(%, %=, Base, Self)                                                                       \
+    friend Self operator+(const Self::value_t &v, const Self &rhs) { return Self(v) + rhs; }                           \
+    friend Self operator-(const Self::value_t &v, const Self &rhs) { return Self(v) - rhs; }                           \
+    friend Self operator*(const Self::value_t &v, const Self &rhs) { return Self(v) * rhs; }                           \
+    friend Self operator/(const Self::value_t &v, const Self &rhs) { return Self(v) / rhs; }                           \
+    Self operator-() const { return Self(-static_cast<const Base &>(*this)); }                                         \
+    Self &operator=(const Base &base) {                                                                                \
+        static_cast<Base &>(*this) = base;                                                                             \
+        return *this;                                                                                                  \
+    }                                                                                                                  \
+    Self(const Base &base) : Base(base) {}
 } // namespace akari
