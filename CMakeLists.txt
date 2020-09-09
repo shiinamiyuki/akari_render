@@ -83,7 +83,15 @@ target_compile_options(akari_core PUBLIC ${AKR_CXX_FLAGS})
 target_include_directories(akari_core PUBLIC src/)
 target_include_directories(akari_core PUBLIC external/pybind11/include)
 target_include_directories(akari_core PUBLIC ${Python_INCLUDE_DIRS} ${EMBREE_INCLUDE_DIRS})
-target_precompile_headers(akari_core PUBLIC ${PYBIND11_HEADERS})
+target_precompile_headers(akari_core
+     PUBLIC ${PYBIND11_HEADERS}
+     <vector>
+     <string>
+     <unordered_map>
+     <memory>
+     <memory_resource>
+     <thread>
+     <atomic>)
 set_target_properties(akari_core PROPERTIES UNITY_BUILD ON)
 
 # file(GLOB AKR_KERNEL_SRC src/akari/kernel/*.* src/akari/kernel/*/*.*)

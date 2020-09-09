@@ -50,6 +50,5 @@ namespace akari {
         w('    throw std::runtime_error("unsupported variant");\\\n')
         w('})()\n')
         w('constexpr const char * enabled_variants[] = {')
-        for enabled in config['enabled']:
-            w('"{}"'.format(enabled))
+        w(','.join(['"{}"'.format(enabled) for enabled in config['enabled']]))
         w('};\n}')
