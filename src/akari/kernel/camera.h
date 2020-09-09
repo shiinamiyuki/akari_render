@@ -69,7 +69,7 @@ namespace akari {
             sample->p_film = Point2f(raster) + (u2 - 0.5f);
             sample->weight = 1;
 
-            Point2f p = shuffle<0, 1>(r2c * (Point3f(sample->p_film.x(), sample->p_film.y(), 0.0f)));
+            Point2f p = shuffle<0, 1>(r2c.apply_point(Point3f(sample->p_film.x(), sample->p_film.y(), 0.0f)));
             Ray3f ray(Point3f(0), Vector3f(normalize(Point3f(p.x(), p.y(), 0) - Point3f(0, 0, 1))));
             if (lens_radius > 0 && focal_distance > 0) {
                 Float ft = focal_distance / std::abs(ray.d.z());
@@ -77,9 +77,9 @@ namespace akari {
                 ray.o = Point3f(sample->p_lens.x(), sample->p_lens.y(), 0);
                 ray.d = Vector3f(normalize(pFocus - ray.o));
             }
-            ray.o = c2w * ray.o;
-            ray.d = c2w * ray.d;
-            sample->normal = c2w * Normal3f(0, 0, -1.0f);
+            ray.o = c2w.apply_point(ray.o);
+            ray.d = c2w.apply_vector(ray.d);
+            sample->normal = c2w.apply_normal(Normal3f(0, 0, -1.0f));
             sample->ray = ray;
         }
     };

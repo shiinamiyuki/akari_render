@@ -84,16 +84,7 @@ namespace akari {
         }
     };
     void register_invariant_math_functions(py::module &m) {
-        AKR_IMPORT_CORE_TYPES_WITH(float)
-        {
-            auto c = py::class_<Point2i>(m, "Point2i");
-            RegisterArrayOp<Float, Point2i>()(m, c);
-        }
-        {
-            auto c = py::class_<Point3i>(m, "Point3i");
-            RegisterArrayOp<Float, Point3i>()(m, c);
-        }
-        {
+        AKR_IMPORT_CORE_TYPES_WITH(float) {
             auto c = py::class_<Array2i>(m, "Array2i");
             RegisterArrayOp<Float, Array2i>()(m, c);
         }
@@ -117,27 +108,18 @@ namespace akari {
             auto c = py::class_<Array4b>(m, "Array4b");
             RegisterArrayOp<Float, Array4b>()(m, c);
         }
+        m.attr("Point2i") = m.attr("Array2i");
+        m.attr("Point3i") = m.attr("Array3i");
+        m.attr("Point4i") = m.attr("Array4i");
     }
     AKR_VARIANT void RegisterMathFunction<C>::register_math_functions(py::module &m) {
         AKR_IMPORT_TYPES()
         m.def("degrees", [](const Float &a) { return degrees(a); });
         m.def("radians", [](const Float &a) { return radians(a); });
-        {
-            auto c = py::class_<Vector2f>(m, "Vector2f");
-            RegisterArrayOp<Float, Vector2f>()(m, c);
-        }
-        {
-            auto c = py::class_<Vector3f>(m, "Vector3f");
-            RegisterArrayOp<Float, Vector3f>()(m, c);
-        }
 
         {
-            auto c = py::class_<Point2f>(m, "Point2f");
-            RegisterArrayOp<Float, Point2f>()(m, c);
-        }
-        {
-            auto c = py::class_<Point3f>(m, "Point3f");
-            RegisterArrayOp<Float, Point3f>()(m, c);
+            auto c = py::class_<Color1f>(m, "Color1f");
+            RegisterArrayOp<Float, Color1f>()(m, c);
         }
         {
             auto c = py::class_<Color3f>(m, "Color3f");
@@ -155,6 +137,13 @@ namespace akari {
             auto c = py::class_<Array4f>(m, "Array4f");
             RegisterArrayOp<Float, Array4f>()(m, c);
         }
+        m.attr("Point2f") = m.attr("Array2f");
+        m.attr("Point3f") = m.attr("Array3f");
+        m.attr("Point4f") = m.attr("Array4f");
+        m.attr("Vector2f") = m.attr("Array2f");
+        m.attr("Vector3f") = m.attr("Array3f");
+        m.attr("Vector4f") = m.attr("Array4f");
+        m.attr("Normal4f") = m.attr("Array3f");
     }
     AKR_RENDER_STRUCT(RegisterMathFunction)
 

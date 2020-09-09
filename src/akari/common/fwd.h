@@ -76,16 +76,9 @@ namespace akari {
     template <typename T, int N, int packed = 0>
     struct alignas(compute_align<T, N, packed>()) Array;
     template <typename Float, int N>
-    struct Vector;
-    template <typename Float, int N>
-    struct Point;
-    template <typename Float, int N>
-    struct Normal;
+    struct Color;
     template <typename Float, int N>
     struct Matrix;
-    template <typename Float, int N>
-    struct Color;
-
     template <typename Float>
     struct Transform;
     template <typename Vector>
@@ -97,20 +90,8 @@ namespace akari {
     struct value_ {
         using type = T;
     };
-    template <typename T, int N>
-    struct value_<Array<T, N>> {
-        using type = T;
-    };
-    template <typename T, int N>
-    struct value_<Vector<T, N>> {
-        using type = T;
-    };
-    template <typename T, int N>
-    struct value_<Point<T, N>> {
-        using type = T;
-    };
-    template <typename T, int N>
-    struct value_<Normal<T, N>> {
+    template <typename T, int N, int P>
+    struct value_<Array<T, N, P>> {
         using type = T;
     };
     template <typename T, int N>
@@ -123,18 +104,11 @@ namespace akari {
     struct replace_scalar_ {
         using type = S;
     };
-    template <typename T, int N, typename S>
-    struct replace_scalar_<Vector<T, N>, S> {
-        using type = Vector<S, N>;
+    template <typename T, int N, int P, typename S>
+    struct replace_scalar_<Array<T, N, P>, S> {
+        using type = Array<S, N>;
     };
-    template <typename T, int N, typename S>
-    struct replace_scalar_<Point<T, N>, S> {
-        using type = Point<S, N>;
-    };
-    template <typename T, int N, typename S>
-    struct replace_scalar_<Normal<T, N>, S> {
-        using type = Normal<S, N>;
-    };
+
     template <typename T, int N, typename S>
     struct replace_scalar_<Matrix<T, N>, S> {
         using type = Matrix<S, N>;
@@ -146,20 +120,8 @@ namespace akari {
     struct array_size {
         static constexpr size_t value = 1;
     };
-    template <typename T, int N>
-    struct array_size<Point<T, N>> {
-        static constexpr size_t value = N;
-    };
-    template <typename T, int N>
-    struct array_size<Array<T, N>> {
-        static constexpr size_t value = N;
-    };
-    template <typename T, int N>
-    struct array_size<Vector<T, N>> {
-        static constexpr size_t value = N;
-    };
-    template <typename T, int N>
-    struct array_size<Normal<T, N>> {
+    template <typename T, int N, int P>
+    struct array_size<Array<T, N, P>> {
         static constexpr size_t value = N;
     };
     template <typename T, int N>
@@ -168,17 +130,17 @@ namespace akari {
     };
     template <typename T>
     constexpr size_t array_size_v = array_size<T>::value;
-
+    template <typename Value, int N>
+    using Vector = Array<Value, N>;
+    template <typename Value, int N>
+    using Point = Array<Value, N>;
+    template <typename Value, int N>
+    using Normal = Array<Value, N>;
     template <typename T>
     struct is_array : std::false_type {};
     template <typename T, int N, int P>
     struct is_array<Array<T, N, P>> : std::true_type {};
-    template <typename T, int N>
-    struct is_array<Point<T, N>> : std::true_type {};
-    template <typename T, int N>
-    struct is_array<Vector<T, N>> : std::true_type {};
-    template <typename T, int N>
-    struct is_array<Normal<T, N>> : std::true_type {};
+
     template <typename T, int N>
     struct is_array<Color<T, N>> : std::true_type {};
     template <typename T>
@@ -200,7 +162,7 @@ namespace akari {
     // template <typename T>
     // using uint64_array_t = replace_scalar_t<T, uint64_t>;
     // template <typename T>
-    // using uint32_array_t = replace_scalar_t<T, uint32_t>;
+    // using uint32_array_t = r eplace_scalar_t<T, uint32_t>;
     // template <typename T>
     // using float32_array_t = replace_scalar_t<T, float>;
     // template <typename T>

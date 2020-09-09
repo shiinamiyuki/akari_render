@@ -67,27 +67,6 @@ struct fmt::formatter<akari::Array<T, N>> {
     }
 };
 template <typename T, int N>
-struct fmt::formatter<akari::Point<T, N>> : fmt::formatter<akari::Array<T, N>> {
-    template <typename FormatCtx>
-    auto format(const akari::Point<T, N> &a, FormatCtx &ctx) {
-        return fmt::formatter<akari::Array<T, N>>::format(a, ctx);
-    }
-};
-template <typename T, int N>
-struct fmt::formatter<akari::Vector<T, N>> : fmt::formatter<akari::Array<T, N>> {
-    template <typename FormatCtx>
-    auto format(const akari::Vector<T, N> &a, FormatCtx &ctx) {
-        return fmt::formatter<akari::Array<T, N>>::format(a, ctx);
-    }
-};
-template <typename T, int N>
-struct fmt::formatter<akari::Normal<T, N>> : fmt::formatter<akari::Array<T, N>> {
-    template <typename FormatCtx>
-    auto format(const akari::Normal<T, N> &a, FormatCtx &ctx) {
-        return fmt::formatter<akari::Array<T, N>>::format(a, ctx);
-    }
-};
-template <typename T, int N>
 struct fmt::formatter<akari::Color<T, N>> : fmt::formatter<akari::Array<T, N>> {
     template <typename FormatCtx>
     auto format(const akari::Color<T, N> &a, FormatCtx &ctx) {

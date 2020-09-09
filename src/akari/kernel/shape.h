@@ -31,10 +31,10 @@ namespace akari {
         const Material<C> *material = nullptr;
         AKR_XPU Point3f p(const Point2f &uv) const { return lerp3(vertices[0], vertices[1], vertices[2], uv); }
         AKR_XPU Float area() const {
-            return length(cross(Vector3f(vertices[1] - vertices[0]), Vector3f(vertices[2] - vertices[0]))) * 0.5f;
+            return length(cross(vertices[1] - vertices[0], vertices[2] - vertices[0])) * 0.5f;
         }
         AKR_XPU Normal3f ng() const {
-            return Normal3f(normalize(cross(Vector3f(vertices[1] - vertices[0]), Vector3f(vertices[2] - vertices[0]))));
+            return Normal3f(normalize(cross(vertices[1] - vertices[0], vertices[2] - vertices[0])));
         }
         AKR_XPU Normal3f ns(const Point2f &uv) const { return lerp3(normals[0], normals[1], normals[2], uv); }
         AKR_XPU Point2f texcoord(const Point2f &uv) const {

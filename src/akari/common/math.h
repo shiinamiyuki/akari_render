@@ -41,56 +41,6 @@ namespace akari {
         static constexpr Float ShadowEps() { return Float(0.0001f); }
     };
 
-    template <typename Value, int N>
-    struct Vector : Array<Value, N> {
-        using Base = Array<Value, N>;
-        using Base::Base;
-        using value_t = Value;
-        static constexpr size_t size = N;
-        AKR_ARRAY_IMPORT(Base, Vector)
-    };
-    template <typename Value, int N>
-    struct Point : Array<Value, N> {
-        using Base = Array<Value, N>;
-        using Base::Base;
-        using value_t = Value;
-        static constexpr size_t size = N;
-        AKR_ARRAY_IMPORT(Base, Point)
-    };
-    template <typename Value, int N>
-    struct Normal : Array<Value, N> {
-        using Base = Array<Value, N>;
-        using Base::Base;
-        using value_t = Value;
-        static constexpr size_t size = N;
-        AKR_ARRAY_IMPORT(Base, Normal)
-    };
-
-    // template <typename Value, int N> Vector<Value, N> operator-(const Point<Value, N> &p1, const Point<Value, N>
-    // &p2)
-    // {
-    //     Vector<Value, N> v;
-    //     for (int i = 0; i < N; i++) {
-    //         v[i] = p1[i] - p2[i];
-    //     }
-    //     return v;
-    // }
-    template <typename Value, int N>
-    Point<Value, N> operator+(const Point<Value, N> &p1, const Vector<Value, N> &v) {
-        Point<Value, N> p2;
-        for (int i = 0; i < N; i++) {
-            p2[i] = p1[i] + v[i];
-        }
-        return p2;
-    }
-    template <typename Value, int N>
-    Point<Value, N> operator+(const Vector<Value, N> &v, const Point<Value, N> &p1) {
-        Point<Value, N> p2;
-        for (int i = 0; i < N; i++) {
-            p2[i] = p1[i] + v[i];
-        }
-        return p2;
-    }
 
     template <typename V, typename V2>
     inline V lerp3(const V &v0, const V &v1, const V &v2, const V2 &uv) {
@@ -220,18 +170,13 @@ namespace akari {
         }
     };
 
-    template <typename T>
-    Vector<T, 3> cross(const Vector<T, 3> &v1, const Vector<T, 3> &v2) {
+    template <typename T, int P>
+    Array<T, 3, P> cross(const Array<T, 3, P> &v1, const Array<T, 3, P> &v2) {
         T v1x = v1.x(), v1y = v1.y(), v1z = v1.z();
         T v2x = v2.x(), v2y = v2.y(), v2z = v2.z();
-        return Vector<T, 3>((v1y * v2z) - (v1z * v2y), (v1z * v2x) - (v1x * v2z), (v1x * v2y) - (v1y * v2x));
+        return Array<T, 3, P>((v1y * v2z) - (v1z * v2y), (v1z * v2x) - (v1x * v2z), (v1x * v2y) - (v1y * v2x));
     }
-    template <typename T>
-    Normal<T, 3> cross(const Normal<T, 3> &v1, const Normal<T, 3> &v2) {
-        T v1x = v1.x(), v1y = v1.y(), v1z = v1.z();
-        T v2x = v2.x(), v2y = v2.y(), v2z = v2.z();
-        return Normal<T, 3>((v1y * v2z) - (v1z * v2y), (v1z * v2x) - (v1x * v2z), (v1x * v2y) - (v1y * v2x));
-    }
+
     AKR_VARIANT struct Ray {
         // Float time = 0.0f;
         using Float = typename C::Float;
@@ -293,7 +238,7 @@ namespace akari {
             m3inv = m3.inverse();
         }
         Transform inverse() const { return Transform(minv, m); }
-        Point3f operator*(const Point3f &p) const {
+        Point3f apply_point(const Point3f &p) const {
             Vector4f v(p.x(), p.y(), p.z(), 1.0);
             v = m * v;
             Point3f q(v.x(), v.y(), v.z());
@@ -303,10 +248,10 @@ namespace akari {
             return q;
         }
         Transform operator*(const Transform &t) const { return Transform(m * t.m); }
-        Vector3f operator*(const Vector3f &v) const { return m3 * v; }
-        Normal3f operator*(const Normal3f &n) const { return m3inv.transpose() * n; }
+        Vector3f apply_vector(const Vector3f &v) const { return m3 * v; }
+        Normal3f apply_normal(const Normal3f &n) const { return m3inv.transpose() * n; }
         template <typename Spectrum, typename C = Config<Float, Spectrum>>
-        Ray<C> operator*(const Ray<C> &ray) const {
+        Ray<C> apply_ray(const Ray<C> &ray) const {
             using Ray3f = Ray<C>;
             auto &T = *this;
             auto d2 = T * ray.d;

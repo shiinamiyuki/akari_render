@@ -67,7 +67,7 @@ std::shared_ptr<Mesh> load_wavefront_obj(const fs::path &path, std::string &gene
                 triangle[v] = Point3f(load<PackedArray<Float, 3>>(&mesh->vertices[3 * idx.vertex_index]));
             }
             mesh->material_indices.emplace_back(shapes[s].mesh.material_ids[f]);
-            Normal3f ng = normalize(cross(Vector3f(triangle[1] - triangle[0]), Vector3f(triangle[2] - triangle[0])));
+            Normal3f ng = normalize(cross(triangle[1] - triangle[0], triangle[2] - triangle[0]));
             for (int v = 0; v < fv; v++) {
                 tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
                 if (idx.normal_index < 0) {
