@@ -21,7 +21,7 @@
 // SOFTWARE.
 
 #pragma once
-#include <akari/core/scenegraph.h>
+#include <akari/core/python/scenegraph.h>
 
 namespace akari {
     AKR_VARIANT class Material;

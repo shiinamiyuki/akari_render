@@ -23,20 +23,20 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/embed.h>
 #include <pybind11/stl.h>
-#include <akari/core/python.h>
+#include <akari/core/python/python.h>
 // #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
-#include <akari/core/scenegraph.h>
+#include <akari/core/python/scenegraph.h>
 #include <akari/common/config.h>
 #include <akari/core/mesh.h>
 #include <akari/kernel/scene.h>
 #include <akari/core/logger.h>
 #include <akari/core/film.h>
-#include <akari/core/nodes/camera.h>
-#include <akari/core/nodes/mesh.h>
-#include <akari/core/nodes/material.h>
-#include <akari/core/nodes/integrator.h>
-#include <akari/core/nodes/scene.h>
+#include <akari/core/python/camera.h>
+#include <akari/core/python/mesh.h>
+#include <akari/core/python/material.h>
+#include <akari/core/python/integrator.h>
+#include <akari/core/python/scene.h>
 namespace akari {
     namespace py = pybind11;
 

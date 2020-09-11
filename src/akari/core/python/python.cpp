@@ -21,10 +21,10 @@
 // SOFTWARE.
 
 #include <akari/common/fwd.h>
-#include <akari/core/python.h>
+#include <akari/core/python/python.h>
 #include <pybind11/embed.h>
 #include <pybind11/stl.h>
-#include <akari/core/scenegraph.h>
+#include <akari/core/python/scenegraph.h>
 namespace akari {
     template <typename Float, typename T>
     struct RegisterArrayOp {

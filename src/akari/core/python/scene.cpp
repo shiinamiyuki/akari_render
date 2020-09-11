@@ -22,7 +22,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/embed.h>
 #include <pybind11/stl.h>
-#include <akari/core/nodes/scene.h>
+#include <akari/core/python/scene.h>
 #include <akari/kernel/embree.inl>
 #include <akari/core/film.h>
 

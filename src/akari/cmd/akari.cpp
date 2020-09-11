@@ -25,7 +25,7 @@
 #include <akari/common/color.h>
 #include <akari/core/application.h>
 #include <akari/core/logger.h>
-#include <akari/core/scenegraph.h>
+#include <akari/core/python/scenegraph.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/embed.h>
 using namespace akari;

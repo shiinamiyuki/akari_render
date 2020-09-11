@@ -21,7 +21,7 @@
 // SOFTWARE.
 
 #pragma once
-#include <akari/core/scenegraph.h>
+#include <akari/core/python/scenegraph.h>
 #include <akari/kernel/integrators/cpu/integrator.h>
 namespace akari {
     AKR_VARIANT class IntegratorNode : public SceneGraphNode<C> {

@@ -19,8 +19,8 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-#include <akari/core/nodes/mesh.h>
-#include <akari/core/nodes/material.h>
+#include <akari/core/python/mesh.h>
+#include <akari/core/python/material.h>
 #include <akari/core/resource.h>
 #include <akari/core/mesh.h>
 // #define TINYOBJLOADER_IMPLEMENTATION

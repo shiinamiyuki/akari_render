@@ -19,7 +19,7 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-#include <akari/core/nodes/material.h>
+#include <akari/core/python/material.h>
 #include <akari/kernel/material.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/embed.h>
