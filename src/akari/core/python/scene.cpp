@@ -74,6 +74,7 @@ namespace akari {
         auto integrator_ = integrator->compile(&arena);
         integrator_->render(scene, &film);
         film.write_image(fs::path(output));
+        info("render done\n");
     }
     AKR_VARIANT void RegisterSceneNode<C>::register_nodes(py::module &m) {
         AKR_IMPORT_TYPES()

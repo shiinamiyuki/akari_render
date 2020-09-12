@@ -38,7 +38,6 @@ namespace akari {
         AkariMesh(std::string path) : path(path) {}
         std::shared_ptr<Mesh> mesh;
         std::vector<std::shared_ptr<MaterialNode<C>>> materials;
-        Buffer<const Material<C> *> compiled_materials;
         void commit() override {
             auto exp = resource_manager()->load_path<BinaryGeometry>(path);
             if (exp) {
@@ -51,18 +50,16 @@ namespace akari {
         }
         MeshInstance<C> compile(MemoryArena *arena) override {
             commit();
-            MeshInstance<C> view;
-            view.indices = mesh->indices;
-            view.material_indices = mesh->material_indices;
-            view.normals = mesh->normals;
-            view.texcoords = mesh->texcoords;
-            view.vertices = mesh->vertices;
-            compiled_materials.clear();
+            MeshInstance<C> instance;
+            instance.indices = mesh->indices;
+            instance.material_indices = mesh->material_indices;
+            instance.normals = mesh->normals;
+            instance.texcoords = mesh->texcoords;
+            instance.vertices = mesh->vertices;
             for (auto &mat : materials) {
-                compiled_materials.push_back(mat->compile(arena));
+                instance.materials.push_back(mat->compile(arena));
             }
-            view.materials = compiled_materials;
-            return view;
+            return instance;
         }
         void set_material(uint32_t index, const std::shared_ptr<MaterialNode<C>> &mat) {
             if (index >= materials.size()) {

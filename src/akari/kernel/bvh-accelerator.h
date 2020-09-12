@@ -19,13 +19,15 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+
 #include <akari/common/math.h>
-#include <akari/common/buffer.h>
-#include <akari/kernel/instance.h>
+#include <akari/kernel/scene.h>
+#include <akari/common/mesh.h>
+
 namespace akari {
-    template <class Float, class UserData, class ShapeHandleConstructor>
-    struct BVHBuilder {
-        AKR_IMPORT_CORE_TYPES()
+    template <typename C, class UserData, class Hit, class Intersector, class ShapeHandleConstructor>
+    struct TBVHAccelerator {
+        AKR_IMPORT_TYPES()
         struct BVHNode {
             Bounds3f box{};
             uint32_t first = (uint32_t)-1;
@@ -43,13 +45,15 @@ namespace akari {
         auto get(const Index &handle) { return _ctor(user_data, handle.idx); }
 
         Bounds3f boundBox;
-        const UserData *user_data;
+        UserData user_data;
+        Intersector _intersector;
         ShapeHandleConstructor _ctor;
         Buffer<Index> primitives;
         Buffer<BVHNode> nodes;
 
-        BVHBuilder(const UserData *user_data, size_t N, ShapeHandleConstructor ctor = ShapeHandleConstructor())
-            : user_data(user_data), _ctor(std::move(ctor)) {
+        TBVHAccelerator(UserData &&user_data, size_t N, Intersector intersector = Intersector(),
+                        ShapeHandleConstructor ctor = ShapeHandleConstructor())
+            : user_data(std::move(user_data)), _intersector(std::move(intersector)), _ctor(std::move(ctor)) {
             for (auto i = 0; i < (int)N; i++) {
                 primitives.push_back(Index{i});
             }
@@ -57,17 +61,30 @@ namespace akari {
             recursiveBuild(0, (int)primitives.size(), 0);
             info("BVHNodes: {}\n", nodes.size());
         }
+
+        AKR_XPU static Float intersectAABB(const Bounds3f &box, const Ray3f &ray, const Vector3f &invd) {
+            Vector3f t0 = (box.p_min - ray.o) * invd;
+            Vector3f t1 = (box.p_max - ray.o) * invd;
+            Vector3f tMin = min(t0, t1), tMax = max(t0, t1);
+            if (hmax(tMin) <= hmin(tMax)) {
+                auto t = std::max(ray.t_min, hmax(tMin));
+                if (t >= ray.t_max) {
+                    return -1;
+                }
+                return t;
+            }
+            return -1;
+        }
+
         int recursiveBuild(int begin, int end, int depth) {
-            auto MaxFloat = Constants<Float>::Inf();
-            auto MinFLoat = -MaxFloat;
-            Bounds3f box{{MaxFloat, MaxFloat, MaxFloat}, {MinFloat, MinFloat, MinFloat}};
-            Bounds3f centroidBound{{MaxFloat, MaxFloat, MaxFloat}, {MinFloat, MinFloat, MinFloat}};
+            Bounds3f box;
+            Bounds3f centroidBound;
 
             if (end == begin)
                 return -1;
             for (auto i = begin; i < end; i++) {
                 box = box.merge(get(primitives[i]).getBoundingBox());
-                centroidBound = centroidBound.merge(get(primitives[i]).getBoundingBox().centroid());
+                centroidBound = centroidBound.expand(get(primitives[i]).getBoundingBox().centroid());
             }
 
             if (depth == 0) {
@@ -166,39 +183,128 @@ namespace akari {
                 return (int)ret;
             }
         }
+
+        AKR_XPU bool intersect(const Ray3f &ray, Hit &isct) const {
+            bool hit = false;
+            auto invd = Vector3f(1) / ray.d;
+            constexpr int maxDepth = 64;
+            const BVHNode *stack[maxDepth];
+            int sp = 0;
+            stack[sp++] = &nodes[0];
+            while (sp > 0) {
+
+                auto p = stack[--sp];
+                //                PrintBox(p->box, "p->box");
+                auto t = intersectAABB(p->box, ray, invd);
+
+                if (t < 0 || t > isct.t) {
+                    continue;
+                }
+                if (p->is_leaf()) {
+                    for (uint32_t i = p->first; i < p->first + p->count; i++) {
+                        if (_intersector(ray, _ctor(user_data, primitives[i].idx), isct)) {
+                            hit = true;
+                        }
+                    }
+                } else {
+                    if (p->left >= 0)
+                        stack[sp++] = &nodes[p->left];
+                    if (p->right >= 0)
+                        stack[sp++] = &nodes[p->right];
+                }
+            }
+            return hit;
+        }
+        AKR_XPU [[nodiscard]] bool occlude(const Ray3f &ray) const {
+            Hit isct;
+            auto invd = Vector3f(1) / ray.d;
+            constexpr int maxDepth = 64;
+            const BVHNode *stack[maxDepth];
+            int sp = 0;
+            stack[sp++] = &nodes[0];
+            while (sp > 0) {
+                auto p = stack[--sp];
+                auto t = intersectAABB(p->box, ray, invd);
+
+                if (t < 0) {
+                    continue;
+                }
+                if (p->is_leaf()) {
+                    for (uint32_t i = p->first; i < p->first + p->count; i++) {
+                        if (_intersector(ray, _ctor(user_data, primitives[i].idx), isct)) {
+                            return true;
+                        }
+                    }
+                } else {
+                    if (p->left >= 0)
+                        stack[sp++] = &nodes[p->left];
+                    if (p->right >= 0)
+                        stack[sp++] = &nodes[p->right];
+                }
+            }
+            return false;
+        }
     };
-    template <typename Float>
-    struct TwoLevelMeshBVH {
+
+    template <typename C>
+    class BVHAccelerator {
+        AKR_IMPORT_TYPES()
         struct TriangleHandle {
-            AKR_IMPORT_CORE_TYPES()
-            const Mesh *mesh = nullptr;
+            const Mesh<C> *mesh = nullptr;
             int idx = -1;
             [[nodiscard]] Bounds3f getBoundingBox() const {
-                auto MaxFloat = Constants<Float>::Inf();
-                auto MinFLoat = -MaxFloat;
-                auto trig = get_triangle(*mesh, idx);
-                Bounds3f box{{MaxFloat, MaxFloat, MaxFloat}, {MinFloat, MinFloat, MinFloat}};
-                box = box.expand(triangle.vertices[0]);
-                box = box.expand(triangle.vertices[1]);
-                box = box.expand(triangle.vertices[2]);
+                auto v = mesh->get_vertex_buffer();
+                auto i = mesh->get_index_buffer();
+                Bounds3f box;
+                box = box.union_of(v[i[idx * 3 + 0]].pos);
+                box = box.union_of(v[i[idx * 3 + 1]].pos);
+                box = box.union_of(v[i[idx * 3 + 2]].pos);
                 return box;
             }
         };
         struct TriangleHandleConstructor {
-            auto operator()(const Mesh *mesh, int idx) const -> TriangleHandle { return TriangleHandle{mesh, idx}; }
+            auto operator()(const Mesh<C> *mesh, int idx) const -> TriangleHandle { return TriangleHandle{mesh, idx}; }
         };
-        using MeshBVHBuillder = BVHBuillder<Float, const Mesh, TriangleHandleConstructor>;
-    
+
+        struct TriangleIntersector {
+            auto operator()(const Ray3f &ray, const TriangleHandle &handle, Mesh<C>::RayHit &record) const -> bool {
+                return handle.mesh->Intersect(ray, handle.idx, &record);
+            }
+        };
+
+        using MeshBVH =
+            TBVHAccelerator<C, const Mesh<C> *, Mesh<C>::RayHit, TriangleIntersector, TriangleHandleConstructor>;
+        using MeshBVHes = Buffer<MeshBVH>;
         struct BVHHandle {
-            BufferView<const MeshBVHes>scene = nullptr;
+            const MeshBVHes *scene = nullptr;
             int idx;
 
             [[nodiscard]] auto getBoundingBox() const { return (*scene)[idx].boundBox; }
         };
 
         struct BVHHandleConstructor {
-            auto operator()(const MeshBVHes *scene, int idx) const -> BVHHandle { return BVHHandle{scene, idx}; }
+            auto operator()(const MeshBVHes &scene, int idx) const -> BVHHandle { return BVHHandle{scene, idx}; }
         };
-    };
 
+        struct BVHIntersector {
+            auto operator()(const Ray3f &ray, const BVHHandle &handle, Intersection<C> &record) const -> bool {
+
+                Mesh<C>::RayHit localHit;
+                localHit.t = record.t;
+                auto &bvh = (*handle.scene)[handle.idx];
+                if (bvh.intersect(ray, localHit) && localHit.t < record.t) {
+                    record.t = localHit.t;
+                    record.uv = localHit.uv;
+                    record.ng = localHit.ng;
+                    record.mesh_id = handle.idx;
+                    record.prim_id = localHit.prim_id;
+                    return true;
+                }
+                return false;
+            }
+        };
+        Buffer<MeshBVH> meshBVHs;
+        using TopLevelBVH = TBVHAccelerator<MeshBVHes, Intersection, BVHIntersector, BVHHandleConstructor>;
+        astd::optional<TopLevelBVH> topLevelBVH;
+    };
 } // namespace akari

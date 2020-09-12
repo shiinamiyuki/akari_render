@@ -21,20 +21,14 @@
 // SOFTWARE.
 
 #pragma once
-#include <akari/common/mesh.h>
-#include <akari/core/resource.h>
-#include <akari/common/variant.h>
+#include <akari/common/math.h>
+#include <akari/common/buffer.h>
+
 namespace akari {
-
-
-    class AKR_EXPORT BinaryGeometry : public Resource {
-        std::shared_ptr<Mesh> _mesh;
-
-      public:
-        BinaryGeometry() = default;
-        BinaryGeometry(std::shared_ptr<Mesh> mesh) : _mesh(std::move(mesh)) {}
-        Expected<bool> load(const fs::path &) override;
-        const std::shared_ptr<Mesh> &mesh() const { return _mesh; }
-        Expected<bool> save(const fs::path &path) const;
+    struct Mesh {
+        Buffer<float> vertices, normals, texcoords;
+        Buffer<int> indices;
+        Buffer<int> material_indices;
     };
+
 } // namespace akari
