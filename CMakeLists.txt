@@ -67,9 +67,9 @@ include(cmake/Embree.cmake)
 ##set(AKR_CORE_EXT_LIBS ${AKR_CORE_EXT_LIBS} embree embree_sse42 embree_avx embree_avx2 lexers math simd tasking sys)
 set(AKR_CONFIG_H ${CMAKE_CURRENT_SOURCE_DIR}/src/akari/common/config.h )
 add_custom_command(OUTPUT ${AKR_CONFIG_H}
-    COMMAND python resources/configure.py akari.conf  ${AKR_CONFIG_H}
+    COMMAND python src/akari/tools/configure.py akari.conf  ${AKR_CONFIG_H}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    DEPENDS akari.conf resources/configure.py)
+    DEPENDS akari.conf src/akari/tools/configure.py)
 
 file(GLOB PYBIND11_HEADERS external/pybind11/include/pybind11.h external/pybind11/include/stl.h)
 file(GLOB AKR_COMMON_SRC src/akari/common/*.*)

@@ -55,20 +55,11 @@ namespace akari {
 
         AKR_CPU bool intersect(const Ray3f &ray, Intersection<C> *isct) const;
         AKR_CPU bool occlude(const Ray3f &ray) const;
-        
+
         void commit();
         AKR_XPU Triangle<C> get_triangle(int mesh_id, int prim_id) const {
-            Triangle<C> trig;
             auto &mesh = meshes[mesh_id];
-            for (int i = 0; i < 3; i++) {
-                int idx = mesh.indices[3 * prim_id + i];
-                trig.vertices[i] =
-                    Point3f(mesh.vertices[3 * idx + 0], mesh.vertices[3 * idx + 1], mesh.vertices[3 * idx + 2]);
-                idx = 3 * prim_id + i;
-                trig.normals[i] =
-                    Normal3f(mesh.normals[3 * idx + 0], mesh.normals[3 * idx + 1], mesh.normals[3 * idx + 2]);
-                trig.texcoords[i] = Point2f(mesh.texcoords[2 * idx + 0], mesh.texcoords[2 * idx + 1]);
-            }
+            Triangle<C> trig = get_triangle(mesh, prim_id);
             auto mat_idx = mesh.material_indices[prim_id];
             if (mat_idx != -1) {
                 trig.material = mesh.materials[mat_idx];

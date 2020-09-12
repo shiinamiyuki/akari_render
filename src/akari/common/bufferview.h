@@ -28,7 +28,7 @@ namespace akari {
         BufferView() = default;
         BufferView(T *data, size_t size) : _data(data), _size(size) {}
         template <typename Allocator>
-        AKR_CPU BufferView(std::vector<T, Allocator> &vec) : BufferView(vec.data(), vec.size()) {}
+        AKR_CPU BufferView(std::vector<std::remove_const_t<T>, Allocator> &vec) : BufferView(vec.data(), vec.size()) {}
         AKR_XPU T &operator[](uint32_t i) const { return _data[i]; }
         AKR_XPU size_t size() const { return _size; }
         AKR_XPU T *begin() const { return _data; }

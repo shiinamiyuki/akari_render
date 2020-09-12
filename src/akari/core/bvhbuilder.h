@@ -20,6 +20,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 #include <akari/common/math.h>
+#include <akari/core/buffer.h>
+#include <akari/kernel/meshview.h>
 namespace akari {
     template <class Float, class UserData, class ShapeHandleConstructor>
     struct BVHBuilder {
@@ -43,8 +45,8 @@ namespace akari {
         Bounds3f boundBox;
         const UserData *user_data;
         ShapeHandleConstructor _ctor;
-        std::vector<Index> primitives;
-        std::vector<BVHNode> nodes;
+        Buffer<Index> primitives;
+        Buffer<BVHNode> nodes;
 
         BVHBuilder(const UserData *user_data, size_t N, ShapeHandleConstructor ctor = ShapeHandleConstructor())
             : user_data(user_data), _ctor(std::move(ctor)) {
@@ -55,30 +57,17 @@ namespace akari {
             recursiveBuild(0, (int)primitives.size(), 0);
             info("BVHNodes: {}\n", nodes.size());
         }
-
-        static Float intersectAABB(const Bounds3f &box, const Ray &ray, const vec3 &invd) {
-            vec3 t0 = (box.p_min - ray.o) * invd;
-            vec3 t1 = (box.p_max - ray.o) * invd;
-            vec3 tMin = min(t0, t1), tMax = max(t0, t1);
-            if (max_comp(tMin) <= min_comp(tMax)) {
-                auto t = std::max(ray.t_min, max_comp(tMin));
-                if (t >= ray.t_max) {
-                    return -1;
-                }
-                return t;
-            }
-            return -1;
-        }
-
         int recursiveBuild(int begin, int end, int depth) {
+            auto MaxFloat = Constants<Float>::Inf();
+            auto MinFLoat = -MaxFloat;
             Bounds3f box{{MaxFloat, MaxFloat, MaxFloat}, {MinFloat, MinFloat, MinFloat}};
             Bounds3f centroidBound{{MaxFloat, MaxFloat, MaxFloat}, {MinFloat, MinFloat, MinFloat}};
 
             if (end == begin)
                 return -1;
             for (auto i = begin; i < end; i++) {
-                box = box.union_of(get(primitives[i]).getBoundingBox());
-                centroidBound = centroidBound.union_of(get(primitives[i]).getBoundingBox().centroid());
+                box = box.merge(get(primitives[i]).getBoundingBox());
+                centroidBound = centroidBound.merge(get(primitives[i]).getBoundingBox().centroid());
             }
 
             if (depth == 0) {
@@ -125,7 +114,7 @@ namespace akari {
                         auto offset = centroidBound.offset(get(primitives[i]).getBoundingBox().centroid())[axis];
                         int b = std::min<int>(nBuckets - 1, (int)std::floor(offset * nBuckets));
                         buckets[b].count++;
-                        buckets[b].bound = buckets[b].bound.union_of(get(primitives[i]).getBoundingBox());
+                        buckets[b].bound = buckets[b].bound.merge(get(primitives[i]).getBoundingBox());
                     }
                     Float cost[nBuckets - 1] = {0};
                     for (uint32_t i = 0; i < nBuckets - 1; i++) {
@@ -133,11 +122,11 @@ namespace akari {
                         Bounds3f b1{{MaxFloat, MaxFloat, MaxFloat}, {MinFloat, MinFloat, MinFloat}};
                         int count0 = 0, count1 = 0;
                         for (uint32_t j = 0; j <= i; j++) {
-                            b0 = b0.union_of(buckets[j].bound);
+                            b0 = b0.merge(buckets[j].bound);
                             count0 += buckets[j].count;
                         }
                         for (uint32_t j = i + 1; j < nBuckets; j++) {
-                            b1 = b1.union_of(buckets[j].bound);
+                            b1 = b1.merge(buckets[j].bound);
                             count1 += buckets[j].count;
                         }
                         float cost0 = count0 == 0 ? 0 : count0 * b0.surface_area();
@@ -178,4 +167,38 @@ namespace akari {
             }
         }
     };
+    template <typename Float>
+    struct TwoLevelMeshBVH {
+        struct TriangleHandle {
+            AKR_IMPORT_CORE_TYPES()
+            const Mesh *mesh = nullptr;
+            int idx = -1;
+            [[nodiscard]] Bounds3f getBoundingBox() const {
+                auto MaxFloat = Constants<Float>::Inf();
+                auto MinFLoat = -MaxFloat;
+                auto trig = get_triangle(*mesh, idx);
+                Bounds3f box{{MaxFloat, MaxFloat, MaxFloat}, {MinFloat, MinFloat, MinFloat}};
+                box = box.expand(triangle.vertices[0]);
+                box = box.expand(triangle.vertices[1]);
+                box = box.expand(triangle.vertices[2]);
+                return box;
+            }
+        };
+        struct TriangleHandleConstructor {
+            auto operator()(const Mesh *mesh, int idx) const -> TriangleHandle { return TriangleHandle{mesh, idx}; }
+        };
+        using MeshBVHBuillder = BVHBuillder<Float, const Mesh, TriangleHandleConstructor>;
+    
+        struct BVHHandle {
+            BufferView<const MeshBVHes>scene = nullptr;
+            int idx;
+
+            [[nodiscard]] auto getBoundingBox() const { return (*scene)[idx].boundBox; }
+        };
+
+        struct BVHHandleConstructor {
+            auto operator()(const MeshBVHes *scene, int idx) const -> BVHHandle { return BVHHandle{scene, idx}; }
+        };
+    };
+
 } // namespace akari

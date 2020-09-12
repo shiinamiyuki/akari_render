@@ -25,6 +25,7 @@
 #include <akari/common/bufferview.h>
 #include <akari/common/fwd.h>
 #include <akari/kernel/material.h>
+#include <akari/kernel/shape.h>
 namespace akari {
     AKR_VARIANT struct MeshView {
         BufferView<float> vertices, normals, texcoords;
@@ -32,4 +33,19 @@ namespace akari {
         BufferView<int> material_indices;
         BufferView<const Material<C> *> materials;
     };
+
+    template <typename C, typename Mesh>
+    Triangle<C> get_triangle(const Mesh &mesh, int prim_id) {
+        AKR_IMPORT_TYPES()
+        Triangle<C> trig;
+        for (int i = 0; i < 3; i++) {
+            int idx = mesh.indices[3 * prim_id + i];
+            trig.vertices[i] =
+                Point3f(mesh.vertices[3 * idx + 0], mesh.vertices[3 * idx + 1], mesh.vertices[3 * idx + 2]);
+            idx = 3 * prim_id + i;
+            trig.normals[i] = Normal3f(mesh.normals[3 * idx + 0], mesh.normals[3 * idx + 1], mesh.normals[3 * idx + 2]);
+            trig.texcoords[i] = Point2f(mesh.texcoords[2 * idx + 0], mesh.texcoords[2 * idx + 1]);
+        }
+        return trig;
+    }
 } // namespace akari

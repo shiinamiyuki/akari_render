@@ -310,6 +310,9 @@ namespace akari {
             pmin = min(pmin, p);
             pmax = max(pmax, p);
         }
+        BoundingBox merge(const BoundingBox &b1)const{
+            return merge(*this, b1);
+        }
         static BoundingBox merge(const BoundingBox &b1, const BoundingBox &b2) {
             return BoundingBox(min(b1.pmin, b2.pmin), max(b1.pmax, b2.pmax));
         }
