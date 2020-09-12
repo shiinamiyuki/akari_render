@@ -25,5 +25,5 @@ namespace akari {
     void set_device_gpu() { std::abort(); }
     void set_device_cpu() {}
 
-    std::pmr::memory_resource *get_device_memory_resource() { return std::pmr::get_default_resource(); }
+    astd::pmr::memory_resource *get_device_memory_resource() { return astd::pmr::get_default_resource(); }
 } // namespace akari

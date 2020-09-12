@@ -27,11 +27,11 @@
 #include <akari/core/mode.h>
 #include <akari/common/bufferview.h>
 namespace akari {
-    std::pmr::memory_resource *get_device_memory_resource();
+    astd::pmr::memory_resource *get_device_memory_resource();
     // template <typename T> using Buffer = std::vector<T, std::pmr::polymorphic_allocator<T>>;
     template <typename T>
-    struct DeviceAllocator : std::pmr::polymorphic_allocator<T> {
-        DeviceAllocator() : std::pmr::polymorphic_allocator<T>(get_device_memory_resource()) {}
+    struct DeviceAllocator : astd::pmr::polymorphic_allocator<T> {
+        DeviceAllocator() : astd::pmr::polymorphic_allocator<T>(get_device_memory_resource()) {}
     };
     template <typename T>
     struct BufferView;

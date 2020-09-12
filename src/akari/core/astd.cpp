@@ -20,11 +20,24 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#pragma once
 #include <akari/common/astd.h>
-namespace akari {
-    void set_device_gpu();
-    void set_device_cpu();
 
-    astd::pmr::memory_resource *get_device_memory_resource();
-} // namespace akari
+namespace akari::astd {
+    namespace pmr {
+        class new_delete_resource_impl : public memory_resource {
+          public:
+            void *do_allocate(size_t bytes, size_t alignment) { return aligned_alloc(alignment, bytes); }
+            void do_deallocate(void *p, size_t bytes, size_t alignment) { free(p); }
+            bool do_is_equal(const memory_resource &other) const noexcept { return &other == this; }
+        };
+        static new_delete_resource_impl _new_delete_resource;
+        static memory_resource *_default_resource = &_new_delete_resource;
+        AKR_EXPORT memory_resource *new_delete_resource() noexcept { return &_new_delete_resource; }
+        AKR_EXPORT memory_resource *set_default_resource(memory_resource *r) noexcept {
+            auto tmp = _default_resource;
+            _default_resource = r;
+            return tmp;
+        }
+        AKR_EXPORT memory_resource *get_default_resource() noexcept { return _default_resource; }
+    } // namespace pmr
+} // namespace akari::astd
