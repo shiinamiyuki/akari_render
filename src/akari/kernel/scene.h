@@ -34,6 +34,8 @@
 namespace akari {
     AKR_VARIANT
     class EmbreeAccelerator;
+    AKR_VARIANT
+    class BVHAccelerator;
     AKR_VARIANT struct Intersection {
         AKR_IMPORT_TYPES()
         Point3f p;
@@ -52,6 +54,7 @@ namespace akari {
         Sampler<C> sampler;
         BufferView<AreaLight<C>> area_lights;
         EmbreeAccelerator<C> *embree_scene = nullptr;
+        BVHAccelerator<C> * bvh_scene = nullptr;
 
         AKR_CPU bool intersect(const Ray3f &ray, Intersection<C> *isct) const;
         AKR_CPU bool occlude(const Ray3f &ray) const;

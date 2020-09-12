@@ -148,6 +148,9 @@ namespace akari {
             _size = 0;
             _capacity = 0;
         }
+        const T &back() const { return *(end() - 1); }
+        T &back() { return *(end() - 1); }
+
       private:
         Allocator allocator;
         T *_data = nullptr;

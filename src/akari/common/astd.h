@@ -85,6 +85,12 @@ namespace akari {
                 }
                 return *this;
             }
+            template <typename... Ts>
+            AKR_XPU void emplace(Ts &&... args) {
+                reset();
+                new (ptr()) T(std::forward<Ts>(args)...);
+                set = true;
+            }
             AKR_XPU
             optional &operator=(optional &&v) {
                 reset();
@@ -165,6 +171,7 @@ namespace akari {
         template <typename T, int N>
         class array {
             T _data[N] = {};
+
           public:
             AKR_XPU array() = default;
             AKR_XPU T *data() { return _data; }

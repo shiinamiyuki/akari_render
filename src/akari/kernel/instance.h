@@ -41,7 +41,7 @@ namespace akari {
             int prim_id = -1;
             int mat_idx = -1;
         };
-        AKR_XPU bool interect(const Ray3f &ray, int prim_id, RayHit *hit) const {
+        AKR_XPU bool intersect(const Ray3f &ray, int prim_id, RayHit *hit) const {
             int idx0 = indices[3 * prim_id + 0];
             int idx1 = indices[3 * prim_id + 1];
             int idx2 = indices[3 * prim_id + 2];

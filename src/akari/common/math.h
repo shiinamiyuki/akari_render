@@ -41,7 +41,6 @@ namespace akari {
         static constexpr Float ShadowEps() { return Float(0.0001f); }
     };
 
-
     template <typename V, typename V2>
     inline V lerp3(const V &v0, const V &v1, const V &v2, const V2 &uv) {
         return (1.0f - uv[0] - uv[1]) * v0 + uv[0] * v1 + uv[1] * v2;
@@ -306,13 +305,8 @@ namespace akari {
         Vector extents() const { return pmax - pmin; }
         Vector size() const { return extents(); }
         Vector offset(const Point &p) { return (p - pmin) / extents(); }
-        void expand(const Point &p) {
-            pmin = min(pmin, p);
-            pmax = max(pmax, p);
-        }
-        BoundingBox merge(const BoundingBox &b1)const{
-            return merge(*this, b1);
-        }
+        BoundingBox expand(const Point &p) const { return BoundingBox(min(pmin, p), max(pmax, p)); }
+        BoundingBox merge(const BoundingBox &b1) const { return merge(*this, b1); }
         static BoundingBox merge(const BoundingBox &b1, const BoundingBox &b2) {
             return BoundingBox(min(b1.pmin, b2.pmin), max(b1.pmax, b2.pmax));
         }

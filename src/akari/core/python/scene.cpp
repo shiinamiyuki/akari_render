@@ -24,6 +24,7 @@
 #include <pybind11/stl.h>
 #include <akari/core/python/scene.h>
 #include <akari/kernel/embree.inl>
+#include <akari/kernel/bvh-accelerator.h>
 #include <akari/core/film.h>
 
 namespace akari {
@@ -68,8 +69,8 @@ namespace akari {
         auto res = scene.camera.resolution();
         auto film = Film<C>(res);
         scene.sampler = RandomSampler<C>();
-        auto embree_scene = EmbreeAccelerator<C>();
-        scene.embree_scene = &embree_scene;
+        auto embree_scene = BVHAccelerator<C>();
+        scene.bvh_scene = &embree_scene;
         scene.commit();
         auto integrator_ = integrator->compile(&arena);
         integrator_->render(scene, &film);

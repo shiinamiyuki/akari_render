@@ -21,12 +21,12 @@
 // SOFTWARE.
 
 #include <akari/kernel/scene.h>
-
+#include <akari/kernel/bvh-accelerator.h>
 namespace akari {
     AKR_VARIANT bool Scene<C>::intersect(const Ray<C> &ray, Intersection<C> *intersection) const {
         bool hit = false;
         if constexpr (akari_enable_embree) {
-            hit = embree_scene->intersect(ray, intersection);
+            hit = bvh_scene->intersect(ray, intersection);
         } else {
             std::abort();
         }
@@ -37,14 +37,14 @@ namespace akari {
     }
     AKR_VARIANT bool Scene<C>::occlude(const Ray<C> &ray) const {
         if constexpr (akari_enable_embree) {
-            return embree_scene->occlude(ray);
+            return bvh_scene->occlude(ray);
         } else {
             std::abort();
         }
-        }
+    }
     AKR_VARIANT void Scene<C>::commit() {
         if constexpr (akari_enable_embree) {
-            embree_scene->build(*this);
+            bvh_scene->build(*this);
         } else {
         }
     }
