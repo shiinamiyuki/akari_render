@@ -66,6 +66,7 @@ namespace akari {
             Vector3f t0 = (box.pmin - ray.o) * invd;
             Vector3f t1 = (box.pmax - ray.o) * invd;
             Vector3f tMin = min(t0, t1), tMax = max(t0, t1);
+            // debug("t0: {} t1: {} tmin:{} tmax:{}\n", t0, t1, tMin, tMax);
             if (hmax(tMin) <= hmin(tMax)) {
                 auto t = std::max(ray.tmin, hmax(tMin));
                 if (t >= ray.tmax) {

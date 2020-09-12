@@ -38,12 +38,12 @@ namespace akari {
     inline bool all(bool a) { return a; }
     inline bool all(float a) { return a; }
     inline bool all(double a) { return a; }
-    inline float min(float a, float b) { return std::min(a, b); }
-    inline float min(double a, double b) { return std::min(a, b); }
-    inline float min(int a, int b) { return std::min(a, b); }
-    inline float max(float a, float b) { return std::max(a, b); }
-    inline float max(double a, double b) { return std::max(a, b); }
-    inline float max(int a, int b) { return std::max(a, b); }
+    inline auto min(float a, float b) { return std::min(a, b); }
+    inline auto min(double a, double b) { return std::min(a, b); }
+    inline auto min(int a, int b) { return std::min(a, b); }
+    inline auto max(float a, float b) { return std::max(a, b); }
+    inline auto max(double a, double b) { return std::max(a, b); }
+    inline auto max(int a, int b) { return std::max(a, b); }
     template <typename T, int N, int packed>
     struct alignas(compute_align<T, N, packed>()) Array {
         static constexpr int padded_size = (int)compute_padded_size<T, N, packed>();

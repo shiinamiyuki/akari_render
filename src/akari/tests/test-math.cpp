@@ -33,6 +33,19 @@ TEST(TestMath, Color) {
     ASSERT_LT(x[1], 1.0f);
     ASSERT_LT(x[2], 1.0f);
 }
+TEST(TestMath, Reduce) {
+    using Float = float;
+    AKR_IMPORT_CORE_TYPES() {
+        Vector3i v(1, 2, 3);
+        ASSERT_EQ(hmin(v), 1);
+        ASSERT_EQ(hmax(v), 3);
+    }
+    {
+        Vector3f v(1, 2, 3);
+        ASSERT_EQ(hmin(v), 1);
+        ASSERT_EQ(hmax(v), 3);
+    }
+}
 TEST(TestMath, Frame) {
     using Float = float;
     AKR_IMPORT_CORE_TYPES()
