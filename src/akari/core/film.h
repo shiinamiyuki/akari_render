@@ -26,7 +26,7 @@
 #include <akari/common/fwd.h>
 #include <akari/core/image.hpp>
 #include <akari/core/parallel.h>
-#include <akari/core/buffer.h>
+#include <akari/common/buffer.h>
 
 namespace akari {
     AKR_VARIANT struct Pixel {

@@ -59,7 +59,7 @@ namespace akari {
         void commit();
         AKR_XPU Triangle<C> get_triangle(int mesh_id, int prim_id) const {
             auto &mesh = meshes[mesh_id];
-            Triangle<C> trig = get_triangle(mesh, prim_id);
+            Triangle<C> trig = akari::get_triangle<C>(mesh, prim_id);
             auto mat_idx = mesh.material_indices[prim_id];
             if (mat_idx != -1) {
                 trig.material = mesh.materials[mat_idx];

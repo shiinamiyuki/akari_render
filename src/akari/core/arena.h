@@ -25,7 +25,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <list>
-#include <akari/core/buffer.h>
+#include <akari/common/buffer.h>
 namespace akari {
     class MemoryArena {
         static constexpr size_t align16(size_t x) { return (x + 15ULL) & (~15ULL); }

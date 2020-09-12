@@ -63,7 +63,10 @@ namespace akari {
         size_t triangleCount;
         in.read(reinterpret_cast<char *>(&vertexCount), sizeof(size_t));
         in.read(reinterpret_cast<char *>(&triangleCount), sizeof(size_t));
+        debug("{} {}\n",_mesh->vertices.size(), _mesh->vertices.capacity());
         _mesh->vertices.resize(vertexCount * 3);
+        debug("{} {} {}\n",vertexCount * 3, _mesh->vertices.size(), _mesh->vertices.capacity());
+        AKR_ASSERT(_mesh->vertices.data() != nullptr);
         in.read(reinterpret_cast<char *>(_mesh->vertices.data()), sizeof(float) * vertexCount * 3);
         _mesh->normals.resize(triangleCount * 9);
         in.read(reinterpret_cast<char *>(_mesh->normals.data()), sizeof(float) * triangleCount * 9);

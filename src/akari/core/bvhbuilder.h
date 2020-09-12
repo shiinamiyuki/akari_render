@@ -20,7 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 #include <akari/common/math.h>
-#include <akari/core/buffer.h>
+#include <akari/common/buffer.h>
 #include <akari/kernel/meshview.h>
 namespace akari {
     template <class Float, class UserData, class ShapeHandleConstructor>

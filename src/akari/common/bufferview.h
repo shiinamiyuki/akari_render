@@ -24,11 +24,13 @@
 
 namespace akari {
     template <typename T>
+    struct Buffer;
+    template <typename T>
     struct BufferView {
-        BufferView() = default;
-        BufferView(T *data, size_t size) : _data(data), _size(size) {}
-        template <typename Allocator>
-        AKR_CPU BufferView(std::vector<std::remove_const_t<T>, Allocator> &vec) : BufferView(vec.data(), vec.size()) {}
+        AKR_XPU BufferView() = default;
+        AKR_XPU BufferView(T *data, size_t size) : _data(data), _size(size) {}
+
+        AKR_XPU BufferView(const Buffer<T> &vec) : BufferView(vec.data(), vec.size()) {}
         AKR_XPU T &operator[](uint32_t i) const { return _data[i]; }
         AKR_XPU size_t size() const { return _size; }
         AKR_XPU T *begin() const { return _data; }
