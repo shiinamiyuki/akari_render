@@ -54,7 +54,7 @@ namespace akari {
                         std::abort();
                     }
                 } else {
-                    return arg->occlude(ray, intersection);
+                    return arg->occlude(ray);
                 }
             });
         } else {
@@ -63,7 +63,7 @@ namespace akari {
     }
     AKR_VARIANT void Scene<C>::commit() {
         if constexpr (akari_enable_embree) {
-            accel.accept([&](auto &&arg) -> bool {
+            accel.accept([&](auto &&arg) {
                 using T = std::decay_t<decltype(arg)>;
                 if constexpr (std::is_same_v<T, EmbreeAccelerator<C> *>) {
                     if constexpr (akari_enable_embree) {
