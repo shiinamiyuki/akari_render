@@ -23,7 +23,7 @@
 #ifndef AKARIRENDER_LOGGER_H
 #define AKARIRENDER_LOGGER_H
 
-#include <akari/core/platform.h>
+#include <akari/common/platform.h>
 #include <akari/common/color.h>
 #include <fmt/format.h>
 template <typename T, int N>

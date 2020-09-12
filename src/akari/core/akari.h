@@ -22,7 +22,7 @@
 
 #ifndef AKARIRENDER_AKARI_H
 #define AKARIRENDER_AKARI_H
-#include <akari/core/platform.h>
+#include <akari/common/platform.h>
 #include <akari/common/diagnostic.h>
 #ifdef __GNUC__
 #    if __GNUC__ >= 8

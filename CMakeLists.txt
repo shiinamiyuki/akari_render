@@ -31,6 +31,9 @@ endif()
 
 if(NOT WIN32)
     set(AKR_CORE_EXT_LIBS ${AKR_CORE_EXT_LIBS} pthread dl)
+    add_compile_definitions(AKR_PLATFORM_LINUX)
+else()
+    add_compile_definitions(_ENABLE_EXTENDED_ALIGNED_STORAGE AKR_PLATFORM_WINDOWS)
 endif()
 
 find_package(Python COMPONENTS Interpreter Development)
@@ -78,21 +81,23 @@ file(GLOB AKR_CORE_SRC src/akari/core/*.*)
 file(GLOB AKR_PYBIND_SRC src/akari/core/python/*.*)
 file(GLOB AKR_KERNEL_SRC src/akari/kernel/*.* src/akari/kernel/*/*.*)
 file(GLOB AKR_KERNEL_CPU_SRC src/akari/kernel/integrators/cpu/*.*)
-add_library(akari_core_base STATIC ${AKR_COMMON_SRC}  ${AKR_CORE_SRC} ${AKR_CONFIG_H}  ${AKR_SHADING_SRC})
+add_library(akari_core_base SHARED ${AKR_COMMON_SRC}  ${AKR_CORE_SRC} ${AKR_CONFIG_H}  ${AKR_SHADING_SRC})
 target_link_libraries(akari_core_base PUBLIC  ${AKR_CORE_EXT_LIBS} ${Python_LIBRARIES} ${EMBREE_LIBRARY})
 target_compile_options(akari_core_base PUBLIC ${AKR_CXX_FLAGS})
 target_include_directories(akari_core_base PUBLIC src/)
 target_include_directories(akari_core_base PUBLIC external/pybind11/include)
 target_include_directories(akari_core_base PUBLIC ${Python_INCLUDE_DIRS} ${EMBREE_INCLUDE_DIRS})
-target_precompile_headers(akari_core_base
-     PUBLIC ${PYBIND11_HEADERS}
-     <vector>
-     <string>
-     <unordered_map>
-     <memory>
-     <memory_resource>
-     <thread>
-     <atomic>)
+if(NOT WIN32)
+    target_precompile_headers(akari_core_base
+        PUBLIC ${PYBIND11_HEADERS}
+        <vector>
+        <string>
+        <unordered_map>
+        <memory>
+        <memory_resource>
+        <thread>
+        <atomic>)
+endif()
 set_target_properties(akari_core_base PROPERTIES UNITY_BUILD ON)
 add_library(akari_core SHARED ${AKR_COMMON_SRC} ${AKR_PYBIND_SRC} ${AKR_KERNEL_SRC} ${AKR_KERNEL_CPU_SRC})
 target_link_libraries(akari_core PUBLIC akari_core_base) 

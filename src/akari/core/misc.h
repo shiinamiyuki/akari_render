@@ -19,17 +19,9 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-
-#ifndef AKARIRENDER_APPLICATION_H
-#define AKARIRENDER_APPLICATION_H
-
-#include <akari/common/platform.h>
-namespace akari {
-    class AKR_EXPORT Application {
-      public:
-        Application();
-        ~Application();
-    };
-
-} // namespace akari
-#endif // AKARIRENDER_APPLICATION_H
+#include <tiny_obj_loader.h>
+namespace akari::misc {
+    AKR_EXPORT bool LoadObj(tinyobj::attrib_t *attrib, std::vector<tinyobj::shape_t> *shapes,
+                            std::vector<tinyobj::material_t> *materials, std::string *err, const char *filename,
+                            const char *mtl_basedir = nullptr, bool trianglulate = true);
+}

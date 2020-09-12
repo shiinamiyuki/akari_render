@@ -23,8 +23,8 @@
 #pragma once
 #include <akari/common/astd.h>
 namespace akari {
-    void set_device_gpu();
-    void set_device_cpu();
+    AKR_EXPORT void set_device_gpu();
+    AKR_EXPORT void set_device_cpu();
 
-    astd::pmr::memory_resource *get_device_memory_resource();
+    AKR_EXPORT astd::pmr::memory_resource *get_device_memory_resource();
 } // namespace akari

@@ -24,7 +24,7 @@
 #include <cxxopts.hpp>
 #include <akari/core/logger.h>
 #include <akari/core/mesh.h>
-#include <tiny_obj_loader.h>
+#include <akari/core/misc.h>
 using namespace akari;
 std::shared_ptr<Mesh> load_wavefront_obj(const fs::path &path, std::string &generated) {
     AKR_IMPORT_CORE_TYPES_WITH(float)
@@ -44,7 +44,7 @@ std::shared_ptr<Mesh> load_wavefront_obj(const fs::path &path, std::string &gene
 
     std::string _file = file.string();
     std::ostringstream os;
-    bool ret = tinyobj::LoadObj(&attrib, &shapes, &obj_materials, &err, _file.c_str());
+    bool ret = misc::LoadObj(&attrib, &shapes, &obj_materials, &err, _file.c_str());
     if (!ret) {
         error("error: {}\n", err);
         return nullptr;

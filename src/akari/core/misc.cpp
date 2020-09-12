@@ -21,3 +21,11 @@
 // SOFTWARE.
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
+#include <akari/common/platform.h>
+namespace akari::misc {
+    AKR_EXPORT bool LoadObj(tinyobj::attrib_t *attrib, std::vector<tinyobj::shape_t> *shapes,
+                 std::vector<tinyobj::material_t> *materials, std::string *err, const char *filename,
+                 const char *mtl_basedir, bool trianglulate) {
+        return tinyobj::LoadObj(attrib, shapes, materials, err, filename, mtl_basedir, trianglulate);
+    }
+} // namespace akari::misc

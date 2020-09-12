@@ -163,7 +163,8 @@ namespace akari {
         return std::vector<const char *>(std::begin(enabled_variants), std::end(enabled_variants));
     }
     AKR_VARIANT void register_scene_graph(py::module &m) { RegisterSceneGraph<C>::register_scene_graph(m); }
-    PYBIND11_EMBEDDED_MODULE(akari, m) {
+    AKR_EXPORT void register_module_akari(py::module &m) {
+        info("registering module\n");
         register_utility(m);
         register_invariant_math_functions(m);
         m.def("enabled_variants", _get_enabled_variants);

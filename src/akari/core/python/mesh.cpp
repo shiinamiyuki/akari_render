@@ -24,7 +24,7 @@
 #include <akari/core/resource.h>
 #include <akari/core/mesh.h>
 // #define TINYOBJLOADER_IMPLEMENTATION
-#include <tiny_obj_loader.h>
+#include <akari/core/misc.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/embed.h>
 #include <pybind11/stl.h>
@@ -113,7 +113,7 @@ namespace akari {
 
             std::string _file = file.string();
 
-            bool ret = tinyobj::LoadObj(&attrib, &shapes, &obj_materials, &err, _file.c_str());
+            bool ret = misc::LoadObj(&attrib, &shapes, &obj_materials, &err, _file.c_str());
             (void)ret;
             mesh.vertices.resize(attrib.vertices.size());
             std::memcpy(&mesh.vertices[0], &attrib.vertices[0], sizeof(float) * mesh.vertices.size());

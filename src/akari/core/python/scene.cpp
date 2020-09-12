@@ -54,6 +54,7 @@ namespace akari {
                     continue;
                 if (material->template isa<EmissiveMaterial<C>>()) {
                     const EmissiveMaterial<C> *e = material->template get<EmissiveMaterial<C>>();
+                    (void)e;
                     area_lights.emplace_back(triangle);
                 }
             }
@@ -70,7 +71,7 @@ namespace akari {
         auto film = Film<C>(res);
         scene.sampler = RandomSampler<C>();
         auto embree_scene = BVHAccelerator<C>();
-        scene.bvh_scene = &embree_scene;
+        scene.accel = &embree_scene;
         scene.commit();
         auto integrator_ = integrator->compile(&arena);
         integrator_->render(scene, &film);

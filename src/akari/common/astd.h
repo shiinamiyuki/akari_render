@@ -24,7 +24,7 @@
 #include <new>
 #include <akari/common/panic.h>
 #include <akari/common/def.h>
-#include <akari/core/platform.h>
+#include <akari/common/platform.h>
 #include <math.h>
 
 // port some nessary stl class to CUDA

@@ -24,7 +24,7 @@
 #define AKARIRENDER_RESOURCE_H
 
 #include <akari/core/akari.h>
-#include <akari/core/platform.h>
+#include <akari/common/platform.h>
 #include <akari/core/error.hpp>
 
 namespace akari {

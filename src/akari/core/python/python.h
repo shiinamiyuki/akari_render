@@ -31,4 +31,5 @@ namespace akari {
         static void register_math_functions(py::module &m);
     };
     void register_utility(py::module &m);
+    AKR_EXPORT void register_module_akari(py::module &m);
 } // namespace akari

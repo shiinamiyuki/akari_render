@@ -26,8 +26,20 @@ namespace akari::astd {
     namespace pmr {
         class new_delete_resource_impl : public memory_resource {
           public:
-            void *do_allocate(size_t bytes, size_t alignment) { return aligned_alloc(alignment, bytes); }
-            void do_deallocate(void *p, size_t bytes, size_t alignment) { free(p); }
+            void *do_allocate(size_t bytes, size_t alignment) {
+#ifdef AKR_PLATFORM_WINDOWS
+                return _aligned_malloc(bytes, alignment);
+#else
+                return aligned_alloc(alignment, bytes);
+#endif
+            }
+            void do_deallocate(void *p, size_t bytes, size_t alignment) {
+#ifdef AKR_PLATFORM_WINDOWS
+                return _aligned_free(p);
+#else
+                return free(p);
+#endif
+            }
             bool do_is_equal(const memory_resource &other) const noexcept { return &other == this; }
         };
         static new_delete_resource_impl _new_delete_resource;

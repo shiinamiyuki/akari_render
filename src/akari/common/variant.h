@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <cstring>
 #include <akari/common/panic.h>
+#include <akari/common/platform.h>
 namespace akari {
     template <typename... T>
     struct TypeIndex {

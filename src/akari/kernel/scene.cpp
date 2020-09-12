@@ -25,11 +25,19 @@
 namespace akari {
     AKR_VARIANT bool Scene<C>::intersect(const Ray<C> &ray, Intersection<C> *intersection) const {
         bool hit = false;
-        if constexpr (akari_enable_embree) {
-            hit = bvh_scene->intersect(ray, intersection);
-        } else {
-            std::abort();
-        }
+        accel.accept([&](auto &&arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, EmbreeAccelerator<C> *>) {
+                if constexpr (akari_enable_embree) {
+                    hit = arg->intersect(ray, intersection);
+                } else {
+                    std::abort();
+                }
+            } else {
+                hit = arg->intersect(ray, intersection);
+            }
+        });
+
         if (hit) {
             intersection->p = ray(intersection->t);
         }
@@ -37,14 +45,36 @@ namespace akari {
     }
     AKR_VARIANT bool Scene<C>::occlude(const Ray<C> &ray) const {
         if constexpr (akari_enable_embree) {
-            return bvh_scene->occlude(ray);
+            return accel.accept([&](auto &&arg) -> bool {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, EmbreeAccelerator<C> *>) {
+                    if constexpr (akari_enable_embree) {
+                        return arg->occlude(ray);
+                    } else {
+                        std::abort();
+                    }
+                } else {
+                    return arg->occlude(ray, intersection);
+                }
+            });
         } else {
             std::abort();
         }
     }
     AKR_VARIANT void Scene<C>::commit() {
         if constexpr (akari_enable_embree) {
-            bvh_scene->build(*this);
+            accel.accept([&](auto &&arg) -> bool {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, EmbreeAccelerator<C> *>) {
+                    if constexpr (akari_enable_embree) {
+                        return arg->build(*this);
+                    } else {
+                        std::abort();
+                    }
+                } else {
+                    return arg->build(*this);
+                }
+            });
         } else {
         }
     }

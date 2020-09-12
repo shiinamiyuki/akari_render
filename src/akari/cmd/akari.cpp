@@ -26,6 +26,7 @@
 #include <akari/core/application.h>
 #include <akari/core/logger.h>
 #include <akari/core/python/scenegraph.h>
+#include <akari/core/python/python.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/embed.h>
 using namespace akari;
@@ -58,6 +59,7 @@ void parse(int argc, const char **argv) {
         exit(1);
     }
 }
+PYBIND11_EMBEDDED_MODULE(akari, m) { akari::register_module_akari(m); }
 int main(int argc, const char **argv) {
     Application app;
     parse(argc, argv);

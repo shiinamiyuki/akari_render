@@ -70,6 +70,7 @@ namespace akari {
                 auto tile = film->tile(tileBounds);
                 auto &camera = scene.camera;
                 auto &arena = small_arenas[tid];
+                (void)arena;
                 auto sampler = scene.sampler;
                 for (int y = tile.bounds.pmin.y(); y < tile.bounds.pmax.y(); y++) {
                     for (int x = tile.bounds.pmin.x(); x < tile.bounds.pmax.x(); x++) {
@@ -101,7 +102,6 @@ namespace akari {
                     Intersection<C> intersection;
                     if (scene.intersect(ray, &intersection)) {
                         auto trig = scene.get_triangle(intersection.geom_id, intersection.prim_id);
-                        auto &mesh = scene.meshes[intersection.geom_id];
                         SurfaceInteraction<C> si(intersection, trig);
                         MaterialEvalContext<C> ctx(sampler, si, arena);
                         auto wo = -ray.d;
