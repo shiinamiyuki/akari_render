@@ -25,7 +25,7 @@
 #include <akari/common/fwd.h>
 #include <akari/common/buffer.h>
 #include <akari/core/arena.h>
-#include <akari/kernel/meshview.h>
+#include <akari/kernel/instance.h>
 #include <akari/kernel/integrators/cpu/integrator.h>
 // #include <akari/kernel/material.h>
 namespace pybind11 {

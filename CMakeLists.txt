@@ -93,10 +93,10 @@ target_precompile_headers(akari_core_base
      <memory_resource>
      <thread>
      <atomic>)
-# set_target_properties(akari_core_base PROPERTIES UNITY_BUILD ON)
+set_target_properties(akari_core_base PROPERTIES UNITY_BUILD ON)
 add_library(akari_core SHARED ${AKR_COMMON_SRC} ${AKR_PYBIND_SRC} ${AKR_KERNEL_SRC} ${AKR_KERNEL_CPU_SRC})
 target_link_libraries(akari_core PUBLIC akari_core_base) 
-# set_target_properties(akari_core PROPERTIES UNITY_BUILD ON)
+set_target_properties(akari_core PROPERTIES UNITY_BUILD ON)
 
 # file(GLOB AKR_KERNEL_SRC src/akari/kernel/*.* src/akari/kernel/*/*.*)
 # add_library(akari_kernel ${AKR_KERNEL_SRC})

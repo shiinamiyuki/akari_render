@@ -21,7 +21,7 @@
 // SOFTWARE.
 #include <akari/common/math.h>
 #include <akari/common/buffer.h>
-#include <akari/kernel/meshview.h>
+#include <akari/kernel/instance.h>
 namespace akari {
     template <class Float, class UserData, class ShapeHandleConstructor>
     struct BVHBuilder {

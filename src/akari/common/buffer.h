@@ -148,7 +148,6 @@ namespace akari {
             _size = 0;
             _capacity = 0;
         }
-
       private:
         Allocator allocator;
         T *_data = nullptr;

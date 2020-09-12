@@ -27,7 +27,7 @@
 namespace akari {
     AKR_VARIANT void EmbreeAccelerator<C>::build(Scene<C> &scene) {
         rtcScene = rtcNewScene(device);
-        for (const MeshView<C> &mesh : scene.meshes) {
+        for (const MeshInstance<C> &mesh : scene.meshes) {
             auto geometry = rtcNewGeometry(device, RTC_GEOMETRY_TYPE_TRIANGLE);
             rtcSetSharedGeometryBuffer(geometry, RTC_BUFFER_TYPE_VERTEX, 0, RTC_FORMAT_FLOAT3, &mesh.vertices[0], 0,
                                        sizeof(float) * 3, mesh.vertices.size() / 3);

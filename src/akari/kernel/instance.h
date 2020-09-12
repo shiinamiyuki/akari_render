@@ -27,7 +27,7 @@
 #include <akari/kernel/material.h>
 #include <akari/kernel/shape.h>
 namespace akari {
-    AKR_VARIANT struct MeshView {
+    AKR_VARIANT struct MeshInstance {
         BufferView<float> vertices, normals, texcoords;
         BufferView<int> indices;
         BufferView<int> material_indices;

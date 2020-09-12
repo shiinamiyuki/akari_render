@@ -40,12 +40,12 @@ namespace akari {
 
         scene.camera = camera->compile(arena);
         for (auto &shape : shapes) {
-            meshviews.emplace_back(shape->compile(arena));
+            instances.emplace_back(shape->compile(arena));
         }
-        scene.meshes = meshviews;
+        scene.meshes = instances;
         area_lights.clear();
         for (uint32_t mesh_id = 0; mesh_id < scene.meshes.size(); mesh_id++) {
-            MeshView<C> &mesh = scene.meshes[mesh_id];
+            MeshInstance<C> &mesh = scene.meshes[mesh_id];
             for (uint32_t prim_id = 0; prim_id < mesh.indices.size() / 3; prim_id++) {
                 auto triangle = scene.get_triangle(mesh_id, prim_id);
                 auto material = triangle.material;

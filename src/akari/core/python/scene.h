@@ -30,7 +30,7 @@ namespace akari {
     AKR_VARIANT class SceneNode : public SceneGraphNode<C> {
       public:
         AKR_IMPORT_TYPES()
-        Buffer<MeshView<C>> meshviews;
+        Buffer<MeshInstance<C>> instances;
         std::string variant;
         std::shared_ptr<CameraNode<C>> camera;
         std::vector<std::shared_ptr<MeshNode<C>>> shapes;

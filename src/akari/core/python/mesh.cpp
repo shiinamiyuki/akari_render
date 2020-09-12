@@ -49,9 +49,9 @@ namespace akari {
                 std::abort();
             }
         }
-        MeshView<C> compile(MemoryArena *arena) override {
+        MeshInstance<C> compile(MemoryArena *arena) override {
             commit();
-            MeshView<C> view;
+            MeshInstance<C> view;
             view.indices = mesh->indices;
             view.material_indices = mesh->material_indices;
             view.normals = mesh->normals;
@@ -87,9 +87,9 @@ namespace akari {
                 return;
             (void)load_wavefront_obj(path);
         }
-        MeshView<C> compile(MemoryArena *) override {
+        MeshInstance<C> compile(MemoryArena *) override {
             commit();
-            MeshView<C> view;
+            MeshInstance<C> view;
             view.indices = mesh.indices;
             view.material_indices = mesh.material_indices;
             view.normals = mesh.normals;

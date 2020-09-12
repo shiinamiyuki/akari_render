@@ -22,7 +22,7 @@
 
 #pragma once
 #include <akari/common/math.h>
-#include <akari/kernel/meshview.h>
+#include <akari/kernel/instance.h>
 #include <akari/kernel/camera.h>
 #include <akari/kernel/sampler.h>
 #include <akari/kernel/shape.h>
@@ -47,7 +47,7 @@ namespace akari {
     AKR_VARIANT class Scene {
       public:
         AKR_IMPORT_TYPES()
-        BufferView<MeshView<C>> meshes;
+        BufferView<MeshInstance<C>> meshes;
         Camera<C> camera;
         Sampler<C> sampler;
         BufferView<AreaLight<C>> area_lights;
