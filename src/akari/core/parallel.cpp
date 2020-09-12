@@ -112,10 +112,12 @@ namespace akari {
             }
         }
     };
-    static std::once_flag flag;
-    static std::unique_ptr<ParallelForWorkPool> pool;
+    namespace thread_internal {
+        static std::once_flag flag;
+        static std::unique_ptr<ParallelForWorkPool> pool;
+    } // namespace thread_internal
     void parallel_for(int count, const std::function<void(uint32_t, uint32_t)> &func, size_t chunkSize) {
-
+        using namespace thread_internal;
         std::call_once(flag, [&]() { pool = std::make_unique<ParallelForWorkPool>(); });
         ParallelForContext ctx;
         ctx.func = &func;
@@ -126,5 +128,8 @@ namespace akari {
         pool->wait();
     }
 
-    void ThreadPoolFinalize() { pool.reset(nullptr); }
+    void ThreadPoolFinalize() {
+        using namespace thread_internal;
+        pool.reset(nullptr);
+    }
 } // namespace akari

@@ -213,21 +213,21 @@ namespace akari {
     template <typename T, int N>
     using PackedArray = Array<T, N, 1>;
 
-#pragma GCC diagnostic push
-#if defined(__GNUG__) && !defined(__clang__)
-#    pragma GCC diagnostic ignored "-Wclass-memaccess"
-#endif
     template <typename T, typename = std::enable_if_t<is_array_v<T>>>
     T load(const void *p) {
         T v;
-        std::memcpy(&v, p, sizeof(T));
+        for (size_t i = 0; i < array_size_v<T>; i++) {
+            v[i] = reinterpret_cast<const value_t<T> *>(p)[i];
+        }
         return v;
     }
     template <typename T, int N, int P>
     void store(void *p, const Array<T, N, P> &a) {
-        std::memcpy(p, &a, sizeof(Array<T, N, P>));
+        for (size_t i = 0; i < array_size_v<T>; i++) {
+            reinterpret_cast<T *>(p)[i] = a[i];
+        }
     }
-#pragma GCC diagnostic pop
+
     template <typename T, int N>
     T length(const Array<T, N> &a) {
         return sqrt(dot(a, a));
