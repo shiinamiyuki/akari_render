@@ -21,9 +21,43 @@
 // SOFTWARE.
 
 #include <akari/core/mode.h>
+#ifdef AKR_ENABLE_GPU
+#    include <cuda.h>
+#    include <cuda_runtime_api.h>
+#    include <akari/kernel/cuda/util.h>
+#endif
 namespace akari {
-    void set_device_gpu() { std::abort(); }
-    void set_device_cpu() {}
-
-    astd::pmr::memory_resource *get_device_memory_resource() { return astd::pmr::get_default_resource(); }
+#ifdef AKR_ENABLE_GPU
+    class cuda_unified_memory_resource : public astd::pmr::memory_resource {
+      public:
+        void *do_allocate(size_t bytes, size_t alignment) {
+            void *p;
+            CUDA_CHECK(cudaMallocManaged(&p, bytes));
+            return p;
+        }
+        void do_deallocate(void *p, size_t bytes, size_t alignment) { CUDA_CHECK(cudaFree(p)); }
+        bool do_is_equal(const memory_resource &other) const noexcept { return &other == this; }
+    };
+    static cuda_unified_memory_resource _cuda_unified_memory_resource;
+#endif
+    namespace _mode_internal {
+        ComputeDevice cur_device = ComputeDevice::cpu;
+    }
+#ifndef AKR_ENABLE_GPU
+    void set_device_gpu() {
+        fatal("gpu rendering is not supported\n");
+        std::abort();
+    }
+#else
+    void set_device_gpu() { _mode_internal::cur_device = ComputeDevice::gpu; }
+#endif
+    void set_device_cpu() { _mode_internal::cur_device = ComputeDevice::cpu; }
+    AKR_EXPORT ComputeDevice get_device() { return _mode_internal::cur_device; }
+    astd::pmr::memory_resource *get_device_memory_resource() {
+        if (get_device() == ComputeDevice::cpu) {
+            return astd::pmr::get_default_resource();
+        } else {
+            return &_cuda_unified_memory_resource;
+        }
+    }
 } // namespace akari

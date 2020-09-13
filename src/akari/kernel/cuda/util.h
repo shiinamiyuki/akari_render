@@ -22,33 +22,14 @@
 
 #pragma once
 
-// Predefined macros:
-/*
-AKR_ENABLE_GPU
-AKR_ENABLE_CPU (always on)
-AKR_ENABLE_EMBREE
-AKR_GPU_BACKEND_CUDA
-AKR_GPU_BACKEND_SYCL
-AKR_GPU_BACKEND_METAL
-AKR_PLATFORM_WINDOWS
-AKR_PLATFORM_LINUX
-*/
+#include <akari/core/logger.h>
 
-#if defined(__CUDA_ARCH__)
-#    define AKR_GPU_CODE
-#endif
-
-#ifdef AKR_GPU_CODE
-
-#    ifdef AKR_GPU_BACKEND_CUDA
-#        define AKR_CPU __host__
-#        define AKR_GPU __device__
-
-#    endif
-
-#else
-#    define AKR_CPU
-#    define AKR_GPU
-#endif
-
-#define AKR_XPU AKR_GPU AKR_CPU
+namespace akari {
+#define CUDA_CHECK(EXPR)                                                                                               \
+    do {                                                                                                               \
+        if (EXPR != cudaSuccess) {                                                                                     \
+            cudaError_t error = cudaGetLastError();                                                                    \
+            fatal("CUDA error: {}", cudaGetErrorString(error));                                                        \
+        }                                                                                                              \
+    } while (0)
+} // namespace akari

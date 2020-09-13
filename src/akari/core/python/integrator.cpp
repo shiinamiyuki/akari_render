@@ -41,6 +41,16 @@ namespace akari {
             return arena->alloc<cpu::Integrator<C>>(cpu::PathTracer<C>(spp));
         }
     };
+#ifdef AKR_ENABLE_GPU
+    AKR_VARIANT class GPUAOIntegratorNode : public GPUIntegratorNode<C> {
+      public:
+        AKR_IMPORT_TYPES()
+        int spp = 16;
+        gpu::Integrator<C> *compile(MemoryArena *arena) override {
+            return arena->alloc<gpu::Integrator<C>>(gpu::AmbientOcclusion<C>(spp));
+        }
+    };
+#endif
     AKR_VARIANT void RegisterIntegratorNode<C>::register_nodes(py::module &m) {
         AKR_IMPORT_TYPES()
         py::class_<IntegratorNode<C>, SceneGraphNode<C>, std::shared_ptr<IntegratorNode<C>>>(m, "Integrator");
@@ -52,6 +62,12 @@ namespace akari {
             .def(py::init<>())
             .def_readwrite("spp", &PathIntegratorNode<C>::spp)
             .def("commit", &PathIntegratorNode<C>::commit);
+#ifdef AKR_ENABLE_GPU
+        py::class_<GPUAOIntegratorNode<C>, GPUIntegratorNode<C>, std::shared_ptr<GPUAOIntegratorNode<C>>>(m, "RTAO")
+            .def(py::init<>())
+            .def_readwrite("spp", &GPUAOIntegratorNode<C>::spp)
+            .def("commit", &GPUAOIntegratorNode<C>::commit);
+#endif
     }
     AKR_RENDER_STRUCT(RegisterIntegratorNode)
 } // namespace akari

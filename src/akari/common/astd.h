@@ -175,7 +175,7 @@ namespace akari::astd {
         T _data[N] = {};
 
       public:
-        AKR_XPU array() = default;
+        array() = default;
         AKR_XPU T *data() { return _data; }
         AKR_XPU const T *data() const { return _data; }
         AKR_XPU T &operator[](int i) { return _data[i]; }

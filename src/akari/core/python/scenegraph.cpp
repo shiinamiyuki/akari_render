@@ -52,8 +52,17 @@ namespace akari {
         RegisterMeshNode<C>::register_nodes(m);
         RegisterMaterialNode<C>::register_nodes(m);
         RegisterIntegratorNode<C>::register_nodes(m);
-        m.def("set_device_cpu", &set_device_cpu);
-        m.def("set_device_gpu", &set_device_gpu);
+        m.def("set_device_cpu", []() {
+            warning("compute device set to cpu\n");
+            warning("use akari [scene file] instead\n");
+            set_device_cpu();
+        });
+        m.def("set_device_gpu", []() {
+            warning("compute device set to gpu\n");
+            warning("use akari --gpu [scene file] instead\n");
+            set_device_gpu();
+        });
+        m.def("get_device", []() -> std::string { return get_device() == ComputeDevice::cpu ? "cpu" : "gpu"; });
     }
     AKR_RENDER_STRUCT(RegisterSceneGraph)
 } // namespace akari

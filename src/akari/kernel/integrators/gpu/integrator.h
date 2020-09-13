@@ -21,34 +21,25 @@
 // SOFTWARE.
 
 #pragma once
-
-// Predefined macros:
-/*
-AKR_ENABLE_GPU
-AKR_ENABLE_CPU (always on)
-AKR_ENABLE_EMBREE
-AKR_GPU_BACKEND_CUDA
-AKR_GPU_BACKEND_SYCL
-AKR_GPU_BACKEND_METAL
-AKR_PLATFORM_WINDOWS
-AKR_PLATFORM_LINUX
-*/
-
-#if defined(__CUDA_ARCH__)
-#    define AKR_GPU_CODE
-#endif
-
-#ifdef AKR_GPU_CODE
-
-#    ifdef AKR_GPU_BACKEND_CUDA
-#        define AKR_CPU __host__
-#        define AKR_GPU __device__
-
-#    endif
-
-#else
-#    define AKR_CPU
-#    define AKR_GPU
-#endif
-
-#define AKR_XPU AKR_GPU AKR_CPU
+#include <akari/common/fwd.h>
+#include <akari/common/variant.h>
+#include <akari/kernel/scene.h>
+namespace akari {
+    namespace gpu {
+        AKR_VARIANT class AmbientOcclusion {
+          public:
+            int spp = 16;
+            int tile_size = 16;
+            AKR_IMPORT_TYPES()
+            AmbientOcclusion() = default;
+            AmbientOcclusion(int spp) : spp(spp) {}
+            void render(const Scene<C> &scene, Film<C> *out) const;
+        };
+        AKR_VARIANT class Integrator : public Variant<AmbientOcclusion<C>> {
+          public:
+            AKR_IMPORT_TYPES()
+            using Variant<AmbientOcclusion<C>>::Variant;
+            void render(const Scene<C> &scene, Film<C> *out) const { AKR_VAR_DISPATCH(render, scene, out); }
+        };
+    } // namespace gpu
+} // namespace akari

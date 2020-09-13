@@ -25,6 +25,10 @@
 namespace akari {
     AKR_EXPORT void set_device_gpu();
     AKR_EXPORT void set_device_cpu();
-
+    enum class ComputeDevice {
+        cpu,
+        gpu
+    };
+    AKR_EXPORT ComputeDevice get_device();
     AKR_EXPORT astd::pmr::memory_resource *get_device_memory_resource();
 } // namespace akari

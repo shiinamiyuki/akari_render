@@ -27,7 +27,7 @@ namespace akari {
     struct Buffer;
     template <typename T>
     struct BufferView {
-        AKR_XPU BufferView() = default;
+        BufferView() = default;
         AKR_XPU BufferView(T *data, size_t size) : _data(data), _size(size) {}
 
         AKR_XPU BufferView(const Buffer<T> &vec) : BufferView(vec.data(), vec.size()) {}

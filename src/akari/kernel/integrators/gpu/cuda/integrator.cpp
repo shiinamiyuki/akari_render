@@ -20,29 +20,26 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#pragma once
-#include <functional>
-#include <mutex>
-namespace akari {
-    template<typename T>
-    struct Lazy{
-        Lazy(){
-            cb = std::make_shared<ControlBlock>();
-        }
-        template<typename F>
-        Lazy(F && f):f(f){}
-        T & get()const{
-            std::call_once(cb->flag, [&](){
-                cb->_result.emplace(f());
+#include <akari/core/parallel.h>
+#include <akari/kernel/integrators/gpu/integrator.h>
+#include <akari/core/film.h>
+#include <akari/core/logger.h>
+#include <akari/kernel/scene.h>
+#include <akari/kernel/interaction.h>
+#include <akari/kernel/material.h>
+#include <akari/kernel/sampling.h>
+#include <akari/core/arena.h>
+#include <akari/common/smallarena.h>
+#include <akari/kernel/cuda/launch.h>
+namespace akari::gpu {
+    AKR_VARIANT void AmbientOcclusion<C>::render(const Scene<C> &scene, Film<C> *film) const {
+        if constexpr (std::is_same_v<Float, float>) {
+            launch("test", 100, [] AKR_GPU(int i) {
+
             });
-            return cb->_result.value();
+        } else {
+            fatal("only float is supported for gpu\n");
         }
-    private:
-        std::function<T(void)> f;
-        struct ControlBlock{
-            std::once_flag flag;
-            std::optional<T> _result;
-        };
-        std::shared_ptr<ControlBlock> cb;
-    };
-}
+    }
+    AKR_RENDER_CLASS(AmbientOcclusion)
+} // namespace akari::gpu

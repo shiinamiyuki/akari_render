@@ -44,39 +44,32 @@ namespace akari {
         return hit;
     }
     AKR_VARIANT bool Scene<C>::occlude(const Ray<C> &ray) const {
-        if constexpr (akari_enable_embree) {
-            return accel.accept([&](auto &&arg) -> bool {
-                using T = std::decay_t<decltype(arg)>;
-                if constexpr (std::is_same_v<T, EmbreeAccelerator<C> *>) {
-                    if constexpr (akari_enable_embree) {
-                        return arg->occlude(ray);
-                    } else {
-                        std::abort();
-                    }
-                } else {
+        return accel.accept([&](auto &&arg) -> bool {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, EmbreeAccelerator<C> *>) {
+                if constexpr (akari_enable_embree) {
                     return arg->occlude(ray);
+                } else {
+                    std::abort();
                 }
-            });
-        } else {
-            std::abort();
-        }
+            } else {
+                return arg->occlude(ray);
+            }
+        });
     }
     AKR_VARIANT void Scene<C>::commit() {
-        if constexpr (akari_enable_embree) {
-            accel.accept([&](auto &&arg) {
-                using T = std::decay_t<decltype(arg)>;
-                if constexpr (std::is_same_v<T, EmbreeAccelerator<C> *>) {
-                    if constexpr (akari_enable_embree) {
-                        return arg->build(*this);
-                    } else {
-                        std::abort();
-                    }
-                } else {
+        accel.accept([&](auto &&arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, EmbreeAccelerator<C> *>) {
+                if constexpr (akari_enable_embree) {
                     return arg->build(*this);
+                } else {
+                    std::abort();
                 }
-            });
-        } else {
-        }
+            } else {
+                return arg->build(*this);
+            }
+        });
     }
 
     AKR_RENDER_CLASS(Scene)

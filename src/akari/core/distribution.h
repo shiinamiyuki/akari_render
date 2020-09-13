@@ -20,7 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-
+#if 0
 namespace akari {
     /*
      * Return the largest index i such that
@@ -124,3 +124,4 @@ namespace akari {
         }
     };
 } // namespace akari
+#endif

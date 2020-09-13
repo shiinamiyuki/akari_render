@@ -73,9 +73,25 @@ namespace akari {
         auto embree_scene = BVHAccelerator<C>();
         scene.accel = &embree_scene;
         scene.commit();
-        auto integrator_ = integrator->compile(&arena);
-        integrator_->render(scene, &film);
-        film.write_image(fs::path(output));
+        auto render_cpu = [&]() {
+            auto integrator_ = integrator->compile(&arena);
+            integrator_->render(scene, &film);
+            film.write_image(fs::path(output));
+        };
+#ifdef AKR_ENABLE_GPU
+        auto render_gpu = [&]() {
+            auto integrator_ = gpu_integrator->compile(&arena);
+            integrator_->render(scene, &film);
+            film.write_image(fs::path(output));
+        };
+#else
+        auto render_gpu = [&]() { fatal("gpu rendering is not supported\n"); };
+#endif
+        if (get_device() == ComputeDevice::cpu) {
+            render_cpu();
+        } else {
+            render_gpu();
+        }
         info("render done\n");
     }
     AKR_VARIANT void RegisterSceneNode<C>::register_nodes(py::module &m) {
