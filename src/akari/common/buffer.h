@@ -29,7 +29,7 @@
 namespace akari {
     astd::pmr::memory_resource *get_device_memory_resource();
     // template <typename T> using Buffer = std::vector<T, std::pmr::polymorphic_allocator<T>>;
-    template <typename T>
+    template <typename T = std::byte>
     struct DeviceAllocator : astd::pmr::polymorphic_allocator<T> {
         DeviceAllocator() : astd::pmr::polymorphic_allocator<T>(get_device_memory_resource()) {}
     };
@@ -53,7 +53,24 @@ namespace akari {
 
         Buffer() {}
         Buffer(size_t s) { resize(s); }
-        Buffer(const Buffer &) = delete;
+        Buffer(const Buffer &other) {
+            reserve(other.size());
+            for (size_t i = 0; i < other.size(); ++i)
+                this->allocator.construct(_data + i, other[i]);
+            _size = other.size();
+        }
+        Buffer &operator=(const Buffer &other) {
+            if (this == &other)
+                return *this;
+
+            clear();
+            reserve(other.size());
+            for (size_t i = 0; i < other.size(); ++i)
+                this->allocator.construct(_data + i, other[i]);
+            _size = other.size();
+
+            return *this;
+        }
         Buffer(Buffer &&rhs) : allocator(std::move(rhs.allocator)) {
             _data = rhs._data;
             _capacity = rhs._capacity;
@@ -61,7 +78,6 @@ namespace akari {
             rhs._data = nullptr;
             rhs._capacity = rhs._size = 0u;
         }
-        Buffer &operator=(const Buffer &) = delete;
         Buffer &operator=(Buffer &&rhs) {
             _data = rhs._data;
             _capacity = rhs._capacity;
@@ -148,8 +164,8 @@ namespace akari {
             _size = 0;
             _capacity = 0;
         }
-        const T &back() const { return *(end() - 1); }
-        T &back() { return *(end() - 1); }
+        AKR_XPU const T &back() const { return *(end() - 1); }
+        AKR_XPU T &back() { return *(end() - 1); }
 
       private:
         Allocator allocator;

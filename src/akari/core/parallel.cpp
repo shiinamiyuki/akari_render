@@ -127,9 +127,10 @@ namespace akari {
         pool->enqueue(ctx);
         pool->wait();
     }
-
-    void ThreadPoolFinalize() {
-        using namespace thread_internal;
-        pool.reset(nullptr);
-    }
+    namespace thread {
+        void finalize() {
+            using namespace thread_internal;
+            pool.reset(nullptr);
+        }
+    } // namespace thread
 } // namespace akari

@@ -42,7 +42,7 @@ namespace akari {
         Float fov;
         Float lens_radius = 0.0f;
         Float focal_distance = 0.0f;
-        void preprocess() {
+        AKR_XPU void preprocess() {
             Transform3f m;
             m = Transform3f::scale(Vector3f(1.0f / _resolution.x(), 1.0f / _resolution.y(), 1)) * m;
             m = Transform3f::scale(Vector3f(2, 2, 1)) * m;
@@ -59,12 +59,13 @@ namespace akari {
         }
 
       public:
-        PerspectiveCamera(const Point2i &_resolution, const Transform3f &c2w, Float fov)
+        AKR_XPU PerspectiveCamera(const Point2i &_resolution, const Transform3f &c2w, Float fov)
             : c2w(c2w), w2c(c2w.inverse()), _resolution(_resolution), fov(fov) {
             preprocess();
         }
-        Point2i resolution() const { return _resolution; }
-        void generate_ray(const Point2f &u1, const Point2f &u2, const Point2i &raster, CameraSample<C> *sample) const {
+        AKR_XPU Point2i resolution() const { return _resolution; }
+        AKR_XPU void generate_ray(const Point2f &u1, const Point2f &u2, const Point2i &raster,
+                                  CameraSample<C> *sample) const {
             sample->p_lens = sampling<C>::concentric_disk_sampling(u1) * lens_radius;
             sample->p_film = Point2f(raster) + (u2 - 0.5f);
             sample->weight = 1;
@@ -87,9 +88,10 @@ namespace akari {
       public:
         AKR_IMPORT_TYPES()
         using Variant<PerspectiveCamera<C>>::Variant;
-        void generate_ray(const Point2f &u1, const Point2f &u2, const Point2i &raster, CameraSample<C> *sample) const {
+        AKR_XPU void generate_ray(const Point2f &u1, const Point2f &u2, const Point2i &raster,
+                                  CameraSample<C> *sample) const {
             AKR_VAR_DISPATCH(generate_ray, u1, u2, raster, sample);
         }
-        Point2i resolution() const { AKR_VAR_DISPATCH(resolution); }
+        AKR_XPU Point2i resolution() const { AKR_VAR_DISPATCH(resolution); }
     };
 } // namespace akari

@@ -28,11 +28,15 @@ namespace akari {
         accel.accept([&](auto &&arg) {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, EmbreeAccelerator<C> *>) {
+#ifndef AKR_GPU_CODE
                 if constexpr (akari_enable_embree) {
                     hit = arg->intersect(ray, intersection);
                 } else {
-                    std::abort();
+                    astd::abort();
                 }
+#else
+                astd::abort();
+#endif
             } else {
                 hit = arg->intersect(ray, intersection);
             }
@@ -47,11 +51,15 @@ namespace akari {
         return accel.accept([&](auto &&arg) -> bool {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, EmbreeAccelerator<C> *>) {
+#ifndef AKR_GPU_CODE
                 if constexpr (akari_enable_embree) {
                     return arg->occlude(ray);
                 } else {
-                    std::abort();
+                    astd::abort();
                 }
+#else
+                astd::abort();
+#endif
             } else {
                 return arg->occlude(ray);
             }
@@ -61,11 +69,15 @@ namespace akari {
         accel.accept([&](auto &&arg) {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, EmbreeAccelerator<C> *>) {
+#ifndef AKR_GPU_CODE
                 if constexpr (akari_enable_embree) {
                     return arg->build(*this);
                 } else {
-                    std::abort();
+                    astd::abort();
                 }
+#else
+                astd::abort();
+#endif
             } else {
                 return arg->build(*this);
             }

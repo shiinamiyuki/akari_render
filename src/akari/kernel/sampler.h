@@ -29,8 +29,8 @@ namespace akari {
         uint64_t state = 0x4d595df4d0f33173; // Or something seed-dependent
         static uint64_t const multiplier = 6364136223846793005u;
         static uint64_t const increment = 1442695040888963407u; // Or an arbitrary odd constant
-        static uint32_t rotr32(uint32_t x, unsigned r) { return x >> r | x << (-r & 31); }
-        uint32_t pcg32(void) {
+        AKR_XPU static uint32_t rotr32(uint32_t x, unsigned r) { return x >> r | x << (-r & 31); }
+        AKR_XPU uint32_t pcg32(void) {
             uint64_t x = state;
             unsigned count = (unsigned)(x >> 59); // 59 = 64 - 5
 
@@ -38,26 +38,26 @@ namespace akari {
             x ^= x >> 18;                              // 18 = (64 - 27)/2
             return rotr32((uint32_t)(x >> 27), count); // 27 = 32 - 5
         }
-        void pcg32_init(uint64_t seed) {
+        AKR_XPU void pcg32_init(uint64_t seed) {
             state = seed + increment;
             (void)pcg32();
         }
 
       public:
         AKR_IMPORT_TYPES()
-        void set_sample_index(uint64_t idx) { pcg32_init(idx); }
-        Float next1d() { return Float(pcg32()) / (float)0xffffffff; }
-        Point2f next2d() { return Point2f(next1d(), next1d()); }
-        void start_next_sample() {}
-        RandomSampler(uint64_t seed = 0u) { pcg32_init(seed); }
+        AKR_XPU void set_sample_index(uint64_t idx) { pcg32_init(idx); }
+        AKR_XPU Float next1d() { return Float(pcg32()) / (float)0xffffffff; }
+        AKR_XPU Point2f next2d() { return Point2f(next1d(), next1d()); }
+        AKR_XPU void start_next_sample() {}
+        AKR_XPU RandomSampler(uint64_t seed = 0u) { pcg32_init(seed); }
     };
     AKR_VARIANT class Sampler : Variant<RandomSampler<C>> {
       public:
         AKR_IMPORT_TYPES()
         using Variant<RandomSampler<C>>::Variant;
-        Float next1d() { AKR_VAR_DISPATCH(next1d); }
-        Point2f next2d() { AKR_VAR_DISPATCH(next2d); }
-        void start_next_sample() { AKR_VAR_DISPATCH(start_next_sample); }
-        void set_sample_index(uint64_t idx) { AKR_VAR_DISPATCH(set_sample_index, idx); }
+        AKR_XPU Float next1d() { AKR_VAR_DISPATCH(next1d); }
+        AKR_XPU Point2f next2d() { AKR_VAR_DISPATCH(next2d); }
+        AKR_XPU void start_next_sample() { AKR_VAR_DISPATCH(start_next_sample); }
+        AKR_XPU void set_sample_index(uint64_t idx) { AKR_VAR_DISPATCH(set_sample_index, idx); }
     };
 } // namespace akari

@@ -34,9 +34,47 @@
 namespace akari::gpu {
     AKR_VARIANT void AmbientOcclusion<C>::render(const Scene<C> &scene, Film<C> *film) const {
         if constexpr (std::is_same_v<Float, float>) {
-            launch("test", 100, [] AKR_GPU(int i) {
-
-            });
+            AKR_ASSERT_THROW(all(film->resolution() == scene.camera.resolution()));
+            auto n_tiles = Point2i(film->resolution() + Point2i(tile_size - 1)) / Point2i(tile_size);
+            auto Li = AKR_GPU_LAMBDA(Ray3f ray, Sampler<C> & sampler)->Spectrum {
+                Intersection<C> intersection;
+                if (scene.intersect(ray, &intersection)) {
+                    Frame3f frame(intersection.ng);
+                    auto w = sampling<C>::cosine_hemisphere_sampling(sampler.next2d());
+                    w = frame.local_to_world(w);
+                    ray = Ray3f(intersection.p, w);
+                    intersection = Intersection<C>();
+                    if (scene.intersect(ray, &intersection))
+                        return Spectrum(0);
+                    return Spectrum(1);
+                }
+                return Spectrum(0);
+            };
+            debug("resolution: {}, tile size: {}, tiles: {}\n", film->resolution(), tile_size, n_tiles);
+            launch(
+                "test", n_tiles.x() * n_tiles.y(), AKR_GPU_LAMBDA(int tid) {
+                    Point2i tile_pos(tid % n_tiles.x(), tid / n_tiles.x());
+                    Bounds2i tileBounds =
+                        Bounds2i{tile_pos * (int)tile_size, (tile_pos + Vector2i(1)) * (int)tile_size};
+                    // auto tile = film->tile(tileBounds);
+                    auto &camera = scene.camera;
+                    auto sampler = scene.sampler;
+                    // for (int y = tile.bounds.pmin.y(); y < tile.bounds.pmax.y(); y++) {
+                    //     for (int x = tile.bounds.pmin.x(); x < tile.bounds.pmax.x(); x++) {
+                        int x = 0;
+                        int y = 0;
+                            sampler.set_sample_index(x + y * film->resolution().x());
+                            for (int s = 0; s < spp; s++) {
+                                sampler.start_next_sample();
+                                CameraSample<C> sample;
+                                camera.generate_ray(sampler.next2d(), sampler.next2d(), Point2i(x, y), &sample);
+                                auto L = Li(sample.ray, sampler);
+                                // tile.add_sample(Point2f(x, y), L, 1.0f);
+                            }
+                        //}
+                    //}
+                });
+            cudaDeviceSynchronize();
         } else {
             fatal("only float is supported for gpu\n");
         }

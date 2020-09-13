@@ -54,7 +54,11 @@ namespace akari::gpu {
             return;
         func(tid);
     }
-
+#ifdef AKR_PLATFORM_WINDOWS
+    #define AKR_GPU_LAMBDA(...) [=,*this] AKR_GPU(__VA_ARGS__) mutable
+#else
+    #define AKR_GPU_LAMBDA(...) [=] AKR_GPU(__VA_ARGS__)
+#endif
     template <typename F>
     void launch(const char *name, int nItems, F func) {
         auto kernel = &_kernel_wrapper<F>;

@@ -31,12 +31,12 @@ namespace akari {
         AKR_IMPORT_TYPES()
         ConstantTexture(Spectrum v) : value(v) {}
         Spectrum value;
-        Spectrum evaluate(const Point2f &texcoords) const { return value; }
+        AKR_XPU Spectrum evaluate(const Point2f &texcoords) const { return value; }
     };
     AKR_VARIANT class Texture : public Variant<ConstantTexture<C>> {
       public:
         AKR_IMPORT_TYPES()
         using Variant<ConstantTexture<C>>::Variant;
-        Spectrum evaluate(const Point2f &texcoords) const { AKR_VAR_DISPATCH(evaluate, texcoords); }
+        AKR_XPU Spectrum evaluate(const Point2f &texcoords) const { AKR_VAR_DISPATCH(evaluate, texcoords); }
     };
 } // namespace akari

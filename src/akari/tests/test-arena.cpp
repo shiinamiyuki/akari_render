@@ -9,8 +9,8 @@
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
 //
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
 //
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -19,23 +19,39 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-#pragma once
-#include <akari/common/math.h>
-#include <akari/kernel/material.h>
-#include <akari/kernel/shape.h>
-namespace akari {
-    AKR_VARIANT class BSDF;
-    AKR_VARIANT struct Intersection;
-    AKR_VARIANT struct SurfaceInteraction {
-        AKR_IMPORT_TYPES()
-        Point3f p;
-        Triangle<C> triangle;
-        BSDF<C> bsdf;
-        Normal3f ng, ns;
-        Point2f texcoords;
 
-        AKR_XPU SurfaceInteraction(const Intersection<C> &isct, const Triangle<C> &triangle)
-            : p(isct.p), triangle(triangle), ng(isct.ng), ns(triangle.ns(isct.uv)),
-              texcoords(triangle.texcoord(isct.uv)) {}
+#include <akari/core/arena.h>
+#include <akari/common/math.h>
+#include <akari/common/variant.h>
+#include "gtest/gtest.h"
+using namespace akari;
+
+TEST(TestArena, Alloc) {
+    struct Foo {
+        int arr[3] ={7,8,9};
     };
-} // namespace akari
+    MemoryArena arena;
+    auto *p = arena.allocN<int>(1024, 0x7f);
+    for (int i = 0; i < 1024; i++) {
+        ASSERT_EQ(p[i], 0x7f);
+    }
+    arena.reset();
+    auto v = *arena.alloc<Variant<Foo, int>>(Foo());
+    ASSERT_TRUE(v.isa<Foo>());
+    auto foo = *v.get<Foo>();
+    ASSERT_EQ(foo.arr[0], 7);
+    ASSERT_EQ(foo.arr[1], 8);
+    ASSERT_EQ(foo.arr[2], 9);
+}
+
+#ifdef AKR_ENABLE_GPU
+TEST(TestArena, GPUAlloc) {
+    set_device_gpu();
+    MemoryArena arena;
+    auto *p = arena.allocN<int>(1024, 0x7f);
+    for (int i = 0; i < 1024; i++) {
+        ASSERT_EQ(p[i], 0x7f);
+    }
+    set_device_cpu();
+}
+#endif

@@ -28,53 +28,55 @@
 #include <akari/core/akari.h>
 #include <akari/common/math.h>
 #include <akari/common/color.h>
+#include <akari/common/buffer.h>
 
 namespace akari {
-    
-    template <class T> class TImage {
+
+    template <class T>
+    class TImage {
         using Float = float;
         AKR_IMPORT_CORE_TYPES()
-        std::vector<T> _texels;
+        Buffer<T> _texels;
         Point2i _resolution;
 
       public:
         TImage(const Point2i &dim = Point2i(1)) : _texels(dim[0] * dim[1]), _resolution(dim) {}
 
-        const T &operator()(int x, int y) const {
+        AKR_XPU const T &operator()(int x, int y) const {
             x = std::clamp(x, 0, _resolution[0] - 1);
             y = std::clamp(y, 0, _resolution[1] - 1);
             return _texels[x + y * _resolution[0]];
         }
 
-        T &operator()(int x, int y) {
+        AKR_XPU T &operator()(int x, int y) {
             x = std::clamp(x, 0, _resolution[0] - 1);
             y = std::clamp(y, 0, _resolution[1] - 1);
             return _texels[x + y * _resolution[0]];
         }
 
-        const T &operator()(float x, float y) const { return (*this)(Point3f(x, y)); }
+        AKR_XPU const T &operator()(float x, float y) const { return (*this)(Point3f(x, y)); }
 
-        T &operator()(float x, float y) { return (*this)(Point3f(x, y)); }
+        AKR_XPU T &operator()(float x, float y) { return (*this)(Point3f(x, y)); }
 
-        const T &operator()(const Point2i &p) const { return (*this)(p.x(), p.y()); }
+        AKR_XPU const T &operator()(const Point2i &p) const { return (*this)(p.x(), p.y()); }
 
-        T &operator()(const Point2i &p) { return (*this)(p.x(), p.y()); }
+        AKR_XPU T &operator()(const Point2i &p) { return (*this)(p.x(), p.y()); }
 
-        const T &operator()(const Point2f &p) const { return (*this)(Point2i(p * Point2f(_resolution))); }
+        AKR_XPU const T &operator()(const Point2f &p) const { return (*this)(Point2i(p * Point2f(_resolution))); }
 
-        T &operator()(const Point2f &p) { return (*this)(Point2i(p * Point2f(_resolution))); }
+        AKR_XPU T &operator()(const Point2f &p) { return (*this)(Point2i(p * Point2f(_resolution))); }
 
-        [[nodiscard]] const std::vector<T> &texels() const { return _texels; }
+        [[nodiscard]] AKR_XPU const Buffer<T> &texels() const { return _texels; }
 
         void resize(const Point2i &size) {
             _resolution = size;
             _texels.resize(_resolution[0] * _resolution[1]);
         }
 
-        [[nodiscard]] Point2i resolution() const { return _resolution; }
-        T *data() { return _texels.data(); }
+        [[nodiscard]] AKR_XPU Point2i resolution() const { return _resolution; }
+        AKR_XPU T *data() { return _texels.data(); }
 
-        [[nodiscard]] const T *data() const { return _texels.data(); }
+        [[nodiscard]] AKR_XPU const T *data() const { return _texels.data(); }
     };
 
     class RGBImage : public TImage<Color<float, 3>> {

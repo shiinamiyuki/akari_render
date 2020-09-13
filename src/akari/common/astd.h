@@ -22,8 +22,8 @@
 #pragma once
 #include <type_traits>
 #include <new>
-#include <akari/common/panic.h>
 #include <akari/common/def.h>
+#include <akari/common/panic.h>
 #include <akari/common/platform.h>
 #include <math.h>
 
@@ -254,5 +254,28 @@ namespace akari::astd {
             memory_resource *memoryResource;
         };
     } // namespace pmr
+    AKR_XPU inline void *align(size_t _Bound, size_t _Size, void *&_Ptr, size_t &_Space) noexcept /* strengthened */ {
+        // try to carve out _Size bytes on boundary _Bound
+        size_t _Off = static_cast<size_t>(reinterpret_cast<uintptr_t>(_Ptr) & (_Bound - 1));
+        if (_Off != 0) {
+            _Off = _Bound - _Off; // number of bytes to skip
+        }
+
+        if (_Space < _Off || _Space - _Off < _Size) {
+            return nullptr;
+        }
+
+        // enough room, update
+        _Ptr = static_cast<char *>(_Ptr) + _Off;
+        _Space -= _Off;
+        return _Ptr;
+    }
+    [[noreturn]] AKR_XPU inline void abort() {
+#ifdef AKR_GPU_CODE
+        asm("trap;");
+#else
+        std::abort();
+#endif
+    }
 
 } // namespace akari::astd

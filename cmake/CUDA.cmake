@@ -47,7 +47,7 @@ if (CMAKE_CUDA_COMPILER)
                     RESULT_VARIABLE CUDA_RETURN_CODE
                     OUTPUT_VARIABLE AKR_CUDA_ARCH)
 
-    set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --std=c++17 -rdc=true")
+    set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --std=c++17 -rdc=true --keep")
     #if (CMAKE_BUILD_TYPE MATCHES Debug)
     #    set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --use_fast_math -G -g")
     #else()

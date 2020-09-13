@@ -84,8 +84,7 @@ namespace akari {
                         }
                     }
                 }
-                std::lock_guard<std::mutex> _(mutex);
-                film->merge_tile(tile);
+
             });
         }
 

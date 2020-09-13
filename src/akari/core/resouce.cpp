@@ -49,9 +49,16 @@ namespace akari {
             return nullptr;
         }
     };
-    std::shared_ptr<ResourceManager> resource_manager() {
+    namespace _resource_internal {
         static std::shared_ptr<ResourceManagerImpl> mgr;
         static std::once_flag flag;
+    } // namespace _resource_internal
+    AKR_EXPORT void ResourceManager::finalize() {
+        using namespace _resource_internal;
+        mgr = nullptr;
+    }
+    std::shared_ptr<ResourceManager> resource_manager() {
+        using namespace _resource_internal;
         std::call_once(flag, [&]() { mgr = std::make_shared<ResourceManagerImpl>(); });
         return mgr;
     }

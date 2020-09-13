@@ -77,6 +77,7 @@ if(AKR_ENABLE_CUDA)
     set(AKR_KERNEL_SRC ${AKR_KERNEL_COMMON_SRC} ${AKR_KERNEL_CPU_SRC} ${AKR_KERNEL_GPU_SRC} ${AKR_KERNEL_GPU_CUDA_SRC})
     set_source_files_properties(
         src/akari/kernel/integrators/gpu/cuda/integrator.cpp
+        src/akari/kernel/scene.cpp
          PROPERTIES LANGUAGE CUDA
     )
 else()

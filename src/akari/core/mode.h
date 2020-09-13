@@ -25,6 +25,7 @@
 namespace akari {
     AKR_EXPORT void set_device_gpu();
     AKR_EXPORT void set_device_cpu();
+    AKR_EXPORT void sync_device();
     enum class ComputeDevice {
         cpu,
         gpu

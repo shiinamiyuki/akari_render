@@ -34,7 +34,7 @@ namespace akari {
             uint32_t count = (uint32_t)-1;
             int left = -1, right = -1;
 
-            [[nodiscard]] bool is_leaf() const { return left < 0 && right < 0; }
+            [[nodiscard]] AKR_XPU bool is_leaf() const { return left < 0 && right < 0; }
         };
 
         struct Index {
@@ -42,7 +42,7 @@ namespace akari {
         };
         static_assert(sizeof(Index) == sizeof(int));
 
-        auto get(const Index &handle) { return _ctor(user_data, handle.idx); }
+        AKR_XPU auto get(const Index &handle) { return _ctor(user_data, handle.idx); }
 
         Bounds3f boundBox;
         UserData user_data;
@@ -253,7 +253,7 @@ namespace akari {
         struct TriangleHandle {
             const MeshInstance<C> *mesh = nullptr;
             int idx = -1;
-            [[nodiscard]] Bounds3f getBoundingBox() const {
+            [[nodiscard]] AKR_XPU Bounds3f getBoundingBox() const {
                 auto trig = get_triangle<C>(*mesh, idx);
                 Bounds3f box;
                 box = box.expand(trig.vertices[0]);
@@ -263,14 +263,14 @@ namespace akari {
             }
         };
         struct TriangleHandleConstructor {
-            auto operator()(const MeshInstance<C> *mesh, int idx) const -> TriangleHandle {
+            AKR_XPU auto operator()(const MeshInstance<C> *mesh, int idx) const -> TriangleHandle {
                 return TriangleHandle{mesh, idx};
             }
         };
 
         struct TriangleIntersector {
-            auto operator()(const Ray3f &ray, const TriangleHandle &handle,
-                            typename MeshInstance<C>::RayHit &record) const -> bool {
+            AKR_XPU auto operator()(const Ray3f &ray, const TriangleHandle &handle,
+                                    typename MeshInstance<C>::RayHit &record) const -> bool {
                 return handle.mesh->intersect(ray, handle.idx, &record);
             }
         };
@@ -282,15 +282,17 @@ namespace akari {
             const MeshBVHes *scene = nullptr;
             int idx;
 
-            [[nodiscard]] auto getBoundingBox() const { return (*scene)[idx].boundBox; }
+            [[nodiscard]] AKR_XPU auto getBoundingBox() const { return (*scene)[idx].boundBox; }
         };
 
         struct BVHHandleConstructor {
-            auto operator()(const MeshBVHes &scene, int idx) const -> BVHHandle { return BVHHandle{&scene, idx}; }
+            AKR_XPU auto operator()(const MeshBVHes &scene, int idx) const -> BVHHandle {
+                return BVHHandle{&scene, idx};
+            }
         };
 
         struct BVHIntersector {
-            auto operator()(const Ray3f &ray, const BVHHandle &handle, Intersection<C> &record) const -> bool {
+            AKR_XPU auto operator()(const Ray3f &ray, const BVHHandle &handle, Intersection<C> &record) const -> bool {
                 typename MeshInstance<C>::RayHit localHit;
                 localHit.t = record.t;
                 auto &bvh = (*handle.scene)[handle.idx];
@@ -316,7 +318,9 @@ namespace akari {
             }
             topLevelBVH.emplace(meshBVHs, meshBVHs.size());
         }
-        bool intersect(const Ray<C> &ray, Intersection<C> *isct) const { return topLevelBVH->intersect(ray, *isct); }
-        bool occlude(const Ray<C> &ray) const { return topLevelBVH->occlude(ray); }
+        AKR_XPU bool intersect(const Ray<C> &ray, Intersection<C> *isct) const {
+            return topLevelBVH->intersect(ray, *isct);
+        }
+        AKR_XPU bool occlude(const Ray<C> &ray) const { return topLevelBVH->occlude(ray); }
     };
 } // namespace akari

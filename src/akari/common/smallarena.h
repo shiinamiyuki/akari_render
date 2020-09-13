@@ -28,28 +28,36 @@
 
 namespace akari {
     // A very fast memory arena for device
-    // Can allocate concurrently
     class SmallArena {
-        device_ptr<uint8_t> buffer = nullptr;
+        std::byte *buffer = nullptr;
         size_t size;
-        std::atomic<size_t> allocated;
-        static constexpr size_t align16(size_t x) { return (x + 15ULL) & (~15ULL); }
+        size_t allocated = 0;
+        template <size_t alignment>
+        static constexpr size_t align(size_t x) {
+            static_assert((alignment & (alignment - 1)) == 0);
+            return (x + alignment - 1) & (~(alignment - 1));
+        }
 
       public:
-        SmallArena(SmallArena &&rhs) : buffer(rhs.buffer), size(rhs.size), allocated(rhs.allocated.load()) {
+        AKR_XPU SmallArena(const SmallArena &) = delete;
+        AKR_XPU SmallArena(SmallArena &&rhs) : buffer(rhs.buffer), size(rhs.size), allocated(rhs.allocated) {
             rhs.buffer = nullptr;
             rhs.size = 0u;
             rhs.allocated = 0;
         }
-        SmallArena(device_ptr<uint8_t> buffer, size_t size) : buffer(buffer), size(size), allocated(0) {}
+        AKR_XPU SmallArena(std::byte *buffer, size_t size) : buffer(buffer), size(size), allocated(0) {}
         template <typename T, typename... Args>
-        device_ptr<T> alloc(Args &&... args) {
-            size_t bytes_needed = align16(sizeof(T));
-            size_t cur = allocated.fetch_add(bytes_needed);
+        AKR_XPU T *alloc(Args &&... args) {
+            size_t bytes_needed = align<alignof(T)>(sizeof(T) + alignof(T));
+            // size_t cur = allocated.fetch_add(bytes_needed);
+            size_t cur = allocated;
+            allocated += (bytes_needed);
             if (cur >= size) {
                 return nullptr;
             }
-            device_ptr<T> p = reinterpret_cast<device_ptr<T>>(buffer + cur);
+            auto q = (void *)(buffer + cur);
+            AKR_ASSERT(astd::align(alignof(T), sizeof(T), q, bytes_needed));
+            auto p = reinterpret_cast<T *>(q);
             new (p) T(std::forward<Args>(args)...);
             return p;
         }

@@ -28,28 +28,35 @@
 #include <akari/common/buffer.h>
 namespace akari {
     class MemoryArena {
-        static constexpr size_t align16(size_t x) { return (x + 15ULL) & (~15ULL); }
+        template <size_t alignment>
+        static constexpr size_t align(size_t x) {
+            static_assert((alignment & (alignment - 1)) == 0);
+            return (x + alignment - 1) & (~(alignment - 1));
+        }
 
         struct Block {
             size_t size;
-            uint8_t *data;
+            std::byte *data;
 
-            Block(size_t size) : size(size) { data = (uint8_t *)get_device_memory_resource()->allocate(size); }
+            Block(size_t size, DeviceAllocator<> &allocator) : size(size) {
+                data = allocator.allocate(size);
+                AKR_ASSERT(data);
+            }
 
             ~Block() = default;
         };
 
         std::list<Block> availableBlocks, usedBlocks;
-
+        DeviceAllocator<> allocator;
         size_t currentBlockPos = 0;
         Block currentBlock;
 
       public:
         static constexpr size_t DEFAULT_BLOCK_SIZE = 262144ull;
-        MemoryArena() : currentBlock(DEFAULT_BLOCK_SIZE) {}
-        uint8_t *alloc_bytes(size_t bytes) {
+        MemoryArena() : currentBlock(DEFAULT_BLOCK_SIZE, allocator) {}
+        std::byte *alloc_bytes(size_t bytes) {
             typename std::list<Block>::iterator iter;
-            uint8_t *p = nullptr;
+            std::byte *p = nullptr;
             if (currentBlockPos + bytes > currentBlock.size) {
                 usedBlocks.emplace_front(currentBlock);
                 currentBlockPos = 0;
@@ -63,7 +70,7 @@ namespace akari {
                 }
                 if (iter == availableBlocks.end()) {
                     auto sz = std::max<size_t>(bytes, DEFAULT_BLOCK_SIZE);
-                    currentBlock = Block(sz);
+                    currentBlock = Block(sz, allocator);
                 }
             }
             p = currentBlock.data + currentBlockPos;
@@ -72,13 +79,15 @@ namespace akari {
         }
         template <typename T, typename... Args>
         T *allocN(size_t count, Args &&... args) {
-            auto allocSize = sizeof(T) * count;
+            auto allocSize = align<alignof(T)>(sizeof(T) * count + alignof(T));
             auto p = alloc_bytes(allocSize);
-            if constexpr (!std::is_trivially_constructible_v<T>) {
-                for (size_t i = 0; i < count; i++) {
-                    new (p + i * sizeof(T)) T(std::forward<Args>(args)...);
-                }
+            auto q = (void *)p;
+            AKR_ASSERT(astd::align(alignof(T), sizeof(T), q, allocSize));
+            p = (std::byte *)q;
+            for (size_t i = 0; i < count; i++) {
+                new (p + i * sizeof(T)) T(std::forward<Args>(args)...);
             }
+
             return reinterpret_cast<T *>(p);
         }
 
@@ -93,12 +102,12 @@ namespace akari {
         }
 
         ~MemoryArena() {
-            get_device_memory_resource()->deallocate(currentBlock.data, currentBlock.size);
+            allocator.deallocate(currentBlock.data, currentBlock.size);
             for (auto i : availableBlocks) {
-                get_device_memory_resource()->deallocate(i.data, i.size);
+                allocator.deallocate(i.data, i.size);
             }
             for (auto i : usedBlocks) {
-                get_device_memory_resource()->deallocate(i.data, i.size);
+                allocator.deallocate(i.data, i.size);
             }
         }
     };

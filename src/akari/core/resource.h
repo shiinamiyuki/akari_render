@@ -60,6 +60,7 @@ namespace akari {
             return exp.extract_error();
         }
         virtual ~ResourceManager() = default;
+        static void finalize();
     };
     AKR_EXPORT std::shared_ptr<ResourceManager> resource_manager();
 

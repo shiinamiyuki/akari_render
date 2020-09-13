@@ -22,9 +22,13 @@
 
 #include <akari/core/akari.h>
 #include <akari/core/application.h>
+#include <akari/core/resource.h>
 #include <akari/core/parallel.h>
 
 namespace akari {
     Application::Application() {}
-    Application::~Application() { ThreadPoolFinalize(); }
+    Application::~Application() {
+        thread::finalize();
+        ResourceManager::finalize();
+    }
 } // namespace akari

@@ -34,9 +34,14 @@ namespace akari {
         void *do_allocate(size_t bytes, size_t alignment) {
             void *p;
             CUDA_CHECK(cudaMallocManaged(&p, bytes));
+            AKR_ASSERT(p != nullptr);
+            AKR_ASSERT(intptr_t(p) % alignment == 0);
             return p;
         }
-        void do_deallocate(void *p, size_t bytes, size_t alignment) { CUDA_CHECK(cudaFree(p)); }
+        void do_deallocate(void *p, size_t bytes, size_t alignment) {
+            // debug("deallocate {}\n", p);
+            CUDA_CHECK(cudaFree(p));
+        }
         bool do_is_equal(const memory_resource &other) const noexcept { return &other == this; }
     };
     static cuda_unified_memory_resource _cuda_unified_memory_resource;
@@ -50,7 +55,9 @@ namespace akari {
         fatal("gpu rendering is not supported\n");
         std::abort();
     }
+    AKR_EXPORT void sync_device() { cudaDeviceSynchronize(); }
 #else
+    AKR_EXPORT void sync_device() {}
     void set_device_gpu() {
         _mode_internal::cur_device = ComputeDevice::gpu;
         _mode_internal::_device_memory_resource = &_cuda_unified_memory_resource;

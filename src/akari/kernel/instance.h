@@ -86,7 +86,7 @@ namespace akari {
     };
 
     template <typename C, typename Mesh>
-    Triangle<C> get_triangle(const Mesh &mesh, int prim_id) {
+    AKR_XPU Triangle<C> get_triangle(const Mesh &mesh, int prim_id) {
         AKR_IMPORT_TYPES()
         Triangle<C> trig;
         for (int i = 0; i < 3; i++) {

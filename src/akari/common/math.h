@@ -32,64 +32,64 @@
 namespace akari {
     template <typename Float>
     struct Constants {
-        static constexpr Float Inf() { return std::numeric_limits<Float>::infinity(); }
-        static constexpr Float Pi() { return Float(3.1415926535897932384f); }
-        static constexpr Float Pi2() { return Pi() / Float(2.0f); }
-        static constexpr Float Pi4() { return Pi() / Float(4.0f); }
-        static constexpr Float InvPi() { return Float(1.0f) / Pi(); }
-        static constexpr Float Eps() { return Float(0.001f); }
-        static constexpr Float ShadowEps() { return Float(0.0001f); }
+        AKR_XPU static constexpr Float Inf() { return std::numeric_limits<Float>::infinity(); }
+        AKR_XPU static constexpr Float Pi() { return Float(3.1415926535897932384f); }
+        AKR_XPU static constexpr Float Pi2() { return Pi() / Float(2.0f); }
+        AKR_XPU static constexpr Float Pi4() { return Pi() / Float(4.0f); }
+        AKR_XPU static constexpr Float InvPi() { return Float(1.0f) / Pi(); }
+        AKR_XPU static constexpr Float Eps() { return Float(0.001f); }
+        AKR_XPU static constexpr Float ShadowEps() { return Float(0.0001f); }
     };
 
     template <typename V, typename V2>
-    inline V lerp3(const V &v0, const V &v1, const V &v2, const V2 &uv) {
+    AKR_XPU inline V lerp3(const V &v0, const V &v1, const V &v2, const V2 &uv) {
         return (1.0f - uv[0] - uv[1]) * v0 + uv[0] * v1 + uv[1] * v2;
     }
 
     template <typename Float, int N>
     struct Matrix {
         Array<Array<Float, N>, N> rows;
-        Matrix(Float v = 1.0) {
+        AKR_XPU Matrix(Float v = 1.0) {
             for (int i = 0; i < N; i++) {
                 rows[i][i] = v;
             }
         }
-        Matrix(const Array<Array<Float, N>, N> &m) : rows(m) {}
-        Matrix(Float m[N][N]) {
+        AKR_XPU Matrix(const Array<Array<Float, N>, N> &m) : rows(m) {}
+        AKR_XPU Matrix(Float m[N][N]) {
             for (int i = 0; i < N; i++) {
                 for (int j = 0; j < N; j++) {
                     rows[i][j] = m[i][j];
                 }
             }
         }
-        Matrix(Float m[N * N]) {
+        AKR_XPU Matrix(Float m[N * N]) {
             for (int i = 0; i < N; i++) {
                 for (int j = 0; j < N; j++) {
                     rows[i][j] = m[i * 4 + j];
                 }
             }
         }
-        const Float &operator()(int i, int j) const { return rows[i][j]; }
-        Float &operator()(int i, int j) { return rows[i][j]; }
-        const Array<Float, N> &row(int i) const { return rows[i]; }
-        Array<Float, N> &row(int i) { return rows[i]; }
-        Array<Float, N> col(int i) const {
+        AKR_XPU const Float &operator()(int i, int j) const { return rows[i][j]; }
+        AKR_XPU Float &operator()(int i, int j) { return rows[i][j]; }
+        AKR_XPU const Array<Float, N> &row(int i) const { return rows[i]; }
+        AKR_XPU Array<Float, N> &row(int i) { return rows[i]; }
+        AKR_XPU Array<Float, N> col(int i) const {
             Array<Float, N> r;
             for (int j = 0; j < N; j++) {
                 r[j] = rows[j][i];
             }
             return r;
         }
-        Matrix operator+(const Matrix &rhs) const { return Matrix(rows + rhs.rows); }
-        Matrix operator-(const Matrix &rhs) const { return Matrix(rows - rhs.rows); }
-        Array<Float, N> operator*(const Array<Float, N> &v) const {
+        AKR_XPU Matrix operator+(const Matrix &rhs) const { return Matrix(rows + rhs.rows); }
+        AKR_XPU Matrix operator-(const Matrix &rhs) const { return Matrix(rows - rhs.rows); }
+        AKR_XPU Array<Float, N> operator*(const Array<Float, N> &v) const {
             Array<Float, N> r;
             for (int i = 0; i < N; i++) {
                 r[i] = dot(row(i), v);
             }
             return r;
         }
-        Matrix operator*(const Matrix &rhs) const {
+        AKR_XPU Matrix operator*(const Matrix &rhs) const {
             Matrix m;
             for (int i = 0; i < N; i++) {
                 for (int j = 0; j < N; j++) {
@@ -98,7 +98,7 @@ namespace akari {
             }
             return m;
         }
-        Matrix transpose() const {
+        AKR_XPU Matrix transpose() const {
             Matrix m;
             for (int i = 0; i < N; i++) {
                 for (int j = 0; j < N; j++) {
@@ -107,7 +107,7 @@ namespace akari {
             }
             return m;
         }
-        Matrix inverse() const {
+        AKR_XPU Matrix inverse() const {
             // from pbrt
             auto &m = *this;
             int indxc[N], indxr[N];
@@ -170,7 +170,7 @@ namespace akari {
     };
 
     template <typename T, int P>
-    Array<T, 3, P> cross(const Array<T, 3, P> &v1, const Array<T, 3, P> &v2) {
+    AKR_XPU Array<T, 3, P> cross(const Array<T, 3, P> &v1, const Array<T, 3, P> &v2) {
         T v1x = v1.x(), v1y = v1.y(), v1z = v1.z();
         T v2x = v2.x(), v2y = v2.y(), v2z = v2.z();
         return Array<T, 3, P>((v1y * v2z) - (v1z * v2y), (v1z * v2x) - (v1x * v2z), (v1x * v2y) - (v1y * v2x));
@@ -184,14 +184,14 @@ namespace akari {
         Vector3f d;
         Float tmin = -1, tmax = -1;
         Ray() = default;
-        Ray(const Point3f &o, const Vector3f &d, Float tmin = Constants<Float>::Eps(),
-            Float tmax = std::numeric_limits<Float>::infinity())
+        AKR_XPU Ray(const Point3f &o, const Vector3f &d, Float tmin = Constants<Float>::Eps(),
+                    Float tmax = std::numeric_limits<Float>::infinity())
             : o(o), d(d), tmin(tmin), tmax(tmax) {}
-        static Ray spawn_to(const Point3f &p0, const Point3f &p1) {
+        static AKR_XPU Ray spawn_to(const Point3f &p0, const Point3f &p1) {
             Vector3f dir = p1 - p0;
             return Ray(p0, dir, Constants<Float>::Eps(), Float(1.0f) - Constants<Float>::ShadowEps());
         }
-        Point3f operator()(Float t) const { return o + t * d; }
+        AKR_XPU Point3f operator()(Float t) const { return o + t * d; }
     };
 
     template <typename Vector>
@@ -200,20 +200,20 @@ namespace akari {
         using Vector3f = Vector;
         using Normal3f = Normal<Value, 3>;
         Frame() = default;
-        static inline void compute_local_frame(const Normal3f &v1, Vector3f *v2, Vector3f *v3) {
+        static AKR_XPU inline void compute_local_frame(const Normal3f &v1, Vector3f *v2, Vector3f *v3) {
             if (std::abs(v1.x()) > std::abs(v1.y()))
                 *v2 = Vector3f(-v1.z(), (0), v1.x()) / sqrt(v1.x() * v1.x() + v1.z() * v1.z());
             else
                 *v2 = Vector3f((0), v1.z(), -v1.y()) / sqrt(v1.y() * v1.y() + v1.z() * v1.z());
             *v3 = normalize(cross(Vector3f(v1), *v2));
         }
-        explicit Frame(const Normal3f &v) : normal(v) { compute_local_frame(v, &T, &B); }
+        AKR_XPU explicit Frame(const Normal3f &v) : normal(v) { compute_local_frame(v, &T, &B); }
 
-        [[nodiscard]] Vector3f world_to_local(const Vector3f &v) const {
+        [[nodiscard]] AKR_XPU Vector3f world_to_local(const Vector3f &v) const {
             return Vector3f(dot(T, v), dot(normal, v), dot(B, v));
         }
 
-        [[nodiscard]] Vector3f local_to_world(const Vector3f &v) const {
+        [[nodiscard]] AKR_XPU Vector3f local_to_world(const Vector3f &v) const {
             return Vector3f(v.x() * T + v.y() * Vector3f(normal) + v.z() * B);
         }
 
@@ -227,8 +227,8 @@ namespace akari {
         Matrix4f m, minv;
         Matrix3f m3, m3inv;
         Transform() = default;
-        Transform(const Matrix4f &m) : Transform(m, m.inverse()) {}
-        Transform(const Matrix4f &m, const Matrix4f &minv) : m(m), minv(minv) {
+        AKR_XPU Transform(const Matrix4f &m) : Transform(m, m.inverse()) {}
+        AKR_XPU Transform(const Matrix4f &m, const Matrix4f &minv) : m(m), minv(minv) {
             for (int i = 0; i < 3; i++) {
                 for (int j = 0; j < 3; j++) {
                     m3(i, j) = m(i, j);
@@ -236,8 +236,8 @@ namespace akari {
             }
             m3inv = m3.inverse();
         }
-        Transform inverse() const { return Transform(minv, m); }
-        Point3f apply_point(const Point3f &p) const {
+        AKR_XPU Transform inverse() const { return Transform(minv, m); }
+        AKR_XPU Point3f apply_point(const Point3f &p) const {
             Vector4f v(p.x(), p.y(), p.z(), 1.0);
             v = m * v;
             Point3f q(v.x(), v.y(), v.z());
@@ -246,11 +246,11 @@ namespace akari {
             }
             return q;
         }
-        Transform operator*(const Transform &t) const { return Transform(m * t.m); }
-        Vector3f apply_vector(const Vector3f &v) const { return m3 * v; }
-        Normal3f apply_normal(const Normal3f &n) const { return m3inv.transpose() * n; }
+        AKR_XPU Transform operator*(const Transform &t) const { return Transform(m * t.m); }
+        AKR_XPU Vector3f apply_vector(const Vector3f &v) const { return m3 * v; }
+        AKR_XPU Normal3f apply_normal(const Normal3f &n) const { return m3inv.transpose() * n; }
         template <typename Spectrum, typename C = Config<Float, Spectrum>>
-        Ray<C> apply_ray(const Ray<C> &ray) const {
+        AKR_XPU Ray<C> apply_ray(const Ray<C> &ray) const {
             using Ray3f = Ray<C>;
             auto &T = *this;
             auto d2 = T * ray.d;
@@ -260,29 +260,29 @@ namespace akari {
             return Ray3f(T * ray.o, d2, ray.tmin * scale, ray.tmax * scale);
         }
 
-        static Transform translate(const Vector3f &v) {
+        static AKR_XPU Transform translate(const Vector3f &v) {
             Float m[] = {1, 0, 0, v.x(), 0, 1, 0, v.y(), 0, 0, 1, v.z(), 0, 0, 0, 1};
             return Transform(Matrix4f(m));
         }
-        static Transform scale(const Vector3f &s) {
+        static AKR_XPU Transform scale(const Vector3f &s) {
             Float m[] = {s.x(), 0, 0, 0, 0, s.y(), 0, 0, 0, 0, s.z(), 0, 0, 0, 0, 1};
             return Transform(Matrix4f(m));
         }
-        static Transform rotate_x(Float theta) {
+        static AKR_XPU Transform rotate_x(Float theta) {
             Float sinTheta = sin(theta);
             Float cosTheta = cos(theta);
             Float m[] = {1, 0, 0, 0, 0, cosTheta, -sinTheta, 0, 0, sinTheta, cosTheta, 0, 0, 0, 0, 1};
             return Transform(m, Matrix4f(m).transpose());
         }
 
-        static Transform rotate_y(Float theta) {
+        static AKR_XPU Transform rotate_y(Float theta) {
             Float sinTheta = sin(theta);
             Float cosTheta = cos(theta);
             Float m[] = {cosTheta, 0, sinTheta, 0, 0, 1, 0, 0, -sinTheta, 0, cosTheta, 0, 0, 0, 0, 1};
             return Transform(m, Matrix4f(m).transpose());
         }
 
-        static Transform rotate_z(Float theta) {
+        static AKR_XPU Transform rotate_z(Float theta) {
             Float sinTheta = sin(theta);
             Float cosTheta = cos(theta);
             Float m[] = {cosTheta, -sinTheta, 0, 0, sinTheta, cosTheta, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
@@ -296,22 +296,22 @@ namespace akari {
         static constexpr auto N = array_size_v<Point>;
         using Vector = akari::Vector<Float, N>;
         Point pmin, pmax;
-        BoundingBox() { reset(); }
-        BoundingBox(const Point &pmin, const Point &pmax) : pmin(pmin), pmax(pmax) {}
-        void reset() {
+        AKR_XPU BoundingBox() { reset(); }
+        AKR_XPU BoundingBox(const Point &pmin, const Point &pmax) : pmin(pmin), pmax(pmax) {}
+        AKR_XPU void reset() {
             pmin = Point(Constants<Float>::Inf());
             pmax = Point(-Constants<Float>::Inf());
         }
-        Vector extents() const { return pmax - pmin; }
-        Vector size() const { return extents(); }
-        Vector offset(const Point &p) { return (p - pmin) / extents(); }
-        BoundingBox expand(const Point &p) const { return BoundingBox(min(pmin, p), max(pmax, p)); }
-        BoundingBox merge(const BoundingBox &b1) const { return merge(*this, b1); }
-        static BoundingBox merge(const BoundingBox &b1, const BoundingBox &b2) {
+        AKR_XPU Vector extents() const { return pmax - pmin; }
+        AKR_XPU Vector size() const { return extents(); }
+        AKR_XPU Vector offset(const Point &p) { return (p - pmin) / extents(); }
+        AKR_XPU BoundingBox expand(const Point &p) const { return BoundingBox(min(pmin, p), max(pmax, p)); }
+        AKR_XPU BoundingBox merge(const BoundingBox &b1) const { return merge(*this, b1); }
+        AKR_XPU static BoundingBox merge(const BoundingBox &b1, const BoundingBox &b2) {
             return BoundingBox(min(b1.pmin, b2.pmin), max(b1.pmax, b2.pmax));
         }
-        Point centroid() const { return extents() * 0.5f + pmin; }
-        Float surface_area() const {
+        AKR_XPU Point centroid() const { return extents() * 0.5f + pmin; }
+        AKR_XPU Float surface_area() const {
             if constexpr (N == 3) {
                 auto ext = extents();
                 return hsum(akari::shuffle<1, 2, 0>(ext) * ext) * Float(2);
@@ -333,11 +333,11 @@ namespace akari {
     };
 
     template <typename Float>
-    inline Float degrees(Float x) {
+    AKR_XPU inline Float degrees(Float x) {
         return x * Constants<value_t<Float>>::InvPi() * 180.0f;
     }
     template <typename Float>
-    inline Float radians(Float x) {
+    AKR_XPU inline Float radians(Float x) {
         return x * Constants<value_t<Float>>::Pi() / 180.0f;
     }
 } // namespace akari

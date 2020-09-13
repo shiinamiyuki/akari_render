@@ -55,8 +55,8 @@ namespace akari {
         BufferView<AreaLight<C>> area_lights;
         Variant<EmbreeAccelerator<C> *, BVHAccelerator<C> *> accel;
 
-        AKR_CPU bool intersect(const Ray3f &ray, Intersection<C> *isct) const;
-        AKR_CPU bool occlude(const Ray3f &ray) const;
+        AKR_XPU bool intersect(const Ray3f &ray, Intersection<C> *isct) const;
+        AKR_XPU bool occlude(const Ray3f &ray) const;
 
         void commit();
         AKR_XPU Triangle<C> get_triangle(int mesh_id, int prim_id) const {

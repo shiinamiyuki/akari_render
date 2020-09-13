@@ -23,11 +23,21 @@
 #pragma once
 #include <cstdio>
 #include <cstdlib>
+#include <akari/common/def.h>
 namespace akari {
-    [[noreturn]] inline void panic(const char *file, int line, const char *msg) {
-        fprintf(stderr, "PANIC at %s:%d: %s\n", file, line, msg);
-        abort();
+    namespace astd {
+        [[noreturn]] AKR_XPU inline void abort();
     }
+    [[noreturn]] AKR_XPU inline void panic(const char *file, int line, const char *msg) {
+#ifdef AKR_GPU_CODE
+        printf("PANIC at %s:%d: %s\n", file, line, msg);
+        astd::abort();
+#else
+        fprintf(stderr, "PANIC at %s:%d: %s\n", file, line, msg);
+        astd::abort();
+#endif
+    }
+
 #define AKR_PANIC(msg) panic(__FILE__, __LINE__, msg)
 #define AKR_CHECK(expr)                                                                                                \
     do {                                                                                                               \

@@ -64,8 +64,9 @@ namespace akari {
             },
             chunkSize);
     }
-
-    AKR_EXPORT void ThreadPoolFinalize();
+    namespace thread {
+        AKR_EXPORT void finalize();
+    }
 
 } // namespace akari
 #endif // AKARIRENDER_PARALLEL_HPP

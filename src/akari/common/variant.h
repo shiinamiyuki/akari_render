@@ -81,19 +81,19 @@ namespace akari {
         Variant() = default;
 
         template <typename U, typename = std::enable_if_t<Index::template GetIndex<U>::value != -1, void>>
-        Variant(const U &u) {
+        AKR_XPU Variant(const U &u) {
             new (&data) U(u);
             index = Index::template GetIndex<U>::value;
         }
 
-        Variant(const Variant &v) : index(v.index) {
+        AKR_XPU Variant(const Variant &v) : index(v.index) {
             v.accept([&](const auto &item) {
                 using U = std::decay_t<decltype(item)>;
                 new (&data) U(item);
             });
         }
 
-        Variant &operator=(const Variant &v) noexcept {
+        AKR_XPU Variant &operator=(const Variant &v) noexcept {
             if (this == &v)
                 return *this;
             if (index != -1)
@@ -107,13 +107,13 @@ namespace akari {
             return *this;
         }
 
-        Variant(Variant &&v) noexcept : index(v.index) {
+        AKR_XPU Variant(Variant &&v) noexcept : index(v.index) {
             index = v.index;
             v.index = -1;
             std::memcpy(&data, &v.data, sizeof(data));
         }
 
-        Variant &operator=(Variant &&v) noexcept {
+        AKR_XPU Variant &operator=(Variant &&v) noexcept {
             if (index != -1)
                 _drop();
             index = v.index;
@@ -123,7 +123,7 @@ namespace akari {
         }
 
         template <typename U>
-        Variant &operator=(const U &u) {
+       AKR_XPU Variant &operator=(const U &u) {
             if (index != -1) {
                 _drop();
             }
@@ -133,18 +133,18 @@ namespace akari {
             return *this;
         }
         template <typename U>
-        bool isa() const {
+        AKR_XPU bool isa() const {
             static_assert(Index::template GetIndex<U>::value != -1, "U is not in T...");
             return Index::template GetIndex<U>::value == index;
         }
         template <typename U>
-        U *get() {
+        AKR_XPU U *get() {
             static_assert(Index::template GetIndex<U>::value != -1, "U is not in T...");
             return Index::template GetIndex<U>::value != index ? nullptr : reinterpret_cast<U *>(&data);
         }
 
         template <typename U>
-        const U *get() const {
+        AKR_XPU const U *get() const {
             static_assert(Index::template GetIndex<U>::value != -1, "U is not in T...");
             return Index::template GetIndex<U>::value != index ? nullptr : reinterpret_cast<const U *>(&data);
         }
@@ -183,7 +183,7 @@ namespace akari {
     _GEN_CASE_N(15)
 
         template <class Visitor>
-        auto accept(Visitor &&visitor) {
+        AKR_XPU auto accept(Visitor &&visitor) {
             using Ret = std::invoke_result_t<Visitor, typename FirstOf<T...>::type &>;
             static_assert(nTypes <= 16, "too many types");
             if constexpr (nTypes <= 2) {
@@ -203,7 +203,7 @@ namespace akari {
         }
 
         template <class Visitor>
-        auto accept(Visitor &&visitor) const {
+        AKR_XPU auto accept(Visitor &&visitor) const {
             using Ret = std::invoke_result_t<Visitor, const typename FirstOf<T...>::type &>;
             static_assert(nTypes <= 16, "too many types");
             if constexpr (nTypes <= 2) {
@@ -222,13 +222,13 @@ namespace akari {
             }
         }
 
-        ~Variant() {
+        AKR_XPU ~Variant() {
             if (index != -1)
                 _drop();
         }
 
       private:
-        void _drop() {
+        AKR_XPU void _drop() {
             auto *that = this; // prevent gcc ICE
             accept([=](auto &&self) {
                 using U = std::decay_t<decltype(self)>;

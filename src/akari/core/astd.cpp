@@ -28,7 +28,9 @@ namespace akari::astd {
           public:
             void *do_allocate(size_t bytes, size_t alignment) {
 #ifdef AKR_PLATFORM_WINDOWS
-                return _aligned_malloc(bytes, alignment);
+                auto p = _aligned_malloc(bytes, alignment);;
+                AKR_ASSERT(p);
+                return p;
 #else
                 return aligned_alloc(alignment, bytes);
 #endif

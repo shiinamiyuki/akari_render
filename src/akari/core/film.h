@@ -44,39 +44,17 @@ namespace akari {
         explicit Tile(const Bounds2i &bounds)
             : bounds(bounds), _size(bounds.size() + Point2i(2, 2)), pixels(_size.x() * _size.y()) {}
 
-        auto &operator()(const Point2f &p) {
+        AKR_XPU auto &operator()(const Point2f &p) {
             auto q = Point2i(floor(p + Point2f(0.5) - Point2f(bounds.pmin) + Point2f(1)));
             return pixels[q.x() + q.y() * _size.x()];
         }
 
-        const auto &operator()(const Point2f &p) const {
+        AKR_XPU const auto &operator()(const Point2f &p) const {
             auto q = Point2i(floor(p + Point2f(0.5) - Point2f(bounds.pmin) + Point2f(1)));
             return pixels[q.x() + q.y() * _size.x()];
         }
 
-        void add_sample(const Point2f &p, const Spectrum &radiance, Float weight) {
-            auto &pix = (*this)(p);
-            pix.weight += weight;
-            pix.radiance += radiance;
-        }
-    };
-    AKR_VARIANT struct TileView {
-        AKR_IMPORT_TYPES()
-        Bounds2i bounds{};
-        Point2i _size;
-        BufferView<Pixel<C>> pixels;
-        explicit TileView(Tile<C> &tile) : bounds(tile.bounds), _size(tile._size), pixels(tile.pixels) {}
-        auto &operator()(const Point2f &p) {
-            auto q = Point2i(floor(p + Point2f(0.5) - Point2f(bounds.p_min) + Point2f(1)));
-            return pixels[q.x() + q.y() * _size.x()];
-        }
-
-        const auto &operator()(const Point2f &p) const {
-            auto q = Point2i(floor(p + Point2f(0.5) - Point2f(bounds.p_min) + Point2f(1)));
-            return pixels[q.x() + q.y() * _size.x()];
-        }
-
-        void add_sample(const Point2f &p, const Spectrum &radiance, Float weight) {
+        AKR_XPU void add_sample(const Point2f &p, const Spectrum &radiance, Float weight) {
             auto &pix = (*this)(p);
             pix.weight += weight;
             pix.radiance += radiance;
@@ -92,10 +70,10 @@ namespace akari {
         explicit Film(const Point2i &dimension) : radiance(dimension), weight(dimension) {}
         Tile<C> tile(const Bounds2i &bounds) { return Tile<C>(bounds); }
 
-        [[nodiscard]] Point2i resolution() const { return radiance.resolution(); }
+        [[nodiscard]] AKR_XPU Point2i resolution() const { return radiance.resolution(); }
 
-        [[nodiscard]] Bounds2i bounds() const { return Bounds2i{Point2i(0), resolution()}; }
-        void merge_tile(const Tile<C> &tile) {
+        [[nodiscard]] AKR_XPU Bounds2i bounds() const { return Bounds2i{Point2i(0), resolution()}; }
+        AKR_XPU void merge_tile(const Tile<C> &tile) {
             const auto lo = max(tile.bounds.pmin - Point2i(1, 1), Point2i(0, 0));
             const auto hi = min(tile.bounds.pmax + Point2i(1, 1), radiance.resolution());
             for (int y = lo.y(); y < hi.y(); y++) {
