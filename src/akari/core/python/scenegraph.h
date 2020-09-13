@@ -38,6 +38,7 @@ namespace akari {
         using Float = typename C::Float;
         AKR_IMPORT_CORE_TYPES()
         virtual void commit() {}
+        virtual const char *description() { return "unknown"; }
         virtual ~SceneGraphNode() = default;
     };
     AKR_VARIANT class SceneNode;

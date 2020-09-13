@@ -36,7 +36,6 @@ namespace akari {
         std::vector<std::shared_ptr<MeshNode<C>>> shapes;
         std::string output;
         std::shared_ptr<IntegratorNode<C>> integrator;
-        std::shared_ptr<GPUIntegratorNode<C>> gpu_integrator;
         Buffer<AreaLight<C>> area_lights;
         void commit() override;
         Scene<C> compile(MemoryArena *arena);

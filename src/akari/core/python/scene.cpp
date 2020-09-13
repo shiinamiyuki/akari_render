@@ -65,6 +65,7 @@ namespace akari {
     }
     AKR_VARIANT void SceneNode<C>::render() {
         commit();
+        info("preparing scene\n");
         MemoryArena arena;
         auto scene = compile(&arena);
         auto res = scene.camera.resolution();
@@ -80,7 +81,11 @@ namespace akari {
         };
 #ifdef AKR_ENABLE_GPU
         auto render_gpu = [&]() {
-            auto integrator_ = gpu_integrator->compile(&arena);
+            auto integrator_ = integrator->compile_gpu(&arena);
+            if (!integrator_) {
+                fatal("integrator {} is not supported on gpu\n", integrator->description());
+                std::exit(0);
+            }
             integrator_->render(scene, &film);
             film.write_image(fs::path(output));
         };

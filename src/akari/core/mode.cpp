@@ -41,23 +41,24 @@ namespace akari {
     static cuda_unified_memory_resource _cuda_unified_memory_resource;
 #endif
     namespace _mode_internal {
-        ComputeDevice cur_device = ComputeDevice::cpu;
-    }
+        static ComputeDevice cur_device = ComputeDevice::cpu;
+        static astd::pmr::memory_resource *_device_memory_resource = astd::pmr::get_default_resource();
+    } // namespace _mode_internal
 #ifndef AKR_ENABLE_GPU
     void set_device_gpu() {
         fatal("gpu rendering is not supported\n");
         std::abort();
     }
 #else
-    void set_device_gpu() { _mode_internal::cur_device = ComputeDevice::gpu; }
-#endif
-    void set_device_cpu() { _mode_internal::cur_device = ComputeDevice::cpu; }
-    AKR_EXPORT ComputeDevice get_device() { return _mode_internal::cur_device; }
-    astd::pmr::memory_resource *get_device_memory_resource() {
-        if (get_device() == ComputeDevice::cpu) {
-            return astd::pmr::get_default_resource();
-        } else {
-            return &_cuda_unified_memory_resource;
-        }
+    void set_device_gpu() {
+        _mode_internal::cur_device = ComputeDevice::gpu;
+        _mode_internal::_device_memory_resource = &_cuda_unified_memory_resource;
     }
+#endif
+    void set_device_cpu() {
+        _mode_internal::cur_device = ComputeDevice::cpu;
+        _mode_internal::_device_memory_resource = astd::pmr::get_default_resource();
+    }
+    AKR_EXPORT ComputeDevice get_device() { return _mode_internal::cur_device; }
+    astd::pmr::memory_resource *get_device_memory_resource() { return _mode_internal::_device_memory_resource; }
 } // namespace akari

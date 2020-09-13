@@ -40,6 +40,7 @@ void parse(int argc, const char **argv) {
         {
             auto opt = options.allow_unrecognised_options().add_options();
             opt("i,input", "Input Scene Description File", cxxopts::value<std::string>());
+            opt("gpu", "use gpu rendering");
             opt("help", "Show this help");
         }
         options.parse_positional({"input"});
@@ -48,6 +49,9 @@ void parse(int argc, const char **argv) {
             fatal("Input file must be provided\n");
             std::cout << options.help() << std::endl;
             exit(0);
+        }
+        if (result.count("gpu")) {
+            set_device_gpu();
         }
         if (result.arguments().empty() || result.count("help")) {
             std::cout << options.help() << std::endl;

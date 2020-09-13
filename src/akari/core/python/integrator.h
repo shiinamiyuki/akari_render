@@ -27,19 +27,15 @@
 #    include <akari/kernel/integrators/gpu/integrator.h>
 #endif
 namespace akari {
+    namespace gpu {
+        AKR_VARIANT class Integrator;
+    }
     AKR_VARIANT class IntegratorNode : public SceneGraphNode<C> {
       public:
         AKR_IMPORT_TYPES()
         virtual cpu::Integrator<C> *compile(MemoryArena *arena) = 0;
+        virtual gpu::Integrator<C> *compile_gpu(MemoryArena *arena) { return nullptr; }
     };
-#ifdef AKR_ENABLE_GPU
-    AKR_VARIANT class GPUIntegratorNode : public SceneGraphNode<C> {
-      public:
-        AKR_IMPORT_TYPES()
-        virtual gpu::Integrator<C> *compile(MemoryArena *arena) = 0;
-    };
-#else
-    AKR_VARIANT class GPUIntegratorNode : public SceneGraphNode<C> { public: };
-#endif
+
     AKR_VARIANT struct RegisterIntegratorNode { static void register_nodes(py::module &m); };
 } // namespace akari
