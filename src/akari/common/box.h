@@ -31,7 +31,7 @@ namespace akari {
     struct Box {
         Box() = default;
         Box(const Box &) = delete;
-        Box(Box &&rhs) : allocator(std::move(rhs.allocator)), _ptr(rhs._ptr) { rhs._ptr = nullptr; }
+        Box(Box &&rhs) :  _ptr(rhs._ptr), allocator(std::move(rhs.allocator)) { rhs._ptr = nullptr; }
         Box &operator=(const Box &) = delete;
         Box &operator=(Box &&rhs) {
             reset();
