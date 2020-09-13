@@ -27,6 +27,7 @@
 #include <akari/core/image.hpp>
 #include <akari/core/parallel.h>
 #include <akari/common/buffer.h>
+#include <akari/common/box.h>
 
 namespace akari {
     AKR_VARIANT struct Pixel {
@@ -60,6 +61,28 @@ namespace akari {
             pix.radiance += radiance;
         }
     };
+    AKR_VARIANT struct TileView {
+        AKR_IMPORT_TYPES()
+        Bounds2i bounds{};
+        Point2i _size;
+        BufferView<Pixel<C>> pixels;
+        explicit TileView(Tile<C> &tile) : bounds(tile.bounds), _size(tile._size), pixels(tile.pixels) {}
+        auto &operator()(const Point2f &p) {
+            auto q = Point2i(floor(p + Point2f(0.5) - Point2f(bounds.pmin) + Point2f(1)));
+            return pixels[q.x() + q.y() * _size.x()];
+        }
+
+        const auto &operator()(const Point2f &p) const {
+            auto q = Point2i(floor(p + Point2f(0.5) - Point2f(bounds.pmin) + Point2f(1)));
+            return pixels[q.x() + q.y() * _size.x()];
+        }
+
+        void add_sample(const Point2f &p, const Spectrum &radiance, Float weight) {
+            auto &pix = (*this)(p);
+            pix.weight += weight;
+            pix.radiance += radiance;
+        }
+    };
     AKR_VARIANT class Film {
         AKR_IMPORT_TYPES()
         TImage<Spectrum> radiance;
@@ -69,7 +92,7 @@ namespace akari {
         Float splatScale = 1.0f;
         explicit Film(const Point2i &dimension) : radiance(dimension), weight(dimension) {}
         Tile<C> tile(const Bounds2i &bounds) { return Tile<C>(bounds); }
-
+        Box<Tile<C>> boxed_tile(const Bounds2i &bounds) { return Box<Tile<C>>::make(bounds); }
         [[nodiscard]] AKR_XPU Point2i resolution() const { return radiance.resolution(); }
 
         [[nodiscard]] AKR_XPU Bounds2i bounds() const { return Bounds2i{Point2i(0), resolution()}; }

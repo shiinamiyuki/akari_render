@@ -67,7 +67,8 @@ namespace akari {
             parallel_for_2d(n_tiles, [=, &scene, &mutex, &small_arenas](const Point2i &tile_pos, int tid) {
                 (void)tid;
                 Bounds2i tileBounds = Bounds2i{tile_pos * (int)tile_size, (tile_pos + Vector2i(1)) * (int)tile_size};
-                auto tile = film->tile(tileBounds);
+                auto boxed_tile = film->boxed_tile(tileBounds);
+                auto &tile = *boxed_tile.get();
                 auto &camera = scene.camera;
                 auto &arena = small_arenas[tid];
                 (void)arena;

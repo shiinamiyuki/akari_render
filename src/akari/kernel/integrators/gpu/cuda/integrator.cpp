@@ -50,31 +50,43 @@ namespace akari::gpu {
                 }
                 return Spectrum(0);
             };
-            debug("resolution: {}, tile size: {}, tiles: {}\n", film->resolution(), tile_size, n_tiles);
-            launch(
-                "test", n_tiles.x() * n_tiles.y(), AKR_GPU_LAMBDA(int tid) {
-                    Point2i tile_pos(tid % n_tiles.x(), tid / n_tiles.x());
+            size_t ARENA_SIZE = 16 * 1024;
+            MemoryArena _arena;
+            SmallArena arena(_arena.alloc_bytes(ARENA_SIZE), ARENA_SIZE);
+            debug("GPU RTAO resolution: {}, tile size: {}, tiles: {}\n", film->resolution(), tile_size, n_tiles);
+            for (int tile_y = 0; tile_y < n_tiles.y(); tile_y++) {
+                for (int tile_x = 0; tile_x < n_tiles.x(); tile_x++) {
+                    Point2i tile_pos(tile_x, tile_y);
                     Bounds2i tileBounds =
                         Bounds2i{tile_pos * (int)tile_size, (tile_pos + Vector2i(1)) * (int)tile_size};
-                    // auto tile = film->tile(tileBounds);
+                    auto boxed_tile = film->boxed_tile(tileBounds);
                     auto &camera = scene.camera;
                     auto sampler = scene.sampler;
-                    // for (int y = tile.bounds.pmin.y(); y < tile.bounds.pmax.y(); y++) {
-                    //     for (int x = tile.bounds.pmin.x(); x < tile.bounds.pmax.x(); x++) {
-                        int x = 0;
-                        int y = 0;
-                            sampler.set_sample_index(x + y * film->resolution().x());
+                    auto extents = tileBounds.extents();
+                    auto tile = boxed_tile.get();
+                    cudaDeviceSynchronize();
+                    auto resolution = film->resolution();
+                    launch(
+                        "RTAO", extents.x() * extents.y(), AKR_GPU_LAMBDA(int tid) {
+                            int tx = tid % extents.x();
+                            int ty = tid / extents.x();
+                            int x = tx + tileBounds.pmin.x();
+                            int y = ty + tileBounds.pmin.y();
+                            sampler.set_sample_index(x + y * resolution.x());
                             for (int s = 0; s < spp; s++) {
                                 sampler.start_next_sample();
                                 CameraSample<C> sample;
+
                                 camera.generate_ray(sampler.next2d(), sampler.next2d(), Point2i(x, y), &sample);
                                 auto L = Li(sample.ray, sampler);
-                                // tile.add_sample(Point2f(x, y), L, 1.0f);
+                                tile->add_sample(Point2f(x, y), L, 1.0f);
                             }
-                        //}
-                    //}
-                });
-            cudaDeviceSynchronize();
+                        });
+                    CUDA_CHECK(cudaDeviceSynchronize());
+                    // std::lock_guard<std::mutex> _(mutex);
+                    film->merge_tile(*tile);
+                }
+            }
         } else {
             fatal("only float is supported for gpu\n");
         }

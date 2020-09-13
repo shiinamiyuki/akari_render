@@ -57,7 +57,7 @@ namespace akari {
     }
     AKR_EXPORT void sync_device() {}
 #else
-    AKR_EXPORT void sync_device() { cudaDeviceSynchronize(); }
+    AKR_EXPORT void sync_device() { CUDA_CHECK(cudaDeviceSynchronize()); }
 
     void set_device_gpu() {
         _mode_internal::cur_device = ComputeDevice::gpu;
