@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 #include <akari/core/mode.h>
+#include <akari/core/logger.h>
 #ifdef AKR_ENABLE_GPU
 #    include <cuda.h>
 #    include <cuda_runtime_api.h>

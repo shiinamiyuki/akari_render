@@ -32,7 +32,7 @@ namespace akari {
         cpu::Integrator<C> *compile(MemoryArena *arena) override {
             return arena->alloc<cpu::Integrator<C>>(cpu::AmbientOcclusion<C>(spp));
         }
-        const char *description() { return "[Ambient Occlution]"; }
+        const char *description() override { return "[Ambient Occlution]"; }
 #ifdef AKR_ENABLE_GPU
         virtual gpu::Integrator<C> *compile_gpu(MemoryArena *arena) {
             return arena->alloc<gpu::Integrator<C>>(gpu::AmbientOcclusion<C>(spp));
@@ -46,7 +46,7 @@ namespace akari {
         cpu::Integrator<C> *compile(MemoryArena *arena) override {
             return arena->alloc<cpu::Integrator<C>>(cpu::PathTracer<C>(spp));
         }
-         const char *description() { return "[Path Tracer]"; }
+        const char *description() override { return "[Path Tracer]"; }
     };
 
     AKR_VARIANT void RegisterIntegratorNode<C>::register_nodes(py::module &m) {

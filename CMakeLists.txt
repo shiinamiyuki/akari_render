@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
 project(AkariRender)
-cmake_policy(SET CMP0104 NEW)
 
 set(CMAKE_CXX_STANDARD 17)
 option(AKR_BUILD_GUI "Build Gui / Editor" OFF)
@@ -73,6 +72,7 @@ file(GLOB AKR_KERNEL_COMMON_SRC src/akari/kernel/*.* src/akari/kernel/*/*.*)
 file(GLOB AKR_KERNEL_CPU_SRC src/akari/kernel/integrators/cpu/*.*)
 file(GLOB AKR_KERNEL_GPU_SRC src/akari/kernel/integrators/gpu/*.* src/akari/kernel/cuda/*.*)
 if(AKR_ENABLE_CUDA)
+    cmake_policy(SET CMP0104 NEW)
     file(GLOB AKR_KERNEL_GPU_CUDA_SRC src/akari/kernel/integrators/gpu/cuda/*.*)
     set(AKR_KERNEL_SRC ${AKR_KERNEL_COMMON_SRC} ${AKR_KERNEL_CPU_SRC} ${AKR_KERNEL_GPU_SRC} ${AKR_KERNEL_GPU_CUDA_SRC})
     set_source_files_properties(
