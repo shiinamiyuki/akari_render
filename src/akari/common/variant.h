@@ -96,7 +96,7 @@ namespace akari {
             });
         }
         AKR_XPU int typeindex() const { return index; }
-        template <typename T>
+        template <typename U>
         AKR_XPU int indexof() const {
             return Index::template GetIndex<U>::value;
         }
