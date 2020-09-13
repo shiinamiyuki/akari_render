@@ -55,9 +55,10 @@ namespace akari {
         fatal("gpu rendering is not supported\n");
         std::abort();
     }
-    AKR_EXPORT void sync_device() { cudaDeviceSynchronize(); }
-#else
     AKR_EXPORT void sync_device() {}
+#else
+    AKR_EXPORT void sync_device() { cudaDeviceSynchronize(); }
+
     void set_device_gpu() {
         _mode_internal::cur_device = ComputeDevice::gpu;
         _mode_internal::_device_memory_resource = &_cuda_unified_memory_resource;
