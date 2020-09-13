@@ -29,6 +29,7 @@ namespace akari {
       public:
         AKR_IMPORT_TYPES()
         int spp = 16;
+        int tile_size = 16;
         cpu::Integrator<C> *compile(MemoryArena *arena) override {
             return arena->alloc<cpu::Integrator<C>>(cpu::AmbientOcclusion<C>(spp));
         }
@@ -43,6 +44,7 @@ namespace akari {
       public:
         AKR_IMPORT_TYPES()
         int spp = 16;
+        int tile_size = 64;
         cpu::Integrator<C> *compile(MemoryArena *arena) override {
             return arena->alloc<cpu::Integrator<C>>(cpu::PathTracer<C>(spp));
         }
@@ -55,10 +57,12 @@ namespace akari {
         py::class_<AOIntegratorNode<C>, IntegratorNode<C>, std::shared_ptr<AOIntegratorNode<C>>>(m, "RTAO")
             .def(py::init<>())
             .def_readwrite("spp", &AOIntegratorNode<C>::spp)
+            .def_readwrite("tile_size", &AOIntegratorNode<C>::tile_size)
             .def("commit", &AOIntegratorNode<C>::commit);
         py::class_<PathIntegratorNode<C>, IntegratorNode<C>, std::shared_ptr<PathIntegratorNode<C>>>(m, "Path")
             .def(py::init<>())
             .def_readwrite("spp", &PathIntegratorNode<C>::spp)
+            .def_readwrite("tile_size", &PathIntegratorNode<C>::tile_size)
             .def("commit", &PathIntegratorNode<C>::commit);
     }
     AKR_RENDER_STRUCT(RegisterIntegratorNode)

@@ -21,3 +21,13 @@
 // SOFTWARE.
 
 #include <akari/core/profiler.h>
+
+namespace akari {
+    AKR_EXPORT Profiler *get_profiler() {
+        static Profiler profiler;
+        return &profiler;
+    }
+    void Profiler::print_stats(){
+        
+    }
+} // namespace akari

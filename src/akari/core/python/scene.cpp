@@ -28,7 +28,7 @@
 #include <akari/kernel/embree.inl>
 #include <akari/kernel/bvh-accelerator.h>
 #include <akari/core/film.h>
-
+#include <akari/core/profiler.h>
 namespace akari {
     AKR_VARIANT void SceneNode<C>::commit() {
         for (auto &shape : shapes) {
@@ -100,12 +100,13 @@ namespace akari {
 #else
         auto render_gpu = [&]() { fatal("gpu rendering is not supported\n"); };
 #endif
+        Timer timer;
         if (get_device() == ComputeDevice::cpu) {
             render_cpu();
         } else {
             render_gpu();
         }
-        info("render done\n");
+        info("render done took ({}s)\n", timer.elapsed_seconds());
     }
     AKR_VARIANT void RegisterSceneNode<C>::register_nodes(py::module &m) {
         AKR_IMPORT_TYPES()
