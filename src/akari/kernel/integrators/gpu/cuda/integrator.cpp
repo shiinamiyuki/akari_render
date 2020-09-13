@@ -64,7 +64,6 @@ namespace akari::gpu {
                     auto sampler = scene.sampler;
                     auto extents = tileBounds.extents();
                     auto tile = boxed_tile.get();
-                    cudaDeviceSynchronize();
                     auto resolution = film->resolution();
                     launch(
                         "RTAO", extents.x() * extents.y(), AKR_GPU_LAMBDA(int tid) {
@@ -83,8 +82,10 @@ namespace akari::gpu {
                             }
                         });
                     CUDA_CHECK(cudaDeviceSynchronize());
+                    debug("merge\n");
                     // std::lock_guard<std::mutex> _(mutex);
                     film->merge_tile(*tile);
+                    debug("merge done\n");
                 }
             }
         } else {

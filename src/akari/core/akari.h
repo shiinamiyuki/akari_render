@@ -66,6 +66,24 @@ namespace akari {
     std::shared_ptr<U> dyn_cast(const std::shared_ptr<T> &p) {
         return std::dynamic_pointer_cast<U>(p);
     }
-    //    using Float = float;
+
+    template <typename T>
+    struct ScopedAssignment {
+        ScopedAssignment(T *p) : ptr(p), backup(*p) {}
+        ~ScopedAssignment() { *ptr = backup; }
+
+      private:
+        T *ptr;
+        T backup;
+    };
+
+    template <typename F>
+    struct AtScopeExit {
+        F f;
+        AtScopeExit(F &&f) : f(f) {}
+        ~AtScopeExit() { f(); }
+    };
+    template <typename F>
+    AtScopeExit(F &&f)->AtScopeExit<F>;
 } // namespace akari
 #endif // AKARIRENDER_AKARI_H

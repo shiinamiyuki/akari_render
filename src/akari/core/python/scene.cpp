@@ -19,6 +19,7 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+#include <csignal>
 #include <pybind11/pybind11.h>
 #include <pybind11/embed.h>
 #include <pybind11/stl.h>
@@ -65,6 +66,11 @@ namespace akari {
         return scene;
     }
     AKR_VARIANT void SceneNode<C>::render() {
+        /*
+        We want to restore the SIGINT handler so that the user can interrupt the renderer
+        */
+        auto _prev_SIGINT_handler = signal(SIGINT, SIG_DFL);
+        auto _restore_handler = AtScopeExit([=]() { signal(SIGINT, _prev_SIGINT_handler); });
         commit();
         info("preparing scene\n");
         MemoryArena arena;
