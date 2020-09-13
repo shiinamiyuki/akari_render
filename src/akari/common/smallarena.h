@@ -58,7 +58,7 @@ namespace akari {
             auto q = (void *)(buffer + cur);
             AKR_ASSERT(astd::align(alignof(T), sizeof(T), q, bytes_needed));
             auto p = reinterpret_cast<T *>(q);
-            new (p) T(std::forward<Args>(args)...);
+            new (p) T(args...);
             return p;
         }
         void reset() { allocated = 0; }

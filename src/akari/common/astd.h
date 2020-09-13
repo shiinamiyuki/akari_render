@@ -30,6 +30,12 @@
 // port some nessary stl class to CUDA
 // mostly from pbrt-v4
 namespace akari::astd {
+    template <class _Ty>
+    AKR_XPU constexpr _Ty &&forward(std::remove_reference_t<_Ty> &&_Arg) noexcept { // forward an rvalue as an rvalue
+        static_assert(!std::is_lvalue_reference_v<_Ty>, "bad forward call");
+        return static_cast<_Ty &&>(_Arg);
+    }
+
     template <typename T1, typename T2>
     struct pair {
         T1 first;
@@ -88,7 +94,7 @@ namespace akari::astd {
             return *this;
         }
         template <typename... Ts>
-        AKR_XPU void emplace(Ts &&... args) {
+        AKR_CPU void emplace(Ts &&... args) {
             reset();
             new (ptr()) T(std::forward<Ts>(args)...);
             set = true;
@@ -144,18 +150,18 @@ namespace akari::astd {
         bool has_value() const { return set; }
 
       private:
-#ifdef __NVCC__
+        // #ifdef __NVCC__
         // Work-around NVCC bug
         AKR_XPU
         T *ptr() { return reinterpret_cast<T *>(&optionalValue); }
         AKR_XPU
         const T *ptr() const { return reinterpret_cast<const T *>(&optionalValue); }
-#else
-        AKR_XPU
-        T *ptr() { return std::launder(reinterpret_cast<T *>(&optionalValue)); }
-        AKR_XPU
-        const T *ptr() const { return std::launder(reinterpret_cast<const T *>(&optionalValue)); }
-#endif
+        // #else
+        //         AKR_XPU
+        //         T *ptr() { return std::launder(reinterpret_cast<T *>(&optionalValue)); }
+        //         AKR_XPU
+        //         const T *ptr() const { return std::launder(reinterpret_cast<const T *>(&optionalValue)); }
+        // #endif
 
         std::aligned_storage_t<sizeof(T), alignof(T)> optionalValue;
         bool set = false;

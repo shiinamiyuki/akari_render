@@ -25,7 +25,7 @@
 namespace akari {
     AKR_VARIANT bool Scene<C>::intersect(const Ray<C> &ray, Intersection<C> *intersection) const {
         bool hit = false;
-        accel.accept([&](auto &&arg) {
+        accel.dispatch([&](auto &&arg) {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, EmbreeAccelerator<C> *>) {
 #ifndef AKR_GPU_CODE
@@ -48,7 +48,7 @@ namespace akari {
         return hit;
     }
     AKR_VARIANT bool Scene<C>::occlude(const Ray<C> &ray) const {
-        return accel.accept([&](auto &&arg) -> bool {
+        return accel.dispatch([&](auto &&arg) -> bool {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, EmbreeAccelerator<C> *>) {
 #ifndef AKR_GPU_CODE
@@ -66,7 +66,7 @@ namespace akari {
         });
     }
     AKR_VARIANT void Scene<C>::commit() {
-        accel.accept([&](auto &&arg) {
+        accel.dispatch_cpu([&](auto &&arg) {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, EmbreeAccelerator<C> *>) {
 #ifndef AKR_GPU_CODE

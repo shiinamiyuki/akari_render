@@ -72,10 +72,13 @@ namespace akari {
 
     template <typename... T>
     struct Variant {
+      private:
         static constexpr int nTypes = sizeof...(T);
         static constexpr std::size_t alignment_value = std::max({alignof(T)...});
         typename std::aligned_storage<SizeOf<T...>::value, alignment_value>::type data;
         int index = -1;
+
+      public:
         using Index = TypeIndex<T...>;
 
         Variant() = default;
@@ -87,12 +90,16 @@ namespace akari {
         }
 
         AKR_XPU Variant(const Variant &v) : index(v.index) {
-            v.accept([&](const auto &item) {
+            v.dispatch([&](const auto &item) {
                 using U = std::decay_t<decltype(item)>;
                 new (&data) U(item);
             });
         }
-
+        AKR_XPU int typeindex() const { return index; }
+        template <typename T>
+        AKR_XPU int indexof() const {
+            return Index::template GetIndex<U>::value;
+        }
         AKR_XPU Variant &operator=(const Variant &v) noexcept {
             if (this == &v)
                 return *this;
@@ -100,7 +107,7 @@ namespace akari {
                 _drop();
             index = v.index;
             auto that = this;
-            v.accept([&](const auto &item) {
+            v.dispatch([&](const auto &item) {
                 using U = std::decay_t<decltype(item)>;
                 *that->template get<U>() = item;
             });
@@ -123,7 +130,7 @@ namespace akari {
         }
 
         template <typename U>
-       AKR_XPU Variant &operator=(const U &u) {
+        AKR_XPU Variant &operator=(const U &u) {
             if (index != -1) {
                 _drop();
             }
@@ -181,46 +188,40 @@ namespace akari {
     _GEN_CASE_N(13)                                                                                                    \
     _GEN_CASE_N(14)                                                                                                    \
     _GEN_CASE_N(15)
-
+#define _GEN_DISPATCH_BODY()                                                                                           \
+    using Ret = std::invoke_result_t<Visitor, typename FirstOf<T...>::type &>;                                         \
+    static_assert(nTypes <= 16, "too many types");                                                                     \
+    if constexpr (nTypes <= 2) {                                                                                       \
+        switch (index) { _GEN_CASES_2(); }                                                                             \
+    } else if constexpr (nTypes <= 4) {                                                                                \
+        switch (index) { _GEN_CASES_4(); }                                                                             \
+    } else if constexpr (nTypes <= 8) {                                                                                \
+        switch (index) { _GEN_CASES_8(); }                                                                             \
+    } else if constexpr (nTypes <= 16) {                                                                               \
+        switch (index) { _GEN_CASES_16(); }                                                                            \
+    }                                                                                                                  \
+    if constexpr (std::is_same_v<void, Ret>) {                                                                         \
+        return;                                                                                                        \
+    } else {                                                                                                           \
+        AKR_PANIC("No matching case");                                                                                 \
+    }
         template <class Visitor>
-        AKR_XPU auto accept(Visitor &&visitor) {
-            using Ret = std::invoke_result_t<Visitor, typename FirstOf<T...>::type &>;
-            static_assert(nTypes <= 16, "too many types");
-            if constexpr (nTypes <= 2) {
-                switch (index) { _GEN_CASES_2(); }
-            } else if constexpr (nTypes <= 4) {
-                switch (index) { _GEN_CASES_4(); }
-            } else if constexpr (nTypes <= 8) {
-                switch (index) { _GEN_CASES_8(); }
-            } else if constexpr (nTypes <= 16) {
-                switch (index) { _GEN_CASES_16(); }
-            }
-            if constexpr (std::is_same_v<void, Ret>) {
-                return;
-            } else {
-                AKR_PANIC("No matching case");
-            }
+        AKR_XPU auto dispatch(Visitor &&visitor) {
+            _GEN_DISPATCH_BODY()
         }
 
         template <class Visitor>
-        AKR_XPU auto accept(Visitor &&visitor) const {
-            using Ret = std::invoke_result_t<Visitor, const typename FirstOf<T...>::type &>;
-            static_assert(nTypes <= 16, "too many types");
-            if constexpr (nTypes <= 2) {
-                switch (index) { _GEN_CASES_2(); }
-            } else if constexpr (nTypes <= 4) {
-                switch (index) { _GEN_CASES_4(); }
-            } else if constexpr (nTypes <= 8) {
-                switch (index) { _GEN_CASES_8(); }
-            } else if constexpr (nTypes <= 16) {
-                switch (index) { _GEN_CASES_16(); }
-            }
-            if constexpr (std::is_same_v<void, Ret>) {
-                return;
-            } else {
-                AKR_PANIC("No matching case");
-            }
+        AKR_XPU auto dispatch(Visitor &&visitor) const {
+            _GEN_DISPATCH_BODY()
         }
+
+        template <class Visitor>
+        AKR_CPU auto dispatch_cpu(Visitor &&visitor) {
+            _GEN_DISPATCH_BODY()
+        }
+
+        template <class Visitor>
+        AKR_CPU auto dispatch_cpu(Visitor &&visitor) const {_GEN_DISPATCH_BODY()}
 
         AKR_XPU ~Variant() {
             if (index != -1)
@@ -230,13 +231,14 @@ namespace akari {
       private:
         AKR_XPU void _drop() {
             auto *that = this; // prevent gcc ICE
-            accept([=](auto &&self) {
+            dispatch([=](auto &&self) {
                 using U = std::decay_t<decltype(self)>;
                 that->template get<U>()->~U();
             });
         }
+#undef _GEN_CASE_N
 #define AKR_VAR_DISPATCH(method, ...)                                                                                  \
-    return this->accept([&, this](auto &&self) {                                                                       \
+    return this->dispatch([&, this](auto &&self) {                                                                     \
         (void)this;                                                                                                    \
         return self.method(__VA_ARGS__);                                                                               \
     });

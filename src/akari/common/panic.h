@@ -39,12 +39,16 @@ namespace akari {
     }
 
 #define AKR_PANIC(msg) panic(__FILE__, __LINE__, msg)
-#define AKR_CHECK(expr)                                                                                                \
-    do {                                                                                                               \
-        if (!(expr)) {                                                                                                 \
-            fprintf(stderr, #expr " not satisfied at %s:%d\n", __FILE__, __LINE__);                                    \
-        }                                                                                                              \
-    } while (0)
+#ifdef AKR_GPU_CODE
+#    define AKR_CHECK(expr)
+#else
+#    define AKR_CHECK(expr)                                                                                            \
+        do {                                                                                                           \
+            if (!(expr)) {                                                                                             \
+                fprintf(stderr, #expr " not satisfied at %s:%d\n", __FILE__, __LINE__);                                \
+            }                                                                                                          \
+        } while (0)
+#endif
 #define AKR_ASSERT(expr)                                                                                               \
     do {                                                                                                               \
         if (!(expr)) {                                                                                                 \

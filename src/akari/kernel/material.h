@@ -211,7 +211,7 @@ namespace akari {
             return ptr;
         }
         AKR_XPU BSDF<C> get_bsdf0(MaterialEvalContext<C> &ctx) const {
-            return this->accept([&](auto &&arg) {
+            return this->dispatch([&](auto &&arg) {
                 using T = std::decay_t<decltype(arg)>;
                 if constexpr (std::is_same_v<T, MixMaterial<C>> || std::is_same_v<T, EmissiveMaterial<C>>) {
                     return BSDF<C>();
