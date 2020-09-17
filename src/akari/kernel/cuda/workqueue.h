@@ -20,31 +20,35 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#pragma once
-
-#include <type_traits>
-#include <string_view>
+#include <cuda.h>
+#include <akari/common/fwd.h>
+#include <akari/common/tuple.h>
+#include <akari/common/soa.h>
+#include <akari/kernel/soa.h>
 
 namespace akari {
-    struct StaticAttribute {
-        std::string_view key, value;
+    template <typename T>
+    class WorkQueue : SOA<T> {
+        using value_type = T;
+        using SOA<T>::SOA<T>;
+        size_t head = 0;
+        AKR_XPU void append(const T &el) {
+            auto i = atomicAdd(&head, 1);
+            AKR_ASSERT(i < head);
+            buffer[i] = el;
+        }
+        AKR_XPU size_t elements_in_queue() const { return head; }
+        AKR_XPU void clear() { head = 0; }
     };
-    struct StaticProperty {
-        const std::string_view name;
-        const StaticAttribute * const attributes;
-        const size_t attribute_count;
-        template<size_t N>
-        static constexpr StaticProperty make(std::string_view name, const StaticAttribute (&attributes) [N]) {
-            return StaticProperty{
-                name, attributes, N
-            };
+
+    template <typename... Ts>
+    struct MultiWorkQueue : Tuple<WorkQueue<Ts>...> {
+        MultiWorkQueue(MemoryArena &arena, size_t max_size) {
+            foreach_cpu([](auto &arg) {
+                using Queue = std::decay_t<decltype(arg)>;
+                using T = typename Queue::value_type;
+                arg = Queue(arena.allocN<T>(), max_size);
+            });
         }
     };
-    template<typename T>
-    struct StaticMeta {
-        template<class F>
-        static void foreach_property(T & object,F && f){}
-        static size_t property_count() {return 0;}
-        static size_t method_count() {return 0;}
-    };
-}
+} // namespace akari

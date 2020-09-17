@@ -50,5 +50,9 @@ namespace akari {
 #    endif
 #    define AKR_FORCEINLINE inline __attribute__((always_inline))
 #endif
+
+#ifdef _MSC_VER
+#define __restrict__ __restrict 
+#endif
 } // namespace akari
 #endif // AKARIRENDER_PLATFORM_H

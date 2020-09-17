@@ -35,6 +35,15 @@ namespace akari {
             AmbientOcclusion(int spp) : spp(spp) {}
             void render(const Scene<C> &scene, Film<C> *out) const;
         };
+        AKR_VARIANT class PathTracer {
+          public:
+            int spp = 16;
+            int tile_size = 16;
+            AKR_IMPORT_TYPES()
+            PathTracer() = default;
+            PathTracer(int spp) : spp(spp) {}
+            void render(const Scene<C> &scene, Film<C> *out) const;
+        };
         AKR_VARIANT class Integrator : public Variant<AmbientOcclusion<C>> {
           public:
             AKR_IMPORT_TYPES()

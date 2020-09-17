@@ -29,6 +29,7 @@
 #include <akari/core/python/python.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/embed.h>
+#include <akari/common/soa.h>
 using namespace akari;
 namespace py = pybind11;
 static std::string inputFilename;
@@ -64,6 +65,8 @@ void parse(int argc, const char **argv) {
     }
 }
 PYBIND11_EMBEDDED_MODULE(akari, m) { akari::register_module_akari(m); }
+
+
 int main(int argc, const char **argv) {
     Application app;
     parse(argc, argv);

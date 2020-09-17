@@ -68,9 +68,12 @@ file(GLOB AKR_COMMON_SRC src/akari/common/*.*)
 file(GLOB AKR_SHADING_SRC src/akari/shading/*.*)
 file(GLOB AKR_CORE_SRC src/akari/core/*.*)
 file(GLOB AKR_PYBIND_SRC src/akari/core/python/*.*)
+
 file(GLOB AKR_KERNEL_COMMON_SRC src/akari/kernel/*.* src/akari/kernel/*/*.*)
 file(GLOB AKR_KERNEL_CPU_SRC src/akari/kernel/integrators/cpu/*.*)
-file(GLOB AKR_KERNEL_GPU_SRC src/akari/kernel/integrators/gpu/*.* src/akari/kernel/cuda/*.*)
+file(GLOB AKR_KERNEL_GPU_SRC ${AKR_KERNEL_SOA_H} src/akari/kernel/integrators/gpu/*.* src/akari/kernel/cuda/*.*)
+
+
 if(AKR_ENABLE_CUDA)
     cmake_policy(SET CMP0104 NEW)
     file(GLOB AKR_KERNEL_GPU_CUDA_SRC src/akari/kernel/integrators/gpu/cuda/*.*)
@@ -106,9 +109,14 @@ set_target_properties(akari_core_base PROPERTIES UNITY_BUILD ON)
 set_target_CUDA_props(akari_core_base)
 
 
+set(AKR_KERNEL_SOA_H src/akari/kernel/soa.h)
+add_custom_command(OUTPUT ${AKR_KERNEL_SOA_H}
+    COMMAND python src/akari/tools/soac.py src/akari/kernel/soa.py  ${AKR_KERNEL_SOA_H}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    DEPENDS ${AKR_KERNEL_SOA_H} src/akari/tools/soac.py)
 
 
-add_library(akari_core SHARED ${AKR_COMMON_SRC} ${AKR_PYBIND_SRC} ${AKR_KERNEL_SRC})
+add_library(akari_core SHARED ${AKR_COMMON_SRC} ${AKR_PYBIND_SRC} ${AKR_KERNEL_SRC}  ${AKR_KERNEL_SOA_H})
 target_link_libraries(akari_core PUBLIC akari_core_base) 
 set_target_properties(akari_core PROPERTIES UNITY_BUILD ON)
 set_target_CUDA_props(akari_core)

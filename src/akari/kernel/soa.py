@@ -1,0 +1,29 @@
+{
+    'headers':[
+        'akari/common/math.h'
+    ],
+    'flat':['int', 'bool', 'Float', 'Array3f', 'Array2f'],
+    'soa':{
+        'Ray<C>' : {
+            'template':['C'],
+            'fields':{
+                'o':'Array3f',
+                'd':'Array3f',
+                'tmin':'Float',
+                'tmax':'Float'
+            }
+        },
+        'Intersection<C>':{
+            'template':['C'],
+            'fields':{
+                'p':'Array3f',
+                't':'Float',
+                'ng':'Array3f',
+                'uv':'Array2f',
+                'geom_id':'int',
+                'prim_id':'int',
+                'is_instance':'bool'
+            }
+        }
+    }
+}

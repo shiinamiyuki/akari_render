@@ -13,4 +13,5 @@ scenes/
 out/
 **/__pycache__/
 src/akari/common/config.h
+src/akari/kernel/soa.h
 akari.conf

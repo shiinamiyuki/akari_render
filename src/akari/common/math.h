@@ -26,6 +26,7 @@
 #include <akari/common/fwd.h>
 #include <akari/common/panic.h>
 #include <akari/common/array.h>
+#include <akari/common/static-reflect.h>
 #include <algorithm>
 #include <cstring>
 
@@ -219,6 +220,7 @@ namespace akari {
 
         Normal3f normal;
         Vector3f T, B;
+
     };
 
     template <typename Float>

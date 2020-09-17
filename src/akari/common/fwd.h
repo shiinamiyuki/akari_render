@@ -87,6 +87,8 @@ namespace akari {
     struct BoundingBox;
 
     template <typename T>
+    struct SOA;
+    template <typename T>
     struct value_ {
         using type = T;
     };
@@ -102,13 +104,22 @@ namespace akari {
     using value_t = typename value_<T>::type;
     template <typename T, typename S>
     struct replace_scalar_ {
+        static_assert(std::is_fundamental_v<T>);
         using type = S;
     };
     template <typename T, int N, int P, typename S>
     struct replace_scalar_<Array<T, N, P>, S> {
         using type = Array<S, N>;
     };
+    template <typename T, typename S>
+    struct replace_scalar_<SOA<T>, S> {
+        using type = SOA<S>;
+    };
 
+    template <typename T, int N, typename S>
+    struct replace_scalar_<Color<T, N>, S> {
+        using type = Color<S, N>;
+    };
     template <typename T, int N, typename S>
     struct replace_scalar_<Matrix<T, N>, S> {
         using type = Matrix<S, N>;
@@ -153,30 +164,32 @@ namespace akari {
     constexpr static bool is_integer_v = is_integer<T>::value;
     template <typename T>
     constexpr static bool is_float_v = is_float<T>::value;
-    // template <typename T>
-    // using int32_array_t = replace_scalar_t<T, int32_t>;
-    // template <typename T>
-    // using uint32_array_t = replace_scalar_t<T, uint32_t>;
-    // template <typename T>
-    // using int64_array_t = replace_scalar_t<T, uint64_t>;
-    // template <typename T>
-    // using uint64_array_t = replace_scalar_t<T, uint64_t>;
-    // template <typename T>
-    // using uint32_array_t = r eplace_scalar_t<T, uint32_t>;
-    // template <typename T>
-    // using float32_array_t = replace_scalar_t<T, float>;
-    // template <typename T>
-    // using float64_array_t = replace_scalar_t<T, double>;
+    template <typename T>
+    using int8_array_t = replace_scalar_t<T, int8_t>;
+    template <typename T>
+    using int32_array_t = replace_scalar_t<T, int32_t>;
+    template <typename T>
+    using uint32_array_t = replace_scalar_t<T, uint32_t>;
+    template <typename T>
+    using int64_array_t = replace_scalar_t<T, uint64_t>;
+    template <typename T>
+    using uint64_array_t = replace_scalar_t<T, uint64_t>;
+    template <typename T>
+    using uint32_array_t = replace_scalar_t<T, uint32_t>;
+    template <typename T>
+    using float32_array_t = replace_scalar_t<T, float>;
+    template <typename T>
+    using float64_array_t = replace_scalar_t<T, double>;
 
     template <typename Float>
     struct CoreAliases {
-        using Int8 = int8_t;
-        using Int32 = int32_t;
-        using UInt32 = uint32_t;
-        using Int64 = int64_t;
-        using UInt64 = uint64_t;
-        using Float32 = float;
-        using Float64 = double;
+        using Int8 = int8_array_t<Float>;
+        using Int32 = int32_array_t<Float>;
+        using UInt32 = uint32_array_t<Float>;
+        using Int64 = int64_array_t<Float>;
+        using UInt64 = uint64_array_t<Float>;
+        using Float32 = float32_array_t<Float>;
+        using Float64 = float64_array_t<Float>;
 
         using Array2b = Array<bool, 2>;
         using Array3b = Array<bool, 3>;

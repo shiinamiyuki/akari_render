@@ -84,6 +84,7 @@ namespace akari {
             z() = zz;
             w() = ww;
         }
+
 #define GEN_ACCESSOR(name, idx)                                                                                        \
     AKR_XPU const T &name() const {                                                                                    \
         static_assert(N > idx);                                                                                        \

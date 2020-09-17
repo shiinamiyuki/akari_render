@@ -90,4 +90,27 @@ namespace akari::gpu {
         }
     }
     AKR_RENDER_CLASS(AmbientOcclusion)
+
+    AKR_VARIANT struct CameraRayWorkItem {
+        AKR_IMPORT_CORE_TYPES_WITH(float)
+        CameraSample<C> sample;
+    };
+
+    AKR_VARIANT void PathTracer<C>::render(const Scene<C> &scene, Film<C> *film) const {
+        if constexpr (std::is_same_v<Float, float>) {
+            // for (int tile_y = 0; tile_y < n_tiles.y(); tile_y++) {
+            //     for (int tile_x = 0; tile_x < n_tiles.x(); tile_x++) {
+            //         Point2i tile_pos(tile_x, tile_y);
+            //         Bounds2i tileBounds =
+            //             Bounds2i{tile_pos * (int)tile_size, (tile_pos + Vector2i(1)) * (int)tile_size};
+            //         auto boxed_tile = film->boxed_tile(tileBounds);
+            //         auto tile = boxed_tile.get();
+            //     }
+            // }
+        } else {
+            fatal("only float is supported for gpu\n");
+        }
+    }
+    AKR_RENDER_CLASS(PathTracer)
+
 } // namespace akari::gpu

@@ -32,4 +32,7 @@ namespace akari {
     };
     AKR_EXPORT ComputeDevice get_device();
     AKR_EXPORT astd::pmr::memory_resource *get_device_memory_resource();
+
+    // allocate only; no need to free (manually)
+    // AKR_EXPORT astd::pmr::memory_resource * get_device_auto_release_resource();
 } // namespace akari
