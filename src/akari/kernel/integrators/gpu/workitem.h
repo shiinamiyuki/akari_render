@@ -19,37 +19,42 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-
-#include <cuda.h>
-#include <akari/common/fwd.h>
-#include <akari/common/tuple.h>
-#include <akari/common/soa.h>
-#include <akari/kernel/soa.h>
-
+#include <akari/kernel/sampler.h>
+#include <akari/kernel/camera.h>
 namespace akari {
-    template <typename T>
-    struct WorkQueue : SOA<T> {
-        using value_type = T;
-        using SOA<T>::SOA;
-        size_t head = 0;
-        AKR_XPU int append(const T &el) {
-            auto i = atomicAdd(&head, 1);
-            AKR_ASSERT(i < head);
-            (*this)[i] = el;
-            return i;
-        }
-        AKR_XPU size_t elements_in_queue() const { return head; }
-        AKR_XPU void clear() { head = 0; }
+    AKR_VARIANT struct PathState {
+        AKR_IMPORT_TYPES()
+        int pixel;
+        Sampler<C> sampler;
+        Spectrum L;
+        Spectrum beta;
     };
-
-    // template <typename... Ts>
-    // struct MultiWorkQueue : Tuple<WorkQueue<Ts>...> {
-    //     MultiWorkQueue(MemoryArena &arena, size_t max_size) {
-    //         foreach_cpu([](auto &arg) {
-    //             using Queue = std::decay_t<decltype(arg)>;
-    //             using T = typename Queue::value_type;
-    //             arg = Queue(arena.allocN<T>(), max_size);
-    //         });
-    //     }
-    // };
+    AKR_VARIANT struct CameraRayWorkItem {
+        AKR_IMPORT_TYPES()
+        CameraSample<C> sample;
+    };
+    AKR_VARIANT struct ClosestHitWorkItem {
+        AKR_IMPORT_TYPES();
+        int pixel;
+        Intersection<C> intersection;
+    };
+    AKR_VARIANT struct MissWorkItem {
+        AKR_IMPORT_TYPES();
+        int pixel;
+    };
+    AKR_VARIANT struct AnyHitWorkItem {
+        AKR_IMPORT_TYPES();
+        int pixel;
+        bool hit = false;
+    };
+    AKR_VARIANT struct RayWorkItem {
+        AKR_IMPORT_TYPES()
+        int pixel;
+        Ray3f ray;
+    };
+    AKR_VARIANT struct ShadowRayWorkItem {
+        AKR_IMPORT_TYPES()
+        int pixel;
+        Ray3f ray;
+    };
 } // namespace akari

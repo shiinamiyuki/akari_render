@@ -29,7 +29,7 @@ namespace akari {
         AKR_VARIANT class AmbientOcclusion {
           public:
             int spp = 16;
-            int tile_size = 256;
+            const int tile_size = 512;
             AKR_IMPORT_TYPES()
             AmbientOcclusion() = default;
             AmbientOcclusion(int spp) : spp(spp) {}

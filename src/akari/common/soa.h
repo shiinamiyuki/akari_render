@@ -24,7 +24,7 @@
 #include <type_traits>
 #include <akari/common/platform.h>
 #include <akari/common/buffer.h>
-
+#include <akari/common/color.h>
 namespace akari {
     template <typename T>
     struct SOA {
@@ -43,10 +43,10 @@ namespace akari {
         T *__restrict__ array = nullptr;
     };
 
-    template <typename T, int N>
+    template <typename T, int N, typename A>
     struct SOAArrayXT {
-        using Self = SOAArrayXT<T, N>;
-        using value_type = Array<T, N>;
+        using Self = SOAArrayXT<T, N, A>;
+        using value_type = A;
         template <typename Allocator = DeviceAllocator<T>>
         SOAArrayXT(int n, Allocator &&allocator) : _size(n) {
             array = allocator.template allocate_object<T>(n * sizeof(value_type));
@@ -57,13 +57,13 @@ namespace akari {
             AKR_XPU operator value_type() {
                 value_type ret;
                 for (int i = 0; i < N; i++) {
-                    ret[i] = array[idx * sizeof(value_type) + i];
+                    ret[i] = self.array[idx * sizeof(value_type) + i];
                 }
                 return ret;
             }
             AKR_XPU const value_type &operator=(const value_type &rhs) {
                 for (int i = 0; i < N; i++) {
-                    array[idx * sizeof(value_type) + i] = rhs[i];
+                    self.array[idx * sizeof(value_type) + i] = rhs[i];
                 }
                 return rhs;
             }
@@ -79,17 +79,21 @@ namespace akari {
                 return ret;
             }
         };
-        AKR_XPU IndexHelper operator[](int idx){return IndexHelper{*this, idx}};
-        AKR_XPU ConstIndexHelper operator[](int idx)const{return ConstIndexHelper{*this, idx}};
+        AKR_XPU IndexHelper operator[](int idx) { return IndexHelper{*this, idx}; };
+        AKR_XPU ConstIndexHelper operator[](int idx) const { return ConstIndexHelper{*this, idx}; };
         int _size = 0;
         T *__restrict__ array = nullptr;
     };
     template <int N>
-    struct SOA<Array<float, N>> : SOAArrayXT<float, N> {
-        using SOAArrayXT<float, N>::SOAArrayXT;
+    struct SOA<Array<float, N>> : SOAArrayXT<float, N, Array<float, N>> {
+        using SOAArrayXT<float, N, Array<float, N>>::SOAArrayXT;
     };
     template <int N>
-    struct SOA<Array<int, N>> : SOAArrayXT<int, N> {
-        using SOAArrayXT<int, N>::SOAArrayXT;
+    struct SOA<Array<int, N>> : SOAArrayXT<int, N, Array<int, N>> {
+        using SOAArrayXT<int, N, Array<int, N>>::SOAArrayXT;
+    };
+    template <int N>
+    struct SOA<Color<float, N>> : SOAArrayXT<float, N, Color<float, N>> {
+        using SOAArrayXT<float, N, Color<float, N>>::SOAArrayXT;
     };
 } // namespace akari

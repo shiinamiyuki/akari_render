@@ -23,6 +23,7 @@
 #pragma once
 
 #include <akari/kernel/cuda/util.h>
+#include <akari/core/parallel.h>
 #include <typeindex>
 #include <typeinfo>
 #include <map>
@@ -59,11 +60,27 @@ namespace akari::gpu {
 #else
     #define AKR_GPU_LAMBDA(...) [=] AKR_GPU(__VA_ARGS__)
 #endif
+ #define AKR_CPU_LAMBDA(...) [=,*this](__VA_ARGS__) mutable
     template <typename F>
     void launch(const char *name, int nItems, F func) {
         auto kernel = &_kernel_wrapper<F>;
         int blockSize = get_block_size(name, kernel);
         int gridSize = (nItems + blockSize - 1) / blockSize;
         kernel<<<gridSize, blockSize>>>(func, nItems);
+        //  CUDA_CHECK(cudaDeviceSynchronize());
+    }
+    template<typename F>
+    void launch_single(const char * name, F func){
+        launch(name, 1, func);
+    }
+    template <typename F>
+    void launch_cpu(const char *name, int nItems, F func) {
+        // auto kernel = &_kernel_wrapper<F>;
+        // int blockSize = get_block_size(name, kernel);
+        // int gridSize = (nItems + blockSize - 1) / blockSize;
+        // kernel<<<gridSize, blockSize>>>(func, nItems);
+        parallel_for(nItems, [&](uint32_t tid, auto _){
+            func(tid);
+        });
     }
 } // namespace akari::gpu

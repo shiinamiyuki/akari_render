@@ -33,8 +33,8 @@ namespace akari {
     AKR_VARIANT class IntegratorNode : public SceneGraphNode<C> {
       public:
         AKR_IMPORT_TYPES()
-        virtual cpu::Integrator<C> *compile(MemoryArena *arena) = 0;
-        virtual gpu::Integrator<C> *compile_gpu(MemoryArena *arena) { return nullptr; }
+        virtual std::unique_ptr<cpu::Integrator<C>> compile(MemoryArena *arena) = 0;
+        virtual std::unique_ptr<gpu::Integrator<C>> compile_gpu(MemoryArena *arena) { return nullptr; }
     };
 
     AKR_VARIANT struct RegisterIntegratorNode { static void register_nodes(py::module &m); };

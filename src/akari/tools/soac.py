@@ -93,12 +93,12 @@ if __name__ == '__main__':
                 wl('AKR_IMPORT_TYPES();')
             wl('size_t _size = 1;')
             for field in fields:
-                assert fields[field] in flats or fields[field] in soa, '{} is illegal'.format(fields[field])
+                assert fields[field] in flats or fields[field] in soas, '{} is illegal'.format(fields[field])
                 wl('SOA<' + fields[field] + '> ' + field + ';')
             wl('using Self = SOA<' + name + '>;')
             wl('using value_type = ' + name + ';')
             wl('template<class Allocator>')
-            wl('Self(size_t s, Allocator & alloc): _size(n)')
+            wl('Self(size_t s, Allocator & alloc): _size(s)')
             for field in fields:
                 wl(', ' + field + '(s, alloc)')
             wl('{}')
@@ -106,7 +106,7 @@ if __name__ == '__main__':
             with Block():
                 wl('Self & self;')
                 wl('int idx;')
-                wl('operator value_type(){')
+                wl('AKR_XPU operator value_type(){')
                 with Block():
                     wl('value_type ret;')
                     for field in fields:
@@ -132,9 +132,9 @@ if __name__ == '__main__':
                     wl('return ret;')
                 wl('}')
             wl('};')
-            wl('AKR_XPU IndexHelper operator[](int idx){return IndexHelper{*this, idx}};')
-            wl('AKR_XPU ConstIndexHelper operator[](int idx)const{return ConstIndexHelper{*this, idx}};')
-            wl('AKR_XPU size_t size()const{return size;}')
+            wl('AKR_XPU IndexHelper operator[](int idx){return IndexHelper{*this, idx};}')
+            wl('AKR_XPU ConstIndexHelper operator[](int idx)const{return ConstIndexHelper{*this, idx};}')
+            wl('AKR_XPU size_t size()const{return _size;}')
             # wl('void resize(size_t s){')
             # with Block():
             #     wl('_size = s;')
@@ -145,19 +145,9 @@ if __name__ == '__main__':
         return out
     with open(sys.argv[2], 'w') as out_file:
         for h in headers:
-            out_file.write('#include <' + h + '>\n')
+            out_file.write('#pragma once\n#include <' + h + '>\n')
         out_file.write('namespace akari {\n')
         for soa in soas:
             out_file.write(gen_struct(soa, soas[soa]) + '\n')
         out_file.write('}\n')
 
-
-
-
-
-
-
-
-
-
-    

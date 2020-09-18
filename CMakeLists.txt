@@ -109,14 +109,20 @@ set_target_properties(akari_core_base PROPERTIES UNITY_BUILD ON)
 set_target_CUDA_props(akari_core_base)
 
 
-set(AKR_KERNEL_SOA_H src/akari/kernel/soa.h)
+set(AKR_KERNEL_SOA_H ${CMAKE_CURRENT_SOURCE_DIR}/src/akari/kernel/soa.h)
 add_custom_command(OUTPUT ${AKR_KERNEL_SOA_H}
     COMMAND python src/akari/tools/soac.py src/akari/kernel/soa.py  ${AKR_KERNEL_SOA_H}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    DEPENDS ${AKR_KERNEL_SOA_H} src/akari/tools/soac.py)
+    DEPENDS src/akari/kernel/soa.py  src/akari/tools/soac.py)
+
+set(AKR_KERNEL_WORKITEM_SOA_H ${CMAKE_CURRENT_SOURCE_DIR}/src/akari/kernel/integrators/gpu/workitem-soa.h)
+add_custom_command(OUTPUT ${AKR_KERNEL_WORKITEM_SOA_H}
+    COMMAND python src/akari/tools/soac.py src/akari/kernel/integrators/gpu/workitem.py  ${AKR_KERNEL_WORKITEM_SOA_H}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    DEPENDS src/akari/kernel/integrators/gpu/workitem.py src/akari/tools/soac.py)
 
 
-add_library(akari_core SHARED ${AKR_COMMON_SRC} ${AKR_PYBIND_SRC} ${AKR_KERNEL_SRC}  ${AKR_KERNEL_SOA_H})
+add_library(akari_core SHARED ${AKR_COMMON_SRC} ${AKR_PYBIND_SRC} ${AKR_KERNEL_SRC}  ${AKR_KERNEL_SOA_H} ${AKR_KERNEL_WORKITEM_SOA_H})
 target_link_libraries(akari_core PUBLIC akari_core_base) 
 set_target_properties(akari_core PROPERTIES UNITY_BUILD ON)
 set_target_CUDA_props(akari_core)

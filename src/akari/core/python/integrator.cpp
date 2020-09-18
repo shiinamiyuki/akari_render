@@ -30,13 +30,13 @@ namespace akari {
         AKR_IMPORT_TYPES()
         int spp = 16;
         int tile_size = 16;
-        cpu::Integrator<C> *compile(MemoryArena *arena) override {
-            return arena->alloc<cpu::Integrator<C>>(cpu::AmbientOcclusion<C>(spp));
+        std::unique_ptr<cpu::Integrator<C>>compile(MemoryArena *arena) override {
+            return std::make_unique<cpu::Integrator<C>>(cpu::AmbientOcclusion<C>(spp));
         }
         const char *description() override { return "[Ambient Occlution]"; }
 #ifdef AKR_ENABLE_GPU
-        virtual gpu::Integrator<C> *compile_gpu(MemoryArena *arena) {
-            return arena->alloc<gpu::Integrator<C>>(gpu::AmbientOcclusion<C>(spp));
+        virtual std::unique_ptr<gpu::Integrator<C>> compile_gpu(MemoryArena *arena) {
+            return std::make_unique<gpu::Integrator<C>>(gpu::AmbientOcclusion<C>(spp));
         }
 #endif
     };
@@ -45,8 +45,8 @@ namespace akari {
         AKR_IMPORT_TYPES()
         int spp = 16;
         int tile_size = 64;
-        cpu::Integrator<C> *compile(MemoryArena *arena) override {
-            return arena->alloc<cpu::Integrator<C>>(cpu::PathTracer<C>(spp));
+        std::unique_ptr<cpu::Integrator<C>> compile(MemoryArena *arena) override {
+            return std::make_unique<cpu::Integrator<C>>(cpu::PathTracer<C>(spp));
         }
         const char *description() override { return "[Path Tracer]"; }
     };

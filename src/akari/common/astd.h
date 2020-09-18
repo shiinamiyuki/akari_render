@@ -215,7 +215,7 @@ namespace akari::astd {
         AKR_EXPORT memory_resource *new_delete_resource() noexcept;
         AKR_EXPORT memory_resource *set_default_resource(memory_resource *r) noexcept;
         AKR_EXPORT memory_resource *get_default_resource() noexcept;
-        
+
         template <class Tp = std::byte>
         class polymorphic_allocator {
           public:
@@ -249,7 +249,12 @@ namespace akari::astd {
             void construct(T *p, Args &&... args) {
                 ::new ((void *)p) T(std::forward<Args>(args)...);
             }
-
+            template <class T, class... Args>
+            T *new_object(Args &&... args) {
+                auto *p = allocate_object<T>();
+                construct(p, std::forward<Args>(args)...);
+                return p;
+            }
             template <class T>
             void destroy(T *p) {
                 p->~T();

@@ -22,17 +22,37 @@
 
 #pragma once
 #include <akari/common/astd.h>
+#include <unordered_map>
 namespace akari {
     AKR_EXPORT void set_device_gpu();
     AKR_EXPORT void set_device_cpu();
     AKR_EXPORT void sync_device();
-    enum class ComputeDevice {
-        cpu,
-        gpu
-    };
+    enum class ComputeDevice { cpu, gpu };
     AKR_EXPORT ComputeDevice get_device();
     AKR_EXPORT astd::pmr::memory_resource *get_device_memory_resource();
 
     // allocate only; no need to free (manually)
-    // AKR_EXPORT astd::pmr::memory_resource * get_device_auto_release_resource();
+    class auto_release_resource : public astd::pmr::memory_resource {
+        astd::pmr::memory_resource *resource;
+        std::unordered_map<void *, std::pair<size_t, size_t>> allocated;
+
+      public:
+        auto_release_resource(astd::pmr::memory_resource *resource) : resource(resource) {}
+        void *do_allocate(size_t bytes, size_t alignment) {
+            auto p = resource->allocate(bytes, alignment);
+            allocated.emplace(p, std::make_pair(bytes, alignment));
+            return p;
+        }
+        void do_deallocate(void *p, size_t bytes, size_t alignment) {
+            resource->deallocate(p, bytes, alignment);
+            allocated.erase(p);
+        }
+        bool do_is_equal(const memory_resource &other) const noexcept { return &other == this; }
+        ~auto_release_resource() {
+            for (auto p : allocated) {
+                auto [bytes, alignment] = p.second;
+                resource->deallocate(p.first, bytes, alignment);
+            }
+        }
+    };
 } // namespace akari
