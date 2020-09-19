@@ -74,7 +74,7 @@ namespace akari {
             AKR_XPU operator value_type() {
                 value_type ret;
                 for (int i = 0; i < N; i++) {
-                    ret[i] = array[idx * sizeof(value_type) + i];
+                    ret[i] = self.array[idx * sizeof(value_type) + i];
                 }
                 return ret;
             }
