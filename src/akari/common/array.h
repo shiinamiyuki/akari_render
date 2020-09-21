@@ -59,14 +59,8 @@ namespace akari {
         }
         template <typename U, int P>
         AKR_XPU explicit Array(const Array<U, N, P> &rhs) {
-            if (!P) {
-                for (int i = 0; i < padded_size; i++) {
-                    _s[i] = T(rhs[i]);
-                }
-            } else {
-                for (int i = 0; i < N; i++) {
-                    _s[i] = T(rhs[i]);
-                }
+            for (int i = 0; i < std::min(padded_size, Array<U, N, P>::padded_size); i++) {
+                _s[i] = T(rhs[i]);
             }
         }
         AKR_XPU Array(const T &xx, const T &yy) {
