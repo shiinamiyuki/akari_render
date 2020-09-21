@@ -3,10 +3,7 @@
 	url = https://github.com/tinyobjloader/tinyobjloader
 [submodule "external/cxxopts"]
 	path = external/cxxopts
-	url = https://github.com/jarro2783/cxxopts
-[submodule "external/oidn"]
-	path = external/oidn
-	url = https://github.com/OpenImageDenoise/oidn.git	
+	url = https://github.com/jarro2783/cxxopts	
 [submodule "external/magic_enum"]
 	path = external/magic_enum
 	url = https://github.com/Neargye/magic_enum
