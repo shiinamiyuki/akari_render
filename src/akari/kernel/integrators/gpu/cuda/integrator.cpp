@@ -206,7 +206,6 @@ namespace akari::gpu {
                                 auto *material = trig.material;
                                 if (!material)
                                     return;
-                                // printf("%d\n", ray_item.pixel);
                                 MaterialWorkItem<C> material_item;
                                 material_item.pixel = ray_item.pixel;
                                 material_item.material = material;
@@ -215,22 +214,14 @@ namespace akari::gpu {
                                 material_item.uv = intersection.uv;
                                 material_item.wo = -ray_item.ray.d;
                                 auto queue_idx = material->typeindex();
-                                // printf("fuck\n");
                                 AKR_ASSERT(queue_idx >= 0 && queue_idx < material_queues.size());
                                 material_queues[queue_idx]->append(material_item);
-                                // PathState<C> path_state = path_states[tid];
-                                // path_state.L = intersection.ng * 0.5f + 0.5f;
-                                // path_states[tid] = path_state;
                             }
                         });
-                    // break;
-                    // CUDA_CHECK(cudaDeviceSynchronize());
+
                     launch_single(
                         "Reset Ray Queue", AKR_GPU_LAMBDA() { ray_queue[0]->clear(); });
-                    // break;
-                    // printf("hoy many queues? %zd\n", material_queues.size());
                     for (auto material_queue : material_queues) {
-                        // printf("fuck?\n");
                         launch(
                             "Evaluate Material", launch_size, AKR_GPU_LAMBDA(int tid) {
                                 if (tid >= material_queue->elements_in_queue()) {
@@ -247,10 +238,8 @@ namespace akari::gpu {
                                 MaterialEvalContext<C> ctx(sampler, si);
                                 auto *material = material_item.material;
                                 auto wo = material_item.wo;
-                                bool fuck = false;
                                 if (material->template isa<EmissiveMaterial<C>>()) {
                                     if (true || depth == 0) {
-                                        // printf("fuck\n");
                                         auto *emission = material->template get<EmissiveMaterial<C>>();
                                         bool face_front = dot(-wo, si.ng) < 0.0f;
                                         if (emission->double_sided || face_front) {
@@ -270,16 +259,7 @@ namespace akari::gpu {
                                     ray_item.ray = ray;
                                     ray_queue[0]->append(ray_item);
                                 }
-                                // path_state.L = Spectrum(1.0f);
-                                // if (tid == 0) {
-                                    // printf("pixel: idx=%d, (x,y)=(%d, %d)\n", pixel, get_pixel(pixel).x(),get_pixel(pixel).y());
-                                    // printf("%f\n", path_state.L[0], path_state.L[1], path_state.L[2]);
-                                // }
                                 path_states[pixel] = path_state;
-                                if (tid == 0) {
-                                    // path_state = path_states[pixel];
-                                    // printf("%f\n", path_state.L[0], path_state.L[1], path_state.L[2]);
-                                }
                             });
                     }
                 }
@@ -301,7 +281,7 @@ namespace akari::gpu {
                 render_tile(tile_x, tile_y);
             }
         }
-         info("total gpu time {}s\n", gpu_time);
+        info("total gpu time {}s\n", gpu_time);
     }
     AKR_RENDER_CLASS(PathTracer)
 
