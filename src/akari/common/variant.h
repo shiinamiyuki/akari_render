@@ -80,7 +80,7 @@ namespace akari {
 
       public:
         using Index = TypeIndex<T...>;
-
+        static constexpr size_t num_types = nTypes;
         Variant() = default;
 
         template <typename U, typename = std::enable_if_t<Index::template GetIndex<U>::value != -1, void>>
@@ -139,6 +139,7 @@ namespace akari {
             index = Index::template GetIndex<U>::value;
             return *this;
         }
+        AKR_XPU bool null() const { return index == -1; }
         template <typename U>
         AKR_XPU bool isa() const {
             static_assert(Index::template GetIndex<U>::value != -1, "U is not in T...");

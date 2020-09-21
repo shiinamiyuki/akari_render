@@ -73,7 +73,8 @@ namespace akari {
             return Spectrum(0.0f);
         }
         [[nodiscard]] AKR_XPU BSDFType type() const { return BSDFType(BSDF_DIFFUSE | BSDF_REFLECTION); }
-        AKR_XPU Spectrum sample(const Point2f &u, const Vector3f &wo, Vector3f *wi, Float *pdf, BSDFType *sampledType) {
+        AKR_XPU Spectrum sample(const Point2f &u, const Vector3f &wo, Vector3f *wi, Float *pdf,
+                                BSDFType *sampledType) const {
             *wi = sampling<C>::cosine_hemisphere_sampling(u);
             if (!bsdf<C>::same_hemisphere(wo, *wi)) {
                 wi->y() = -wi->y();
@@ -96,14 +97,15 @@ namespace akari {
         }
         [[nodiscard]] AKR_XPU BSDFType type() const { AKR_VAR_DISPATCH(type); }
         [[nodiscard]] AKR_XPU bool match_flags(BSDFType flag) const { return ((uint32_t)type() & (uint32_t)flag) != 0; }
-        AKR_XPU Spectrum sample(const Point2f &u, const Vector3f &wo, Vector3f *wi, Float *pdf, BSDFType *sampledType) {
+        AKR_XPU Spectrum sample(const Point2f &u, const Vector3f &wo, Vector3f *wi, Float *pdf,
+                                BSDFType *sampledType) const {
             AKR_VAR_DISPATCH(sample, u, wo, wi, pdf, sampledType);
         }
     };
 
     AKR_VARIANT class BSDF {
         AKR_IMPORT_TYPES()
-        BSDFClosure<C> *closure_ = nullptr;
+        BSDFClosure<C> closure_;
         Normal3f ng, ns;
         Frame3f frame;
         Float choice_pdf = 1.0f;
@@ -112,25 +114,25 @@ namespace akari {
         BSDF() = default;
         AKR_XPU explicit BSDF(const Normal3f &ng, const Normal3f &ns) : ng(ng), ns(ns) { frame = Frame3f(ns); }
         AKR_XPU bool null() const { return closure().null(); }
-        AKR_XPU void set_closure(BSDFClosure<C> *closure) { closure_ = closure; }
+        AKR_XPU void set_closure(const BSDFClosure<C> &closure) { closure_ = closure; }
         AKR_XPU void set_choice_pdf(Float pdf) { choice_pdf = pdf; }
-        [[nodiscard]] AKR_XPU BSDFClosure<C> *closure() const { return closure_; }
+        AKR_XPU const BSDFClosure<C> &closure() const { return closure_; }
         [[nodiscard]] AKR_XPU Float evaluate_pdf(const Vector3f &wo, const Vector3f &wi) const {
-            auto pdf = closure_->evaluate_pdf(frame.world_to_local(wo), frame.world_to_local(wi));
+            auto pdf = closure().evaluate_pdf(frame.world_to_local(wo), frame.world_to_local(wi));
             return pdf * choice_pdf;
         }
         [[nodiscard]] AKR_XPU Spectrum evaluate(const Vector3f &wo, const Vector3f &wi) const {
-            auto f = closure_->evaluate(frame.world_to_local(wo), frame.world_to_local(wi));
+            auto f = closure().evaluate(frame.world_to_local(wo), frame.world_to_local(wi));
             return f;
         }
 
-        [[nodiscard]] AKR_XPU BSDFType type() const { return closure_->type(); }
-        [[nodiscard]] AKR_XPU bool match_flags(BSDFType flag) const { return closure_->match_flags(flag); }
+        [[nodiscard]] AKR_XPU BSDFType type() const { return closure().type(); }
+        [[nodiscard]] AKR_XPU bool match_flags(BSDFType flag) const { return closure().match_flags(flag); }
         AKR_XPU BSDFSample<C> sample(const BSDFSampleContext<C> &ctx) const {
             auto wo = frame.world_to_local(ctx.wo);
             Vector3f wi;
             BSDFSample<C> sample;
-            sample.f = closure()->sample(ctx.u1, wo, &wi, &sample.pdf, &sample.sampled);
+            sample.f = closure().sample(ctx.u1, wo, &wi, &sample.pdf, &sample.sampled);
             sample.wi = frame.local_to_world(wi);
             sample.pdf *= choice_pdf;
             return sample;
@@ -141,13 +143,12 @@ namespace akari {
         Point2f u1, u2;
         Point2f texcoords;
         Normal3f ng, ns;
-        SmallArena *arena = nullptr;
         MaterialEvalContext() = default;
-        AKR_XPU MaterialEvalContext(Sampler<C> sampler, const SurfaceInteraction<C> &si, SmallArena *arena)
-            : MaterialEvalContext(sampler, si.texcoords, si.ng, si.ns, arena) {}
-      AKR_XPU   MaterialEvalContext(Sampler<C> sampler, const Point2f &texcoords, const Normal3f &ng, const Normal3f &ns,
-                            SmallArena *arena)
-            : u1(sampler.next2d()), u2(sampler.next2d()), texcoords(texcoords), ng(ng), ns(ns), arena(arena) {}
+        AKR_XPU MaterialEvalContext(Sampler<C> sampler, const SurfaceInteraction<C> &si)
+            : MaterialEvalContext(sampler, si.texcoords, si.ng, si.ns) {}
+        AKR_XPU MaterialEvalContext(Sampler<C> sampler, const Point2f &texcoords, const Normal3f &ng,
+                                    const Normal3f &ns)
+            : u1(sampler.next2d()), u2(sampler.next2d()), texcoords(texcoords), ng(ng), ns(ns) {}
     };
 
     AKR_VARIANT class DiffuseMaterial {
@@ -157,9 +158,8 @@ namespace akari {
         Texture<C> *color;
         AKR_XPU BSDF<C> get_bsdf(MaterialEvalContext<C> &ctx) const {
             auto R = color->evaluate(ctx.texcoords);
-            BSDFClosure<C> *closure = ctx.arena->template alloc<BSDFClosure<C>>(DiffuseBSDF<C>(R));
             BSDF<C> bsdf(ctx.ng, ctx.ns);
-            bsdf.set_closure(closure);
+            bsdf.set_closure((DiffuseBSDF<C>(R)));
             return bsdf;
         }
     };

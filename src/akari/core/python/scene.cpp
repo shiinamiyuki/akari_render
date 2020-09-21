@@ -84,7 +84,6 @@ namespace akari {
         auto render_cpu = [&]() {
             auto integrator_ = integrator->compile(&arena);
             integrator_->render(scene, &film);
-            film.write_image(fs::path(output));
         };
 #ifdef AKR_ENABLE_GPU
         auto render_gpu = [&]() {
@@ -95,10 +94,12 @@ namespace akari {
             }
             integrator_->render(scene, &film);
             sync_device();
-            film.write_image(fs::path(output));
         };
 #else
-        auto render_gpu = [&]() { fatal("gpu rendering is not supported\n"); };
+        auto render_gpu = [&]() {
+            fatal("gpu rendering is not supported\n");
+            std::exit(1);
+        };
 #endif
         Timer timer;
         if (get_device() == ComputeDevice::cpu) {
@@ -107,6 +108,7 @@ namespace akari {
             render_gpu();
         }
         info("render done took ({}s)\n", timer.elapsed_seconds());
+        film.write_image(fs::path(output));
     }
     AKR_VARIANT void RegisterSceneNode<C>::register_nodes(py::module &m) {
         AKR_IMPORT_TYPES()

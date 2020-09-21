@@ -54,165 +54,6 @@ namespace akari::gpu {
                 }
                 return Spectrum(0);
             };
-            auto resource = std::make_unique<auto_release_resource>(get_device_memory_resource());
-            auto allocator = astd::pmr::polymorphic_allocator(resource.get());
-            size_t MAX_QUEUE_SIZE = tile_size * tile_size;
-            auto *camera_ray_queue =
-                allocator.template new_object<WorkQueue<CameraRayWorkItem<C>>>(MAX_QUEUE_SIZE, allocator);
-            auto *path_states = allocator.template new_object<WorkQueue<PathState<C>>>(MAX_QUEUE_SIZE, allocator);
-            auto *ray_queue = allocator.template new_object<WorkQueue<RayWorkItem<C>>>(MAX_QUEUE_SIZE, allocator);
-            auto *shadow_ray_queue =
-                allocator.template new_object<WorkQueue<ShadowRayWorkItem<C>>>(MAX_QUEUE_SIZE, allocator);
-            auto *closest_hit_queue =
-                allocator.template new_object<WorkQueue<ClosestHitWorkItem<C>>>(MAX_QUEUE_SIZE, allocator);
-            auto *any_hit_queue =
-                allocator.template new_object<WorkQueue<AnyHitWorkItem<C>>>(MAX_QUEUE_SIZE, allocator);
-            auto *miss_queue = allocator.template new_object<WorkQueue<MissWorkItem<C>>>(MAX_QUEUE_SIZE, allocator);
-            auto render_tile = [&](int tile_x, int tile_y) {
-                Point2i tile_pos(tile_x, tile_y);
-                Bounds2i tileBounds = Bounds2i{tile_pos * (int)tile_size, (tile_pos + Vector2i(1)) * (int)tile_size};
-                auto boxed_tile = film->boxed_tile(tileBounds);
-                auto &camera = scene.camera;
-                auto _sampler = scene.sampler;
-                auto extents = tileBounds.extents();
-                auto tile = boxed_tile.get();
-                auto resolution = film->resolution();
-                auto _spp = this->spp;
-                Timer timer;
-                auto get_pixel = AKR_GPU_LAMBDA(int pixel_id) {
-                    int tx = pixel_id % extents.x();
-                    int ty = pixel_id / extents.x();
-                    int x = tx + tileBounds.pmin.x();
-                    int y = ty + tileBounds.pmin.y();
-                    return Point2i(x, y);
-                };
-                size_t launch_size = extents.x() * extents.y();
-                launch(
-                    "set_path_state", launch_size, AKR_GPU_LAMBDA(int tid) {
-                        int tx = tid % extents.x();
-                        int ty = tid / extents.x();
-                        int x = tx + tileBounds.pmin.x();
-                        int y = ty + tileBounds.pmin.y();
-                        auto sampler = _sampler;
-                        sampler.set_sample_index(x + y * resolution.x());
-                        PathState<C> path_state = (*path_states)[tid];
-                        path_state.sampler = sampler;
-                        path_state.pixel = tid;
-                        path_state.L = Spectrum(0);
-                        (*path_states)[tid] = path_state;
-                    });
-                for (int s = 0; s < _spp; s++) {
-                    launch(
-                        "generate_camera_ray", launch_size, AKR_GPU_LAMBDA(int tid) {
-                            int tx = tid % extents.x();
-                            int ty = tid / extents.x();
-                            int x = tx + tileBounds.pmin.x();
-                            int y = ty + tileBounds.pmin.y();
-                            PathState<C> path_state = (*path_states)[tid];
-                            auto &sampler = path_state.sampler;
-                            sampler.start_next_sample();
-                            CameraSample<C> sample;
-                            camera.generate_ray(sampler.next2d(), sampler.next2d(), Point2i(x, y), &sample);
-                            CameraRayWorkItem<C> work_item;
-                            work_item.sample = sample;
-                            (*camera_ray_queue)[tid] = work_item;
-                             path_state.L = Spectrum(0);
-                            (*path_states)[tid] = path_state;
-                            RayWorkItem<C> ray_work_item;
-                            ray_work_item.ray = sample.ray;
-                            ray_work_item.pixel = tid;
-                            (*ray_queue)[tid] = ray_work_item;
-                        });
-                    launch_single(
-                        "reset_closest_hit", AKR_GPU_LAMBDA(int) {
-                            closest_hit_queue->clear();
-                            miss_queue->clear();
-                            any_hit_queue->clear();
-                            shadow_ray_queue->clear();
-                        });
-                    launch(
-                        "closest_hit", launch_size, AKR_GPU_LAMBDA(int tid) {
-                            RayWorkItem<C> ray_work_item = (*ray_queue)[tid];
-                            ClosestHitWorkItem<C> closest_hit;
-                            closest_hit.pixel = ray_work_item.pixel;
-                            if (scene.intersect(ray_work_item.ray, &closest_hit.intersection)) {
-                                (*closest_hit_queue).append(closest_hit);
-                            } else {
-                                MissWorkItem<C> miss;
-                                miss.pixel = ray_work_item.pixel;
-                                miss_queue->append(miss);
-                            }
-                        });
-#if 0
-                    launch(
-                        "on_miss", launch_size, AKR_GPU_LAMBDA(int tid) {
-                            if (tid >= miss_queue->elements_in_queue())
-                                return;
-                            MissWorkItem<C> miss = (*miss_queue)[tid];
-                            // auto pixel = get_pixel(closest_hit.pixel);
-                            PathState<C> state = (*path_states)[miss.pixel];
-                            state.L = Spectrum(0);
-                            (*path_states)[miss.pixel] = state;
-                        });
-#endif
-                    launch(
-                        "on_closest_hit", launch_size, AKR_GPU_LAMBDA(int tid) {
-                            if (tid >= closest_hit_queue->elements_in_queue())
-                                return;
-                            ClosestHitWorkItem<C> closest_hit = (*closest_hit_queue)[tid];
-                            PathState<C> state = (*path_states)[closest_hit.pixel];
-                            auto &intersection = closest_hit.intersection;
-                            Frame3f frame(intersection.ng);
-                            auto w = sampling<C>::cosine_hemisphere_sampling(state.sampler.next2d());
-                            w = frame.local_to_world(w);
-                            ShadowRayWorkItem<C> shadow_ray;
-                            shadow_ray.pixel = closest_hit.pixel;
-                            shadow_ray.ray = Ray3f(intersection.p, w);
-                            shadow_ray_queue->append(shadow_ray);
-                            // state.L = intersection.ng * 0.5f + 0.5f;
-                            (*path_states)[closest_hit.pixel] = state;
-                        });
-
-                    launch(
-                        "any_hit", launch_size, AKR_GPU_LAMBDA(int tid) {
-                            if (tid >= shadow_ray_queue->elements_in_queue())
-                                return;
-                            ShadowRayWorkItem<C> shadow_ray = (*shadow_ray_queue)[tid];
-                            AnyHitWorkItem<C> any_hit;
-                            any_hit.pixel = shadow_ray.pixel;
-                            any_hit.hit = scene.occlude(shadow_ray.ray);
-                            any_hit_queue->append(any_hit);
-                        });
-                    launch(
-                        "on_any_hit_miss", launch_size, AKR_GPU_LAMBDA(int tid) {
-                            if (tid >= any_hit_queue->elements_in_queue())
-                                return;
-                            AnyHitWorkItem<C> any_hit = (*any_hit_queue)[tid];
-                            // auto pixel = get_pixel(closest_hit.pixel);
-                            if (!any_hit.hit) {
-                                PathState<C> state = (*path_states)[any_hit.pixel];
-                                state.L = Spectrum(1);
-                                (*path_states)[any_hit.pixel] = state;
-                            }
-                        });
-
-                    launch(
-                        "update_film", launch_size, AKR_GPU_LAMBDA(int tid) {
-                            PathState<C> state = (*path_states)[tid];
-                            auto p = get_pixel(tid);
-                            tile->add_sample(Point2f(p), state.L, 1.0f);
-                        });
-                }
-                CUDA_CHECK(cudaDeviceSynchronize());
-                info("tile took {}s\n", timer.elapsed_seconds());
-                film->merge_tile(*tile);
-            };
-            for (int tile_y = 0; tile_y < n_tiles.y(); tile_y++) {
-                for (int tile_x = 0; tile_x < n_tiles.x(); tile_x++) {
-                    render_tile(tile_x, tile_y);
-                }
-            }
-#if 0
             size_t ARENA_SIZE = 16 * 1024;
 
             MemoryArena _arena;
@@ -249,27 +90,218 @@ namespace akari::gpu {
                     film->merge_tile(*tile);
                 }
             }
-#endif
         } else {
             fatal("only float is supported for gpu\n");
         }
     }
     AKR_RENDER_CLASS(AmbientOcclusion)
-
+    AKR_VARIANT struct PathTracerImpl {
+        AKR_IMPORT_TYPES()
+        using Allocator = astd::pmr::polymorphic_allocator<>;
+        using RayQueue = WorkQueue<RayWorkItem<C>>;
+        int spp;
+        int tile_size = 512;
+        int max_depth = 5;
+        size_t MAX_QUEUE_SIZE;
+        SOA<PathState<C>> path_states;
+        RayQueue *ray_queue[2] = {nullptr, nullptr};
+        using MaterialQueue = WorkQueue<MaterialWorkItem<C>>;
+        using MaterialWorkQueues = astd::array<MaterialQueue *, Material<C>::num_types>;
+        MaterialWorkQueues material_queues;
+        PathTracerImpl(Allocator &allocator, const PathTracer<C> &pt) : spp(pt.spp), tile_size(pt.tile_size) {
+            MAX_QUEUE_SIZE = tile_size * tile_size;
+            path_states = SOA<PathState<C>>(MAX_QUEUE_SIZE, allocator);
+            ray_queue[0] = allocator.template new_object<RayQueue>(MAX_QUEUE_SIZE, allocator);
+            ray_queue[1] = allocator.template new_object<RayQueue>(MAX_QUEUE_SIZE, allocator);
+            for (size_t i = 0; i < material_queues.size(); i++) {
+                material_queues[i] = allocator.template new_object<MaterialQueue>(MAX_QUEUE_SIZE, allocator);
+            }
+        }
+        void render(const Scene<C> &scene, Film<C> *film);
+    };
     AKR_VARIANT void PathTracer<C>::render(const Scene<C> &scene, Film<C> *film) const {
         if constexpr (std::is_same_v<Float, float>) {
-            // for (int tile_y = 0; tile_y < n_tiles.y(); tile_y++) {
-            //     for (int tile_x = 0; tile_x < n_tiles.x(); tile_x++) {
-            //         Point2i tile_pos(tile_x, tile_y);
-            //         Bounds2i tileBounds =
-            //             Bounds2i{tile_pos * (int)tile_size, (tile_pos + Vector2i(1)) * (int)tile_size};
-            //         auto boxed_tile = film->boxed_tile(tileBounds);
-            //         auto tile = boxed_tile.get();
-            //     }
-            // }
+            auto resource = std::make_unique<auto_release_resource>(get_device_memory_resource());
+            auto allocator = astd::pmr::polymorphic_allocator(resource.get());
+            PathTracerImpl<C> tracer(allocator, *this);
+            tracer.render(scene, film);
         } else {
             fatal("only float is supported for gpu\n");
         }
+    }
+
+    AKR_VARIANT void PathTracerImpl<C>::render(const Scene<C> &scene, Film<C> *film) {
+        double gpu_time = 0;
+        auto render_tile = [&](int tile_x, int tile_y) {
+            Point2i tile_pos(tile_x, tile_y);
+            Bounds2i tileBounds = Bounds2i{tile_pos * (int)tile_size, (tile_pos + Vector2i(1)) * (int)tile_size};
+            auto boxed_tile = film->boxed_tile(tileBounds);
+            auto &camera = scene.camera;
+            auto _sampler = scene.sampler;
+            auto extents = tileBounds.extents();
+            auto tile = boxed_tile.get();
+            auto resolution = film->resolution();
+            auto _spp = this->spp;
+            Timer timer;
+            auto get_pixel = AKR_GPU_LAMBDA(int pixel_id) {
+                int tx = pixel_id % extents.x();
+                int ty = pixel_id / extents.x();
+                int x = tx + tileBounds.pmin.x();
+                int y = ty + tileBounds.pmin.y();
+                return Point2i(x, y);
+            };
+            auto launch_size = extents.x() * extents.y();
+            launch(
+                "Set Path State", launch_size, AKR_GPU_LAMBDA(int tid) {
+                    auto px = get_pixel(tid);
+                    int x = px.x(), y = px.y();
+                    auto sampler = _sampler;
+                    sampler.set_sample_index(x + y * resolution.x());
+                    PathState<C> path_state = path_states[tid];
+                    path_state.sampler = sampler;
+                    path_state.L = Spectrum(0);
+                    path_states[tid] = path_state;
+                });
+            for (int s = 0; s < _spp; s++) {
+                launch(
+                    "Generate Camera Ray", launch_size, AKR_GPU_LAMBDA(int tid) {
+                        auto px = get_pixel(tid);
+                        int x = px.x(), y = px.y();
+                        PathState<C> path_state = path_states[tid];
+                        path_state.L = Spectrum(0);
+                        path_state.beta = Spectrum(1.0f);
+                        auto &sampler = path_state.sampler;
+                        sampler.start_next_sample();
+                        CameraSample<C> sample;
+                        camera.generate_ray(sampler.next2d(), sampler.next2d(), Point2i(x, y), &sample);
+                        RayWorkItem<C> ray_item = (*ray_queue[0])[tid];
+                        ray_item.pixel = tid;
+                        ray_item.ray = sample.ray;
+                        (*ray_queue[0])[tid] = ray_item;
+                        path_states[tid] = path_state;
+                    });
+                // first bounce ray queue is full
+                launch_single(
+                    "Set Ray Queue", AKR_GPU_LAMBDA() { ray_queue[0]->head = MAX_QUEUE_SIZE; });
+                // CUDA_CHECK(cudaDeviceSynchronize());
+                for (int depth = 0; depth <= max_depth; depth++) {
+                    // printf("fuck??? depth=%d max_depth=%d\n",depth, max_depth);
+                    for (size_t i = 0; i < material_queues.size(); i++) {
+                        launch_single(
+                            "Reset Material Queue", AKR_GPU_LAMBDA() { material_queues[i]->clear(); });
+                        // CUDA_CHECK(cudaDeviceSynchronize());
+                    }
+                    launch(
+                        "Intersect Closest", launch_size, AKR_GPU_LAMBDA(int tid) {
+                            if (tid >= ray_queue[0]->elements_in_queue())
+                                return;
+                            RayWorkItem<C> ray_item = (*ray_queue[0])[tid];
+                            if (!ray_item.valid()) {
+                                return;
+                            }
+
+                            Intersection<C> intersection;
+                            if (scene.intersect(ray_item.ray, &intersection)) {
+                                auto trig = scene.get_triangle(intersection.geom_id, intersection.prim_id);
+                                auto *material = trig.material;
+                                if (!material)
+                                    return;
+                                // printf("%d\n", ray_item.pixel);
+                                MaterialWorkItem<C> material_item;
+                                material_item.pixel = ray_item.pixel;
+                                material_item.material = material;
+                                material_item.geom_id = intersection.geom_id;
+                                material_item.prim_id = intersection.prim_id;
+                                material_item.uv = intersection.uv;
+                                material_item.wo = -ray_item.ray.d;
+                                auto queue_idx = material->typeindex();
+                                // printf("fuck\n");
+                                AKR_ASSERT(queue_idx >= 0 && queue_idx < material_queues.size());
+                                material_queues[queue_idx]->append(material_item);
+                                // PathState<C> path_state = path_states[tid];
+                                // path_state.L = intersection.ng * 0.5f + 0.5f;
+                                // path_states[tid] = path_state;
+                            }
+                        });
+                    // break;
+                    // CUDA_CHECK(cudaDeviceSynchronize());
+                    launch_single(
+                        "Reset Ray Queue", AKR_GPU_LAMBDA() { ray_queue[0]->clear(); });
+                    // break;
+                    // printf("hoy many queues? %zd\n", material_queues.size());
+                    for (auto material_queue : material_queues) {
+                        // printf("fuck?\n");
+                        launch(
+                            "Evaluate Material", launch_size, AKR_GPU_LAMBDA(int tid) {
+                                if (tid >= material_queue->elements_in_queue()) {
+                                    return;
+                                }
+                                int cur_depth = depth;
+                                MaterialWorkItem<C> material_item = (*material_queue)[tid];
+                                int pixel = material_item.pixel;
+                                PathState<C> path_state = path_states[pixel];
+                                auto &sampler = path_state.sampler;
+
+                                auto trig = scene.get_triangle(material_item.geom_id, material_item.prim_id);
+                                SurfaceInteraction<C> si(material_item.uv, trig);
+                                MaterialEvalContext<C> ctx(sampler, si);
+                                auto *material = material_item.material;
+                                auto wo = material_item.wo;
+                                bool fuck = false;
+                                if (material->template isa<EmissiveMaterial<C>>()) {
+                                    if (true || depth == 0) {
+                                        // printf("fuck\n");
+                                        auto *emission = material->template get<EmissiveMaterial<C>>();
+                                        bool face_front = dot(-wo, si.ng) < 0.0f;
+                                        if (emission->double_sided || face_front) {
+                                            path_state.L += path_state.beta * emission->color->evaluate(ctx.texcoords);
+                                        }
+                                    }
+                                } else if (cur_depth < max_depth) {
+                                    si.bsdf = material->get_bsdf(ctx);
+                                    cur_depth++;
+                                    BSDFSampleContext<C> sample_ctx(sampler.next2d(), wo);
+                                    auto sample = si.bsdf.sample(sample_ctx);
+                                    path_state.beta *= sample.f * std::abs(dot(si.ng, sample.wi)) / sample.pdf;
+                                    auto ray = Ray3f(si.p, sample.wi,
+                                                     Constants<Float>::Eps() / std::abs(dot(si.ng, sample.wi)));
+                                    RayWorkItem<C> ray_item;
+                                    ray_item.pixel = pixel;
+                                    ray_item.ray = ray;
+                                    ray_queue[0]->append(ray_item);
+                                }
+                                // path_state.L = Spectrum(1.0f);
+                                // if (tid == 0) {
+                                    // printf("pixel: idx=%d, (x,y)=(%d, %d)\n", pixel, get_pixel(pixel).x(),get_pixel(pixel).y());
+                                    // printf("%f\n", path_state.L[0], path_state.L[1], path_state.L[2]);
+                                // }
+                                path_states[pixel] = path_state;
+                                if (tid == 0) {
+                                    // path_state = path_states[pixel];
+                                    // printf("%f\n", path_state.L[0], path_state.L[1], path_state.L[2]);
+                                }
+                            });
+                    }
+                }
+                launch(
+                    "update_film", launch_size, AKR_GPU_LAMBDA(int tid) {
+                        PathState<C> state = path_states[tid];
+                        auto p = get_pixel(tid);
+                        tile->add_sample(Point2f(p), state.L, 1.0f);
+                    });
+            }
+            CUDA_CHECK(cudaDeviceSynchronize());
+            info("tile took {}s\n", timer.elapsed_seconds());
+            gpu_time += timer.elapsed_seconds();
+            film->merge_tile(*tile);
+        };
+        auto n_tiles = Point2i(film->resolution() + Point2i(tile_size - 1)) / Point2i(tile_size);
+        for (int tile_y = 0; tile_y < n_tiles.y(); tile_y++) {
+            for (int tile_x = 0; tile_x < n_tiles.x(); tile_x++) {
+                render_tile(tile_x, tile_y);
+            }
+        }
+         info("total gpu time {}s\n", gpu_time);
     }
     AKR_RENDER_CLASS(PathTracer)
 

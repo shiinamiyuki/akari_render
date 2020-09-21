@@ -45,9 +45,7 @@ namespace akari {
         int geom_id = -1;
         int prim_id = -1;
         bool is_instance = false;
-        bool hit()const{
-            return geom_id != -1 && prim_id != -1;
-        }
+        bool hit() const { return geom_id != -1 && prim_id != -1; }
     };
     AKR_VARIANT class Scene {
       public:

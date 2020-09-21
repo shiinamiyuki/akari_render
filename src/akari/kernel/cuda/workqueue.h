@@ -27,6 +27,30 @@
 #include <akari/kernel/soa.h>
 
 namespace akari {
+#if 0
+    template <typename T>
+    struct WorkQueue {
+        using value_type = T;
+        int _size = 0;
+        T *__restrict__ array = nullptr;
+        size_t head = 0;
+        template <class Allocator>
+        WorkQueue(size_t s, Allocator &&allocator) : _size(s) {
+            array = allocator.template allocate_object<T>(s);
+        }
+        AKR_XPU T &operator[](int i) { return array[i]; }
+        AKR_XPU const T &operator[](int i) const { return array[i]; }
+        AKR_XPU size_t size() const { return _size; }
+        AKR_XPU int append(const T &el) {
+            auto i = atomicAdd(&head, 1);
+            AKR_ASSERT(i < size());
+            (*this)[i] = el;
+            return i;
+        }
+        AKR_XPU size_t elements_in_queue() const { return head; }
+        AKR_XPU void clear() { head = 0; }
+    };
+#else
     template <typename T>
     struct WorkQueue : SOA<T> {
         using value_type = T;
@@ -34,22 +58,23 @@ namespace akari {
         size_t head = 0;
         AKR_XPU int append(const T &el) {
             auto i = atomicAdd(&head, 1);
-            AKR_ASSERT(i < head);
+            AKR_ASSERT(i < size());
             (*this)[i] = el;
             return i;
         }
         AKR_XPU size_t elements_in_queue() const { return head; }
         AKR_XPU void clear() { head = 0; }
     };
-
-    // template <typename... Ts>
-    // struct MultiWorkQueue : Tuple<WorkQueue<Ts>...> {
-    //     MultiWorkQueue(MemoryArena &arena, size_t max_size) {
-    //         foreach_cpu([](auto &arg) {
-    //             using Queue = std::decay_t<decltype(arg)>;
-    //             using T = typename Queue::value_type;
-    //             arg = Queue(arena.allocN<T>(), max_size);
-    //         });
-    //     }
-    // };
+#endif
+    template <typename... Ts>
+    struct MultiWorkQueue : Tuple<WorkQueue<Ts>...> {
+        template <class Allocator>
+        MultiWorkQueue(size_t max_size, Allocator &allocator) {
+            foreach_cpu([&](auto &arg) {
+                using Queue = std::decay_t<decltype(arg)>;
+                using T = typename Queue::value_type;
+                arg = Queue(max_size, allocator);
+            });
+        }
+    };
 } // namespace akari

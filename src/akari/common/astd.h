@@ -176,23 +176,6 @@ namespace akari::astd {
             return p.second;
         }
     }
-    template <typename T, int N>
-    class array {
-        T _data[N] = {};
-
-      public:
-        array() = default;
-        AKR_XPU T *data() { return _data; }
-        AKR_XPU const T *data() const { return _data; }
-        AKR_XPU T &operator[](int i) { return _data[i]; }
-        AKR_XPU const T &operator[](int i) const { return _data[i]; }
-        AKR_XPU size_t size() const { return N; }
-        AKR_XPU T *begin() const { return _data; }
-        AKR_XPU T *end() const { return _data + size(); }
-        AKR_XPU const T *cbegin() const { return _data; }
-        AKR_XPU const T *cend() const { return _data + size(); }
-    };
-
     // MSVC has incomplete pmr support ...
     namespace pmr {
         class AKR_EXPORT memory_resource {
@@ -288,5 +271,63 @@ namespace akari::astd {
         std::abort();
 #endif
     }
+
+    template <typename T, int N>
+    class array {
+      public:
+        using value_type = T;
+        using iterator = value_type *;
+        using const_iterator = const value_type *;
+        using size_t = std::size_t;
+
+        array() = default;
+        AKR_XPU
+        array(std::initializer_list<T> v) {
+            size_t i = 0;
+            for (const T &val : v)
+                values[i++] = val;
+        }
+
+        AKR_XPU
+        void fill(const T &v) {
+            for (int i = 0; i < N; ++i)
+                values[i] = v;
+        }
+
+        AKR_XPU
+        bool operator==(const array<T, N> &a) const {
+            for (int i = 0; i < N; ++i)
+                if (values[i] != a.values[i])
+                    return false;
+            return true;
+        }
+        AKR_XPU
+        bool operator!=(const array<T, N> &a) const { return !(*this == a); }
+
+        AKR_XPU
+        iterator begin() { return values; }
+        AKR_XPU
+        iterator end() { return values + N; }
+        AKR_XPU
+        const_iterator begin() const { return values; }
+        AKR_XPU
+        const_iterator end() const { return values + N; }
+
+        AKR_XPU
+        size_t size() const { return N; }
+
+        AKR_XPU
+        T &operator[](size_t i) { return values[i]; }
+        AKR_XPU
+        const T &operator[](size_t i) const { return values[i]; }
+
+        AKR_XPU
+        T *data() { return values; }
+        AKR_XPU
+        const T *data() const { return values; }
+
+      private:
+        T values[N] = {};
+    };
 
 } // namespace akari::astd

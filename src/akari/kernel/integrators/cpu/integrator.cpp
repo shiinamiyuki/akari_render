@@ -104,7 +104,7 @@ namespace akari {
                     if (scene.intersect(ray, &intersection)) {
                         auto trig = scene.get_triangle(intersection.geom_id, intersection.prim_id);
                         SurfaceInteraction<C> si(intersection, trig);
-                        MaterialEvalContext<C> ctx(sampler, si, arena);
+                        MaterialEvalContext<C> ctx(sampler, si);
                         auto wo = -ray.d;
                         auto *material = trig.material;
                         if (!material)

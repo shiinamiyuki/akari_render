@@ -24,37 +24,33 @@
 namespace akari {
     AKR_VARIANT struct PathState {
         AKR_IMPORT_TYPES()
-        int pixel;
         Sampler<C> sampler;
         Spectrum L;
         Spectrum beta;
-    };
-    AKR_VARIANT struct CameraRayWorkItem {
-        AKR_IMPORT_TYPES()
-        CameraSample<C> sample;
-    };
-    AKR_VARIANT struct ClosestHitWorkItem {
-        AKR_IMPORT_TYPES();
-        int pixel;
-        Intersection<C> intersection;
-    };
-    AKR_VARIANT struct MissWorkItem {
-        AKR_IMPORT_TYPES();
-        int pixel;
-    };
-    AKR_VARIANT struct AnyHitWorkItem {
-        AKR_IMPORT_TYPES();
-        int pixel;
-        bool hit = false;
+        // bool terminated = false;
     };
     AKR_VARIANT struct RayWorkItem {
         AKR_IMPORT_TYPES()
         int pixel;
         Ray3f ray;
+        bool valid() const { return ray.tmax > 0; }
     };
+
+    template <typename C>
+    struct MaterialWorkItem {
+        AKR_IMPORT_TYPES()
+        int pixel;
+        const Material<C> *material = nullptr;
+        int geom_id = -1;
+        int prim_id = -1;
+        Point2f uv;
+        Vector3f wo;
+    };
+
     AKR_VARIANT struct ShadowRayWorkItem {
         AKR_IMPORT_TYPES()
         int pixel;
         Ray3f ray;
+        bool hit() const { return ray.tmax < 0.0f; }
     };
 } // namespace akari

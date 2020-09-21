@@ -30,7 +30,7 @@ namespace akari {
         AKR_IMPORT_TYPES()
         int spp = 16;
         int tile_size = 16;
-        std::shared_ptr<cpu::Integrator<C>>compile(MemoryArena *arena) override {
+        std::shared_ptr<cpu::Integrator<C>> compile(MemoryArena *arena) override {
             return std::make_shared<cpu::Integrator<C>>(cpu::AmbientOcclusion<C>(spp));
         }
         const char *description() override { return "[Ambient Occlution]"; }
@@ -48,6 +48,11 @@ namespace akari {
         std::shared_ptr<cpu::Integrator<C>> compile(MemoryArena *arena) override {
             return std::make_shared<cpu::Integrator<C>>(cpu::PathTracer<C>(spp));
         }
+#ifdef AKR_ENABLE_GPU
+        std::shared_ptr<gpu::Integrator<C>> compile_gpu(MemoryArena *arena) override {
+            return std::make_shared<gpu::Integrator<C>>(gpu::PathTracer<C>(spp));
+        }
+#endif
         const char *description() override { return "[Path Tracer]"; }
     };
 

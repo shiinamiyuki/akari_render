@@ -25,39 +25,41 @@
 namespace akari {
     AKR_VARIANT struct bsdf {
         AKR_IMPORT_TYPES()
-        static inline Float cos_theta(const Vector3f &w) { return w.y(); }
+        AKR_XPU static inline Float cos_theta(const Vector3f &w) { return w.y(); }
 
-        static inline Float abs_cos_theta(const Vector3f &w) { return std::abs(cos_theta(w)); }
+        AKR_XPU static inline Float abs_cos_theta(const Vector3f &w) { return std::abs(cos_theta(w)); }
 
-        static inline Float cos2_theta(const Vector3f &w) { return w.y() * w.y(); }
+        AKR_XPU static inline Float cos2_theta(const Vector3f &w) { return w.y() * w.y(); }
 
-        static inline Float sin2_theta(const Vector3f &w) { return 1 - cos2_theta(w); }
+        AKR_XPU static inline Float sin2_theta(const Vector3f &w) { return 1 - cos2_theta(w); }
 
-        static inline Float sin_theta(const Vector3f &w) { return sqrt(std::fmax(0.0f, sin2_theta(w))); }
+        AKR_XPU static inline Float sin_theta(const Vector3f &w) { return sqrt(std::fmax(0.0f, sin2_theta(w))); }
 
-        static inline Float tan2_theta(const Vector3f &w) { return sin2_theta(w) / cos2_theta(w); }
+        AKR_XPU static inline Float tan2_theta(const Vector3f &w) { return sin2_theta(w) / cos2_theta(w); }
 
-        static inline Float tan_theta(const Vector3f &w) { return sqrt(std::fmax(0.0f, tan2_theta(w))); }
+        AKR_XPU static inline Float tan_theta(const Vector3f &w) { return sqrt(std::fmax(0.0f, tan2_theta(w))); }
 
-        static inline Float cos_phi(const Vector3f &w) {
+        AKR_XPU static inline Float cos_phi(const Vector3f &w) {
             Float sinTheta = sin_theta(w);
             return (sinTheta == 0) ? 1 : std::clamp<Float>(w.x / sinTheta, -1, 1);
         }
-        static inline Float sin_phi(const Vector3f &w) {
+        AKR_XPU static inline Float sin_phi(const Vector3f &w) {
             Float sinTheta = sin_theta(w);
             return (sinTheta == 0) ? 0 : std::clamp<Float>(w.z / sinTheta, -1, 1);
         }
 
-        static inline Float cos2_phi(const Vector3f &w) { return cos_phi(w) * cos_phi(w); }
-        static inline Float sin2_phi(const Vector3f &w) { return sin_phi(w) * sin_phi(w); }
+        AKR_XPU static inline Float cos2_phi(const Vector3f &w) { return cos_phi(w) * cos_phi(w); }
+        AKR_XPU static inline Float sin2_phi(const Vector3f &w) { return sin_phi(w) * sin_phi(w); }
 
-        static inline bool same_hemisphere(const Vector3f &wo, const Vector3f &wi) { return wo.y() * wi.y() >= 0; }
+        AKR_XPU static inline bool same_hemisphere(const Vector3f &wo, const Vector3f &wi) {
+            return wo.y() * wi.y() >= 0;
+        }
 
-        static inline Vector3f reflect(const Vector3f &w, const Normal3f &n) {
+        AKR_XPU static inline Vector3f reflect(const Vector3f &w, const Normal3f &n) {
             return -1.0f * w + 2.0f * dot(w, n) * n;
         }
 
-        static inline bool refract(const Vector3f &wi, const Normal3f &n, Float eta, Vector3f *wt) {
+        AKR_XPU static inline bool refract(const Vector3f &wi, const Normal3f &n, Float eta, Vector3f *wt) {
             Float cosThetaI = dot(n, wi);
             Float sin2ThetaI = std::fmax(0.0f, 1.0f - cosThetaI * cosThetaI);
             Float sin2ThetaT = eta * eta * sin2ThetaI;
@@ -69,7 +71,7 @@ namespace akari {
             *wt = eta * -wi + (eta * cosThetaI - cosThetaT) * n;
             return true;
         }
-        static inline Float fr_dielectric(Float cosThetaI, Float etaI, Float etaT) {
+        AKR_XPU static inline Float fr_dielectric(Float cosThetaI, Float etaI, Float etaT) {
             bool entering = cosThetaI > 0.f;
             if (!entering) {
                 std::swap(etaI, etaT);
@@ -87,8 +89,8 @@ namespace akari {
         }
 
         // https://seblagarde.wordpress.com/2013/04/29/memo-on-fresnel-equations/
-        static inline Spectrum fr_conductor(Float cosThetaI, const Spectrum &etaI, const Spectrum &etaT,
-                                            const Spectrum &k) {
+        AKR_XPU static inline Spectrum fr_conductor(Float cosThetaI, const Spectrum &etaI, const Spectrum &etaT,
+                                                    const Spectrum &k) {
             Float CosTheta2 = cosThetaI * cosThetaI;
             Float SinTheta2 = 1 - CosTheta2;
             Spectrum Eta = etaT / etaI;

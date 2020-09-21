@@ -28,13 +28,13 @@ struct SOA<STRUCT> {
 
 """
 test_src = {
-    'flat':['Float', 'Point3f'],
+    'flat': ['Float', 'Point3f'],
     # 'defined':{
     #     'Array<Float, 3>' : {
     #         'template':['Float']
     #     }
     # },
-    'soa':{
+    'soa': {
         # 'Point3f':{
         #     'template':[],
         #     'fields':{
@@ -43,13 +43,13 @@ test_src = {
         #         'z':'Float'
         #     }
         # },
-        'Ray<C>' : {
-            'template':['C'],
-            'fields':{
-                'o':'Point3f',
-                'd':'Point3f',
-                'tmin':'Float',
-                'tmax':'Float'
+        'Ray<C>': {
+            'template': ['C'],
+            'fields': {
+                'o': 'Point3f',
+                'd': 'Point3f',
+                'tmin': 'Float',
+                'tmax': 'Float'
             }
         }
     }
@@ -64,39 +64,43 @@ if __name__ == '__main__':
     # cfg = test_src
     flats = set(cfg['flat'])
     soas = cfg['soa']
-    
+
     def gen_struct(name, desc):
         indent = 4
         out = ''
+
         class Block:
             def __enter__(self):
                 nonlocal indent
                 indent += 4
+
             def __exit__(self, type, value, tb):
                 nonlocal indent
                 indent -= 4
-        
+
         def wl(s):
             nonlocal out
             out += ' ' * indent + s + '\n'
 
-        
         templates = desc['template']
         fields = desc['fields']
         if templates:
-            wl("template<" + ','.join(['typename ' + i for i in templates]) + ">")
+            wl("template<" +
+               ','.join(['typename ' + i for i in templates]) + ">")
         wl('struct SOA<' + name + '>{')
         with Block():
             if 'Float' in templates:
                 wl('AKR_IMPORT_CORE_TYPES();')
             elif 'C' in templates:
                 wl('AKR_IMPORT_TYPES();')
-            wl('size_t _size = 1;')
+            wl('size_t _size = 0;')
             for field in fields:
-                assert fields[field] in flats or fields[field] in soas, '{} is illegal'.format(fields[field])
+                assert fields[field] in flats or fields[field] in soas or fields[field] in templates, '{} is illegal'.format(
+                    fields[field])
                 wl('SOA<' + fields[field] + '> ' + field + ';')
             wl('using Self = SOA<' + name + '>;')
             wl('using value_type = ' + name + ';')
+            wl('Self() = default;')
             wl('template<class Allocator>')
             wl('Self(size_t s, Allocator & alloc): _size(s)')
             for field in fields:
@@ -116,7 +120,7 @@ if __name__ == '__main__':
                 wl('AKR_XPU const value_type & operator=(const value_type & rhs){')
                 with Block():
                     for field in fields:
-                        wl('self.' + field + '[idx] = rhs.' + field +';')
+                        wl('self.' + field + '[idx] = rhs.' + field + ';')
                     wl('return rhs;')
                 wl('}')
             wl('};')
@@ -150,4 +154,3 @@ if __name__ == '__main__':
         for soa in soas:
             out_file.write(gen_struct(soa, soas[soa]) + '\n')
         out_file.write('}\n')
-

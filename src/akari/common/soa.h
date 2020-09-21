@@ -47,9 +47,12 @@ namespace akari {
     struct SOAArrayXT {
         using Self = SOAArrayXT<T, N, A>;
         using value_type = A;
+        static_assert(sizeof(A) % sizeof(T) == 0);
+        static constexpr size_t stride = sizeof(A) / sizeof(T);
+        SOAArrayXT() = default;
         template <typename Allocator = DeviceAllocator<T>>
         SOAArrayXT(int n, Allocator &&allocator) : _size(n) {
-            array = allocator.template allocate_object<T>(n * sizeof(value_type));
+            array = allocator.template allocate_object<T>(n * stride);
         }
         struct IndexHelper {
             Self &self;
@@ -57,13 +60,13 @@ namespace akari {
             AKR_XPU operator value_type() {
                 value_type ret;
                 for (int i = 0; i < N; i++) {
-                    ret[i] = self.array[idx * sizeof(value_type) + i];
+                    ret[i] = self.array[idx * stride + i];
                 }
                 return ret;
             }
             AKR_XPU const value_type &operator=(const value_type &rhs) {
                 for (int i = 0; i < N; i++) {
-                    self.array[idx * sizeof(value_type) + i] = rhs[i];
+                    self.array[idx * stride + i] = rhs[i];
                 }
                 return rhs;
             }
@@ -74,7 +77,7 @@ namespace akari {
             AKR_XPU operator value_type() {
                 value_type ret;
                 for (int i = 0; i < N; i++) {
-                    ret[i] = self.array[idx * sizeof(value_type) + i];
+                    ret[i] = self.array[idx * stride + i];
                 }
                 return ret;
             }

@@ -37,17 +37,19 @@ namespace akari {
         };
         AKR_VARIANT class PathTracer {
           public:
+            template <typename C1>
+            friend struct PathTracerImpl;
             int spp = 16;
-            int tile_size = 16;
+            int tile_size = 512;
             AKR_IMPORT_TYPES()
             PathTracer() = default;
             PathTracer(int spp) : spp(spp) {}
             void render(const Scene<C> &scene, Film<C> *out) const;
         };
-        AKR_VARIANT class Integrator : public Variant<AmbientOcclusion<C>> {
+        AKR_VARIANT class Integrator : public Variant<AmbientOcclusion<C>, PathTracer<C>> {
           public:
             AKR_IMPORT_TYPES()
-            using Variant<AmbientOcclusion<C>>::Variant;
+            using Variant<AmbientOcclusion<C>, PathTracer<C>>::Variant;
             void render(const Scene<C> &scene, Film<C> *out) const { AKR_VAR_DISPATCH(render, scene, out); }
         };
     } // namespace gpu

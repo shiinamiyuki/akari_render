@@ -1,69 +1,72 @@
 {
-    'headers':[
+    'headers': [
         'akari/kernel/soa.h',
         'akari/kernel/integrators/gpu/workitem.h'
     ],
-    'flat':['int', 'bool', 'Float', 'Array3f',
-     'Array2f','Sampler<C>','Ray<C>', 'Spectrum',
-     'Intersection<C>'],
-    'soa':{
-        'PathState<C>':{
-            'template':'C',
-            'fields':{
-                'sampler':'Sampler<C>',
-                'L':'Spectrum',
-                'beta':'Spectrum',                
+    'flat': ['int', 'bool', 'Float', 'Array3f',
+             'Array2f', 'Sampler<C>', 'Ray<C>', 'Spectrum',
+             'Intersection<C>', 'const Material<C> *'],
+    'soa': {
+        'PathState<C>': {
+            'template': 'C',
+            'fields': {
+                'sampler': 'Sampler<C>',
+                'L': 'Spectrum',
+                'beta': 'Spectrum',
+                # 'terminated': 'bool'
             }
         },
-        'CameraSample<C>':{
-            'template':'C',
-            'fields':{
-                'p_lens':'Array2f',
-                'p_film':'Array2f',
-                'weight':'Float',
-                'normal':'Array3f',
-                'ray':'Ray<C>'
-            }
-        },
-         'CameraRayWorkItem<C>':{
-            'template':'C',
-            'fields':{
-                'sample':'CameraSample<C>'
-            }
-        },
-         'RayWorkItem<C>':{
-            'template':'C',
-            'fields':{
+        'MaterialWorkItem<C>': {
+            'template': 'C',
+            'fields': {
                 'pixel':'int',
-                'ray':'Ray<C>',
+                'material': 'const Material<C> *',
+                'geom_id': 'int',
+                'prim_id': 'int',
+                'uv': 'Array2f',
+                'wo':'Array3f'
             }
         },
-        'ShadowRayWorkItem<C>':{
-            'template':'C',
-            'fields':{
-                'pixel':'int',
-                'ray':'Ray<C>'
+        #  'CameraRayWorkItem<C>':{
+        #     'template':'C',
+        #     'fields':{
+        #         'sample':'CameraSample<C>'
+        #     }
+        # },
+        'RayWorkItem<C>': {
+            'template': 'C',
+            'fields': {
+                'pixel': 'int',
+                'ray': 'Ray<C>',
+
             }
         },
-        'ClosestHitWorkItem<C>':{
-            'template':'C',
-            'fields':{
-                'pixel':'int',
-                'intersection':'Intersection<C>'
-            }
-        },
-        'AnyHitWorkItem<C>':{
-            'template':'C',
-            'fields':{
-                'pixel':'int',
-                'hit':'bool'
-            }
-        },
-         'MissWorkItem<C>':{
-            'template':'C',
-            'fields':{
-                'pixel':'int'
-            }
-        }
+        # 'ShadowRayWorkItem<C>':{
+        #     'template':'C',
+        #     'fields':{
+        #         'pixel':'int',
+        #         'ray':'Ray<C>'
+        #     }
+        # },
+        # 'ClosestHitWorkItem<C>':{
+        #     'template':'C',
+        #     'fields':{
+        #         'pixel':'int',
+        #         'intersection':'Intersection<C>'
+        #     }
+        # },
+        # 'AnyHitWorkItem<C>':{
+        #     'template':'C',
+        #     'fields':{
+        #         'pixel':'int',
+        #         'hit':'bool'
+        #     }
+        # },
+        #  'MissWorkItem<C>':{
+        #     'template':'C',
+        #     'fields':{
+        #         'pixel':'int'
+        #     }
+        # }
     }
 }

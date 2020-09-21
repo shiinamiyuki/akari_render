@@ -71,7 +71,7 @@ namespace akari::gpu {
     }
     template<typename F>
     void launch_single(const char * name, F func){
-        launch(name, 1, func);
+        launch(name, 1, [=]AKR_GPU (int )mutable{func();});
     }
     template <typename F>
     void launch_cpu(const char *name, int nItems, F func) {
