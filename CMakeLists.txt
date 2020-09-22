@@ -47,9 +47,24 @@ include_directories(external/fmt-6.1.2/include)
 add_subdirectory(external/fmt-6.1.2)
 set(AKR_CORE_EXT_LIBS ${AKR_CORE_EXT_LIBS} fmt)
 
-# include_directories(external/asmjit/src)
-# add_subdirectory(external/asmjit)
+# ---------------- Begin Build Utils --------------------
+add_executable(akari-configure src/akari/tools/configure.cpp)
+target_link_libraries(akari-configure fmt)
+set_target_properties(akari-configure 
+        PROPERTIES  CUDA_ARCHITECTURES OFF)
 
+add_executable(akari-soac src/akari/tools/soac.cpp)
+target_link_libraries(akari-soac fmt)
+set_target_properties(akari-soac
+        PROPERTIES  CUDA_ARCHITECTURES OFF)
+macro(add_soa_header target source)
+    add_custom_command(OUTPUT ${target}
+        COMMAND akari-soac ${source} ${target}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        DEPENDS ${source} akari-soac)
+endmacro()
+
+# ---------------- End Build Utils --------------------
 
 
 include(cmake/Embree.cmake)
@@ -58,9 +73,9 @@ include(cmake/CUDA.cmake)
 
 set(AKR_CONFIG_H ${CMAKE_CURRENT_SOURCE_DIR}/src/akari/common/config.h )
 add_custom_command(OUTPUT ${AKR_CONFIG_H}
-    COMMAND python src/akari/tools/configure.py akari.conf  ${AKR_CONFIG_H}
+    COMMAND akari-configure akari.conf ${AKR_CONFIG_H}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    DEPENDS akari.conf src/akari/tools/configure.py)
+    DEPENDS akari.conf akari-configure)
 
 
 file(GLOB PYBIND11_HEADERS external/pybind11/include/pybind11.h external/pybind11/include/stl.h)
@@ -88,6 +103,7 @@ else()
 endif()
 
 add_library(akari_core_base SHARED ${AKR_COMMON_SRC}  ${AKR_CORE_SRC} ${AKR_CONFIG_H}  ${AKR_SHADING_SRC})
+add_dependencies(akari_core_base akari-configure)
 target_link_libraries(akari_core_base PUBLIC  ${AKR_CORE_EXT_LIBS} ${Python_LIBRARIES} ${EMBREE_LIBRARY} ${AKR_CUDA_LIBS})
 target_compile_options(akari_core_base PUBLIC ${AKR_CXX_FLAGS})
 target_compile_definitions(akari_core_base PUBLIC ${AKR_COMPILE_DEFINITIONS})
@@ -110,17 +126,18 @@ set_target_CUDA_props(akari_core_base)
 
 
 set(AKR_KERNEL_SOA_H ${CMAKE_CURRENT_SOURCE_DIR}/src/akari/kernel/soa.h)
-add_custom_command(OUTPUT ${AKR_KERNEL_SOA_H}
-    COMMAND python src/akari/tools/soac.py src/akari/kernel/soa.py  ${AKR_KERNEL_SOA_H}
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    DEPENDS src/akari/kernel/soa.py  src/akari/tools/soac.py)
+#add_custom_command(OUTPUT ${AKR_KERNEL_SOA_H}
+#    COMMAND python src/akari/tools/soac.py src/akari/kernel/soa.py  ${AKR_KERNEL_SOA_H}
+#    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+#    DEPENDS src/akari/kernel/soa.py  src/akari/tools/soac.py)
+add_soa_header(${AKR_KERNEL_SOA_H} src/akari/kernel/akari.soa)
 
 set(AKR_KERNEL_WORKITEM_SOA_H ${CMAKE_CURRENT_SOURCE_DIR}/src/akari/kernel/integrators/gpu/workitem-soa.h)
-add_custom_command(OUTPUT ${AKR_KERNEL_WORKITEM_SOA_H}
-    COMMAND python src/akari/tools/soac.py src/akari/kernel/integrators/gpu/workitem.py  ${AKR_KERNEL_WORKITEM_SOA_H}
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    DEPENDS src/akari/kernel/integrators/gpu/workitem.py src/akari/tools/soac.py)
-
+#add_custom_command(OUTPUT ${AKR_KERNEL_WORKITEM_SOA_H}
+#    COMMAND python src/akari/tools/soac.py src/akari/kernel/integrators/gpu/workitem.py  ${AKR_KERNEL_WORKITEM_SOA_H}
+#    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+#    DEPENDS src/akari/kernel/integrators/gpu/workitem.py src/akari/tools/soac.py)
+add_soa_header(${AKR_KERNEL_WORKITEM_SOA_H} src/akari/kernel/integrators/gpu/workitem.soa)
 
 add_library(akari_core SHARED ${AKR_COMMON_SRC} ${AKR_PYBIND_SRC} ${AKR_KERNEL_SRC}  ${AKR_KERNEL_SOA_H} ${AKR_KERNEL_WORKITEM_SOA_H})
 target_link_libraries(akari_core PUBLIC akari_core_base) 
