@@ -50,39 +50,44 @@ namespace akari {
 )";
         out << "#define AKR_CORE_STRUCT(Name) ";
         for (auto enabled : config["enabled"]) {
-            out << fmt::format("template struct Name<{}>;", variants[enabled.get<std::string>()]["Float"]);
+            out << fmt::format("template struct Name<{}>;",
+                               variants[enabled.get<std::string>()]["Float"].get<std::string>());
         }
         out << "\n";
         out << "#define AKR_CORE_CLASS(Name) ";
         for (auto enabled : config["enabled"]) {
-            out << fmt::format("template class Name<{}>;", variants[enabled.get<std::string>()]["Float"]);
+            out << fmt::format("template class Name<{}>;",
+                               variants[enabled.get<std::string>()]["Float"].get<std::string>());
         }
         out << "\n";
         out << "#define AKR_RENDER_STRUCT(Name) ";
         for (auto enabled : config["enabled"]) {
-            out << fmt::format("template struct Name<Config<{}, {}>>;", variants[enabled.get<std::string>()]["Float"],
-                               variants[enabled.get<std::string>()]["Spectrum"]);
+            out << fmt::format("template struct Name<Config<{}, {}>>;",
+                               variants[enabled.get<std::string>()]["Float"].get<std::string>(),
+                               variants[enabled.get<std::string>()]["Spectrum"].get<std::string>());
         }
         out << "\n";
         out << "#define AKR_RENDER_CLASS(Name) ";
         for (auto enabled : config["enabled"]) {
-            out << fmt::format("template class Name<Config<{}, {}>>;", variants[enabled.get<std::string>()]["Float"],
-                               variants[enabled.get<std::string>()]["Spectrum"]);
+            out << fmt::format("template class Name<Config<{}, {}>>;",
+                               variants[enabled.get<std::string>()]["Float"].get<std::string>(),
+                               variants[enabled.get<std::string>()]["Spectrum"].get<std::string>());
         }
         out << "\n";
         out << "template<typename C>constexpr const char * get_variant_string(){\n";
         for (auto enabled : config["enabled"]) {
             out << fmt::format(R"(    if constexpr(std::is_same_v<Config<{},{}>, C>)return "{}";)",
-                               variants[enabled.get<std::string>()]["Float"],
-                               variants[enabled.get<std::string>()]["Spectrum"], enabled.get<std::string>());
+                               variants[enabled.get<std::string>()]["Float"].get<std::string>(),
+                               variants[enabled.get<std::string>()]["Spectrum"].get<std::string>(),
+                               enabled.get<std::string>());
         }
         out << "\n    return \"unknown\";\n}\n";
         out << "#define AKR_INVOKE_VARIANT(variant, func, ...) ([&](){\\\n";
         for (auto enabled : config["enabled"]) {
             out << fmt::format("    if (variant == \"{}\")\\\n", enabled.get<std::string>());
             out << fmt::format("        return func<Config<{}, {}>>(__VA_ARGS__);\\\n",
-                               variants[enabled.get<std::string>()]["Float"],
-                               variants[enabled.get<std::string>()]["Spectrum"]);
+                               variants[enabled.get<std::string>()]["Float"].get<std::string>(),
+                               variants[enabled.get<std::string>()]["Spectrum"].get<std::string>());
         }
         out << "    throw std::runtime_error(\"unsupported variant\");\\\n";
         out << "})()\n";
