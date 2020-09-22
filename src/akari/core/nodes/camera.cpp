@@ -19,11 +19,8 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-#include <akari/core/python/camera.h>
+#include <akari/core/nodes/camera.h>
 #include <akari/kernel/camera.h>
-#include <pybind11/pybind11.h>
-#include <pybind11/embed.h>
-#include <pybind11/stl.h>
 namespace akari {
     AKR_VARIANT class PerspectiveCameraNode : public CameraNode<C> {
       public:
@@ -41,6 +38,7 @@ namespace akari {
             return PerspectiveCamera<C>(resolution, c2w, fov);
         }
     };
+#ifdef AKR_ENABLE_PYTHON
     AKR_VARIANT void RegisterCameraNode<C>::register_nodes(py::module &m) {
         AKR_IMPORT_TYPES()
         py::class_<CameraNode<C>, SceneGraphNode<C>, std::shared_ptr<CameraNode<C>>>(m, "Camera");
@@ -54,4 +52,5 @@ namespace akari {
             .def("commit", &PerspectiveCameraNode<C>::commit);
     }
     AKR_RENDER_STRUCT(RegisterCameraNode)
+#endif
 } // namespace akari

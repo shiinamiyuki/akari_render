@@ -19,31 +19,24 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+
 #pragma once
-
-#include <akari/core/akari.h>
-#include <akari/common/fwd.h>
-#include <akari/common/buffer.h>
-#include <akari/core/arena.h>
-#include <akari/kernel/instance.h>
+#include <akari/core/nodes/scenegraph.h>
 #include <akari/kernel/integrators/cpu/integrator.h>
-// #include <akari/kernel/material.h>
-namespace pybind11 {
-    class module;
-}
+#ifdef AKR_ENABLE_GPU
+#    include <akari/kernel/integrators/gpu/integrator.h>
+#endif
 namespace akari {
-    namespace py = pybind11;
-    AKR_VARIANT class SceneGraphNode {
+    namespace gpu {
+        AKR_VARIANT class Integrator;
+    }
+    AKR_VARIANT class IntegratorNode : public SceneGraphNode<C> {
       public:
-        using Float = typename C::Float;
-        AKR_IMPORT_CORE_TYPES()
-        virtual void commit() {}
-        virtual const char *description() { return "unknown"; }
-        virtual ~SceneGraphNode() = default;
+        AKR_IMPORT_TYPES()
+        virtual std::shared_ptr<cpu::Integrator<C>> compile(MemoryArena *arena) = 0;
+        virtual std::shared_ptr<gpu::Integrator<C>> compile_gpu(MemoryArena *arena) { return nullptr; }
     };
-    AKR_VARIANT class SceneNode;
-
-    AKR_VARIANT class FilmNode : public SceneGraphNode<C> { public: };
-    AKR_VARIANT struct RegisterSceneGraph { static void register_scene_graph(py::module &parent); };
-
+#ifdef AKR_ENABLE_PYTHON
+    AKR_VARIANT struct RegisterIntegratorNode { static void register_nodes(py::module &m); };
+#endif
 } // namespace akari

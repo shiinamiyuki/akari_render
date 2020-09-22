@@ -19,11 +19,9 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-#include <akari/core/python/material.h>
+#include <akari/core/nodes/material.h>
 #include <akari/kernel/material.h>
-#include <pybind11/pybind11.h>
-#include <pybind11/embed.h>
-#include <pybind11/stl.h>
+
 namespace akari {
     AKR_VARIANT class DiffuseMaterialNode : public MaterialNode<C> {
       public:
@@ -44,6 +42,7 @@ namespace akari {
             return arena->alloc<Material<C>>(EmissiveMaterial<C>(tex));
         }
     };
+#ifdef AKR_ENABLE_PYTHON
     AKR_VARIANT void RegisterMaterialNode<C>::register_nodes(py::module &m) {
         AKR_IMPORT_TYPES()
         py::class_<MaterialNode<C>, SceneGraphNode<C>, std::shared_ptr<MaterialNode<C>>>(m, "Material");
@@ -60,4 +59,5 @@ namespace akari {
             .def("commit", &EmissiveMaterialNode<C>::commit);
     }
     AKR_RENDER_STRUCT(RegisterMaterialNode)
+#endif
 } // namespace akari

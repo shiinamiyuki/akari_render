@@ -19,12 +19,12 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-
-#include <akari/common/fwd.h>
-#include <akari/core/python/python.h>
-#include <pybind11/embed.h>
-#include <pybind11/stl.h>
-#include <akari/core/python/scenegraph.h>
+#ifdef AKR_ENABLE_PYTHON
+#    include <akari/common/fwd.h>
+#    include <akari/core/nodes/python.h>
+#    include <pybind11/embed.h>
+#    include <pybind11/stl.h>
+#    include <akari/core/nodes/scenegraph.h>
 namespace akari {
     template <typename Float, typename T>
     struct RegisterArrayOp {
@@ -45,7 +45,7 @@ namespace akari {
                 c.def("__sub__", [](const value_t<T> &a, const T &b) { return a - b; });
                 c.def("__mul__", [](const value_t<T> &a, const T &b) { return a * b; });
                 c.def("__truediv__", [](const value_t<T> &a, const T &b) { return a / b; });
-#define REGISTER_MATH_OP(name, op) c.def(#name, [](const T &a, const T &b) { return a op b; });
+#    define REGISTER_MATH_OP(name, op) c.def(#    name, [](const T &a, const T &b) { return a op b; });
                 REGISTER_MATH_OP("__lt__", <)
                 REGISTER_MATH_OP("__gt__", >)
                 REGISTER_MATH_OP("__le__", <=)
@@ -58,10 +58,10 @@ namespace akari {
                 m.def("degrees", [](const T &a) { return degrees(a); });
                 m.def("radians", [](const T &a) { return radians(a); });
                 m.def("dot", [](const T &u, const T &v) -> T { return dot(u, v); });
-#define REGISTER_MATH_FUNC2(name)                                                                                      \
-    m.def(#name, [](const T &u, const T &v) -> T { return name(u, v); });                                              \
-    m.def(#name, [](const value_t<T> &u, const T &v) -> T { return name(u, v); });                                     \
-    m.def(#name, [](const T &u, const value_t<T> &v) -> T { return name(u, v); });
+#    define REGISTER_MATH_FUNC2(name)                                                                                  \
+        m.def(#name, [](const T &u, const T &v) -> T { return name(u, v); });                                          \
+        m.def(#name, [](const value_t<T> &u, const T &v) -> T { return name(u, v); });                                 \
+        m.def(#name, [](const T &u, const value_t<T> &v) -> T { return name(u, v); });
                 REGISTER_MATH_FUNC2(min)
                 REGISTER_MATH_FUNC2(max)
                 REGISTER_MATH_FUNC2(pow)
@@ -173,3 +173,4 @@ namespace akari {
         }
     }
 } // namespace akari
+#endif

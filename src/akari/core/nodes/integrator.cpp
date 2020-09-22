@@ -19,11 +19,9 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-#include <akari/core/python/integrator.h>
+#include <akari/core/nodes/integrator.h>
 #include <akari/kernel/material.h>
-#include <pybind11/pybind11.h>
-#include <pybind11/embed.h>
-#include <pybind11/stl.h>
+
 namespace akari {
     AKR_VARIANT class AOIntegratorNode : public IntegratorNode<C> {
       public:
@@ -55,7 +53,7 @@ namespace akari {
 #endif
         const char *description() override { return "[Path Tracer]"; }
     };
-
+#ifdef AKR_ENABLE_PYTHON
     AKR_VARIANT void RegisterIntegratorNode<C>::register_nodes(py::module &m) {
         AKR_IMPORT_TYPES()
         py::class_<IntegratorNode<C>, SceneGraphNode<C>, std::shared_ptr<IntegratorNode<C>>>(m, "Integrator");
@@ -71,4 +69,5 @@ namespace akari {
             .def("commit", &PathIntegratorNode<C>::commit);
     }
     AKR_RENDER_STRUCT(RegisterIntegratorNode)
+#endif
 } // namespace akari

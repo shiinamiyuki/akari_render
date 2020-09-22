@@ -19,24 +19,24 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-
-#include <pybind11/pybind11.h>
-#include <pybind11/embed.h>
-#include <pybind11/stl.h>
-#include <akari/core/python/python.h>
+#ifdef AKR_ENABLE_PYTHON
+#    include <pybind11/pybind11.h>
+#    include <pybind11/embed.h>
+#    include <pybind11/stl.h>
+#    include <akari/core/nodes/python.h>
 // #define TINYOBJLOADER_IMPLEMENTATION
-#include <tiny_obj_loader.h>
-#include <akari/core/python/scenegraph.h>
-#include <akari/common/config.h>
-#include <akari/core/mesh.h>
-#include <akari/kernel/scene.h>
-#include <akari/core/logger.h>
-#include <akari/core/film.h>
-#include <akari/core/python/camera.h>
-#include <akari/core/python/mesh.h>
-#include <akari/core/python/material.h>
-#include <akari/core/python/integrator.h>
-#include <akari/core/python/scene.h>
+#    include <tiny_obj_loader.h>
+#    include <akari/core/nodes/scenegraph.h>
+#    include <akari/common/config.h>
+#    include <akari/core/mesh.h>
+#    include <akari/kernel/scene.h>
+#    include <akari/core/logger.h>
+#    include <akari/core/film.h>
+#    include <akari/core/nodes/camera.h>
+#    include <akari/core/nodes/mesh.h>
+#    include <akari/core/nodes/material.h>
+#    include <akari/core/nodes/integrator.h>
+#    include <akari/core/nodes/scene.h>
 namespace akari {
     namespace py = pybind11;
 
@@ -66,3 +66,5 @@ namespace akari {
     }
     AKR_RENDER_STRUCT(RegisterSceneGraph)
 } // namespace akari
+
+#endif

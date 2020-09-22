@@ -20,11 +20,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 #include <csignal>
-#include <pybind11/pybind11.h>
-#include <pybind11/embed.h>
-#include <pybind11/stl.h>
+#ifdef AKR_ENABLE_PYTHON
+#    include <pybind11/pybind11.h>
+#    include <pybind11/embed.h>
+#    include <pybind11/stl.h>
+#endif
 #include <akari/common/box.h>
-#include <akari/core/python/scene.h>
+#include <akari/core/nodes/scene.h>
 #include <akari/kernel/embree.inl>
 #include <akari/kernel/bvh-accelerator.h>
 #include <akari/core/film.h>
@@ -110,6 +112,7 @@ namespace akari {
         info("render done took ({}s)\n", timer.elapsed_seconds());
         film.write_image(fs::path(output));
     }
+#ifdef AKR_ENABLE_PYTHON
     AKR_VARIANT void RegisterSceneNode<C>::register_nodes(py::module &m) {
         AKR_IMPORT_TYPES()
         py::class_<SceneNode<C>, SceneGraphNode<C>, std::shared_ptr<SceneNode<C>>>(m, "Scene")
@@ -121,6 +124,8 @@ namespace akari {
             .def("render", &SceneNode<C>::render)
             .def("add_mesh", &SceneNode<C>::add_mesh);
     }
-    AKR_RENDER_CLASS(SceneNode)
     AKR_RENDER_STRUCT(RegisterSceneNode)
+#endif
+    AKR_RENDER_CLASS(SceneNode)
+
 } // namespace akari

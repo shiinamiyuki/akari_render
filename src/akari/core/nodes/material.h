@@ -21,21 +21,16 @@
 // SOFTWARE.
 
 #pragma once
-#include <akari/core/python/scenegraph.h>
-#include <akari/kernel/integrators/cpu/integrator.h>
-#ifdef AKR_ENABLE_GPU
-#    include <akari/kernel/integrators/gpu/integrator.h>
-#endif
+#include <akari/core/nodes/scenegraph.h>
+
 namespace akari {
-    namespace gpu {
-        AKR_VARIANT class Integrator;
-    }
-    AKR_VARIANT class IntegratorNode : public SceneGraphNode<C> {
+    AKR_VARIANT class Material;
+    AKR_VARIANT class MaterialNode : public SceneGraphNode<C> {
       public:
         AKR_IMPORT_TYPES()
-        virtual std::shared_ptr<cpu::Integrator<C>> compile(MemoryArena *arena) = 0;
-        virtual std::shared_ptr<gpu::Integrator<C>> compile_gpu(MemoryArena *arena) { return nullptr; }
+        virtual Material<C> *compile(MemoryArena *arena) = 0;
     };
-
-    AKR_VARIANT struct RegisterIntegratorNode { static void register_nodes(py::module &m); };
+#ifdef AKR_ENABLE_PYTHON
+    AKR_VARIANT struct RegisterMaterialNode { static void register_nodes(py::module &m); };
+#endif
 } // namespace akari

@@ -7,6 +7,7 @@ option(AKR_PYTHON_SUPPORT "Enable Python Support" OFF)
 option(AKR_ENABLE_EMBREE "Use Embree as ray intersection backend" OFF)
 option(AKR_USE_PREBUILD_EMBREE "Use prebuilt binary" OFF)
 option(AKR_ENABLE_ASL "Enable Akari Shading Language for procedural shading" OFF)
+option(AKR_ENABLE_PYTHON "Build Python Binding" OFF)
 
 include_directories(${CMAKE_SOURCE_DIR}/external/glm)
 include_directories(${CMAKE_SOURCE_DIR}/external/misc)
@@ -38,9 +39,11 @@ else()
     add_compile_definitions(_ENABLE_EXTENDED_ALIGNED_STORAGE)
 endif()
 
-find_package(Python COMPONENTS Interpreter Development)
-add_subdirectory(external/pybind11)
-
+if(AKR_ENABLE_PYTHON)
+    find_package(Python COMPONENTS Interpreter Development)
+    add_subdirectory(external/pybind11)
+    add_compile_definitions(AKR_ENABLE_PYTHON)
+endif()
 include_directories(external/tinyobjloader)
 
 include_directories(external/fmt-6.1.2/include)
@@ -82,7 +85,7 @@ file(GLOB PYBIND11_HEADERS external/pybind11/include/pybind11.h external/pybind1
 file(GLOB AKR_COMMON_SRC src/akari/common/*.*)
 file(GLOB AKR_SHADING_SRC src/akari/shading/*.*)
 file(GLOB AKR_CORE_SRC src/akari/core/*.*)
-file(GLOB AKR_PYBIND_SRC src/akari/core/python/*.*)
+file(GLOB AKR_PYBIND_SRC src/akari/core/nodes/*.*)
 
 file(GLOB AKR_KERNEL_COMMON_SRC src/akari/kernel/*.* src/akari/kernel/*/*.*)
 file(GLOB AKR_KERNEL_CPU_SRC src/akari/kernel/integrators/cpu/*.*)
@@ -104,12 +107,18 @@ endif()
 
 add_library(akari_core_base SHARED ${AKR_COMMON_SRC}  ${AKR_CORE_SRC} ${AKR_CONFIG_H}  ${AKR_SHADING_SRC})
 add_dependencies(akari_core_base akari-configure)
-target_link_libraries(akari_core_base PUBLIC  ${AKR_CORE_EXT_LIBS} ${Python_LIBRARIES} ${EMBREE_LIBRARY} ${AKR_CUDA_LIBS})
+target_link_libraries(akari_core_base PUBLIC  ${AKR_CORE_EXT_LIBS} ${EMBREE_LIBRARY} ${AKR_CUDA_LIBS})
+if(AKR_ENABLE_PYTHON)
+    target_link_libraries(akari_core_base ${Python_LIBRARIES})
+endif()
 target_compile_options(akari_core_base PUBLIC ${AKR_CXX_FLAGS})
 target_compile_definitions(akari_core_base PUBLIC ${AKR_COMPILE_DEFINITIONS})
 target_include_directories(akari_core_base PUBLIC src/)
 target_include_directories(akari_core_base PUBLIC external/pybind11/include)
 target_include_directories(akari_core_base PUBLIC ${Python_INCLUDE_DIRS} ${EMBREE_INCLUDE_DIRS})
+if(AKR_ENABLE_PYTHON)
+    target_include_directories(akari_core_base ${Python_INCLUDE_DIRS})
+endif()
 if(NOT WIN32)
     target_precompile_headers(akari_core_base
         PUBLIC ${PYBIND11_HEADERS}
@@ -126,17 +135,9 @@ set_target_CUDA_props(akari_core_base)
 
 
 set(AKR_KERNEL_SOA_H ${CMAKE_CURRENT_SOURCE_DIR}/src/akari/kernel/soa.h)
-#add_custom_command(OUTPUT ${AKR_KERNEL_SOA_H}
-#    COMMAND python src/akari/tools/soac.py src/akari/kernel/soa.py  ${AKR_KERNEL_SOA_H}
-#    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-#    DEPENDS src/akari/kernel/soa.py  src/akari/tools/soac.py)
 add_soa_header(${AKR_KERNEL_SOA_H} src/akari/kernel/akari.soa)
 
 set(AKR_KERNEL_WORKITEM_SOA_H ${CMAKE_CURRENT_SOURCE_DIR}/src/akari/kernel/integrators/gpu/workitem-soa.h)
-#add_custom_command(OUTPUT ${AKR_KERNEL_WORKITEM_SOA_H}
-#    COMMAND python src/akari/tools/soac.py src/akari/kernel/integrators/gpu/workitem.py  ${AKR_KERNEL_WORKITEM_SOA_H}
-#    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-#    DEPENDS src/akari/kernel/integrators/gpu/workitem.py src/akari/tools/soac.py)
 add_soa_header(${AKR_KERNEL_WORKITEM_SOA_H} src/akari/kernel/integrators/gpu/workitem.soa)
 
 add_library(akari_core SHARED ${AKR_COMMON_SRC} ${AKR_PYBIND_SRC} ${AKR_KERNEL_SRC}  ${AKR_KERNEL_SOA_H} ${AKR_KERNEL_WORKITEM_SOA_H})

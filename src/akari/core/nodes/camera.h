@@ -21,14 +21,15 @@
 // SOFTWARE.
 
 #pragma once
-#include <akari/core/python/scenegraph.h>
-#include <akari/core/python/material.h>
-namespace akari {
+#include <akari/core/nodes/scenegraph.h>
 
-    AKR_VARIANT class MeshNode : public SceneGraphNode<C> {
+namespace akari {
+    AKR_VARIANT class CameraNode : public SceneGraphNode<C> {
       public:
         AKR_IMPORT_TYPES()
-        virtual MeshInstance<C> compile(MemoryArena *arena) = 0;
+        virtual Camera<C> compile(MemoryArena *arena) = 0;
     };
-    AKR_VARIANT struct RegisterMeshNode { static void register_nodes(py::module &m); };
+#ifdef AKR_ENABLE_PYTHON
+    AKR_VARIANT struct RegisterCameraNode { static void register_nodes(py::module &m); };
+#endif
 } // namespace akari

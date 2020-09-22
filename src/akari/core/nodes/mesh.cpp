@@ -19,15 +19,12 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-#include <akari/core/python/mesh.h>
-#include <akari/core/python/material.h>
+#include <akari/core/nodes/mesh.h>
+#include <akari/core/nodes/material.h>
 #include <akari/core/resource.h>
 #include <akari/core/mesh.h>
 // #define TINYOBJLOADER_IMPLEMENTATION
 #include <akari/core/misc.h>
-#include <pybind11/pybind11.h>
-#include <pybind11/embed.h>
-#include <pybind11/stl.h>
 #include <akari/core/logger.h>
 
 namespace akari {
@@ -160,6 +157,7 @@ namespace akari {
             return true;
         }
     };
+#ifdef AKR_ENABLE_PYTHON
     AKR_VARIANT void RegisterMeshNode<C>::register_nodes(py::module &m) {
         AKR_IMPORT_TYPES();
         py::class_<MeshNode<C>, SceneGraphNode<C>, std::shared_ptr<MeshNode<C>>>(m, "Mesh").def("commit",
@@ -177,5 +175,7 @@ namespace akari {
             .def_readwrite("path", &AkariMesh<C>::path);
         m.def("load_mesh", [](const std::string &path) { return std::make_shared<AkariMesh<C>>(path); });
     }
+
     AKR_RENDER_STRUCT(RegisterMeshNode)
+#endif
 } // namespace akari

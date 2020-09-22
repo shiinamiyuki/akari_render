@@ -25,10 +25,8 @@
 #include <akari/common/color.h>
 #include <akari/core/application.h>
 #include <akari/core/logger.h>
-#include <akari/core/python/scenegraph.h>
-#include <akari/core/python/python.h>
-#include <pybind11/pybind11.h>
-#include <pybind11/embed.h>
+#include <akari/core/nodes/scenegraph.h>
+#include <akari/core/nodes/python.h>
 #include <akari/common/soa.h>
 using namespace akari;
 namespace py = pybind11;
@@ -64,27 +62,13 @@ void parse(int argc, const char **argv) {
         exit(1);
     }
 }
-PYBIND11_EMBEDDED_MODULE(akari, m) { akari::register_module_akari(m); }
-
 
 int main(int argc, const char **argv) {
     Application app;
     parse(argc, argv);
     try {
         CurrentPathGuard _guard;
-        py::scoped_interpreter py_guard{};
-        py::module::import("akari");
-        auto parent = fs::absolute(fs::path(inputFilename)).parent_path();
-        if (!parent.empty())
-            fs::current_path(parent);
-        inputFilename = fs::path(inputFilename).filename().string();
-
-        {
-            info("Loading {}\n", inputFilename);
-            std::ifstream in(inputFilename);
-            std::string str((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-            py::exec(str);
-        }
+       
 
     } catch (std::exception &e) {
         fatal("Exception: {}", e.what());

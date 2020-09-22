@@ -19,15 +19,36 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-
 #pragma once
-#include <akari/core/python/scenegraph.h>
 
+#include <akari/core/akari.h>
+#include <akari/common/fwd.h>
+#include <akari/common/buffer.h>
+#include <akari/core/arena.h>
+#include <akari/kernel/instance.h>
+#include <akari/kernel/integrators/cpu/integrator.h>
+#ifdef AKR_ENABLE_PYTHON
+#    include <pybind11/pybind11.h>
+#    include <pybind11/embed.h>
+#    include <pybind11/stl.h>
+#endif
+// #include <akari/kernel/material.h>
+namespace pybind11 {
+    class module;
+}
 namespace akari {
-    AKR_VARIANT class CameraNode : public SceneGraphNode<C> {
+    namespace py = pybind11;
+    AKR_VARIANT class SceneGraphNode {
       public:
-        AKR_IMPORT_TYPES()
-        virtual Camera<C> compile(MemoryArena *arena) = 0;
+        using Float = typename C::Float;
+        AKR_IMPORT_CORE_TYPES()
+        virtual void commit() {}
+        virtual const char *description() { return "unknown"; }
+        virtual ~SceneGraphNode() = default;
     };
-    AKR_VARIANT struct RegisterCameraNode { static void register_nodes(py::module &m); };
+    AKR_VARIANT class SceneNode;
+
+    AKR_VARIANT class FilmNode : public SceneGraphNode<C> { public: };
+    AKR_VARIANT struct RegisterSceneGraph { static void register_scene_graph(py::module &parent); };
+
 } // namespace akari

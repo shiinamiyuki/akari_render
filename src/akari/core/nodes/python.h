@@ -20,9 +20,14 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 #pragma once
-#include <akari/common/math.h>
-#include <pybind11/pybind11.h>
-#include <akari/core/logger.h>
+#ifdef AKR_ENABLE_PYTHON
+#    include <akari/common/math.h>
+#    include <akari/core/logger.h>
+#    ifdef AKR_ENABLE_PYTHON
+#        include <pybind11/pybind11.h>
+#        include <pybind11/pybind11.h>
+#        include <pybind11/embed.h>
+#    endif
 namespace akari {
     namespace py = pybind11;
 
@@ -33,3 +38,5 @@ namespace akari {
     void register_utility(py::module &m);
     AKR_EXPORT void register_module_akari(py::module &m);
 } // namespace akari
+
+#endif
