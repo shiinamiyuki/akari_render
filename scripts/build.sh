@@ -1,5 +1,5 @@
 cp ./resources/default.conf akari.conf
-mkdir build-general
-cd build-general
+mkdir build
+cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build . --config Release
