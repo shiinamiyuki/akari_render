@@ -25,7 +25,7 @@
 #include <memory_resource>
 #include <akari/common/fwd.h>
 #include <akari/core/mode.h>
-
+#include <akari/common/buffer.h>
 namespace akari {
     template <typename T, typename Allocator = DeviceAllocator<T>>
     struct Box {
