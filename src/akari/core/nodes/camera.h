@@ -29,7 +29,9 @@ namespace akari {
         AKR_IMPORT_TYPES()
         virtual Camera<C> compile(MemoryArena *arena) = 0;
     };
-#ifdef AKR_ENABLE_PYTHON
-    AKR_VARIANT struct RegisterCameraNode { static void register_nodes(py::module &m); };
-#endif
+
+    AKR_VARIANT struct RegisterCameraNode {
+        static void register_nodes(py::module &m);
+    };
+
 } // namespace akari

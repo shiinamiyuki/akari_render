@@ -55,7 +55,7 @@ namespace akari {
                 // debug("{}\n", ray.d);
                 // return Spectrum(ray.d * 0.5f + 0.5f);
             };
-            debug("resolution: {}, tile size: {}, tiles: {}\n", film->resolution(), tile_size, n_tiles);
+            debug("resolution: {}, tile size: {}, tiles: {}", film->resolution(), tile_size, n_tiles);
             std::mutex mutex;
             auto num_threads = num_work_threads();
             MemoryArena _arena;

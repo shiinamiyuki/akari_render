@@ -42,7 +42,7 @@ namespace akari {
         void render();
         void add_mesh(const std::shared_ptr<MeshNode<C>> &mesh) { shapes.emplace_back(mesh); }
     };
-#ifdef AKR_ENABLE_PYTHON
+
     AKR_VARIANT struct RegisterSceneNode { static void register_nodes(py::module &m); };
-#endif
+
 } // namespace akari

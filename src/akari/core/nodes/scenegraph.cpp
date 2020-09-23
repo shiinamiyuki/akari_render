@@ -24,20 +24,41 @@
 #    include <pybind11/embed.h>
 #    include <pybind11/stl.h>
 #    include <akari/core/nodes/python.h>
+#endif
 // #define TINYOBJLOADER_IMPLEMENTATION
-#    include <tiny_obj_loader.h>
-#    include <akari/core/nodes/scenegraph.h>
-#    include <akari/common/config.h>
-#    include <akari/core/mesh.h>
-#    include <akari/kernel/scene.h>
-#    include <akari/core/logger.h>
-#    include <akari/core/film.h>
-#    include <akari/core/nodes/camera.h>
-#    include <akari/core/nodes/mesh.h>
-#    include <akari/core/nodes/material.h>
-#    include <akari/core/nodes/integrator.h>
-#    include <akari/core/nodes/scene.h>
+#include <tiny_obj_loader.h>
+#include <akari/core/nodes/scenegraph.h>
+#include <akari/common/config.h>
+#include <akari/core/mesh.h>
+#include <akari/kernel/scene.h>
+#include <akari/core/logger.h>
+#include <akari/core/film.h>
+#include <akari/core/nodes/camera.h>
+#include <akari/core/nodes/mesh.h>
+#include <akari/core/nodes/material.h>
+#include <akari/core/nodes/integrator.h>
+#include <akari/core/nodes/scene.h>
 namespace akari {
+    namespace __node_register {
+        static std::unordered_map<std::string_view, std::unordered_map<std::string, Node::CreateFunc>> map;
+    }
+    std::shared_ptr<Node> create_node_with_name(std::string_view variant, const std::string &name) {
+        using namespace __node_register;
+        auto vit = map.find(variant);
+        if (map.end() == vit) {
+            throw std::runtime_error(fmt::format("variant {} not found", variant.data()));
+        }
+        auto it = vit->second.find(name);
+        if (it == vit->second.end()) {
+            throw std::runtime_error(fmt::format("{}.{} is not registered", variant.data(), name));
+        }
+        return it->second();
+    }
+    void register_node(std::string_view variant, const std::string &name, Node::CreateFunc func) {
+        using namespace __node_register;
+        map[variant][name] = func;
+    }
+#ifdef AKR_ENABLE_PYTHON
     namespace py = pybind11;
 
     AKR_VARIANT void RegisterSceneGraph<C>::register_scene_graph(py::module &parent) {
@@ -65,6 +86,5 @@ namespace akari {
         m.def("get_device", []() -> std::string { return get_device() == ComputeDevice::cpu ? "cpu" : "gpu"; });
     }
     AKR_RENDER_STRUCT(RegisterSceneGraph)
-} // namespace akari
-
 #endif
+} // namespace akari

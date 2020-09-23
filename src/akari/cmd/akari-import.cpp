@@ -28,7 +28,7 @@
 using namespace akari;
 std::shared_ptr<Mesh> load_wavefront_obj(const fs::path &path, std::string &generated) {
     AKR_IMPORT_CORE_TYPES_WITH(float)
-    info("loading {}\n", fs::absolute(path).string());
+    info("loading {}", fs::absolute(path).string());
     std::shared_ptr<Mesh> mesh;
     fs::path parent_path = fs::absolute(path).parent_path();
     fs::path file = path.filename();
@@ -46,7 +46,7 @@ std::shared_ptr<Mesh> load_wavefront_obj(const fs::path &path, std::string &gene
     std::ostringstream os;
     bool ret = misc::LoadObj(&attrib, &shapes, &obj_materials, &err, _file.c_str());
     if (!ret) {
-        error("error: {}\n", err);
+        error("error: {}", err);
         return nullptr;
     }
     os << "mesh = AkariMesh(" << path.filename().concat(".mesh") << ")\n";
@@ -104,7 +104,7 @@ std::shared_ptr<Mesh> load_wavefront_obj(const fs::path &path, std::string &gene
         os << "mesh.set_material(" << (idx) << ", materials['" << obj_mat.name << "'])\n";
         idx++;
     }
-    info("loaded {} triangles, {} vertices\n", mesh->indices.size() / 3, mesh->vertices.size() / 3);
+    info("loaded {} triangles, {} vertices", mesh->indices.size() / 3, mesh->vertices.size() / 3);
     os << "export(mesh)\n";
     generated = os.str();
     return mesh;
@@ -123,12 +123,12 @@ int main(int argc, const char **argv) {
         options.parse_positional({"input", "output"});
         auto result = options.parse(argc, argv);
         if (!result.count("input")) {
-            fatal("Input file must be provided\n");
+            fatal("Input file must be provided");
             std::cout << options.help() << std::endl;
             exit(0);
         }
         if (!result.count("output")) {
-            fatal("Output file must be provided\n");
+            fatal("Output file must be provided");
             std::cout << options.help() << std::endl;
             exit(0);
         }
@@ -147,7 +147,7 @@ int main(int argc, const char **argv) {
         std::ofstream os(outputFilename);
         os << generated;
     } catch (std::exception &e) {
-        fatal("Exception: {}\n", e.what());
+        fatal("Exception: {}", e.what());
         exit(1);
     }
 }

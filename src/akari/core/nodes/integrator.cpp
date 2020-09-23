@@ -53,9 +53,12 @@ namespace akari {
 #endif
         const char *description() override { return "[Path Tracer]"; }
     };
-#ifdef AKR_ENABLE_PYTHON
+
     AKR_VARIANT void RegisterIntegratorNode<C>::register_nodes(py::module &m) {
         AKR_IMPORT_TYPES()
+        register_node<C, AOIntegratorNode<C>>("ao");
+        register_node<C, PathIntegratorNode<C>>("path");
+#ifdef AKR_ENABLE_PYTHON
         py::class_<IntegratorNode<C>, SceneGraphNode<C>, std::shared_ptr<IntegratorNode<C>>>(m, "Integrator");
         py::class_<AOIntegratorNode<C>, IntegratorNode<C>, std::shared_ptr<AOIntegratorNode<C>>>(m, "RTAO")
             .def(py::init<>())
@@ -67,7 +70,8 @@ namespace akari {
             .def_readwrite("spp", &PathIntegratorNode<C>::spp)
             .def_readwrite("tile_size", &PathIntegratorNode<C>::tile_size)
             .def("commit", &PathIntegratorNode<C>::commit);
-    }
-    AKR_RENDER_STRUCT(RegisterIntegratorNode)
 #endif
+    }
+
+    AKR_RENDER_STRUCT(RegisterIntegratorNode)
 } // namespace akari

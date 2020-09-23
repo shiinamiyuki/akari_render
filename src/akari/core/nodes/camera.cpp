@@ -21,6 +21,8 @@
 // SOFTWARE.
 #include <akari/core/nodes/camera.h>
 #include <akari/kernel/camera.h>
+#include <akari/core/xml.h>
+#include <akari/core/logger.h>
 namespace akari {
     AKR_VARIANT class PerspectiveCameraNode : public CameraNode<C> {
       public:
@@ -37,10 +39,48 @@ namespace akari {
             c2w = Transform3f::translate(position) * c2w;
             return PerspectiveCamera<C>(resolution, c2w, fov);
         }
+        void load(const pugi::xml_node &xml) const {
+            auto pos = xml.child("position");
+            if (!pos.empty()) {
+                position = load_array<Point3f>(pos);
+            }
+            auto rot = xml.child("rotation");
+            if (!rot.empty()) {
+                rotation = load_array<Vector3f>(rot);
+                if (!rot.attribute("unit").empty()) {
+                    std::string_view unit = rot.attribute("unit").value();
+                    if (unit == "deg") { // default
+                        ;
+                    } else if (unit == "rad") {
+                        rotation = degrees(roration);
+                    } else {
+                        warning("unknown unit {}", unit);
+                    }
+                }
+            }
+            auto res = xml.child("resolution");
+            if (!res) {
+                resolution = load_array<Point2i>(res);
+            }
+            auto fov_ = xml.child("fov");
+            if (!fov_) {
+                fov = load_array<Array<Float, 1>>(fov_);
+                std::string_view unit = fov_.attribute("unit").value();
+                if (unit == "deg") { // default
+                    ;
+                } else if (unit == "rad") {
+                    fov = degrees(fov);
+                } else {
+                    warning("unknown unit {}", unit);
+                }
+            }
+        }
     };
-#ifdef AKR_ENABLE_PYTHON
+
     AKR_VARIANT void RegisterCameraNode<C>::register_nodes(py::module &m) {
         AKR_IMPORT_TYPES()
+        register_node<C, PerspectiveCameraNode>("perspective");
+#ifdef AKR_ENABLE_PYTHON
         py::class_<CameraNode<C>, SceneGraphNode<C>, std::shared_ptr<CameraNode<C>>>(m, "Camera");
         py::class_<PerspectiveCameraNode<C>, CameraNode<C>, std::shared_ptr<PerspectiveCameraNode<C>>>(
             m, "PerspectiveCamera")
@@ -50,7 +90,8 @@ namespace akari {
             .def_readwrite("fov", &PerspectiveCameraNode<C>::fov)
             .def_readwrite("resolution", &PerspectiveCameraNode<C>::resolution)
             .def("commit", &PerspectiveCameraNode<C>::commit);
+#endif
     }
     AKR_RENDER_STRUCT(RegisterCameraNode)
-#endif
+
 } // namespace akari

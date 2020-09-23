@@ -19,18 +19,20 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-
 #pragma once
-#include <akari/core/nodes/scenegraph.h>
-
+#include <sstream>
+#include <pugixml.hpp>
+#include <akari/common/color.h>
 namespace akari {
-    AKR_VARIANT class Material;
-    AKR_VARIANT class MaterialNode : public SceneGraphNode<C> {
-      public:
-        AKR_IMPORT_TYPES()
-        virtual Material<C> *compile(MemoryArena *arena) = 0;
-    };
-
-    AKR_VARIANT struct RegisterMaterialNode { static void register_nodes(py::module &m); };
+    template <typename A, typename T = value_t<A>, int N = array_size_v<A>>
+    A load_array(const pugi::xml_node &xml) {
+        std::istringstream in(xml.attribute("value").value());
+        A v;
+        for (int i = 0; i < N; i++) {
+            AKR_ASSERT(!in.eof());
+            in >> v[i];
+        }
+        return v;
+    }
 
 } // namespace akari

@@ -57,9 +57,9 @@ namespace akari {
             for (auto i = 0; i < (int)N; i++) {
                 primitives.push_back(Index{i});
             }
-            info("Building BVH for {} objects\n", primitives.size());
+            info("Building BVH for {} objects", primitives.size());
             recursiveBuild(0, (int)primitives.size(), 0);
-            info("BVHNodes: {}\n", nodes.size());
+            info("BVHNodes: {}", nodes.size());
         }
 
         AKR_XPU static Float intersectAABB(const Bounds3f &box, const Ray3f &ray, const Vector3f &invd) {

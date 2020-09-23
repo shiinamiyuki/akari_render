@@ -78,7 +78,7 @@ namespace akari {
       public:
         AKR_IMPORT_CORE_TYPES_WITH(float)
         std::shared_ptr<RGBAImage> read(const fs::path &path) override {
-            info("Loading {}\n", path.string());
+            info("Loading {}", path.string());
             std::shared_ptr<RGBAImage> image;
             int x, y, channel;
             auto ext = path.extension().string();

@@ -50,6 +50,10 @@ include_directories(external/fmt-6.1.2/include)
 add_subdirectory(external/fmt-6.1.2)
 set(AKR_CORE_EXT_LIBS ${AKR_CORE_EXT_LIBS} fmt)
 
+include_directories(${CMAKE_SOURCE_DIR}/external/pugixml/src)
+add_subdirectory(external/pugixml)
+set(AKR_CORE_EXT_LIBS ${AKR_CORE_EXT_LIBS} pugixml)
+
 # ---------------- Begin Build Utils --------------------
 add_executable(akari-configure src/akari/tools/configure.cpp)
 target_link_libraries(akari-configure fmt)

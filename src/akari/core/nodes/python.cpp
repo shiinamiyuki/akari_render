@@ -164,7 +164,7 @@ namespace akari {
     }
     AKR_VARIANT void register_scene_graph(py::module &m) { RegisterSceneGraph<C>::register_scene_graph(m); }
     AKR_EXPORT void register_module_akari(py::module &m) {
-        info("registering module\n");
+        info("registering module");
         register_utility(m);
         register_invariant_math_functions(m);
         m.def("enabled_variants", _get_enabled_variants);

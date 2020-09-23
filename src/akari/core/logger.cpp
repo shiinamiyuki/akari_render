@@ -34,8 +34,14 @@ namespace akari {
             return fmt::format("[{}] [{:.3f}] ", level, elapsed.count());
         }
         void DoLogMessage(LogLevel level, const std::string &msg, FILE *fp = stdout) {
-            fprintf(fp, "%s", msg.c_str());
+            if (level == LogLevel::Fatal || level == LogLevel::Warning) {
+                fprintf(fp, "\u001b[31m");
+            } else if (level == LogLevel::Warning) {
+                fprintf(fp, "\u001b[33m");
+            }
+            fprintf(fp, "%s\n", msg.c_str());
             fflush(fp);
+            fprintf(fp, "\u001b[0m");
             for (auto it = handlers.begin(); it != handlers.end();) {
                 auto &wp = *it;
                 if (wp.expired()) {

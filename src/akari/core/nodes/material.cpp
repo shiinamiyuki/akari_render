@@ -21,7 +21,8 @@
 // SOFTWARE.
 #include <akari/core/nodes/material.h>
 #include <akari/kernel/material.h>
-
+#include <akari/core/xml.h>
+#include <akari/core/logger.h>
 namespace akari {
     AKR_VARIANT class DiffuseMaterialNode : public MaterialNode<C> {
       public:
@@ -30,6 +31,14 @@ namespace akari {
         Material<C> *compile(MemoryArena *arena) override {
             auto tex = arena->alloc<Texture<C>>(ConstantTexture<C>(color));
             return arena->alloc<Material<C>>(DiffuseMaterial<C>(tex));
+        }
+        void load(const pugi::xml_node &xml) const {
+            auto c = xml.child("color");
+            if (c.empty()) {
+                error("color must be specified");
+            } else {
+                color = load_array<Color3f>(c);
+            }
         }
     };
     AKR_VARIANT class EmissiveMaterialNode : public MaterialNode<C> {
@@ -41,10 +50,21 @@ namespace akari {
             auto tex = arena->alloc<Texture<C>>(ConstantTexture<C>(color));
             return arena->alloc<Material<C>>(EmissiveMaterial<C>(tex));
         }
+        void load(const pugi::xml_node &xml) const {
+            auto c = xml.child("color");
+            if (c.empty()) {
+                error("color must be specified");
+            } else {
+                color = load_array<Color3f>(c);
+            }
+        }
     };
-#ifdef AKR_ENABLE_PYTHON
+
     AKR_VARIANT void RegisterMaterialNode<C>::register_nodes(py::module &m) {
         AKR_IMPORT_TYPES()
+        register_node<C, DiffuseMaterialNode<C>>("diffuse");
+        register_node<C, EmissiveMaterialNode<C>>("emissive");
+#ifdef AKR_ENABLE_PYTHON
         py::class_<MaterialNode<C>, SceneGraphNode<C>, std::shared_ptr<MaterialNode<C>>>(m, "Material");
         py::class_<DiffuseMaterialNode<C>, MaterialNode<C>, std::shared_ptr<DiffuseMaterialNode<C>>>(m,
                                                                                                      "DiffuseMaterial")
@@ -57,7 +77,8 @@ namespace akari {
             .def_readwrite("color", &EmissiveMaterialNode<C>::color)
             .def_readwrite("double_sided", &EmissiveMaterialNode<C>::double_sided)
             .def("commit", &EmissiveMaterialNode<C>::commit);
-    }
-    AKR_RENDER_STRUCT(RegisterMaterialNode)
 #endif
+    }
+
+    AKR_RENDER_STRUCT(RegisterMaterialNode)
 } // namespace akari

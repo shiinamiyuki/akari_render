@@ -20,13 +20,15 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 #pragma once
-
+#include <sstream>
+#include <pugixml.hpp>
 #include <akari/core/akari.h>
 #include <akari/common/fwd.h>
 #include <akari/common/buffer.h>
 #include <akari/core/arena.h>
 #include <akari/kernel/instance.h>
 #include <akari/kernel/integrators/cpu/integrator.h>
+
 #ifdef AKR_ENABLE_PYTHON
 #    include <pybind11/pybind11.h>
 #    include <pybind11/embed.h>
@@ -38,17 +40,31 @@ namespace pybind11 {
 }
 namespace akari {
     namespace py = pybind11;
-    AKR_VARIANT class SceneGraphNode {
+    class Node {
+      public:
+        virtual void load(const pugi::xml_node &xml) const = 0;
+        virtual void commit() {}
+        virtual const char *description() { return "unknown"; }
+        virtual ~Node() = default;
+        typedef std::shared_ptr<Node> (*CreateFunc)(void);
+    };
+    AKR_VARIANT class SceneGraphNode : public Node {
       public:
         using Float = typename C::Float;
         AKR_IMPORT_CORE_TYPES()
-        virtual void commit() {}
-        virtual const char *description() { return "unknown"; }
-        virtual ~SceneGraphNode() = default;
     };
     AKR_VARIANT class SceneNode;
 
     AKR_VARIANT class FilmNode : public SceneGraphNode<C> { public: };
     AKR_VARIANT struct RegisterSceneGraph { static void register_scene_graph(py::module &parent); };
 
+    AKR_EXPORT std::shared_ptr<Node> create_node_with_name(std::string_view variant, const std::string &name);
+    AKR_EXPORT void register_node(std::string_view variant, const std::string &name, Node::CreateFunc);
+    AKR_VARIANT void register_node(const std::string &name, Node::CreateFunc f) {
+        register_node(get_variant_string<C>(), name, f);
+    }
+    template <class C, class T>
+    void register_node(const std::string &name) {
+        register_node(get_variant_string<C>(), name, [] -> std::shared_ptr<Node> { return std::make_shared<T>(); });
+    }
 } // namespace akari

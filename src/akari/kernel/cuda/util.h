@@ -29,8 +29,8 @@ namespace akari {
     do {                                                                                                               \
         if (EXPR != cudaSuccess) {                                                                                     \
             cudaError_t error = cudaGetLastError();                                                                    \
-            fatal("CUDA error: {} \n", cudaGetErrorString(error));                                                     \
-            fatal("Calling {} at {}:{}\n", #EXPR, __FILE__, __LINE__);                                                 \
+            fatal("CUDA error: {} ", cudaGetErrorString(error));                                                     \
+            fatal("Calling {} at {}:{}", #EXPR, __FILE__, __LINE__);                                                 \
             std::abort();                                                                                              \
         }                                                                                                              \
     } while (0)

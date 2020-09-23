@@ -20,17 +20,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#pragma once
-#include <akari/core/nodes/scenegraph.h>
+#include <akari/core/akari.h>
+#include <akari/core/xml.h>
 
-namespace akari {
-    AKR_VARIANT class Material;
-    AKR_VARIANT class MaterialNode : public SceneGraphNode<C> {
-      public:
-        AKR_IMPORT_TYPES()
-        virtual Material<C> *compile(MemoryArena *arena) = 0;
-    };
+namespace akari{
 
-    AKR_VARIANT struct RegisterMaterialNode { static void register_nodes(py::module &m); };
-
-} // namespace akari
+}

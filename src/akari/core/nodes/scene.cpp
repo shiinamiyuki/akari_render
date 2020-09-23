@@ -74,7 +74,7 @@ namespace akari {
         auto _prev_SIGINT_handler = signal(SIGINT, SIG_DFL);
         auto _restore_handler = AtScopeExit([=]() { signal(SIGINT, _prev_SIGINT_handler); });
         commit();
-        info("preparing scene\n");
+        info("preparing scene");
         MemoryArena arena;
         auto scene = compile(&arena);
         auto res = scene.camera.resolution();
@@ -91,7 +91,7 @@ namespace akari {
         auto render_gpu = [&]() {
             auto integrator_ = integrator->compile_gpu(&arena);
             if (!integrator_) {
-                fatal("integrator {} is not supported on gpu\n", integrator->description());
+                fatal("integrator {} is not supported on gpu", integrator->description());
                 std::exit(0);
             }
             integrator_->render(scene, &film);
@@ -99,7 +99,7 @@ namespace akari {
         };
 #else
         auto render_gpu = [&]() {
-            fatal("gpu rendering is not supported\n");
+            fatal("gpu rendering is not supported");
             std::exit(1);
         };
 #endif
@@ -109,12 +109,15 @@ namespace akari {
         } else {
             render_gpu();
         }
-        info("render done took ({}s)\n", timer.elapsed_seconds());
+        info("render done took ({}s)", timer.elapsed_seconds());
         film.write_image(fs::path(output));
     }
-#ifdef AKR_ENABLE_PYTHON
+
     AKR_VARIANT void RegisterSceneNode<C>::register_nodes(py::module &m) {
         AKR_IMPORT_TYPES()
+        register_node<C, SceneNode>("scene");
+#ifdef AKR_ENABLE_PYTHON
+
         py::class_<SceneNode<C>, SceneGraphNode<C>, std::shared_ptr<SceneNode<C>>>(m, "Scene")
             .def(py::init<>())
             .def_readwrite("variant", &SceneNode<C>::variant)
@@ -123,9 +126,10 @@ namespace akari {
             .def_readwrite("integrator", &SceneNode<C>::integrator)
             .def("render", &SceneNode<C>::render)
             .def("add_mesh", &SceneNode<C>::add_mesh);
+#endif
     }
     AKR_RENDER_STRUCT(RegisterSceneNode)
-#endif
+
     AKR_RENDER_CLASS(SceneNode)
 
 } // namespace akari

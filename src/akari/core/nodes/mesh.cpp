@@ -41,7 +41,7 @@ namespace akari {
                 mesh = exp.extract_value()->mesh();
             } else {
                 auto err = exp.extract_error();
-                error("error loading {}: {}\n", path, err.what());
+                error("error loading {}: {}", path, err.what());
                 std::abort();
             }
         }
@@ -64,6 +64,29 @@ namespace akari {
             }
             materials[index] = mat;
         }
+        void load(const pugi::xml_node &xml) const {
+            auto include = xml.child("include");
+            pugi::xml_document fragment;
+            const pugi::xml_node * base = nullptr;
+            if (!include.empty()) {
+                if (std::disance(xml.children().begin(), xml.children().end()) != 1) {
+                    error("if include path is specified then no other children are allowed");
+                    throw std::runtime_error("invalid input");
+                } else {
+                    auto path = include.attribute("path").value();
+                    auto result = fragment.load_file(include.attribute("path").value());
+                    if (result) {
+                        base = &fragment;
+                    } else {
+                        error("xml parsing error: {}", result.description());
+                        throw std::runtime_error("parsing error");
+                    }
+                }
+            }else{
+                base = &xml;
+            }
+            std::string path = base.child("path").value();
+        }
     };
     AKR_VARIANT class OBJMesh : public MeshNode<C> {
         std::string loaded;
@@ -81,6 +104,7 @@ namespace akari {
                 return;
             (void)load_wavefront_obj(path);
         }
+        void load(const pugi::xml_node &xml) const {}
         MeshInstance<C> compile(MemoryArena *) override {
             commit();
             MeshInstance<C> view;
@@ -94,7 +118,7 @@ namespace akari {
 
       private:
         bool load_wavefront_obj(const fs::path &obj) {
-            info("loading {}\n", fs::absolute(obj).string());
+            info("loading {}", fs::absolute(obj).string());
             loaded = obj.string();
             fs::path parent_path = fs::absolute(obj).parent_path();
             fs::path file = obj.filename();
@@ -153,13 +177,15 @@ namespace akari {
                     index_offset += fv;
                 }
             }
-            info("loaded {} triangles, {} vertices\n", mesh.indices.size() / 3, mesh.vertices.size() / 3);
+            info("loaded {} triangles, {} vertices", mesh.indices.size() / 3, mesh.vertices.size() / 3);
             return true;
         }
     };
-#ifdef AKR_ENABLE_PYTHON
+
     AKR_VARIANT void RegisterMeshNode<C>::register_nodes(py::module &m) {
         AKR_IMPORT_TYPES();
+        register_node<C, AkariMesh<C>>("binary");
+#ifdef AKR_ENABLE_PYTHON
         py::class_<MeshNode<C>, SceneGraphNode<C>, std::shared_ptr<MeshNode<C>>>(m, "Mesh").def("commit",
                                                                                                 &MeshNode<C>::commit);
         py::class_<OBJMesh<C>, MeshNode<C>, std::shared_ptr<OBJMesh<C>>>(m, "OBJMesh")
@@ -174,8 +200,8 @@ namespace akari {
             .def("set_material", &AkariMesh<C>::set_material)
             .def_readwrite("path", &AkariMesh<C>::path);
         m.def("load_mesh", [](const std::string &path) { return std::make_shared<AkariMesh<C>>(path); });
+#endif
     }
 
     AKR_RENDER_STRUCT(RegisterMeshNode)
-#endif
 } // namespace akari

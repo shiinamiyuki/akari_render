@@ -26,7 +26,7 @@
 namespace akari {
     const char *AKR_MESH_MAGIC = "AKARI_BINARY_MESH";
     Expected<bool> BinaryGeometry::save(const fs::path &path) const {
-        info("save to {}\n", path.string());
+        info("save to {}", path.string());
         std::ofstream out(path, std::ios::binary | std::ios::out);
         out.write(AKR_MESH_MAGIC, strlen(AKR_MESH_MAGIC));
         size_t vertexCount = _mesh->vertices.size() / 3;
@@ -46,16 +46,16 @@ namespace akari {
         return true;
     }
     Expected<bool> BinaryGeometry::load(const fs::path &path) {
-        info("Loading {}\n", path.string());
+        info("Loading {}", path.string());
         std::ifstream in(path, std::ios::binary | std::ios::in);
         if (!in.is_open()) {
-            error("Cannot open file\n");
+            error("Cannot open file");
             return Error("No file");
         }
         char buffer[128] = {0};
         in.read(buffer, strlen(AKR_MESH_MAGIC));
         if (strcmp(buffer, AKR_MESH_MAGIC) != 0) {
-            error("Failed to load mesh: invalid format; expected '{}' but found '{}'\n", AKR_MESH_MAGIC, buffer);
+            error("Failed to load mesh: invalid format; expected '{}' but found '{}'", AKR_MESH_MAGIC, buffer);
             return Error("Invalid format");
         }
         _mesh = std::make_shared<Mesh>();
@@ -77,10 +77,10 @@ namespace akari {
         memset(buffer, 0, sizeof(buffer));
         in.read(buffer, strlen(AKR_MESH_MAGIC));
         if (strcmp(buffer, AKR_MESH_MAGIC) != 0) {
-            error("Failed to load mesh: invalid format; expected '{}' but found '{}'\n", AKR_MESH_MAGIC, buffer);
+            error("Failed to load mesh: invalid format; expected '{}' but found '{}'", AKR_MESH_MAGIC, buffer);
             return Error("Invalid format");
         }
-        info("Loaded {} triangles\n", triangleCount);
+        info("Loaded {} triangles", triangleCount);
         return true;
     }
 } // namespace akari

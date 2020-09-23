@@ -45,7 +45,7 @@ void parse(int argc, const char **argv) {
         options.parse_positional({"input"});
         auto result = options.parse(argc, argv);
         if (!result.count("input")) {
-            fatal("Input file must be provided\n");
+            fatal("Input file must be provided");
             std::cout << options.help() << std::endl;
             exit(0);
         }

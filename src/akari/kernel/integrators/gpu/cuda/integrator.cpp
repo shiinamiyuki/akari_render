@@ -58,7 +58,7 @@ namespace akari::gpu {
 
             MemoryArena _arena;
             SmallArena arena(_arena.alloc_bytes(ARENA_SIZE), ARENA_SIZE);
-            debug("GPU RTAO resolution: {}, tile size: {}, tiles: {}\n", film->resolution(), tile_size, n_tiles);
+            debug("GPU RTAO resolution: {}, tile size: {}, tiles: {}", film->resolution(), tile_size, n_tiles);
             for (int tile_y = 0; tile_y < n_tiles.y(); tile_y++) {
                 for (int tile_x = 0; tile_x < n_tiles.x(); tile_x++) {
                     Point2i tile_pos(tile_x, tile_y);
@@ -91,7 +91,7 @@ namespace akari::gpu {
                 }
             }
         } else {
-            fatal("only float is supported for gpu\n");
+            fatal("only float is supported for gpu");
         }
     }
     AKR_RENDER_CLASS(AmbientOcclusion)
@@ -126,7 +126,7 @@ namespace akari::gpu {
             PathTracerImpl<C> tracer(allocator, *this);
             tracer.render(scene, film);
         } else {
-            fatal("only float is supported for gpu\n");
+            fatal("only float is supported for gpu");
         }
     }
 
@@ -271,7 +271,7 @@ namespace akari::gpu {
                     });
             }
             CUDA_CHECK(cudaDeviceSynchronize());
-            info("tile took {}s\n", timer.elapsed_seconds());
+            info("tile took {}s", timer.elapsed_seconds());
             gpu_time += timer.elapsed_seconds();
             film->merge_tile(*tile);
         };
@@ -281,7 +281,7 @@ namespace akari::gpu {
                 render_tile(tile_x, tile_y);
             }
         }
-        info("total gpu time {}s\n", gpu_time);
+        info("total gpu time {}s", gpu_time);
     }
     AKR_RENDER_CLASS(PathTracer)
 
