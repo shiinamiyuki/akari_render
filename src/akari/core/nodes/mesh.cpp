@@ -126,7 +126,7 @@ namespace akari {
                 return;
             (void)load_wavefront_obj(path);
         }
-        void load(const pugi::xml_node &xml) const {}
+        void load(const pugi::xml_node &xml) {}
         MeshInstance<C> compile(MemoryArena *) override {
             commit();
             MeshInstance<C> view;
@@ -171,7 +171,7 @@ namespace akari {
                     for (int v = 0; v < fv; v++) {
                         tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
                         mesh.indices.push_back(idx.vertex_index);
-                        triangle[v] = Point3f(load<PackedArray<Float, 3>>(&mesh.vertices[3 * idx.vertex_index]));
+                        triangle[v] = Point3f(akari::load<PackedArray<Float, 3>>(&mesh.vertices[3 * idx.vertex_index]));
                     }
 
                     Normal3f ng =
