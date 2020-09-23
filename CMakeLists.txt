@@ -77,12 +77,16 @@ endmacro()
 include(cmake/Embree.cmake)
 include(cmake/CUDA.cmake)
 
+if(EXISTS ${CMAKE_CURRENT_BINARY_DIR}/akari.conf)
+else()
+    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/resources/akari.conf DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+endif()
 
 set(AKR_CONFIG_H ${CMAKE_CURRENT_SOURCE_DIR}/src/akari/common/config.h )
 add_custom_command(OUTPUT ${AKR_CONFIG_H}
-    COMMAND akari-configure akari.conf ${AKR_CONFIG_H}
+    COMMAND akari-configure ${CMAKE_CURRENT_BINARY_DIR}/akari.conf ${AKR_CONFIG_H}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    DEPENDS akari.conf akari-configure)
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/akari.conf akari-configure)
 
 
 file(GLOB PYBIND11_HEADERS external/pybind11/include/pybind11.h external/pybind11/include/stl.h)
