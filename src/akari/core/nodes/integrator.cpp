@@ -32,6 +32,7 @@ namespace akari {
             return std::make_shared<cpu::Integrator<C>>(cpu::AmbientOcclusion<C>(spp));
         }
         const char *description() override { return "[Ambient Occlution]"; }
+        void load(const pugi::xml_node &xml)  {}
 #ifdef AKR_ENABLE_GPU
         virtual std::shared_ptr<gpu::Integrator<C>> compile_gpu(MemoryArena *arena) {
             return std::make_shared<gpu::Integrator<C>>(gpu::AmbientOcclusion<C>(spp));
@@ -46,6 +47,7 @@ namespace akari {
         std::shared_ptr<cpu::Integrator<C>> compile(MemoryArena *arena) override {
             return std::make_shared<cpu::Integrator<C>>(cpu::PathTracer<C>(spp));
         }
+        void load(const pugi::xml_node &xml)  {}
 #ifdef AKR_ENABLE_GPU
         std::shared_ptr<gpu::Integrator<C>> compile_gpu(MemoryArena *arena) override {
             return std::make_shared<gpu::Integrator<C>>(gpu::PathTracer<C>(spp));

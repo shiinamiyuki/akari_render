@@ -59,33 +59,55 @@ namespace akari {
             return instance;
         }
         void set_material(uint32_t index, const std::shared_ptr<MaterialNode<C>> &mat) {
+            AKR_ASSERT(mat);
             if (index >= materials.size()) {
                 materials.resize(index + 1);
             }
             materials[index] = mat;
         }
-        void load(const pugi::xml_node &xml) const {
+        void load(const pugi::xml_node &xml) {
             auto include = xml.child("include");
             pugi::xml_document fragment;
-            const pugi::xml_node * base = nullptr;
+            const pugi::xml_node *base = nullptr;
+            auto F = [&]() {
+                std::string path_ = base->child("file").attribute("path").value();
+                this->path = path_;
+                for(auto child : base->children()){
+                    if(std::string_view(child.name()) == "material"){
+                        std::string mat_type = child.attribute("type").value();
+                        if(mat_type.empty()){
+                            error("material missing type");
+                            throw std::runtime_error("invalid input");
+                        }
+                        auto mat = create_node_with_name(get_variant_string<C>(), mat_type);
+                        auto idx = std::stoi(child.attribute("index").value());
+                        set_material(idx, dyn_cast<MaterialNode<C>>(mat));
+                    }
+                }
+            };
             if (!include.empty()) {
-                if (std::disance(xml.children().begin(), xml.children().end()) != 1) {
+                if (std::distance(xml.children().begin(), xml.children().end()) != 1) {
                     error("if include path is specified then no other children are allowed");
                     throw std::runtime_error("invalid input");
                 } else {
-                    auto path = include.attribute("path").value();
+                    fs::path path_ = std::string(include.attribute("path").value());
                     auto result = fragment.load_file(include.attribute("path").value());
                     if (result) {
+                        path_ = fs::absolute(path_);
+                        auto parent_path = path_.parent_path();
+                        CurrentPathGuard _;
+                        fs::current_path(parent_path);
                         base = &fragment;
+                        F();
                     } else {
                         error("xml parsing error: {}", result.description());
                         throw std::runtime_error("parsing error");
                     }
                 }
-            }else{
+            } else {
                 base = &xml;
+                F();
             }
-            std::string path = base.child("path").value();
         }
     };
     AKR_VARIANT class OBJMesh : public MeshNode<C> {

@@ -67,6 +67,7 @@ namespace akari {
 
         return scene;
     }
+    AKR_VARIANT void SceneNode<C>::load(const pugi::xml_node &xml){}
     AKR_VARIANT void SceneNode<C>::render() {
         /*
         We want to restore the SIGINT handler so that the user can interrupt the renderer
@@ -115,7 +116,7 @@ namespace akari {
 
     AKR_VARIANT void RegisterSceneNode<C>::register_nodes(py::module &m) {
         AKR_IMPORT_TYPES()
-        register_node<C, SceneNode>("scene");
+        register_node<C, SceneNode<C>>("scene");
 #ifdef AKR_ENABLE_PYTHON
 
         py::class_<SceneNode<C>, SceneGraphNode<C>, std::shared_ptr<SceneNode<C>>>(m, "Scene")

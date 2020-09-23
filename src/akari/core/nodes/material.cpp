@@ -32,7 +32,7 @@ namespace akari {
             auto tex = arena->alloc<Texture<C>>(ConstantTexture<C>(color));
             return arena->alloc<Material<C>>(DiffuseMaterial<C>(tex));
         }
-        void load(const pugi::xml_node &xml) const {
+        void load(const pugi::xml_node &xml) override {
             auto c = xml.child("color");
             if (c.empty()) {
                 error("color must be specified");
@@ -50,7 +50,7 @@ namespace akari {
             auto tex = arena->alloc<Texture<C>>(ConstantTexture<C>(color));
             return arena->alloc<Material<C>>(EmissiveMaterial<C>(tex));
         }
-        void load(const pugi::xml_node &xml) const {
+        void load(const pugi::xml_node &xml) override {
             auto c = xml.child("color");
             if (c.empty()) {
                 error("color must be specified");

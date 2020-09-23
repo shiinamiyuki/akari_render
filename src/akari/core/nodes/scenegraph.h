@@ -42,7 +42,7 @@ namespace akari {
     namespace py = pybind11;
     class Node {
       public:
-        virtual void load(const pugi::xml_node &xml) const = 0;
+        virtual void load(const pugi::xml_node &xml) = 0;
         virtual void commit() {}
         virtual const char *description() { return "unknown"; }
         virtual ~Node() = default;
@@ -65,6 +65,6 @@ namespace akari {
     }
     template <class C, class T>
     void register_node(const std::string &name) {
-        register_node(get_variant_string<C>(), name, [] -> std::shared_ptr<Node> { return std::make_shared<T>(); });
+        register_node(get_variant_string<C>(), name, []() -> std::shared_ptr<Node> { return std::make_shared<T>(); });
     }
 } // namespace akari

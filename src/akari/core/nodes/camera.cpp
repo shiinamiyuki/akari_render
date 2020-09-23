@@ -39,7 +39,7 @@ namespace akari {
             c2w = Transform3f::translate(position) * c2w;
             return PerspectiveCamera<C>(resolution, c2w, fov);
         }
-        void load(const pugi::xml_node &xml) const {
+        void load(const pugi::xml_node &xml)  {
             auto pos = xml.child("position");
             if (!pos.empty()) {
                 position = load_array<Point3f>(pos);
@@ -52,7 +52,7 @@ namespace akari {
                     if (unit == "deg") { // default
                         ;
                     } else if (unit == "rad") {
-                        rotation = degrees(roration);
+                        rotation = degrees(rotation);
                     } else {
                         warning("unknown unit {}", unit);
                     }
@@ -64,7 +64,7 @@ namespace akari {
             }
             auto fov_ = xml.child("fov");
             if (!fov_) {
-                fov = load_array<Array<Float, 1>>(fov_);
+                fov = load_array<Array<Float, 1>>(fov_)[0];
                 std::string_view unit = fov_.attribute("unit").value();
                 if (unit == "deg") { // default
                     ;
@@ -79,7 +79,7 @@ namespace akari {
 
     AKR_VARIANT void RegisterCameraNode<C>::register_nodes(py::module &m) {
         AKR_IMPORT_TYPES()
-        register_node<C, PerspectiveCameraNode>("perspective");
+        register_node<C, PerspectiveCameraNode<C>>("perspective");
 #ifdef AKR_ENABLE_PYTHON
         py::class_<CameraNode<C>, SceneGraphNode<C>, std::shared_ptr<CameraNode<C>>>(m, "Camera");
         py::class_<PerspectiveCameraNode<C>, CameraNode<C>, std::shared_ptr<PerspectiveCameraNode<C>>>(
