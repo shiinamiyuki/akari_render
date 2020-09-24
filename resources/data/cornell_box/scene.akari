@@ -4,12 +4,13 @@ export camera = PerspectiveCamera {
     fov: 15,
     position: [0, 1, 9],
     rotation: [0, 0, 0],
+    resolution: [1024, 1024]
 }
 
 export scene = Scene {
     camera: $camera,
     integrator: Path {
-        spp: 1
+        spp: 32
     },
     output: "out.png",
     shapes: [

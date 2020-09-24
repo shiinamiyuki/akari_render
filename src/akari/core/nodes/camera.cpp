@@ -46,6 +46,8 @@ namespace akari {
                 rotation = radians(load_array<Array3f>(value));
             } else if (field == "position") {
                 position = load_array<Array3f>(value);
+            } else if (field == "resolution") {
+                resolution = load_array<Array2i>(value);
             }
         }
     };

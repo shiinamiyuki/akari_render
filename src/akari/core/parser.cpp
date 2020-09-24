@@ -20,6 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 #include <fstream>
+#include <unordered_set>
 #include <akari/core/parser.h>
 #include <cctype>
 namespace akari::sdl {
@@ -264,8 +265,12 @@ namespace akari::sdl {
         skip(ctx);
         ctx.expect('{');
         skip(ctx);
+        std::unordered_set<std::string> fields;
         while (ctx.peek() && ctx.peek() != '}') {
             auto fieldname = parse_identifier(ctx);
+            if(fields.find(fieldname) != fields.end()){
+                ctx.report_error(fmt::format("field {} redefined", fieldname), ctx.loc);
+            }
             skip(ctx);
             ctx.expect(':');
             skip(ctx);
