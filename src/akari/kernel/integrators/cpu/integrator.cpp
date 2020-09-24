@@ -47,7 +47,7 @@ namespace akari {
                     w = frame.local_to_world(w);
                     ray = Ray3f(intersection.p, w);
                     intersection = Intersection<C>();
-                    if (scene.intersect(ray, &intersection))
+                    if (scene.intersect(ray, &intersection) && intersection.t < occlude)
                         return Spectrum(0);
                     return Spectrum(1);
                 }

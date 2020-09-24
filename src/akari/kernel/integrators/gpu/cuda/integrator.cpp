@@ -49,7 +49,7 @@ namespace akari::gpu {
                     ray = Ray3f(intersection.p, w);
                     intersection = Intersection<C>();
 
-                    if (scene.intersect(ray, &intersection))
+                    if (scene.intersect(ray, &intersection) && intersection.t < occlude)
                         return Spectrum(0);
                     return Spectrum(1);
                 }
@@ -188,7 +188,7 @@ namespace akari::gpu {
                     });
                 // first bounce ray queue is full
                 launch_single(
-                    "Set Ray Queue", AKR_GPU_LAMBDA() { ray_queue[0]->head = MAX_QUEUE_SIZE; });
+                    "Set Ray Queue", AKR_GPU_LAMBDA() { ray_queue[0]->head = launch_size; });
                 for (int depth = 0; depth <= max_depth; depth++) {
                     for (size_t i = 0; i < material_queues.size(); i++) {
                         launch_single(

@@ -30,9 +30,10 @@ namespace akari {
           public:
             int spp = 16;
             const int tile_size = 1024;
+            float occlude = std::numeric_limits<float>::infinity();
             AKR_IMPORT_TYPES()
             AmbientOcclusion() = default;
-            AmbientOcclusion(int spp) : spp(spp) {}
+            AmbientOcclusion(int spp, float occlude) : spp(spp), occlude(occlude) {}
             void render(const Scene<C> &scene, Film<C> *out) const;
         };
         AKR_VARIANT class PathTracer {

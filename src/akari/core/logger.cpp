@@ -32,7 +32,7 @@ namespace akari {
         void DoLogMessage(LogLevel level, const std::string &msg, FILE *fp = stdout) {
             std::chrono::duration<double> elapsed = std::chrono::system_clock::now() - start;
 
-            if (level == LogLevel::Fatal || level == LogLevel::Warning) {
+            if (level == LogLevel::Fatal || level == LogLevel::Error) {
                 fprintf(fp, "\u001b[31m");
             } else if (level == LogLevel::Warning) {
                 fprintf(fp, "\u001b[33m");

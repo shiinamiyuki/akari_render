@@ -112,7 +112,7 @@ std::shared_ptr<Mesh> load_wavefront_obj(const fs::path &path, std::string &gene
         os << "    $" << normalize_name(obj_mat.name) << ",\n";
         idx++;
     }
-    os << "}\n";
+    os << "  ]\n}\n";
     generated = os.str();
     return mesh;
 }

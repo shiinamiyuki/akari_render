@@ -28,19 +28,22 @@ namespace akari {
         AKR_IMPORT_TYPES()
         int spp = 16;
         int tile_size = 16;
+        float occlude = std::numeric_limits<float>::infinity();
         std::shared_ptr<cpu::Integrator<C>> compile(MemoryArena *arena) override {
-            return std::make_shared<cpu::Integrator<C>>(cpu::AmbientOcclusion<C>(spp));
+            return std::make_shared<cpu::Integrator<C>>(cpu::AmbientOcclusion<C>(spp, occlude));
         }
         const char *description() override { return "[Ambient Occlution]"; }
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override {
             if (field == "spp") {
                 spp = value.get<int>().value();
+            } else if (field == "occlude") {
+                occlude = value.get<float>().value();
             }
         }
 #ifdef AKR_ENABLE_GPU
         virtual std::shared_ptr<gpu::Integrator<C>> compile_gpu(MemoryArena *arena) {
-            return std::make_shared<gpu::Integrator<C>>(gpu::AmbientOcclusion<C>(spp));
+            return std::make_shared<gpu::Integrator<C>>(gpu::AmbientOcclusion<C>(spp, occlude));
         }
 #endif
     };

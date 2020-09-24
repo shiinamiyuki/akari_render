@@ -19,7 +19,7 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-
+#include <future>
 #include <akari/common/math.h>
 #include <akari/kernel/scene.h>
 #include <akari/common/mesh.h>
@@ -51,10 +51,11 @@ namespace akari {
         ShapeHandleConstructor _ctor;
         Buffer<Index> primitives;
         Buffer<BVHNode> nodes;
-
+        std::shared_ptr<std::mutex> m;
         TBVHAccelerator(UserData &&user_data, size_t N, Intersector intersector = Intersector(),
                         ShapeHandleConstructor ctor = ShapeHandleConstructor())
             : user_data(std::move(user_data)), _intersector(std::move(intersector)), _ctor(std::move(ctor)) {
+            m = std::make_shared<std::mutex>();
             for (auto i = 0; i < (int)N; i++) {
                 primitives.push_back(Index{i});
             }
@@ -92,13 +93,14 @@ namespace akari {
                 boundBox = box;
             }
 
-            if (end - begin <= 4 || depth >= 32) {
+            if (end - begin <= 8 || depth >= 32) {
                 BVHNode node;
 
                 node.box = box;
                 node.first = begin;
                 node.count = end - begin;
                 node.left = node.right = -1;
+                std::lock_guard<std::mutex> _(*m);
                 nodes.push_back(node);
                 return (int)nodes.size() - 1;
             } else {
@@ -171,16 +173,28 @@ namespace akari {
                 } else {
                     mid = primitives.data() + (begin + end) / 2;
                 }
-                auto ret = nodes.size();
-                nodes.emplace_back();
-
+                size_t ret;
+                {
+                    std::lock_guard<std::mutex> _(*m);
+                    ret = nodes.size();
+                    nodes.emplace_back();
+                }
                 BVHNode &node = nodes.back();
                 node.box = box;
                 node.count = (uint32_t)-1;
-                nodes.push_back(node);
-                nodes[ret].left = (int)recursiveBuild(begin, int(mid - &primitives[0]), depth + 1);
-                nodes[ret].right = (int)recursiveBuild(int(mid - &primitives[0]), end, depth + 1);
-
+                if (end - begin > 128 * 1024) {
+                    auto left = std::async(std::launch::async, [&]() {
+                        return (int)recursiveBuild(begin, int(mid - &primitives[0]), depth + 1);
+                    });
+                    auto right = std::async(std::launch::async, [&]() {
+                        return (int)recursiveBuild(int(mid - &primitives[0]), end, depth + 1);
+                    });
+                    nodes[ret].left = left.get();
+                    nodes[ret].right = right.get();
+                } else {
+                    nodes[ret].left = (int)recursiveBuild(begin, int(mid - &primitives[0]), depth + 1);
+                    nodes[ret].right = (int)recursiveBuild(int(mid - &primitives[0]), end, depth + 1);
+                }
                 return (int)ret;
             }
         }
