@@ -35,7 +35,6 @@ namespace akari {
                           const sdl::Value &value) override {
             if (field == "color") {
                 color = load_array<Color3f>(value);
-                debug("color={}", color);
             }
         }
     };

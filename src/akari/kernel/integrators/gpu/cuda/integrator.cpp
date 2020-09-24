@@ -48,6 +48,7 @@ namespace akari::gpu {
                     w = frame.local_to_world(w);
                     ray = Ray3f(intersection.p, w);
                     intersection = Intersection<C>();
+
                     if (scene.intersect(ray, &intersection))
                         return Spectrum(0);
                     return Spectrum(1);
@@ -59,6 +60,7 @@ namespace akari::gpu {
             MemoryArena _arena;
             SmallArena arena(_arena.alloc_bytes(ARENA_SIZE), ARENA_SIZE);
             debug("GPU RTAO resolution: {}, tile size: {}, tiles: {}", film->resolution(), tile_size, n_tiles);
+            double gpu_time = 0;
             for (int tile_y = 0; tile_y < n_tiles.y(); tile_y++) {
                 for (int tile_x = 0; tile_x < n_tiles.x(); tile_x++) {
                     Point2i tile_pos(tile_x, tile_y);
@@ -70,6 +72,7 @@ namespace akari::gpu {
                     auto extents = tileBounds.extents();
                     auto tile = boxed_tile.get();
                     auto resolution = film->resolution();
+                    Timer timer;
                     launch(
                         "RTAO", extents.x() * extents.y(), AKR_GPU_LAMBDA(int tid) {
                             int tx = tid % extents.x();
@@ -77,19 +80,23 @@ namespace akari::gpu {
                             int x = tx + tileBounds.pmin.x();
                             int y = ty + tileBounds.pmin.y();
                             sampler.set_sample_index(x + y * resolution.x());
+                            Spectrum acc;
                             for (int s = 0; s < spp; s++) {
                                 sampler.start_next_sample();
                                 CameraSample<C> sample;
 
                                 camera.generate_ray(sampler.next2d(), sampler.next2d(), Point2i(x, y), &sample);
                                 auto L = Li(sample.ray, sampler);
-                                tile->add_sample(Point2f(x, y), L, 1.0f);
+                                acc += L;
                             }
+                            tile->add_sample(Point2f(x, y), acc / spp, 1.0f);
                         });
                     CUDA_CHECK(cudaDeviceSynchronize());
+                    gpu_time += timer.elapsed_seconds();
                     film->merge_tile(*tile);
                 }
             }
+            info("total gpu time {}s", gpu_time);
         } else {
             fatal("only float is supported for gpu");
         }

@@ -25,7 +25,7 @@
 #include <akari/common/variant.h>
 #include <akari/common/smallarena.h>
 namespace akari {
-    AKR_VARIANT class RandomSampler {
+    AKR_VARIANT class PCGSampler {
         uint64_t state = 0x4d595df4d0f33173; // Or something seed-dependent
         static uint64_t const multiplier = 6364136223846793005u;
         static uint64_t const increment = 1442695040888963407u; // Or an arbitrary odd constant
@@ -49,12 +49,26 @@ namespace akari {
         AKR_XPU Float next1d() { return Float(pcg32()) / (float)0xffffffff; }
         AKR_XPU Point2f next2d() { return Point2f(next1d(), next1d()); }
         AKR_XPU void start_next_sample() {}
-        AKR_XPU RandomSampler(uint64_t seed = 0u) { pcg32_init(seed); }
+        AKR_XPU PCGSampler(uint64_t seed = 0u) { pcg32_init(seed); }
     };
-    AKR_VARIANT class Sampler : Variant<RandomSampler<C>> {
+    AKR_VARIANT class LCGSampler {
+        uint32_t seed;
+
       public:
         AKR_IMPORT_TYPES()
-        using Variant<RandomSampler<C>>::Variant;
+        AKR_XPU void set_sample_index(uint64_t idx) { seed = idx & 0xffffffff; }
+        AKR_XPU Float next1d() {
+            seed = (1103515245 * seed + 12345);
+            return (Float)seed / (Float)0xFFFFFFFF;
+        }
+        AKR_XPU Point2f next2d() { return Point2f(next1d(), next1d()); }
+        AKR_XPU void start_next_sample() {}
+        AKR_XPU LCGSampler(uint64_t seed = 0u) : seed(seed) {}
+    };
+    AKR_VARIANT class alignas(16) Sampler : Variant<PCGSampler<C>, LCGSampler<C>> {
+      public:
+        AKR_IMPORT_TYPES()
+        using Variant<PCGSampler<C>, LCGSampler<C>>::Variant;
         AKR_XPU Float next1d() { AKR_VAR_DISPATCH(next1d); }
         AKR_XPU Point2f next2d() { AKR_VAR_DISPATCH(next2d); }
         AKR_XPU void start_next_sample() { AKR_VAR_DISPATCH(start_next_sample); }

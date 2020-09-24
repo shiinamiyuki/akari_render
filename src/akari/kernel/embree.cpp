@@ -78,7 +78,7 @@ namespace akari {
             return false;
         intersection->prim_id = rayHit.hit.primID;
         intersection->geom_id = rayHit.hit.geomID;
-        intersection->ng = normalize(Normal3f(rayHit.hit.Ng_x, rayHit.hit.Ng_y, rayHit.hit.Ng_z));
+        //intersection->ng = normalize(Normal3f(rayHit.hit.Ng_x, rayHit.hit.Ng_y, rayHit.hit.Ng_z));
         intersection->uv = Point2f(rayHit.hit.u, rayHit.hit.v);
         intersection->t = rayHit.ray.tfar;
         return true;

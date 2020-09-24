@@ -96,7 +96,7 @@ namespace akari {
         auto scene = compile(&arena);
         auto res = scene.camera.resolution();
         auto film = Film<C>(res);
-        scene.sampler = RandomSampler<C>();
+        scene.sampler = LCGSampler<C>();
         auto embree_scene = Box<BVHAccelerator<C>>::make();
         scene.accel = embree_scene.get();
         scene.commit();

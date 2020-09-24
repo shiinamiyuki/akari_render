@@ -32,7 +32,11 @@ namespace akari {
         SOA(T v) : SOA(1, DeviceAllocator<T>()) { *array = v; }
         template <typename Allocator = DeviceAllocator<T>>
         SOA(int n, Allocator &&allocator) : _size(n) {
-            array = allocator.template allocate_object<T>(n);
+            if constexpr (std::is_fundamental_v<T>) {
+                array = (T *)allocator.allocate_bytes(sizeof(T) * n, 1024u);
+            } else {
+                array = allocator.template allocate_object<T>(n);
+            }
         }
         AKR_XPU T &operator[](int i) { return array[i]; }
         AKR_XPU const T &operator[](int i) const { return array[i]; }

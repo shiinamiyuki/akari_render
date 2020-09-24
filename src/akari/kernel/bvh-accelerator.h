@@ -188,14 +188,13 @@ namespace akari {
         AKR_XPU bool intersect(const Ray3f &ray, Hit &isct) const {
             bool hit = false;
             auto invd = Vector3f(1) / ray.d;
-            constexpr int maxDepth = 64;
+            constexpr int maxDepth = 40;
             const BVHNode *stack[maxDepth];
             int sp = 0;
             stack[sp++] = &nodes[0];
             while (sp > 0) {
 
                 auto p = stack[--sp];
-                //                PrintBox(p->box, "p->box");
                 auto t = intersectAABB(p->box, ray, invd);
 
                 if (t < 0 || t > isct.t) {
