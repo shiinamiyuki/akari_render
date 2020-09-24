@@ -27,12 +27,13 @@ namespace akari {
 
     AKR_VARIANT class MeshNode : public SceneGraphNode<C> {
       public:
-        AKR_IMPORT_TYPES()
+        // AKR_IMPORT_TYPES()
         virtual MeshInstance<C> compile(MemoryArena *arena) = 0;
     };
 
     AKR_VARIANT struct RegisterMeshNode {
-        static void register_nodes(py::module &m);
+        static void register_nodes();
+        static void register_python_nodes(py::module &m);
     };
 
 } // namespace akari

@@ -32,7 +32,12 @@ namespace akari {
             return std::make_shared<cpu::Integrator<C>>(cpu::AmbientOcclusion<C>(spp));
         }
         const char *description() override { return "[Ambient Occlution]"; }
-        void load(const pugi::xml_node &xml)  {}
+        void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
+                          const sdl::Value &value) override {
+            if (field == "spp") {
+                spp = value.get<int>().value();
+            }
+        }
 #ifdef AKR_ENABLE_GPU
         virtual std::shared_ptr<gpu::Integrator<C>> compile_gpu(MemoryArena *arena) {
             return std::make_shared<gpu::Integrator<C>>(gpu::AmbientOcclusion<C>(spp));
@@ -47,7 +52,12 @@ namespace akari {
         std::shared_ptr<cpu::Integrator<C>> compile(MemoryArena *arena) override {
             return std::make_shared<cpu::Integrator<C>>(cpu::PathTracer<C>(spp));
         }
-        void load(const pugi::xml_node &xml)  {}
+        void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
+                          const sdl::Value &value) override {
+            if (field == "spp") {
+                spp = value.get<int>().value();
+            }
+        }
 #ifdef AKR_ENABLE_GPU
         std::shared_ptr<gpu::Integrator<C>> compile_gpu(MemoryArena *arena) override {
             return std::make_shared<gpu::Integrator<C>>(gpu::PathTracer<C>(spp));
@@ -56,10 +66,13 @@ namespace akari {
         const char *description() override { return "[Path Tracer]"; }
     };
 
-    AKR_VARIANT void RegisterIntegratorNode<C>::register_nodes(py::module &m) {
+    AKR_VARIANT void RegisterIntegratorNode<C>::register_nodes() {
         AKR_IMPORT_TYPES()
-        register_node<C, AOIntegratorNode<C>>("ao");
-        register_node<C, PathIntegratorNode<C>>("path");
+        register_node<C, AOIntegratorNode<C>>("AO");
+        register_node<C, PathIntegratorNode<C>>("Path");
+    }
+
+    AKR_VARIANT void RegisterIntegratorNode<C>::register_python_nodes(py::module &m) {
 #ifdef AKR_ENABLE_PYTHON
         py::class_<IntegratorNode<C>, SceneGraphNode<C>, std::shared_ptr<IntegratorNode<C>>>(m, "Integrator");
         py::class_<AOIntegratorNode<C>, IntegratorNode<C>, std::shared_ptr<AOIntegratorNode<C>>>(m, "RTAO")

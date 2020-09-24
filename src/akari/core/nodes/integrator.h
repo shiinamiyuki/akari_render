@@ -37,6 +37,9 @@ namespace akari {
         virtual std::shared_ptr<gpu::Integrator<C>> compile_gpu(MemoryArena *arena) { return nullptr; }
     };
 
-    AKR_VARIANT struct RegisterIntegratorNode { static void register_nodes(py::module &m); };
+    AKR_VARIANT struct RegisterIntegratorNode {
+        static void register_nodes();
+        static void register_python_nodes(py::module &m);
+    };
 
 } // namespace akari

@@ -23,7 +23,6 @@
 #include <akari/core/nodes/material.h>
 #include <akari/core/resource.h>
 #include <akari/core/mesh.h>
-// #define TINYOBJLOADER_IMPLEMENTATION
 #include <akari/core/misc.h>
 #include <akari/core/logger.h>
 
@@ -53,6 +52,7 @@ namespace akari {
             instance.normals = mesh->normals;
             instance.texcoords = mesh->texcoords;
             instance.vertices = mesh->vertices;
+            // AKR_ASSERT_THROW(mesh->material_indices.size() == materials.size());
             for (auto &mat : materials) {
                 instance.materials.push_back(mat->compile(arena));
             }
@@ -65,48 +65,18 @@ namespace akari {
             }
             materials[index] = mat;
         }
-        void load(const pugi::xml_node &xml) {
-            auto include = xml.child("include");
-            pugi::xml_document fragment;
-            const pugi::xml_node *base = nullptr;
-            auto F = [&]() {
-                std::string path_ = base->child("file").attribute("path").value();
-                this->path = path_;
-                for(auto child : base->children()){
-                    if(std::string_view(child.name()) == "material"){
-                        std::string mat_type = child.attribute("type").value();
-                        if(mat_type.empty()){
-                            error("material missing type");
-                            throw std::runtime_error("invalid input");
-                        }
-                        auto mat = create_node_with_name(get_variant_string<C>(), mat_type);
-                        auto idx = std::stoi(child.attribute("index").value());
-                        set_material(idx, dyn_cast<MaterialNode<C>>(mat));
-                    }
+        void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
+                          const sdl::Value &value) override {
+            if (field == "path") {
+                path = value.get<std::string>().value();
+            } else if (field == "materials") {
+                AKR_ASSERT_THROW(value.is_array());
+                for (auto mat : value) {
+                    // debug("{}", typeid(*value.object()).name());
+                    auto m = dyn_cast<MaterialNode<C>>(mat.object());
+                    AKR_ASSERT(m);
+                    materials.emplace_back(m);
                 }
-            };
-            if (!include.empty()) {
-                if (std::distance(xml.children().begin(), xml.children().end()) != 1) {
-                    error("if include path is specified then no other children are allowed");
-                    throw std::runtime_error("invalid input");
-                } else {
-                    fs::path path_ = std::string(include.attribute("path").value());
-                    auto result = fragment.load_file(include.attribute("path").value());
-                    if (result) {
-                        path_ = fs::absolute(path_);
-                        auto parent_path = path_.parent_path();
-                        CurrentPathGuard _;
-                        fs::current_path(parent_path);
-                        base = &fragment;
-                        F();
-                    } else {
-                        error("xml parsing error: {}", result.description());
-                        throw std::runtime_error("parsing error");
-                    }
-                }
-            } else {
-                base = &xml;
-                F();
             }
         }
     };
@@ -126,7 +96,10 @@ namespace akari {
                 return;
             (void)load_wavefront_obj(path);
         }
-        void load(const pugi::xml_node &xml) {}
+        void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
+                          const sdl::Value &value) override {
+            AKR_ASSERT_THROW(false && "not implemented");
+        }
         MeshInstance<C> compile(MemoryArena *) override {
             commit();
             MeshInstance<C> view;
@@ -204,9 +177,12 @@ namespace akari {
         }
     };
 
-    AKR_VARIANT void RegisterMeshNode<C>::register_nodes(py::module &m) {
+    AKR_VARIANT void RegisterMeshNode<C>::register_nodes() {
         AKR_IMPORT_TYPES();
-        register_node<C, AkariMesh<C>>("binary");
+        register_node<C, AkariMesh<C>>("AkariMesh");
+    }
+
+    AKR_VARIANT void RegisterMeshNode<C>::register_python_nodes(py::module &m) {
 #ifdef AKR_ENABLE_PYTHON
         py::class_<MeshNode<C>, SceneGraphNode<C>, std::shared_ptr<MeshNode<C>>>(m, "Mesh").def("commit",
                                                                                                 &MeshNode<C>::commit);

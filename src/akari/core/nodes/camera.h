@@ -31,7 +31,8 @@ namespace akari {
     };
 
     AKR_VARIANT struct RegisterCameraNode {
-        static void register_nodes(py::module &m);
+        static void register_nodes();
+        static void register_python_nodes(py::module &m);
     };
 
 } // namespace akari

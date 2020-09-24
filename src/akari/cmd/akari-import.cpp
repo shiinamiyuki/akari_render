@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 #include <fstream>
+#include <regex>
 #include <cxxopts.hpp>
 #include <akari/core/logger.h>
 #include <akari/core/mesh.h>
@@ -46,10 +47,10 @@ std::shared_ptr<Mesh> load_wavefront_obj(const fs::path &path, std::string &gene
     std::ostringstream os;
     bool ret = misc::LoadObj(&attrib, &shapes, &obj_materials, &err, _file.c_str());
     if (!ret) {
-        error("error: {}", err);
+        error("error: {}\n", err);
         return nullptr;
     }
-    os << "mesh = AkariMesh(" << path.filename().concat(".mesh") << ")\n";
+
     mesh = std::make_shared<Mesh>();
     mesh->vertices.resize(attrib.vertices.size());
     std::memcpy(&mesh->vertices[0], &attrib.vertices[0], sizeof(float) * mesh->vertices.size());
@@ -90,22 +91,28 @@ std::shared_ptr<Mesh> load_wavefront_obj(const fs::path &path, std::string &gene
             index_offset += fv;
         }
     }
-    os << "materials = dict()\n";
+    auto normalize_name = [](const std::string &src) {
+        auto out = std::regex_replace(src, std::regex("-|\\."), "_");
+        return out;
+    };
     for (auto &obj_mat : obj_materials) {
-        os << "# OBJ Material: " << obj_mat.name << "\n";
-        os << "mat = DiffuseMaterial()\n";
-        os << "mat.color = Color3f(" << obj_mat.diffuse[0] << "," << obj_mat.diffuse[1] << "," << obj_mat.diffuse[2]
-           << ")\n";
-        os << "materials['" << obj_mat.name << "'] = mat\n";
-        os << "# ======================================== \n";
-    }
-    int idx = 0;
-    for (auto &obj_mat : obj_materials) {
-        os << "mesh.set_material(" << (idx) << ", materials['" << obj_mat.name << "'])\n";
-        idx++;
+        auto normalized = normalize_name(obj_mat.name);
+        os << "// OBJ Material: " << obj_mat.name << "\n";
+        os << "export " << normalized << " = DiffuseMaterial {\n";
+        os << "  color : [" << obj_mat.diffuse[0] << "," << obj_mat.diffuse[1] << "," << obj_mat.diffuse[2]
+           << "]\n}\n";
+        os << "// ======================================== \n\n";
     }
     info("loaded {} triangles, {} vertices", mesh->indices.size() / 3, mesh->vertices.size() / 3);
-    os << "export(mesh)\n";
+    os << "export mesh = AkariMesh {\n  path: " << path.filename().concat(".mesh") << ",\n";
+    os << "  materials: [\n";
+    int idx = 0;
+    for (auto &obj_mat : obj_materials) {
+        os << "    // material index " << idx << "\n";
+        os << "    $" << normalize_name(obj_mat.name) << ",\n";
+        idx++;
+    }
+    os << "}\n";
     generated = os.str();
     return mesh;
 }
@@ -123,12 +130,12 @@ int main(int argc, const char **argv) {
         options.parse_positional({"input", "output"});
         auto result = options.parse(argc, argv);
         if (!result.count("input")) {
-            fatal("Input file must be provided");
+            fatal("Input file must be provided\n");
             std::cout << options.help() << std::endl;
             exit(0);
         }
         if (!result.count("output")) {
-            fatal("Output file must be provided");
+            fatal("Output file must be provided\n");
             std::cout << options.help() << std::endl;
             exit(0);
         }
@@ -147,7 +154,7 @@ int main(int argc, const char **argv) {
         std::ofstream os(outputFilename);
         os << generated;
     } catch (std::exception &e) {
-        fatal("Exception: {}", e.what());
+        fatal("Exception: {}\n", e.what());
         exit(1);
     }
 }

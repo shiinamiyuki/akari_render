@@ -1,0 +1,6 @@
+import "foo.akari" as foo
+
+export bar = [$foo.foo, 123]
+export obj = Camera {
+    position: [1,2,3]
+}

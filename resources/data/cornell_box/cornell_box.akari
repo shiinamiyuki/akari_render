@@ -1,0 +1,69 @@
+// OBJ Material: leftWall
+export leftWall = DiffuseMaterial {
+  color : [0.63,0.065,0.05]
+}
+// ======================================== 
+
+// OBJ Material: rightWall
+export rightWall = DiffuseMaterial {
+  color : [0.14,0.45,0.091]
+}
+// ======================================== 
+
+// OBJ Material: floor
+export floor = DiffuseMaterial {
+  color : [0.725,0.71,0.68]
+}
+// ======================================== 
+
+// OBJ Material: ceiling
+export ceiling = DiffuseMaterial {
+  color : [0.725,0.71,0.68]
+}
+// ======================================== 
+
+// OBJ Material: backWall
+export backWall = DiffuseMaterial {
+  color : [0.725,0.71,0.68]
+}
+// ======================================== 
+
+// OBJ Material: shortBox
+export shortBox = DiffuseMaterial {
+  color : [0.725,0.71,0.68]
+}
+// ======================================== 
+
+// OBJ Material: tallBox
+export tallBox = DiffuseMaterial {
+  color : [0.725,0.71,0.68]
+}
+// ======================================== 
+
+// OBJ Material: light
+export light = EmissiveMaterial {
+  color : [17, 12, 4]
+}
+// ======================================== 
+
+export mesh = AkariMesh {
+  path: "CornellBox-Original.obj.mesh",
+  materials: [
+    // material index 0
+    $leftWall,
+    // material index 1
+    $rightWall,
+    // material index 2
+    $floor,
+    // material index 3
+    $ceiling,
+    // material index 4
+    $backWall,
+    // material index 5
+    $shortBox,
+    // material index 6
+    $tallBox,
+    // material index 7
+    $light,
+  ]
+}

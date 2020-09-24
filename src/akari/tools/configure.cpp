@@ -91,6 +91,7 @@ namespace akari {
         }
         out << "    throw std::runtime_error(\"unsupported variant\");\\\n";
         out << "})()\n";
+        out << "constexpr const char * default_variant = \"" << config["default"].get<std::string>() << "\";\n";
         out << "constexpr const char * enabled_variants[] = {";
         {
             std::vector<std::string> v;

@@ -21,7 +21,6 @@
 // SOFTWARE.
 #include <akari/core/nodes/material.h>
 #include <akari/kernel/material.h>
-#include <akari/core/xml.h>
 #include <akari/core/logger.h>
 namespace akari {
     AKR_VARIANT class DiffuseMaterialNode : public MaterialNode<C> {
@@ -32,12 +31,11 @@ namespace akari {
             auto tex = arena->alloc<Texture<C>>(ConstantTexture<C>(color));
             return arena->alloc<Material<C>>(DiffuseMaterial<C>(tex));
         }
-        void load(const pugi::xml_node &xml) override {
-            auto c = xml.child("color");
-            if (c.empty()) {
-                error("color must be specified");
-            } else {
-                color = load_array<Color3f>(c);
+        void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
+                          const sdl::Value &value) override {
+            if (field == "color") {
+                color = load_array<Color3f>(value);
+                debug("color={}", color);
             }
         }
     };
@@ -50,20 +48,21 @@ namespace akari {
             auto tex = arena->alloc<Texture<C>>(ConstantTexture<C>(color));
             return arena->alloc<Material<C>>(EmissiveMaterial<C>(tex));
         }
-        void load(const pugi::xml_node &xml) override {
-            auto c = xml.child("color");
-            if (c.empty()) {
-                error("color must be specified");
-            } else {
-                color = load_array<Color3f>(c);
+        void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
+                          const sdl::Value &value) override {
+            if (field == "color") {
+                color = load_array<Color3f>(value);
             }
         }
     };
 
-    AKR_VARIANT void RegisterMaterialNode<C>::register_nodes(py::module &m) {
+    AKR_VARIANT void RegisterMaterialNode<C>::register_nodes() {
         AKR_IMPORT_TYPES()
-        register_node<C, DiffuseMaterialNode<C>>("diffuse");
-        register_node<C, EmissiveMaterialNode<C>>("emissive");
+        register_node<C, DiffuseMaterialNode<C>>("DiffuseMaterial");
+        register_node<C, EmissiveMaterialNode<C>>("EmissiveMaterial");
+    }
+
+    AKR_VARIANT void RegisterMaterialNode<C>::register_python_nodes(py::module &m) {
 #ifdef AKR_ENABLE_PYTHON
         py::class_<MaterialNode<C>, SceneGraphNode<C>, std::shared_ptr<MaterialNode<C>>>(m, "Material");
         py::class_<DiffuseMaterialNode<C>, MaterialNode<C>, std::shared_ptr<DiffuseMaterialNode<C>>>(m,

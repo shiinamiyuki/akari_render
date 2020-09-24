@@ -14,7 +14,6 @@ AkariRender is a CPU/GPU physically based renderer written in C++17.
 
 ## Build from Source
 ```bash
-cp ./resources/default.conf akari.conf
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 ```

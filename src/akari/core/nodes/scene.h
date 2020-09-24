@@ -27,7 +27,7 @@
 #include <akari/core/nodes/integrator.h>
 #include <akari/kernel/scene.h>
 namespace akari {
-    AKR_VARIANT class SceneNode : public SceneGraphNode<C> {
+    AKR_VARIANT class AKR_EXPORT SceneNode : public SceneGraphNode<C> {
       public:
         AKR_IMPORT_TYPES()
         Buffer<MeshInstance<C>> instances;
@@ -41,9 +41,13 @@ namespace akari {
         Scene<C> compile(MemoryArena *arena);
         void render();
         void add_mesh(const std::shared_ptr<MeshNode<C>> &mesh) { shapes.emplace_back(mesh); }
-        void load(const pugi::xml_node &xml);
+        void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
+                          const sdl::Value &value) override;
     };
 
-    AKR_VARIANT struct RegisterSceneNode { static void register_nodes(py::module &m); };
+    AKR_VARIANT struct RegisterSceneNode {
+        static void register_nodes();
+        static void register_python_nodes(py::module &m);
+    };
 
 } // namespace akari

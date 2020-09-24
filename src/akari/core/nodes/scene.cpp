@@ -67,7 +67,23 @@ namespace akari {
 
         return scene;
     }
-    AKR_VARIANT void SceneNode<C>::load(const pugi::xml_node &xml){}
+    AKR_VARIANT void SceneNode<C>::object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
+                                                const sdl::Value &value) {
+        if (field == "camera") {
+            camera = dyn_cast<CameraNode<C>>(value.object());
+            AKR_ASSERT_THROW(camera);
+        } else if (field == "output") {
+            output = value.get<std::string>().value();
+        } else if (field == "integrator") {
+            integrator = dyn_cast<IntegratorNode<C>>(value.object());
+            AKR_ASSERT_THROW(integrator);
+        } else if(field == "shapes"){
+            AKR_ASSERT_THROW(value.is_array());
+            for(auto shape : value){
+                shapes.emplace_back(dyn_cast<MeshNode<C>>(shape.object()));
+            }
+        }
+    }
     AKR_VARIANT void SceneNode<C>::render() {
         /*
         We want to restore the SIGINT handler so that the user can interrupt the renderer
@@ -114,11 +130,14 @@ namespace akari {
         film.write_image(fs::path(output));
     }
 
-    AKR_VARIANT void RegisterSceneNode<C>::register_nodes(py::module &m) {
+    AKR_VARIANT void RegisterSceneNode<C>::register_nodes() {
         AKR_IMPORT_TYPES()
-        register_node<C, SceneNode<C>>("scene");
-#ifdef AKR_ENABLE_PYTHON
+        register_node<C, SceneNode<C>>("Scene");
+    }
 
+    AKR_VARIANT void RegisterSceneNode<C>::register_python_nodes(py::module &m) {
+        AKR_IMPORT_TYPES()
+#ifdef AKR_ENABLE_PYTHON
         py::class_<SceneNode<C>, SceneGraphNode<C>, std::shared_ptr<SceneNode<C>>>(m, "Scene")
             .def(py::init<>())
             .def_readwrite("variant", &SceneNode<C>::variant)
@@ -129,6 +148,7 @@ namespace akari {
             .def("add_mesh", &SceneNode<C>::add_mesh);
 #endif
     }
+
     AKR_RENDER_STRUCT(RegisterSceneNode)
 
     AKR_RENDER_CLASS(SceneNode)

@@ -31,6 +31,9 @@ namespace akari {
         virtual Material<C> *compile(MemoryArena *arena) = 0;
     };
 
-    AKR_VARIANT struct RegisterMaterialNode { static void register_nodes(py::module &m); };
+    AKR_VARIANT struct RegisterMaterialNode {
+        static void register_nodes();
+        static void register_python_nodes(py::module &m);
+    };
 
 } // namespace akari

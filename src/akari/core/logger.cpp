@@ -29,19 +29,45 @@
 namespace akari {
     class DefaultLogger : public Logger {
         decltype(std::chrono::system_clock::now()) start = std::chrono::system_clock::now();
-        std::string GetMessageHeader(const std::string &level) {
-            std::chrono::duration<double> elapsed = std::chrono::system_clock::now() - start;
-            return fmt::format("[{}] [{:.3f}] ", level, elapsed.count());
-        }
         void DoLogMessage(LogLevel level, const std::string &msg, FILE *fp = stdout) {
+            std::chrono::duration<double> elapsed = std::chrono::system_clock::now() - start;
+
             if (level == LogLevel::Fatal || level == LogLevel::Warning) {
                 fprintf(fp, "\u001b[31m");
             } else if (level == LogLevel::Warning) {
                 fprintf(fp, "\u001b[33m");
+            } else if (level == LogLevel::Info) {
+                fprintf(fp, "\u001b[32m");
             }
-            fprintf(fp, "%s\n", msg.c_str());
+            switch (level) {
+            case LogLevel::Fatal:
+                fprintf(fp, "[FATAL] ");
+                break;
+            case LogLevel::Error:
+                fprintf(fp, "[ERROR] ");
+                break;
+            case LogLevel::Warning:
+                fprintf(fp, "[WARNING] ");
+                break;
+            case LogLevel::Info:
+                fprintf(fp, "[INFO] ");
+                break;
+            case LogLevel::Debug:
+                fprintf(fp, "[DEBUG] ");
+                break;
+            }
+
+            if (level != LogLevel::Fatal) {
+                fprintf(fp, "\u001b[0m");
+                fmt::print("[{:.3f}] ", elapsed.count());
+                fprintf(fp, "%s\n", msg.c_str());
+
+            } else {
+                fmt::print("[{:.3f}] ", elapsed.count());
+                fprintf(fp, "%s\n", msg.c_str());
+                fprintf(fp, "\u001b[0m");
+            }
             fflush(fp);
-            fprintf(fp, "\u001b[0m");
             for (auto it = handlers.begin(); it != handlers.end();) {
                 auto &wp = *it;
                 if (wp.expired()) {
@@ -67,25 +93,15 @@ namespace akari {
                 }
             }
         }
-        void Warning(const std::string &msg) override {
-            DoLogMessage(LogLevel::Warning, GetMessageHeader("WARNING").append(msg), stderr);
-        }
+        void Warning(const std::string &msg) override { DoLogMessage(LogLevel::Warning, msg, stderr); }
 
-        void Error(const std::string &msg) override {
-            DoLogMessage(LogLevel::Error, GetMessageHeader("ERROR").append(msg), stderr);
-        }
+        void Error(const std::string &msg) override { DoLogMessage(LogLevel::Error, msg); }
 
-        void Info(const std::string &msg) override {
-            DoLogMessage(LogLevel::Info, GetMessageHeader("INFO").append(msg));
-        }
+        void Info(const std::string &msg) override { DoLogMessage(LogLevel::Info, msg); }
 
-        void Debug(const std::string &msg) override {
-            DoLogMessage(LogLevel::Debug, GetMessageHeader("DEBUG").append(msg));
-        }
+        void Debug(const std::string &msg) override { DoLogMessage(LogLevel::Debug, msg); }
 
-        void Fatal(const std::string &msg) override {
-            DoLogMessage(LogLevel::Fatal, GetMessageHeader("FATAL").append(msg), stderr);
-        }
+        void Fatal(const std::string &msg) override { DoLogMessage(LogLevel::Fatal, msg, stderr); }
     }; // namespace akari
 
     Logger *GetDefaultLogger() {

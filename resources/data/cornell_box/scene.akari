@@ -1,0 +1,19 @@
+import "cornell_box.akari" as cbox
+
+export camera = PerspectiveCamera {
+    fov: 15,
+    position: [0, 1, 9],
+    rotation: [0, 0, 0],
+}
+
+export scene = Scene {
+    camera: $camera,
+    integrator: Path {
+        spp: 1
+    },
+    output: "out.png",
+    shapes: [
+        $cbox.mesh
+    ]
+}
+

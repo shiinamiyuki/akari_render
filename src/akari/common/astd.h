@@ -209,6 +209,11 @@ namespace akari::astd {
             template <class U>
             polymorphic_allocator(const polymorphic_allocator<U> &other) noexcept : memoryResource(other.resource()) {}
             polymorphic_allocator &operator=(const polymorphic_allocator &rhs) = delete;
+            polymorphic_allocator &operator=(polymorphic_allocator &&rhs) {
+                this->memoryResource = rhs.memoryResource;
+                rhs.memoryResource = nullptr;
+                return *this;
+            }
             [[nodiscard]] Tp *allocate(size_t n) {
                 return static_cast<Tp *>(resource()->allocate(n * sizeof(Tp), alignof(Tp)));
             }

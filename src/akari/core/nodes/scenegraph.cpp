@@ -58,21 +58,22 @@ namespace akari {
         using namespace __node_register;
         map[variant][name] = func;
     }
-#ifdef AKR_ENABLE_PYTHON
+
     namespace py = pybind11;
 
-    AKR_VARIANT void RegisterSceneGraph<C>::register_scene_graph(py::module &parent) {
+    AKR_VARIANT void RegisterSceneGraph<C>::register_python_scene_graph(py::module &parent) {
+#ifdef AKR_ENABLE_PYTHON
         auto m = parent.def_submodule(get_variant_string<C>());
         AKR_IMPORT_TYPES();
 
         RegisterMathFunction<C>::register_math_functions(m);
         py::class_<SceneGraphNode<C>, std::shared_ptr<SceneGraphNode<C>>>(m, "SceneGraphNode")
             .def("commit", &SceneGraphNode<C>::commit);
-        RegisterSceneNode<C>::register_nodes(m);
-        RegisterCameraNode<C>::register_nodes(m);
-        RegisterMeshNode<C>::register_nodes(m);
-        RegisterMaterialNode<C>::register_nodes(m);
-        RegisterIntegratorNode<C>::register_nodes(m);
+        RegisterSceneNode<C>::register_python_nodes(m);
+        RegisterCameraNode<C>::register_python_nodes(m);
+        RegisterMeshNode<C>::register_python_nodes(m);
+        RegisterMaterialNode<C>::register_python_nodes(m);
+        RegisterIntegratorNode<C>::register_python_nodes(m);
         m.def("set_device_cpu", []() {
             warning("compute device set to cpu\n");
             warning("use akari [scene file] instead\n");
@@ -84,7 +85,17 @@ namespace akari {
             set_device_gpu();
         });
         m.def("get_device", []() -> std::string { return get_device() == ComputeDevice::cpu ? "cpu" : "gpu"; });
-    }
-    AKR_RENDER_STRUCT(RegisterSceneGraph)
 #endif
+    }
+
+    AKR_VARIANT void RegisterSceneGraph<C>::register_scene_graph() {
+        RegisterSceneNode<C>::register_nodes();
+        RegisterCameraNode<C>::register_nodes();
+        RegisterMeshNode<C>::register_nodes();
+        RegisterMaterialNode<C>::register_nodes();
+        RegisterIntegratorNode<C>::register_nodes();
+    }
+
+    AKR_RENDER_STRUCT(RegisterSceneGraph)
+
 } // namespace akari

@@ -21,14 +21,13 @@
 // SOFTWARE.
 #pragma once
 #include <sstream>
-#include <pugixml.hpp>
 #include <akari/core/akari.h>
 #include <akari/common/fwd.h>
 #include <akari/common/buffer.h>
 #include <akari/core/arena.h>
 #include <akari/kernel/instance.h>
 #include <akari/kernel/integrators/cpu/integrator.h>
-
+#include <akari/core/parser.h>
 #ifdef AKR_ENABLE_PYTHON
 #    include <pybind11/pybind11.h>
 #    include <pybind11/embed.h>
@@ -40,23 +39,22 @@ namespace pybind11 {
 }
 namespace akari {
     namespace py = pybind11;
-    class Node {
+    class Node;
+    class Node : public sdl::Object {
       public:
-        virtual void load(const pugi::xml_node &xml) = 0;
         virtual void commit() {}
         virtual const char *description() { return "unknown"; }
         virtual ~Node() = default;
         typedef std::shared_ptr<Node> (*CreateFunc)(void);
     };
-    AKR_VARIANT class SceneGraphNode : public Node {
-      public:
-        using Float = typename C::Float;
-        AKR_IMPORT_CORE_TYPES()
-    };
+    AKR_VARIANT class SceneGraphNode : public Node { public: };
     AKR_VARIANT class SceneNode;
 
     AKR_VARIANT class FilmNode : public SceneGraphNode<C> { public: };
-    AKR_VARIANT struct RegisterSceneGraph { static void register_scene_graph(py::module &parent); };
+    AKR_VARIANT struct AKR_EXPORT RegisterSceneGraph {
+        static void register_scene_graph();
+        static void register_python_scene_graph(py::module &parent);
+    };
 
     AKR_EXPORT std::shared_ptr<Node> create_node_with_name(std::string_view variant, const std::string &name);
     AKR_EXPORT void register_node(std::string_view variant, const std::string &name, Node::CreateFunc);
@@ -66,5 +64,22 @@ namespace akari {
     template <class C, class T>
     void register_node(const std::string &name) {
         register_node(get_variant_string<C>(), name, []() -> std::shared_ptr<Node> { return std::make_shared<T>(); });
+    }
+    AKR_VARIANT class SceneGraphParser : public sdl::Parser {
+      public:
+        sdl::P<sdl::Object> do_parse_object_creation(sdl::ParserContext &ctx, const std::string &type) {
+            return create_node_with_name(get_variant_string<C>(), type);
+        }
+    };
+
+    template <typename A, typename T = value_t<A>, int N = array_size_v<A>>
+    A load_array(const sdl::Value &v) {
+        AKR_ASSERT_THROW(v.is_array());
+        AKR_ASSERT_THROW(v.size() == size_t(N));
+        A a;
+        for (int i = 0; i < N; i++) {
+            a[i] = v.at(i).get<T>().value();
+        }
+        return a;
     }
 } // namespace akari
