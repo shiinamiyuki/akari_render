@@ -138,7 +138,6 @@ namespace akari::gpu {
     }
 
     AKR_VARIANT void PathTracerImpl<C>::render(const Scene<C> &scene, Film<C> *film) {
-        double gpu_time = 0;
         auto render_tile = [&](int tile_x, int tile_y) {
             Point2i tile_pos(tile_x, tile_y);
             Bounds2i tileBounds = Bounds2i{tile_pos * (int)tile_size, (tile_pos + Vector2i(1)) * (int)tile_size};
@@ -149,7 +148,6 @@ namespace akari::gpu {
             auto tile = boxed_tile.get();
             auto resolution = film->resolution();
             auto _spp = this->spp;
-            Timer timer;
             auto get_pixel = AKR_GPU_LAMBDA(int pixel_id) {
                 int tx = pixel_id % extents.x();
                 int ty = pixel_id / extents.x();
@@ -158,6 +156,7 @@ namespace akari::gpu {
                 return Point2i(x, y);
             };
             auto launch_size = extents.x() * extents.y();
+            Timer timer;
             launch(
                 "Set Path State", launch_size, AKR_GPU_LAMBDA(int tid) {
                     auto px = get_pixel(tid);
@@ -190,13 +189,10 @@ namespace akari::gpu {
                 // first bounce ray queue is full
                 launch_single(
                     "Set Ray Queue", AKR_GPU_LAMBDA() { ray_queue[0]->head = MAX_QUEUE_SIZE; });
-                // CUDA_CHECK(cudaDeviceSynchronize());
                 for (int depth = 0; depth <= max_depth; depth++) {
-                    // printf("fuck??? depth=%d max_depth=%d\n",depth, max_depth);
                     for (size_t i = 0; i < material_queues.size(); i++) {
                         launch_single(
                             "Reset Material Queue", AKR_GPU_LAMBDA() { material_queues[i]->clear(); });
-                        // CUDA_CHECK(cudaDeviceSynchronize());
                     }
                     launch(
                         "Intersect Closest", launch_size, AKR_GPU_LAMBDA(int tid) {
@@ -209,8 +205,13 @@ namespace akari::gpu {
 
                             Intersection<C> intersection;
                             if (scene.intersect(ray_item.ray, &intersection)) {
-                                auto trig = scene.get_triangle(intersection.geom_id, intersection.prim_id);
-                                auto *material = trig.material;
+                                // auto trig = scene.get_triangle(intersection.geom_id, intersection.prim_id);
+                                auto mat_idx =
+                                    scene.meshes[intersection.geom_id].material_indices[intersection.prim_id];
+                                if (mat_idx < 0)
+                                    return;
+
+                                auto *material = scene.meshes[intersection.geom_id].materials[mat_idx];
                                 if (!material)
                                     return;
                                 MaterialWorkItem<C> material_item;
@@ -271,7 +272,7 @@ namespace akari::gpu {
                     }
                 }
                 launch(
-                    "update_film", launch_size, AKR_GPU_LAMBDA(int tid) {
+                    "Update Film", launch_size, AKR_GPU_LAMBDA(int tid) {
                         PathState<C> state = path_states[tid];
                         auto p = get_pixel(tid);
                         tile->add_sample(Point2f(p), state.L, 1.0f);
@@ -279,7 +280,6 @@ namespace akari::gpu {
             }
             CUDA_CHECK(cudaDeviceSynchronize());
             info("tile took {}s", timer.elapsed_seconds());
-            gpu_time += timer.elapsed_seconds();
             film->merge_tile(*tile);
         };
         auto n_tiles = Point2i(film->resolution() + Point2i(tile_size - 1)) / Point2i(tile_size);
@@ -288,7 +288,7 @@ namespace akari::gpu {
                 render_tile(tile_x, tile_y);
             }
         }
-        info("total gpu time {}s", gpu_time);
+        print_kernel_stats();
     }
     AKR_RENDER_CLASS(PathTracer)
 

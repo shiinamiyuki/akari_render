@@ -25,7 +25,8 @@
 #include <akari/common/mesh.h>
 #include <akari/core/logger.h>
 namespace akari {
-    template <typename C, class UserData, class Hit, class Intersector, class ShapeHandleConstructor>
+    template <typename C, class UserData, class Hit, class Intersector, class ShapeHandleConstructor,
+              size_t StackDepth = 40>
     struct TBVHAccelerator {
         AKR_IMPORT_TYPES()
         struct BVHNode {
@@ -66,7 +67,6 @@ namespace akari {
             Vector3f t0 = (box.pmin - ray.o) * invd;
             Vector3f t1 = (box.pmax - ray.o) * invd;
             Vector3f tMin = min(t0, t1), tMax = max(t0, t1);
-            // debug("t0: {} t1: {} tmin:{} tmax:{}\n", t0, t1, tMin, tMax);
             if (hmax(tMin) <= hmin(tMax)) {
                 auto t = std::max(ray.tmin, hmax(tMin));
                 if (t >= ray.tmax) {
@@ -188,7 +188,7 @@ namespace akari {
         AKR_XPU bool intersect(const Ray3f &ray, Hit &isct) const {
             bool hit = false;
             auto invd = Vector3f(1) / ray.d;
-            constexpr int maxDepth = 40;
+            constexpr size_t maxDepth = StackDepth;
             const BVHNode *stack[maxDepth];
             int sp = 0;
             stack[sp++] = &nodes[0];
@@ -218,7 +218,7 @@ namespace akari {
         AKR_XPU [[nodiscard]] bool occlude(const Ray3f &ray) const {
             Hit isct;
             auto invd = Vector3f(1) / ray.d;
-            constexpr int maxDepth = 64;
+            constexpr size_t maxDepth = StackDepth;
             const BVHNode *stack[maxDepth];
             int sp = 0;
             stack[sp++] = &nodes[0];
@@ -307,7 +307,7 @@ namespace akari {
             }
         };
         Buffer<MeshBVH> meshBVHs;
-        using TopLevelBVH = TBVHAccelerator<C, MeshBVHes, Intersection<C>, BVHIntersector, BVHHandleConstructor>;
+        using TopLevelBVH = TBVHAccelerator<C, MeshBVHes, Intersection<C>, BVHIntersector, BVHHandleConstructor, 28>;
         astd::optional<TopLevelBVH> topLevelBVH;
 
       public:

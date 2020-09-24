@@ -31,6 +31,8 @@
 #include <cuda_runtime_api.h>
 
 namespace akari::gpu {
+    std::pair<cudaEvent_t, cudaEvent_t> get_profiler_events(const char *description);
+    void print_kernel_stats();
     template <typename F>
     inline int get_block_size(const char *description, F kernel) {
         static std::map<std::type_index, int> kernelBlockSizes;
@@ -66,7 +68,10 @@ namespace akari::gpu {
         auto kernel = &_kernel_wrapper<F>;
         int blockSize = get_block_size(name, kernel);
         int gridSize = (nItems + blockSize - 1) / blockSize;
+        auto event =  get_profiler_events(name);
+        cudaEventRecord(event.first);
         kernel<<<gridSize, blockSize>>>(func, nItems);
+        cudaEventRecord(event.second);
         //  CUDA_CHECK(cudaDeviceSynchronize());
     }
     template<typename F>
