@@ -73,9 +73,9 @@ void parse_and_run() {
     using namespace sdl;
     RegisterSceneGraph<C>::register_scene_graph();
     SceneGraphParser<C> parser;
-    Module module = parser.parse_file(inputFilename, "this");
-    auto it = module.exports.find("scene");
-    if (it == module.exports.end()) {
+    auto module = parser.parse_file(inputFilename, "this");
+    auto it = module->exports.find("scene");
+    if (it == module->exports.end()) {
         fatal("variable 'scene' not found");
     }
     auto scene = dyn_cast<SceneNode<C>>(it->second.object());

@@ -147,9 +147,9 @@ namespace akari::sdl {
         }
         return s;
     }
-    Module Parser::parse_string(const std::string &src, const fs::path &filename, const std::string &module_name) {
+    P<Module> Parser::parse_string(const std::string &src, const fs::path &filename, const std::string &module_name) {
         ParserContext ctx(src, filename.string());
-        ctx.main.name = module_name;
+        ctx.main->name = module_name;
         while (ctx.peek()) {
             skip(ctx);
             if (ctx.startswith("import")) {
@@ -164,7 +164,7 @@ namespace akari::sdl {
         }
         return ctx.main;
     }
-    Module Parser::parse_file(const fs::path &_path, const std::string &module_name) {
+    P<Module> Parser::parse_file(const fs::path &_path, const std::string &module_name) {
         auto path = fs::absolute(_path);
         auto parent_path = path.parent_path();
         CurrentPathGuard _;
@@ -230,7 +230,7 @@ namespace akari::sdl {
                 if (m == mod->submodules.end()) {
                     ctx.report_error(fmt::format("module {} has no submodule named {}", mod->name, *it), ctx.loc);
                 } else {
-                    mod = &m->second;
+                    mod = m->second;
                 }
             }
             auto v = mod->exports.find(*it);

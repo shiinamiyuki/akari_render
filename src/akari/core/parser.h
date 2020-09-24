@@ -41,6 +41,8 @@ namespace akari::sdl {
     class Object;
     class Null;
     class Boolean;
+    class Number;
+    class String;
 
     struct ParseError : std::runtime_error {
         using std::runtime_error::runtime_error;
@@ -68,30 +70,7 @@ namespace akari::sdl {
         Value at(int i) const;
         P<Object> object() const;
         template <typename T>
-        std::optional<T> get() const {
-            if (is_null())
-                return std::nullopt;
-            if constexpr (std::is_integral_v<T> || std::is_floating_point_v<T>) {
-                if (!is_number()) {
-                    return std::nullopt;
-                }
-                auto number = dyn_cast<Number>(data);
-                return static_cast<T>(number->number);
-            } else if constexpr (std::is_same_v<T, bool>) {
-                if (is_boolean()) {
-                    return dyn_cast<Boolean>(data)->v;
-                }
-                return std::nullopt;
-            } else if constexpr (std::is_same_v<T, std::string> || std::is_same_v<T, std::string_view>) {
-                if (!is_string()) {
-                    return std::nullopt;
-                }
-                auto s = dyn_cast<String>(data);
-                return T(s->s);
-            } else {
-                static_assert("T is not supported");
-            }
-        }
+        inline std::optional<T> get() const;
 
       private:
         P<ValueBase> data;
@@ -145,6 +124,31 @@ namespace akari::sdl {
             return Value();
         }
     };
+    template <typename T>
+    inline std::optional<T> Value::get() const {
+        if (is_null())
+            return std::nullopt;
+        if constexpr (std::is_integral_v<T> || std::is_floating_point_v<T>) {
+            if (!is_number()) {
+                return std::nullopt;
+            }
+            auto number = dyn_cast<Number>(data);
+            return static_cast<T>(number->number);
+        } else if constexpr (std::is_same_v<T, bool>) {
+            if (is_boolean()) {
+                return dyn_cast<Boolean>(data)->v;
+            }
+            return std::nullopt;
+        } else if constexpr (std::is_same_v<T, std::string> || std::is_same_v<T, std::string_view>) {
+            if (!is_string()) {
+                return std::nullopt;
+            }
+            auto s = dyn_cast<String>(data);
+            return T(s->s);
+        } else {
+            static_assert("T is not supported");
+        }
+    }
     struct SourceLoc {
         int line = 1, col = 1;
         P<std::string> filename;
@@ -152,20 +156,21 @@ namespace akari::sdl {
     using Accessor = std::vector<std::string>;
     struct Module {
         std::string name;
-        std::unordered_map<std::string, Module> submodules;
+        std::unordered_map<std::string, P<Module>> submodules;
         std::unordered_map<std::string, Value> exports;
         std::unordered_map<std::string, Value> locals;
     };
     struct AKR_EXPORT ParserContext {
-        std::vector<Module *> mod_stack;
-        Module main;
+        std::vector<P<Module>> mod_stack;
+        P<Module> main;
 
         SourceLoc loc;
         const std::string &source;
         size_t pos = 0;
         ParserContext(const std::string &source, const std::string &filename) : source(source) {
             loc.filename = std::make_shared<std::string>(filename);
-            mod_stack.push_back(&main);
+            main = std::make_shared<Module>();
+            mod_stack.push_back(main);
         }
         char peek() {
             if (pos < source.length()) {
@@ -209,7 +214,7 @@ namespace akari::sdl {
                 }
             }
         }
-        Module *cur_mod() { return mod_stack.back(); }
+        P<Module> cur_mod() { return mod_stack.back(); }
         [[noreturn]] void report_error(const std::string &message, SourceLoc loc_) {
             auto path = fs::path(*loc_.filename);
             path = fs::absolute(path);
@@ -250,8 +255,8 @@ namespace akari::sdl {
         void parse_import(ParserContext &ctx);
         void parse_let(ParserContext &ctx);
         void parse_export(ParserContext &ctx);
-        Module parse_file(const fs::path &, const std::string &module_name = "");
-        Module parse_string(const std::string &src, const fs::path &filename = "", const std::string &module_name = "");
+        P<Module> parse_file(const fs::path &, const std::string &module_name = "");
+        P<Module> parse_string(const std::string &src, const fs::path &filename = "", const std::string &module_name = "");
         void skip_comment(ParserContext &ctx);
         bool is_comment(ParserContext &ctx);
     };
