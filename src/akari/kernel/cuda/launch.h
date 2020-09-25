@@ -26,7 +26,7 @@
 #include <akari/core/parallel.h>
 #include <typeindex>
 #include <typeinfo>
-#include <map>
+#include <unordered_map>
 #include <cuda.h>
 #include <cuda_runtime_api.h>
 
@@ -35,7 +35,7 @@ namespace akari::gpu {
     void print_kernel_stats();
     template <typename F>
     inline int get_block_size(const char *description, F kernel) {
-        static std::map<std::type_index, int> kernelBlockSizes;
+        static std::unordered_map<std::type_index, int> kernelBlockSizes;
 
         std::type_index index = std::type_index(typeid(F));
 

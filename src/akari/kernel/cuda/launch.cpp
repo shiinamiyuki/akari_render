@@ -20,6 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <map>
 #include "launch.h"
 #include <akari/core/logger.h>
 namespace akari::gpu {
@@ -57,11 +58,13 @@ namespace akari::gpu {
     } // namespace cuda_profiler
     std::pair<cudaEvent_t, cudaEvent_t> get_profiler_events(const char *description) {
         using namespace cuda_profiler;
-        if (stats.find(description) == stats.end()) {
-            stats.emplace(description, KernelStats());
-            stats[description].name = description;
+        auto it = stats.find(description);
+        if (it == stats.end()) {
+            auto [it_, _] = stats.emplace(description, KernelStats());
+            it = it_;
+            it->second.name = description;
         }
-        auto &stat = stats[description];
+        auto &stat = it->second;
         if (stat.active) {
             stat.sync();
         }
