@@ -26,14 +26,15 @@
 #include <akari/core/logger.h>
 namespace akari {
     template <typename C, class UserData, class Hit, class Intersector, class ShapeHandleConstructor,
-              size_t StackDepth = 40>
+              size_t StackDepth = 64>
     struct TBVHAccelerator {
         AKR_IMPORT_TYPES()
-        struct BVHNode {
+        struct alignas(32) BVHNode {
             Bounds3f box{};
+            int left = -1, right = -1;
             uint32_t first = (uint32_t)-1;
             uint32_t count = (uint32_t)-1;
-            int left = -1, right = -1;
+            int axis = -1;
 
             [[nodiscard]] AKR_XPU bool is_leaf() const { return left < 0 && right < 0; }
         };
@@ -93,7 +94,7 @@ namespace akari {
                 boundBox = box;
             }
 
-            if (end - begin <= 8 || depth >= 32) {
+            if (end - begin <= 4 || depth >= 32) {
                 BVHNode node;
 
                 node.box = box;
@@ -122,7 +123,7 @@ namespace akari {
                 }
                 Index *mid = nullptr;
                 if (size[axis] > 0) {
-                    constexpr size_t nBuckets = 12;
+                    constexpr size_t nBuckets = 16;
                     struct Bucket {
                         int count = 0;
                         Bounds3f bound;
@@ -178,10 +179,12 @@ namespace akari {
                     std::lock_guard<std::mutex> _(*m);
                     ret = nodes.size();
                     nodes.emplace_back();
+                    BVHNode &node = nodes.back();
+                    node.axis = axis;
+                    node.box = box;
+                    node.count = (uint32_t)-1;
                 }
-                BVHNode &node = nodes.back();
-                node.box = box;
-                node.count = (uint32_t)-1;
+
                 if (end - begin > 128 * 1024) {
                     auto left = std::async(std::launch::async, [&]() {
                         return (int)recursiveBuild(begin, int(mid - &primitives[0]), depth + 1);
@@ -221,10 +224,17 @@ namespace akari {
                         }
                     }
                 } else {
-                    if (p->left >= 0)
-                        stack[sp++] = &nodes[p->left];
-                    if (p->right >= 0)
-                        stack[sp++] = &nodes[p->right];
+                    if (ray.d[p->axis] > 0) {
+                        if (p->right >= 0)
+                            stack[sp++] = &nodes[p->right];
+                        if (p->left >= 0)
+                            stack[sp++] = &nodes[p->left];
+                    } else {
+                        if (p->left >= 0)
+                            stack[sp++] = &nodes[p->left];
+                        if (p->right >= 0)
+                            stack[sp++] = &nodes[p->right];
+                    }
                 }
             }
             return hit;
@@ -250,10 +260,17 @@ namespace akari {
                         }
                     }
                 } else {
-                    if (p->left >= 0)
-                        stack[sp++] = &nodes[p->left];
-                    if (p->right >= 0)
-                        stack[sp++] = &nodes[p->right];
+                    if (ray.d[p->axis] > 0) {
+                        if (p->right >= 0)
+                            stack[sp++] = &nodes[p->right];
+                        if (p->left >= 0)
+                            stack[sp++] = &nodes[p->left];
+                    } else {
+                        if (p->left >= 0)
+                            stack[sp++] = &nodes[p->left];
+                        if (p->right >= 0)
+                            stack[sp++] = &nodes[p->right];
+                    }
                 }
             }
             return false;

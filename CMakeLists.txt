@@ -107,6 +107,7 @@ if(AKR_ENABLE_CUDA)
     set_source_files_properties(
         src/akari/kernel/integrators/gpu/cuda/integrator.cpp
         src/akari/kernel/scene.cpp
+       src/akari/kernel/cuda/launch.cpp
          PROPERTIES LANGUAGE CUDA
     )
 else()
