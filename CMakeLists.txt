@@ -95,7 +95,7 @@ file(GLOB AKR_SHADING_SRC src/akari/shading/*.*)
 file(GLOB AKR_CORE_SRC src/akari/core/*.*)
 file(GLOB AKR_PYBIND_SRC src/akari/core/nodes/*.*)
 
-file(GLOB AKR_KERNEL_COMMON_SRC src/akari/kernel/*.* src/akari/kernel/*/*.*)
+file(GLOB AKR_KERNEL_COMMON_SRC src/akari/kernel/*.*)
 file(GLOB AKR_KERNEL_CPU_SRC src/akari/kernel/integrators/cpu/*.*)
 file(GLOB AKR_KERNEL_GPU_SRC ${AKR_KERNEL_SOA_H} src/akari/kernel/integrators/gpu/*.* src/akari/kernel/cuda/*.*)
 
