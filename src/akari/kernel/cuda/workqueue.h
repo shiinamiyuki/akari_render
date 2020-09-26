@@ -21,11 +21,12 @@
 // SOFTWARE.
 
 #include <cuda.h>
+#include <akari/common/def.h>
 #include <akari/common/fwd.h>
 #include <akari/common/tuple.h>
 #include <akari/common/soa.h>
 #include <akari/kernel/soa.h>
-
+#include <cooperative_groups.h>
 namespace akari {
 #if 0
     template <typename T>
@@ -55,11 +56,16 @@ namespace akari {
     struct WorkQueue : SOA<T> {
         using value_type = T;
         using SOA<T>::SOA;
-        size_t head = 0;
+        int head = 0;
         AKR_XPU int append(const T &el) {
             auto i = atomicAdd(&head, 1);
             AKR_ASSERT(i < size());
             (*this)[i] = el;
+            return i;
+        }
+        AKR_XPU int allocate(int n) {
+            auto i = atomicAdd(&head, n);
+            AKR_ASSERT(i + n <= size());
             return i;
         }
         AKR_XPU size_t elements_in_queue() const { return head; }

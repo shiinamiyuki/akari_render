@@ -67,7 +67,7 @@ namespace akari {
         AKR_XPU CameraSample<C> generate_ray(const Point2f &u1, const Point2f &u2, const Point2i &raster) const {
             CameraSample<C> sample;
             sample.p_lens = sampling<C>::concentric_disk_sampling(u1) * lens_radius;
-            sample.p_film = Point2f(raster) + (u2 - 0.5f);
+            sample.p_film = Point2f(raster) + u2;
             sample.weight = 1;
 
             Point2f p = shuffle<0, 1>(r2c.apply_point(Point3f(sample.p_film.x(), sample.p_film.y(), 0.0f)));

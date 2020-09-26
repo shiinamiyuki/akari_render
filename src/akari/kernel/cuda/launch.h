@@ -53,8 +53,8 @@ namespace akari::gpu {
     template <typename F>
     __global__ void _kernel_wrapper(F func, int nItems) {
         int tid = blockIdx.x * blockDim.x + threadIdx.x;
-        if (tid >= nItems)
-            return;
+        // if (tid >= nItems)
+            // return;
         func(tid);
     }
 #ifdef AKR_PLATFORM_WINDOWS

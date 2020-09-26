@@ -41,10 +41,11 @@ namespace akari {
             template <typename C1>
             friend struct PathTracerImpl;
             int spp = 16;
-            int tile_size = 512;
+            int max_depth = 5;
+            int tile_size = 256;
             AKR_IMPORT_TYPES()
             PathTracer() = default;
-            PathTracer(int spp) : spp(spp) {}
+            PathTracer(int spp, int max_depth, int tile_size) : spp(spp), max_depth(max_depth), tile_size(tile_size) {}
             void render(const Scene<C> &scene, Film<C> *out) const;
         };
         AKR_VARIANT class Integrator : public Variant<AmbientOcclusion<C>, PathTracer<C>> {

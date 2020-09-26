@@ -241,6 +241,7 @@ namespace akari {
         }
         return s;
     }
+
 #define FWD_MATH_FUNC1(name)                                                                                           \
                                                                                                                        \
     template <typename V, int N, int P>                                                                                \

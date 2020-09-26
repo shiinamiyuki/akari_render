@@ -42,42 +42,27 @@ namespace akari {
         Point2i _size;
         Buffer<Pixel<C>> pixels;
 
-        explicit Tile(const Bounds2i &bounds)
-            : bounds(bounds), _size(bounds.size() + Point2i(2, 2)), pixels(_size.x() * _size.y()) {}
+        explicit Tile(const Bounds2i &bounds) : bounds(bounds), _size(bounds.size()), pixels(_size.x() * _size.y()) {}
 
         AKR_XPU auto &operator()(const Point2f &p) {
-            auto q = Point2i(floor(p + Point2f(0.5) - Point2f(bounds.pmin) + Point2f(1)));
+            auto q = Point2i(floor(p - Point2f(bounds.pmin)));
             return pixels[q.x() + q.y() * _size.x()];
         }
 
+        AKR_XPU auto &operator()(const Point2i &p) {
+            auto q = Point2i(p - bounds.pmin);
+            return pixels[q.x() + q.y() * _size.x()];
+        }
+        AKR_XPU const auto &operator()(const Point2i &p) const {
+            auto q = Point2i(p - bounds.pmin);
+            return pixels[q.x() + q.y() * _size.x()];
+        }
         AKR_XPU const auto &operator()(const Point2f &p) const {
-            auto q = Point2i(floor(p + Point2f(0.5) - Point2f(bounds.pmin) + Point2f(1)));
+            auto q = Point2i(floor(p - Point2f(bounds.pmin)));
             return pixels[q.x() + q.y() * _size.x()];
         }
 
         AKR_XPU void add_sample(const Point2f &p, const Spectrum &radiance, Float weight) {
-            auto &pix = (*this)(p);
-            pix.weight += weight;
-            pix.radiance += radiance;
-        }
-    };
-    AKR_VARIANT struct TileView {
-        AKR_IMPORT_TYPES()
-        Bounds2i bounds{};
-        Point2i _size;
-        BufferView<Pixel<C>> pixels;
-        explicit TileView(Tile<C> &tile) : bounds(tile.bounds), _size(tile._size), pixels(tile.pixels) {}
-        auto &operator()(const Point2f &p) {
-            auto q = Point2i(floor(p + Point2f(0.5) - Point2f(bounds.pmin) + Point2f(1)));
-            return pixels[q.x() + q.y() * _size.x()];
-        }
-
-        const auto &operator()(const Point2f &p) const {
-            auto q = Point2i(floor(p + Point2f(0.5) - Point2f(bounds.pmin) + Point2f(1)));
-            return pixels[q.x() + q.y() * _size.x()];
-        }
-
-        void add_sample(const Point2f &p, const Spectrum &radiance, Float weight) {
             auto &pix = (*this)(p);
             pix.weight += weight;
             pix.radiance += radiance;
@@ -97,11 +82,11 @@ namespace akari {
 
         [[nodiscard]] AKR_XPU Bounds2i bounds() const { return Bounds2i{Point2i(0), resolution()}; }
         AKR_XPU void merge_tile(const Tile<C> &tile) {
-            const auto lo = max(tile.bounds.pmin - Point2i(1, 1), Point2i(0, 0));
-            const auto hi = min(tile.bounds.pmax + Point2i(1, 1), radiance.resolution());
+            const auto lo = max(tile.bounds.pmin, Point2i(0, 0));
+            const auto hi = min(tile.bounds.pmax, radiance.resolution());
             for (int y = lo.y(); y < hi.y(); y++) {
                 for (int x = lo.x(); x < hi.x(); x++) {
-                    auto &pix = tile(Point2f(x, y));
+                    auto &pix = tile(Point2i(x, y));
                     radiance(x, y) += pix.radiance;
                     weight(x, y) += pix.weight;
                 }

@@ -250,7 +250,7 @@ namespace akari {
                 auto p = stack[--sp];
                 auto t = intersectAABB(p->box, ray, invd);
 
-                if (t < 0) {
+                if (t < 0 || t > ray.tmax) {
                     continue;
                 }
                 if (p->is_leaf()) {
@@ -260,10 +260,17 @@ namespace akari {
                         }
                     }
                 } else {
-                    if (p->left >= 0)
-                        stack[sp++] = &nodes[p->left];
-                    if (p->right >= 0)
-                        stack[sp++] = &nodes[p->right];
+                    if (ray.d[p->axis] > 0) {
+                        if (p->right >= 0)
+                            stack[sp++] = &nodes[p->right];
+                        if (p->left >= 0)
+                            stack[sp++] = &nodes[p->left];
+                    } else {
+                        if (p->left >= 0)
+                            stack[sp++] = &nodes[p->left];
+                        if (p->right >= 0)
+                            stack[sp++] = &nodes[p->right];
+                    }
                 }
             }
             return false;
