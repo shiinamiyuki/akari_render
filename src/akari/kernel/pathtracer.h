@@ -106,6 +106,10 @@ namespace akari {
                 si.bsdf = material->get_bsdf(ctx);
                 BSDFSampleContext<C> sample_ctx(sampler.next2d(), wo);
                 auto sample = si.bsdf.sample(sample_ctx);
+                AKR_ASSERT(sample.pdf >= 0.0f);
+                if(sample.pdf == 0.0f){
+                    return astd::nullopt;
+                }
                 event.ray = Ray3f(si.p, sample.wi, Constants<Float>::Eps() / std::abs(dot(si.ng, sample.wi)));
                 event.beta = sample.f * std::abs(dot(si.ng, sample.wi)) / sample.pdf;
                 event.pdf = sample.pdf;

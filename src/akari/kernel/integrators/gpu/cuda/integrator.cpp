@@ -211,7 +211,6 @@ namespace akari::gpu {
 
                             Intersection<C> intersection;
                             if (scene.intersect(ray_item.ray, &intersection)) {
-                                // auto trig = scene.get_triangle(intersection.geom_id, intersection.prim_id);
                                 auto mat_idx =
                                     scene.meshes[intersection.geom_id].material_indices[intersection.prim_id];
                                 if (mat_idx < 0)
@@ -263,11 +262,6 @@ namespace akari::gpu {
                                     auto has_event = pt.on_surface_scatter(si, surface_hit);
                                     if (has_event) {
                                         auto event = has_event.value();
-                                        pt.beta *= event.beta;
-                                        RayWorkItem<C> ray_item;
-                                        ray_item.pixel = pixel;
-                                        ray_item.ray = event.ray;
-                                        ray_queue[0]->append(ray_item);
 
                                         // Direct Light Sampling
                                         astd::optional<DirectLighting<C>> has_direct =
@@ -282,6 +276,11 @@ namespace akari::gpu {
                                                 // shadow_ray_offset = atomicAdd(&num_shadow_ray_block, 1);
                                             }
                                         }
+                                        pt.beta *= event.beta;
+                                        RayWorkItem<C> ray_item;
+                                        ray_item.pixel = pixel;
+                                        ray_item.ray = event.ray;
+                                        ray_queue[0]->append(ray_item);
                                     }
 
                                     path_state.update(pt);

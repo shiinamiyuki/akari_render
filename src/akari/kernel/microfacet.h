@@ -68,7 +68,7 @@ namespace akari {
         AKR_XPU static inline Float PhongD(Float alpha, const Normal3f &m) {
             if (m.y() <= 0.0f)
                 return 0.0f;
-            return (alpha + 2.0) / (2.0 * Constants<Float>::Pi()) * pow(m.y(), alpha);
+            return (alpha + 2.0) / (2.0 * Constants<Float>::Pi()) * std::pow(m.y(), alpha);
         }
 
         AKR_XPU static inline Float GGX_D(Float alpha, const Normal3f &m) {
@@ -132,7 +132,7 @@ namespace akari {
                     break;
                 }
                 case EPhong: {
-                    cosTheta = pow((Float64)u[0], 1.0 / ((Float64)alpha + 2.0f));
+                    cosTheta = std::pow((Float)u[0], Float(1.0 / ((Float)alpha + 2.0f)));
                     break;
                 }
                 case EGGX: {

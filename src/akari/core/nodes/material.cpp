@@ -38,6 +38,26 @@ namespace akari {
             }
         }
     };
+    AKR_VARIANT class GlossyMaterialNode : public MaterialNode<C> {
+      public:
+        AKR_IMPORT_TYPES()
+        Color3f color;
+        Float roughness = Float(0.1);
+        Material<C> *compile(MemoryArena *arena) override {
+            auto tex = arena->alloc<Texture<C>>(ConstantTexture<C>(color));
+            auto tex_rough = arena->alloc<Texture<C>>(ConstantTexture<C>(roughness));
+            return arena->alloc<Material<C>>(GlossyMaterial<C>(tex, tex_rough));
+        }
+        void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
+                          const sdl::Value &value) override {
+            if (field == "color") {
+                color = load_array<Color3f>(value);
+            }
+            if (field == "roughness") {
+                roughness = value.get<double>().value();
+            }
+        }
+    };
     AKR_VARIANT class EmissiveMaterialNode : public MaterialNode<C> {
       public:
         AKR_IMPORT_TYPES()
@@ -59,6 +79,7 @@ namespace akari {
         AKR_IMPORT_TYPES()
         register_node<C, DiffuseMaterialNode<C>>("DiffuseMaterial");
         register_node<C, EmissiveMaterialNode<C>>("EmissiveMaterial");
+        register_node<C, GlossyMaterialNode<C>>("GlossyMaterial");
     }
 
     AKR_VARIANT void RegisterMaterialNode<C>::register_python_nodes(py::module &m) {

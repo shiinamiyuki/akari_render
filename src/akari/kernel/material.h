@@ -84,10 +84,61 @@ namespace akari {
             return R * Constants<Float>::InvPi();
         }
     };
+    AKR_VARIANT class MicrofacetReflection {
+        AKR_IMPORT_TYPES();
+        Spectrum R;
+        Float roughness;
+        typename microfacet<C>::MicrofacetModel model;
 
-    AKR_VARIANT class BSDFClosure : Variant<DiffuseBSDF<C>> {
       public:
-        using Variant<DiffuseBSDF<C>>::Variant;
+        AKR_XPU MicrofacetReflection(const Spectrum &R, Float roughness)
+            : R(R), roughness(roughness), model(microfacet<C>::MicrofacetType::EGGX, roughness) {}
+        [[nodiscard]] AKR_XPU Float evaluate_pdf(const Vector3f &wo, const Vector3f &wi) const {
+            if (bsdf<C>::same_hemisphere(wo, wi)) {
+                auto wh = normalize(wo + wi);
+                return model.evaluate_pdf(wh) / (Float(4.0f) * dot(wo, wh));
+            }
+            return 0.0f;
+        }
+        [[nodiscard]] AKR_XPU Spectrum evaluate(const Vector3f &wo, const Vector3f &wi) const {
+            if (bsdf<C>::same_hemisphere(wo, wi)) {
+                Float cosThetaO = bsdf<C>::abs_cos_theta(wo);
+                Float cosThetaI = bsdf<C>::abs_cos_theta(wi);
+                auto wh = (wo + wi);
+                if (cosThetaI == 0 || cosThetaO == 0)
+                    return Spectrum(0);
+                if (wh.x() == 0 && wh.y() == 0 && wh.z() == 0)
+                    return Spectrum(0);
+                wh = normalize(wh);
+                if (wh.y() < 0) {
+                    wh = -wh;
+                }
+                auto F = 1.0f;//fresnel->evaluate(dot(wi, wh));
+                return R * (model.D(wh) * model.G(wo, wi, wh) * F / (Float(4.0f) * cosThetaI * cosThetaO));
+            }
+            return Spectrum(0.0f);
+        }
+        [[nodiscard]] AKR_XPU BSDFType type() const { return BSDFType(BSDF_GLOSSY | BSDF_REFLECTION); }
+        AKR_XPU Spectrum sample(const Point2f &u, const Vector3f &wo, Vector3f *wi, Float *pdf,
+                                BSDFType *sampledType) const {
+            *sampledType = type();
+            auto wh = model.sample_wh(wo, u);
+            *wi = bsdf<C>::reflect(wo, wh);
+            if (!bsdf<C>::same_hemisphere(wo, *wi)) {
+                *pdf = 0;
+                return Spectrum(0);
+            } else {
+                if (wh.y() < 0) {
+                    wh = -wh;
+                }
+                *pdf = model.evaluate_pdf(wh) / (Float(4.0f) * abs(dot(wo, wh)));
+            }
+            return evaluate(wo, *wi);
+        }
+    };
+    AKR_VARIANT class BSDFClosure : Variant<DiffuseBSDF<C>, MicrofacetReflection<C>> {
+      public:
+        using Variant<DiffuseBSDF<C>, MicrofacetReflection<C>>::Variant;
         AKR_IMPORT_TYPES();
         [[nodiscard]] AKR_XPU Float evaluate_pdf(const Vector3f &wo, const Vector3f &wi) const {
             AKR_VAR_DISPATCH(evaluate_pdf, wo, wi);
@@ -166,8 +217,17 @@ namespace akari {
     AKR_VARIANT class GlossyMaterial {
       public:
         AKR_IMPORT_TYPES()
-        const Texture<C> *roughness = nullptr;
         const Texture<C> *color = nullptr;
+        const Texture<C> *roughness = nullptr;
+        GlossyMaterial(Texture<C> *color, const Texture<C> *roughness) : color(color), roughness(roughness) {}
+        AKR_XPU BSDF<C> get_bsdf(MaterialEvalContext<C> &ctx) const {
+            auto R = color->evaluate(ctx.texcoords);
+            auto roughness_ = roughness->evaluate(ctx.texcoords).x();
+            roughness_ *= roughness_;
+            BSDF<C> bsdf(ctx.ng, ctx.ns);
+            bsdf.set_closure(MicrofacetReflection<C>(R, roughness_));
+            return bsdf;
+        }
     };
     AKR_VARIANT class EmissiveMaterial {
       public:
@@ -184,10 +244,11 @@ namespace akari {
         const Texture<C> *fraction;
         const Material<C> *material_A, *material_B;
     };
-    AKR_VARIANT class Material : public Variant<DiffuseMaterial<C>, MixMaterial<C>, EmissiveMaterial<C>> {
+    AKR_VARIANT class Material
+        : public Variant<DiffuseMaterial<C>, GlossyMaterial<C>, MixMaterial<C>, EmissiveMaterial<C>> {
       public:
         AKR_IMPORT_TYPES()
-        using Variant<DiffuseMaterial<C>, MixMaterial<C>, EmissiveMaterial<C>>::Variant;
+        using Variant<DiffuseMaterial<C>, GlossyMaterial<C>, MixMaterial<C>, EmissiveMaterial<C>>::Variant;
 
       private:
         AKR_XPU const Material<C> *select_material(Float &u, const Point2f &texcoords, Float *choice_pdf) const {
