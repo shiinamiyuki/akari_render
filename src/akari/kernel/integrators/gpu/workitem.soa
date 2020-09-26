@@ -3,9 +3,18 @@
         "akari/kernel/soa.h",
         "akari/kernel/integrators/gpu/workitem.h"
     ],
-    "flat": ["int", "bool", "Float", "Array3f",
-             "Array2f", "Sampler<C>", "Ray<C>", "Spectrum",
-             "Intersection<C>", "const Material<C> *"],
+    "flat": [
+        "int",
+        "bool",
+        "Float",
+        "Array3f",
+        "Array2f",
+        "Sampler<C>",
+        "Ray<C>",
+        "Spectrum",
+        "Intersection<C>",
+        "const Material<C> *"
+    ],
     "soa": {
         "PathState<C>": {
             "template": "C",
@@ -19,12 +28,12 @@
         "MaterialWorkItem<C>": {
             "template": "C",
             "fields": {
-                "pixel":"int",
+                "pixel": "int",
                 "material": "const Material<C> *",
                 "geom_id": "int",
                 "prim_id": "int",
                 "uv": "Array2f",
-                "wo":"Array3f"
+                "wo": "Array3f"
             }
         },
         //  "CameraRayWorkItem<C>":{
@@ -38,16 +47,17 @@
             "fields": {
                 "pixel": "int",
                 "ray": "Ray<C>"
-
+            }
+        },
+        "ShadowRayWorkItem<C>": {
+            "template": "C",
+            "fields": {
+                "pixel": "int",
+                "ray": "Ray<C>",
+                "pdf": "Float",
+                "color": "Spectrum"
             }
         }
-        // "ShadowRayWorkItem<C>":{
-        //     "template":"C",
-        //     "fields":{
-        //         "pixel":"int",
-        //         "ray":"Ray<C>"
-        //     }
-        // },
         // "ClosestHitWorkItem<C>":{
         //     "template":"C",
         //     "fields":{

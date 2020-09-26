@@ -50,7 +50,6 @@ namespace akari {
             auto v2 = Point3f(vertices[3 * idx2 + 0], vertices[3 * idx2 + 1], vertices[3 * idx2 + 2]);
             Vector3f e1 = (v1 - v0);
             Vector3f e2 = (v2 - v0);
-            auto Ng = normalize(cross(e1, e2));
             Float a, f, u, v;
             auto h = cross(ray.d, e2);
             a = dot(e1, h);
@@ -69,7 +68,6 @@ namespace akari {
             if (t > ray.tmin && t < ray.tmax) {
                 if (hit) {
                     if (t < hit->t) {
-                        hit->ng = Ng;
                         hit->uv = Point2f(u, v);
                         hit->prim_id = prim_id;
                         hit->mat_idx = material_indices[prim_id];

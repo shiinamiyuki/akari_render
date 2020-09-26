@@ -32,7 +32,7 @@ namespace akari {
         using value_t = Float;
         static constexpr size_t size = N;
         AKR_ARRAY_IMPORT(Base, Color)
-        Color clamp_zero() const {
+        AKR_XPU Color clamp_zero() const {
             Color c;
             for (int i = 0; i < N; i++) {
                 auto x = (*this)[i];
@@ -45,7 +45,7 @@ namespace akari {
             }
             return c;
         }
-        bool is_black() const {
+        AKR_XPU bool is_black() const {
             return !reduce(*this, [](bool acc, Float f) { return acc || (f > 0.0f); });
         }
     };

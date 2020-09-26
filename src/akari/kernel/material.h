@@ -52,7 +52,7 @@ namespace akari {
         AKR_IMPORT_TYPES()
         const Point2f u1;
         const Vector3f wo;
-        BSDFSampleContext(const Point2f &u1, const Vector3f &wo) : u1(u1), wo(wo) {}
+        AKR_XPU BSDFSampleContext(const Point2f &u1, const Vector3f &wo) : u1(u1), wo(wo) {}
     };
     AKR_VARIANT class DiffuseBSDF {
         AKR_IMPORT_TYPES();

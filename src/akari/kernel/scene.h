@@ -57,6 +57,13 @@ namespace akari {
         Variant<EmbreeAccelerator<C> *, BVHAccelerator<C> *> accel;
 
         AKR_XPU bool intersect(const Ray3f &ray, Intersection<C> *isct) const;
+        AKR_XPU astd::optional<Intersection<C>> intersect(const Ray3f &ray) const {
+            Intersection<C> isct;
+            if (intersect(ray, &isct)) {
+                return isct;
+            }
+            return astd::nullopt;
+        }
         AKR_XPU bool occlude(const Ray3f &ray) const;
 
         void commit();

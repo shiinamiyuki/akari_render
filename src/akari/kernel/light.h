@@ -19,28 +19,29 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-
+#pragma once
 #include <akari/kernel/texture.h>
 #include <akari/kernel/sampling.h>
 namespace akari {
-    AKR_VARIANT struct VisibilityTest {
-        AKR_IMPORT_TYPES()
-        Ray3f ray;
-        VisibilityTest() = default;
-        VisibilityTest(const Ray3f &ray) : ray(ray) {}
-    };
     AKR_VARIANT struct LightSample {
         AKR_IMPORT_TYPES()
         Normal3f ng = Normal3f(0.0f);
         Vector3f wi; // w.r.t to the luminated surface; normalized
         Float pdf = 0.0f;
         Spectrum L;
-        VisibilityTest<C> test;
+        Ray3f shadow_ray;
     };
     AKR_VARIANT struct LightSampleContext {
         AKR_IMPORT_TYPES()
         Point2f u;
         Point3f p;
+    };
+    AKR_VARIANT
+    struct DirectLighting {
+        AKR_IMPORT_TYPES()
+        Ray3f shadow_ray;
+        Spectrum color;
+        Float pdf;
     };
     // Diffuse Area Light
     AKR_VARIANT class AreaLight {
@@ -63,9 +64,11 @@ namespace akari {
             sample.wi /= sqrt(dist_sqr);
             sample.L = color->evaluate(triangle.texcoord(coords));
             sample.pdf = dist_sqr / (std::abs(dot(sample.wi, sample.ng))) / triangle.area();
-            sample.test.ray = Ray3f(p, -sample.wi, Constants<Float>::Eps() / std::abs(dot(sample.wi, sample.ng)),
-                                    sqrt(dist_sqr) * (Float(1.0f) - Constants<Float>::ShadowEps()));
+            sample.shadow_ray = Ray3f(p, -sample.wi, Constants<Float>::Eps() / std::abs(dot(sample.wi, sample.ng)),
+                                      sqrt(dist_sqr) * (Float(1.0f) - Constants<Float>::ShadowEps()));
             return sample;
         }
     };
+    template<class C>
+    using Light = AreaLight<C>;
 } // namespace akari

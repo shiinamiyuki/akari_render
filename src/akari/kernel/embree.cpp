@@ -64,7 +64,7 @@ namespace akari {
         rtcOccluded1(rtcScene, &context, &rtcRay);
         return rtcRay.tfar == -std::numeric_limits<float>::infinity();
     }
-    AKR_VARIANT bool EmbreeAccelerator<C>::intersect(const Ray<C> &ray, Intersection<C> *intersection) const {
+    AKR_VARIANT bool EmbreeAccelerator<C>::intersect(const Ray<C> &ray, SurfaceHit<C> *intersection) const {
         RTCRayHit rayHit;
         rayHit.ray = toRTCRay(ray);
         rayHit.ray.flags = 0;
@@ -78,9 +78,7 @@ namespace akari {
             return false;
         intersection->prim_id = rayHit.hit.primID;
         intersection->geom_id = rayHit.hit.geomID;
-        //intersection->ng = normalize(Normal3f(rayHit.hit.Ng_x, rayHit.hit.Ng_y, rayHit.hit.Ng_z));
         intersection->uv = Point2f(rayHit.hit.u, rayHit.hit.v);
-        intersection->t = rayHit.ray.tfar;
         return true;
     }
     AKR_RENDER_CLASS(EmbreeAccelerator)

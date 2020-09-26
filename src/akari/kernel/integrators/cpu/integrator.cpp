@@ -31,6 +31,7 @@
 #include <akari/kernel/sampling.h>
 #include <akari/core/arena.h>
 #include <akari/common/smallarena.h>
+#include <akari/kernel/pathtracer.h>
 namespace akari {
     namespace cpu {
 
@@ -41,8 +42,8 @@ namespace akari {
                 (void)scene;
                 Intersection<C> intersection;
                 if (scene.intersect(ray, &intersection)) {
-                    Frame3f frame(intersection.ng);
-                    // return Spectrum(intersection.ng);
+                    auto trig = scene.get_triangle(intersection.geom_id, intersection.prim_id);
+                    Frame3f frame(trig.ng());
                     auto w = sampling<C>::cosine_hemisphere_sampling(sampler.next2d());
                     w = frame.local_to_world(w);
                     ray = Ray3f(intersection.p, w);
@@ -78,8 +79,8 @@ namespace akari {
                         sampler.set_sample_index(x + y * film->resolution().x());
                         for (int s = 0; s < spp; s++) {
                             sampler.start_next_sample();
-                            CameraSample<C> sample;
-                            camera.generate_ray(sampler.next2d(), sampler.next2d(), Point2i(x, y), &sample);
+                            CameraSample<C> sample =
+                                camera.generate_ray(sampler.next2d(), sampler.next2d(), Point2i(x, y));
                             auto L = Li(sample.ray, sampler);
                             tile.add_sample(Point2f(x, y), L, 1.0f);
                         }
@@ -92,68 +93,42 @@ namespace akari {
 
         AKR_VARIANT void PathTracer<C>::render(const Scene<C> &scene, Film<C> *film) const {
             AKR_ASSERT_THROW(all(film->resolution() == scene.camera.resolution()));
+            int max_depth = 5;
             auto n_tiles = Point2i(film->resolution() + Point2i(tile_size - 1)) / Point2i(tile_size);
             auto Li = [=, &scene](Ray3f ray, Sampler<C> &sampler, SmallArena *arena) -> Spectrum {
-                (void)scene;
-                int depth = 0;
-                int max_depth = 5;
-                Spectrum beta(1.0f);
-                Spectrum L(0.0f);
+                GenericPathTracer<C> pt;
+                pt.sampler = sampler;
+                pt.max_depth = max_depth;
                 while (true) {
-                    Intersection<C> intersection;
-                    if (scene.intersect(ray, &intersection)) {
-                        auto trig = scene.get_triangle(intersection.geom_id, intersection.prim_id);
-                        SurfaceInteraction<C> si(intersection, trig);
-                        MaterialEvalContext<C> ctx(sampler, si);
-                        auto wo = -ray.d;
-                        auto *material = trig.material;
-                        if (!material)
-                            break;
-                        if (material->template isa<EmissiveMaterial<C>>()) {
-                            if (depth == 0) {
-                                auto *emission = material->template get<EmissiveMaterial<C>>();
-                                bool face_front = dot(ray.d, si.ng) < 0.0f;
-                                if (emission->double_sided || face_front) {
-                                    L += beta * emission->color->evaluate(ctx.texcoords);
-                                }
-                            }
-                            break;
-                        }
-                        if (depth >= max_depth) {
-                            break;
-                        }
-                        depth++;
-
-                        si.bsdf = material->get_bsdf(ctx);
-                        {
-                            auto [light, light_pdf] = scene.select_light(sampler.next2d());
-                            if (light) {
-                                LightSampleContext<C> light_ctx;
-                                light_ctx.u = sampler.next2d();
-                                light_ctx.p = si.p;
-                                LightSample<C> light_sample = light->sample(light_ctx);
-                                light_pdf *= light_sample.pdf;
-                                auto f = light_sample.L * si.bsdf.evaluate(wo, light_sample.wi) *
-                                         std::abs(dot(si.ns, light_sample.wi));
-                                if (!f.is_black()) {
-                                    if (!scene.occlude(light_sample.test.ray)) {
-                                        L += beta * f / light_pdf;
-                                    }
-                                }
-                            }
-                        }
-                        BSDFSampleContext<C> sample_ctx(sampler.next2d(), -ray.d);
-                        auto sample = si.bsdf.sample(sample_ctx);
-                        beta *= sample.f * std::abs(dot(si.ng, sample.wi)) / sample.pdf;
-                        ray =
-                            Ray3f(intersection.p, sample.wi, Constants<Float>::Eps() / std::abs(dot(si.ng, sample.wi)));
-
-                    } else {
-                        L += beta * Spectrum(0);
+                    auto hit = scene.intersect(ray);
+                    if (!hit) {
+                        pt.on_miss(scene, ray);
                         break;
                     }
+                    SurfaceHit<C> surface_hit(ray, hit.value());
+                    auto trig = scene.get_triangle(surface_hit.geom_id, surface_hit.prim_id);
+                    surface_hit.material = trig.material;
+                    SurfaceInteraction<C> si(surface_hit.uv, trig);
+
+                    auto has_event = pt.on_surface_scatter(si, surface_hit);
+                    if (!has_event) {
+                        break;
+                    }
+                    astd::optional<DirectLighting<C>> has_direct =
+                        pt.compute_direct_lighting(si, surface_hit, pt.select_light(scene));
+                    if (has_direct) {
+                        auto &direct = has_direct.value();
+                        if (!direct.color.is_black() && !scene.occlude(direct.shadow_ray)) {
+                            pt.L += direct.color;
+                        }
+                    }
+                    auto event = has_event.value();
+                    pt.beta *= event.beta;
+                    pt.depth++;
+                    ray = event.ray;
                 }
-                return L;
+                sampler = pt.sampler;
+                return pt.L;
             };
             std::mutex mutex;
             auto num_threads = num_work_threads();
@@ -175,8 +150,8 @@ namespace akari {
                         sampler.set_sample_index(x + y * film->resolution().x());
                         for (int s = 0; s < spp; s++) {
                             sampler.start_next_sample();
-                            CameraSample<C> sample;
-                            camera.generate_ray(sampler.next2d(), sampler.next2d(), Point2i(x, y), &sample);
+                            CameraSample<C> sample =
+                                camera.generate_ray(sampler.next2d(), sampler.next2d(), Point2i(x, y));
                             auto L = Li(sample.ray, sampler, &arena);
                             tile.add_sample(Point2f(x, y), L, 1.0f);
                             arena.reset();

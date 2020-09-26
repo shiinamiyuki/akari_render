@@ -68,7 +68,6 @@ namespace akari::gpu {
         if (stat.active) {
             stat.sync();
         }
-        stat.num_launches++;
         stat.active = true;
         return std::make_pair(stat.start, stat.stop);
     }

@@ -64,33 +64,33 @@ namespace akari {
             preprocess();
         }
         AKR_XPU Point2i resolution() const { return _resolution; }
-        AKR_XPU void generate_ray(const Point2f &u1, const Point2f &u2, const Point2i &raster,
-                                  CameraSample<C> *sample) const {
-            sample->p_lens = sampling<C>::concentric_disk_sampling(u1) * lens_radius;
-            sample->p_film = Point2f(raster) + (u2 - 0.5f);
-            sample->weight = 1;
+        AKR_XPU CameraSample<C> generate_ray(const Point2f &u1, const Point2f &u2, const Point2i &raster) const {
+            CameraSample<C> sample;
+            sample.p_lens = sampling<C>::concentric_disk_sampling(u1) * lens_radius;
+            sample.p_film = Point2f(raster) + (u2 - 0.5f);
+            sample.weight = 1;
 
-            Point2f p = shuffle<0, 1>(r2c.apply_point(Point3f(sample->p_film.x(), sample->p_film.y(), 0.0f)));
+            Point2f p = shuffle<0, 1>(r2c.apply_point(Point3f(sample.p_film.x(), sample.p_film.y(), 0.0f)));
             Ray3f ray(Point3f(0), Vector3f(normalize(Point3f(p.x(), p.y(), 0) - Point3f(0, 0, 1))));
             if (lens_radius > 0 && focal_distance > 0) {
                 Float ft = focal_distance / std::abs(ray.d.z());
                 Point3f pFocus = ray(ft);
-                ray.o = Point3f(sample->p_lens.x(), sample->p_lens.y(), 0);
+                ray.o = Point3f(sample.p_lens.x(), sample.p_lens.y(), 0);
                 ray.d = Vector3f(normalize(pFocus - ray.o));
             }
             ray.o = c2w.apply_point(ray.o);
             ray.d = c2w.apply_vector(ray.d);
-            sample->normal = c2w.apply_normal(Normal3f(0, 0, -1.0f));
-            sample->ray = ray;
+            sample.normal = c2w.apply_normal(Normal3f(0, 0, -1.0f));
+            sample.ray = ray;
+            return sample;
         }
     };
     AKR_VARIANT class Camera : public Variant<PerspectiveCamera<C>> {
       public:
         AKR_IMPORT_TYPES()
         using Variant<PerspectiveCamera<C>>::Variant;
-        AKR_XPU void generate_ray(const Point2f &u1, const Point2f &u2, const Point2i &raster,
-                                  CameraSample<C> *sample) const {
-            AKR_VAR_DISPATCH(generate_ray, u1, u2, raster, sample);
+        AKR_XPU CameraSample<C> generate_ray(const Point2f &u1, const Point2f &u2, const Point2i &raster) const {
+            AKR_VAR_DISPATCH(generate_ray, u1, u2, raster);
         }
         AKR_XPU Point2i resolution() const { AKR_VAR_DISPATCH(resolution); }
     };

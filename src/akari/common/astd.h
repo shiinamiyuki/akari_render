@@ -51,7 +51,7 @@ namespace akari::astd {
     class optional {
       public:
         using value_type = T;
-        optional(nullopt_t) : optional() {}
+        AKR_XPU optional(nullopt_t) : optional() {}
         optional() = default;
         AKR_XPU
         optional(const T &v) : set(true) { new (ptr()) T(v); }

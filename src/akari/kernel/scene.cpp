@@ -41,10 +41,6 @@ namespace akari {
                 hit = arg->intersect(ray, intersection);
             }
         });
-
-        if (hit) {
-            intersection->p = ray(intersection->t);
-        }
         return hit;
     }
     AKR_VARIANT bool Scene<C>::occlude(const Ray<C> &ray) const {

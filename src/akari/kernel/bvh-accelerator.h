@@ -260,17 +260,10 @@ namespace akari {
                         }
                     }
                 } else {
-                    if (ray.d[p->axis] > 0) {
-                        if (p->right >= 0)
-                            stack[sp++] = &nodes[p->right];
-                        if (p->left >= 0)
-                            stack[sp++] = &nodes[p->left];
-                    } else {
-                        if (p->left >= 0)
-                            stack[sp++] = &nodes[p->left];
-                        if (p->right >= 0)
-                            stack[sp++] = &nodes[p->right];
-                    }
+                    if (p->left >= 0)
+                        stack[sp++] = &nodes[p->left];
+                    if (p->right >= 0)
+                        stack[sp++] = &nodes[p->right];
                 }
             }
             return false;
@@ -329,7 +322,6 @@ namespace akari {
                 if (bvh.intersect(ray, localHit) && localHit.t < record.t) {
                     record.t = localHit.t;
                     record.uv = localHit.uv;
-                    record.ng = localHit.ng;
                     record.geom_id = handle.idx;
                     record.prim_id = localHit.prim_id;
                     return true;
