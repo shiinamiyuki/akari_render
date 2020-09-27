@@ -37,7 +37,7 @@ namespace akari {
     struct BufferView;
     template <typename T>
     struct Buffer {
-        static_assert(std::is_trivially_copyable_v<T>);
+        static_assert(std::is_trivially_copyable_v<T> && std::is_trivially_destructible_v<T>);
         using Allocator = DeviceAllocator<T>;
         using value_type = T;
         using allocator_type = Allocator;
@@ -56,19 +56,16 @@ namespace akari {
         Buffer(size_t s) { resize(s); }
         Buffer(const Buffer &other) {
             reserve(other.size());
-            for (size_t i = 0; i < other.size(); ++i)
-                this->allocator.construct(_data + i, other[i]);
             _size = other.size();
+            std::memcpy(data(), other.data(), sizeof(T) * size());
         }
         Buffer &operator=(const Buffer &other) {
             if (this == &other)
                 return *this;
-
             clear();
             reserve(other.size());
-            for (size_t i = 0; i < other.size(); ++i)
-                this->allocator.construct(_data + i, other[i]);
             _size = other.size();
+            std::memcpy(data(), other.data(), sizeof(T) * size());
 
             return *this;
         }
@@ -108,10 +105,7 @@ namespace akari {
                 size_t new_cap = s;
                 auto *new_data = allocator.allocate(new_cap);
                 if (_data) {
-                    for (size_t i = 0; i < _size; i++) {
-                        allocator.construct(new_data + i, std::move(_data[i]));
-                        allocator.destroy(_data + i);
-                    }
+                    std::memcpy(new_data, _data, sizeof(T) * _capacity);
                     allocator.deallocate(_data, _capacity);
                 }
                 _data = new_data;
@@ -120,9 +114,6 @@ namespace akari {
         }
         void resize(size_t s) {
             if (s < _size) {
-                for (size_t i = s; i < _size; i++) {
-                    allocator.destroy(_data + i);
-                }
                 if (s == 0) {
                     allocator.deallocate(_data, _capacity);
                     _data = 0;
@@ -136,16 +127,8 @@ namespace akari {
             }
             _size = s;
         }
-        void pop_back() {
-            _size -= 1;
-            allocator.destroy(_data + _size);
-        }
-        ~Buffer() {
-            for (size_t i = 0; i < _size; i++) {
-                allocator.destroy(_data + i);
-            }
-            allocator.deallocate(_data, _capacity);
-        }
+        void pop_back() { _size -= 1; }
+        ~Buffer() { allocator.deallocate(_data, _capacity); }
         AKR_XPU T &operator[](size_t i) { return _data[i]; }
         AKR_XPU const T &operator[](size_t i) const { return _data[i]; }
         AKR_XPU T &at(size_t i) { return _data[i]; }
@@ -158,18 +141,13 @@ namespace akari {
         AKR_XPU size_t size() const { return _size; }
         AKR_XPU size_t capacity() const { return _capacity; }
         void clear() {
-            for (auto it = begin(); it != end(); it++) {
-                allocator.destroy(it);
-            }
-            _data = 0;
             _size = 0;
             _capacity = 0;
         }
         AKR_XPU const T &back() const { return *(end() - 1); }
         AKR_XPU T &back() { return *(end() - 1); }
-        BufferView<T> view()const{
-            return {data(), size()};
-        }
+        BufferView<T> view() const { return {data(), size()}; }
+
       private:
         Allocator allocator;
         T *_data = nullptr;
