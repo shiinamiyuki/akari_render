@@ -29,30 +29,44 @@ namespace akari {
     AKR_EXPORT void sync_device();
     enum class ComputeDevice { cpu, gpu };
     AKR_EXPORT ComputeDevice get_device();
+
+    class ManagedDeviceMemoryResource : public astd::pmr::memory_resource {
+      public:
+        virtual void prefech_to_device(void *p, size_t) {}
+    };
     AKR_EXPORT astd::pmr::memory_resource *get_managed_memory_resource();
     AKR_EXPORT astd::pmr::memory_resource *get_device_memory_resource();
     // allocate only; no need to free (manually)
-    class auto_release_resource : public astd::pmr::memory_resource {
+    class AKR_EXPORT TrackedDeviceMemoryResource : public astd::pmr::memory_resource {
         astd::pmr::memory_resource *resource;
         std::unordered_map<void *, std::pair<size_t, size_t>> allocated;
 
       public:
-        auto_release_resource(astd::pmr::memory_resource *resource) : resource(resource) {}
+        TrackedDeviceMemoryResource(const TrackedDeviceMemoryResource &) = delete;
+        TrackedDeviceMemoryResource(astd::pmr::memory_resource *resource) : resource(resource) {}
         void *do_allocate(size_t bytes, size_t alignment) {
             auto p = resource->allocate(bytes, alignment);
             allocated.emplace(p, std::make_pair(bytes, alignment));
             return p;
         }
         void do_deallocate(void *p, size_t bytes, size_t alignment) {
+            AKR_ASSERT(allocated.find(p) != allocated.end());
             resource->deallocate(p, bytes, alignment);
             allocated.erase(p);
         }
         bool do_is_equal(const memory_resource &other) const noexcept { return &other == this; }
-        ~auto_release_resource() {
+        void prefech_to_device() {
+            auto r = dynamic_cast<ManagedDeviceMemoryResource *>(resource);
+            AKR_ASSERT(r);
+            for (auto p : allocated)
+                r->prefech_to_device(p.first, p.second.first);
+        }
+        ~TrackedDeviceMemoryResource() {
             for (auto p : allocated) {
                 auto [bytes, alignment] = p.second;
                 resource->deallocate(p.first, bytes, alignment);
             }
+            allocated.clear();
         }
     };
 } // namespace akari

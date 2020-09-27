@@ -27,7 +27,7 @@ namespace akari {
     AKR_VARIANT class CameraNode : public SceneGraphNode<C> {
       public:
         AKR_IMPORT_TYPES()
-        virtual Camera<C> compile(MemoryArena *arena) = 0;
+        virtual Camera<C> compile(MemoryArena<>*arena) = 0;
     };
 
     AKR_VARIANT struct RegisterCameraNode {

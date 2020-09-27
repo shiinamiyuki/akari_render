@@ -28,9 +28,9 @@ using namespace akari;
 
 TEST(TestArena, Alloc) {
     struct Foo {
-        int arr[3] ={7,8,9};
+        int arr[3] = {7, 8, 9};
     };
-    MemoryArena arena;
+    auto arena = MemoryArena<>(astd::pmr::polymorphic_allocator<>());
     auto *p = arena.allocN<int>(1024, 0x7f);
     for (int i = 0; i < 1024; i++) {
         ASSERT_EQ(p[i], 0x7f);
@@ -47,7 +47,7 @@ TEST(TestArena, Alloc) {
 #ifdef AKR_ENABLE_GPU
 TEST(TestArena, GPUAlloc) {
     set_device_gpu();
-    MemoryArena arena;
+    auto arena = MemoryArena<>(astd::pmr::polymorphic_allocator<>());
     auto *p = arena.allocN<int>(1024, 0x7f);
     for (int i = 0; i < 1024; i++) {
         ASSERT_EQ(p[i], 0x7f);

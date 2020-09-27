@@ -29,7 +29,7 @@
 #endif
 namespace akari {
 #ifdef AKR_ENABLE_GPU
-    class cuda_unified_memory_resource : public astd::pmr::memory_resource {
+    class cuda_unified_memory_resource : public ManagedDeviceMemoryResource {
       public:
         void *do_allocate(size_t bytes, size_t alignment) {
             void *p;
@@ -43,6 +43,11 @@ namespace akari {
             CUDA_CHECK(cudaFree(p));
         }
         bool do_is_equal(const memory_resource &other) const noexcept { return &other == this; }
+        void prefech_to_device(void *p, size_t bytes) {
+            int deviceIndex;
+            CUDA_CHECK(cudaGetDevice(&deviceIndex));
+            cudaMemPrefetchAsync(p, bytes, 0);
+        }
     };
     class cuda_memory_resource : public astd::pmr::memory_resource {
       public:

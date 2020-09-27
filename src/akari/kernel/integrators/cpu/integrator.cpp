@@ -59,21 +59,13 @@ namespace akari {
             };
             debug("resolution: {}, tile size: {}, tiles: {}", film->resolution(), tile_size, n_tiles);
             std::mutex mutex;
-            auto num_threads = num_work_threads();
-            MemoryArena _arena;
-            std::vector<SmallArena> small_arenas;
-            for (auto i = 0u; i < num_threads; i++) {
-                size_t size = 256 * 1024;
-                small_arenas.emplace_back(_arena.alloc_bytes(size), size);
-            }
-            parallel_for_2d(n_tiles, [=, &scene, &mutex, &small_arenas](const Point2i &tile_pos, int tid) {
+
+            parallel_for_2d(n_tiles, [=, &scene, &mutex](const Point2i &tile_pos, int tid) {
                 (void)tid;
                 Bounds2i tileBounds = Bounds2i{tile_pos * (int)tile_size, (tile_pos + Vector2i(1)) * (int)tile_size};
                 auto boxed_tile = film->boxed_tile(tileBounds);
                 auto &tile = *boxed_tile.get();
                 auto &camera = scene.camera;
-                auto &arena = small_arenas[tid];
-                (void)arena;
                 auto sampler = scene.sampler;
                 for (int y = tile.bounds.pmin.y(); y < tile.bounds.pmax.y(); y++) {
                     for (int x = tile.bounds.pmin.x(); x < tile.bounds.pmax.x(); x++) {
@@ -133,7 +125,7 @@ namespace akari {
             };
             std::mutex mutex;
             auto num_threads = num_work_threads();
-            MemoryArena _arena;
+            auto _arena = MemoryArena<>(astd::pmr::polymorphic_allocator<>(get_managed_memory_resource()));
             std::vector<SmallArena> small_arenas;
             for (auto i = 0u; i < num_threads; i++) {
                 size_t size = 256 * 1024;

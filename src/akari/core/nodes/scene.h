@@ -38,7 +38,7 @@ namespace akari {
         std::shared_ptr<IntegratorNode<C>> integrator;
         Buffer<AreaLight<C>> area_lights;
         void commit() override;
-        Scene<C> compile(MemoryArena *arena);
+        Scene<C> compile(MemoryArena<>*arena);
         void render();
         void add_mesh(const std::shared_ptr<MeshNode<C>> &mesh) { shapes.emplace_back(mesh); }
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,

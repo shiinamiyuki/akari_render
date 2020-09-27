@@ -27,7 +27,7 @@ namespace akari {
     AKR_VARIANT class TextureNode : public SceneGraphNode<C> {
       public:
         AKR_IMPORT_TYPES()
-        virtual Texture<C> *compile(MemoryArena *arena) = 0;
+        virtual Texture<C> *compile(MemoryArena<>*arena) = 0;
     };
 
     AKR_VARIANT class ConstantTextureNode : public TextureNode<C> {
@@ -36,7 +36,7 @@ namespace akari {
         Color3f color;
         ConstantTextureNode() = default;
         ConstantTextureNode(Color3f color) : color(color) {}
-        Texture<C> *compile(MemoryArena *arena) override { return arena->alloc<Texture<C>>(ConstantTexture<C>(color)); }
+        Texture<C> *compile(MemoryArena<>*arena) override { return arena->alloc<Texture<C>>(ConstantTexture<C>(color)); }
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override {}
     };
@@ -56,7 +56,7 @@ namespace akari {
                 throw std::runtime_error("Error loading image");
             }
         }
-        Texture<C> *compile(MemoryArena *arena) override {
+        Texture<C> *compile(MemoryArena<>*arena) override {
             return arena->alloc<Texture<C>>(ImageTexture<C>(image.get()));
         }
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
@@ -83,7 +83,7 @@ namespace akari {
       public:
         AKR_IMPORT_TYPES()
         std::shared_ptr<TextureNode<C>> color;
-        Material<C> *compile(MemoryArena *arena) override {
+        Material<C> *compile(MemoryArena<>*arena) override {
             auto tex = color->compile(arena);
             return arena->alloc<Material<C>>(DiffuseMaterial<C>(tex));
         }
@@ -99,7 +99,7 @@ namespace akari {
         AKR_IMPORT_TYPES()
         std::shared_ptr<TextureNode<C>> color;
         std::shared_ptr<TextureNode<C>> roughness;
-        Material<C> *compile(MemoryArena *arena) override {
+        Material<C> *compile(MemoryArena<>*arena) override {
             auto tex = color->compile(arena);
             auto tex_rough = roughness->compile(arena);
             return arena->alloc<Material<C>>(GlossyMaterial<C>(tex, tex_rough));
@@ -118,7 +118,7 @@ namespace akari {
         AKR_IMPORT_TYPES()
         std::shared_ptr<TextureNode<C>> fraction;
         std::shared_ptr<MaterialNode<C>> first, second;
-        Material<C> *compile(MemoryArena *arena) override {
+        Material<C> *compile(MemoryArena<>*arena) override {
             auto tex = fraction->compile(arena);
             auto a = first->compile(arena);
             auto b = second->compile(arena);
@@ -142,7 +142,7 @@ namespace akari {
         AKR_IMPORT_TYPES()
         bool double_sided = false;
         std::shared_ptr<TextureNode<C>> color;
-        Material<C> *compile(MemoryArena *arena) override {
+        Material<C> *compile(MemoryArena<>*arena) override {
             auto tex = color->compile(arena);
             return arena->alloc<Material<C>>(EmissiveMaterial<C>(tex));
         }

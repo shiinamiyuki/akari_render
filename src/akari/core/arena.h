@@ -27,18 +27,20 @@
 #include <list>
 #include <akari/common/buffer.h>
 namespace akari {
+    template <typename Allocator = astd::pmr::polymorphic_allocator<>>
     class MemoryArena {
         template <size_t alignment>
         static constexpr size_t align(size_t x) {
             static_assert((alignment & (alignment - 1)) == 0);
-            return (x + alignment - 1) & (~(alignment - 1));
+            x = (x + alignment - 1) & (~(alignment - 1));
+            return x < 4 ? 4 : x;
         }
 
         struct Block {
             size_t size;
             std::byte *data;
 
-            Block(size_t size, DeviceAllocator<> &allocator) : size(size) {
+            Block(size_t size, Allocator &allocator) : size(size) {
                 data = allocator.allocate(size);
                 AKR_ASSERT(data);
             }
@@ -47,13 +49,13 @@ namespace akari {
         };
 
         std::list<Block> availableBlocks, usedBlocks;
-        DeviceAllocator<> allocator;
+        Allocator allocator;
         size_t currentBlockPos = 0;
         Block currentBlock;
 
       public:
         static constexpr size_t DEFAULT_BLOCK_SIZE = 262144ull;
-        MemoryArena() : currentBlock(DEFAULT_BLOCK_SIZE, allocator) {}
+        MemoryArena(Allocator allocator) : allocator(allocator), currentBlock(DEFAULT_BLOCK_SIZE, allocator) {}
         std::byte *alloc_bytes(size_t bytes) {
             typename std::list<Block>::iterator iter;
             std::byte *p = nullptr;

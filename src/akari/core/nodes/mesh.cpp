@@ -44,7 +44,7 @@ namespace akari {
                 throw std::runtime_error("Error loading mesh");
             }
         }
-        MeshInstance<C> compile(MemoryArena *arena) override {
+        MeshInstance<C> compile(MemoryArena<>*arena) override {
             commit();
             MeshInstance<C> instance;
             instance.indices = mesh->indices;
@@ -100,7 +100,7 @@ namespace akari {
                           const sdl::Value &value) override {
             AKR_ASSERT_THROW(false && "not implemented");
         }
-        MeshInstance<C> compile(MemoryArena *) override {
+        MeshInstance<C> compile(MemoryArena<>*) override {
             commit();
             MeshInstance<C> view;
             view.indices = mesh.indices;

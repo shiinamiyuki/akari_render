@@ -61,10 +61,6 @@ namespace akari::gpu {
                 }
                 return Spectrum(0);
             };
-            size_t ARENA_SIZE = 16 * 1024;
-
-            MemoryArena _arena;
-            SmallArena arena(_arena.alloc_bytes(ARENA_SIZE), ARENA_SIZE);
             debug("GPU RTAO resolution: {}, tile size: {}, tiles: {}", film->resolution(), tile_size, n_tiles);
             double gpu_time = 0;
             for (int tile_y = 0; tile_y < n_tiles.y(); tile_y++) {
@@ -123,29 +119,25 @@ namespace akari::gpu {
         using ShadowRayQueue = WorkQueue<ShadowRayWorkItem<C>>;
         MaterialWorkQueues material_queues;
         ShadowRayQueue *shadow_ray_queue;
-        auto_release_resource* resource;
         PathTracerImpl(Allocator &allocator, const PathTracer<C> &pt)
-            : spp(pt.spp), tile_size(pt.tile_size), max_depth(pt.max_depth), ray_clamp(pt.ray_clamp),
-              resource(new auto_release_resource(get_device_memory_resource())) {
+            : spp(pt.spp), tile_size(pt.tile_size), max_depth(pt.max_depth), ray_clamp(pt.ray_clamp) {
             MAX_QUEUE_SIZE = tile_size * tile_size;
-            astd::pmr::polymorphic_allocator<> alloc(resource);
-            path_states = SOA<PathState<C>>(MAX_QUEUE_SIZE, alloc);
-            ray_queue[0] = allocator.template new_object<RayQueue>(MAX_QUEUE_SIZE, alloc);
+            path_states = SOA<PathState<C>>(MAX_QUEUE_SIZE, allocator);
+            ray_queue[0] = allocator.template new_object<RayQueue>(MAX_QUEUE_SIZE, allocator);
             // ray_queue[1] = allocator.template new_object<RayQueue>(MAX_QUEUE_SIZE, allocator);
-            shadow_ray_queue = allocator.template new_object<ShadowRayQueue>(MAX_QUEUE_SIZE, alloc);
+            shadow_ray_queue = allocator.template new_object<ShadowRayQueue>(MAX_QUEUE_SIZE, allocator);
             for (size_t i = 0; i < material_queues.size(); i++) {
-                material_queues[i] = allocator.template new_object<MaterialQueue>(MAX_QUEUE_SIZE, alloc);
+                material_queues[i] = allocator.template new_object<MaterialQueue>(MAX_QUEUE_SIZE, allocator);
             }
         }
         void render(const Scene<C> &scene, Film<C> *film);
     };
     AKR_VARIANT void PathTracer<C>::render(const Scene<C> &scene, Film<C> *film) const {
         if constexpr (std::is_same_v<Float, float>) {
-            auto resource = std::make_unique<auto_release_resource>(get_managed_memory_resource());
+            auto resource = std::make_unique<TrackedDeviceMemoryResource>(get_managed_memory_resource());
             auto allocator = astd::pmr::polymorphic_allocator(resource.get());
             PathTracerImpl<C> tracer(allocator, *this);
             tracer.render(scene, film);
-            delete tracer.resource;
         } else {
             fatal("only float is supported for gpu");
         }
@@ -153,7 +145,29 @@ namespace akari::gpu {
 
     AKR_VARIANT void PathTracerImpl<C>::render(const Scene<C> &scene, Film<C> *film) {
         std::shared_ptr<ProgressReporter> reporter;
-        std::vector<std::thread> waiters;
+        auto n_tiles = Point2i(film->resolution() + Point2i(tile_size - 1)) / Point2i(tile_size);
+        struct WorkTile {
+            Point2i tile_pos;
+            Bounds2i tile_bounds;
+            Box<Tile<C>> tile;
+            WorkTile(Point2i tile_pos, Bounds2i tile_bounds, Film<C> *film)
+                : tile_pos(tile_pos), tile_bounds(tile_bounds), tile(film->boxed_tile(tile_bounds)) {}
+        };
+
+        std::list<WorkTile> tiles;
+        for (int tile_y = 0; tile_y < n_tiles.y(); tile_y++) {
+            for (int tile_x = 0; tile_x < n_tiles.x(); tile_x++) {
+                Point2i tile_pos(tile_x, tile_y);
+                Bounds2i tileBounds = Bounds2i{tile_pos * (int)tile_size, (tile_pos + Vector2i(1)) * (int)tile_size};
+                tiles.emplace_back(tile_pos, tileBounds, film);
+            }
+        }
+        reporter = std::make_shared<ProgressReporter>(tiles.size(), [](size_t cur, size_t total) {
+            show_progress(double(cur) / double(total), 60);
+            if (cur == total) {
+                putchar('\n');
+            }
+        });
         auto render_tile = [&](Tile<C> *tile, const Point2i &tile_pos, const Bounds2i &tileBounds) {
             auto &camera = scene.camera;
             auto _sampler = scene.sampler;
@@ -170,8 +184,6 @@ namespace akari::gpu {
             auto launch_size = extents.x() * extents.y();
             launch(
                 "Set Path State", launch_size, AKR_GPU_LAMBDA(int tid) {
-                    if (tid > launch_size)
-                        return;
                     auto px = get_pixel(tid);
                     int x = px.x(), y = px.y();
                     auto sampler = _sampler;
@@ -184,7 +196,7 @@ namespace akari::gpu {
             for (int s = 0; s < _spp; s++) {
                 launch(
                     "Generate Camera Ray", launch_size, AKR_GPU_LAMBDA(int tid) {
-                        if (tid > launch_size)
+                        if (tid >= launch_size)
                             return;
                         auto px = get_pixel(tid);
                         int x = px.x(), y = px.y();
@@ -257,61 +269,41 @@ namespace akari::gpu {
                     for (auto material_queue : material_queues) {
                         launch(
                             "Evaluate Material", launch_size, AKR_GPU_LAMBDA(int tid) {
-                                // astd::optional<ShadowRayWorkItem<C>> opt_shadow_ray;
-                                // __shared__ int num_shadow_ray_block;
-                                // __shared__ int shadow_ray_offset_base;
-                                // if (threadIdx.x == 0) {
-                                //     num_shadow_ray_block = 0;
-                                // }
-                                // __syncthreads();
-                                // int shadow_ray_offset = 0;
-                                if (tid < material_queue->elements_in_queue()) {
-                                    MaterialWorkItem<C> material_item = (*material_queue)[tid];
-                                    int pixel = material_item.pixel;
-                                    PathState<C> path_state = path_states[pixel];
-                                    auto pt = path_state.path_tracer();
-                                    pt.depth = depth;
-                                    pt.max_depth = max_depth;
-                                    auto surface_hit = material_item.surface_hit();
-                                    auto trig = scene.get_triangle(material_item.geom_id, material_item.prim_id);
-                                    SurfaceInteraction<C> si(surface_hit.uv, trig);
+                                if (tid >= material_queue->elements_in_queue())
+                                    return;
+                                MaterialWorkItem<C> material_item = (*material_queue)[tid];
+                                int pixel = material_item.pixel;
+                                PathState<C> path_state = path_states[pixel];
+                                auto pt = path_state.path_tracer();
+                                pt.depth = depth;
+                                pt.max_depth = max_depth;
+                                auto surface_hit = material_item.surface_hit();
+                                auto trig = scene.get_triangle(material_item.geom_id, material_item.prim_id);
+                                SurfaceInteraction<C> si(surface_hit.uv, trig);
 
-                                    auto has_event = pt.on_surface_scatter(si, surface_hit, material_item.pdf);
-                                    if (has_event) {
-                                        auto event = has_event.value();
+                                auto has_event = pt.on_surface_scatter(si, surface_hit, material_item.pdf);
+                                if (has_event) {
+                                    auto event = has_event.value();
 
-                                        // Direct Light Sampling
-                                        astd::optional<DirectLighting<C>> has_direct =
-                                            pt.compute_direct_lighting(si, surface_hit, pt.select_light(scene));
-                                        if (has_direct) {
-                                            auto direct = has_direct.value();
-                                            if (!direct.color.is_black()) {
-                                                ShadowRayWorkItem<C> shadow_ray_item(direct);
-                                                shadow_ray_item.pixel = pixel;
-                                                shadow_ray_queue->append(shadow_ray_item);
-                                                // opt_shadow_ray = ShadowRayWorkItem<C>(shadow_ray_item);
-                                                // shadow_ray_offset = atomicAdd(&num_shadow_ray_block, 1);
-                                            }
+                                    // Direct Light Sampling
+                                    astd::optional<DirectLighting<C>> has_direct =
+                                        pt.compute_direct_lighting(si, surface_hit, pt.select_light(scene));
+                                    if (has_direct) {
+                                        auto direct = has_direct.value();
+                                        if (!direct.color.is_black()) {
+                                            ShadowRayWorkItem<C> shadow_ray_item(direct);
+                                            shadow_ray_item.pixel = pixel;
+                                            shadow_ray_queue->append(shadow_ray_item);
                                         }
-                                        pt.beta *= event.beta;
-                                        RayWorkItem<C> ray_item;
-                                        ray_item.pixel = pixel;
-                                        ray_item.ray = event.ray;
-                                        ray_queue[0]->append(ray_item);
                                     }
-
-                                    path_state.update(pt);
-                                    path_states[pixel] = path_state;
+                                    pt.beta *= event.beta;
+                                    RayWorkItem<C> ray_item;
+                                    ray_item.pixel = pixel;
+                                    ray_item.ray = event.ray;
+                                    ray_queue[0]->append(ray_item);
                                 }
-                                // __syncthreads();
-                                // if (threadIdx.x == 0) {
-                                //     shadow_ray_offset_base = shadow_ray_queue->allocate(num_shadow_ray_block);
-                                // }
-                                // __syncthreads();
-                                // if (opt_shadow_ray) {
-                                //     (*shadow_ray_queue)[shadow_ray_offset_base + shadow_ray_offset] =
-                                //         opt_shadow_ray.value();
-                                // }
+                                path_state.update(pt);
+                                path_states[pixel] = path_state;
                             });
                     }
                     launch(
@@ -337,46 +329,16 @@ namespace akari::gpu {
                         tile->add_sample(Point2f(p), rad, 1.0f);
                     });
             }
-            cudaEvent_t tile_complete;
-            CUDA_CHECK(cudaEventCreate(&tile_complete));
-            waiters.emplace_back([=]() {
-                CUDA_CHECK(cudaEventSynchronize(tile_complete));
-                reporter->update();
-                CUDA_CHECK(cudaEventDestroy(tile_complete));
-            });
-        };
-        auto n_tiles = Point2i(film->resolution() + Point2i(tile_size - 1)) / Point2i(tile_size);
-        struct WorkTile {
-            Point2i tile_pos;
-            Bounds2i tile_bounds;
-            Box<Tile<C>> tile;
-            WorkTile(Point2i tile_pos, Bounds2i tile_bounds, Film<C> *film)
-                : tile_pos(tile_pos), tile_bounds(tile_bounds), tile(film->boxed_tile(tile_bounds)) {}
+            cuLaunchHostFunc((cudaStream_t) nullptr, [](void *reporter) { ((ProgressReporter *)reporter)->update(); },
+                             reporter.get());
         };
 
-        std::list<WorkTile> tiles;
-        for (int tile_y = 0; tile_y < n_tiles.y(); tile_y++) {
-            for (int tile_x = 0; tile_x < n_tiles.x(); tile_x++) {
-                Point2i tile_pos(tile_x, tile_y);
-                Bounds2i tileBounds = Bounds2i{tile_pos * (int)tile_size, (tile_pos + Vector2i(1)) * (int)tile_size};
-                tiles.emplace_back(tile_pos, tileBounds, film);
-            }
-        }
-        reporter = std::make_shared<ProgressReporter>(tiles.size(), [](size_t cur, size_t total) {
-            show_progress(double(cur) / double(total), 60);
-            if (cur == total) {
-                putchar('\n');
-            }
-        });
-        // debug("tile size:{} n_tiles: {}", tile_size, n_tiles);
+        debug("tile size:{} n_tiles: {}", tile_size, n_tiles);
         for (auto &item : tiles) {
             auto &[tile_pos, tile_bounds, tile] = item;
             render_tile(tile.get(), tile_pos, tile_bounds);
         }
         sync_device();
-        for (auto &waiter : waiters) {
-            waiter.join();
-        }
         std::for_each(std::execution::par_unseq, tiles.begin(), tiles.end(),
                       [=](const WorkTile &item) { film->merge_tile(*item.tile.get()); });
         print_kernel_stats();

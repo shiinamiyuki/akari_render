@@ -28,7 +28,7 @@ namespace akari {
     AKR_VARIANT class MeshNode : public SceneGraphNode<C> {
       public:
         // AKR_IMPORT_TYPES()
-        virtual MeshInstance<C> compile(MemoryArena *arena) = 0;
+        virtual MeshInstance<C> compile(MemoryArena<>*arena) = 0;
     };
 
     AKR_VARIANT struct RegisterMeshNode {

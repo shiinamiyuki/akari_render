@@ -40,7 +40,7 @@ namespace akari {
         AKR_ASSERT_THROW(camera);
         camera->commit();
     }
-    AKR_VARIANT Scene<C> SceneNode<C>::compile(MemoryArena *arena) {
+    AKR_VARIANT Scene<C> SceneNode<C>::compile(MemoryArena<> *arena) {
         Scene<C> scene;
 
         scene.camera = camera->compile(arena);
@@ -77,9 +77,9 @@ namespace akari {
         } else if (field == "integrator") {
             integrator = dyn_cast<IntegratorNode<C>>(value.object());
             AKR_ASSERT_THROW(integrator);
-        } else if(field == "shapes"){
+        } else if (field == "shapes") {
             AKR_ASSERT_THROW(value.is_array());
-            for(auto shape : value){
+            for (auto shape : value) {
                 shapes.emplace_back(dyn_cast<MeshNode<C>>(shape.object()));
             }
         }
@@ -92,7 +92,8 @@ namespace akari {
         auto _restore_handler = AtScopeExit([=]() { signal(SIGINT, _prev_SIGINT_handler); });
         commit();
         info("preparing scene");
-        MemoryArena arena;
+        TrackedDeviceMemoryResource resource(get_managed_memory_resource());
+        auto arena = MemoryArena<>(astd::pmr::polymorphic_allocator<>(&resource));
         auto scene = compile(&arena);
         auto res = scene.camera.resolution();
         auto film = Film<C>(res);

@@ -98,6 +98,7 @@ namespace akari {
             auto wo = surface_hit.wo;
             MaterialEvalContext<C> ctx(sampler, si);
             if (material->template isa<EmissiveMaterial<C>>()) {
+
                 if (depth == 0) {
                     auto *emission = material->template get<EmissiveMaterial<C>>();
                     bool face_front = dot(-wo, si.ng) < 0.0f;

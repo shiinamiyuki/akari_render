@@ -28,6 +28,7 @@
 #include <mutex>
 #include <atomic>
 #include <unordered_map>
+#include <akari/common/fwd.h>
 #include <akari/common/platform.h>
 #include <akari/common/lock.h>
 

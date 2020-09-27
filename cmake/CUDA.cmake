@@ -2,19 +2,19 @@ set(AKR_ENABLE_CUDA OFF)
 include (CheckLanguage)
 check_language(CUDA)
 if (CMAKE_CUDA_COMPILER)
-    find_package (CUDA REQUIRED)
+    find_package (CUDAToolKit REQUIRED)
     if (${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.17.0")
         set (CMAKE_CUDA_STANDARD 17)
     endif ()
 
-    message (STATUS "Found CUDA: ${CUDA_VERSION_MAJOR}.${CUDA_VERSION_MINOR}")
+    message (STATUS "Found CUDA: ${CUDAToolkit_VERSION_MAJOR}.${CUDAToolkit_VERSION_MINOR}")
     if (CUDA_VERSION_MAJOR LESS 11)
         message(SEND_ERROR "AkariRender requires CUDA version 11.0 or later. If you have multiple versions installed, please update your PATH.")
     endif ()
     enable_language (CUDA)
 
     # FIXME
-    include_directories (${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})  # for regular c++ compiles
+    include_directories (${CUDAToolkit_INCLUDE_DIRS})  # for regular c++ compiles
 
     # http://www.ssl.berkeley.edu/~jimm/grizzly_docs/SSL/opt/intel/cc/9.0/lib/locale/en_US/mcpcom.msg
     set (AKR_CUDA_DIAG_FLAGS "")
@@ -67,7 +67,7 @@ if (CMAKE_CUDA_COMPILER)
         PROPERTIES  CUDA_ARCHITECTURES ${AKR_CUDA_ARCH}
                     CUDA_SEPARABLE_COMPILATION  ON )
     endmacro()
-    set(AKR_CUDA_LIBS ${CUDA_LIBRARIES})
+    set(AKR_CUDA_LIBS CUDA::cudart CUDA::cuda_driver)
     set(AKR_CXX_FLAGS "") # or nvcc chokes
 else()
     macro (set_target_CUDA_props target)

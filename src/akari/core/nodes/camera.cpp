@@ -30,7 +30,7 @@ namespace akari {
         Vector3f rotation;
         Point2i resolution = Point2i(512, 512);
         Float fov = radians(80.0f);
-        Camera<C> compile(MemoryArena *arena) override {
+        Camera<C> compile(MemoryArena<>*arena) override {
             Transform3f c2w;
             c2w = Transform3f::rotate_z(rotation.z());
             c2w = Transform3f::rotate_x(rotation.y()) * c2w;
