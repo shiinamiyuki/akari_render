@@ -54,9 +54,9 @@ namespace akari {
             return _texels[x + y * _resolution[0]];
         }
 
-        AKR_XPU const T &operator()(float x, float y) const { return (*this)(Point3f(x, y)); }
+        AKR_XPU const T &operator()(float x, float y) const { return (*this)(Float3(x, y)); }
 
-        AKR_XPU T &operator()(float x, float y) { return (*this)(Point3f(x, y)); }
+        AKR_XPU T &operator()(float x, float y) { return (*this)(Float3(x, y)); }
 
         AKR_XPU const T &operator()(const Point2i &p) const { return (*this)(p.x(), p.y()); }
 
@@ -91,7 +91,7 @@ namespace akari {
                 return _texels[x + y * _resolution[0]];
             }
 
-            AKR_XPU const T &operator()(float x, float y) const { return (*this)(Point3f(x, y)); }
+            AKR_XPU const T &operator()(float x, float y) const { return (*this)(Float3(x, y)); }
 
             AKR_XPU const T &operator()(const Point2i &p) const { return (*this)(p.x(), p.y()); }
 

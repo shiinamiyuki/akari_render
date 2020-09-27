@@ -53,6 +53,7 @@ namespace akari {
         int spp = 16;
         int max_depth = 5;
         int tile_size = 256;
+        float ray_clamp = 10.0f;
         std::shared_ptr<cpu::Integrator<C>> compile(MemoryArena *arena) override {
             return std::make_shared<cpu::Integrator<C>>(cpu::PathTracer<C>(spp));
         }
@@ -60,17 +61,17 @@ namespace akari {
                           const sdl::Value &value) override {
             if (field == "spp") {
                 spp = value.get<int>().value();
-            }
-            if (field == "max_depth") {
+            } else if (field == "max_depth") {
                 max_depth = value.get<int>().value();
-            }
-            if (field == "tile_size") {
+            } else if (field == "tile_size") {
                 tile_size = value.get<int>().value();
+            } else if (field == "ray_clamp") {
+                ray_clamp = value.get<float>().value();
             }
         }
 #ifdef AKR_ENABLE_GPU
         std::shared_ptr<gpu::Integrator<C>> compile_gpu(MemoryArena *arena) override {
-            return std::make_shared<gpu::Integrator<C>>(gpu::PathTracer<C>(spp, max_depth, tile_size));
+            return std::make_shared<gpu::Integrator<C>>(gpu::PathTracer<C>(spp, max_depth, tile_size, ray_clamp));
         }
 #endif
         const char *description() override { return "[Path Tracer]"; }

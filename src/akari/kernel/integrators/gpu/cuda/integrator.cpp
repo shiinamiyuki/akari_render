@@ -113,6 +113,7 @@ namespace akari::gpu {
         int spp;
         int tile_size = 512;
         int max_depth = 5;
+        float ray_clamp;
         size_t MAX_QUEUE_SIZE;
         SOA<PathState<C>> path_states;
         RayQueue *ray_queue[2] = {nullptr, nullptr};
@@ -122,7 +123,7 @@ namespace akari::gpu {
         MaterialWorkQueues material_queues;
         ShadowRayQueue *shadow_ray_queue;
         PathTracerImpl(Allocator &allocator, const PathTracer<C> &pt)
-            : spp(pt.spp), tile_size(pt.tile_size), max_depth(pt.max_depth) {
+            : spp(pt.spp), tile_size(pt.tile_size), max_depth(pt.max_depth), ray_clamp(pt.ray_clamp) {
             MAX_QUEUE_SIZE = tile_size * tile_size;
             path_states = SOA<PathState<C>>(MAX_QUEUE_SIZE, allocator);
             ray_queue[0] = allocator.template new_object<RayQueue>(MAX_QUEUE_SIZE, allocator);
@@ -324,7 +325,9 @@ namespace akari::gpu {
                     "Update Film", launch_size, AKR_GPU_LAMBDA(int tid) {
                         PathState<C> state = path_states[tid];
                         auto p = get_pixel(tid);
-                        tile->add_sample(Point2f(p), state.L, 1.0f);
+                        auto rad = state.L.clamp_zero();
+                        rad = min(rad, Spectrum(ray_clamp));
+                        tile->add_sample(Point2f(p), rad, 1.0f);
                     });
             }
         };

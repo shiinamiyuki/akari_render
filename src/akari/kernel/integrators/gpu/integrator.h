@@ -43,9 +43,11 @@ namespace akari {
             int spp = 16;
             int max_depth = 5;
             int tile_size = 256;
+            float ray_clamp = 0;
             AKR_IMPORT_TYPES()
             PathTracer() = default;
-            PathTracer(int spp, int max_depth, int tile_size) : spp(spp), max_depth(max_depth), tile_size(tile_size) {}
+            PathTracer(int spp, int max_depth, int tile_size, float ray_clamp)
+                : spp(spp), max_depth(max_depth), tile_size(tile_size), ray_clamp(ray_clamp) {}
             void render(const Scene<C> &scene, Film<C> *out) const;
         };
         AKR_VARIANT class Integrator : public Variant<AmbientOcclusion<C>, PathTracer<C>> {

@@ -36,7 +36,7 @@ namespace akari {
             Color c;
             for (int i = 0; i < N; i++) {
                 auto x = (*this)[i];
-                if (std::isnan(x)) {
+                if (isnan(x)) {
                     x = 0;
                 } else {
                     x = max(Float(0.0f), x);
