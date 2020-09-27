@@ -95,6 +95,9 @@ namespace akari {
             }
 
             if (end - begin <= 4 || depth >= 32) {
+                if(depth == 32){
+                    warning("BVH exceeds max depth");
+                }
                 BVHNode node;
 
                 node.box = box;

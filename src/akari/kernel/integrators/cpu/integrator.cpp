@@ -32,6 +32,7 @@
 #include <akari/core/arena.h>
 #include <akari/common/smallarena.h>
 #include <akari/kernel/pathtracer.h>
+#include <akari/core/progress.hpp>
 namespace akari {
     namespace cpu {
 
@@ -138,6 +139,23 @@ namespace akari {
                 size_t size = 256 * 1024;
                 small_arenas.emplace_back(_arena.alloc_bytes(size), size);
             }
+            auto reporter =
+                std::make_shared<ProgressReporter>(n_tiles.x() * n_tiles.y(), [=](size_t cur, size_t total) {
+                    bool show = false;
+                    if (spp < 32) {
+                        show = cur % 32 == 0;
+                    } else {
+                        show = true;
+                    }
+
+                    if (show)
+                        show_progress(double(cur) / double(total), 60);
+
+                    if (cur == total) {
+
+                        putchar('\n');
+                    }
+                });
             parallel_for_2d(n_tiles, [=, &scene, &mutex, &small_arenas](const Point2i &tile_pos, int tid) {
                 (void)tid;
                 Bounds2i tileBounds = Bounds2i{tile_pos * (int)tile_size, (tile_pos + Vector2i(1)) * (int)tile_size};
@@ -159,6 +177,7 @@ namespace akari {
                     }
                 }
                 std::lock_guard<std::mutex> _(mutex);
+                reporter->update();
                 film->merge_tile(tile);
             });
         }

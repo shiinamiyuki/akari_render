@@ -69,7 +69,7 @@ namespace akari::gpu {
         auto kernel = &_kernel_wrapper<F>;
         int blockSize = get_block_size(name, kernel);
         int gridSize = (nItems + blockSize - 1) / blockSize;
-
+        AKR_ASSERT(blockSize >= 32);
         auto event = get_profiler_events(name);
         cudaEventRecord(event.first);
         kernel<<<gridSize, blockSize>>>(func, nItems);
@@ -83,10 +83,6 @@ namespace akari::gpu {
     }
     template <typename F>
     void launch_cpu(const char *name, int nItems, F func) {
-        // auto kernel = &_kernel_wrapper<F>;
-        // int blockSize = get_block_size(name, kernel);
-        // int gridSize = (nItems + blockSize - 1) / blockSize;
-        // kernel<<<gridSize, blockSize>>>(func, nItems);
         parallel_for(nItems, [&](uint32_t tid, auto _){
             func(tid);
         });

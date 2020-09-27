@@ -123,25 +123,29 @@ namespace akari::gpu {
         using ShadowRayQueue = WorkQueue<ShadowRayWorkItem<C>>;
         MaterialWorkQueues material_queues;
         ShadowRayQueue *shadow_ray_queue;
+        auto_release_resource* resource;
         PathTracerImpl(Allocator &allocator, const PathTracer<C> &pt)
-            : spp(pt.spp), tile_size(pt.tile_size), max_depth(pt.max_depth), ray_clamp(pt.ray_clamp) {
+            : spp(pt.spp), tile_size(pt.tile_size), max_depth(pt.max_depth), ray_clamp(pt.ray_clamp),
+              resource(new auto_release_resource(get_device_memory_resource())) {
             MAX_QUEUE_SIZE = tile_size * tile_size;
-            path_states = SOA<PathState<C>>(MAX_QUEUE_SIZE, allocator);
-            ray_queue[0] = allocator.template new_object<RayQueue>(MAX_QUEUE_SIZE, allocator);
+            astd::pmr::polymorphic_allocator<> alloc(resource);
+            path_states = SOA<PathState<C>>(MAX_QUEUE_SIZE, alloc);
+            ray_queue[0] = allocator.template new_object<RayQueue>(MAX_QUEUE_SIZE, alloc);
             // ray_queue[1] = allocator.template new_object<RayQueue>(MAX_QUEUE_SIZE, allocator);
-            shadow_ray_queue = allocator.template new_object<ShadowRayQueue>(MAX_QUEUE_SIZE, allocator);
+            shadow_ray_queue = allocator.template new_object<ShadowRayQueue>(MAX_QUEUE_SIZE, alloc);
             for (size_t i = 0; i < material_queues.size(); i++) {
-                material_queues[i] = allocator.template new_object<MaterialQueue>(MAX_QUEUE_SIZE, allocator);
+                material_queues[i] = allocator.template new_object<MaterialQueue>(MAX_QUEUE_SIZE, alloc);
             }
         }
         void render(const Scene<C> &scene, Film<C> *film);
     };
     AKR_VARIANT void PathTracer<C>::render(const Scene<C> &scene, Film<C> *film) const {
         if constexpr (std::is_same_v<Float, float>) {
-            auto resource = std::make_unique<auto_release_resource>(get_device_memory_resource());
+            auto resource = std::make_unique<auto_release_resource>(get_managed_memory_resource());
             auto allocator = astd::pmr::polymorphic_allocator(resource.get());
             PathTracerImpl<C> tracer(allocator, *this);
             tracer.render(scene, film);
+            delete tracer.resource;
         } else {
             fatal("only float is supported for gpu");
         }
@@ -364,6 +368,7 @@ namespace akari::gpu {
                 putchar('\n');
             }
         });
+        // debug("tile size:{} n_tiles: {}", tile_size, n_tiles);
         for (auto &item : tiles) {
             auto &[tile_pos, tile_bounds, tile] = item;
             render_tile(tile.get(), tile_pos, tile_bounds);

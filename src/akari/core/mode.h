@@ -29,8 +29,8 @@ namespace akari {
     AKR_EXPORT void sync_device();
     enum class ComputeDevice { cpu, gpu };
     AKR_EXPORT ComputeDevice get_device();
+    AKR_EXPORT astd::pmr::memory_resource *get_managed_memory_resource();
     AKR_EXPORT astd::pmr::memory_resource *get_device_memory_resource();
-
     // allocate only; no need to free (manually)
     class auto_release_resource : public astd::pmr::memory_resource {
         astd::pmr::memory_resource *resource;

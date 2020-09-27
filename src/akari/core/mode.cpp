@@ -44,7 +44,23 @@ namespace akari {
         }
         bool do_is_equal(const memory_resource &other) const noexcept { return &other == this; }
     };
+    class cuda_memory_resource : public astd::pmr::memory_resource {
+      public:
+        void *do_allocate(size_t bytes, size_t alignment) {
+            void *p;
+            CUDA_CHECK(cudaMalloc(&p, bytes));
+            AKR_ASSERT(p != nullptr);
+            AKR_ASSERT(intptr_t(p) % alignment == 0);
+            return p;
+        }
+        void do_deallocate(void *p, size_t bytes, size_t alignment) {
+            // debug("deallocate {}\n", p);
+            CUDA_CHECK(cudaFree(p));
+        }
+        bool do_is_equal(const memory_resource &other) const noexcept { return &other == this; }
+    };
     static cuda_unified_memory_resource _cuda_unified_memory_resource;
+    static cuda_memory_resource _cuda_memory_resource;
 #endif
     namespace _mode_internal {
         static ComputeDevice cur_device = ComputeDevice::cpu;
@@ -69,5 +85,6 @@ namespace akari {
         _mode_internal::_device_memory_resource = astd::pmr::get_default_resource();
     }
     AKR_EXPORT ComputeDevice get_device() { return _mode_internal::cur_device; }
-    astd::pmr::memory_resource *get_device_memory_resource() { return _mode_internal::_device_memory_resource; }
+    astd::pmr::memory_resource *get_managed_memory_resource() { return _mode_internal::_device_memory_resource; }
+    astd::pmr::memory_resource *get_device_memory_resource() { return &_cuda_memory_resource; }
 } // namespace akari
