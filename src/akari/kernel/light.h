@@ -50,6 +50,7 @@ namespace akari {
         const Texture<C> *color;
         bool double_sided = false;
         Triangle<C> triangle;
+        AreaLight() = default;
         AKR_XPU AreaLight(Triangle<C> triangle) : triangle(triangle) {
             color = triangle.material->template get<EmissiveMaterial<C>>()->color;
             double_sided = triangle.material->template get<EmissiveMaterial<C>>()->double_sided;
@@ -69,6 +70,6 @@ namespace akari {
             return sample;
         }
     };
-    template<class C>
+    template <class C>
     using Light = AreaLight<C>;
 } // namespace akari

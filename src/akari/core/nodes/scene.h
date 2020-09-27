@@ -30,7 +30,7 @@ namespace akari {
     AKR_VARIANT class AKR_EXPORT SceneNode : public SceneGraphNode<C> {
       public:
         AKR_IMPORT_TYPES()
-        Buffer<MeshInstance<C>> instances;
+        astd::pmr::vector<MeshInstance<C>> instances;
         std::string variant;
         std::shared_ptr<CameraNode<C>> camera;
         std::vector<std::shared_ptr<MeshNode<C>>> shapes;
@@ -38,11 +38,12 @@ namespace akari {
         std::shared_ptr<IntegratorNode<C>> integrator;
         Buffer<AreaLight<C>> area_lights;
         void commit() override;
-        Scene<C> compile(MemoryArena<>*arena);
+        Scene<C> compile(MemoryArena<> *arena);
         void render();
         void add_mesh(const std::shared_ptr<MeshNode<C>> &mesh) { shapes.emplace_back(mesh); }
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override;
+        SceneNode() : instances(astd::pmr::polymorphic_allocator<>(get_managed_memory_resource())) {}
     };
 
     AKR_VARIANT struct RegisterSceneNode {

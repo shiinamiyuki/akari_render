@@ -37,6 +37,7 @@ namespace akari {
     struct BufferView;
     template <typename T>
     struct Buffer {
+        static_assert(std::is_trivially_copyable_v<T>);
         using Allocator = DeviceAllocator<T>;
         using value_type = T;
         using allocator_type = Allocator;
@@ -166,7 +167,9 @@ namespace akari {
         }
         AKR_XPU const T &back() const { return *(end() - 1); }
         AKR_XPU T &back() { return *(end() - 1); }
-
+        BufferView<T> view()const{
+            return {data(), size()};
+        }
       private:
         Allocator allocator;
         T *_data = nullptr;

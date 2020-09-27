@@ -50,8 +50,8 @@ namespace akari {
         UserData user_data;
         Intersector _intersector;
         ShapeHandleConstructor _ctor;
-        Buffer<Index> primitives;
-        Buffer<BVHNode> nodes;
+        astd::vector<Index, DeviceAllocator<Index>> primitives;
+        astd::vector<BVHNode, DeviceAllocator<BVHNode>> nodes;
         std::shared_ptr<std::mutex> m;
         TBVHAccelerator(UserData &&user_data, size_t N, Intersector intersector = Intersector(),
                         ShapeHandleConstructor ctor = ShapeHandleConstructor())
@@ -95,7 +95,7 @@ namespace akari {
             }
 
             if (end - begin <= 4 || depth >= 32) {
-                if(depth == 32){
+                if (depth == 32) {
                     warning("BVH exceeds max depth");
                 }
                 BVHNode node;
@@ -339,7 +339,8 @@ namespace akari {
                 return false;
             }
         };
-        Buffer<MeshBVH> meshBVHs;
+        astd::vector<MeshBVH, DeviceAllocator<MeshBVH>> meshBVHs;
+
         using TopLevelBVH = TBVHAccelerator<C, MeshBVHes, Intersection<C>, BVHIntersector, BVHHandleConstructor, 28>;
         astd::optional<TopLevelBVH> topLevelBVH;
 
@@ -348,7 +349,7 @@ namespace akari {
             for (auto &instance : scene.meshes) {
                 meshBVHs.emplace_back(&instance, instance.indices.size() / 3);
             }
-            topLevelBVH.emplace(meshBVHs, meshBVHs.size());
+            topLevelBVH.emplace(MeshBVHes(meshBVHs.data(), meshBVHs.size()), meshBVHs.size());
         }
         AKR_XPU bool intersect(const Ray<C> &ray, Intersection<C> *isct) const {
             return topLevelBVH->intersect(ray, *isct);

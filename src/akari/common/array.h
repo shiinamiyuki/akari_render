@@ -47,7 +47,7 @@ namespace akari {
     template <typename T, int N, int packed>
     struct alignas(compute_align<T, N, packed>()) Array {
         static constexpr int padded_size = (int)compute_padded_size<T, N, packed>();
-        T _s[padded_size] = {};
+        T _s[padded_size];
         using value_t = T;
         AKR_XPU const T &operator[](int i) const { return _s[i]; }
         AKR_XPU T &operator[](int i) { return _s[i]; }
@@ -57,6 +57,7 @@ namespace akari {
                 _s[i] = x;
             }
         }
+        Array(const Array &rhs) = default;
         template <typename U, int P>
         AKR_XPU explicit Array(const Array<U, N, P> &rhs) {
             for (int i = 0; i < std::min(padded_size, Array<U, N, P>::padded_size); i++) {

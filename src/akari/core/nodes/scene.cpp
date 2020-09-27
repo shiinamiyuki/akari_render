@@ -47,7 +47,7 @@ namespace akari {
         for (auto &shape : shapes) {
             instances.emplace_back(shape->compile(arena));
         }
-        scene.meshes = instances;
+        scene.meshes = {instances.data(), instances.size()};
         area_lights.clear();
         for (uint32_t mesh_id = 0; mesh_id < scene.meshes.size(); mesh_id++) {
             MeshInstance<C> &mesh = scene.meshes[mesh_id];
@@ -63,7 +63,7 @@ namespace akari {
                 }
             }
         }
-        scene.area_lights = area_lights;
+        scene.area_lights = area_lights.view();
 
         return scene;
     }

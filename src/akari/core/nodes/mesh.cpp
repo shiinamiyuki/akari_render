@@ -47,11 +47,11 @@ namespace akari {
         MeshInstance<C> compile(MemoryArena<>*arena) override {
             commit();
             MeshInstance<C> instance;
-            instance.indices = mesh->indices;
-            instance.material_indices = mesh->material_indices;
-            instance.normals = mesh->normals;
-            instance.texcoords = mesh->texcoords;
-            instance.vertices = mesh->vertices;
+            instance.indices = mesh->indices.view();
+            instance.material_indices = mesh->material_indices.view();
+            instance.normals = mesh->normals.view();
+            instance.texcoords = mesh->texcoords.view();
+            instance.vertices = mesh->vertices.view();
             // AKR_ASSERT_THROW(mesh->material_indices.size() == materials.size());
             for (auto &mat : materials) {
                 instance.materials.push_back(mat->compile(arena));
