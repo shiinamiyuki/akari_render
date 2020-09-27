@@ -70,7 +70,7 @@ namespace akari::gpu {
         int blockSize = get_block_size(name, kernel);
         int gridSize = (nItems + blockSize - 1) / blockSize;
 
-        auto event =  get_profiler_events(name);
+        auto event = get_profiler_events(name);
         cudaEventRecord(event.first);
         kernel<<<gridSize, blockSize>>>(func, nItems);
         cudaEventRecord(event.second);

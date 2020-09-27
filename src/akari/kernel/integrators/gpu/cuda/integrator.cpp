@@ -37,6 +37,7 @@
 #include <akari/kernel/cuda/workqueue.h>
 #include <akari/kernel/integrators/gpu/workitem-soa.h>
 #include <akari/core/profiler.h>
+#include <akari/core/progress.hpp>
 namespace akari::gpu {
     AKR_VARIANT void AmbientOcclusion<C>::render(const Scene<C> &scene, Film<C> *film) const {
         if constexpr (std::is_same_v<Float, float>) {
@@ -147,6 +148,8 @@ namespace akari::gpu {
     }
 
     AKR_VARIANT void PathTracerImpl<C>::render(const Scene<C> &scene, Film<C> *film) {
+        std::shared_ptr<ProgressReporter> reporter;
+        std::vector<std::thread> waiters;
         auto render_tile = [&](Tile<C> *tile, const Point2i &tile_pos, const Bounds2i &tileBounds) {
             auto &camera = scene.camera;
             auto _sampler = scene.sampler;
@@ -330,6 +333,13 @@ namespace akari::gpu {
                         tile->add_sample(Point2f(p), rad, 1.0f);
                     });
             }
+            cudaEvent_t tile_complete;
+            CUDA_CHECK(cudaEventCreate(&tile_complete));
+            waiters.emplace_back([=]() {
+                CUDA_CHECK(cudaEventSynchronize(tile_complete));
+                reporter->update();
+                CUDA_CHECK(cudaEventDestroy(tile_complete));
+            });
         };
         auto n_tiles = Point2i(film->resolution() + Point2i(tile_size - 1)) / Point2i(tile_size);
         struct WorkTile {
@@ -348,12 +358,20 @@ namespace akari::gpu {
                 tiles.emplace_back(tile_pos, tileBounds, film);
             }
         }
+        reporter = std::make_shared<ProgressReporter>(tiles.size(), [](size_t cur, size_t total) {
+            show_progress(double(cur) / double(total), 60);
+            if (cur == total) {
+                putchar('\n');
+            }
+        });
         for (auto &item : tiles) {
             auto &[tile_pos, tile_bounds, tile] = item;
             render_tile(tile.get(), tile_pos, tile_bounds);
         }
         sync_device();
-
+        for (auto &waiter : waiters) {
+            waiter.join();
+        }
         std::for_each(std::execution::par_unseq, tiles.begin(), tiles.end(),
                       [=](const WorkTile &item) { film->merge_tile(*item.tile.get()); });
         print_kernel_stats();

@@ -38,6 +38,11 @@ export shortBox = DiffuseMaterial {
 export tallBox = DiffuseMaterial {
   color : [0.725,0.71,0.68]
 }
+
+//export tallBox = GlossyMaterial {
+//  color : [1,1,1],
+//  roughness: 0.9
+// }
 // ======================================== 
 
 // OBJ Material: light

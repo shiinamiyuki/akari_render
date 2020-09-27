@@ -46,8 +46,8 @@ namespace akari {
             : total(total), callback([](size_t cur, size_t total) { show_progress(double(cur) / total, 70); }) {}
         ProgressReporter(size_t total, std::function<void(size_t, size_t)> &&cb) : total(total), callback(cb) {}
         void update() {
-            count++;
-            callback(count, total);
+            auto cur = count.fetch_add(1);
+            callback(cur + 1, total);
         }
 
       private:

@@ -34,7 +34,7 @@ namespace akari {
         using value_type = T;
         int _size = 0;
         T *__restrict__ array = nullptr;
-        size_t head = 0;
+        int head = 0;
         template <class Allocator>
         WorkQueue(size_t s, Allocator &&allocator) : _size(s) {
             array = allocator.template allocate_object<T>(s);
