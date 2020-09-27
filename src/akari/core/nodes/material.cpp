@@ -32,8 +32,8 @@ namespace akari {
 
     AKR_VARIANT class ConstantTextureNode : public TextureNode<C> {
       public:
-        Color3f color;
         AKR_IMPORT_TYPES()
+        Color3f color;
         ConstantTextureNode() = default;
         ConstantTextureNode(Color3f color) : color(color) {}
         Texture<C> *compile(MemoryArena *arena) override { return arena->alloc<Texture<C>>(ConstantTexture<C>(color)); }
@@ -67,7 +67,7 @@ namespace akari {
         AKR_IMPORT_TYPES()
         if (value.is_array()) {
             return std::make_shared<ConstantTextureNode<C>>(load_array<Color3f>(value));
-        }else if (value.is_number()) {
+        } else if (value.is_number()) {
             return std::make_shared<ConstantTextureNode<C>>(Color3f(value.get<float>().value()));
         } else if (value.is_string()) {
             auto path = value.get<std::string>().value();
