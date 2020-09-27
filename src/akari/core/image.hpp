@@ -77,6 +77,32 @@ namespace akari {
         AKR_XPU T *data() { return _texels.data(); }
 
         [[nodiscard]] AKR_XPU const T *data() const { return _texels.data(); }
+
+        struct View {
+            AKR_XPU const T &operator()(int x, int y) const {
+                x = std::clamp(x, 0, _resolution[0] - 1);
+                y = std::clamp(y, 0, _resolution[1] - 1);
+                return _texels[x + y * _resolution[0]];
+            }
+
+            AKR_XPU T &operator()(int x, int y) {
+                x = std::clamp(x, 0, _resolution[0] - 1);
+                y = std::clamp(y, 0, _resolution[1] - 1);
+                return _texels[x + y * _resolution[0]];
+            }
+
+            AKR_XPU const T &operator()(float x, float y) const { return (*this)(Point3f(x, y)); }
+
+            AKR_XPU const T &operator()(const Point2i &p) const { return (*this)(p.x(), p.y()); }
+
+            AKR_XPU const T &operator()(const Point2f &p) const { return (*this)(Point2i(p * Point2f(_resolution))); }
+
+            [[nodiscard]] AKR_XPU Point2i resolution() const { return _resolution; }
+            [[nodiscard]] AKR_XPU const T *data() const { return _texels; }
+            const T *_texels = nullptr;
+            Point2i _resolution = Point2i(0);
+        };
+        View view() const { return View{data(), resolution()}; }
     };
 
     class RGBImage : public TImage<Color<float, 3>> {
@@ -84,9 +110,16 @@ namespace akari {
         using TImage<Color<float, 3>>::TImage;
     };
 
-    class RGBAImage : public TImage<std::pair<Color<float, 3>, float>> {
+    struct alignas(16) RGBA {
+        AKR_IMPORT_CORE_TYPES_WITH(float)
+        Color3f rgb;
+        Float alpha;
+        RGBA()=default;
+        AKR_XPU RGBA(Array3f rgb, Float alpha):rgb(rgb),alpha(alpha){}
+    };
+    class RGBAImage : public TImage<RGBA> {
       public:
-        using TImage<std::pair<Color<float, 3>, float>>::TImage;
+        using TImage<RGBA>::TImage;
     };
 
     class AKR_EXPORT PostProcessor {

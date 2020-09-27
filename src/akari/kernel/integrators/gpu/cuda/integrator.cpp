@@ -117,7 +117,7 @@ namespace akari::gpu {
         SOA<PathState<C>> path_states;
         RayQueue *ray_queue[2] = {nullptr, nullptr};
         using MaterialQueue = WorkQueue<MaterialWorkItem<C>>;
-        using MaterialWorkQueues = astd::array<MaterialQueue *, Material<C>::num_types>;
+        using MaterialWorkQueues = astd::array<MaterialQueue *, Material<C>::num_types - 1>;
         using ShadowRayQueue = WorkQueue<ShadowRayWorkItem<C>>;
         MaterialWorkQueues material_queues;
         ShadowRayQueue *shadow_ray_queue;
@@ -219,14 +219,23 @@ namespace akari::gpu {
                                 auto *material = scene.meshes[intersection.geom_id].materials[mat_idx];
                                 if (!material)
                                     return;
+                                int pixel = ray_item.pixel;
+                                PathState<C> path_state = path_states[pixel];
+                                Float _u = path_state.sampler.next1d();
+                                auto [mat, pdf] = material->select_material(_u, intersection.uv);
+                                if (!mat)
+                                    return;
                                 MaterialWorkItem<C> material_item;
-                                material_item.pixel = ray_item.pixel;
-                                material_item.material = material;
+                                material_item.pdf = pdf;
+                                material_item.pixel = pixel;
+                                material_item.material = mat;
                                 material_item.geom_id = intersection.geom_id;
                                 material_item.prim_id = intersection.prim_id;
                                 material_item.uv = intersection.uv;
                                 material_item.wo = -ray_item.ray.d;
-                                auto queue_idx = material->typeindex();
+                                path_states[pixel] = path_state;
+                                auto queue_idx = mat->typeindex();
+                                AKR_ASSERT(queue_idx != Material<C>::template indexof<MixMaterial<C>>());
                                 AKR_ASSERT(queue_idx >= 0 && queue_idx < material_queues.size());
                                 material_queues[queue_idx]->append(material_item);
                             }
@@ -259,7 +268,7 @@ namespace akari::gpu {
                                     auto trig = scene.get_triangle(material_item.geom_id, material_item.prim_id);
                                     SurfaceInteraction<C> si(surface_hit.uv, trig);
 
-                                    auto has_event = pt.on_surface_scatter(si, surface_hit);
+                                    auto has_event = pt.on_surface_scatter(si, surface_hit, material_item.pdf);
                                     if (has_event) {
                                         auto event = has_event.value();
 
@@ -337,10 +346,8 @@ namespace akari::gpu {
             }
         }
         for (auto &item : tiles) {
-            Timer timer;
             auto &[tile_pos, tile_bounds, tile] = item;
             render_tile(tile.get(), tile_pos, tile_bounds);
-            info("tile took {}s", timer.elapsed_seconds());
         }
         sync_device();
 

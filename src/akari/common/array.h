@@ -324,6 +324,7 @@ namespace akari {
     FWD_MATH_FUNC1(acos)
     FWD_MATH_FUNC1(atan)
     FWD_MATH_FUNC2(atan2)
+    FWD_MATH_FUNC2(fmod)
     FWD_MATH_FUNC2(pow)
     FWD_MATH_FUNC2(min)
     FWD_MATH_FUNC2(max)

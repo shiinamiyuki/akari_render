@@ -101,9 +101,9 @@ namespace akari {
                     for (int x = 0; x < radiance.resolution().x(); x++) {
                         if (weight(x, y) != 0) {
                             auto color = (radiance(x, y)) / weight(x, y);
-                            image(x, y) = std::make_pair(Color<float, 3>(color), 1);
+                            image(x, y) = RGBA(Color<float, 3>(color), 1);
                         } else {
-                            image(x, y) = std::make_pair(Color<float, 3>(radiance(x, y)), 1);
+                            image(x, y) = RGBA(Color<float, 3>(radiance(x, y)), 1);
                         }
                     }
                 },

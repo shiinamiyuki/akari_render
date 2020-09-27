@@ -97,7 +97,7 @@ namespace akari {
         }
         AKR_XPU int typeindex() const { return index; }
         template <typename U>
-        AKR_XPU int indexof() const {
+        AKR_XPU static int indexof() {
             return Index::template GetIndex<U>::value;
         }
         AKR_XPU Variant &operator=(const Variant &v) noexcept {

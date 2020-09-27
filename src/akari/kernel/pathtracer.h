@@ -36,7 +36,7 @@ namespace akari {
         Vector3f wo;
         int geom_id = -1;
         int prim_id = -1;
-        const Material<C> * material = nullptr;
+        const Material<C> *material = nullptr;
         SurfaceHit() = default;
         SurfaceHit(const Ray3f &ray, const Intersection<C> &isct)
             : uv(isct.uv), wo(-ray.d), geom_id(isct.geom_id), prim_id(isct.prim_id) {}
@@ -67,7 +67,8 @@ namespace akari {
         }
 
         AKR_XPU astd::optional<DirectLighting<C>>
-        compute_direct_lighting(SurfaceInteraction<C> &si, const SurfaceHit<C> &surface_hit,const astd::pair<const Light<C> *, Float> &selected) {
+        compute_direct_lighting(SurfaceInteraction<C> &si, const SurfaceHit<C> &surface_hit,
+                                const astd::pair<const Light<C> *, Float> &selected) {
             auto [light, light_pdf] = selected;
             if (light) {
                 DirectLighting<C> lighting;
@@ -76,7 +77,8 @@ namespace akari {
                 light_ctx.p = si.p;
                 LightSample<C> light_sample = light->sample(light_ctx);
                 light_pdf *= light_sample.pdf;
-                auto f = light_sample.L * si.bsdf.evaluate(surface_hit.wo, light_sample.wi) * std::abs(dot(si.ns, light_sample.wi));
+                auto f = light_sample.L * si.bsdf.evaluate(surface_hit.wo, light_sample.wi) *
+                         std::abs(dot(si.ns, light_sample.wi));
                 lighting.color = beta * f / light_pdf;
                 lighting.shadow_ray = light_sample.shadow_ray;
                 lighting.pdf = light_pdf;
@@ -87,8 +89,11 @@ namespace akari {
         }
 
         AKR_XPU void on_miss(const Scene<C> &scene, const Ray3f &ray) {}
+
+        // @param mat_pdf: supplied if material is already chosen
         AKR_XPU astd::optional<ScatteringEvent<C>> on_surface_scatter(SurfaceInteraction<C> &si,
-                                                                      const SurfaceHit<C> &surface_hit) {
+                                                                      const SurfaceHit<C> &surface_hit,
+                                                                      astd::optional<Float> mat_pdf = astd::nullopt) {
             auto *material = surface_hit.material;
             auto wo = surface_hit.wo;
             MaterialEvalContext<C> ctx(sampler, si);
@@ -103,11 +108,16 @@ namespace akari {
                 }
             } else if (depth < max_depth) {
                 ScatteringEvent<C> event;
-                si.bsdf = material->get_bsdf(ctx);
+                if (mat_pdf) {
+                    auto pdf = mat_pdf.value();
+                    si.bsdf = Material<C>::get_bsdf(astd::pair<const Material<C>*, Float>{material, pdf}, ctx);
+                } else {
+                    si.bsdf = material->get_bsdf(ctx);
+                }
                 BSDFSampleContext<C> sample_ctx(sampler.next2d(), wo);
                 auto sample = si.bsdf.sample(sample_ctx);
                 AKR_ASSERT(sample.pdf >= 0.0f);
-                if(sample.pdf == 0.0f){
+                if (sample.pdf == 0.0f) {
                     return astd::nullopt;
                 }
                 event.ray = Ray3f(si.p, sample.wi, Constants<Float>::Eps() / std::abs(dot(si.ng, sample.wi)));

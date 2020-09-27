@@ -55,6 +55,7 @@ namespace akari {
         AKR_IMPORT_TYPES()
         int pixel;
         const Material<C> *material = nullptr;
+        Float pdf = 0.0f;
         int geom_id = -1;
         int prim_id = -1;
         Point2f uv;

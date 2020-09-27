@@ -24,6 +24,7 @@
 
 #include <akari/kernel/cuda/util.h>
 #include <akari/core/parallel.h>
+#include <akari/core/options.h>
 #include <typeindex>
 #include <typeinfo>
 #include <unordered_map>
@@ -68,10 +69,12 @@ namespace akari::gpu {
         auto kernel = &_kernel_wrapper<F>;
         int blockSize = get_block_size(name, kernel);
         int gridSize = (nItems + blockSize - 1) / blockSize;
+
         auto event =  get_profiler_events(name);
         cudaEventRecord(event.first);
         kernel<<<gridSize, blockSize>>>(func, nItems);
         cudaEventRecord(event.second);
+
         //  CUDA_CHECK(cudaDeviceSynchronize());
     }
     template<typename F>

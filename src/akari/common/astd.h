@@ -37,14 +37,18 @@ namespace akari::astd {
     }
 
     template <typename T1, typename T2>
-    struct pair {
+    struct alignas(std::max(alignof(T1), alignof(T2))) pair {
         T1 first;
         T2 second;
     };
     template <typename T1, typename T2>
+    pair(T1 &&, T2 &&) -> pair<T1, T2>;
+
+    template <typename T1, typename T2>
     AKR_XPU pair<T1, T2> make_pair(T1 &&a, T2 &&b) {
-        return pair{a, b};
+        return pair<T1, T2>{a, b};
     }
+
     struct nullopt_t {};
     inline constexpr nullopt_t nullopt{};
     template <typename T>

@@ -97,14 +97,86 @@ std::shared_ptr<Mesh> load_wavefront_obj(const fs::path &path, std::string &gene
     };
     for (auto &obj_mat : obj_materials) {
         auto normalized = normalize_name(obj_mat.name);
-        os << "// OBJ Material: " << obj_mat.name << "\n";
-        os << "export " << normalized << " = DiffuseMaterial {\n";
-        os << "  color : [" << obj_mat.diffuse[0] << "," << obj_mat.diffuse[1] << "," << obj_mat.diffuse[2]
-           << "]\n}\n";
-        os << "// ======================================== \n\n";
+        auto kd = load<Array3f>(obj_mat.diffuse);
+        auto ks = load<Array3f>(obj_mat.specular);
+        auto ke = load<Array3f>(obj_mat.emission);
+        if (hmax(ke) > 0.001) {
+            os << "// OBJ Material: " << obj_mat.name << "\n";
+            os << "export " << normalized << " = EmissiveMaterial {\n";
+            os << "  color : [" << ke[0] << "," << ke[1] << "," << ke[2] << "]\n}\n";
+            os << "// ======================================== \n\n";
+            continue;
+        }
+        auto roughness = std::sqrt(2.0f / (obj_mat.shininess + 2.0f));
+        Float frac = hmax(ks) / (hmax(kd) + hmax(ks));
+        if (!std::isnormal(frac)) {
+            frac = 0;
+        }
+        fs::path diffuse_tex = obj_mat.diffuse_texname, specular_tex = obj_mat.specular_texname;
+
+        if (!diffuse_tex.empty() || !specular_tex.empty()) {
+            frac = 0.5f;
+            os << "// OBJ Material: " << obj_mat.name << " Diffuse part\n";
+            os << "let " << normalized << "_diffuse"
+               << " = DiffuseMaterial {\n";
+            if (diffuse_tex.empty()) {
+                os << "  color : [" << obj_mat.diffuse[0] << "," << obj_mat.diffuse[1] << "," << obj_mat.diffuse[2]
+                   << "]\n";
+            } else {
+                os << "  color : \"" << diffuse_tex.generic_string() << "\"\n";
+            }
+            os << "}\n";
+            os << "// OBJ Material: " << obj_mat.name << " Diffuse part\n";
+            os << "let " << normalized << "_glossy"
+               << " = GlossyMaterial {\n";
+            if (specular_tex.empty()) {
+                os << "  color : [" << obj_mat.specular[0] << "," << obj_mat.specular[1] << "," << obj_mat.specular[2]
+                   << "],\n";
+            } else {
+                os << "  color : \"" << specular_tex.generic_string() << "\"\n";
+            }
+            os << "  roughness: " << roughness << "\n}\n";
+            os << "export " << normalized << " = MixMaterial {\n";
+            os << "  fraction: " << frac << ",\n";
+            os << "  first: $" << normalized << "_diffuse"
+               << ",\n";
+            os << "  second: $" << normalized << "_glossy\n"
+               << "}\n";
+            os << "// ======================================== \n\n";
+        } else if (hmax(ks) < 0.0001f) {
+            os << "// OBJ Material: " << obj_mat.name << "\n";
+            os << "export " << normalized << " = DiffuseMaterial {\n";
+            os << "  color : [" << obj_mat.diffuse[0] << "," << obj_mat.diffuse[1] << "," << obj_mat.diffuse[2]
+               << "]\n}\n";
+            os << "// ======================================== \n\n";
+        } else if (hmax(kd) < 0.0001f) {
+            os << "// OBJ Material: " << obj_mat.name << "\n";
+            os << "export " << normalized << " = GlossyMaterial {\n";
+            os << "  color : [" << obj_mat.specular[0] << "," << obj_mat.specular[1] << "," << obj_mat.specular[2]
+               << "],\n  roughness: " << roughness << "\n}\n";
+            os << "// ======================================== \n\n";
+        } else {
+            os << "// OBJ Material: " << obj_mat.name << " Diffuse part\n";
+            os << "let " << normalized << "_diffuse"
+               << " = DiffuseMaterial {\n";
+            os << "  color : [" << obj_mat.diffuse[0] << "," << obj_mat.diffuse[1] << "," << obj_mat.diffuse[2]
+               << "]\n}\n";
+            os << "// OBJ Material: " << obj_mat.name << " Diffuse part\n";
+            os << "let " << normalized << "_glossy"
+               << " = GlossyMaterial {\n";
+            os << "  color : [" << obj_mat.specular[0] << "," << obj_mat.specular[1] << "," << obj_mat.specular[2]
+               << "],\n  roughness: " << roughness << "\n}\n";
+            os << "export " << normalized << " = MixMaterial {\n";
+            os << "  fraction: " << frac << ",\n";
+            os << "  first: $" << normalized << "_diffuse"
+               << ",\n";
+            os << "  second: $" << normalized << "_glossy\n"
+               << "}\n";
+            os << "// ======================================== \n\n";
+        }
     }
     info("loaded {} triangles, {} vertices", mesh->indices.size() / 3, mesh->vertices.size() / 3);
-    os << "export mesh = AkariMesh {\n  path: " << path.filename().concat(".mesh") << ",\n";
+    os << "export mesh = AkariMesh {\n  path: \"" << path.filename().concat(".mesh").generic_string() << "\",\n";
     os << "  materials: [\n";
     int idx = 0;
     for (auto &obj_mat : obj_materials) {

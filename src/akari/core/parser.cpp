@@ -233,6 +233,12 @@ namespace akari::sdl {
                     mod = m->second;
                 }
             }
+            if (acc.size() == 1) {
+                auto v = ctx.cur_mod()->locals.find(*it);
+                if (v != ctx.cur_mod()->locals.end()) {
+                    return v->second;
+                }
+            }
             auto v = mod->exports.find(*it);
             if (v == mod->exports.end()) {
                 ctx.report_error(fmt::format("module {} has no exported variable named {}", mod->name, *it), ctx.loc);
@@ -268,7 +274,7 @@ namespace akari::sdl {
         std::unordered_set<std::string> fields;
         while (ctx.peek() && ctx.peek() != '}') {
             auto fieldname = parse_identifier(ctx);
-            if(fields.find(fieldname) != fields.end()){
+            if (fields.find(fieldname) != fields.end()) {
                 ctx.report_error(fmt::format("field {} redefined", fieldname), ctx.loc);
             }
             skip(ctx);

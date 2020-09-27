@@ -46,7 +46,7 @@ namespace akari {
                 texels.size(),
                 [&](uint32_t i, uint32_t) {
                     auto pixel = static_cast<uint8_t *>(&buffer[i * 3]);
-                    auto rgb = Point3f(texels[i].first);
+                    auto rgb = Point3f(texels[i].rgb);
                     rgb = clamp(rgb, Point3f(0), Point3f(1));
                     for (int comp = 0; comp < 3; comp++) {
                         pixel[comp] = (uint8_t)std::clamp<int>((int)std::round(rgb[comp] * 255.5), 0, 255);
@@ -67,7 +67,7 @@ namespace akari {
             in.resolution().y(),
             [&](uint32_t y, uint32_t) {
                 for (int i = 0; i < in.resolution().x(); i++)
-                    out(i, y) = std::make_pair(linear_to_srgb(in(i, y).first), in(i, y).second);
+                    out(i, y) = RGBA(linear_to_srgb(in(i, y).rgb), in(i, y).alpha);
             },
             1024);
     }
@@ -97,7 +97,7 @@ namespace akari {
                                 rgb[1] = data[3 * (x + y * image->resolution().x()) + 1];
                                 rgb[2] = data[3 * (x + y * image->resolution().x()) + 2];
                             }
-                            (*image)(x, y) = std::make_pair(rgb, 1.0f);
+                            (*image)(x, y) = RGBA(rgb, 1.0f);
                         }
                     },
                     128);
@@ -116,7 +116,7 @@ namespace akari {
                                 rgb[1] = (float)data[3 * (x + y * image->resolution().x()) + 1] / 255.0f;
                                 rgb[2] = (float)data[3 * (x + y * image->resolution().x()) + 2] / 255.0f;
                             }
-                            (*image)(x, y) = std::make_pair(rgb, 1.0f);
+                            (*image)(x, y) = RGBA(rgb, 1.0f);
                         }
                     },
                     128);

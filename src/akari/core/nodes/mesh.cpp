@@ -41,7 +41,7 @@ namespace akari {
             } else {
                 auto err = exp.extract_error();
                 error("error loading {}: {}", path, err.what());
-                std::abort();
+                throw std::runtime_error("Error loading mesh");
             }
         }
         MeshInstance<C> compile(MemoryArena *arena) override {

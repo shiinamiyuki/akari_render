@@ -113,7 +113,7 @@ namespace akari {
                 if (wh.y() < 0) {
                     wh = -wh;
                 }
-                auto F = 1.0f;//fresnel->evaluate(dot(wi, wh));
+                auto F = 1.0f; // fresnel->evaluate(dot(wi, wh));
                 return R * (model.D(wh) * model.G(wo, wi, wh) * F / (Float(4.0f) * cosThetaI * cosThetaO));
             }
             return Spectrum(0.0f);
@@ -243,34 +243,34 @@ namespace akari {
         AKR_IMPORT_TYPES()
         const Texture<C> *fraction;
         const Material<C> *material_A, *material_B;
+        MixMaterial(const Texture<C> *fraction, const Material<C> *material_A, const Material<C> *material_B)
+            : fraction(fraction), material_A(material_A), material_B(material_B) {}
     };
     AKR_VARIANT class Material
-        : public Variant<DiffuseMaterial<C>, GlossyMaterial<C>, MixMaterial<C>, EmissiveMaterial<C>> {
+        : public Variant<DiffuseMaterial<C>, GlossyMaterial<C>, EmissiveMaterial<C>, MixMaterial<C>> {
       public:
         AKR_IMPORT_TYPES()
-        using Variant<DiffuseMaterial<C>, GlossyMaterial<C>, MixMaterial<C>, EmissiveMaterial<C>>::Variant;
+        using Variant<DiffuseMaterial<C>, GlossyMaterial<C>, EmissiveMaterial<C>, MixMaterial<C>>::Variant;
 
-      private:
-        AKR_XPU const Material<C> *select_material(Float &u, const Point2f &texcoords, Float *choice_pdf) const {
-            if (this->template isa<EmissiveMaterial<C>>()) {
-                return nullptr;
-            }
-            *choice_pdf = 1.0f;
+        AKR_XPU astd::pair<const Material<C> *, Float> select_material(Float &u, const Point2f &texcoords) const {
+            Float choice_pdf = 1.0f;
             auto ptr = this;
             while (ptr->template isa<MixMaterial<C>>()) {
                 auto frac = ptr->template get<MixMaterial<C>>()->fraction->evaluate(texcoords).x();
                 if (u < frac) {
                     u = u / frac;
-                    ptr = ptr->template get<MixMaterial<C>>()->material_A;
-                    *choice_pdf *= 1.0f / frac;
+                    ptr = ptr->template get<MixMaterial<C>>()->material_B;
+                    choice_pdf *= 1.0f / frac;
                 } else {
                     u = (u - frac) / (1.0f - frac);
-                    ptr = ptr->template get<MixMaterial<C>>()->material_B;
-                    *choice_pdf *= 1.0f / (1.0f - frac);
+                    ptr = ptr->template get<MixMaterial<C>>()->material_A;
+                    choice_pdf *= 1.0f / (1.0f - frac);
                 }
             }
-            return ptr;
+            return {ptr, choice_pdf};
         }
+
+      private:
         AKR_XPU BSDF<C> get_bsdf0(MaterialEvalContext<C> &ctx) const {
             return this->dispatch([&](auto &&arg) {
                 using T = std::decay_t<decltype(arg)>;
@@ -282,9 +282,15 @@ namespace akari {
         }
 
       public:
+        AKR_XPU static BSDF<C> get_bsdf(const astd::pair<const Material<C> *, Float> &pair,
+                                        MaterialEvalContext<C> &ctx) {
+            auto [mat, choice_pdf] = pair;
+            auto bsdf = mat->get_bsdf0(ctx);
+            bsdf.set_choice_pdf(choice_pdf);
+            return bsdf;
+        }
         AKR_XPU BSDF<C> get_bsdf(MaterialEvalContext<C> &ctx) const {
-            Float choice_pdf = 0.0f;
-            auto mat = select_material(ctx.u1[0], ctx.texcoords, &choice_pdf);
+            auto [mat, choice_pdf] = select_material(ctx.u1[0], ctx.texcoords);
             auto bsdf = mat->get_bsdf0(ctx);
             bsdf.set_choice_pdf(choice_pdf);
             return bsdf;

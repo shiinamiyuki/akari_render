@@ -20,38 +20,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#pragma once
-
-#include <akari/common/variant.h>
-#include <akari/common/color.h>
-#include <akari/core/image.hpp>
-
+#include <akari/core/options.h>
 namespace akari {
-    AKR_VARIANT class ConstantTexture {
-      public:
-        AKR_IMPORT_TYPES()
-        ConstantTexture(Spectrum v) : value(v) {}
-        Spectrum value;
-        AKR_XPU Spectrum evaluate(const Point2f &texcoords) const { return value; }
-    };
+    GlobalOptions *GlobalOptions::get() {
+        static GlobalOptions opt;
+        return &opt;
+    }
 
-    AKR_VARIANT class ImageTexture {
-      public:
-        AKR_IMPORT_TYPES()
-        RGBAImage::View image;
-        ImageTexture() = default;
-        AKR_XPU ImageTexture(RGBAImage::View image) : image(image) {}
-        ImageTexture(const RGBAImage * image) : image(image->view()) {}
-        AKR_XPU Spectrum evaluate(const Point2f &texcoords) const {
-            Point2f tc = fmod(texcoords, Array2f(1.0f));
-            tc.y() = 1.0f - tc.y();
-            return image(tc).rgb;
-        }
-    };
-    AKR_VARIANT class Texture : public Variant<ConstantTexture<C>, ImageTexture<C>> {
-      public:
-        AKR_IMPORT_TYPES()
-        using Variant<ConstantTexture<C>, ImageTexture<C>>::Variant;
-        AKR_XPU Spectrum evaluate(const Point2f &texcoords) const { AKR_VAR_DISPATCH(evaluate, texcoords); }
-    };
 } // namespace akari

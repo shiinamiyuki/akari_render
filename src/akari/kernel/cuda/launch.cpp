@@ -32,7 +32,14 @@ namespace akari::gpu {
             double max_ms = 0;
             double min_ms = 0;
             bool active = false;
-            KernelStats() {
+
+            cudaEvent_t start, stop;
+        };
+        struct ProfilerEvent {
+            cudaEvent_t start, stop;
+            bool active = false;
+            KernelStats *stat = nullptr;
+            ProfilerEvent() {
                 CUDA_CHECK(cudaEventCreate(&start));
                 CUDA_CHECK(cudaEventCreate(&stop));
             }
@@ -42,43 +49,56 @@ namespace akari::gpu {
                 CUDA_CHECK(cudaEventSynchronize(stop));
                 float ms = 0;
                 CUDA_CHECK(cudaEventElapsedTime(&ms, start, stop));
-                total_ms += ms;
-                num_launches++;
-                if (num_launches == 1) {
-                    min_ms = max_ms = ms;
+                stat->total_ms += ms;
+                stat->num_launches++;
+                if (stat->num_launches == 1) {
+                    stat->min_ms = stat->max_ms = ms;
                 } else {
-                    min_ms = std::min(min_ms, (double)ms);
-                    max_ms = std::max(max_ms, (double)ms);
+                    stat->min_ms = std::min(stat->min_ms, (double)ms);
+                    stat->max_ms = std::max(stat->max_ms, (double)ms);
                 }
                 active = false;
+                stat = nullptr;
             }
-            cudaEvent_t start, stop;
         };
+
         static std::unordered_map<std::string_view, KernelStats> stats;
+        static std::vector<ProfilerEvent> event_pool;
+        static size_t event_pool_head = 0;
     } // namespace cuda_profiler
     std::pair<cudaEvent_t, cudaEvent_t> get_profiler_events(const char *description) {
         using namespace cuda_profiler;
+        if (event_pool.empty()) {
+            event_pool.resize(1024 * 4);
+        }
+        if (event_pool_head == event_pool.size()) {
+            event_pool_head = 0;
+        }
+        ProfilerEvent &event = event_pool[event_pool_head++];
+        if (event.active) {
+            event.sync();
+        }
         auto it = stats.find(description);
         if (it == stats.end()) {
             auto [it_, _] = stats.emplace(description, KernelStats());
             it = it_;
             it->second.name = description;
         }
-        auto &stat = it->second;
-        if (stat.active) {
-            stat.sync();
-        }
-        stat.active = true;
-        return std::make_pair(stat.start, stat.stop);
+        auto stat = &it->second;
+        event.active = true;
+        event.stat = stat;
+        return std::make_pair(event.start, event.stop);
     }
     void print_kernel_stats() {
         using namespace cuda_profiler;
         std::vector<KernelStats *> vstats;
-        for (auto &[name, stat] : stats) {
-            if (stat.active) {
-                stat.sync();
+        for (auto &e : event_pool) {
+            if (e.active) {
+                e.sync();
             }
-            vstats.push_back(&stat);
+        }
+        for (auto &stat : stats) {
+            vstats.push_back(&stat.second);
         }
         double total_ms = 0;
         int total_launches = 0;
