@@ -54,9 +54,9 @@ namespace akari {
             return _texels[x + y * _resolution[0]];
         }
 
-        AKR_XPU const T &operator()(float x, float y) const { return (*this)(Float3(x, y)); }
+        AKR_XPU const T &operator()(float x, float y) const { return (*this)(Point2f(x, y)); }
 
-        AKR_XPU T &operator()(float x, float y) { return (*this)(Float3(x, y)); }
+        AKR_XPU T &operator()(float x, float y) { return (*this)(Point2f(x, y)); }
 
         AKR_XPU const T &operator()(const Point2i &p) const { return (*this)(p.x(), p.y()); }
 
@@ -91,7 +91,7 @@ namespace akari {
                 return _texels[x + y * _resolution[0]];
             }
 
-            AKR_XPU const T &operator()(float x, float y) const { return (*this)(Float3(x, y)); }
+            AKR_XPU const T &operator()(float x, float y) const { return (*this)(Point2f(x, y)); }
 
             AKR_XPU const T &operator()(const Point2i &p) const { return (*this)(p.x(), p.y()); }
 
@@ -114,8 +114,8 @@ namespace akari {
         AKR_IMPORT_CORE_TYPES_WITH(float)
         Color3f rgb;
         Float alpha;
-        RGBA()=default;
-        AKR_XPU RGBA(Array3f rgb, Float alpha):rgb(rgb),alpha(alpha){}
+        RGBA() = default;
+        AKR_XPU RGBA(Array3f rgb, Float alpha) : rgb(rgb), alpha(alpha) {}
     };
     class RGBAImage : public TImage<RGBA> {
       public:
