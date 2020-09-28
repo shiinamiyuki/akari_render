@@ -51,11 +51,10 @@ namespace akari {
         Buffer(MemoryResource *resource) : resource(resource), allocator(Allocator(resource)) {}
         Buffer(const Buffer &) = delete;
         // copy host data and resize
-        template <typename T, typename A>
+        template <typename A>
         void copy(const std::vector<T, A> &v) {
             copy(v.data(), v.size());
         }
-        template <typename T>
         void copy(const astd::pmr::vector<T> &v) {
             copy(v.data(), v.size());
         }
@@ -101,7 +100,6 @@ namespace akari {
         AKR_XPU const T *cbegin() const { return _data; }
         AKR_XPU const T *cend() const { return _data + _size; }
         AKR_XPU size_t size() const { return _size; }
-        AKR_XPU size_t capacity() const { return _capacity; }
         void clear() {
             allocator.deallocate(_data, _size);
             _data = nullptr;

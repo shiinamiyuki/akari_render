@@ -54,7 +54,7 @@ namespace akari {
             instance.vertices = mesh->vertices.view();
             // AKR_ASSERT_THROW(mesh->material_indices.size() == materials.size());
             instance.materials = {arena->allocN<const Material<C> *>(materials.size()), materials.size()};
-            for (size_t i = 0; i < materials.size();i++) {
+            for (size_t i = 0; i < materials.size(); i++) {
                 instance.materials[i] = (materials[i]->compile(arena));
             }
             return instance;
@@ -81,6 +81,7 @@ namespace akari {
             }
         }
     };
+#if 0
     AKR_VARIANT class OBJMesh : public MeshNode<C> {
         std::string loaded;
 
@@ -177,7 +178,7 @@ namespace akari {
             return true;
         }
     };
-
+#endif
     AKR_VARIANT void RegisterMeshNode<C>::register_nodes() {
         AKR_IMPORT_TYPES();
         register_node<C, AkariMesh<C>>("AkariMesh");

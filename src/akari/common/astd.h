@@ -508,7 +508,7 @@ namespace akari::astd {
                 return;
 
             T *ra = alloc.template allocate_object<T>(n);
-            for (int i = 0; i < nStored; ++i) {
+            for (size_t i = 0; i < nStored; ++i) {
                 alloc.template construct<T>(ra + i, std::move(begin()[i]));
                 alloc.destroy(begin() + i);
             }
@@ -543,7 +543,7 @@ namespace akari::astd {
         const_pointer data() const { return ptr; }
 
         void clear() {
-            for (int i = 0; i < nStored; ++i)
+            for (size_t i = 0; i < nStored; ++i)
                 alloc.destroy(&ptr[i]);
             nStored = 0;
         }
