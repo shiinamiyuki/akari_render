@@ -76,6 +76,8 @@ namespace akari {
                 light_ctx.u = sampler.next2d();
                 light_ctx.p = si.p;
                 LightSample<C> light_sample = light->sample(light_ctx);
+                if(light_sample.pdf <= 0.0)
+                    return astd::nullopt;
                 light_pdf *= light_sample.pdf;
                 auto f = light_sample.L * si.bsdf.evaluate(surface_hit.wo, light_sample.wi) *
                          std::abs(dot(si.ns, light_sample.wi));
