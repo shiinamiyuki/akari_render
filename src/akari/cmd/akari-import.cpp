@@ -189,9 +189,10 @@ std::shared_ptr<Mesh> load_wavefront_obj(const fs::path &path, std::string &gene
     }
     os << "  ]\n}\n";
     generated = os.str();
-    mesh = std::make_shared<Mesh>(active_device()->host_resource());
+    mesh = std::make_shared<Mesh>(cpu_device()->host_resource());
     mesh->indices.copy(indices);
     mesh->normals.copy(normals);
+    mesh->vertices.copy(vertices);
     mesh->texcoords.copy(texcoords);
     mesh->material_indices.copy(material_indices);
     return mesh;

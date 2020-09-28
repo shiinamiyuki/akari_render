@@ -55,9 +55,7 @@ namespace akari {
         void copy(const std::vector<T, A> &v) {
             copy(v.data(), v.size());
         }
-        void copy(const astd::pmr::vector<T> &v) {
-            copy(v.data(), v.size());
-        }
+        void copy(const astd::pmr::vector<T> &v) { copy(v.data(), v.size()); }
         void copy(const T *host_ptr, size_t s) {
             resize(s);
             if (auto device_res = dynamic_cast<DeviceMemoryResource *>(resource)) {
@@ -72,11 +70,13 @@ namespace akari {
             _data = rhs._data;
             _size = rhs._size;
             rhs._data = nullptr;
+            rhs._size = 0;
         }
         Buffer &operator=(Buffer &&rhs) {
             _data = rhs._data;
             _size = rhs._size;
             rhs._data = nullptr;
+            rhs._size = 0;
             allocator = std::move(rhs.allocator);
             return *this;
         }
