@@ -40,9 +40,10 @@ namespace akari {
         AKR_IMPORT_TYPES()
         Bounds2i bounds{};
         Point2i _size;
-        Buffer<Pixel<C>> pixels;
+        astd::pmr::vector<Pixel<C>> pixels;
 
-        explicit Tile(const Bounds2i &bounds) : bounds(bounds), _size(bounds.size()), pixels(_size.x() * _size.y()) {}
+        explicit Tile(const Bounds2i &bounds, MemoryResource *resource = default_resource())
+            : bounds(bounds), _size(bounds.size()), pixels(_size.x() * _size.y(), TAllocator<Pixel<C>>(resource)) {}
 
         AKR_XPU auto &operator()(const Point2f &p) {
             auto q = Point2i(floor(p - Point2f(bounds.pmin)));
@@ -77,7 +78,7 @@ namespace akari {
         Float splatScale = 1.0f;
         explicit Film(const Point2i &dimension) : radiance(dimension), weight(dimension) {}
         Tile<C> tile(const Bounds2i &bounds) { return Tile<C>(bounds); }
-        Box<Tile<C>> boxed_tile(const Bounds2i &bounds) { return Box<Tile<C>>::make(bounds); }
+        Box<Tile<C>> boxed_tile(const Bounds2i &bounds) { return Box<Tile<C>>::make(default_resource(), bounds); }
         [[nodiscard]] AKR_XPU Point2i resolution() const { return radiance.resolution(); }
 
         [[nodiscard]] AKR_XPU Bounds2i bounds() const { return Bounds2i{Point2i(0), resolution()}; }

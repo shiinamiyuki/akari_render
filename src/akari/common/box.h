@@ -24,14 +24,14 @@
 #include <vector>
 #include <memory_resource>
 #include <akari/common/fwd.h>
-#include <akari/core/mode.h>
 #include <akari/common/buffer.h>
 namespace akari {
-    template <typename T, typename Allocator = DeviceAllocator<T>>
+    template <typename T>
     struct Box {
-        Box() = default;
+        using Allocator = astd::pmr::polymorphic_allocator<T>;
+        Box(MemoryResource *resource) : allocator(resource) {}
         Box(const Box &) = delete;
-        Box(Box &&rhs) :  _ptr(rhs._ptr), allocator(std::move(rhs.allocator)) { rhs._ptr = nullptr; }
+        Box(Box &&rhs) : _ptr(rhs._ptr), allocator(std::move(rhs.allocator)) { rhs._ptr = nullptr; }
         Box &operator=(const Box &) = delete;
         Box &operator=(Box &&rhs) {
             reset();
@@ -41,8 +41,8 @@ namespace akari {
             return *this;
         }
         template <typename... Ts>
-        static Box make(Ts &&... args) {
-            Box<T> box;
+        static Box make(MemoryResource *resource, Ts &&... args) {
+            Box<T> box(resource);
             box.emplace(std::forward<Ts>(args)...);
             return box;
         }

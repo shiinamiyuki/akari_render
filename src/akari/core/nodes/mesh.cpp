@@ -44,7 +44,7 @@ namespace akari {
                 throw std::runtime_error("Error loading mesh");
             }
         }
-        MeshInstance<C> compile(MemoryArena<>*arena) override {
+        MeshInstance<C> compile(MemoryArena<> *arena) override {
             commit();
             MeshInstance<C> instance;
             instance.indices = mesh->indices.view();
@@ -53,8 +53,9 @@ namespace akari {
             instance.texcoords = mesh->texcoords.view();
             instance.vertices = mesh->vertices.view();
             // AKR_ASSERT_THROW(mesh->material_indices.size() == materials.size());
-            for (auto &mat : materials) {
-                instance.materials.push_back(mat->compile(arena));
+            instance.materials = {arena->allocN<const Material<C> *>(materials.size()), materials.size()};
+            for (size_t i = 0; i < materials.size();i++) {
+                instance.materials[i] = (materials[i]->compile(arena));
             }
             return instance;
         }
@@ -100,7 +101,7 @@ namespace akari {
                           const sdl::Value &value) override {
             AKR_ASSERT_THROW(false && "not implemented");
         }
-        MeshInstance<C> compile(MemoryArena<>*) override {
+        MeshInstance<C> compile(MemoryArena<> *) override {
             commit();
             MeshInstance<C> view;
             view.indices = mesh.indices;

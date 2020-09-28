@@ -38,7 +38,6 @@ namespace akari {
     class BVHAccelerator;
     AKR_VARIANT struct Intersection {
         AKR_IMPORT_TYPES()
-        Point3f p;
         Float t = Constants<Float>::Inf();
         Normal3f ng;
         Point2f uv;

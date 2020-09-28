@@ -43,7 +43,9 @@ namespace akari {
         void add_mesh(const std::shared_ptr<MeshNode<C>> &mesh) { shapes.emplace_back(mesh); }
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override;
-        SceneNode() : instances(astd::pmr::polymorphic_allocator<>(get_managed_memory_resource())) {}
+        SceneNode()
+            : instances(TAllocator<MeshInstance<C>>(default_resource())),
+              area_lights(active_device()->device_resource()) {}
     };
 
     AKR_VARIANT struct RegisterSceneNode {

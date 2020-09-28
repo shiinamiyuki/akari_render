@@ -29,8 +29,7 @@ namespace akari {
     template <typename T>
     struct SOA {
         SOA() = default;
-        SOA(T v) : SOA(1, DeviceAllocator<T>()) { *array = v; }
-        template <typename Allocator = DeviceAllocator<T>>
+        template <typename Allocator>
         SOA(int n, Allocator &&allocator) : _size(n) {
             if constexpr (std::is_fundamental_v<T>) {
                 array = (T *)allocator.allocate_bytes(sizeof(T) * n, 1024u);
@@ -54,7 +53,7 @@ namespace akari {
         static_assert(sizeof(A) % sizeof(T) == 0);
         static constexpr size_t stride = sizeof(A) / sizeof(T);
         SOAArrayXT() = default;
-        template <typename Allocator = DeviceAllocator<T>>
+        template <typename Allocator>
         SOAArrayXT(int n, Allocator &&allocator) : _size(n) {
             array = allocator.template allocate_object<T>(n * stride);
         }

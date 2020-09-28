@@ -75,7 +75,15 @@ struct fmt::formatter<akari::Color<T, N>> : fmt::formatter<akari::Array<T, N>> {
 };
 namespace akari {
 
-    enum class LogLevel { Info, Debug, Warning, Error, Fatal };
+    enum class LogLevel {
+        Debug,
+        Verbose,
+        Info,
+        Warning,
+        Error,
+        Fatal,
+    };
+
     class LogHandler {
       public:
         virtual void AddMessage(LogLevel level, const std::string &msg) = 0;
@@ -88,7 +96,9 @@ namespace akari {
         virtual void Error(const std::string &msg) = 0;
         virtual void Info(const std::string &msg) = 0;
         virtual void Debug(const std::string &msg) = 0;
+        virtual void Verbose(const std::string &msg) = 0;
         virtual void Fatal(const std::string &msg) = 0;
+        virtual void log_verbose(bool on) = 0;
         virtual ~Logger() = default;
     };
 
@@ -104,6 +114,12 @@ namespace akari {
     void error(const char *fmt, Args &&... args) {
         auto logger = GetDefaultLogger();
         logger->Error(fmt::format(fmt, std::forward<Args>(args)...));
+    }
+
+    template <typename... Args>
+    void verbose(const char *fmt, Args &&... args) {
+        auto logger = GetDefaultLogger();
+        logger->Verbose(fmt::format(fmt, std::forward<Args>(args)...));
     }
 
     template <typename... Args>

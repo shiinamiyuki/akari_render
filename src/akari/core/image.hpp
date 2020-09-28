@@ -36,11 +36,13 @@ namespace akari {
     class TImage {
         using Float = float;
         AKR_IMPORT_CORE_TYPES()
-        Buffer<T> _texels;
+        astd::pmr::vector<T> _texels;
         Point2i _resolution;
 
       public:
-        TImage(const Point2i &dim = Point2i(1)) : _texels(dim[0] * dim[1]), _resolution(dim) {}
+        TImage(const Point2i &dim = Point2i(1),
+               astd::pmr::memory_resource *resource = astd::pmr::get_default_resource())
+            : _texels(dim[0] * dim[1], astd::pmr::polymorphic_allocator<T>(resource)), _resolution(dim) {}
 
         AKR_XPU const T &operator()(int x, int y) const {
             x = std::clamp(x, 0, _resolution[0] - 1);
@@ -66,7 +68,7 @@ namespace akari {
 
         AKR_XPU T &operator()(const Point2f &p) { return (*this)(Point2i(p * Point2f(_resolution))); }
 
-        [[nodiscard]] AKR_XPU const Buffer<T> &texels() const { return _texels; }
+        [[nodiscard]] AKR_XPU const astd::pmr::vector<T> &texels() const { return _texels; }
 
         void resize(const Point2i &size) {
             _resolution = size;

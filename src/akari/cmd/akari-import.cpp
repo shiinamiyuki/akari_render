@@ -51,9 +51,12 @@ std::shared_ptr<Mesh> load_wavefront_obj(const fs::path &path, std::string &gene
         return nullptr;
     }
 
-    mesh = std::make_shared<Mesh>();
-    mesh->vertices.resize(attrib.vertices.size());
-    std::memcpy(&mesh->vertices[0], &attrib.vertices[0], sizeof(float) * mesh->vertices.size());
+    std::vector<float> vertices, normals, texcoords;
+    std::vector<int> indices;
+    std::vector<int> material_indices;
+    vertices.resize(attrib.vertices.size());
+    std::memcpy(&vertices[0], &attrib.vertices[0], sizeof(float) * vertices.size());
+
     for (size_t s = 0; s < shapes.size(); s++) {
         // Loop over faces(polygon)
         size_t index_offset = 0;
@@ -64,28 +67,28 @@ std::shared_ptr<Mesh> load_wavefront_obj(const fs::path &path, std::string &gene
             Point3f triangle[3];
             for (int v = 0; v < fv; v++) {
                 tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
-                mesh->indices.push_back(idx.vertex_index);
-                triangle[v] = Point3f(load<PackedArray<Float, 3>>(&mesh->vertices[3 * idx.vertex_index]));
+                indices.push_back(idx.vertex_index);
+                triangle[v] = Point3f(load<PackedArray<Float, 3>>(&vertices[3 * idx.vertex_index]));
             }
-            mesh->material_indices.emplace_back(shapes[s].mesh.material_ids[f]);
+            material_indices.emplace_back(shapes[s].mesh.material_ids[f]);
             Normal3f ng = normalize(cross(triangle[1] - triangle[0], triangle[2] - triangle[0]));
             for (int v = 0; v < fv; v++) {
                 tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
                 if (idx.normal_index < 0) {
-                    mesh->normals.emplace_back(ng[0]);
-                    mesh->normals.emplace_back(ng[1]);
-                    mesh->normals.emplace_back(ng[2]);
+                    normals.emplace_back(ng[0]);
+                    normals.emplace_back(ng[1]);
+                    normals.emplace_back(ng[2]);
                 } else {
-                    mesh->normals.emplace_back(attrib.normals[3 * idx.normal_index + 0]);
-                    mesh->normals.emplace_back(attrib.normals[3 * idx.normal_index + 1]);
-                    mesh->normals.emplace_back(attrib.normals[3 * idx.normal_index + 2]);
+                    normals.emplace_back(attrib.normals[3 * idx.normal_index + 0]);
+                    normals.emplace_back(attrib.normals[3 * idx.normal_index + 1]);
+                    normals.emplace_back(attrib.normals[3 * idx.normal_index + 2]);
                 }
                 if (idx.texcoord_index < 0) {
-                    mesh->texcoords.emplace_back(v > 0);
-                    mesh->texcoords.emplace_back(v % 2 == 0);
+                    texcoords.emplace_back(v > 0);
+                    texcoords.emplace_back(v % 2 == 0);
                 } else {
-                    mesh->texcoords.emplace_back(attrib.texcoords[2 * idx.texcoord_index + 0]);
-                    mesh->texcoords.emplace_back(attrib.texcoords[2 * idx.texcoord_index + 1]);
+                    texcoords.emplace_back(attrib.texcoords[2 * idx.texcoord_index + 0]);
+                    texcoords.emplace_back(attrib.texcoords[2 * idx.texcoord_index + 1]);
                 }
             }
             index_offset += fv;
@@ -175,7 +178,7 @@ std::shared_ptr<Mesh> load_wavefront_obj(const fs::path &path, std::string &gene
             os << "// ======================================== \n\n";
         }
     }
-    info("loaded {} triangles, {} vertices", mesh->indices.size() / 3, mesh->vertices.size() / 3);
+    info("loaded {} triangles, {} vertices", indices.size() / 3, vertices.size() / 3);
     os << "export mesh = AkariMesh {\n  path: \"" << path.filename().concat(".mesh").generic_string() << "\",\n";
     os << "  materials: [\n";
     int idx = 0;
@@ -186,6 +189,11 @@ std::shared_ptr<Mesh> load_wavefront_obj(const fs::path &path, std::string &gene
     }
     os << "  ]\n}\n";
     generated = os.str();
+    mesh = std::make_shared<Mesh>(active_device()->host_resource());
+    mesh->indices.copy(indices);
+    mesh->normals.copy(normals);
+    mesh->texcoords.copy(texcoords);
+    mesh->material_indices.copy(material_indices);
     return mesh;
 }
 

@@ -50,12 +50,14 @@ namespace akari {
         UserData user_data;
         Intersector _intersector;
         ShapeHandleConstructor _ctor;
-        astd::vector<Index, DeviceAllocator<Index>> primitives;
-        astd::vector<BVHNode, DeviceAllocator<BVHNode>> nodes;
+
+        astd::pmr::vector<Index> primitives;
+        astd::pmr::vector<BVHNode> nodes;
         std::shared_ptr<std::mutex> m;
         TBVHAccelerator(UserData &&user_data, size_t N, Intersector intersector = Intersector(),
                         ShapeHandleConstructor ctor = ShapeHandleConstructor())
-            : user_data(std::move(user_data)), _intersector(std::move(intersector)), _ctor(std::move(ctor)) {
+            : user_data(std::move(user_data)), _intersector(std::move(intersector)), _ctor(std::move(ctor)),
+              primitives(TAllocator<Index>(default_resource())), nodes(TAllocator<BVHNode>(default_resource())) {
             m = std::make_shared<std::mutex>();
             for (auto i = 0; i < (int)N; i++) {
                 primitives.push_back(Index{i});
@@ -339,12 +341,13 @@ namespace akari {
                 return false;
             }
         };
-        astd::vector<MeshBVH, DeviceAllocator<MeshBVH>> meshBVHs;
+        astd::pmr::vector<MeshBVH> meshBVHs;
 
         using TopLevelBVH = TBVHAccelerator<C, MeshBVHes, Intersection<C>, BVHIntersector, BVHHandleConstructor, 28>;
         astd::optional<TopLevelBVH> topLevelBVH;
 
       public:
+        BVHAccelerator() : meshBVHs(TAllocator<MeshBVH>(default_resource())) {}
         void build(Scene<C> &scene) {
             for (auto &instance : scene.meshes) {
                 meshBVHs.emplace_back(&instance, instance.indices.size() / 3);

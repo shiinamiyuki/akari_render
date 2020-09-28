@@ -28,6 +28,7 @@
 
 namespace akari {
     class DefaultLogger : public Logger {
+        bool do_log_verbose = false;
         decltype(std::chrono::system_clock::now()) start = std::chrono::system_clock::now();
         void DoLogMessage(LogLevel level, const std::string &msg, FILE *fp = stdout) {
             std::chrono::duration<double> elapsed = std::chrono::system_clock::now() - start;
@@ -36,7 +37,7 @@ namespace akari {
                 fprintf(fp, "\u001b[31m");
             } else if (level == LogLevel::Warning) {
                 fprintf(fp, "\u001b[33m");
-            } else if (level == LogLevel::Info) {
+            } else if (level == LogLevel::Info || level == LogLevel::Verbose) {
                 fprintf(fp, "\u001b[32m");
             }
             switch (level) {
@@ -50,6 +51,7 @@ namespace akari {
                 fprintf(fp, "[WARNING] ");
                 break;
             case LogLevel::Info:
+            case LogLevel::Verbose:
                 fprintf(fp, "[INFO] ");
                 break;
             case LogLevel::Debug:
@@ -102,6 +104,14 @@ namespace akari {
         void Debug(const std::string &msg) override { DoLogMessage(LogLevel::Debug, msg); }
 
         void Fatal(const std::string &msg) override { DoLogMessage(LogLevel::Fatal, msg, stderr); }
+
+        void Verbose(const std::string &msg) override {
+            if (!do_log_verbose)
+                return;
+            DoLogMessage(LogLevel::Verbose, msg, stderr);
+        }
+
+        void log_verbose(bool on) { do_log_verbose = on; }
     }; // namespace akari
 
     Logger *GetDefaultLogger() {

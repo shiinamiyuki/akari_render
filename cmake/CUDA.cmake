@@ -7,7 +7,7 @@ if (CMAKE_CUDA_COMPILER)
         set (CMAKE_CUDA_STANDARD 17)
     endif ()
 
-    message (STATUS "Found CUDA: ${CUDAToolkit_VERSION_MAJOR}.${CUDAToolkit_VERSION_MINOR}")
+    message (STATUS "Found CUDA: ${CUDAToolkit_BIN_DIR}")
     if (CUDA_VERSION_MAJOR LESS 11)
         message(SEND_ERROR "AkariRender requires CUDA version 11.0 or later. If you have multiple versions installed, please update your PATH.")
     endif ()

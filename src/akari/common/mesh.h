@@ -29,6 +29,9 @@ namespace akari {
         Buffer<float> vertices, normals, texcoords;
         Buffer<int> indices;
         Buffer<int> material_indices;
-    };
+        Mesh(MemoryResource *resource)
+            : vertices(resource), normals(resource), texcoords(resource), indices(resource),
+              material_indices(resource) {}
+        };
 
 } // namespace akari

@@ -27,6 +27,7 @@
 #include <akari/common/math.h>
 #include <atomic>
 #include <functional>
+#include <future>
 
 namespace akari {
     class AtomicFloat {
@@ -68,5 +69,32 @@ namespace akari {
         AKR_EXPORT void finalize();
     }
 
+    // Wrapper around std::future<T>
+    template <typename T>
+    class Future {
+        std::future<T> inner;
+        template <typename R>
+        friend class Future;
+
+      public:
+        Future(std::future<T> ft) : inner(std::move(ft)) {}
+        template <typename F, typename R = std::invoke_result_t<F, decltype(std::declval<std::future<T>>().get())>>
+        auto then(F &&f, std::launch policy = std::launch::deferred) -> Future<R> {
+            return Future<R>(std::async(std::launch::deferred, [=, ft = std::move(inner)]() mutable {
+                if constexpr (std::is_same_v<T, void>) {
+                    ft.get();
+                    return f();
+                } else {
+                    decltype(auto) result = ft.get();
+                    return f(result);
+                }
+            }));
+        }
+    };
+    template <class _Fty, class... _ArgTypes>
+    Future<std::invoke_result_t<std::decay_t<_Fty>, std::decay_t<_ArgTypes>...>>
+    async_do(std::launch policy, _Fty &&_Fnarg, _ArgTypes &&... _Args) {
+        return std::async(policy, std::forward<_Fty>(_Fnarg), std::forward<_ArgTypes>(_Args)...);
+    }
 } // namespace akari
 #endif // AKARIRENDER_PARALLEL_HPP

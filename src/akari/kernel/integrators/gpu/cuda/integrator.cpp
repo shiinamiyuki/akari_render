@@ -50,7 +50,7 @@ namespace akari::gpu {
                     Frame3f frame(trig.ng());
                     auto w = sampling<C>::cosine_hemisphere_sampling(sampler.next2d());
                     w = frame.local_to_world(w);
-                    ray = Ray3f(intersection.p, w);
+                    ray = Ray3f(trig.p(intersection.uv), w);
 
                     if (auto isct = scene.intersect(ray)) {
                         if (isct.value().t < occlude)
@@ -134,8 +134,8 @@ namespace akari::gpu {
     };
     AKR_VARIANT void PathTracer<C>::render(const Scene<C> &scene, Film<C> *film) const {
         if constexpr (std::is_same_v<Float, float>) {
-            auto resource = std::make_unique<TrackedDeviceMemoryResource>(get_managed_memory_resource());
-            auto allocator = astd::pmr::polymorphic_allocator(resource.get());
+            auto resource = TrackedManagedMemoryResource(active_device()->managed_resource());
+            auto allocator = astd::pmr::polymorphic_allocator(&resource);
             PathTracerImpl<C> tracer(allocator, *this);
             tracer.render(scene, film);
         } else {
@@ -338,7 +338,7 @@ namespace akari::gpu {
             auto &[tile_pos, tile_bounds, tile] = item;
             render_tile(tile.get(), tile_pos, tile_bounds);
         }
-        sync_device();
+        active_device()->sync();
         std::for_each(std::execution::par_unseq, tiles.begin(), tiles.end(),
                       [=](const WorkTile &item) { film->merge_tile(*item.tile.get()); });
         print_kernel_stats();

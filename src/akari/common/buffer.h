@@ -24,21 +24,19 @@
 #include <vector>
 #include <memory_resource>
 #include <akari/common/fwd.h>
-#include <akari/core/mode.h>
+#include <akari/core/device.h>
 #include <akari/common/bufferview.h>
 namespace akari {
     astd::pmr::memory_resource *get_managed_memory_resource();
     // template <typename T> using Buffer = std::vector<T, std::pmr::polymorphic_allocator<T>>;
-    template <typename T = std::byte>
-    struct DeviceAllocator : astd::pmr::polymorphic_allocator<T> {
-        DeviceAllocator() : astd::pmr::polymorphic_allocator<T>(get_managed_memory_resource()) {}
-    };
     template <typename T>
     struct BufferView;
+
     template <typename T>
     struct Buffer {
+        // as we need to memcpy directly across device
         static_assert(std::is_trivially_copyable_v<T> && std::is_trivially_destructible_v<T>);
-        using Allocator = DeviceAllocator<T>;
+        using Allocator = astd::pmr::polymorphic_allocator<T>;
         using value_type = T;
         using allocator_type = Allocator;
         using size_type = std::size_t;
@@ -49,86 +47,50 @@ namespace akari {
         using const_pointer = const T *;
         using iterator = T *;
         using const_iterator = const T *;
-        // using reverse_iterator = std::reverse_iterator<iterator>;
-        // using const_reverse_iterator = std::reverse_iterator<const iterator>;
 
-        Buffer() {}
-        Buffer(size_t s) { resize(s); }
-        Buffer(const Buffer &other) {
-            reserve(other.size());
-            _size = other.size();
-            std::memcpy(data(), other.data(), sizeof(T) * size());
+        Buffer(MemoryResource *resource) : resource(resource), allocator(Allocator(resource)) {}
+        Buffer(const Buffer &) = delete;
+        // copy host data and resize
+        template <typename T, typename A>
+        void copy(const std::vector<T, A> &v) {
+            copy(v.data(), v.size());
         }
-        Buffer &operator=(const Buffer &other) {
-            if (this == &other)
-                return *this;
-            clear();
-            reserve(other.size());
-            _size = other.size();
-            std::memcpy(data(), other.data(), sizeof(T) * size());
-
-            return *this;
+        template <typename T>
+        void copy(const astd::pmr::vector<T> &v) {
+            copy(v.data(), v.size());
+        }
+        void copy(const T *host_ptr, size_t s) {
+            resize(s);
+            if (auto device_res = dynamic_cast<DeviceMemoryResource *>(resource)) {
+                device_res->device()->copy_host_to_device(data(), host_ptr, sizeof(T) * size());
+            } else if (auto managed_res = dynamic_cast<ManagedMemoryResource *>(resource)) {
+                managed_res->device()->copy_host_to_device(data(), host_ptr, sizeof(T) * size());
+            } else {
+                std::memcpy(data(), host_ptr, sizeof(T) * size());
+            }
         }
         Buffer(Buffer &&rhs) : allocator(std::move(rhs.allocator)) {
             _data = rhs._data;
-            _capacity = rhs._capacity;
             _size = rhs._size;
             rhs._data = nullptr;
-            rhs._capacity = rhs._size = 0u;
         }
         Buffer &operator=(Buffer &&rhs) {
             _data = rhs._data;
-            _capacity = rhs._capacity;
             _size = rhs._size;
             rhs._data = nullptr;
-            rhs._capacity = rhs._size = 0u;
             allocator = std::move(rhs.allocator);
             return *this;
         }
-        void push_back(const T &v) {
-            if (_size == _capacity) {
-                reserve(_capacity == 0 ? 4 : 2 * _capacity);
-            }
-            allocator.construct(_data + _size, v);
-            _size++;
-        }
-        template <typename... Ts>
-        void emplace_back(Ts &&... args) {
-            if (_size == _capacity) {
-                reserve(_capacity == 0 ? 4 : 2 * _capacity);
-            }
-            allocator.construct(_data + _size, std::forward<Ts>(args)...);
-            _size++;
-        }
-        void reserve(size_t s) {
-            if (s > _capacity) {
-                size_t new_cap = s;
-                auto *new_data = allocator.allocate(new_cap);
-                if (_data) {
-                    std::memcpy(new_data, _data, sizeof(T) * _capacity);
-                    allocator.deallocate(_data, _capacity);
-                }
-                _data = new_data;
-                _capacity = new_cap;
-            }
-        }
         void resize(size_t s) {
-            if (s < _size) {
-                if (s == 0) {
-                    allocator.deallocate(_data, _capacity);
-                    _data = 0;
-                    _capacity = 0;
-                }
-            } else if (s > _size) {
-                reserve(s);
-                for (size_t i = _size; i < s; i++) {
-                    allocator.construct(_data + i);
-                }
-            }
+            if (_data)
+                allocator.deallocate(_data, _size);
             _size = s;
+            _data = allocator.allocate(_size);
         }
-        void pop_back() { _size -= 1; }
-        ~Buffer() { allocator.deallocate(_data, _capacity); }
+        ~Buffer() {
+            if (_data)
+                allocator.deallocate(_data, _size);
+        }
         AKR_XPU T &operator[](size_t i) { return _data[i]; }
         AKR_XPU const T &operator[](size_t i) const { return _data[i]; }
         AKR_XPU T &at(size_t i) { return _data[i]; }
@@ -141,17 +103,18 @@ namespace akari {
         AKR_XPU size_t size() const { return _size; }
         AKR_XPU size_t capacity() const { return _capacity; }
         void clear() {
+            allocator.deallocate(_data, _size);
+            _data = nullptr;
             _size = 0;
-            _capacity = 0;
         }
         AKR_XPU const T &back() const { return *(end() - 1); }
         AKR_XPU T &back() { return *(end() - 1); }
         BufferView<T> view() const { return {data(), size()}; }
 
       private:
+        MemoryResource *resource;
         Allocator allocator;
         T *_data = nullptr;
         size_t _size = 0;
-        size_t _capacity = 0;
     };
 } // namespace akari

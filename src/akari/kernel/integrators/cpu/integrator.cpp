@@ -47,11 +47,12 @@ namespace akari {
                     Frame3f frame(trig.ng());
                     auto w = sampling<C>::cosine_hemisphere_sampling(sampler.next2d());
                     w = frame.local_to_world(w);
-                    ray = Ray3f(intersection.p, w);
+                    ray = Ray3f(trig.p(intersection.uv), w);
                     intersection = Intersection<C>();
                     if (scene.intersect(ray, &intersection) && intersection.t < occlude)
                         return Spectrum(0);
                     return Spectrum(1);
+                    // return trig.ng() * 0.5 + 0.5;
                 }
                 return Spectrum(0);
                 // debug("{}\n", ray.d);
@@ -125,7 +126,7 @@ namespace akari {
             };
             std::mutex mutex;
             auto num_threads = num_work_threads();
-            auto _arena = MemoryArena<>(astd::pmr::polymorphic_allocator<>(get_managed_memory_resource()));
+            auto _arena = MemoryArena<>(astd::pmr::polymorphic_allocator<>(active_device()->managed_resource()));
             std::vector<SmallArena> small_arenas;
             for (auto i = 0u; i < num_threads; i++) {
                 size_t size = 256 * 1024;

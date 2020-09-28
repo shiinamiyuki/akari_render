@@ -48,7 +48,7 @@ namespace akari {
             instances.emplace_back(shape->compile(arena));
         }
         scene.meshes = {instances.data(), instances.size()};
-        area_lights.clear();
+        std::vector<AreaLight<C>> area_light_buffer;
         for (uint32_t mesh_id = 0; mesh_id < scene.meshes.size(); mesh_id++) {
             MeshInstance<C> &mesh = scene.meshes[mesh_id];
             for (uint32_t prim_id = 0; prim_id < mesh.indices.size() / 3; prim_id++) {
@@ -59,10 +59,11 @@ namespace akari {
                 if (material->template isa<EmissiveMaterial<C>>()) {
                     const EmissiveMaterial<C> *e = material->template get<EmissiveMaterial<C>>();
                     (void)e;
-                    area_lights.emplace_back(triangle);
+                    area_light_buffer.emplace_back(triangle);
                 }
             }
         }
+        area_lights.copy(area_light_buffer.data(), area_light_buffer.size());
         scene.area_lights = area_lights.view();
 
         return scene;
@@ -92,15 +93,16 @@ namespace akari {
         auto _restore_handler = AtScopeExit([=]() { signal(SIGINT, _prev_SIGINT_handler); });
         commit();
         info("preparing scene");
-        TrackedDeviceMemoryResource resource(get_managed_memory_resource());
+        TrackedManagedMemoryResource resource(active_device()->managed_resource());
         auto arena = MemoryArena<>(astd::pmr::polymorphic_allocator<>(&resource));
         auto scene = compile(&arena);
         auto res = scene.camera.resolution();
         auto film = Film<C>(res);
         scene.sampler = LCGSampler<C>();
-        auto embree_scene = Box<BVHAccelerator<C>>::make();
+        auto embree_scene = Box<BVHAccelerator<C>>::make(default_resource());
         scene.accel = embree_scene.get();
         scene.commit();
+        resource.prefetch();
         auto render_cpu = [&]() {
             auto integrator_ = integrator->compile(&arena);
             integrator_->render(scene, &film);
@@ -113,7 +115,7 @@ namespace akari {
                 std::exit(0);
             }
             integrator_->render(scene, &film);
-            sync_device();
+            active_device()->sync();
         };
 #else
         auto render_gpu = [&]() {
@@ -122,7 +124,7 @@ namespace akari {
         };
 #endif
         Timer timer;
-        if (get_device() == ComputeDevice::cpu) {
+        if (active_device() == cpu_device()) {
             render_cpu();
         } else {
             render_gpu();
