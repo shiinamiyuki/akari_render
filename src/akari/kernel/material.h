@@ -77,7 +77,7 @@ namespace akari {
                                 BSDFType *sampledType) const {
             *wi = sampling<C>::cosine_hemisphere_sampling(u);
             if (!bsdf<C>::same_hemisphere(wo, *wi)) {
-                wi->y() = -wi->y();
+                wi->y = -wi->y;
             }
             *sampledType = type();
             *pdf = sampling<C>::cosine_hemisphere_pdf(std::abs(bsdf<C>::cos_theta(*wi)));
@@ -107,10 +107,10 @@ namespace akari {
                 auto wh = (wo + wi);
                 if (cosThetaI == 0 || cosThetaO == 0)
                     return Spectrum(0);
-                if (wh.x() == 0 && wh.y() == 0 && wh.z() == 0)
+                if (wh.x == 0 && wh.y == 0 && wh.z == 0)
                     return Spectrum(0);
                 wh = normalize(wh);
-                if (wh.y() < 0) {
+                if (wh.y < 0) {
                     wh = -wh;
                 }
                 auto F = 1.0f; // fresnel->evaluate(dot(wi, wh));
@@ -128,7 +128,7 @@ namespace akari {
                 *pdf = 0;
                 return Spectrum(0);
             } else {
-                if (wh.y() < 0) {
+                if (wh.y < 0) {
                     wh = -wh;
                 }
                 *pdf = model.evaluate_pdf(wh) / (Float(4.0f) * abs(dot(wo, wh)));
@@ -222,7 +222,7 @@ namespace akari {
         GlossyMaterial(Texture<C> *color, const Texture<C> *roughness) : color(color), roughness(roughness) {}
         AKR_XPU BSDF<C> get_bsdf(MaterialEvalContext<C> &ctx) const {
             auto R = color->evaluate(ctx.texcoords);
-            auto roughness_ = roughness->evaluate(ctx.texcoords).x();
+            auto roughness_ = roughness->evaluate(ctx.texcoords).x;
             roughness_ *= roughness_;
             BSDF<C> bsdf(ctx.ng, ctx.ns);
             bsdf.set_closure(MicrofacetReflection<C>(R, roughness_));
@@ -256,7 +256,7 @@ namespace akari {
             Float choice_pdf = 1.0f;
             auto ptr = this;
             while (ptr->template isa<MixMaterial<C>>()) {
-                auto frac = ptr->template get<MixMaterial<C>>()->fraction->evaluate(texcoords).x();
+                auto frac = ptr->template get<MixMaterial<C>>()->fraction->evaluate(texcoords).x;
                 if (u < frac) {
                     u = u / frac;
                     ptr = ptr->template get<MixMaterial<C>>()->material_B;

@@ -43,24 +43,24 @@ namespace akari {
         astd::pmr::vector<Pixel<C>> pixels;
 
         explicit Tile(const Bounds2i &bounds, MemoryResource *resource = default_resource())
-            : bounds(bounds), _size(bounds.size()), pixels(_size.x() * _size.y(), TAllocator<Pixel<C>>(resource)) {}
+            : bounds(bounds), _size(bounds.size()), pixels(_size.x * _size.y, TAllocator<Pixel<C>>(resource)) {}
 
         AKR_XPU auto &operator()(const Point2f &p) {
             auto q = Point2i(floor(p - Point2f(bounds.pmin)));
-            return pixels[q.x() + q.y() * _size.x()];
+            return pixels[q.x + q.y * _size.x];
         }
 
         AKR_XPU auto &operator()(const Point2i &p) {
             auto q = Point2i(p - bounds.pmin);
-            return pixels[q.x() + q.y() * _size.x()];
+            return pixels[q.x + q.y * _size.x];
         }
         AKR_XPU const auto &operator()(const Point2i &p) const {
             auto q = Point2i(p - bounds.pmin);
-            return pixels[q.x() + q.y() * _size.x()];
+            return pixels[q.x + q.y * _size.x];
         }
         AKR_XPU const auto &operator()(const Point2f &p) const {
             auto q = Point2i(floor(p - Point2f(bounds.pmin)));
-            return pixels[q.x() + q.y() * _size.x()];
+            return pixels[q.x + q.y * _size.x];
         }
 
         AKR_XPU void add_sample(const Point2f &p, const Spectrum &radiance, Float weight) {
@@ -85,8 +85,8 @@ namespace akari {
         AKR_XPU void merge_tile(const Tile<C> &tile) {
             const auto lo = max(tile.bounds.pmin, Point2i(0, 0));
             const auto hi = min(tile.bounds.pmax, radiance.resolution());
-            for (int y = lo.y(); y < hi.y(); y++) {
-                for (int x = lo.x(); x < hi.x(); x++) {
+            for (int y = lo.y; y < hi.y; y++) {
+                for (int x = lo.x; x < hi.x; x++) {
                     auto &pix = tile(Point2i(x, y));
                     radiance(x, y) += pix.radiance;
                     weight(x, y) += pix.weight;
@@ -97,9 +97,9 @@ namespace akari {
         void write_image(const fs::path &path, const PostProcessor &postProcessor = GammaCorrection()) const {
             RGBAImage image(resolution());
             parallel_for(
-                radiance.resolution().y(),
+                radiance.resolution().y,
                 [&](uint32_t y, uint32_t) {
-                    for (int x = 0; x < radiance.resolution().x(); x++) {
+                    for (int x = 0; x < radiance.resolution().x; x++) {
                         if (weight(x, y) != 0) {
                             auto color = (radiance(x, y)) / weight(x, y);
                             image(x, y) = RGBA(Color<float, 3>(color), 1);

@@ -32,37 +32,22 @@ namespace akari {
     // like different types of Spectrum
     // float vs double
     // however vectorization is not supported
-    template <typename T, size_t N, int packed>
-    constexpr int compute_padded_size() {
-        if constexpr (!std::is_fundamental_v<T>) {
-            return N;
-        }
-        if constexpr (packed || N <= 2) {
-            return N;
-        }
-        if constexpr (sizeof(T) == 1) {
-            // round to 128 bits
-            return (N + 15u) & ~15u;
-        } else if constexpr (sizeof(T) == 2) {
-            // round to 128 bits
-            return (N + 7u) & ~7u;
-        } else if constexpr (sizeof(T) == 4) {
-            // round to 128 bits
-            return (N + 3u) & ~3u;
-        } else if constexpr (sizeof(T) == 8) {
-            // round to 128 bits
-            return (N + 1u) & ~1u;
-        } else {
-            return N;
-        }
-    }
-    template <typename T, size_t N, int packed>
+    template <typename T, int N, int packed>
     constexpr int compute_align() {
         if constexpr (!std::is_fundamental_v<T>) {
             return alignof(T);
         }
         if constexpr (packed || N <= 2) {
             return alignof(T);
+        }
+        if constexpr(sizeof(T) == 1){
+            return 4;
+        }
+        if constexpr(sizeof(T) == 2){
+            return 4;
+        }
+        if constexpr(sizeof(T) == 4){
+            return 16;
         }
         // align to 128 bits (16 bytes)
         return (alignof(T) + 15u) & ~15u;

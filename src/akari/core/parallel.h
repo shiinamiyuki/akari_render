@@ -57,10 +57,10 @@ namespace akari {
     inline void parallel_for_2d(const Point<int, 2> &dim, const std::function<void(Point<int, 2>, uint32_t)> &func,
                                 size_t chunkSize = 1) {
         parallel_for(
-            dim.x() * dim.y(),
+            dim.x * dim.y,
             [&](uint32_t idx, int tid) {
-                auto x = idx % dim.x();
-                auto y = idx / dim.x();
+                auto x = idx % dim.x;
+                auto y = idx / dim.x;
                 func(Point<int, 2>(x, y), tid);
             },
             chunkSize);

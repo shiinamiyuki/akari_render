@@ -25,11 +25,11 @@
 namespace akari {
     AKR_VARIANT struct bsdf {
         AKR_IMPORT_TYPES()
-        AKR_XPU static inline Float cos_theta(const Vector3f &w) { return w.y(); }
+        AKR_XPU static inline Float cos_theta(const Vector3f &w) { return w.y; }
 
         AKR_XPU static inline Float abs_cos_theta(const Vector3f &w) { return std::abs(cos_theta(w)); }
 
-        AKR_XPU static inline Float cos2_theta(const Vector3f &w) { return w.y() * w.y(); }
+        AKR_XPU static inline Float cos2_theta(const Vector3f &w) { return w.y * w.y; }
 
         AKR_XPU static inline Float sin2_theta(const Vector3f &w) { return 1 - cos2_theta(w); }
 
@@ -52,7 +52,7 @@ namespace akari {
         AKR_XPU static inline Float sin2_phi(const Vector3f &w) { return sin_phi(w) * sin_phi(w); }
 
         AKR_XPU static inline bool same_hemisphere(const Vector3f &wo, const Vector3f &wi) {
-            return wo.y() * wi.y() >= 0;
+            return wo.y * wi.y >= 0;
         }
 
         AKR_XPU static inline Vector3f reflect(const Vector3f &w, const Normal3f &n) {

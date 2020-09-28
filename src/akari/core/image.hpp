@@ -60,9 +60,9 @@ namespace akari {
 
         AKR_XPU T &operator()(float x, float y) { return (*this)(Point2f(x, y)); }
 
-        AKR_XPU const T &operator()(const Point2i &p) const { return (*this)(p.x(), p.y()); }
+        AKR_XPU const T &operator()(const Point2i &p) const { return (*this)(p.x, p.y); }
 
-        AKR_XPU T &operator()(const Point2i &p) { return (*this)(p.x(), p.y()); }
+        AKR_XPU T &operator()(const Point2i &p) { return (*this)(p.x, p.y); }
 
         AKR_XPU const T &operator()(const Point2f &p) const { return (*this)(Point2i(p * Point2f(_resolution))); }
 
@@ -95,7 +95,7 @@ namespace akari {
 
             AKR_XPU const T &operator()(float x, float y) const { return (*this)(Point2f(x, y)); }
 
-            AKR_XPU const T &operator()(const Point2i &p) const { return (*this)(p.x(), p.y()); }
+            AKR_XPU const T &operator()(const Point2i &p) const { return (*this)(p.x, p.y); }
 
             AKR_XPU const T &operator()(const Point2f &p) const { return (*this)(Point2i(p * Point2f(_resolution))); }
 

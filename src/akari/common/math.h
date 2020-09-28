@@ -172,8 +172,8 @@ namespace akari {
 
     template <typename T, int P>
     AKR_XPU Array<T, 3, P> cross(const Array<T, 3, P> &v1, const Array<T, 3, P> &v2) {
-        T v1x = v1.x(), v1y = v1.y(), v1z = v1.z();
-        T v2x = v2.x(), v2y = v2.y(), v2z = v2.z();
+        T v1x = v1.x, v1y = v1.y, v1z = v1.z;
+        T v2x = v2.x, v2y = v2.y, v2z = v2.z;
         return Array<T, 3, P>((v1y * v2z) - (v1z * v2y), (v1z * v2x) - (v1x * v2z), (v1x * v2y) - (v1y * v2x));
     }
 
@@ -202,10 +202,10 @@ namespace akari {
         using Normal3f = Normal<Value, 3>;
         Frame() = default;
         static AKR_XPU inline void compute_local_frame(const Normal3f &v1, Vector3f *v2, Vector3f *v3) {
-            if (std::abs(v1.x()) > std::abs(v1.y()))
-                *v2 = Vector3f(-v1.z(), (0), v1.x()) / sqrt(v1.x() * v1.x() + v1.z() * v1.z());
+            if (std::abs(v1.x) > std::abs(v1.y))
+                *v2 = Vector3f(-v1.z, (0), v1.x) / sqrt(v1.x * v1.x + v1.z * v1.z);
             else
-                *v2 = Vector3f((0), v1.z(), -v1.y()) / sqrt(v1.y() * v1.y() + v1.z() * v1.z());
+                *v2 = Vector3f((0), v1.z, -v1.y) / sqrt(v1.y * v1.y + v1.z * v1.z);
             *v3 = normalize(cross(Vector3f(v1), *v2));
         }
         AKR_XPU explicit Frame(const Normal3f &v) : normal(v) { compute_local_frame(v, &T, &B); }
@@ -215,7 +215,7 @@ namespace akari {
         }
 
         [[nodiscard]] AKR_XPU Vector3f local_to_world(const Vector3f &v) const {
-            return Vector3f(v.x() * T + v.y() * Vector3f(normal) + v.z() * B);
+            return Vector3f(v.x * T + v.y * Vector3f(normal) + v.z * B);
         }
 
         Normal3f normal;
@@ -240,11 +240,11 @@ namespace akari {
         }
         AKR_XPU Transform inverse() const { return Transform(minv, m); }
         AKR_XPU Point3f apply_point(const Point3f &p) const {
-            Vector4f v(p.x(), p.y(), p.z(), 1.0);
+            Vector4f v(p.x, p.y, p.z, 1.0);
             v = m * v;
-            Point3f q(v.x(), v.y(), v.z());
-            if (v.w() != 1.0) {
-                q /= v.w();
+            Point3f q(v.x, v.y, v.z);
+            if (v.w != 1.0) {
+                q /= v.w;
             }
             return q;
         }
@@ -263,11 +263,11 @@ namespace akari {
         }
 
         static AKR_XPU Transform translate(const Vector3f &v) {
-            Float m[] = {1, 0, 0, v.x(), 0, 1, 0, v.y(), 0, 0, 1, v.z(), 0, 0, 0, 1};
+            Float m[] = {1, 0, 0, v.x, 0, 1, 0, v.y, 0, 0, 1, v.z, 0, 0, 0, 1};
             return Transform(Matrix4f(m));
         }
         static AKR_XPU Transform scale(const Vector3f &s) {
-            Float m[] = {s.x(), 0, 0, 0, 0, s.y(), 0, 0, 0, 0, s.z(), 0, 0, 0, 0, 1};
+            Float m[] = {s.x, 0, 0, 0, 0, s.y, 0, 0, 0, 0, s.z, 0, 0, 0, 0, 1};
             return Transform(Matrix4f(m));
         }
         static AKR_XPU Transform rotate_x(Float theta) {

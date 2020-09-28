@@ -63,8 +63,8 @@ namespace akari::gpu {
             };
             debug("GPU RTAO resolution: {}, tile size: {}, tiles: {}", film->resolution(), tile_size, n_tiles);
             double gpu_time = 0;
-            for (int tile_y = 0; tile_y < n_tiles.y(); tile_y++) {
-                for (int tile_x = 0; tile_x < n_tiles.x(); tile_x++) {
+            for (int tile_y = 0; tile_y < n_tiles.y; tile_y++) {
+                for (int tile_x = 0; tile_x < n_tiles.x; tile_x++) {
                     Point2i tile_pos(tile_x, tile_y);
                     Bounds2i tileBounds =
                         Bounds2i{tile_pos * (int)tile_size, (tile_pos + Vector2i(1)) * (int)tile_size};
@@ -76,12 +76,12 @@ namespace akari::gpu {
                     auto resolution = film->resolution();
                     Timer timer;
                     launch(
-                        "RTAO", extents.x() * extents.y(), AKR_GPU_LAMBDA(int tid) {
-                            int tx = tid % extents.x();
-                            int ty = tid / extents.x();
-                            int x = tx + tileBounds.pmin.x();
-                            int y = ty + tileBounds.pmin.y();
-                            sampler.set_sample_index(x + y * resolution.x());
+                        "RTAO", extents.x * extents.y, AKR_GPU_LAMBDA(int tid) {
+                            int tx = tid % extents.x;
+                            int ty = tid / extents.x;
+                            int x = tx + tileBounds.pmin.x;
+                            int y = ty + tileBounds.pmin.y;
+                            sampler.set_sample_index(x + y * resolution.x);
                             Spectrum acc;
                             for (int s = 0; s < spp; s++) {
                                 sampler.start_next_sample();
@@ -157,8 +157,8 @@ namespace akari::gpu {
         };
 
         std::list<WorkTile> tiles;
-        for (int tile_y = 0; tile_y < n_tiles.y(); tile_y++) {
-            for (int tile_x = 0; tile_x < n_tiles.x(); tile_x++) {
+        for (int tile_y = 0; tile_y < n_tiles.y; tile_y++) {
+            for (int tile_x = 0; tile_x < n_tiles.x; tile_x++) {
                 Point2i tile_pos(tile_x, tile_y);
                 Bounds2i tileBounds = Bounds2i{tile_pos * (int)tile_size, (tile_pos + Vector2i(1)) * (int)tile_size};
                 tiles.emplace_back(tile_pos, tileBounds, film);
@@ -176,12 +176,12 @@ namespace akari::gpu {
             auto extents = tile_bounds.extents();
             auto resolution = film->resolution();
             launch(
-                "Megakernel PT", extents.x() * extents.y(), AKR_GPU_LAMBDA(int tid) {
-                    int tx = tid % extents.x();
-                    int ty = tid / extents.x();
-                    int x = tx + tile_bounds.pmin.x();
-                    int y = ty + tile_bounds.pmin.y();
-                    sampler.set_sample_index(x + y * resolution.x());
+                "Megakernel PT", extents.x * extents.y, AKR_GPU_LAMBDA(int tid) {
+                    int tx = tid % extents.x;
+                    int ty = tid / extents.x;
+                    int x = tx + tile_bounds.pmin.x;
+                    int y = ty + tile_bounds.pmin.y;
+                    sampler.set_sample_index(x + y * resolution.x);
                     Spectrum acc;
                     for (int s = 0; s < spp; s++) {
                         sampler.start_next_sample();
@@ -207,19 +207,19 @@ namespace akari::gpu {
             auto resolution = film->resolution();
             auto _spp = this->spp;
             auto get_pixel = AKR_GPU_LAMBDA(int pixel_id) {
-                int tx = pixel_id % extents.x();
-                int ty = pixel_id / extents.x();
-                int x = tx + tileBounds.pmin.x();
-                int y = ty + tileBounds.pmin.y();
+                int tx = pixel_id % extents.x;
+                int ty = pixel_id / extents.x;
+                int x = tx + tileBounds.pmin.x;
+                int y = ty + tileBounds.pmin.y;
                 return Point2i(x, y);
             };
-            auto launch_size = extents.x() * extents.y();
+            auto launch_size = extents.x * extents.y;
             launch(
                 "Set Path State", launch_size, AKR_GPU_LAMBDA(int tid) {
                     auto px = get_pixel(tid);
-                    int x = px.x(), y = px.y();
+                    int x = px.x, y = px.y;
                     auto sampler = _sampler;
-                    sampler.set_sample_index(x + y * resolution.x());
+                    sampler.set_sample_index(x + y * resolution.x);
                     PathState<C> path_state = path_states[tid];
                     path_state.sampler = sampler;
                     path_state.L = Spectrum(0);
@@ -231,7 +231,7 @@ namespace akari::gpu {
                         if (tid >= launch_size)
                             return;
                         auto px = get_pixel(tid);
-                        int x = px.x(), y = px.y();
+                        int x = px.x, y = px.y;
                         PathState<C> path_state = path_states[tid];
                         path_state.L = Spectrum(0);
                         path_state.beta = Spectrum(1.0f);

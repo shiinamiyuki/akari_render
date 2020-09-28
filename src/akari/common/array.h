@@ -44,72 +44,118 @@ namespace akari {
     AKR_XPU inline auto max(float a, float b) { return std::max(a, b); }
     AKR_XPU inline auto max(double a, double b) { return std::max(a, b); }
     AKR_XPU inline auto max(int a, int b) { return std::max(a, b); }
+    template <typename T, int N>
+    struct ArrayStorage {
+        T _s[N] = {};
+        AKR_XPU const T &operator[](int i) const { return this->_s[i]; }
+        AKR_XPU T &operator[](int i) { return this->_s[i]; }
+    };
+    template <typename T>
+    struct ArrayStorage<T, 1> {
+        T x = T();
+        AKR_XPU const T &operator[](int i) const { return x; }
+        AKR_XPU T &operator[](int i) { return x; }
+    };
+    template <typename T>
+    struct ArrayStorage<T, 2> {
+        T x = T();
+        T y = T();
+        AKR_XPU const T &operator[](int i) const { return i == 0 ? x : y; }
+        AKR_XPU T &operator[](int i) { return i == 0 ? x : y; }
+    };
+    template <typename T>
+    struct ArrayStorage<T, 3> {
+        T x = T();
+        T y = T();
+        T z = T();
+        AKR_XPU const T &operator[](int i) const {
+            if (i == 0)
+                return x;
+            else if (i == 1)
+                return y;
+            else
+                return z;
+        }
+        AKR_XPU T &operator[](int i) {
+            if (i == 0)
+                return x;
+            else if (i == 1)
+                return y;
+            else
+                return z;
+        }
+    };
+    template <typename T>
+    struct ArrayStorage<T, 4> {
+        T x = T();
+        T y = T();
+        T z = T();
+        T w = T();
+        AKR_XPU const T &operator[](int i) const {
+            if (i == 0)
+                return x;
+            else if (i == 1)
+                return y;
+            else if (i == 2)
+                return z;
+            else
+                return w;
+        }
+        AKR_XPU T &operator[](int i) {
+            if (i == 0)
+                return x;
+            else if (i == 1)
+                return y;
+            else if (i == 2)
+                return z;
+            else
+                return w;
+        }
+    };
     template <typename T, int N, int packed>
-    struct alignas(compute_align<T, N, packed>()) Array {
-        static constexpr int padded_size = (int)compute_padded_size<T, N, packed>();
-        T _s[padded_size] = {};
+    struct alignas(compute_align<T, N, packed>()) Array : ArrayStorage<T, N> {
         using value_t = T;
-        AKR_XPU const T &operator[](int i) const { return _s[i]; }
-        AKR_XPU T &operator[](int i) { return _s[i]; }
+        using ArrayStorage<T, N>::operator[];
+
         Array() = default;
         AKR_XPU Array(const T &x) {
-            for (int i = 0; i < padded_size; i++) {
-                _s[i] = x;
+            for (int i = 0; i < N; i++) {
+                (*this)[i] = x;
             }
         }
         Array(const Array &rhs) = default;
         template <typename U, int P>
         AKR_XPU explicit Array(const Array<U, N, P> &rhs) {
-            for (int i = 0; i < std::min(padded_size, Array<U, N, P>::padded_size); i++) {
-                _s[i] = T(rhs[i]);
+            for (int i = 0; i < N; i++) {
+                (*this)[i] = T(rhs[i]);
             }
         }
         AKR_XPU Array(const T &xx, const T &yy) {
-            x() = xx;
-            y() = yy;
+            (*this)[0] = xx;
+            (*this)[1] = yy;
         }
         AKR_XPU Array(const T &xx, const T &yy, const T &zz) {
-            x() = xx;
-            y() = yy;
-            z() = zz;
+            (*this)[0] = xx;
+            (*this)[1] = yy;
+            (*this)[2] = zz;
         }
         AKR_XPU Array(const T &xx, const T &yy, const T &zz, const T &ww) {
-            x() = xx;
-            y() = yy;
-            z() = zz;
-            w() = ww;
+            (*this)[0] = xx;
+            (*this)[1] = yy;
+            (*this)[2] = zz;
+            (*this)[3] = ww;
         }
-
-#define GEN_ACCESSOR(name, idx)                                                                                        \
-    AKR_XPU const T &name() const {                                                                                    \
-        static_assert(N > idx);                                                                                        \
-        return _s[idx];                                                                                                \
-    }                                                                                                                  \
-    AKR_XPU T &name() {                                                                                                \
-        static_assert(N > idx);                                                                                        \
-        return _s[idx];                                                                                                \
-    }
-        GEN_ACCESSOR(x, 0)
-        GEN_ACCESSOR(y, 1)
-        GEN_ACCESSOR(z, 2)
-        GEN_ACCESSOR(w, 3)
-        GEN_ACCESSOR(r, 0)
-        GEN_ACCESSOR(g, 1)
-        GEN_ACCESSOR(b, 2)
-        GEN_ACCESSOR(a, 3)
-#undef GEN_ACCESSOR
-
 #define GEN_ARITH_OP(op, assign_op)                                                                                    \
     AKR_XPU Array operator op(const Array &rhs) const {                                                                \
         Array self;                                                                                                    \
-        for (int i = 0; i < padded_size; i++) {                                                                        \
+        for (int i = 0; i < N; i++) {                                                                                  \
             self[i] = (*this)[i] op rhs[i];                                                                            \
         }                                                                                                              \
         return self;                                                                                                   \
     }                                                                                                                  \
     AKR_XPU Array operator op(const T &rhs) const {                                                                    \
         Array self;                                                                                                    \
-        for (int i = 0; i < padded_size; i++) {                                                                        \
+        for (int i = 0; i < N; i++) {                                                                                  \
             self[i] = (*this)[i] op rhs;                                                                               \
         }                                                                                                              \
         return self;                                                                                                   \
@@ -148,7 +194,7 @@ namespace akari {
         AKR_XPU friend Array operator/(const T &v, const Array &rhs) { return Array(v) / rhs; }
         AKR_XPU Array operator-() const {
             Array self;
-            for (int i = 0; i < padded_size; i++) {
+            for (int i = 0; i < N; i++) {
                 self[i] = -(*this)[i];
             }
             return self;

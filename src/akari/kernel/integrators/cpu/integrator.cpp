@@ -68,9 +68,9 @@ namespace akari {
                 auto &tile = *boxed_tile.get();
                 auto &camera = scene.camera;
                 auto sampler = scene.sampler;
-                for (int y = tile.bounds.pmin.y(); y < tile.bounds.pmax.y(); y++) {
-                    for (int x = tile.bounds.pmin.x(); x < tile.bounds.pmax.x(); x++) {
-                        sampler.set_sample_index(x + y * film->resolution().x());
+                for (int y = tile.bounds.pmin.y; y < tile.bounds.pmax.y; y++) {
+                    for (int x = tile.bounds.pmin.x; x < tile.bounds.pmax.x; x++) {
+                        sampler.set_sample_index(x + y * film->resolution().x);
                         for (int s = 0; s < spp; s++) {
                             sampler.start_next_sample();
                             CameraSample<C> sample =
@@ -98,7 +98,7 @@ namespace akari {
                 small_arenas.emplace_back(_arena.alloc_bytes(size), size);
             }
             auto reporter =
-                std::make_shared<ProgressReporter>(n_tiles.x() * n_tiles.y(), [=](size_t cur, size_t total) {
+                std::make_shared<ProgressReporter>(n_tiles.x * n_tiles.y, [=](size_t cur, size_t total) {
                     bool show = false;
                     if (spp < 32) {
                         show = cur % 32 == 0;
@@ -121,9 +121,9 @@ namespace akari {
                 auto &camera = scene.camera;
                 auto &arena = small_arenas[tid];
                 auto sampler = scene.sampler;
-                for (int y = tile.bounds.pmin.y(); y < tile.bounds.pmax.y(); y++) {
-                    for (int x = tile.bounds.pmin.x(); x < tile.bounds.pmax.x(); x++) {
-                        sampler.set_sample_index(x + y * film->resolution().x());
+                for (int y = tile.bounds.pmin.y; y < tile.bounds.pmax.y; y++) {
+                    for (int x = tile.bounds.pmin.x; x < tile.bounds.pmax.x; x++) {
+                        sampler.set_sample_index(x + y * film->resolution().x);
                         for (int s = 0; s < spp; s++) {
                             sampler.start_next_sample();
                             GenericPathTracer<C> pt;

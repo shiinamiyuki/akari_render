@@ -46,12 +46,12 @@ namespace akari {
     AKR_VARIANT static inline RTCRay toRTCRay(const Ray<C> &_ray) {
         RTCRay ray;
         auto _o = _ray.o;
-        ray.dir_x = _ray.d.x();
-        ray.dir_y = _ray.d.y();
-        ray.dir_z = _ray.d.z();
-        ray.org_x = _o.x();
-        ray.org_y = _o.y();
-        ray.org_z = _o.z();
+        ray.dir_x = _ray.d.x;
+        ray.dir_y = _ray.d.y;
+        ray.dir_z = _ray.d.z;
+        ray.org_x = _o.x;
+        ray.org_y = _o.y;
+        ray.org_z = _o.z;
         ray.tnear = _ray.tmin;
         ray.tfar = _ray.tmax;
         ray.flags = 0;

@@ -34,7 +34,7 @@ namespace akari {
         };
 
         AKR_XPU static inline Float BeckmannD(Float alpha, const Vector3f &m) {
-            if (m.y() <= 0.0f)
+            if (m.y <= 0.0f)
                 return 0.0f;
             auto c = bsdf<C>::cos2_theta(m);
             auto t = bsdf<C>::tan2_theta(m);
@@ -43,7 +43,7 @@ namespace akari {
         }
 
         AKR_XPU static inline Float BeckmannG1(Float alpha, const Vector3f &v, const Normal3f &m) {
-            if (dot(v, m) * v.y() <= 0) {
+            if (dot(v, m) * v.y <= 0) {
                 return 0.0f;
             }
             auto a = 1.0f / (alpha * bsdf<C>::tan_theta(v));
@@ -54,7 +54,7 @@ namespace akari {
             }
         }
         AKR_XPU static inline Float PhongG1(Float alpha, const Vector3f &v, const Normal3f &m) {
-            if (dot(v, m) * v.y() <= 0) {
+            if (dot(v, m) * v.y <= 0) {
                 return 0.0f;
             }
             auto a = sqrt(0.5f * alpha + 1.0f) / bsdf<C>::tan_theta(v);
@@ -66,13 +66,13 @@ namespace akari {
         }
 
         AKR_XPU static inline Float PhongD(Float alpha, const Normal3f &m) {
-            if (m.y() <= 0.0f)
+            if (m.y <= 0.0f)
                 return 0.0f;
-            return (alpha + 2.0) / (2.0 * Constants<Float>::Pi()) * std::pow(m.y(), alpha);
+            return (alpha + 2.0) / (2.0 * Constants<Float>::Pi()) * std::pow(m.y, alpha);
         }
 
         AKR_XPU static inline Float GGX_D(Float alpha, const Normal3f &m) {
-            if (m.y() <= 0.0f)
+            if (m.y <= 0.0f)
                 return 0.0f;
             Float a2 = alpha * alpha;
             auto c2 = bsdf<C>::cos2_theta(m);
@@ -82,7 +82,7 @@ namespace akari {
         }
 
         AKR_XPU static inline Float GGX_G1(Float alpha, const Vector3f &v, const Normal3f &m) {
-            if (dot(v, m) * v.y() <= 0) {
+            if (dot(v, m) * v.y <= 0) {
                 return 0.0f;
             }
             return 2.0 / (1.0 + sqrt(1.0 + alpha * alpha * bsdf<C>::tan2_theta(m)));

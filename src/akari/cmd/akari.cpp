@@ -35,6 +35,8 @@ namespace pybind11 {
     class module {};
 } // namespace pybind11
 #endif
+
+
 static std::string inputFilename;
 std::string variant = default_variant;
 void parse(int argc, const char **argv) {

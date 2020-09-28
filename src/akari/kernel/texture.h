@@ -43,7 +43,7 @@ namespace akari {
         AKR_XPU ImageTexture(RGBAImage::View image) : image(image) {}
         AKR_XPU Spectrum evaluate(const Point2f &texcoords) const {
             Point2f tc = fmod(texcoords, Array2f(1.0f));
-            tc.y() = 1.0f - tc.y();
+            tc.y = 1.0f - tc.y;
             return image(tc).rgb;
         }
     };

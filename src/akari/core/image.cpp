@@ -54,9 +54,9 @@ namespace akari {
                 },
                 1024u);
             if (ext == ".png")
-                return stbi_write_png(path.string().c_str(), dimension.x(), dimension.y(), 3, buffer.data(), 0);
+                return stbi_write_png(path.string().c_str(), dimension.x, dimension.y, 3, buffer.data(), 0);
             else if (ext == ".jpg")
-                return stbi_write_jpg(path.string().c_str(), dimension.x(), dimension.y(), 3, buffer.data(), 0);
+                return stbi_write_jpg(path.string().c_str(), dimension.x, dimension.y, 3, buffer.data(), 0);
             return false;
         }
     };
@@ -64,9 +64,9 @@ namespace akari {
     void GammaCorrection::process(const RGBAImage &in, RGBAImage &out) const {
         out.resize(in.resolution());
         parallel_for(
-            in.resolution().y(),
+            in.resolution().y,
             [&](uint32_t y, uint32_t) {
-                for (int i = 0; i < in.resolution().x(); i++)
+                for (int i = 0; i < in.resolution().x; i++)
                     out(i, y) = RGBA(linear_to_srgb(in(i, y).rgb), in(i, y).alpha);
             },
             1024);
@@ -86,16 +86,16 @@ namespace akari {
                 const float *data = stbi_loadf(path.string().c_str(), &x, &y, &channel, 3);
                 image = std::make_shared<RGBAImage>(Point2i(x, y));
                 parallel_for(
-                    image->resolution().y(),
+                    image->resolution().y,
                     [=, &image](uint32_t y, uint32_t) {
-                        for (int x = 0; x < image->resolution().x(); x++) {
+                        for (int x = 0; x < image->resolution().x; x++) {
                             RGBSpectrum rgb;
                             if (channel == 1) {
-                                rgb = RGBSpectrum(data[x + y * image->resolution().x()]);
+                                rgb = RGBSpectrum(data[x + y * image->resolution().x]);
                             } else {
-                                rgb[0] = data[3 * (x + y * image->resolution().x()) + 0];
-                                rgb[1] = data[3 * (x + y * image->resolution().x()) + 1];
-                                rgb[2] = data[3 * (x + y * image->resolution().x()) + 2];
+                                rgb[0] = data[3 * (x + y * image->resolution().x) + 0];
+                                rgb[1] = data[3 * (x + y * image->resolution().x) + 1];
+                                rgb[2] = data[3 * (x + y * image->resolution().x) + 2];
                             }
                             (*image)(x, y) = RGBA(rgb, 1.0f);
                         }
@@ -105,16 +105,16 @@ namespace akari {
                 const auto *data = stbi_load(path.string().c_str(), &x, &y, &channel, 3);
                 image = std::make_shared<RGBAImage>(Point2i(x, y));
                 parallel_for(
-                    image->resolution().y(),
+                    image->resolution().y,
                     [=, &image](uint32_t y, uint32_t) {
-                        for (int x = 0; x < image->resolution().x(); x++) {
+                        for (int x = 0; x < image->resolution().x; x++) {
                             RGBSpectrum rgb;
                             if (channel == 1) {
-                                rgb = RGBSpectrum((float)data[x + y * image->resolution().x()] / 255.0f);
+                                rgb = RGBSpectrum((float)data[x + y * image->resolution().x] / 255.0f);
                             } else {
-                                rgb[0] = (float)data[3 * (x + y * image->resolution().x()) + 0] / 255.0f;
-                                rgb[1] = (float)data[3 * (x + y * image->resolution().x()) + 1] / 255.0f;
-                                rgb[2] = (float)data[3 * (x + y * image->resolution().x()) + 2] / 255.0f;
+                                rgb[0] = (float)data[3 * (x + y * image->resolution().x) + 0] / 255.0f;
+                                rgb[1] = (float)data[3 * (x + y * image->resolution().x) + 1] / 255.0f;
+                                rgb[2] = (float)data[3 * (x + y * image->resolution().x) + 2] / 255.0f;
                             }
                             (*image)(x, y) = RGBA(rgb, 1.0f);
                         }

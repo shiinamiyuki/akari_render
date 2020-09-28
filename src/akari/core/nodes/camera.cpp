@@ -32,9 +32,9 @@ namespace akari {
         Float fov = radians(80.0f);
         Camera<C> compile(MemoryArena<>*arena) override {
             Transform3f c2w;
-            c2w = Transform3f::rotate_z(rotation.z());
-            c2w = Transform3f::rotate_x(rotation.y()) * c2w;
-            c2w = Transform3f::rotate_y(rotation.x()) * c2w;
+            c2w = Transform3f::rotate_z(rotation.z);
+            c2w = Transform3f::rotate_x(rotation.y) * c2w;
+            c2w = Transform3f::rotate_y(rotation.x) * c2w;
             c2w = Transform3f::translate(position) * c2w;
             return PerspectiveCamera<C>(resolution, c2w, fov);
         }

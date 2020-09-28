@@ -31,16 +31,16 @@ namespace akari {
         AKR_IMPORT_TYPES()
         AKR_XPU static inline Point2f concentric_disk_sampling(const Point2f &u) {
             Point2f uOffset = 2.f * u - Point2f(1, 1);
-            if (uOffset.x() == 0 && uOffset.y() == 0)
+            if (uOffset.x == 0 && uOffset.y == 0)
                 return Point2f(0, 0);
 
             Float theta, r;
-            if (std::abs(uOffset.x()) > std::abs(uOffset.y())) {
-                r = uOffset.x();
-                theta = Constants<Float>::Pi4() * (uOffset.y() / uOffset.x());
+            if (std::abs(uOffset.x) > std::abs(uOffset.y)) {
+                r = uOffset.x;
+                theta = Constants<Float>::Pi4() * (uOffset.y / uOffset.x);
             } else {
-                r = uOffset.y();
-                theta = Constants<Float>::Pi2() - Constants<Float>::Pi4() * (uOffset.x() / uOffset.y());
+                r = uOffset.y;
+                theta = Constants<Float>::Pi2() - Constants<Float>::Pi4() * (uOffset.x / uOffset.y);
             }
             return r * Point2f(cos(theta), sin(theta));
         }
@@ -49,7 +49,7 @@ namespace akari {
             auto uv = concentric_disk_sampling(u);
             auto r = dot(uv, uv);
             auto h = sqrt(std::max(Float(0.0f), Float(1.0f - r)));
-            return Vector3f(uv.x(), h, uv.y());
+            return Vector3f(uv.x, h, uv.y);
         }
         AKR_XPU static inline Float cosine_hemisphere_pdf(Float cosTheta) {
             return cosTheta * Constants<Float>::InvPi();
