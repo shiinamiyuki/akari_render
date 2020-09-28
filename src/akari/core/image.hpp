@@ -40,8 +40,7 @@ namespace akari {
         int2 _resolution;
 
       public:
-        TImage(const int2 &dim = int2(1),
-               astd::pmr::memory_resource *resource = astd::pmr::get_default_resource())
+        TImage(const int2 &dim = int2(1), astd::pmr::memory_resource *resource = astd::pmr::get_default_resource())
             : _texels(dim[0] * dim[1], astd::pmr::polymorphic_allocator<T>(resource)), _resolution(dim) {}
 
         AKR_XPU const T &operator()(int x, int y) const {
@@ -113,11 +112,10 @@ namespace akari {
     };
 
     struct alignas(16) RGBA {
-        AKR_IMPORT_CORE_TYPES_WITH(float)
-        Color3f rgb;
-        Float alpha;
+        color3f rgb;
+        float alpha;
         RGBA() = default;
-        AKR_XPU RGBA(Float3 rgb, Float alpha) : rgb(rgb), alpha(alpha) {}
+        AKR_XPU RGBA(float3 rgb, float alpha) : rgb(rgb), alpha(alpha) {}
     };
     class RGBAImage : public TImage<RGBA> {
       public:

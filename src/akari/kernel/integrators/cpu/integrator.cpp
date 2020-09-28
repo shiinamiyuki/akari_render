@@ -33,6 +33,7 @@
 #include <akari/common/smallarena.h>
 #include <akari/kernel/pathtracer.h>
 #include <akari/core/progress.hpp>
+
 namespace akari {
     namespace cpu {
 
