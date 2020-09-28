@@ -110,6 +110,11 @@ namespace akari {
         AKR_XPU const T &back() const { return *(end() - 1); }
         AKR_XPU T &back() { return *(end() - 1); }
         BufferView<T> view() const { return {data(), size()}; }
+        void set_memory_resource(MemoryResource *resource) {
+            AKR_ASSERT(_data == nullptr);
+            this->resource = resource;
+            allocator = Allocator(resource);
+        }
 
       private:
         MemoryResource *resource;
