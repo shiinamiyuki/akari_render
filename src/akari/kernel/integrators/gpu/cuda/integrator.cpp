@@ -119,8 +119,10 @@ namespace akari::gpu {
         using ShadowRayQueue = WorkQueue<ShadowRayWorkItem<C>>;
         MaterialWorkQueues material_queues;
         ShadowRayQueue *shadow_ray_queue;
+        bool wavefront;
         PathTracerImpl(Allocator &allocator, const PathTracer<C> &pt)
-            : spp(pt.spp), tile_size(pt.tile_size), max_depth(pt.max_depth), ray_clamp(pt.ray_clamp) {
+            : spp(pt.spp), tile_size(pt.tile_size), max_depth(pt.max_depth), ray_clamp(pt.ray_clamp),
+              wavefront(pt.wavefront) {
             MAX_QUEUE_SIZE = tile_size * tile_size;
             path_states = SOA<PathState<C>>(MAX_QUEUE_SIZE, allocator);
             ray_queue[0] = allocator.template new_object<RayQueue>(MAX_QUEUE_SIZE, allocator);
@@ -168,7 +170,37 @@ namespace akari::gpu {
                 putchar('\n');
             }
         });
-        auto render_tile = [&](Tile<C> *tile, const Point2i &tile_pos, const Bounds2i &tileBounds) {
+        auto render_tile_mega = [&](Tile<C> *tile, const Point2i &tile_pos, const Bounds2i &tile_bounds) {
+            auto &camera = scene.camera;
+            auto sampler = scene.sampler;
+            auto extents = tile_bounds.extents();
+            auto resolution = film->resolution();
+            launch(
+                "Megakernel PT", extents.x() * extents.y(), AKR_GPU_LAMBDA(int tid) {
+                    int tx = tid % extents.x();
+                    int ty = tid / extents.x();
+                    int x = tx + tile_bounds.pmin.x();
+                    int y = ty + tile_bounds.pmin.y();
+                    sampler.set_sample_index(x + y * resolution.x());
+                    Spectrum acc;
+                    for (int s = 0; s < spp; s++) {
+                        sampler.start_next_sample();
+                        GenericPathTracer<C> pt;
+                        pt.depth = 0;
+                        pt.max_depth = max_depth;
+                        pt.sampler = sampler;
+                        pt.run_megakernel(scene, camera, Point2i(x, y));
+                        sampler = pt.sampler;
+                        auto rad = pt.L.clamp_zero();
+                        rad = min(rad, Spectrum(ray_clamp));
+                        acc += rad;
+                    }
+                    tile->add_sample(Point2f(x, y), acc / spp, 1.0f);
+                });
+            cuLaunchHostFunc((cudaStream_t) nullptr, [](void *reporter) { ((ProgressReporter *)reporter)->update(); },
+                             reporter.get());
+        };
+        auto render_tile_wavefront = [&](Tile<C> *tile, const Point2i &tile_pos, const Bounds2i &tileBounds) {
             auto &camera = scene.camera;
             auto _sampler = scene.sampler;
             auto extents = tileBounds.extents();
@@ -334,9 +366,16 @@ namespace akari::gpu {
         };
 
         debug("tile size:{} n_tiles: {}", tile_size, n_tiles);
-        for (auto &item : tiles) {
-            auto &[tile_pos, tile_bounds, tile] = item;
-            render_tile(tile.get(), tile_pos, tile_bounds);
+        if (wavefront) {
+            for (auto &item : tiles) {
+                auto &[tile_pos, tile_bounds, tile] = item;
+                render_tile_wavefront(tile.get(), tile_pos, tile_bounds);
+            }
+        } else {
+            for (auto &item : tiles) {
+                auto &[tile_pos, tile_bounds, tile] = item;
+                render_tile_mega(tile.get(), tile_pos, tile_bounds);
+            }
         }
         active_device()->sync();
         std::for_each(std::execution::par_unseq, tiles.begin(), tiles.end(),

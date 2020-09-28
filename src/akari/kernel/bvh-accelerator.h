@@ -96,7 +96,7 @@ namespace akari {
                 boundBox = box;
             }
 
-            if (end - begin <= 4 || depth >= 32) {
+            if (end - begin <= 2 || depth >= 32) {
                 if (depth == 32) {
                     warning("BVH exceeds max depth");
                 }
@@ -203,6 +203,7 @@ namespace akari {
                     nodes[ret].left = (int)recursiveBuild(begin, int(mid - &primitives[0]), depth + 1);
                     nodes[ret].right = (int)recursiveBuild(int(mid - &primitives[0]), end, depth + 1);
                 }
+                AKR_ASSERT(nodes[ret].left >= 0 && nodes[ret].right >= 0);
                 return (int)ret;
             }
         }
@@ -213,13 +214,12 @@ namespace akari {
             constexpr size_t maxDepth = StackDepth;
             const BVHNode *stack[maxDepth];
             int sp = 0;
-            stack[sp++] = &nodes[0];
-            while (sp > 0) {
-
-                auto p = stack[--sp];
+            const BVHNode *p = &nodes[0];
+            while (p) {
                 auto t = intersectAABB(p->box, ray, invd);
 
                 if (t < 0 || t > isct.t) {
+                    p = sp > 0 ? stack[--sp] : nullptr;
                     continue;
                 }
                 if (p->is_leaf()) {
@@ -228,17 +228,14 @@ namespace akari {
                             hit = true;
                         }
                     }
+                    p = sp > 0 ? stack[--sp] : nullptr;
                 } else {
                     if (ray.d[p->axis] > 0) {
-                        if (p->right >= 0)
-                            stack[sp++] = &nodes[p->right];
-                        if (p->left >= 0)
-                            stack[sp++] = &nodes[p->left];
+                        stack[sp++] = &nodes[p->right];
+                        p = &nodes[p->left];
                     } else {
-                        if (p->left >= 0)
-                            stack[sp++] = &nodes[p->left];
-                        if (p->right >= 0)
-                            stack[sp++] = &nodes[p->right];
+                        stack[sp++] = &nodes[p->left];
+                        p = &nodes[p->right];
                     }
                 }
             }
@@ -250,12 +247,12 @@ namespace akari {
             constexpr size_t maxDepth = StackDepth;
             const BVHNode *stack[maxDepth];
             int sp = 0;
-            stack[sp++] = &nodes[0];
-            while (sp > 0) {
-                auto p = stack[--sp];
+            const BVHNode *p = &nodes[0];
+            while (p) {
                 auto t = intersectAABB(p->box, ray, invd);
 
                 if (t < 0 || t > ray.tmax) {
+                    p = sp > 0 ? stack[--sp] : nullptr;
                     continue;
                 }
                 if (p->is_leaf()) {
@@ -264,17 +261,14 @@ namespace akari {
                             return true;
                         }
                     }
+                    p = sp > 0 ? stack[--sp] : nullptr;
                 } else {
                     if (ray.d[p->axis] > 0) {
-                        if (p->right >= 0)
-                            stack[sp++] = &nodes[p->right];
-                        if (p->left >= 0)
-                            stack[sp++] = &nodes[p->left];
+                        stack[sp++] = &nodes[p->right];
+                        p = &nodes[p->left];
                     } else {
-                        if (p->left >= 0)
-                            stack[sp++] = &nodes[p->left];
-                        if (p->right >= 0)
-                            stack[sp++] = &nodes[p->right];
+                        stack[sp++] = &nodes[p->left];
+                        p = &nodes[p->right];
                     }
                 }
             }

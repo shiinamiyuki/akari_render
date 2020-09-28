@@ -128,17 +128,17 @@ namespace akari::sdl {
     inline std::optional<T> Value::get() const {
         if (is_null())
             return std::nullopt;
-        if constexpr (std::is_integral_v<T> || std::is_floating_point_v<T>) {
+        if constexpr (std::is_same_v<T, bool>) {
+            if (is_boolean()) {
+                return dyn_cast<Boolean>(data)->v;
+            }
+            return std::nullopt;
+        } else if constexpr (std::is_integral_v<T> || std::is_floating_point_v<T>) {
             if (!is_number()) {
                 return std::nullopt;
             }
             auto number = dyn_cast<Number>(data);
             return static_cast<T>(number->number);
-        } else if constexpr (std::is_same_v<T, bool>) {
-            if (is_boolean()) {
-                return dyn_cast<Boolean>(data)->v;
-            }
-            return std::nullopt;
         } else if constexpr (std::is_same_v<T, std::string> || std::is_same_v<T, std::string_view>) {
             if (!is_string()) {
                 return std::nullopt;
@@ -256,7 +256,8 @@ namespace akari::sdl {
         void parse_let(ParserContext &ctx);
         void parse_export(ParserContext &ctx);
         P<Module> parse_file(const fs::path &, const std::string &module_name = "");
-        P<Module> parse_string(const std::string &src, const fs::path &filename = "", const std::string &module_name = "");
+        P<Module> parse_string(const std::string &src, const fs::path &filename = "",
+                               const std::string &module_name = "");
         void skip_comment(ParserContext &ctx);
         bool is_comment(ParserContext &ctx);
     };

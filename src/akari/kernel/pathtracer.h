@@ -38,7 +38,7 @@ namespace akari {
         int prim_id = -1;
         const Material<C> *material = nullptr;
         SurfaceHit() = default;
-        SurfaceHit(const Ray3f &ray, const Intersection<C> &isct)
+        AKR_XPU SurfaceHit(const Ray3f &ray, const Intersection<C> &isct)
             : uv(isct.uv), wo(-ray.d), geom_id(isct.geom_id), prim_id(isct.prim_id) {}
     };
     AKR_VARIANT
@@ -111,7 +111,7 @@ namespace akari {
                 ScatteringEvent<C> event;
                 if (mat_pdf) {
                     auto pdf = mat_pdf.value();
-                    si.bsdf = Material<C>::get_bsdf(astd::pair<const Material<C>*, Float>{material, pdf}, ctx);
+                    si.bsdf = Material<C>::get_bsdf(astd::pair<const Material<C> *, Float>{material, pdf}, ctx);
                 } else {
                     si.bsdf = material->get_bsdf(ctx);
                 }
@@ -127,6 +127,38 @@ namespace akari {
                 return event;
             }
             return astd::nullopt;
+        }
+        AKR_XPU void run_megakernel(const Scene<C> &scene, const Camera<C> &camera, const Point2i &p) {
+            auto camera_sample = camera_ray(camera, p);
+            Ray3f ray = camera_sample.ray;
+            while (true) {
+                auto hit = scene.intersect(ray);
+                if (!hit) {
+                    on_miss(scene, ray);
+                    break;
+                }
+                SurfaceHit<C> surface_hit(ray, hit.value());
+                auto trig = scene.get_triangle(surface_hit.geom_id, surface_hit.prim_id);
+                surface_hit.material = trig.material;
+                SurfaceInteraction<C> si(surface_hit.uv, trig);
+
+                auto has_event = on_surface_scatter(si, surface_hit);
+                if (!has_event) {
+                    break;
+                }
+                astd::optional<DirectLighting<C>> has_direct =
+                    compute_direct_lighting(si, surface_hit, select_light(scene));
+                if (has_direct) {
+                    auto &direct = has_direct.value();
+                    if (!direct.color.is_black() && !scene.occlude(direct.shadow_ray)) {
+                        L += direct.color;
+                    }
+                }
+                auto event = has_event.value();
+                beta *= event.beta;
+                depth++;
+                ray = event.ray;
+            }
         }
     };
 } // namespace akari

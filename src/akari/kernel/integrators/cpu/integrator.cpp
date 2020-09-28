@@ -89,41 +89,6 @@ namespace akari {
             AKR_ASSERT_THROW(all(film->resolution() == scene.camera.resolution()));
             int max_depth = 5;
             auto n_tiles = Point2i(film->resolution() + Point2i(tile_size - 1)) / Point2i(tile_size);
-            auto Li = [=, &scene](Ray3f ray, Sampler<C> &sampler, SmallArena *arena) -> Spectrum {
-                GenericPathTracer<C> pt;
-                pt.sampler = sampler;
-                pt.max_depth = max_depth;
-                while (true) {
-                    auto hit = scene.intersect(ray);
-                    if (!hit) {
-                        pt.on_miss(scene, ray);
-                        break;
-                    }
-                    SurfaceHit<C> surface_hit(ray, hit.value());
-                    auto trig = scene.get_triangle(surface_hit.geom_id, surface_hit.prim_id);
-                    surface_hit.material = trig.material;
-                    SurfaceInteraction<C> si(surface_hit.uv, trig);
-
-                    auto has_event = pt.on_surface_scatter(si, surface_hit);
-                    if (!has_event) {
-                        break;
-                    }
-                    astd::optional<DirectLighting<C>> has_direct =
-                        pt.compute_direct_lighting(si, surface_hit, pt.select_light(scene));
-                    if (has_direct) {
-                        auto &direct = has_direct.value();
-                        if (!direct.color.is_black() && !scene.occlude(direct.shadow_ray)) {
-                            pt.L += direct.color;
-                        }
-                    }
-                    auto event = has_event.value();
-                    pt.beta *= event.beta;
-                    pt.depth++;
-                    ray = event.ray;
-                }
-                sampler = pt.sampler;
-                return pt.L;
-            };
             std::mutex mutex;
             auto num_threads = num_work_threads();
             auto _arena = MemoryArena<>(astd::pmr::polymorphic_allocator<>(active_device()->managed_resource()));
@@ -161,10 +126,13 @@ namespace akari {
                         sampler.set_sample_index(x + y * film->resolution().x());
                         for (int s = 0; s < spp; s++) {
                             sampler.start_next_sample();
-                            CameraSample<C> sample =
-                                camera.generate_ray(sampler.next2d(), sampler.next2d(), Point2i(x, y));
-                            auto L = Li(sample.ray, sampler, &arena);
-                            tile.add_sample(Point2f(x, y), L, 1.0f);
+                            GenericPathTracer<C> pt;
+                            pt.depth = 0;
+                            pt.max_depth = max_depth;
+                            pt.sampler = sampler;
+                            pt.run_megakernel(scene, camera, Point2i(x, y));
+                            sampler = pt.sampler;
+                            tile.add_sample(Point2f(x, y), pt.L, 1.0f);
                             arena.reset();
                         }
                     }

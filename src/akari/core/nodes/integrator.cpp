@@ -29,7 +29,7 @@ namespace akari {
         int spp = 16;
         int tile_size = 16;
         float occlude = std::numeric_limits<float>::infinity();
-        std::shared_ptr<cpu::Integrator<C>> compile(MemoryArena<>*arena) override {
+        std::shared_ptr<cpu::Integrator<C>> compile(MemoryArena<> *arena) override {
             return std::make_shared<cpu::Integrator<C>>(cpu::AmbientOcclusion<C>(spp, occlude));
         }
         const char *description() override { return "[Ambient Occlution]"; }
@@ -42,7 +42,7 @@ namespace akari {
             }
         }
 #ifdef AKR_ENABLE_GPU
-        virtual std::shared_ptr<gpu::Integrator<C>> compile_gpu(MemoryArena<>*arena) {
+        virtual std::shared_ptr<gpu::Integrator<C>> compile_gpu(MemoryArena<> *arena) {
             return std::make_shared<gpu::Integrator<C>>(gpu::AmbientOcclusion<C>(spp, occlude));
         }
 #endif
@@ -54,7 +54,8 @@ namespace akari {
         int max_depth = 5;
         int tile_size = 256;
         float ray_clamp = 10.0f;
-        std::shared_ptr<cpu::Integrator<C>> compile(MemoryArena<>*arena) override {
+        bool wavefront = true;
+        std::shared_ptr<cpu::Integrator<C>> compile(MemoryArena<> *arena) override {
             return std::make_shared<cpu::Integrator<C>>(cpu::PathTracer<C>(spp));
         }
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
@@ -67,11 +68,16 @@ namespace akari {
                 tile_size = value.get<int>().value();
             } else if (field == "ray_clamp") {
                 ray_clamp = value.get<float>().value();
+            } else if (field == "wavefront") {
+                wavefront = value.get<bool>().value();
+            } else if (field == "megakernel") {
+                wavefront = !value.get<bool>().value();
             }
         }
 #ifdef AKR_ENABLE_GPU
-        std::shared_ptr<gpu::Integrator<C>> compile_gpu(MemoryArena<>*arena) override {
-            return std::make_shared<gpu::Integrator<C>>(gpu::PathTracer<C>(spp, max_depth, tile_size, ray_clamp));
+        std::shared_ptr<gpu::Integrator<C>> compile_gpu(MemoryArena<> *arena) override {
+            return std::make_shared<gpu::Integrator<C>>(
+                gpu::PathTracer<C>(spp, max_depth, tile_size, ray_clamp, wavefront));
         }
 #endif
         const char *description() override { return "[Path Tracer]"; }
