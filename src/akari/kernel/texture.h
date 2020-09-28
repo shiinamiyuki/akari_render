@@ -32,7 +32,7 @@ namespace akari {
         AKR_IMPORT_TYPES()
         ConstantTexture(Spectrum v) : value(v) {}
         Spectrum value;
-        AKR_XPU Spectrum evaluate(const Point2f &texcoords) const { return value; }
+        AKR_XPU Spectrum evaluate(const float2 &texcoords) const { return value; }
     };
 
     AKR_VARIANT class ImageTexture {
@@ -41,8 +41,8 @@ namespace akari {
         RGBAImage::View image;
         ImageTexture() = default;
         AKR_XPU ImageTexture(RGBAImage::View image) : image(image) {}
-        AKR_XPU Spectrum evaluate(const Point2f &texcoords) const {
-            Point2f tc = fmod(texcoords, Array2f(1.0f));
+        AKR_XPU Spectrum evaluate(const float2 &texcoords) const {
+            float2 tc = fmod(texcoords, Array2f(1.0f));
             tc.y = 1.0f - tc.y;
             return image(tc).rgb;
         }
@@ -51,6 +51,6 @@ namespace akari {
       public:
         AKR_IMPORT_TYPES()
         using Variant<ConstantTexture<C>, ImageTexture<C>>::Variant;
-        AKR_XPU Spectrum evaluate(const Point2f &texcoords) const { AKR_VAR_DISPATCH(evaluate, texcoords); }
+        AKR_XPU Spectrum evaluate(const float2 &texcoords) const { AKR_VAR_DISPATCH(evaluate, texcoords); }
     };
 } // namespace akari

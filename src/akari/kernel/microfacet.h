@@ -33,7 +33,7 @@ namespace akari {
             EPhong,
         };
 
-        AKR_XPU static inline Float BeckmannD(Float alpha, const Vector3f &m) {
+        AKR_XPU static inline Float BeckmannD(Float alpha, const Float3 &m) {
             if (m.y <= 0.0f)
                 return 0.0f;
             auto c = bsdf<C>::cos2_theta(m);
@@ -42,7 +42,7 @@ namespace akari {
             return std::exp(-t / a2) / (Constants<Float>::Pi() * a2 * c * c);
         }
 
-        AKR_XPU static inline Float BeckmannG1(Float alpha, const Vector3f &v, const Normal3f &m) {
+        AKR_XPU static inline Float BeckmannG1(Float alpha, const Float3 &v, const Float3 &m) {
             if (dot(v, m) * v.y <= 0) {
                 return 0.0f;
             }
@@ -53,7 +53,7 @@ namespace akari {
                 return 1.0f;
             }
         }
-        AKR_XPU static inline Float PhongG1(Float alpha, const Vector3f &v, const Normal3f &m) {
+        AKR_XPU static inline Float PhongG1(Float alpha, const Float3 &v, const Float3 &m) {
             if (dot(v, m) * v.y <= 0) {
                 return 0.0f;
             }
@@ -65,13 +65,13 @@ namespace akari {
             }
         }
 
-        AKR_XPU static inline Float PhongD(Float alpha, const Normal3f &m) {
+        AKR_XPU static inline Float PhongD(Float alpha, const Float3 &m) {
             if (m.y <= 0.0f)
                 return 0.0f;
             return (alpha + 2.0) / (2.0 * Constants<Float>::Pi()) * std::pow(m.y, alpha);
         }
 
-        AKR_XPU static inline Float GGX_D(Float alpha, const Normal3f &m) {
+        AKR_XPU static inline Float GGX_D(Float alpha, const Float3 &m) {
             if (m.y <= 0.0f)
                 return 0.0f;
             Float a2 = alpha * alpha;
@@ -81,7 +81,7 @@ namespace akari {
             return a2 / (Constants<Float>::Pi() * c2 * c2 * at * at);
         }
 
-        AKR_XPU static inline Float GGX_G1(Float alpha, const Vector3f &v, const Normal3f &m) {
+        AKR_XPU static inline Float GGX_G1(Float alpha, const Float3 &v, const Float3 &m) {
             if (dot(v, m) * v.y <= 0) {
                 return 0.0f;
             }
@@ -96,7 +96,7 @@ namespace akari {
                     alpha = roughness;
                 }
             }
-            [[nodiscard]] AKR_XPU Float D(const Normal3f &m) const {
+            [[nodiscard]] AKR_XPU Float D(const Float3 &m) const {
                 switch (type) {
                 case EBeckmann:
                     return BeckmannD(alpha, m);
@@ -108,7 +108,7 @@ namespace akari {
 
                 return 0.0f;
             }
-            [[nodiscard]] AKR_XPU Float G1(const Vector3f &v, const Normal3f &m) const {
+            [[nodiscard]] AKR_XPU Float G1(const Float3 &v, const Float3 &m) const {
                 switch (type) {
                 case EBeckmann:
                     return BeckmannG1(alpha, v, m);
@@ -119,10 +119,10 @@ namespace akari {
                 }
                 return 0.0f;
             }
-            [[nodiscard]] AKR_XPU Float G(const Vector3f &i, const Vector3f &o, const Normal3f &m) const {
+            [[nodiscard]] AKR_XPU Float G(const Float3 &i, const Float3 &o, const Float3 &m) const {
                 return G1(i, m) * G1(o, m);
             }
-            [[nodiscard]] AKR_XPU Normal3f sample_wh(const Vector3f &wo, const Point2f &u) const {
+            [[nodiscard]] AKR_XPU Float3 sample_wh(const Float3 &wo, const float2 &u) const {
                 Float phi = 2 * Constants<Float>::Pi() * u[1];
                 Float cosTheta = 0;
                 switch (type) {
@@ -142,12 +142,12 @@ namespace akari {
                 }
                 }
                 auto sinTheta = sqrt(std::max(0.0f, 1 - cosTheta * cosTheta));
-                auto wh = Normal3f(cos(phi) * sinTheta, cosTheta, sin(phi) * sinTheta);
+                auto wh = Float3(cos(phi) * sinTheta, cosTheta, sin(phi) * sinTheta);
                 if (!bsdf<C>::same_hemisphere(wo, wh))
                     wh = -wh;
                 return wh;
             }
-            [[nodiscard]] AKR_XPU Float evaluate_pdf(const Normal3f &wh) const {
+            [[nodiscard]] AKR_XPU Float evaluate_pdf(const Float3 &wh) const {
                 return D(wh) * bsdf<C>::abs_cos_theta(wh);
             }
 

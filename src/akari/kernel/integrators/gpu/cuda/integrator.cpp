@@ -39,10 +39,11 @@
 #include <akari/core/profiler.h>
 #include <akari/core/progress.hpp>
 namespace akari::gpu {
+
     AKR_VARIANT void AmbientOcclusion<C>::render(const Scene<C> &scene, Film<C> *film) const {
         if constexpr (std::is_same_v<Float, float>) {
             AKR_ASSERT_THROW(all(film->resolution() == scene.camera.resolution()));
-            auto n_tiles = Point2i(film->resolution() + Point2i(tile_size - 1)) / Point2i(tile_size);
+            auto n_tiles = int2(film->resolution() + int2(tile_size - 1)) / int2(tile_size);
             auto Li = AKR_GPU_LAMBDA(Ray3f ray, Sampler<C> & sampler)->Spectrum {
                 Intersection<C> intersection;
                 if (scene.intersect(ray, &intersection)) {
@@ -65,9 +66,9 @@ namespace akari::gpu {
             double gpu_time = 0;
             for (int tile_y = 0; tile_y < n_tiles.y; tile_y++) {
                 for (int tile_x = 0; tile_x < n_tiles.x; tile_x++) {
-                    Point2i tile_pos(tile_x, tile_y);
+                    int2 tile_pos(tile_x, tile_y);
                     Bounds2i tileBounds =
-                        Bounds2i{tile_pos * (int)tile_size, (tile_pos + Vector2i(1)) * (int)tile_size};
+                        Bounds2i{tile_pos * (int)tile_size, (tile_pos + int2(1)) * (int)tile_size};
                     auto boxed_tile = film->boxed_tile(tileBounds);
                     auto &camera = scene.camera;
                     auto sampler = scene.sampler;
@@ -86,11 +87,11 @@ namespace akari::gpu {
                             for (int s = 0; s < spp; s++) {
                                 sampler.start_next_sample();
                                 CameraSample<C> sample =
-                                    camera.generate_ray(sampler.next2d(), sampler.next2d(), Point2i(x, y));
+                                    camera.generate_ray(sampler.next2d(), sampler.next2d(), int2(x, y));
                                 auto L = Li(sample.ray, sampler);
                                 acc += L;
                             }
-                            tile->add_sample(Point2f(x, y), acc / spp, 1.0f);
+                            tile->add_sample(float2(x, y), acc / spp, 1.0f);
                         });
                     CUDA_CHECK(cudaDeviceSynchronize());
                     gpu_time += timer.elapsed_seconds();
@@ -147,20 +148,20 @@ namespace akari::gpu {
 
     AKR_VARIANT void PathTracerImpl<C>::render(const Scene<C> &scene, Film<C> *film) {
         std::shared_ptr<ProgressReporter> reporter;
-        auto n_tiles = Point2i(film->resolution() + Point2i(tile_size - 1)) / Point2i(tile_size);
+        auto n_tiles = int2(film->resolution() + int2(tile_size - 1)) / int2(tile_size);
         struct WorkTile {
-            Point2i tile_pos;
+            int2 tile_pos;
             Bounds2i tile_bounds;
             Box<Tile<C>> tile;
-            WorkTile(Point2i tile_pos, Bounds2i tile_bounds, Film<C> *film)
+            WorkTile(int2 tile_pos, Bounds2i tile_bounds, Film<C> *film)
                 : tile_pos(tile_pos), tile_bounds(tile_bounds), tile(film->boxed_tile(tile_bounds)) {}
         };
 
         std::list<WorkTile> tiles;
         for (int tile_y = 0; tile_y < n_tiles.y; tile_y++) {
             for (int tile_x = 0; tile_x < n_tiles.x; tile_x++) {
-                Point2i tile_pos(tile_x, tile_y);
-                Bounds2i tileBounds = Bounds2i{tile_pos * (int)tile_size, (tile_pos + Vector2i(1)) * (int)tile_size};
+                int2 tile_pos(tile_x, tile_y);
+                Bounds2i tileBounds = Bounds2i{tile_pos * (int)tile_size, (tile_pos + int2(1)) * (int)tile_size};
                 tiles.emplace_back(tile_pos, tileBounds, film);
             }
         }
@@ -170,7 +171,7 @@ namespace akari::gpu {
                 putchar('\n');
             }
         });
-        auto render_tile_mega = [&](Tile<C> *tile, const Point2i &tile_pos, const Bounds2i &tile_bounds) {
+        auto render_tile_mega = [&](Tile<C> *tile, const int2 &tile_pos, const Bounds2i &tile_bounds) {
             auto &camera = scene.camera;
             auto sampler = scene.sampler;
             auto extents = tile_bounds.extents();
@@ -189,18 +190,19 @@ namespace akari::gpu {
                         pt.depth = 0;
                         pt.max_depth = max_depth;
                         pt.sampler = sampler;
-                        pt.run_megakernel(scene, camera, Point2i(x, y));
+                        pt.run_megakernel(scene, camera, int2(x, y));
                         sampler = pt.sampler;
                         auto rad = pt.L.clamp_zero();
                         rad = min(rad, Spectrum(ray_clamp));
                         acc += rad;
                     }
-                    tile->add_sample(Point2f(x, y), acc / spp, 1.0f);
+                    
+                    tile->add_sample(float2(x, y), acc / spp, 1.0f);
                 });
             cuLaunchHostFunc((cudaStream_t) nullptr, [](void *reporter) { ((ProgressReporter *)reporter)->update(); },
                              reporter.get());
         };
-        auto render_tile_wavefront = [&](Tile<C> *tile, const Point2i &tile_pos, const Bounds2i &tileBounds) {
+        auto render_tile_wavefront = [&](Tile<C> *tile, const int2 &tile_pos, const Bounds2i &tileBounds) {
             auto &camera = scene.camera;
             auto _sampler = scene.sampler;
             auto extents = tileBounds.extents();
@@ -211,7 +213,7 @@ namespace akari::gpu {
                 int ty = pixel_id / extents.x;
                 int x = tx + tileBounds.pmin.x;
                 int y = ty + tileBounds.pmin.y;
-                return Point2i(x, y);
+                return int2(x, y);
             };
             auto launch_size = extents.x * extents.y;
             launch(
@@ -358,7 +360,7 @@ namespace akari::gpu {
                         auto p = get_pixel(tid);
                         auto rad = state.L.clamp_zero();
                         rad = min(rad, Spectrum(ray_clamp));
-                        tile->add_sample(Point2f(p), rad, 1.0f);
+                        tile->add_sample(float2(p), rad, 1.0f);
                     });
             }
             cuLaunchHostFunc((cudaStream_t) nullptr, [](void *reporter) { ((ProgressReporter *)reporter)->update(); },

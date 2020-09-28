@@ -39,8 +39,8 @@ namespace akari {
     AKR_VARIANT struct Intersection {
         AKR_IMPORT_TYPES()
         Float t = Constants<Float>::Inf();
-        Normal3f ng;
-        Point2f uv;
+        Float3 ng;
+        float2 uv;
         int geom_id = -1;
         int prim_id = -1;
         bool is_instance = false;
@@ -75,7 +75,7 @@ namespace akari {
             }
             return trig;
         }
-        AKR_XPU astd::pair<const AreaLight<C> *, Float> select_light(const Point2f &u) const {
+        AKR_XPU astd::pair<const AreaLight<C> *, Float> select_light(const float2 &u) const {
             if (area_lights.size() == 0) {
                 return {nullptr, Float(0.0f)};
             }

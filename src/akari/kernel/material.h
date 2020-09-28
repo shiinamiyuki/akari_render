@@ -43,16 +43,16 @@ namespace akari {
 
     AKR_VARIANT struct BSDFSample {
         AKR_IMPORT_TYPES()
-        Vector3f wi = Vector3f(0);
+        Float3 wi = Float3(0);
         Float pdf = 0.0;
         Spectrum f = Spectrum(0.0f);
         BSDFType sampled = BSDF_NONE;
     };
     AKR_VARIANT struct BSDFSampleContext {
         AKR_IMPORT_TYPES()
-        const Point2f u1;
-        const Vector3f wo;
-        AKR_XPU BSDFSampleContext(const Point2f &u1, const Vector3f &wo) : u1(u1), wo(wo) {}
+        const float2 u1;
+        const Float3 wo;
+        AKR_XPU BSDFSampleContext(const float2 &u1, const Float3 &wo) : u1(u1), wo(wo) {}
     };
     AKR_VARIANT class DiffuseBSDF {
         AKR_IMPORT_TYPES();
@@ -60,20 +60,20 @@ namespace akari {
 
       public:
         AKR_XPU DiffuseBSDF(const Spectrum &R) : R(R) {}
-        [[nodiscard]] AKR_XPU Float evaluate_pdf(const Vector3f &wo, const Vector3f &wi) const {
+        [[nodiscard]] AKR_XPU Float evaluate_pdf(const Float3 &wo, const Float3 &wi) const {
             if (bsdf<C>::same_hemisphere(wo, wi)) {
                 return sampling<C>::cosine_hemisphere_pdf(std::abs(bsdf<C>::cos_theta(wi)));
             }
             return 0.0f;
         }
-        [[nodiscard]] AKR_XPU Spectrum evaluate(const Vector3f &wo, const Vector3f &wi) const {
+        [[nodiscard]] AKR_XPU Spectrum evaluate(const Float3 &wo, const Float3 &wi) const {
             if (bsdf<C>::same_hemisphere(wo, wi)) {
                 return R * Constants<Float>::InvPi();
             }
             return Spectrum(0.0f);
         }
         [[nodiscard]] AKR_XPU BSDFType type() const { return BSDFType(BSDF_DIFFUSE | BSDF_REFLECTION); }
-        AKR_XPU Spectrum sample(const Point2f &u, const Vector3f &wo, Vector3f *wi, Float *pdf,
+        AKR_XPU Spectrum sample(const float2 &u, const Float3 &wo, Float3 *wi, Float *pdf,
                                 BSDFType *sampledType) const {
             *wi = sampling<C>::cosine_hemisphere_sampling(u);
             if (!bsdf<C>::same_hemisphere(wo, *wi)) {
@@ -93,14 +93,14 @@ namespace akari {
       public:
         AKR_XPU MicrofacetReflection(const Spectrum &R, Float roughness)
             : R(R), roughness(roughness), model(microfacet<C>::MicrofacetType::EGGX, roughness) {}
-        [[nodiscard]] AKR_XPU Float evaluate_pdf(const Vector3f &wo, const Vector3f &wi) const {
+        [[nodiscard]] AKR_XPU Float evaluate_pdf(const Float3 &wo, const Float3 &wi) const {
             if (bsdf<C>::same_hemisphere(wo, wi)) {
                 auto wh = normalize(wo + wi);
                 return model.evaluate_pdf(wh) / (Float(4.0f) * dot(wo, wh));
             }
             return 0.0f;
         }
-        [[nodiscard]] AKR_XPU Spectrum evaluate(const Vector3f &wo, const Vector3f &wi) const {
+        [[nodiscard]] AKR_XPU Spectrum evaluate(const Float3 &wo, const Float3 &wi) const {
             if (bsdf<C>::same_hemisphere(wo, wi)) {
                 Float cosThetaO = bsdf<C>::abs_cos_theta(wo);
                 Float cosThetaI = bsdf<C>::abs_cos_theta(wi);
@@ -119,7 +119,7 @@ namespace akari {
             return Spectrum(0.0f);
         }
         [[nodiscard]] AKR_XPU BSDFType type() const { return BSDFType(BSDF_GLOSSY | BSDF_REFLECTION); }
-        AKR_XPU Spectrum sample(const Point2f &u, const Vector3f &wo, Vector3f *wi, Float *pdf,
+        AKR_XPU Spectrum sample(const float2 &u, const Float3 &wo, Float3 *wi, Float *pdf,
                                 BSDFType *sampledType) const {
             *sampledType = type();
             auto wh = model.sample_wh(wo, u);
@@ -140,15 +140,15 @@ namespace akari {
       public:
         using Variant<DiffuseBSDF<C>, MicrofacetReflection<C>>::Variant;
         AKR_IMPORT_TYPES();
-        [[nodiscard]] AKR_XPU Float evaluate_pdf(const Vector3f &wo, const Vector3f &wi) const {
+        [[nodiscard]] AKR_XPU Float evaluate_pdf(const Float3 &wo, const Float3 &wi) const {
             AKR_VAR_DISPATCH(evaluate_pdf, wo, wi);
         }
-        [[nodiscard]] AKR_XPU Spectrum evaluate(const Vector3f &wo, const Vector3f &wi) const {
+        [[nodiscard]] AKR_XPU Spectrum evaluate(const Float3 &wo, const Float3 &wi) const {
             AKR_VAR_DISPATCH(evaluate, wo, wi);
         }
         [[nodiscard]] AKR_XPU BSDFType type() const { AKR_VAR_DISPATCH(type); }
         [[nodiscard]] AKR_XPU bool match_flags(BSDFType flag) const { return ((uint32_t)type() & (uint32_t)flag) != 0; }
-        AKR_XPU Spectrum sample(const Point2f &u, const Vector3f &wo, Vector3f *wi, Float *pdf,
+        AKR_XPU Spectrum sample(const float2 &u, const Float3 &wo, Float3 *wi, Float *pdf,
                                 BSDFType *sampledType) const {
             AKR_VAR_DISPATCH(sample, u, wo, wi, pdf, sampledType);
         }
@@ -157,22 +157,22 @@ namespace akari {
     AKR_VARIANT class BSDF {
         AKR_IMPORT_TYPES()
         BSDFClosure<C> closure_;
-        Normal3f ng, ns;
+        Float3 ng, ns;
         Frame3f frame;
         Float choice_pdf = 1.0f;
 
       public:
         BSDF() = default;
-        AKR_XPU explicit BSDF(const Normal3f &ng, const Normal3f &ns) : ng(ng), ns(ns) { frame = Frame3f(ns); }
+        AKR_XPU explicit BSDF(const Float3 &ng, const Float3 &ns) : ng(ng), ns(ns) { frame = Frame3f(ns); }
         AKR_XPU bool null() const { return closure().null(); }
         AKR_XPU void set_closure(const BSDFClosure<C> &closure) { closure_ = closure; }
         AKR_XPU void set_choice_pdf(Float pdf) { choice_pdf = pdf; }
         AKR_XPU const BSDFClosure<C> &closure() const { return closure_; }
-        [[nodiscard]] AKR_XPU Float evaluate_pdf(const Vector3f &wo, const Vector3f &wi) const {
+        [[nodiscard]] AKR_XPU Float evaluate_pdf(const Float3 &wo, const Float3 &wi) const {
             auto pdf = closure().evaluate_pdf(frame.world_to_local(wo), frame.world_to_local(wi));
             return pdf * choice_pdf;
         }
-        [[nodiscard]] AKR_XPU Spectrum evaluate(const Vector3f &wo, const Vector3f &wi) const {
+        [[nodiscard]] AKR_XPU Spectrum evaluate(const Float3 &wo, const Float3 &wi) const {
             auto f = closure().evaluate(frame.world_to_local(wo), frame.world_to_local(wi));
             return f;
         }
@@ -181,7 +181,7 @@ namespace akari {
         [[nodiscard]] AKR_XPU bool match_flags(BSDFType flag) const { return closure().match_flags(flag); }
         AKR_XPU BSDFSample<C> sample(const BSDFSampleContext<C> &ctx) const {
             auto wo = frame.world_to_local(ctx.wo);
-            Vector3f wi;
+            Float3 wi;
             BSDFSample<C> sample;
             sample.f = closure().sample(ctx.u1, wo, &wi, &sample.pdf, &sample.sampled);
             sample.wi = frame.local_to_world(wi);
@@ -191,14 +191,14 @@ namespace akari {
     };
     AKR_VARIANT struct MaterialEvalContext {
         AKR_IMPORT_TYPES()
-        Point2f u1, u2;
-        Point2f texcoords;
-        Normal3f ng, ns;
+        float2 u1, u2;
+        float2 texcoords;
+        Float3 ng, ns;
         MaterialEvalContext() = default;
         AKR_XPU MaterialEvalContext(Sampler<C> sampler, const SurfaceInteraction<C> &si)
             : MaterialEvalContext(sampler, si.texcoords, si.ng, si.ns) {}
-        AKR_XPU MaterialEvalContext(Sampler<C> sampler, const Point2f &texcoords, const Normal3f &ng,
-                                    const Normal3f &ns)
+        AKR_XPU MaterialEvalContext(Sampler<C> sampler, const float2 &texcoords, const Float3 &ng,
+                                    const Float3 &ns)
             : u1(sampler.next2d()), u2(sampler.next2d()), texcoords(texcoords), ng(ng), ns(ns) {}
     };
 
@@ -252,7 +252,7 @@ namespace akari {
         AKR_IMPORT_TYPES()
         using Variant<DiffuseMaterial<C>, GlossyMaterial<C>, EmissiveMaterial<C>, MixMaterial<C>>::Variant;
 
-        AKR_XPU astd::pair<const Material<C> *, Float> select_material(Float &u, const Point2f &texcoords) const {
+        AKR_XPU astd::pair<const Material<C> *, Float> select_material(Float &u, const float2 &texcoords) const {
             Float choice_pdf = 1.0f;
             auto ptr = this;
             while (ptr->template isa<MixMaterial<C>>()) {

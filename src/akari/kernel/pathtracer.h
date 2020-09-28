@@ -32,8 +32,8 @@ namespace akari {
     AKR_VARIANT
     struct SurfaceHit {
         AKR_IMPORT_TYPES()
-        Point2f uv;
-        Vector3f wo;
+        float2 uv;
+        Float3 wo;
         int geom_id = -1;
         int prim_id = -1;
         const Material<C> *material = nullptr;
@@ -58,7 +58,7 @@ namespace akari {
         int depth = 0;
         int max_depth = 5;
 
-        AKR_XPU CameraSample<C> camera_ray(const Camera<C> &camera, const Point2i &p) {
+        AKR_XPU CameraSample<C> camera_ray(const Camera<C> &camera, const int2 &p) {
             CameraSample<C> sample = camera.generate_ray(sampler.next2d(), sampler.next2d(), p);
             return sample;
         }
@@ -130,7 +130,7 @@ namespace akari {
             }
             return astd::nullopt;
         }
-        AKR_XPU void run_megakernel(const Scene<C> &scene, const Camera<C> &camera, const Point2i &p) {
+        AKR_XPU void run_megakernel(const Scene<C> &scene, const Camera<C> &camera, const int2 &p) {
             auto camera_sample = camera_ray(camera, p);
             Ray3f ray = camera_sample.ray;
             while (true) {

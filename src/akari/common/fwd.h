@@ -40,13 +40,13 @@ namespace akari {
         if constexpr (packed || N <= 2) {
             return alignof(T);
         }
-        if constexpr(sizeof(T) == 1){
+        if constexpr (sizeof(T) == 1) {
             return 4;
         }
-        if constexpr(sizeof(T) == 2){
+        if constexpr (sizeof(T) == 2) {
             return 4;
         }
-        if constexpr(sizeof(T) == 4){
+        if constexpr (sizeof(T) == 4) {
             return 16;
         }
         // align to 128 bits (16 bytes)
@@ -166,155 +166,94 @@ namespace akari {
     template <typename T>
     using float64_array_t = replace_scalar_t<T, double>;
 
-    template <typename Float>
-    struct CoreAliases {
-        using Int8 = int8_array_t<Float>;
-        using Int32 = int32_array_t<Float>;
-        using UInt32 = uint32_array_t<Float>;
-        using Int64 = int64_array_t<Float>;
-        using UInt64 = uint64_array_t<Float>;
-        using Float32 = float32_array_t<Float>;
-        using Float64 = float64_array_t<Float>;
+    using bool1 = Array<bool, 1>;
+    using bool2 = Array<bool, 2>;
+    using bool3 = Array<bool, 3>;
+    using bool4 = Array<bool, 4>;
+    using bool8 = Array<bool, 8>;
 
-        using Array2b = Array<bool, 2>;
-        using Array3b = Array<bool, 3>;
-        using Array4b = Array<bool, 4>;
+    using char1 = Array<int8_t, 1>;
+    using char2 = Array<int8_t, 2>;
+    using char3 = Array<int8_t, 3>;
+    using char4 = Array<int8_t, 4>;
+    using char8 = Array<int8_t, 8>;
 
-        using Array2f = Array<Float, 2>;
-        using Array3f = Array<Float, 3>;
-        using Array4f = Array<Float, 4>;
+    using uchar1 = Array<uint8_t, 1>;
+    using uchar2 = Array<uint8_t, 2>;
+    using uchar3 = Array<uint8_t, 3>;
+    using uchar4 = Array<uint8_t, 4>;
+    using uchar8 = Array<uint8_t, 8>;
 
-        using Array2i = Array<Int32, 2>;
-        using Array3i = Array<Int32, 3>;
-        using Array4i = Array<Int32, 4>;
+    using float1 = Array<float, 1>;
+    using float2 = Array<float, 2>;
+    using float3 = Array<float, 3>;
+    using float4 = Array<float, 4>;
+    using float8 = Array<float, 8>;
 
-        using Color1f = Color<Float, 1>;
-        using Color3f = Color<Float, 3>;
+    using int1 = Array<int, 1>;
+    using int2 = Array<int, 2>;
+    using int3 = Array<int, 3>;
+    using int4 = Array<int, 4>;
+    using int8 = Array<int, 8>;
 
-        using Vector1i = Vector<Int32, 1>;
-        using Vector2i = Vector<Int32, 2>;
-        using Vector3i = Vector<Int32, 3>;
-        using Vector4i = Vector<Int32, 4>;
+    using uint1 = Array<uint32_t, 1>;
+    using uint2 = Array<uint32_t, 2>;
+    using uint3 = Array<uint32_t, 3>;
+    using uint4 = Array<uint32_t, 4>;
+    using uint8 = Array<uint32_t, 8>;
 
-        using Vector1u = Vector<UInt32, 1>;
-        using Vector2u = Vector<UInt32, 2>;
-        using Vector3u = Vector<UInt32, 3>;
-        using Vector4u = Vector<UInt32, 4>;
+    using ulong1 = Array<uint64_t, 1>;
+    using ulong2 = Array<uint64_t, 2>;
+    using ulong3 = Array<uint64_t, 3>;
+    using ulong4 = Array<uint64_t, 4>;
+    using ulong8 = Array<uint64_t, 8>;
 
-        using Vector1f = Vector<Float, 1>;
-        using Vector2f = Vector<Float, 2>;
-        using Vector3f = Vector<Float, 3>;
-        using Vector4f = Vector<Float, 4>;
+    using long1 = Array<int64_t, 1>;
+    using long2 = Array<int64_t, 2>;
+    using long3 = Array<int64_t, 3>;
+    using long4 = Array<int64_t, 4>;
+    using long8 = Array<int64_t, 8>;
 
-        using Vector1d = Vector<Float64, 1>;
-        using Vector2d = Vector<Float64, 2>;
-        using Vector3d = Vector<Float64, 3>;
-        using Vector4d = Vector<Float64, 4>;
+    using double1 = Array<double, 1>;
+    using double2 = Array<double, 2>;
+    using double3 = Array<double, 3>;
+    using double4 = Array<double, 4>;
+    using double8 = Array<double, 8>;
 
-        using Point1i = Point<Int32, 1>;
-        using Point2i = Point<Int32, 2>;
-        using Point3i = Point<Int32, 3>;
-        using Point4i = Point<Int32, 4>;
+    using matrix3 = Matrix<float, 3>;
+    using matrix4 = Matrix<float, 4>;
+    using frame3f = Frame<float3>;
+    using transform3f = Transform<float>;
+    using bounds2i = BoundingBox<int2>;
+    using bounds2f = BoundingBox<float2>;
+    using bounds3f = BoundingBox<float3>;
 
-        using Point1u = Point<UInt32, 1>;
-        using Point2u = Point<UInt32, 2>;
-        using Point3u = Point<UInt32, 3>;
-        using Point4u = Point<UInt32, 4>;
+    using color1f = Color<float, 1>;
+    using color2f = Color<float, 2>;
+    using color3f = Color<float, 3>;
+    using color4f = Color<float, 4>;
 
-        using Point1f = Point<Float, 1>;
-        using Point2f = Point<Float, 2>;
-        using Point3f = Point<Float, 3>;
-        using Point4f = Point<Float, 4>;
+#define AKR_IMPORT_CORE_TYPES()                                                                                        \
+    using Array1f = Array<Float, 1>;                                                                                   \
+    using Array2f = Array<Float, 2>;                                                                                   \
+    using Array3f = Array<Float, 3>;                                                                                   \
+    using Array4f = Array<Float, 4>;                                                                                   \
+    using Float1 = Array<Float, 1>;                                                                                    \
+    using Float2 = Array<Float, 2>;                                                                                    \
+    using Float3 = Array<Float, 3>;                                                                                    \
+    using Float4 = Array<Float, 4>;                                                                                    \
+    using Color1f = Color<Float, 1>;                                                                                   \
+    using Color2f = Color<Float, 2>;                                                                                   \
+    using Color3f = Color<Float, 3>;                                                                                   \
+    using Color4f = Color<Float, 4>;                                                                                   \
+    using Matrix3f = Matrix<Float, 3>;                                                                                 \
+    using Matrix4f = Matrix<Float, 4>;                                                                                 \
+    using Frame3f = Frame<Float3>;                                                                                     \
+    using Transform3f = Transform<Float>;                                                                              \
+    using Bounds2i = BoundingBox<int2>;                                                                                \
+    using Bounds2f = BoundingBox<Float2>;                                                                              \
+    using Bounds3f = BoundingBox<Float3>;
 
-        using Point1d = Point<Float64, 1>;
-        using Point2d = Point<Float64, 2>;
-        using Point3d = Point<Float64, 3>;
-        using Point4d = Point<Float64, 4>;
-
-        using Normal3f = Normal<Float, 3>;
-        using Normal3d = Normal<Float64, 3>;
-
-        using Matrix2f = Matrix<Float, 2>;
-        using Matrix2d = Matrix<Float64, 2>;
-        using Matrix3f = Matrix<Float, 3>;
-        using Matrix3d = Matrix<Float64, 3>;
-        using Matrix4f = Matrix<Float, 4>;
-        using Matrix4d = Matrix<Float64, 4>;
-
-        using Frame3f = Frame<Vector3f>;
-        using Transform3f = Transform<Float>;
-
-        using Bounds2i = BoundingBox<Point2i>;
-        using Bounds2f = BoundingBox<Point2f>;
-        using Bounds3f = BoundingBox<Point3f>;
-    };
-#define AKR_IMPORT_CORE_TYPES_PREFIX(Float_, prefix)                                                                   \
-    using prefix##CoreAliases = akari::CoreAliases<Float_>;                                                            \
-    using prefix##Int8 = typename prefix##CoreAliases::Int8;                                                           \
-    using prefix##Int32 = typename prefix##CoreAliases::Int32;                                                         \
-    using prefix##UInt32 = typename prefix##CoreAliases::UInt32;                                                       \
-    using prefix##Int64 = typename prefix##CoreAliases::Int64;                                                         \
-    using prefix##UInt64 = typename prefix##CoreAliases::UInt64;                                                       \
-    using prefix##Float32 = typename prefix##CoreAliases::Float32;                                                     \
-    using prefix##Float64 = typename prefix##CoreAliases::Float64;                                                     \
-    using prefix##Array2b = typename prefix##CoreAliases::Array2b;                                                     \
-    using prefix##Array3b = typename prefix##CoreAliases::Array3b;                                                     \
-    using prefix##Array4b = typename prefix##CoreAliases::Array4b;                                                     \
-    using prefix##Array2f = typename prefix##CoreAliases::Array2f;                                                     \
-    using prefix##Array3f = typename prefix##CoreAliases::Array3f;                                                     \
-    using prefix##Array4f = typename prefix##CoreAliases::Array4f;                                                     \
-    using prefix##Array2i = typename prefix##CoreAliases::Array2i;                                                     \
-    using prefix##Array3i = typename prefix##CoreAliases::Array3i;                                                     \
-    using prefix##Array4i = typename prefix##CoreAliases::Array4i;                                                     \
-    using prefix##Vector1i = typename prefix##CoreAliases::Vector1i;                                                   \
-    using prefix##Vector2i = typename prefix##CoreAliases::Vector2i;                                                   \
-    using prefix##Vector3i = typename prefix##CoreAliases::Vector3i;                                                   \
-    using prefix##Vector4i = typename prefix##CoreAliases::Vector4i;                                                   \
-    using prefix##Vector1u = typename prefix##CoreAliases::Vector1u;                                                   \
-    using prefix##Vector2u = typename prefix##CoreAliases::Vector2u;                                                   \
-    using prefix##Vector3u = typename prefix##CoreAliases::Vector3u;                                                   \
-    using prefix##Vector4u = typename prefix##CoreAliases::Vector4u;                                                   \
-    using prefix##Vector1f = typename prefix##CoreAliases::Vector1f;                                                   \
-    using prefix##Vector2f = typename prefix##CoreAliases::Vector2f;                                                   \
-    using prefix##Vector3f = typename prefix##CoreAliases::Vector3f;                                                   \
-    using prefix##Vector4f = typename prefix##CoreAliases::Vector4f;                                                   \
-    using prefix##Vector1d = typename prefix##CoreAliases::Vector1d;                                                   \
-    using prefix##Vector2d = typename prefix##CoreAliases::Vector2d;                                                   \
-    using prefix##Vector3d = typename prefix##CoreAliases::Vector3d;                                                   \
-    using prefix##Vector4d = typename prefix##CoreAliases::Vector4d;                                                   \
-    using prefix##Point1i = typename prefix##CoreAliases::Point1i;                                                     \
-    using prefix##Point2i = typename prefix##CoreAliases::Point2i;                                                     \
-    using prefix##Point3i = typename prefix##CoreAliases::Point3i;                                                     \
-    using prefix##Point4i = typename prefix##CoreAliases::Point4i;                                                     \
-    using prefix##Point1u = typename prefix##CoreAliases::Point1u;                                                     \
-    using prefix##Point2u = typename prefix##CoreAliases::Point2u;                                                     \
-    using prefix##Point3u = typename prefix##CoreAliases::Point3u;                                                     \
-    using prefix##Point4u = typename prefix##CoreAliases::Point4u;                                                     \
-    using prefix##Point1f = typename prefix##CoreAliases::Point1f;                                                     \
-    using prefix##Point2f = typename prefix##CoreAliases::Point2f;                                                     \
-    using prefix##Point3f = typename prefix##CoreAliases::Point3f;                                                     \
-    using prefix##Point4f = typename prefix##CoreAliases::Point4f;                                                     \
-    using prefix##Point1d = typename prefix##CoreAliases::Point1d;                                                     \
-    using prefix##Point2d = typename prefix##CoreAliases::Point2d;                                                     \
-    using prefix##Point3d = typename prefix##CoreAliases::Point3d;                                                     \
-    using prefix##Point4d = typename prefix##CoreAliases::Point4d;                                                     \
-    using prefix##Normal3f = typename prefix##CoreAliases::Normal3f;                                                   \
-    using prefix##Normal3d = typename prefix##CoreAliases::Normal3d;                                                   \
-    using prefix##Matrix2f = typename prefix##CoreAliases::Matrix2f;                                                   \
-    using prefix##Matrix2d = typename prefix##CoreAliases::Matrix2d;                                                   \
-    using prefix##Matrix3f = typename prefix##CoreAliases::Matrix3f;                                                   \
-    using prefix##Matrix3d = typename prefix##CoreAliases::Matrix3d;                                                   \
-    using prefix##Matrix4f = typename prefix##CoreAliases::Matrix4f;                                                   \
-    using prefix##Matrix4d = typename prefix##CoreAliases::Matrix4d;                                                   \
-    using prefix##Frame3f = typename prefix##CoreAliases::Frame3f;                                                     \
-    using prefix##Transform3f = typename prefix##CoreAliases::Transform3f;                                             \
-    using prefix##Color1f = typename prefix##CoreAliases::Color1f;                                                     \
-    using prefix##Color3f = typename prefix##CoreAliases::Color3f;                                                     \
-    using prefix##Bounds2f = typename prefix##CoreAliases::Bounds2f;                                                   \
-    using prefix##Bounds3f = typename prefix##CoreAliases::Bounds3f;                                                   \
-    using prefix##Bounds2i = typename prefix##CoreAliases::Bounds2i;
-
-#define AKR_IMPORT_CORE_TYPES() AKR_IMPORT_CORE_TYPES_PREFIX(Float, )
 #define AKR_IMPORT_CORE_TYPES_WITH(fl)                                                                                 \
     using Float = fl;                                                                                                  \
     AKR_IMPORT_CORE_TYPES()

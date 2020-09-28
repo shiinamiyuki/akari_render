@@ -28,7 +28,6 @@
 #include <akari/core/misc.h>
 using namespace akari;
 std::shared_ptr<Mesh> load_wavefront_obj(const fs::path &path, std::string &generated) {
-    AKR_IMPORT_CORE_TYPES_WITH(float)
     info("loading {}", fs::absolute(path).string());
     std::shared_ptr<Mesh> mesh;
     fs::path parent_path = fs::absolute(path).parent_path();
@@ -64,14 +63,14 @@ std::shared_ptr<Mesh> load_wavefront_obj(const fs::path &path, std::string &gene
 
             // auto mat = materials[shapes[s].mesh.material_ids[f]].name;
             int fv = shapes[s].mesh.num_face_vertices[f];
-            Point3f triangle[3];
+            float3 triangle[3];
             for (int v = 0; v < fv; v++) {
                 tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
                 indices.push_back(idx.vertex_index);
-                triangle[v] = Point3f(load<PackedArray<Float, 3>>(&vertices[3 * idx.vertex_index]));
+                triangle[v] = float3(load<float3>(&vertices[3 * idx.vertex_index]));
             }
             material_indices.emplace_back(shapes[s].mesh.material_ids[f]);
-            Normal3f ng = normalize(cross(triangle[1] - triangle[0], triangle[2] - triangle[0]));
+            float3 ng = normalize(cross(triangle[1] - triangle[0], triangle[2] - triangle[0]));
             for (int v = 0; v < fv; v++) {
                 tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
                 if (idx.normal_index < 0) {
@@ -100,9 +99,9 @@ std::shared_ptr<Mesh> load_wavefront_obj(const fs::path &path, std::string &gene
     };
     for (auto &obj_mat : obj_materials) {
         auto normalized = normalize_name(obj_mat.name);
-        auto kd = load<Array3f>(obj_mat.diffuse);
-        auto ks = load<Array3f>(obj_mat.specular);
-        auto ke = load<Array3f>(obj_mat.emission);
+        auto kd = load<float3>(obj_mat.diffuse);
+        auto ks = load<float3>(obj_mat.specular);
+        auto ke = load<float3>(obj_mat.emission);
         if (hmax(ke) > 0.001) {
             os << "// OBJ Material: " << obj_mat.name << "\n";
             os << "export " << normalized << " = EmissiveMaterial {\n";
@@ -111,7 +110,7 @@ std::shared_ptr<Mesh> load_wavefront_obj(const fs::path &path, std::string &gene
             continue;
         }
         auto roughness = std::sqrt(2.0f / (obj_mat.shininess + 2.0f));
-        Float frac = hmax(ks) / (hmax(kd) + hmax(ks));
+        float frac = hmax(ks) / (hmax(kd) + hmax(ks));
         if (!std::isnormal(frac)) {
             frac = 0;
         }

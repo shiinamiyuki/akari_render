@@ -29,10 +29,10 @@ namespace akari {
     AKR_VARIANT
     struct sampling {
         AKR_IMPORT_TYPES()
-        AKR_XPU static inline Point2f concentric_disk_sampling(const Point2f &u) {
-            Point2f uOffset = 2.f * u - Point2f(1, 1);
+        AKR_XPU static inline float2 concentric_disk_sampling(const float2 &u) {
+            float2 uOffset = 2.f * u - float2(1, 1);
             if (uOffset.x == 0 && uOffset.y == 0)
-                return Point2f(0, 0);
+                return float2(0, 0);
 
             Float theta, r;
             if (std::abs(uOffset.x) > std::abs(uOffset.y)) {
@@ -42,30 +42,30 @@ namespace akari {
                 r = uOffset.y;
                 theta = Constants<Float>::Pi2() - Constants<Float>::Pi4() * (uOffset.x / uOffset.y);
             }
-            return r * Point2f(cos(theta), sin(theta));
+            return r * float2(cos(theta), sin(theta));
         }
 
-        AKR_XPU static inline Vector3f cosine_hemisphere_sampling(const Point2f &u) {
+        AKR_XPU static inline Float3 cosine_hemisphere_sampling(const float2 &u) {
             auto uv = concentric_disk_sampling(u);
             auto r = dot(uv, uv);
             auto h = sqrt(std::max(Float(0.0f), Float(1.0f - r)));
-            return Vector3f(uv.x, h, uv.y);
+            return Float3(uv.x, h, uv.y);
         }
         AKR_XPU static inline Float cosine_hemisphere_pdf(Float cosTheta) {
             return cosTheta * Constants<Float>::InvPi();
         }
         AKR_XPU static inline Float uniform_sphere_pdf() { return 1.0f / (4 * Constants<Float>::Pi()); }
-        AKR_XPU static inline Vector3f uniform_sphere_sampling(const Point2f &u) {
+        AKR_XPU static inline Float3 uniform_sphere_sampling(const float2 &u) {
             Float z = 1 - 2 * u[0];
             Float r = sqrt(max((Float)0, (Float)1 - z * z));
             Float phi = 2 * Constants<Float>::Pi * u[1];
-            return Vector3f(r * cos(phi), r * sin(phi), z);
+            return Float3(r * cos(phi), r * sin(phi), z);
         }
-        AKR_XPU static inline Point2f uniform_sample_triangle(const Point2f &u) {
+        AKR_XPU static inline float2 uniform_sample_triangle(const float2 &u) {
             Float su0 = sqrt(u[0]);
             Float b0 = 1 - su0;
             Float b1 = u[1] * su0;
-            return Point2f(b0, b1);
+            return float2(b0, b1);
         }
     };
 } // namespace akari

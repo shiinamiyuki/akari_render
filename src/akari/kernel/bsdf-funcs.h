@@ -25,41 +25,41 @@
 namespace akari {
     AKR_VARIANT struct bsdf {
         AKR_IMPORT_TYPES()
-        AKR_XPU static inline Float cos_theta(const Vector3f &w) { return w.y; }
+        AKR_XPU static inline Float cos_theta(const Float3 &w) { return w.y; }
 
-        AKR_XPU static inline Float abs_cos_theta(const Vector3f &w) { return std::abs(cos_theta(w)); }
+        AKR_XPU static inline Float abs_cos_theta(const Float3 &w) { return std::abs(cos_theta(w)); }
 
-        AKR_XPU static inline Float cos2_theta(const Vector3f &w) { return w.y * w.y; }
+        AKR_XPU static inline Float cos2_theta(const Float3 &w) { return w.y * w.y; }
 
-        AKR_XPU static inline Float sin2_theta(const Vector3f &w) { return 1 - cos2_theta(w); }
+        AKR_XPU static inline Float sin2_theta(const Float3 &w) { return 1 - cos2_theta(w); }
 
-        AKR_XPU static inline Float sin_theta(const Vector3f &w) { return sqrt(std::fmax(0.0f, sin2_theta(w))); }
+        AKR_XPU static inline Float sin_theta(const Float3 &w) { return sqrt(std::fmax(0.0f, sin2_theta(w))); }
 
-        AKR_XPU static inline Float tan2_theta(const Vector3f &w) { return sin2_theta(w) / cos2_theta(w); }
+        AKR_XPU static inline Float tan2_theta(const Float3 &w) { return sin2_theta(w) / cos2_theta(w); }
 
-        AKR_XPU static inline Float tan_theta(const Vector3f &w) { return sqrt(std::fmax(0.0f, tan2_theta(w))); }
+        AKR_XPU static inline Float tan_theta(const Float3 &w) { return sqrt(std::fmax(0.0f, tan2_theta(w))); }
 
-        AKR_XPU static inline Float cos_phi(const Vector3f &w) {
+        AKR_XPU static inline Float cos_phi(const Float3 &w) {
             Float sinTheta = sin_theta(w);
             return (sinTheta == 0) ? 1 : std::clamp<Float>(w.x / sinTheta, -1, 1);
         }
-        AKR_XPU static inline Float sin_phi(const Vector3f &w) {
+        AKR_XPU static inline Float sin_phi(const Float3 &w) {
             Float sinTheta = sin_theta(w);
             return (sinTheta == 0) ? 0 : std::clamp<Float>(w.z / sinTheta, -1, 1);
         }
 
-        AKR_XPU static inline Float cos2_phi(const Vector3f &w) { return cos_phi(w) * cos_phi(w); }
-        AKR_XPU static inline Float sin2_phi(const Vector3f &w) { return sin_phi(w) * sin_phi(w); }
+        AKR_XPU static inline Float cos2_phi(const Float3 &w) { return cos_phi(w) * cos_phi(w); }
+        AKR_XPU static inline Float sin2_phi(const Float3 &w) { return sin_phi(w) * sin_phi(w); }
 
-        AKR_XPU static inline bool same_hemisphere(const Vector3f &wo, const Vector3f &wi) {
+        AKR_XPU static inline bool same_hemisphere(const Float3 &wo, const Float3 &wi) {
             return wo.y * wi.y >= 0;
         }
 
-        AKR_XPU static inline Vector3f reflect(const Vector3f &w, const Normal3f &n) {
+        AKR_XPU static inline Float3 reflect(const Float3 &w, const Float3 &n) {
             return -1.0f * w + 2.0f * dot(w, n) * n;
         }
 
-        AKR_XPU static inline bool refract(const Vector3f &wi, const Normal3f &n, Float eta, Vector3f *wt) {
+        AKR_XPU static inline bool refract(const Float3 &wi, const Float3 &n, Float eta, Float3 *wt) {
             Float cosThetaI = dot(n, wi);
             Float sin2ThetaI = std::fmax(0.0f, 1.0f - cosThetaI * cosThetaI);
             Float sin2ThetaT = eta * eta * sin2ThetaI;

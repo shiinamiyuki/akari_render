@@ -27,10 +27,10 @@ namespace akari {
     AKR_VARIANT struct CameraSample {
         using Float = typename C::Float;
         AKR_IMPORT_CORE_TYPES()
-        Point2f p_lens;
-        Point2f p_film;
+        float2 p_lens;
+        float2 p_film;
         Float weight = 0.0f;
-        Normal3f normal;
+        Float3 normal;
         Ray<C> ray;
     };
     AKR_VARIANT class PerspectiveCamera {
@@ -38,49 +38,49 @@ namespace akari {
         AKR_IMPORT_TYPES()
       private:
         Transform3f c2w, w2c, r2c, c2r;
-        Point2i _resolution;
+        int2 _resolution;
         Float fov;
         Float lens_radius = 0.0f;
         Float focal_distance = 0.0f;
         AKR_XPU void preprocess() {
             Transform3f m;
-            m = Transform3f::scale(Vector3f(1.0f / _resolution.x, 1.0f / _resolution.y, 1)) * m;
-            m = Transform3f::scale(Vector3f(2, 2, 1)) * m;
-            m = Transform3f::translate(Point3f(-1, -1, 0)) * m;
-            m = Transform3f::scale(Vector3f(1, -1, 1)) * m;
+            m = Transform3f::scale(Float3(1.0f / _resolution.x, 1.0f / _resolution.y, 1)) * m;
+            m = Transform3f::scale(Float3(2, 2, 1)) * m;
+            m = Transform3f::translate(Float3(-1, -1, 0)) * m;
+            m = Transform3f::scale(Float3(1, -1, 1)) * m;
             auto s = atan(fov / 2);
             if (_resolution.x > _resolution.y) {
-                m = Transform3f::scale(Vector3f(s, s * Float(_resolution.y) / _resolution.x, 1)) * m;
+                m = Transform3f::scale(Float3(s, s * Float(_resolution.y) / _resolution.x, 1)) * m;
             } else {
-                m = Transform3f::scale(Vector3f(s * Float(_resolution.x) / _resolution.y, s, 1)) * m;
+                m = Transform3f::scale(Float3(s * Float(_resolution.x) / _resolution.y, s, 1)) * m;
             }
             r2c = m;
             c2r = r2c.inverse();
         }
 
       public:
-        AKR_XPU PerspectiveCamera(const Point2i &_resolution, const Transform3f &c2w, Float fov)
+        AKR_XPU PerspectiveCamera(const int2 &_resolution, const Transform3f &c2w, Float fov)
             : c2w(c2w), w2c(c2w.inverse()), _resolution(_resolution), fov(fov) {
             preprocess();
         }
-        AKR_XPU Point2i resolution() const { return _resolution; }
-        AKR_XPU CameraSample<C> generate_ray(const Point2f &u1, const Point2f &u2, const Point2i &raster) const {
+        AKR_XPU int2 resolution() const { return _resolution; }
+        AKR_XPU CameraSample<C> generate_ray(const float2 &u1, const float2 &u2, const int2 &raster) const {
             CameraSample<C> sample;
             sample.p_lens = sampling<C>::concentric_disk_sampling(u1) * lens_radius;
-            sample.p_film = Point2f(raster) + u2;
+            sample.p_film = float2(raster) + u2;
             sample.weight = 1;
 
-            Point2f p = shuffle<0, 1>(r2c.apply_point(Point3f(sample.p_film.x, sample.p_film.y, 0.0f)));
-            Ray3f ray(Point3f(0), Vector3f(normalize(Point3f(p.x, p.y, 0) - Point3f(0, 0, 1))));
+            float2 p = shuffle<0, 1>(r2c.apply_point(Float3(sample.p_film.x, sample.p_film.y, 0.0f)));
+            Ray3f ray(Float3(0), Float3(normalize(Float3(p.x, p.y, 0) - Float3(0, 0, 1))));
             if (lens_radius > 0 && focal_distance > 0) {
                 Float ft = focal_distance / std::abs(ray.d.z);
-                Point3f pFocus = ray(ft);
-                ray.o = Point3f(sample.p_lens.x, sample.p_lens.y, 0);
-                ray.d = Vector3f(normalize(pFocus - ray.o));
+                Float3 pFocus = ray(ft);
+                ray.o = Float3(sample.p_lens.x, sample.p_lens.y, 0);
+                ray.d = Float3(normalize(pFocus - ray.o));
             }
             ray.o = c2w.apply_point(ray.o);
             ray.d = c2w.apply_vector(ray.d);
-            sample.normal = c2w.apply_normal(Normal3f(0, 0, -1.0f));
+            sample.normal = c2w.apply_normal(Float3(0, 0, -1.0f));
             sample.ray = ray;
             return sample;
         }
@@ -89,9 +89,9 @@ namespace akari {
       public:
         AKR_IMPORT_TYPES()
         using Variant<PerspectiveCamera<C>>::Variant;
-        AKR_XPU CameraSample<C> generate_ray(const Point2f &u1, const Point2f &u2, const Point2i &raster) const {
+        AKR_XPU CameraSample<C> generate_ray(const float2 &u1, const float2 &u2, const int2 &raster) const {
             AKR_VAR_DISPATCH(generate_ray, u1, u2, raster);
         }
-        AKR_XPU Point2i resolution() const { AKR_VAR_DISPATCH(resolution); }
+        AKR_XPU int2 resolution() const { AKR_VAR_DISPATCH(resolution); }
     };
 } // namespace akari

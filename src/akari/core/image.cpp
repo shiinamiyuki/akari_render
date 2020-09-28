@@ -46,8 +46,8 @@ namespace akari {
                 texels.size(),
                 [&](uint32_t i, uint32_t) {
                     auto pixel = static_cast<uint8_t *>(&buffer[i * 3]);
-                    auto rgb = Point3f(texels[i].rgb);
-                    rgb = clamp(rgb, Point3f(0), Point3f(1));
+                    auto rgb = Float3(texels[i].rgb);
+                    rgb = clamp(rgb, Float3(0), Float3(1));
                     for (int comp = 0; comp < 3; comp++) {
                         pixel[comp] = (uint8_t)std::clamp<int>((int)std::round(rgb[comp] * 255.5), 0, 255);
                     }
@@ -84,7 +84,7 @@ namespace akari {
             auto ext = path.extension().string();
             if (ext == ".hdr") {
                 const float *data = stbi_loadf(path.string().c_str(), &x, &y, &channel, 3);
-                image = std::make_shared<RGBAImage>(Point2i(x, y));
+                image = std::make_shared<RGBAImage>(int2(x, y));
                 parallel_for(
                     image->resolution().y,
                     [=, &image](uint32_t y, uint32_t) {
@@ -103,7 +103,7 @@ namespace akari {
                     128);
             } else {
                 const auto *data = stbi_load(path.string().c_str(), &x, &y, &channel, 3);
-                image = std::make_shared<RGBAImage>(Point2i(x, y));
+                image = std::make_shared<RGBAImage>(int2(x, y));
                 parallel_for(
                     image->resolution().y,
                     [=, &image](uint32_t y, uint32_t) {

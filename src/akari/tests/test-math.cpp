@@ -36,12 +36,12 @@ TEST(TestMath, Color) {
 TEST(TestMath, Reduce) {
     using Float = float;
     AKR_IMPORT_CORE_TYPES() {
-        Vector3i v(1, 2, 3);
+        int3 v(1, 2, 3);
         ASSERT_EQ(hmin(v), 1);
         ASSERT_EQ(hmax(v), 3);
     }
     {
-        Vector3f v(1, 2, 3);
+        Float3 v(1, 2, 3);
         ASSERT_EQ(hmin(v), 1);
         ASSERT_EQ(hmax(v), 3);
     }
@@ -49,8 +49,8 @@ TEST(TestMath, Reduce) {
 TEST(TestMath, Frame) {
     using Float = float;
     AKR_IMPORT_CORE_TYPES()
-    Frame3f frame(normalize(Vector3f(0.2, 0.7, 0.4)));
-    Vector3f w = normalize(Vector3f(0.6, 0.3, 0.2));
+    Frame3f frame(normalize(Float3(0.2, 0.7, 0.4)));
+    Float3 w = normalize(Float3(0.6, 0.3, 0.2));
     auto u = frame.local_to_world(w);
     auto v = frame.world_to_local(u);
     ASSERT_FLOAT_EQ(w[0], v[0]);

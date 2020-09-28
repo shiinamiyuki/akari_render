@@ -47,7 +47,7 @@ namespace akari {
         AKR_IMPORT_TYPES()
         AKR_XPU void set_sample_index(uint64_t idx) { pcg32_init(idx); }
         AKR_XPU Float next1d() { return Float(pcg32()) / (float)0xffffffff; }
-        AKR_XPU Point2f next2d() { return Point2f(next1d(), next1d()); }
+        AKR_XPU float2 next2d() { return float2(next1d(), next1d()); }
         AKR_XPU void start_next_sample() {}
         AKR_XPU PCGSampler(uint64_t seed = 0u) { pcg32_init(seed); }
     };
@@ -61,7 +61,7 @@ namespace akari {
             seed = (1103515245 * seed + 12345);
             return (Float)seed / (Float)0xFFFFFFFF;
         }
-        AKR_XPU Point2f next2d() { return Point2f(next1d(), next1d()); }
+        AKR_XPU float2 next2d() { return float2(next1d(), next1d()); }
         AKR_XPU void start_next_sample() {}
         AKR_XPU LCGSampler(uint64_t seed = 0u) : seed(seed) {}
     };
@@ -70,7 +70,7 @@ namespace akari {
         AKR_IMPORT_TYPES()
         using Variant<PCGSampler<C>, LCGSampler<C>>::Variant;
         AKR_XPU Float next1d() { AKR_VAR_DISPATCH(next1d); }
-        AKR_XPU Point2f next2d() { AKR_VAR_DISPATCH(next2d); }
+        AKR_XPU float2 next2d() { AKR_VAR_DISPATCH(next2d); }
         AKR_XPU void start_next_sample() { AKR_VAR_DISPATCH(start_next_sample); }
         AKR_XPU void set_sample_index(uint64_t idx) { AKR_VAR_DISPATCH(set_sample_index, idx); }
     };

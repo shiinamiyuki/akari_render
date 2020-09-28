@@ -37,10 +37,10 @@ namespace akari {
         using Float = float;
         AKR_IMPORT_CORE_TYPES()
         astd::pmr::vector<T> _texels;
-        Point2i _resolution;
+        int2 _resolution;
 
       public:
-        TImage(const Point2i &dim = Point2i(1),
+        TImage(const int2 &dim = int2(1),
                astd::pmr::memory_resource *resource = astd::pmr::get_default_resource())
             : _texels(dim[0] * dim[1], astd::pmr::polymorphic_allocator<T>(resource)), _resolution(dim) {}
 
@@ -56,26 +56,26 @@ namespace akari {
             return _texels[x + y * _resolution[0]];
         }
 
-        AKR_XPU const T &operator()(float x, float y) const { return (*this)(Point2f(x, y)); }
+        AKR_XPU const T &operator()(float x, float y) const { return (*this)(float2(x, y)); }
 
-        AKR_XPU T &operator()(float x, float y) { return (*this)(Point2f(x, y)); }
+        AKR_XPU T &operator()(float x, float y) { return (*this)(float2(x, y)); }
 
-        AKR_XPU const T &operator()(const Point2i &p) const { return (*this)(p.x, p.y); }
+        AKR_XPU const T &operator()(const int2 &p) const { return (*this)(p.x, p.y); }
 
-        AKR_XPU T &operator()(const Point2i &p) { return (*this)(p.x, p.y); }
+        AKR_XPU T &operator()(const int2 &p) { return (*this)(p.x, p.y); }
 
-        AKR_XPU const T &operator()(const Point2f &p) const { return (*this)(Point2i(p * Point2f(_resolution))); }
+        AKR_XPU const T &operator()(const float2 &p) const { return (*this)(int2(p * float2(_resolution))); }
 
-        AKR_XPU T &operator()(const Point2f &p) { return (*this)(Point2i(p * Point2f(_resolution))); }
+        AKR_XPU T &operator()(const float2 &p) { return (*this)(int2(p * float2(_resolution))); }
 
         [[nodiscard]] AKR_XPU const astd::pmr::vector<T> &texels() const { return _texels; }
 
-        void resize(const Point2i &size) {
+        void resize(const int2 &size) {
             _resolution = size;
             _texels.resize(_resolution[0] * _resolution[1]);
         }
 
-        [[nodiscard]] AKR_XPU Point2i resolution() const { return _resolution; }
+        [[nodiscard]] AKR_XPU int2 resolution() const { return _resolution; }
         AKR_XPU T *data() { return _texels.data(); }
 
         [[nodiscard]] AKR_XPU const T *data() const { return _texels.data(); }
@@ -93,16 +93,16 @@ namespace akari {
                 return _texels[x + y * _resolution[0]];
             }
 
-            AKR_XPU const T &operator()(float x, float y) const { return (*this)(Point2f(x, y)); }
+            AKR_XPU const T &operator()(float x, float y) const { return (*this)(float2(x, y)); }
 
-            AKR_XPU const T &operator()(const Point2i &p) const { return (*this)(p.x, p.y); }
+            AKR_XPU const T &operator()(const int2 &p) const { return (*this)(p.x, p.y); }
 
-            AKR_XPU const T &operator()(const Point2f &p) const { return (*this)(Point2i(p * Point2f(_resolution))); }
+            AKR_XPU const T &operator()(const float2 &p) const { return (*this)(int2(p * float2(_resolution))); }
 
-            [[nodiscard]] AKR_XPU Point2i resolution() const { return _resolution; }
+            [[nodiscard]] AKR_XPU int2 resolution() const { return _resolution; }
             [[nodiscard]] AKR_XPU const T *data() const { return _texels; }
             const T *_texels = nullptr;
-            Point2i _resolution = Point2i(0);
+            int2 _resolution = int2(0);
         };
         View view() const { return View{data(), resolution()}; }
     };
@@ -117,7 +117,7 @@ namespace akari {
         Color3f rgb;
         Float alpha;
         RGBA() = default;
-        AKR_XPU RGBA(Array3f rgb, Float alpha) : rgb(rgb), alpha(alpha) {}
+        AKR_XPU RGBA(Float3 rgb, Float alpha) : rgb(rgb), alpha(alpha) {}
     };
     class RGBAImage : public TImage<RGBA> {
       public:

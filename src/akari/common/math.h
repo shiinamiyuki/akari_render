@@ -181,45 +181,44 @@ namespace akari {
         // Float time = 0.0f;
         using Float = typename C::Float;
         AKR_IMPORT_CORE_TYPES()
-        Point3f o;
-        Vector3f d;
+        Float3 o;
+        Float3 d;
         Float tmin = -1, tmax = -1;
         Ray() = default;
-        AKR_XPU Ray(const Point3f &o, const Vector3f &d, Float tmin = Constants<Float>::Eps(),
+        AKR_XPU Ray(const Float3 &o, const Float3 &d, Float tmin = Constants<Float>::Eps(),
                     Float tmax = std::numeric_limits<Float>::infinity())
             : o(o), d(d), tmin(tmin), tmax(tmax) {}
-        static AKR_XPU Ray spawn_to(const Point3f &p0, const Point3f &p1) {
-            Vector3f dir = p1 - p0;
+        static AKR_XPU Ray spawn_to(const Float3 &p0, const Float3 &p1) {
+            Float3 dir = p1 - p0;
             return Ray(p0, dir, Constants<Float>::Eps(), Float(1.0f) - Constants<Float>::ShadowEps());
         }
-        AKR_XPU Point3f operator()(Float t) const { return o + t * d; }
+        AKR_XPU Float3 operator()(Float t) const { return o + t * d; }
     };
 
     template <typename Vector>
     struct Frame {
         using Value = typename Vector::value_t;
-        using Vector3f = Vector;
-        using Normal3f = Normal<Value, 3>;
+        using Float3 = Vector;
         Frame() = default;
-        static AKR_XPU inline void compute_local_frame(const Normal3f &v1, Vector3f *v2, Vector3f *v3) {
+        static AKR_XPU inline void compute_local_frame(const Float3 &v1, Float3 *v2, Float3 *v3) {
             if (std::abs(v1.x) > std::abs(v1.y))
-                *v2 = Vector3f(-v1.z, (0), v1.x) / sqrt(v1.x * v1.x + v1.z * v1.z);
+                *v2 = Float3(-v1.z, (0), v1.x) / sqrt(v1.x * v1.x + v1.z * v1.z);
             else
-                *v2 = Vector3f((0), v1.z, -v1.y) / sqrt(v1.y * v1.y + v1.z * v1.z);
-            *v3 = normalize(cross(Vector3f(v1), *v2));
+                *v2 = Float3((0), v1.z, -v1.y) / sqrt(v1.y * v1.y + v1.z * v1.z);
+            *v3 = normalize(cross(Float3(v1), *v2));
         }
-        AKR_XPU explicit Frame(const Normal3f &v) : normal(v) { compute_local_frame(v, &T, &B); }
+        AKR_XPU explicit Frame(const Float3 &v) : normal(v) { compute_local_frame(v, &T, &B); }
 
-        [[nodiscard]] AKR_XPU Vector3f world_to_local(const Vector3f &v) const {
-            return Vector3f(dot(T, v), dot(normal, v), dot(B, v));
-        }
-
-        [[nodiscard]] AKR_XPU Vector3f local_to_world(const Vector3f &v) const {
-            return Vector3f(v.x * T + v.y * Vector3f(normal) + v.z * B);
+        [[nodiscard]] AKR_XPU Float3 world_to_local(const Float3 &v) const {
+            return Float3(dot(T, v), dot(normal, v), dot(B, v));
         }
 
-        Normal3f normal;
-        Vector3f T, B;
+        [[nodiscard]] AKR_XPU Float3 local_to_world(const Float3 &v) const {
+            return Float3(v.x * T + v.y * Float3(normal) + v.z * B);
+        }
+
+        Float3 normal;
+        Float3 T, B;
 
     };
 
@@ -239,18 +238,18 @@ namespace akari {
             m3inv = m3.inverse();
         }
         AKR_XPU Transform inverse() const { return Transform(minv, m); }
-        AKR_XPU Point3f apply_point(const Point3f &p) const {
-            Vector4f v(p.x, p.y, p.z, 1.0);
+        AKR_XPU Float3 apply_point(const Float3 &p) const {
+            Float4 v(p.x, p.y, p.z, 1.0);
             v = m * v;
-            Point3f q(v.x, v.y, v.z);
+            Float3 q(v.x, v.y, v.z);
             if (v.w != 1.0) {
                 q /= v.w;
             }
             return q;
         }
         AKR_XPU Transform operator*(const Transform &t) const { return Transform(m * t.m); }
-        AKR_XPU Vector3f apply_vector(const Vector3f &v) const { return m3 * v; }
-        AKR_XPU Normal3f apply_normal(const Normal3f &n) const { return m3inv.transpose() * n; }
+        AKR_XPU Float3 apply_vector(const Float3 &v) const { return m3 * v; }
+        AKR_XPU Float3 apply_normal(const Float3 &n) const { return m3inv.transpose() * n; }
         template <typename Spectrum, typename C = Config<Float, Spectrum>>
         AKR_XPU Ray<C> apply_ray(const Ray<C> &ray) const {
             using Ray3f = Ray<C>;
@@ -262,11 +261,11 @@ namespace akari {
             return Ray3f(T * ray.o, d2, ray.tmin * scale, ray.tmax * scale);
         }
 
-        static AKR_XPU Transform translate(const Vector3f &v) {
+        static AKR_XPU Transform translate(const Float3 &v) {
             Float m[] = {1, 0, 0, v.x, 0, 1, 0, v.y, 0, 0, 1, v.z, 0, 0, 0, 1};
             return Transform(Matrix4f(m));
         }
-        static AKR_XPU Transform scale(const Vector3f &s) {
+        static AKR_XPU Transform scale(const Float3 &s) {
             Float m[] = {s.x, 0, 0, 0, 0, s.y, 0, 0, 0, 0, s.z, 0, 0, 0, 0, 1};
             return Transform(Matrix4f(m));
         }

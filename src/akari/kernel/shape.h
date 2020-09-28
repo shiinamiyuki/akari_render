@@ -25,19 +25,19 @@
 namespace akari {
     AKR_VARIANT struct Triangle {
         AKR_IMPORT_TYPES()
-        Array<Point3f, 3> vertices;
-        Array<Normal3f, 3> normals;
-        Array<Point2f, 3> texcoords;
+        Array<Float3, 3> vertices;
+        Array<Float3, 3> normals;
+        Array<float2, 3> texcoords;
         const Material<C> *material = nullptr;
-        AKR_XPU Point3f p(const Point2f &uv) const { return lerp3(vertices[0], vertices[1], vertices[2], uv); }
+        AKR_XPU Float3 p(const float2 &uv) const { return lerp3(vertices[0], vertices[1], vertices[2], uv); }
         AKR_XPU Float area() const {
             return length(cross(vertices[1] - vertices[0], vertices[2] - vertices[0])) * 0.5f;
         }
-        AKR_XPU Normal3f ng() const {
-            return Normal3f(normalize(cross(vertices[1] - vertices[0], vertices[2] - vertices[0])));
+        AKR_XPU Float3 ng() const {
+            return Float3(normalize(cross(vertices[1] - vertices[0], vertices[2] - vertices[0])));
         }
-        AKR_XPU Normal3f ns(const Point2f &uv) const { return lerp3(normals[0], normals[1], normals[2], uv); }
-        AKR_XPU Point2f texcoord(const Point2f &uv) const {
+        AKR_XPU Float3 ns(const float2 &uv) const { return lerp3(normals[0], normals[1], normals[2], uv); }
+        AKR_XPU float2 texcoord(const float2 &uv) const {
             return lerp3(texcoords[0], texcoords[1], texcoords[2], uv);
         }
     };

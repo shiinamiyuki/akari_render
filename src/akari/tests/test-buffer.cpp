@@ -26,8 +26,7 @@
 using namespace akari;
 
 TEST(TestBuffer, Basic) {
-    AKR_IMPORT_CORE_TYPES_WITH(float)
-    astd::pmr::vector<Point3i> vec;
+    astd::pmr::vector<int3> vec;
     ASSERT_EQ(vec.size(), 0);
     ASSERT_TRUE(vec.data() == nullptr);
     vec.resize(32);
@@ -39,7 +38,7 @@ TEST(TestBuffer, Basic) {
     ASSERT_TRUE(vec.capacity() != 0);
     ASSERT_EQ(vec.size(), 1024);
     for (auto &i : vec) {
-        i = Point3i(77, 88, 99);
+        i = int3(77, 88, 99);
     }
     ASSERT_TRUE(all(vec[64] == vec[1023]));
 }

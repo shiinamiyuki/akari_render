@@ -67,10 +67,10 @@ namespace akari {
             info("BVHNodes: {}", nodes.size());
         }
 
-        AKR_XPU static Float intersectAABB(const Bounds3f &box, const Ray3f &ray, const Vector3f &invd) {
-            Vector3f t0 = (box.pmin - ray.o) * invd;
-            Vector3f t1 = (box.pmax - ray.o) * invd;
-            Vector3f tMin = min(t0, t1), tMax = max(t0, t1);
+        AKR_XPU static Float intersectAABB(const Bounds3f &box, const Ray3f &ray, const Float3 &invd) {
+            Float3 t0 = (box.pmin - ray.o) * invd;
+            Float3 t1 = (box.pmax - ray.o) * invd;
+            Float3 tMin = min(t0, t1), tMax = max(t0, t1);
             if (hmax(tMin) <= hmin(tMax)) {
                 auto t = std::max(ray.tmin, hmax(tMin));
                 if (t >= ray.tmax) {
@@ -210,7 +210,7 @@ namespace akari {
 
         AKR_XPU bool intersect(const Ray3f &ray, Hit &isct) const {
             bool hit = false;
-            auto invd = Vector3f(1) / ray.d;
+            auto invd = Float3(1) / ray.d;
             constexpr size_t maxDepth = StackDepth;
             const BVHNode *stack[maxDepth];
             int sp = 0;
@@ -243,7 +243,7 @@ namespace akari {
         }
         AKR_XPU [[nodiscard]] bool occlude(const Ray3f &ray) const {
             Hit isct;
-            auto invd = Vector3f(1) / ray.d;
+            auto invd = Float3(1) / ray.d;
             constexpr size_t maxDepth = StackDepth;
             const BVHNode *stack[maxDepth];
             int sp = 0;

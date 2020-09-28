@@ -25,16 +25,16 @@
 namespace akari {
     AKR_VARIANT struct LightSample {
         AKR_IMPORT_TYPES()
-        Normal3f ng = Normal3f(0.0f);
-        Vector3f wi; // w.r.t to the luminated surface; normalized
+        Float3 ng = Float3(0.0f);
+        Float3 wi; // w.r.t to the luminated surface; normalized
         Float pdf = 0.0f;
         Spectrum L;
         Ray3f shadow_ray;
     };
     AKR_VARIANT struct LightSampleContext {
         AKR_IMPORT_TYPES()
-        Point2f u;
-        Point3f p;
+        float2 u;
+        Float3 p;
     };
     AKR_VARIANT
     struct DirectLighting {

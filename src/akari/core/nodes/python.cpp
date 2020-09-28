@@ -108,8 +108,8 @@ namespace akari {
             auto c = py::class_<Array4b>(m, "Array4b");
             RegisterArrayOp<Float, Array4b>()(m, c);
         }
-        m.attr("Point2i") = m.attr("Array2i");
-        m.attr("Point3i") = m.attr("Array3i");
+        m.attr("int2") = m.attr("Array2i");
+        m.attr("int3") = m.attr("Array3i");
         m.attr("Point4i") = m.attr("Array4i");
     }
     AKR_VARIANT void RegisterMathFunction<C>::register_math_functions(py::module &m) {
@@ -137,12 +137,12 @@ namespace akari {
             auto c = py::class_<Array4f>(m, "Array4f");
             RegisterArrayOp<Float, Array4f>()(m, c);
         }
-        m.attr("Point2f") = m.attr("Array2f");
-        m.attr("Point3f") = m.attr("Array3f");
+        m.attr("float2") = m.attr("Array2f");
+        m.attr("Float3") = m.attr("Array3f");
         m.attr("Point4f") = m.attr("Array4f");
         m.attr("Vector2f") = m.attr("Array2f");
-        m.attr("Vector3f") = m.attr("Array3f");
-        m.attr("Vector4f") = m.attr("Array4f");
+        m.attr("Float3") = m.attr("Array3f");
+        m.attr("Float4") = m.attr("Array4f");
         m.attr("Normal4f") = m.attr("Array3f");
     }
     AKR_RENDER_STRUCT(RegisterMathFunction)

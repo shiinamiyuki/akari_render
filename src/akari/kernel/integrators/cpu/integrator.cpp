@@ -38,7 +38,7 @@ namespace akari {
 
         AKR_VARIANT void AmbientOcclusion<C>::render(const Scene<C> &scene, Film<C> *film) const {
             AKR_ASSERT_THROW(all(film->resolution() == scene.camera.resolution()));
-            auto n_tiles = Point2i(film->resolution() + Point2i(tile_size - 1)) / Point2i(tile_size);
+            auto n_tiles = int2(film->resolution() + int2(tile_size - 1)) / int2(tile_size);
             auto Li = [=, &scene](Ray3f ray, Sampler<C> &sampler) -> Spectrum {
                 (void)scene;
                 Intersection<C> intersection;
@@ -61,9 +61,9 @@ namespace akari {
             debug("resolution: {}, tile size: {}, tiles: {}", film->resolution(), tile_size, n_tiles);
             std::mutex mutex;
 
-            parallel_for_2d(n_tiles, [=, &scene, &mutex](const Point2i &tile_pos, int tid) {
+            parallel_for_2d(n_tiles, [=, &scene, &mutex](const int2 &tile_pos, int tid) {
                 (void)tid;
-                Bounds2i tileBounds = Bounds2i{tile_pos * (int)tile_size, (tile_pos + Vector2i(1)) * (int)tile_size};
+                Bounds2i tileBounds = Bounds2i{tile_pos * (int)tile_size, (tile_pos + int2(1)) * (int)tile_size};
                 auto boxed_tile = film->boxed_tile(tileBounds);
                 auto &tile = *boxed_tile.get();
                 auto &camera = scene.camera;
@@ -74,9 +74,9 @@ namespace akari {
                         for (int s = 0; s < spp; s++) {
                             sampler.start_next_sample();
                             CameraSample<C> sample =
-                                camera.generate_ray(sampler.next2d(), sampler.next2d(), Point2i(x, y));
+                                camera.generate_ray(sampler.next2d(), sampler.next2d(), int2(x, y));
                             auto L = Li(sample.ray, sampler);
-                            tile.add_sample(Point2f(x, y), L, 1.0f);
+                            tile.add_sample(float2(x, y), L, 1.0f);
                         }
                     }
                 }
@@ -88,7 +88,7 @@ namespace akari {
         AKR_VARIANT void PathTracer<C>::render(const Scene<C> &scene, Film<C> *film) const {
             AKR_ASSERT_THROW(all(film->resolution() == scene.camera.resolution()));
             int max_depth = 5;
-            auto n_tiles = Point2i(film->resolution() + Point2i(tile_size - 1)) / Point2i(tile_size);
+            auto n_tiles = int2(film->resolution() + int2(tile_size - 1)) / int2(tile_size);
             std::mutex mutex;
             auto num_threads = num_work_threads();
             auto _arena = MemoryArena<>(astd::pmr::polymorphic_allocator<>(active_device()->managed_resource()));
@@ -114,9 +114,9 @@ namespace akari {
                         putchar('\n');
                     }
                 });
-            parallel_for_2d(n_tiles, [=, &scene, &mutex, &small_arenas](const Point2i &tile_pos, int tid) {
+            parallel_for_2d(n_tiles, [=, &scene, &mutex, &small_arenas](const int2 &tile_pos, int tid) {
                 (void)tid;
-                Bounds2i tileBounds = Bounds2i{tile_pos * (int)tile_size, (tile_pos + Vector2i(1)) * (int)tile_size};
+                Bounds2i tileBounds = Bounds2i{tile_pos * (int)tile_size, (tile_pos + int2(1)) * (int)tile_size};
                 auto tile = film->tile(tileBounds);
                 auto &camera = scene.camera;
                 auto &arena = small_arenas[tid];
@@ -130,9 +130,9 @@ namespace akari {
                             pt.depth = 0;
                             pt.max_depth = max_depth;
                             pt.sampler = sampler;
-                            pt.run_megakernel(scene, camera, Point2i(x, y));
+                            pt.run_megakernel(scene, camera, int2(x, y));
                             sampler = pt.sampler;
-                            tile.add_sample(Point2f(x, y), pt.L, 1.0f);
+                            tile.add_sample(float2(x, y), pt.L, 1.0f);
                             arena.reset();
                         }
                     }

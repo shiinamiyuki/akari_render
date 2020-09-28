@@ -25,12 +25,11 @@
 namespace akari {
     AKR_VARIANT class PerspectiveCameraNode : public CameraNode<C> {
       public:
-        AKR_IMPORT_TYPES()
-        Point3f position;
-        Vector3f rotation;
-        Point2i resolution = Point2i(512, 512);
-        Float fov = radians(80.0f);
-        Camera<C> compile(MemoryArena<>*arena) override {
+        float3 position;
+        float3 rotation;
+        int2 resolution = int2(512, 512);
+        double fov = radians(80.0f);
+        Camera<C> compile(MemoryArena<> *arena) override {
             Transform3f c2w;
             c2w = Transform3f::rotate_z(rotation.z);
             c2w = Transform3f::rotate_x(rotation.y) * c2w;
@@ -43,11 +42,11 @@ namespace akari {
             if (field == "fov") {
                 fov = radians(value.get<double>().value());
             } else if (field == "rotation") {
-                rotation = radians(load_array<Array3f>(value));
+                rotation = radians(load_array<float3>(value));
             } else if (field == "position") {
-                position = load_array<Array3f>(value);
+                position = load_array<float3>(value);
             } else if (field == "resolution") {
-                resolution = load_array<Array2i>(value);
+                resolution = load_array<int2>(value);
             }
         }
     };

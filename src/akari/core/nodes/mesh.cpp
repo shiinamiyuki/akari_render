@@ -142,15 +142,15 @@ namespace akari {
 
                     // auto mat = materials[shapes[s].mesh.material_ids[f]].name;
                     int fv = shapes[s].mesh.num_face_vertices[f];
-                    Point3f triangle[3];
+                    Float3 triangle[3];
                     for (int v = 0; v < fv; v++) {
                         tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
                         mesh.indices.push_back(idx.vertex_index);
-                        triangle[v] = Point3f(akari::load<PackedArray<Float, 3>>(&mesh.vertices[3 * idx.vertex_index]));
+                        triangle[v] = Float3(akari::load<PackedArray<Float, 3>>(&mesh.vertices[3 * idx.vertex_index]));
                     }
 
-                    Normal3f ng =
-                        normalize(cross(Vector3f(triangle[1] - triangle[0]), Vector3f(triangle[2] - triangle[0])));
+                    Float3 ng =
+                        normalize(cross(Float3(triangle[1] - triangle[0]), Float3(triangle[2] - triangle[0])));
                     for (int v = 0; v < fv; v++) {
                         tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
                         if (idx.normal_index < 0) {

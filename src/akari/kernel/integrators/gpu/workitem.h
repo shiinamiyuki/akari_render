@@ -58,8 +58,8 @@ namespace akari {
         Float pdf = 0.0f;
         int geom_id = -1;
         int prim_id = -1;
-        Point2f uv;
-        Vector3f wo;
+        float2 uv;
+        Float3 wo;
         AKR_XPU SurfaceHit<C> surface_hit() const {
             SurfaceHit<C> hit;
             hit.geom_id = geom_id;

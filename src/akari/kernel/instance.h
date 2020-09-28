@@ -34,8 +34,8 @@ namespace akari {
         BufferView<int> material_indices;
         BufferView<const Material<C> *> materials;
         struct RayHit {
-            Point2f uv;
-            Point3f ng;
+            float2 uv;
+            Float3 ng;
             Float t = Constants<Float>::Inf();
             int prim_id = -1;
             int mat_idx = -1;
@@ -44,11 +44,11 @@ namespace akari {
             int idx0 = indices[3 * prim_id + 0];
             int idx1 = indices[3 * prim_id + 1];
             int idx2 = indices[3 * prim_id + 2];
-            auto v0 = Point3f(vertices[3 * idx0 + 0], vertices[3 * idx0 + 1], vertices[3 * idx0 + 2]);
-            auto v1 = Point3f(vertices[3 * idx1 + 0], vertices[3 * idx1 + 1], vertices[3 * idx1 + 2]);
-            auto v2 = Point3f(vertices[3 * idx2 + 0], vertices[3 * idx2 + 1], vertices[3 * idx2 + 2]);
-            Vector3f e1 = (v1 - v0);
-            Vector3f e2 = (v2 - v0);
+            auto v0 = Float3(vertices[3 * idx0 + 0], vertices[3 * idx0 + 1], vertices[3 * idx0 + 2]);
+            auto v1 = Float3(vertices[3 * idx1 + 0], vertices[3 * idx1 + 1], vertices[3 * idx1 + 2]);
+            auto v2 = Float3(vertices[3 * idx2 + 0], vertices[3 * idx2 + 1], vertices[3 * idx2 + 2]);
+            Float3 e1 = (v1 - v0);
+            Float3 e2 = (v2 - v0);
             Float a, f, u, v;
             auto h = cross(ray.d, e2);
             a = dot(e1, h);
@@ -67,7 +67,7 @@ namespace akari {
             if (t > ray.tmin && t < ray.tmax) {
                 if (hit) {
                     if (t < hit->t) {
-                        hit->uv = Point2f(u, v);
+                        hit->uv = float2(u, v);
                         hit->prim_id = prim_id;
                         hit->mat_idx = material_indices[prim_id];
                         hit->t = t;
@@ -89,11 +89,11 @@ namespace akari {
         for (int i = 0; i < 3; i++) {
             int idx = mesh.indices[3 * prim_id + i];
             trig.vertices[i] =
-                Point3f(mesh.vertices[3 * idx + 0], mesh.vertices[3 * idx + 1], mesh.vertices[3 * idx + 2]);
+                Float3(mesh.vertices[3 * idx + 0], mesh.vertices[3 * idx + 1], mesh.vertices[3 * idx + 2]);
             int vidx = 3 * prim_id + i;
             trig.normals[i] =
-                Normal3f(mesh.normals[3 * vidx + 0], mesh.normals[3 * vidx + 1], mesh.normals[3 * vidx + 2]);
-            trig.texcoords[i] = Point2f(mesh.texcoords[2 * vidx + 0], mesh.texcoords[2 * vidx + 1]);
+                Float3(mesh.normals[3 * vidx + 0], mesh.normals[3 * vidx + 1], mesh.normals[3 * vidx + 2]);
+            trig.texcoords[i] = float2(mesh.texcoords[2 * vidx + 0], mesh.texcoords[2 * vidx + 1]);
         }
         return trig;
     }

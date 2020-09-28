@@ -39,31 +39,31 @@ namespace akari {
     AKR_VARIANT struct Tile {
         AKR_IMPORT_TYPES()
         Bounds2i bounds{};
-        Point2i _size;
+        int2 _size;
         astd::pmr::vector<Pixel<C>> pixels;
 
         explicit Tile(const Bounds2i &bounds, MemoryResource *resource = default_resource())
             : bounds(bounds), _size(bounds.size()), pixels(_size.x * _size.y, TAllocator<Pixel<C>>(resource)) {}
 
-        AKR_XPU auto &operator()(const Point2f &p) {
-            auto q = Point2i(floor(p - Point2f(bounds.pmin)));
+        AKR_XPU auto &operator()(const float2 &p) {
+            auto q = int2(floor(p - float2(bounds.pmin)));
             return pixels[q.x + q.y * _size.x];
         }
 
-        AKR_XPU auto &operator()(const Point2i &p) {
-            auto q = Point2i(p - bounds.pmin);
+        AKR_XPU auto &operator()(const int2 &p) {
+            auto q = int2(p - bounds.pmin);
             return pixels[q.x + q.y * _size.x];
         }
-        AKR_XPU const auto &operator()(const Point2i &p) const {
-            auto q = Point2i(p - bounds.pmin);
+        AKR_XPU const auto &operator()(const int2 &p) const {
+            auto q = int2(p - bounds.pmin);
             return pixels[q.x + q.y * _size.x];
         }
-        AKR_XPU const auto &operator()(const Point2f &p) const {
-            auto q = Point2i(floor(p - Point2f(bounds.pmin)));
+        AKR_XPU const auto &operator()(const float2 &p) const {
+            auto q = int2(floor(p - float2(bounds.pmin)));
             return pixels[q.x + q.y * _size.x];
         }
 
-        AKR_XPU void add_sample(const Point2f &p, const Spectrum &radiance, Float weight) {
+        AKR_XPU void add_sample(const float2 &p, const Spectrum &radiance, Float weight) {
             auto &pix = (*this)(p);
             pix.weight += weight;
             pix.radiance += radiance;
@@ -76,18 +76,18 @@ namespace akari {
 
       public:
         Float splatScale = 1.0f;
-        explicit Film(const Point2i &dimension) : radiance(dimension), weight(dimension) {}
+        explicit Film(const int2 &dimension) : radiance(dimension), weight(dimension) {}
         Tile<C> tile(const Bounds2i &bounds) { return Tile<C>(bounds); }
         Box<Tile<C>> boxed_tile(const Bounds2i &bounds) { return Box<Tile<C>>::make(default_resource(), bounds); }
-        [[nodiscard]] AKR_XPU Point2i resolution() const { return radiance.resolution(); }
+        [[nodiscard]] AKR_XPU int2 resolution() const { return radiance.resolution(); }
 
-        [[nodiscard]] AKR_XPU Bounds2i bounds() const { return Bounds2i{Point2i(0), resolution()}; }
+        [[nodiscard]] AKR_XPU Bounds2i bounds() const { return Bounds2i{int2(0), resolution()}; }
         AKR_XPU void merge_tile(const Tile<C> &tile) {
-            const auto lo = max(tile.bounds.pmin, Point2i(0, 0));
+            const auto lo = max(tile.bounds.pmin, int2(0, 0));
             const auto hi = min(tile.bounds.pmax, radiance.resolution());
             for (int y = lo.y; y < hi.y; y++) {
                 for (int x = lo.x; x < hi.x; x++) {
-                    auto &pix = tile(Point2i(x, y));
+                    auto &pix = tile(int2(x, y));
                     radiance(x, y) += pix.radiance;
                     weight(x, y) += pix.weight;
                 }

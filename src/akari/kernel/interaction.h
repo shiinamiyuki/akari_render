@@ -29,15 +29,15 @@ namespace akari {
     AKR_VARIANT struct SurfaceInteraction {
         AKR_IMPORT_TYPES()
         Triangle<C> triangle;
-        Point3f p;
+        Float3 p;
         BSDF<C> bsdf;
-        Normal3f ng, ns;
-        Point2f texcoords;
+        Float3 ng, ns;
+        float2 texcoords;
 
         AKR_XPU SurfaceInteraction(const Intersection<C> &isct, const Triangle<C> &triangle)
             : triangle(triangle), p(isct.p), ng(isct.ng), ns(triangle.ns(isct.uv)),
               texcoords(triangle.texcoord(isct.uv)) {}
-        AKR_XPU SurfaceInteraction(const Point2f &uv, const Triangle<C> &triangle)
+        AKR_XPU SurfaceInteraction(const float2 &uv, const Triangle<C> &triangle)
             : triangle(triangle), p(triangle.p(uv)), ng(triangle.ng()), ns(triangle.ns(uv)),
               texcoords(triangle.texcoord(uv)) {}
     };
