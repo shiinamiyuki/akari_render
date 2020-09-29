@@ -113,7 +113,7 @@ namespace akari {
             DoLogMessage(LogLevel::Verbose, msg, stderr);
         }
 
-        void log_verbose(bool on) { do_log_verbose = on; }
+        void log_verbose(bool on) override { do_log_verbose = on; }
     }; // namespace akari
 
     Logger *GetDefaultLogger() {

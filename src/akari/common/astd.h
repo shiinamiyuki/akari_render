@@ -31,14 +31,15 @@
 // port some nessary stl class to CUDA
 // mostly from pbrt-v4
 namespace akari::astd {
+    enum class byte : unsigned char {};
     template <class _Ty>
     AKR_XPU constexpr _Ty &&forward(std::remove_reference_t<_Ty> &&_Arg) noexcept { // forward an rvalue as an rvalue
         static_assert(!std::is_lvalue_reference_v<_Ty>, "bad forward call");
         return static_cast<_Ty &&>(_Arg);
     }
-
+    inline constexpr size_t max_size_t_(size_t a, size_t b) { return a < b ? b : a; }
     template <typename T1, typename T2>
-    struct alignas(std::max(alignof(T1), alignof(T2))) pair {
+    struct alignas(max_size_t_(alignof(T1), alignof(T2))) pair {
         T1 first;
         T2 second;
     };
@@ -211,7 +212,7 @@ namespace akari::astd {
         AKR_EXPORT memory_resource *set_default_resource(memory_resource *r) noexcept;
         AKR_EXPORT memory_resource *get_default_resource() noexcept;
 
-        template <class Tp = std::byte>
+        template <class Tp = astd::byte>
         class polymorphic_allocator {
           public:
             using value_type = Tp;
@@ -229,8 +230,8 @@ namespace akari::astd {
             [[nodiscard]] Tp *allocate(size_t n) {
                 return static_cast<Tp *>(resource()->allocate(n * sizeof(Tp), alignof(Tp)));
             }
-            template<class T>
-            bool operator ==(const polymorphic_allocator<T> & rhs)const{
+            template <class T>
+            bool operator==(const polymorphic_allocator<T> &rhs) const {
                 return resource() == rhs.resource();
             }
             void deallocate(Tp *p, size_t n) { resource()->deallocate(p, n); }

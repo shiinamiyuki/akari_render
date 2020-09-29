@@ -85,7 +85,7 @@ namespace akari {
         void copy_device_to_host(void *host_ptr, const void *device_ptr, size_t bytes) override {
             std::memcpy(host_ptr, device_ptr, bytes);
         }
-        void prefetch_managed(void *p, size_t bytes) {}
+        void prefetch_managed(void *p, size_t bytes) override {}
     };
 
 #ifdef AKR_ENABLE_GPU

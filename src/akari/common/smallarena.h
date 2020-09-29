@@ -29,7 +29,7 @@
 namespace akari {
     // A very fast memory arena for device
     class SmallArena {
-        std::byte *buffer = nullptr;
+        astd::byte *buffer = nullptr;
         size_t size;
         size_t allocated = 0;
         template <size_t alignment>
@@ -45,7 +45,7 @@ namespace akari {
             rhs.size = 0u;
             rhs.allocated = 0;
         }
-        AKR_XPU SmallArena(std::byte *buffer, size_t size) : buffer(buffer), size(size), allocated(0) {}
+        AKR_XPU SmallArena(astd::byte *buffer, size_t size) : buffer(buffer), size(size), allocated(0) {}
         template <typename T, typename... Args>
         AKR_XPU T *alloc(Args &&... args) {
             size_t bytes_needed = align<alignof(T)>(sizeof(T) + alignof(T));

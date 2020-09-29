@@ -86,7 +86,7 @@ namespace akari {
             resource->deallocate(p, bytes, alignment);
             allocated.erase(p);
         }
-        bool do_is_equal(const astd::pmr::memory_resource &other) const noexcept { return &other == this; }
+        bool do_is_equal(const astd::pmr::memory_resource &other) const noexcept override{ return &other == this; }
         void prefetch() {
             if constexpr (std::is_base_of_v<ManagedMemoryResource, Resource>) {
                 for (auto p : allocated) {

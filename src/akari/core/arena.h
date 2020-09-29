@@ -38,7 +38,7 @@ namespace akari {
 
         struct Block {
             size_t size;
-            std::byte *data;
+            astd::byte *data;
 
             Block(size_t size, Allocator &allocator) : size(size) {
                 data = allocator.allocate(size);
@@ -56,9 +56,9 @@ namespace akari {
       public:
         static constexpr size_t DEFAULT_BLOCK_SIZE = 262144ull;
         MemoryArena(Allocator allocator) : allocator(allocator), currentBlock(DEFAULT_BLOCK_SIZE, allocator) {}
-        std::byte *alloc_bytes(size_t bytes) {
+        astd::byte *alloc_bytes(size_t bytes) {
             typename std::list<Block>::iterator iter;
-            std::byte *p = nullptr;
+            astd::byte *p = nullptr;
             if (currentBlockPos + bytes > currentBlock.size) {
                 usedBlocks.emplace_front(currentBlock);
                 currentBlockPos = 0;
@@ -85,7 +85,7 @@ namespace akari {
             auto p = alloc_bytes(allocSize);
             auto q = (void *)p;
             AKR_ASSERT(astd::align(alignof(T), sizeof(T), q, allocSize));
-            p = (std::byte *)q;
+            p = (astd::byte *)q;
             for (size_t i = 0; i < count; i++) {
                 new (p + i * sizeof(T)) T(std::forward<Args>(args)...);
             }
