@@ -25,6 +25,20 @@ matrix:
       addons:
         apt:
           sources: ['ubuntu-toolchain-r-test']
-          packages: ['ninja-build']
-      env: CC=clang CXX=clang++
+          packages: ['clang-7','ninja-build','libc++-7-dev', 'libc++abi-7-dev']
+      env: CC=clang-7 CXX=clang++-7
+    - os: linux
+      compiler: clang
+      addons:
+        apt:
+          sources: ['ubuntu-toolchain-r-test']
+          packages: ['clang-8','ninja-build','libc++-8-dev', 'libc++abi-8-dev']
+      env: CC=clang-8 CXX=clang++-8
+    - os: linux
+      compiler: clang
+      addons:
+        apt:
+          sources: ['ubuntu-toolchain-r-test']
+          packages: ['clang-9', ninja-build','libc++-9-dev', 'libc++abi-9-dev']
+      env: CC=clang-9 CXX=clang++-9
 script: bash ./scripts/build-linux-cpu.sh
