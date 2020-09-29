@@ -1,5 +1,7 @@
 sudo: required
-dist: focal
+dist:
+  - bionic
+  - focal
 language: cpp
 compiler:
   - gcc

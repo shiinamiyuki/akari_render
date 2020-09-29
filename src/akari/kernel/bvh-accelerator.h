@@ -39,7 +39,7 @@ namespace akari {
             uint32_t count = (uint32_t)-1;
             int axis = -1;
 
-            [[nodiscard]] AKR_XPU bool is_leaf() const { return count != -1; }
+            [[nodiscard]] AKR_XPU bool is_leaf() const { return count != (uint32_t)-1; }
             AKR_XPU int sibling(const BVHNode *nodes, int idx_this) const {
                 if (idx_this == nodes[parent].left) {
                     return nodes[parent].right;
