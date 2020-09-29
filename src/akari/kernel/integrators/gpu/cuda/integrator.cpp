@@ -235,9 +235,9 @@ namespace akari::gpu {
                         "Ray Generation", launch_size, AKR_GPU_LAMBDA(int tid) {
                             auto px = get_pixel(tid);
                             int x = px.x, y = px.y;
-                            PathState<C> path_state = path_states[tid];
-                            if (path_state.state != PathKernelState::RayGen)
+                            if (path_states.state[tid] != PathKernelState::RayGen)
                                 return;
+                            PathState<C> path_state = path_states[tid];
                             path_state.state = PathKernelState::ExtensionRay;
                             path_state.L = Spectrum(0);
                             path_state.beta = Spectrum(1.0f);
@@ -259,9 +259,9 @@ namespace akari::gpu {
                     }
                     launch(
                         "Extension Ray", launch_size, AKR_GPU_LAMBDA(int tid) {
-                            PathState<C> path_state = path_states[tid];
-                            if (path_state.state != PathKernelState::ExtensionRay)
+                            if (path_states.state[tid] != PathKernelState::ExtensionRay)
                                 return;
+                            PathState<C> path_state = path_states[tid];
                             RayWorkItem<C> ray_item = (*ray_queue[0])[tid];
                             path_state.state = PathKernelState::HitNothing;
                             Intersection<C> intersection;
@@ -304,10 +304,10 @@ namespace akari::gpu {
                         });
                     launch(
                         "Hit Nothing", launch_size, AKR_GPU_LAMBDA(int tid) {
-                            PathState<C> path_state = path_states[tid];
-                            if (path_state.state != PathKernelState::HitNothing) {
+                            if (path_states.state[tid] != PathKernelState::HitNothing) {
                                 return;
                             }
+                            PathState<C> path_state = path_states[tid];
                             path_state.state = PathKernelState::Splat;
                             path_states[tid] = path_state;
                         });
@@ -363,15 +363,13 @@ namespace akari::gpu {
                         "Shadow Ray", launch_size, AKR_GPU_LAMBDA(int tid) {
                             if (tid >= launch_size)
                                 return;
-                            PathState<C> path_state = path_states[tid];
-                            if (path_state.state != PathKernelState::ShadowRay)
+
+                            if (path_states.state[tid] != PathKernelState::ShadowRay)
                                 return;
+                            PathState<C> path_state = path_states[tid];
                             ShadowRayWorkItem<C> shadow_ray_item = (*shadow_ray_queue)[tid];
                             DirectLighting<C> direct = shadow_ray_item.direct_lighting();
                             int pixel = shadow_ray_item.pixel;
-                            if (pixel != tid) {
-                                printf("%d %d\n", pixel, tid);
-                            }
                             AKR_ASSERT(pixel == tid);
                             if (!scene.occlude(direct.shadow_ray)) {
                                 path_state.L += direct.color;

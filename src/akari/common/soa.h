@@ -29,13 +29,10 @@ namespace akari {
     template <typename T>
     struct SOA {
         SOA() = default;
+
         template <typename Allocator>
         SOA(int n, Allocator &&allocator) : _size(n) {
-            if constexpr (std::is_fundamental_v<T>) {
-                array = (T *)allocator.allocate_bytes(sizeof(T) * n, 1024u);
-            } else {
-                array = allocator.template allocate_object<T>(n);
-            }
+            array = allocator.template allocate_object<T>(n);
         }
         AKR_XPU T &operator[](int i) { return array[i]; }
         AKR_XPU const T &operator[](int i) const { return array[i]; }
@@ -55,38 +52,10 @@ namespace akari {
         SOAArrayXT() = default;
         template <typename Allocator>
         SOAArrayXT(int n, Allocator &&allocator) : _size(n) {
-            array = allocator.template allocate_object<T>(n * stride);
+            array = (T *)allocator.template allocate_object<A>(n);
         }
-        struct IndexHelper {
-            Self &self;
-            int idx;
-            AKR_XPU operator value_type() {
-                value_type ret;
-                for (int i = 0; i < N; i++) {
-                    ret[i] = self.array[idx * stride + i];
-                }
-                return ret;
-            }
-            AKR_XPU const value_type &operator=(const value_type &rhs) {
-                for (int i = 0; i < N; i++) {
-                    self.array[idx * stride + i] = rhs[i];
-                }
-                return rhs;
-            }
-        };
-        struct ConstIndexHelper {
-            const Self &self;
-            int idx;
-            AKR_XPU operator value_type() {
-                value_type ret;
-                for (int i = 0; i < N; i++) {
-                    ret[i] = self.array[idx * stride + i];
-                }
-                return ret;
-            }
-        };
-        AKR_XPU IndexHelper operator[](int idx) { return IndexHelper{*this, idx}; };
-        AKR_XPU ConstIndexHelper operator[](int idx) const { return ConstIndexHelper{*this, idx}; };
+        AKR_XPU A &operator[](int idx) { return *reinterpret_cast<A *>(&array[idx * stride]); };
+        AKR_XPU const A &operator[](int idx) const { return *reinterpret_cast<const A *>(&array[idx * stride]); };
         int _size = 0;
         T *__restrict__ array = nullptr;
     };
