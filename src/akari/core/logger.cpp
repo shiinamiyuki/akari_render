@@ -30,7 +30,9 @@ namespace akari {
     class DefaultLogger : public Logger {
         bool do_log_verbose = false;
         decltype(std::chrono::system_clock::now()) start = std::chrono::system_clock::now();
+        std::mutex m;
         void DoLogMessage(LogLevel level, const std::string &msg, FILE *fp = stdout) {
+            std::lock_guard<std::mutex> _(m);
             std::chrono::duration<double> elapsed = std::chrono::system_clock::now() - start;
 
             if (level == LogLevel::Fatal || level == LogLevel::Error) {
