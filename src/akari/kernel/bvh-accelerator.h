@@ -284,7 +284,106 @@ namespace akari {
             }
             return hit;
         }
+        AKR_XPU bool intersect_confused(const Ray3f &ray, Hit &isct) const {
+            if (nodes[0].is_leaf()) {
+                return intersect_leaf(nodes[0], ray, isct);
+            }
+            auto invd = Float3(1) / ray.d;
+            bool hit = false;
+            int current = nodes[0].near_child(ray);
+            int last = 0;
+
+            while (true) {
+                if (current == 0)
+                    return hit;
+                int near = nodes[current].near_child(ray);
+                int far = nodes[current].far_child(ray);
+                if (last == far) {
+                    last = current;
+                    current = nodes[current].parent;
+                    continue;
+                }
+                int try_child = (last == nodes[current].parent) ? near : far;
+                Float t = intersectAABB(nodes[current].box, ray, invd);
+                if (t > 0 && t < isct.t) {
+                    if (nodes[current].is_leaf()) {
+                        hit = hit | intersect_leaf(nodes[current], ray, isct);
+                    }
+                    last = current;
+                    current = try_child;
+                } else {
+                    if (try_child == near) {
+                        last = near;
+                    } else {
+                        last = current;
+                        current = nodes[current].parent;
+                    }
+                }
+            }
+        }
         AKR_XPU bool intersect(const Ray3f &ray, Hit &isct) const {
+            return intersect_stackfull(ray, isct);
+        }
+        AKR_XPU bool intersect_stackless(const Ray3f &ray, Hit &isct) const {
+            if (nodes[0].is_leaf()) {
+                return intersect_leaf(nodes[0], ray, isct);
+            }
+            enum State { FromParent, FromChild, FromSibling };
+            auto invd = Float3(1) / ray.d;
+            bool hit = false;
+            State state = FromParent;
+            int current = nodes[0].near_child(ray);
+            while (true) {
+                bool test_leaf = false;
+                int leaf = current;
+                switch (state) {
+                case FromChild:
+                    if (current == 0)
+                        return hit;
+                    if (current == nodes[nodes[current].parent].near_child(ray)) {
+                        current = nodes[current].sibling(nodes.data(), current);
+                        state = FromSibling;
+                    } else {
+                        current = nodes[current].parent;
+                        state = FromChild;
+                    }
+                    break;
+
+                case FromSibling: {
+                    Float t = intersectAABB(nodes[current].box, ray, invd);
+                    if (t < 0 || t > isct.t) {
+                        current = nodes[current].parent;
+                        state = FromChild;
+                    } else if (nodes[current].is_leaf()) {
+                        test_leaf = true;
+                        current = nodes[current].parent;
+                        state = FromChild;
+                    } else {
+                        current = nodes[current].near_child(ray);
+                        state = FromParent;
+                    }
+                } break;
+                case FromParent: {
+                    Float t = intersectAABB(nodes[current].box, ray, invd);
+                    if (t < 0 || t > isct.t) {
+                        current = nodes[current].sibling(nodes.data(), current);
+                        state = FromSibling;
+                    } else if (nodes[current].is_leaf()) {
+                        test_leaf = true;
+                        current = nodes[current].sibling(nodes.data(), current);
+                        state = FromSibling;
+                    } else {
+                        current = nodes[current].near_child(ray);
+                        state = FromParent;
+                    }
+                } break;
+                }
+                if (test_leaf) {
+                    hit = hit | intersect_leaf(nodes[leaf], ray, isct);
+                }
+            }
+        }
+        AKR_XPU bool intersect_stackless_slow(const Ray3f &ray, Hit &isct) const {
             if (nodes[0].is_leaf()) {
                 return intersect_leaf(nodes[0], ray, isct);
             }
