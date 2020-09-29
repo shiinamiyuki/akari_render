@@ -67,8 +67,7 @@ namespace akari::gpu {
             for (int tile_y = 0; tile_y < n_tiles.y; tile_y++) {
                 for (int tile_x = 0; tile_x < n_tiles.x; tile_x++) {
                     int2 tile_pos(tile_x, tile_y);
-                    Bounds2i tileBounds =
-                        Bounds2i{tile_pos * (int)tile_size, (tile_pos + int2(1)) * (int)tile_size};
+                    Bounds2i tileBounds = Bounds2i{tile_pos * (int)tile_size, (tile_pos + int2(1)) * (int)tile_size};
                     auto boxed_tile = film->boxed_tile(tileBounds);
                     auto &camera = scene.camera;
                     auto sampler = scene.sampler;
@@ -196,7 +195,7 @@ namespace akari::gpu {
                         rad = min(rad, Spectrum(ray_clamp));
                         acc += rad;
                     }
-                    
+
                     tile->add_sample(float2(x, y), acc / spp, 1.0f);
                 });
             cuLaunchHostFunc((cudaStream_t) nullptr, [](void *reporter) { ((ProgressReporter *)reporter)->update(); },
@@ -225,60 +224,68 @@ namespace akari::gpu {
                     PathState<C> path_state = path_states[tid];
                     path_state.sampler = sampler;
                     path_state.L = Spectrum(0);
+                    path_state.depth = 0;
+                    path_state.iterations = 0;
+                    path_state.state = PathKernelState::RayGen;
                     path_states[tid] = path_state;
                 });
             for (int s = 0; s < _spp; s++) {
-                launch(
-                    "Generate Camera Ray", launch_size, AKR_GPU_LAMBDA(int tid) {
-                        if (tid >= launch_size)
-                            return;
-                        auto px = get_pixel(tid);
-                        int x = px.x, y = px.y;
-                        PathState<C> path_state = path_states[tid];
-                        path_state.L = Spectrum(0);
-                        path_state.beta = Spectrum(1.0f);
-                        auto pt = path_state.path_tracer();
-                        CameraSample<C> sample = pt.camera_ray(camera, px);
-                        RayWorkItem<C> ray_item = (*ray_queue[0])[tid];
-                        ray_item.pixel = tid;
-                        ray_item.ray = sample.ray;
-                        (*ray_queue[0])[tid] = ray_item;
-                        path_state.update(pt);
-                        path_states[tid] = path_state;
-                    });
-                // first bounce ray queue is full
-                launch_single(
-                    "Set Ray Queue", AKR_GPU_LAMBDA() { ray_queue[0]->head = launch_size; });
                 for (int depth = 0; depth <= max_depth; depth++) {
+                    launch(
+                        "Ray Generation", launch_size, AKR_GPU_LAMBDA(int tid) {
+                            auto px = get_pixel(tid);
+                            int x = px.x, y = px.y;
+                            PathState<C> path_state = path_states[tid];
+                            if (path_state.state != PathKernelState::RayGen)
+                                return;
+                            path_state.state = PathKernelState::ExtensionRay;
+                            path_state.L = Spectrum(0);
+                            path_state.beta = Spectrum(1.0f);
+                            path_state.sampler.start_next_sample();
+                            path_state.depth = 0;
+                            auto pt = path_state.path_tracer();
+                            CameraSample<C> sample = pt.camera_ray(camera, px);
+                            RayWorkItem<C> ray_item = (*ray_queue[0])[tid];
+                            ray_item.pixel = tid;
+                            ray_item.ray = sample.ray;
+                            (*ray_queue[0])[tid] = ray_item;
+                            path_state.update(pt);
+                            path_states[tid] = path_state;
+                        });
+
                     for (size_t i = 0; i < material_queues.size(); i++) {
                         launch_single(
                             "Reset Material Queue", AKR_GPU_LAMBDA() { material_queues[i]->clear(); });
                     }
                     launch(
-                        "Intersect Closest", launch_size, AKR_GPU_LAMBDA(int tid) {
-                            if (tid >= ray_queue[0]->elements_in_queue())
+                        "Extension Ray", launch_size, AKR_GPU_LAMBDA(int tid) {
+                            PathState<C> path_state = path_states[tid];
+                            if (path_state.state != PathKernelState::ExtensionRay)
                                 return;
                             RayWorkItem<C> ray_item = (*ray_queue[0])[tid];
-                            if (!ray_item.valid()) {
-                                return;
-                            }
-
+                            path_state.state = PathKernelState::HitNothing;
                             Intersection<C> intersection;
                             if (scene.intersect(ray_item.ray, &intersection)) {
                                 auto mat_idx =
                                     scene.meshes[intersection.geom_id].material_indices[intersection.prim_id];
-                                if (mat_idx < 0)
+                                if (mat_idx < 0) {
+                                    path_states[tid] = path_state;
                                     return;
-
+                                }
                                 auto *material = scene.meshes[intersection.geom_id].materials[mat_idx];
-                                if (!material)
+                                if (!material) {
+                                    path_states[tid] = path_state;
                                     return;
+                                }
                                 int pixel = ray_item.pixel;
-                                PathState<C> path_state = path_states[pixel];
-                                Float _u = path_state.sampler.next1d();
+                                AKR_ASSERT(pixel == tid);
+
+                                float _u = path_state.sampler.next1d();
                                 auto [mat, pdf] = material->select_material(_u, intersection.uv);
-                                if (!mat)
+                                if (!mat) {
+                                    path_states[tid] = path_state;
                                     return;
+                                }
                                 MaterialWorkItem<C> material_item;
                                 material_item.pdf = pdf;
                                 material_item.pixel = pixel;
@@ -287,18 +294,22 @@ namespace akari::gpu {
                                 material_item.prim_id = intersection.prim_id;
                                 material_item.uv = intersection.uv;
                                 material_item.wo = -ray_item.ray.d;
-                                path_states[pixel] = path_state;
                                 auto queue_idx = mat->typeindex();
                                 AKR_ASSERT(queue_idx != Material<C>::template indexof<MixMaterial<C>>());
                                 AKR_ASSERT(queue_idx >= 0 && queue_idx < material_queues.size());
+                                path_state.state = PathKernelState::EvalMaterial;
                                 material_queues[queue_idx]->append(material_item);
                             }
+                            path_states[tid] = path_state;
                         });
-
-                    launch_single(
-                        "Reset Ray Queue", AKR_GPU_LAMBDA() {
-                            ray_queue[0]->clear();
-                            shadow_ray_queue->clear();
+                    launch(
+                        "Hit Nothing", launch_size, AKR_GPU_LAMBDA(int tid) {
+                            PathState<C> path_state = path_states[tid];
+                            if (path_state.state != PathKernelState::HitNothing) {
+                                return;
+                            }
+                            path_state.state = PathKernelState::Splat;
+                            path_states[tid] = path_state;
                         });
                     for (auto material_queue : material_queues) {
                         launch(
@@ -308,9 +319,12 @@ namespace akari::gpu {
                                 MaterialWorkItem<C> material_item = (*material_queue)[tid];
                                 int pixel = material_item.pixel;
                                 PathState<C> path_state = path_states[pixel];
+                                AKR_ASSERT(path_state.state == PathKernelState::EvalMaterial);
+                                path_state.state = PathKernelState::EvalMaterial;
                                 auto pt = path_state.path_tracer();
-                                pt.depth = depth;
+                                pt.depth = path_state.depth;
                                 pt.max_depth = max_depth;
+                                path_state.depth++;
                                 auto surface_hit = material_item.surface_hit();
                                 auto trig = scene.get_triangle(material_item.geom_id, material_item.prim_id);
                                 SurfaceInteraction<C> si(surface_hit.uv, trig);
@@ -322,46 +336,67 @@ namespace akari::gpu {
                                     // Direct Light Sampling
                                     astd::optional<DirectLighting<C>> has_direct =
                                         pt.compute_direct_lighting(si, surface_hit, pt.select_light(scene));
+                                    path_state.state = PathKernelState::ExtensionRay;
                                     if (has_direct) {
                                         auto direct = has_direct.value();
                                         if (!direct.color.is_black()) {
                                             ShadowRayWorkItem<C> shadow_ray_item(direct);
                                             shadow_ray_item.pixel = pixel;
-                                            shadow_ray_queue->append(shadow_ray_item);
+                                            (*shadow_ray_queue)[pixel] = (shadow_ray_item);
+                                            path_state.state = PathKernelState::ShadowRay;
                                         }
                                     }
                                     pt.beta *= event.beta;
                                     RayWorkItem<C> ray_item;
                                     ray_item.pixel = pixel;
                                     ray_item.ray = event.ray;
-                                    ray_queue[0]->append(ray_item);
+                                    (*ray_queue[0])[pixel] = ray_item;
+
+                                } else {
+                                    path_state.state = PathKernelState::Splat;
                                 }
                                 path_state.update(pt);
                                 path_states[pixel] = path_state;
                             });
                     }
                     launch(
-                        "Test Shadow Ray", launch_size, AKR_GPU_LAMBDA(int tid) {
-                            if (tid >= shadow_ray_queue->elements_in_queue())
+                        "Shadow Ray", launch_size, AKR_GPU_LAMBDA(int tid) {
+                            if (tid >= launch_size)
+                                return;
+                            PathState<C> path_state = path_states[tid];
+                            if (path_state.state != PathKernelState::ShadowRay)
                                 return;
                             ShadowRayWorkItem<C> shadow_ray_item = (*shadow_ray_queue)[tid];
                             DirectLighting<C> direct = shadow_ray_item.direct_lighting();
                             int pixel = shadow_ray_item.pixel;
-                            if (!scene.occlude(direct.shadow_ray)) {
-                                PathState<C> path_state = path_states[pixel];
-                                path_state.L += direct.color;
-                                path_states[pixel] = path_state;
+                            if (pixel != tid) {
+                                printf("%d %d\n", pixel, tid);
                             }
+                            AKR_ASSERT(pixel == tid);
+                            if (!scene.occlude(direct.shadow_ray)) {
+                                path_state.L += direct.color;
+                            }
+                            path_state.state = PathKernelState::ExtensionRay;
+                            path_states[tid] = path_state;
+                        });
+                    launch(
+                        "Splat", launch_size, AKR_GPU_LAMBDA(int tid) {
+                            PathState<C> path_state = path_states[tid];
+                            if (path_state.state != PathKernelState::Splat) {
+                                return;
+                            }
+                            path_state.iterations++;
+                            if (path_state.iterations == _spp) {
+                                path_state.state = PathKernelState::Completed;
+                            } else
+                                path_state.state = PathKernelState::RayGen;
+                            auto p = get_pixel(tid);
+                            auto rad = path_state.L.clamp_zero();
+                            rad = min(rad, Spectrum(ray_clamp));
+                            tile->add_sample(float2(p), rad, 1.0f);
+                            path_states[tid] = path_state;
                         });
                 }
-                launch(
-                    "Update Film", launch_size, AKR_GPU_LAMBDA(int tid) {
-                        PathState<C> state = path_states[tid];
-                        auto p = get_pixel(tid);
-                        auto rad = state.L.clamp_zero();
-                        rad = min(rad, Spectrum(ray_clamp));
-                        tile->add_sample(float2(p), rad, 1.0f);
-                    });
             }
             cuLaunchHostFunc((cudaStream_t) nullptr, [](void *reporter) { ((ProgressReporter *)reporter)->update(); },
                              reporter.get());

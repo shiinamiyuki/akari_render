@@ -13,12 +13,16 @@
         "Ray<C>",
         "Spectrum",
         "Intersection<C>",
-        "const Material<C> *"
+        "const Material<C> *",
+        "PathKernelState"
     ],
     "soa": {
         "PathState<C>": {
             "template": "C",
             "fields": {
+                "state": "PathKernelState",
+                "iterations":"int",
+                "depth":"int",
                 "sampler": "Sampler<C>",
                 "L": "Spectrum",
                 "beta": "Spectrum"
@@ -29,7 +33,7 @@
             "template": "C",
             "fields": {
                 "pixel": "int",
-                "pdf":"Float",
+                "pdf": "Float",
                 "material": "const Material<C> *",
                 "geom_id": "int",
                 "prim_id": "int",

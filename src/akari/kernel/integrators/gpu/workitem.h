@@ -24,8 +24,21 @@
 #include <akari/kernel/pathtracer.h>
 
 namespace akari {
+    enum class PathKernelState {
+        Completed,
+        RayGen,
+        ExtensionRay,
+        EvalMaterial,
+        ShadowRay,
+        HitNothing,
+        Splat
+    };
     AKR_VARIANT struct PathState {
         AKR_IMPORT_TYPES()
+        
+        PathKernelState state;
+        int iterations;
+        int depth;
         Sampler<C> sampler;
         Spectrum L;
         Spectrum beta;
