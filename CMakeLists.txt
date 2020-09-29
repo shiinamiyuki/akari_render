@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.12)
 project(AkariRender)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -128,6 +128,7 @@ target_include_directories(akari_core_base PUBLIC ${Python_INCLUDE_DIRS} ${EMBRE
 if(AKR_ENABLE_PYTHON)
     target_include_directories(akari_core_base ${Python_INCLUDE_DIRS})
 endif()
+if(${CMAKE_VERSION} VERSION_GREATER_EQUAL  "3.16")
 if(NOT WIN32)
     target_precompile_headers(akari_core_base
         PUBLIC ${PYBIND11_HEADERS}
@@ -139,7 +140,9 @@ if(NOT WIN32)
         <thread>
         <atomic>)
 endif()
-set_target_properties(akari_core_base PROPERTIES UNITY_BUILD ON)
+
+    set_target_properties(akari_core_base PROPERTIES UNITY_BUILD ON)
+endif()
 set_target_CUDA_props(akari_core_base)
 
 
@@ -151,7 +154,9 @@ add_soa_header(${AKR_KERNEL_WORKITEM_SOA_H} src/akari/kernel/integrators/gpu/wor
 
 add_library(akari_core SHARED ${AKR_COMMON_SRC} ${AKR_PYBIND_SRC} ${AKR_KERNEL_SRC}  ${AKR_KERNEL_SOA_H} ${AKR_KERNEL_WORKITEM_SOA_H})
 target_link_libraries(akari_core PUBLIC akari_core_base) 
-set_target_properties(akari_core PROPERTIES UNITY_BUILD ON)
+if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.16")
+    set_target_properties(akari_core PROPERTIES UNITY_BUILD ON)
+endif()
 set_target_CUDA_props(akari_core)
 
 
