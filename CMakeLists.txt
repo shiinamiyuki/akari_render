@@ -136,7 +136,6 @@ if(NOT WIN32)
         <string>
         <unordered_map>
         <memory>
-        <memory_resource>
         <thread>
         <atomic>)
 endif()
