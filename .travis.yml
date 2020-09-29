@@ -18,9 +18,13 @@ matrix:
       addons:
         apt:
           sources: ['ubuntu-toolchain-r-test']
-          packages: ['g++9','ninja-build']
+          packages: ['g++-9','ninja-build']
       env: CC=gcc-9 CXX=g++-9
     - os: linux
       compiler: clang
+      addons:
+        apt:
+          sources: ['ubuntu-toolchain-r-test']
+          packages: ['ninja-build']
       env: CC=clang CXX=clang++
 script: bash ./scripts/build-linux-cpu.sh
