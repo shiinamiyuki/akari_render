@@ -22,7 +22,6 @@
 
 #pragma once
 #include <vector>
-#include <memory_resource>
 #include <akari/common/fwd.h>
 #include <akari/core/device.h>
 #include <akari/common/bufferview.h>
