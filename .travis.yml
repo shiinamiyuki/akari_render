@@ -1,18 +1,26 @@
 sudo: required
 dist: focal
 language: cpp
-compiler:
-  - gcc
-  # - clang
 notifications:
   email: false
-addons:
-  apt:
-    sources:
-      - sourceline: 'deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-10 main'
-        key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
-      - sourceline: 'ppa:ubuntu-toolchain-r/test'
-    packages:
-      - ninja-build
-      # - clang-10
+matrix:
+  include:
+    - os: linux
+      compiler: gcc
+      addons:
+        apt:
+          sources: ['ubuntu-toolchain-r-test']
+          packages: ['g++-8','ninja-build']
+      env: CC=gcc-8 CXX=g++-8
+
+    - os: linux
+      compiler: gcc
+      addons:
+        apt:
+          sources: ['ubuntu-toolchain-r-test']
+          packages: ['g++9','ninja-build']
+      env: CC=gcc-9 CXX=g++-9
+    - os: linux
+      compiler: clang
+      env: CC=clang CXX=clang++
 script: bash ./scripts/build-linux-cpu.sh
