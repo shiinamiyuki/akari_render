@@ -6,21 +6,6 @@ notifications:
 matrix:
   include:
     - os: linux
-      compiler: gcc
-      addons:
-        apt:
-          sources: ['ubuntu-toolchain-r-test']
-          packages: ['g++-8','ninja-build']
-      env: CC=gcc-8 CXX=g++-8
-
-    - os: linux
-      compiler: gcc
-      addons:
-        apt:
-          sources: ['ubuntu-toolchain-r-test']
-          packages: ['g++-9','ninja-build']
-      env: CC=gcc-9 CXX=g++-9
-    - os: linux
       compiler: clang
       addons:
         apt:
@@ -48,4 +33,19 @@ matrix:
           sources: ['ubuntu-toolchain-r-test']
           packages: ['clang-10', ninja-build','libc++-10-dev', 'libc++abi-10-dev']
       env: CC=clang-10 CXX=clang++-10
+    - os: linux
+      compiler: gcc
+      addons:
+        apt:
+          sources: ['ubuntu-toolchain-r-test']
+          packages: ['g++-8','ninja-build']
+      env: CC=gcc-8 CXX=g++-8
+
+    - os: linux
+      compiler: gcc
+      addons:
+        apt:
+          sources: ['ubuntu-toolchain-r-test']
+          packages: ['g++-9','ninja-build']
+      env: CC=gcc-9 CXX=g++-9
 script: bash ./scripts/build-linux-cpu.sh
