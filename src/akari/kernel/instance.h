@@ -38,7 +38,6 @@ namespace akari {
             Float3 ng;
             Float t = Constants<Float>::Inf();
             int prim_id = -1;
-            int mat_idx = -1;
         };
         AKR_XPU bool intersect(const Ray3f &ray, int prim_id, RayHit *hit) const {
             int idx0 = indices[3 * prim_id + 0];
@@ -69,7 +68,6 @@ namespace akari {
                     if (t < hit->t) {
                         hit->uv = float2(u, v);
                         hit->prim_id = prim_id;
-                        hit->mat_idx = material_indices[prim_id];
                         hit->t = t;
                         return true;
                     }

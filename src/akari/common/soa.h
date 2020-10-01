@@ -42,7 +42,7 @@ namespace akari {
         int _size = 0;
         T *__restrict__ array = nullptr;
     };
-
+#if 1
     template <typename T, int N, typename A>
     struct SOAArrayXT {
         using Self = SOAArrayXT<T, N, A>;
@@ -52,13 +52,43 @@ namespace akari {
         SOAArrayXT() = default;
         template <typename Allocator>
         SOAArrayXT(int n, Allocator &&allocator) : _size(n) {
-            array = (T *)allocator.template allocate_object<A>(n);
+            for (int i = 0; i < N; i++)
+                arrays[i] = (T *)allocator.template allocate_object<T>(n);
         }
-        AKR_XPU A &operator[](int idx) { return *reinterpret_cast<A *>(&array[idx * stride]); };
-        AKR_XPU const A &operator[](int idx) const { return *reinterpret_cast<const A *>(&array[idx * stride]); };
+        struct IndexHelper {
+            Self &self;
+            int idx;
+            AKR_XPU operator value_type() {
+                value_type ret;
+                for (int i = 0; i < N; i++) {
+                    ret[i] = self.arrays[i][idx];
+                }
+                return ret;
+            }
+            AKR_XPU const value_type &operator=(const value_type &rhs) {
+                for (int i = 0; i < N; i++) {
+                    self.arrays[i][idx] = rhs[i];
+                }
+                return rhs;
+            }
+        };
+        struct ConstIndexHelper {
+            const Self &self;
+            int idx;
+            AKR_XPU operator value_type() const {
+                value_type ret;
+                for (int i = 0; i < N; i++) {
+                    ret[i] = self.arrays[i][idx];
+                }
+                return ret;
+            }
+        };
+        AKR_XPU auto operator[](int idx) { return IndexHelper{*this, idx}; };
+        AKR_XPU auto operator[](int idx) const { return ConstIndexHelper{*this, idx}; };
         int _size = 0;
-        T *__restrict__ array = nullptr;
+        T *__restrict__ arrays[N] = {nullptr};
     };
+
     template <int N>
     struct SOA<Array<float, N>> : SOAArrayXT<float, N, Array<float, N>> {
         using SOAArrayXT<float, N, Array<float, N>>::SOAArrayXT;
@@ -71,4 +101,5 @@ namespace akari {
     struct SOA<Color<float, N>> : SOAArrayXT<float, N, Color<float, N>> {
         using SOAArrayXT<float, N, Color<float, N>>::SOAArrayXT;
     };
+#endif
 } // namespace akari

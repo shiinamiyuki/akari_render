@@ -27,26 +27,18 @@
 #include <optional>
 namespace akari {
     template <typename C, class UserData, class Hit, class Intersector, class ShapeHandleConstructor,
-              size_t StackDepth = 64>
+              size_t StackDepth = 32>
     struct TBVHAccelerator {
         AKR_IMPORT_TYPES()
         struct alignas(32) BVHNode {
             Bounds3f box{};
             int right = -1;
             int left = -1;
-            int parent = -1;
             uint32_t first = (uint32_t)-1;
-            uint32_t count = (uint32_t)-1;
-            int axis = -1;
+            uint16_t count = (uint16_t)-1;
+            uint16_t axis = (uint16_t)-1;
 
-            [[nodiscard]] AKR_XPU bool is_leaf() const { return count != (uint32_t)-1; }
-            AKR_XPU int sibling(const BVHNode *nodes, int idx_this) const {
-                if (idx_this == nodes[parent].left) {
-                    return nodes[parent].right;
-                } else {
-                    return nodes[parent].left;
-                }
-            }
+            [[nodiscard]] AKR_XPU bool is_leaf() const { return count != (uint16_t)-1; }
             AKR_XPU int far_child(const Ray3f &ray) const {
                 if (ray.d[axis] > 0) {
                     return right;
@@ -112,7 +104,6 @@ namespace akari {
         };
         int create_leaf_node(const Bounds3f &box, int begin, int end) {
             BVHNode node;
-
             node.box = box;
             node.first = begin;
             node.count = end - begin;
@@ -196,35 +187,22 @@ namespace akari {
                     return SplitInfo{axis, minCost, splitBuckets};
                 };
                 std::optional<SplitInfo> best_split;
-                int axis;
-                if (size.x > size.y) {
-                    if (size.x > size.z) {
-                        axis = 0;
-                    } else {
-                        axis = 2;
-                    }
-                } else {
-                    if (size.y > size.z) {
-                        axis = 1;
-                    } else {
-                        axis = 2;
-                    }
-                }
-                {
-
+                for (int axis = 0; axis < 3; axis++) {
                     auto candidate = try_split_with_axis(axis);
+                    if (!candidate)
+                        continue;
                     if (best_split.has_value() && candidate.has_value()) {
                         auto split = best_split.value();
                         auto candidate_split = candidate.value();
-                        // debug("candidate: axis={}, cost={}", axis, candidate_split.min_cost);
+                        // debug("size: {} candidate: axis={}, cost={}", size, axis, candidate_split.min_cost);
                         if (split.min_cost > candidate_split.min_cost) {
-                            candidate = best_split;
+                            best_split = candidate;
                         }
                     } else {
                         best_split = candidate;
                     }
                 }
-                // int axis;
+                int axis;
                 if (best_split.has_value()) {
                     axis = best_split.value().axis;
                     mid = std::partition(&primitives[begin], &primitives[end - 1] + 1, [&](Index &p) {
@@ -238,7 +216,7 @@ namespace akari {
                     // debug("left:{} right:{}", mid - &primitives[begin], &primitives[end - 1] + 1 - mid);
                 } else {
                     if (end - begin >= 16) {
-                        warning("best split cannot be found with {} objects", end - begin);
+                        warning("best split cannot be found with {} objects; size: {}", end - begin, size);
                         if (hsum(size) == 0) {
                             warning("centroid bound is zero");
                         }
@@ -253,10 +231,10 @@ namespace akari {
                     BVHNode &node = nodes.back();
                     node.axis = axis;
                     node.box = box;
-                    node.count = (uint32_t)-1;
+                    node.count = (uint16_t)-1;
                 }
 
-                if (end - begin > 128 * 1024) {
+                if (end - begin > 64 * 1024) {
                     auto left = std::async(std::launch::async, [&]() {
                         return (int)recursiveBuild(begin, int(mid - &primitives[0]), depth + 1);
                     });
@@ -269,8 +247,6 @@ namespace akari {
                     nodes[ret].left = (int)recursiveBuild(begin, int(mid - &primitives[0]), depth + 1);
                     nodes[ret].right = (int)recursiveBuild(int(mid - &primitives[0]), end, depth + 1);
                 }
-                nodes[nodes[ret].left].parent = ret;
-                nodes[nodes[ret].right].parent = ret;
                 AKR_ASSERT(nodes[ret].right >= 0 && nodes[ret].left >= 0);
                 return (int)ret;
             }
@@ -284,160 +260,7 @@ namespace akari {
             }
             return hit;
         }
-        AKR_XPU bool intersect_confused(const Ray3f &ray, Hit &isct) const {
-            if (nodes[0].is_leaf()) {
-                return intersect_leaf(nodes[0], ray, isct);
-            }
-            auto invd = Float3(1) / ray.d;
-            bool hit = false;
-            int current = nodes[0].near_child(ray);
-            int last = 0;
-
-            while (true) {
-                if (current == 0)
-                    return hit;
-                int near = nodes[current].near_child(ray);
-                int far = nodes[current].far_child(ray);
-                if (last == far) {
-                    last = current;
-                    current = nodes[current].parent;
-                    continue;
-                }
-                int try_child = (last == nodes[current].parent) ? near : far;
-                Float t = intersectAABB(nodes[current].box, ray, invd);
-                if (t > 0 && t < isct.t) {
-                    if (nodes[current].is_leaf()) {
-                        hit = hit | intersect_leaf(nodes[current], ray, isct);
-                    }
-                    last = current;
-                    current = try_child;
-                } else {
-                    if (try_child == near) {
-                        last = near;
-                    } else {
-                        last = current;
-                        current = nodes[current].parent;
-                    }
-                }
-            }
-        }
         AKR_XPU bool intersect(const Ray3f &ray, Hit &isct) const {
-            return intersect_stackfull(ray, isct);
-        }
-        AKR_XPU bool intersect_stackless(const Ray3f &ray, Hit &isct) const {
-            if (nodes[0].is_leaf()) {
-                return intersect_leaf(nodes[0], ray, isct);
-            }
-            enum State { FromParent, FromChild, FromSibling };
-            auto invd = Float3(1) / ray.d;
-            bool hit = false;
-            State state = FromParent;
-            int current = nodes[0].near_child(ray);
-            while (true) {
-                bool test_leaf = false;
-                int leaf = current;
-                switch (state) {
-                case FromChild:
-                    if (current == 0)
-                        return hit;
-                    if (current == nodes[nodes[current].parent].near_child(ray)) {
-                        current = nodes[current].sibling(nodes.data(), current);
-                        state = FromSibling;
-                    } else {
-                        current = nodes[current].parent;
-                        state = FromChild;
-                    }
-                    break;
-
-                case FromSibling: {
-                    Float t = intersectAABB(nodes[current].box, ray, invd);
-                    if (t < 0 || t > isct.t) {
-                        current = nodes[current].parent;
-                        state = FromChild;
-                    } else if (nodes[current].is_leaf()) {
-                        test_leaf = true;
-                        current = nodes[current].parent;
-                        state = FromChild;
-                    } else {
-                        current = nodes[current].near_child(ray);
-                        state = FromParent;
-                    }
-                } break;
-                case FromParent: {
-                    Float t = intersectAABB(nodes[current].box, ray, invd);
-                    if (t < 0 || t > isct.t) {
-                        current = nodes[current].sibling(nodes.data(), current);
-                        state = FromSibling;
-                    } else if (nodes[current].is_leaf()) {
-                        test_leaf = true;
-                        current = nodes[current].sibling(nodes.data(), current);
-                        state = FromSibling;
-                    } else {
-                        current = nodes[current].near_child(ray);
-                        state = FromParent;
-                    }
-                } break;
-                }
-                if (test_leaf) {
-                    hit = hit | intersect_leaf(nodes[leaf], ray, isct);
-                }
-            }
-        }
-        AKR_XPU bool intersect_stackless_slow(const Ray3f &ray, Hit &isct) const {
-            if (nodes[0].is_leaf()) {
-                return intersect_leaf(nodes[0], ray, isct);
-            }
-            enum State { FromParent, FromChild, FromSibling };
-            auto invd = Float3(1) / ray.d;
-            bool hit = false;
-            State state = FromParent;
-            int current = nodes[0].near_child(ray);
-            while (true) {
-                switch (state) {
-                case FromChild:
-                    if (current == 0)
-                        return hit;
-                    if (current == nodes[nodes[current].parent].near_child(ray)) {
-                        current = nodes[current].sibling(nodes.data(), current);
-                        state = FromSibling;
-                    } else {
-                        current = nodes[current].parent;
-                        state = FromChild;
-                    }
-                    break;
-
-                case FromSibling: {
-                    Float t = intersectAABB(nodes[current].box, ray, invd);
-                    if (t < 0 || t > isct.t) {
-                        current = nodes[current].parent;
-                        state = FromChild;
-                    } else if (nodes[current].is_leaf()) {
-                        hit = hit | intersect_leaf(nodes[current], ray, isct);
-                        current = nodes[current].parent;
-                        state = FromChild;
-                    } else {
-                        current = nodes[current].near_child(ray);
-                        state = FromParent;
-                    }
-                } break;
-                case FromParent: {
-                    Float t = intersectAABB(nodes[current].box, ray, invd);
-                    if (t < 0 || t > isct.t) {
-                        current = nodes[current].sibling(nodes.data(), current);
-                        state = FromSibling;
-                    } else if (nodes[current].is_leaf()) {
-                        hit = hit | intersect_leaf(nodes[current], ray, isct);
-                        current = nodes[current].sibling(nodes.data(), current);
-                        state = FromSibling;
-                    } else {
-                        current = nodes[current].near_child(ray);
-                        state = FromParent;
-                    }
-                } break;
-                }
-            }
-        }
-        AKR_XPU bool intersect_stackfull(const Ray3f &ray, Hit &isct) const {
             bool hit = false;
             auto invd = Float3(1) / ray.d;
             constexpr size_t maxDepth = StackDepth;
@@ -445,22 +268,23 @@ namespace akari {
             int sp = 0;
             const BVHNode *p = &nodes[0];
             while (p) {
-                auto t = intersectAABB(p->box, ray, invd);
+                BVHNode node = *p;
+                auto t = intersectAABB(node.box, ray, invd);
 
                 if (t < 0 || t > isct.t) {
                     p = sp > 0 ? stack[--sp] : nullptr;
                     continue;
                 }
-                if (p->is_leaf()) {
-                    hit = hit | intersect_leaf(*p, ray, isct);
+                if (node.is_leaf()) {
+                    hit = hit | intersect_leaf(node, ray, isct);
                     p = sp > 0 ? stack[--sp] : nullptr;
                 } else {
-                    if (ray.d[p->axis] > 0) {
-                        stack[sp++] = &nodes[p->right];
-                        p = &nodes[p->left];
+                    if (ray.d[node.axis] > 0) {
+                        stack[sp++] = &nodes[node.right];
+                        p = &nodes[node.left];
                     } else {
-                        stack[sp++] = &nodes[p->left];
-                        p = &nodes[p->right];
+                        stack[sp++] = &nodes[node.left];
+                        p = &nodes[node.right];
                     }
                 }
             }
@@ -474,22 +298,23 @@ namespace akari {
             int sp = 0;
             const BVHNode *p = &nodes[0];
             while (p) {
-                auto t = intersectAABB(p->box, ray, invd);
+                BVHNode node = *p;
+                auto t = intersectAABB(node.box, ray, invd);
 
                 if (t < 0 || t > ray.tmax) {
                     p = sp > 0 ? stack[--sp] : nullptr;
                     continue;
                 }
-                if (p->is_leaf()) {
-                    for (uint32_t i = p->first; i < p->first + p->count; i++) {
+                if (node.is_leaf()) {
+                    for (uint32_t i = node.first; i < node.first + node.count; i++) {
                         if (_intersector(ray, _ctor(user_data, primitives[i].idx), isct)) {
                             return true;
                         }
                     }
                     p = sp > 0 ? stack[--sp] : nullptr;
                 } else {
-                    stack[sp++] = &nodes[p->far_child(ray)];
-                    p = &nodes[p->near_child(ray)];
+                    stack[sp++] = &nodes[node.far_child(ray)];
+                    p = &nodes[node.near_child(ray)];
                 }
             }
             return false;

@@ -30,6 +30,7 @@
 #include <unordered_map>
 #include <cuda.h>
 #include <cuda_runtime_api.h>
+#include <nvtx3/nvToolsExt.h>
 
 namespace akari::gpu {
     std::pair<cudaEvent_t, cudaEvent_t> get_profiler_events(const char *description);
@@ -51,7 +52,7 @@ namespace akari::gpu {
         return blockSize;
     }
 
-    template <typename F>
+    template <typename KernelName = void,typename F>
     __global__ void _kernel_wrapper(F func, int nItems) {
         int tid = blockIdx.x * blockDim.x + threadIdx.x;
         if (tid >= nItems)
@@ -64,16 +65,18 @@ namespace akari::gpu {
     #define AKR_GPU_LAMBDA(...) [=] AKR_GPU(__VA_ARGS__)
 #endif
  #define AKR_CPU_LAMBDA(...) [=,*this](__VA_ARGS__) mutable
-    template <typename F>
+    template <class KernelName = void, typename F>
     void launch(const char *name, int nItems, F func) {
-        auto kernel = &_kernel_wrapper<F>;
+        auto kernel = &_kernel_wrapper<KernelName, F>;
         int blockSize = get_block_size(name, kernel);
         int gridSize = (nItems + blockSize - 1) / blockSize;
         AKR_ASSERT(blockSize >= 32);
         auto event = get_profiler_events(name);
-        cudaEventRecord(event.first);
+        nvtxRangePush(name);
+        cudaEventRecord(event.first);       
         kernel<<<gridSize, blockSize>>>(func, nItems);
         cudaEventRecord(event.second);
+        nvtxRangePop();
 
         //  CUDA_CHECK(cudaDeviceSynchronize());
     }

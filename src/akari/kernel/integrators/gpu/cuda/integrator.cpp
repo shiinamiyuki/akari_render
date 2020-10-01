@@ -144,7 +144,9 @@ namespace akari::gpu {
             fatal("only float is supported for gpu");
         }
     }
-
+    struct ExtensionRay;
+    struct EvaluateMaterial;
+    struct ShadowRay;
     AKR_VARIANT void PathTracerImpl<C>::render(const Scene<C> &scene, Film<C> *film) {
         std::shared_ptr<ProgressReporter> reporter;
         auto n_tiles = int2(film->resolution() + int2(tile_size - 1)) / int2(tile_size);
@@ -257,7 +259,8 @@ namespace akari::gpu {
                         launch_single(
                             "Reset Material Queue", AKR_GPU_LAMBDA() { material_queues[i]->clear(); });
                     }
-                    launch(
+
+                    launch<ExtensionRay>(
                         "Extension Ray", launch_size, AKR_GPU_LAMBDA(int tid) {
                             PathState<C> path_state = path_states[tid];
                             if (path_state.state != PathKernelState::ExtensionRay)
@@ -312,7 +315,7 @@ namespace akari::gpu {
                             path_states[tid] = path_state;
                         });
                     for (auto material_queue : material_queues) {
-                        launch(
+                        launch<EvaluateMaterial>(
                             "Evaluate Material", launch_size, AKR_GPU_LAMBDA(int tid) {
                                 if (tid >= material_queue->elements_in_queue())
                                     return;
@@ -359,7 +362,7 @@ namespace akari::gpu {
                                 path_states[pixel] = path_state;
                             });
                     }
-                    launch(
+                    launch<ShadowRay>(
                         "Shadow Ray", launch_size, AKR_GPU_LAMBDA(int tid) {
                             if (tid >= launch_size)
                                 return;
