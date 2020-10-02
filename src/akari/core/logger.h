@@ -73,6 +73,20 @@ struct fmt::formatter<akari::Color<T, N>> : fmt::formatter<akari::Array<T, N>> {
         return fmt::formatter<akari::Array<T, N>>::format(a, ctx);
     }
 };
+template <typename Point>
+struct fmt::formatter<akari::BoundingBox<Point>> {
+    template <typename FormatCtx>
+    auto format(const akari::BoundingBox<Point> &box, FormatCtx &ctx) {
+        return format_to(ctx.out(), "[{}, {}]", box.pmin, box.pmax);
+    }
+    constexpr auto parse(format_parse_context &ctx) {
+        auto it = ctx.begin(), end = ctx.end();
+        // Check if reached the end of the range:
+        if (it != end && *it != '}')
+            throw format_error("invalid format");
+        return it;
+    }
+};
 namespace akari {
 
     enum class LogLevel {

@@ -311,16 +311,20 @@ namespace akari {
         AKR_XPU BoundingBox expand(const Point &p) const { return BoundingBox(min(pmin, p), max(pmax, p)); }
         AKR_XPU BoundingBox merge(const BoundingBox &b1) const { return merge(*this, b1); }
         AKR_XPU static BoundingBox merge(const BoundingBox &b1, const BoundingBox &b2) {
+            if (b1.empty())
+                return b2;
+            if (b2.empty())
+                return b1;
             return BoundingBox(min(b1.pmin, b2.pmin), max(b1.pmax, b2.pmax));
         }
         AKR_XPU BoundingBox intersect(const BoundingBox &rhs) const {
             return BoundingBox(max(pmin, rhs.pmin), min(pmax, rhs.pmax));
         }
-        AKR_XPU bool empty()const{
-            return any(pmin > pmax);
-        }
+        AKR_XPU bool empty() const { return any(pmin > pmax); }
         AKR_XPU Point centroid() const { return extents() * 0.5f + pmin; }
         AKR_XPU Float surface_area() const {
+            if (empty())
+                return Float(0.0);
             if constexpr (N == 3) {
                 auto ext = extents();
                 return hsum(akari::shuffle<1, 2, 0>(ext) * ext) * Float(2);
