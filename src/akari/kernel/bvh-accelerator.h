@@ -67,19 +67,20 @@ namespace akari {
         Intersector _intersector;
         ShapeHandleConstructor _ctor;
 
-        astd::pmr::vector<Index> primitives;
+        astd::pmr::vector<Index> refs;
         astd::pmr::vector<BVHNode> nodes;
         std::shared_ptr<std::mutex> m;
         TBVHAccelerator(UserData &&user_data, size_t N, Intersector intersector = Intersector(),
                         ShapeHandleConstructor ctor = ShapeHandleConstructor())
             : user_data(std::move(user_data)), _intersector(std::move(intersector)), _ctor(std::move(ctor)),
-              primitives(TAllocator<Index>(default_resource())), nodes(TAllocator<BVHNode>(default_resource())) {
+              refs(TAllocator<Index>(default_resource())), nodes(TAllocator<BVHNode>(default_resource())) {
             m = std::make_shared<std::mutex>();
+            std::vector<Index> primitives;
             for (auto i = 0; i < (int)N; i++) {
                 primitives.push_back(Index{i});
             }
             info("Building BVH for {} objects", primitives.size());
-            recursiveBuild(0, (int)primitives.size(), 0);
+            recursiveBuild(std::nullopt, std::move(primitives), 0);
             info("BVHNodes: {}", nodes.size());
         }
 
@@ -102,39 +103,45 @@ namespace akari {
             double min_cost;
             int split; // [0, nBuckets)
         };
-        int create_leaf_node(const Bounds3f &box, int begin, int end) {
+        int create_leaf_node(const Bounds3f &box, const std::vector<Index> &primitives) {
+            std::lock_guard<std::mutex> _(*m);
             BVHNode node;
             node.box = box;
-            node.first = begin;
-            node.count = end - begin;
+            node.first = refs.size();
+            node.count = refs.size() + primitives.size();
             node.right = -1;
-            std::lock_guard<std::mutex> _(*m);
+            for (auto i : primitives) {
+                refs.emplace_back(i);
+            }
             nodes.push_back(node);
             return (int)nodes.size() - 1;
         }
-        int recursiveBuild(int begin, int end, int depth) {
+        int recursiveBuild(std::optional<Bounds3f> provided_bounds, std::vector<Index> primitives, int depth) {
             Bounds3f box;
             Bounds3f centroidBound;
 
-            if (end == begin)
+            if (primitives.empty())
                 return -1;
-            for (auto i = begin; i < end; i++) {
-                box = box.merge(get(primitives[i]).getBoundingBox());
-                centroidBound = centroidBound.expand(get(primitives[i]).getBoundingBox().centroid());
+            if (!provided_bounds) {
+                for (auto i : primitives) {
+                    box = box.merge(get(i).getBoundingBox());
+                    centroidBound = centroidBound.expand(get(i).getBoundingBox().centroid());
+                }
+            } else {
+                box = provided_bounds.value();
             }
-
             if (depth == 0) {
                 boundBox = box;
             }
 
-            if (end - begin <= 2 || depth >= 64) {
+            if (primitives.size() <= 2 || depth >= 64) {
                 if (depth == 64) {
-                    warning("BVH exceeds max depth; {} objects", end - begin);
+                    warning("BVH exceeds max depth; {} objects", primitives.size());
                 }
-                return create_leaf_node(box, begin, end);
+                return create_leaf_node(box, primitives);
             } else {
                 auto size = centroidBound.size();
-                Index *mid = nullptr;
+
                 auto try_split_with_axis = [&](int axis) -> std::optional<SplitInfo> {
                     if (size[axis] == 0) {
                         // debug("box: [{}, {}] size: {}", box.pmin, box.pmin, size);
@@ -147,13 +154,13 @@ namespace akari {
                         Bucket() = default;
                     };
                     Bucket buckets[nBuckets];
-                    for (int i = begin; i < end; i++) {
-                        auto offset = centroidBound.offset(get(primitives[i]).getBoundingBox().centroid())[axis];
+                    for (auto i : primitives) {
+                        auto offset = centroidBound.offset(get(i).getBoundingBox().centroid())[axis];
                         int b = std::min<int>(nBuckets - 1, (int)std::floor(offset * nBuckets));
                         buckets[b].count++;
-                        buckets[b].bound = buckets[b].bound.merge(get(primitives[i]).getBoundingBox());
+                        buckets[b].bound = buckets[b].bound.merge(get(i).getBoundingBox());
                     }
-                    Float cost[nBuckets - 1] = {0};
+                    double cost[nBuckets - 1] = {0};
                     for (uint32_t i = 0; i < nBuckets - 1; i++) {
                         Bounds3f b0;
                         Bounds3f b1;
@@ -176,7 +183,7 @@ namespace akari {
                         AKR_ASSERT(cost[i] >= 0);
                     }
                     int splitBuckets = 0;
-                    Float minCost = cost[0];
+                    double minCost = cost[0];
                     for (uint32_t i = 1; i < nBuckets - 1; i++) {
                         if (cost[i] <= minCost) {
                             minCost = cost[i];
@@ -186,42 +193,169 @@ namespace akari {
                     AKR_ASSERT(minCost > 0);
                     return SplitInfo{axis, minCost, splitBuckets};
                 };
-                std::optional<SplitInfo> best_split;
+                auto try_split_spatial = [&](int axis) -> std::optional<SplitInfo> {
+                    struct Bucket {
+                        int count = 0;
+                        Bounds3f bound;
+                        int enter = 0;
+                        int exit = 0;
+                        Bucket() = default;
+                    };
+                    Bucket bins[nBuckets];
+                    for (auto i : primitives) {
+                        auto bbox = get(i).getBoundingBox();
+                        int first = std::min<int>(nBuckets - 1, std::floor(box.offset(bbox.pmin)[axis] * nBuckets));
+                        int last = std::min<int>(nBuckets - 1, std::floor(box.offset(bbox.pmax)[axis] * nBuckets));
+
+                        Bounds3f right_box;
+                        for (int j = first; j < last; j++) {
+                            double split = box.pmin[axis] + (j + 1) * box.size()[axis] / nBuckets;
+                            auto [left, right] = get(i).split(bbox, axis, split);
+                            bins[j].bound = bins[j].bound.merge(left);
+                            right_box = right;
+                        }
+                        bins[last].bound = bins[last].bound.merge(right_box);
+                        bins[last].exit++;
+                        bins[first].enter++;
+                    }
+                    double cost[nBuckets - 1] = {0};
+                    for (uint32_t i = 0; i < nBuckets - 1; i++) {
+                        Bounds3f b0;
+                        Bounds3f b1;
+                        int count0 = 0, count1 = 0;
+                        for (uint32_t j = 0; j <= i; j++) {
+                            b0 = b0.merge(bins[j].bound);
+                            count0 += bins[j].enter;
+                        }
+                        for (uint32_t j = i + 1; j < nBuckets; j++) {
+                            b1 = b1.merge(bins[j].bound);
+                            count1 += bins[j].exit;
+                        }
+                        float cost0 = count0 == 0 ? 0 : count0 * b0.surface_area();
+                        float cost1 = count1 == 0 ? 0 : count1 * b1.surface_area();
+                        AKR_ASSERT(cost0 >= 0 && cost1 >= 0 && box.surface_area() >= 0);
+                        cost[i] = 0.125f + (cost0 + cost1) / box.surface_area();
+                        AKR_ASSERT(cost[i] >= 0);
+                    }
+                    int splitBuckets = 0;
+                    double minCost = cost[0];
+                    for (uint32_t i = 1; i < nBuckets - 1; i++) {
+                        if (cost[i] <= minCost) {
+                            minCost = cost[i];
+                            splitBuckets = i;
+                        }
+                    }
+                    AKR_ASSERT(minCost > 0);
+                    return SplitInfo{axis, minCost, splitBuckets};
+                };
+                std::optional<SplitInfo> best_sah_split;
                 for (int axis = 0; axis < 3; axis++) {
                     auto candidate = try_split_with_axis(axis);
                     if (!candidate)
                         continue;
-                    if (best_split.has_value() && candidate.has_value()) {
-                        auto split = best_split.value();
+                    if (best_sah_split.has_value() && candidate.has_value()) {
+                        auto split = best_sah_split.value();
                         auto candidate_split = candidate.value();
                         // debug("size: {} candidate: axis={}, cost={}", size, axis, candidate_split.min_cost);
                         if (split.min_cost > candidate_split.min_cost) {
-                            best_split = candidate;
+                            best_sah_split = candidate;
                         }
                     } else {
-                        best_split = candidate;
+                        best_sah_split = candidate;
                     }
                 }
-                int axis;
-                if (best_split.has_value()) {
-                    axis = best_split.value().axis;
-                    mid = std::partition(&primitives[begin], &primitives[end - 1] + 1, [&](Index &p) {
-                        auto b = int(centroidBound.offset(get(p).getBoundingBox().centroid())[axis] * nBuckets);
-                        if (b == (int)nBuckets) {
-                            b = (int)nBuckets - 1;
+                std::optional<SplitInfo> best_spatial_split;
+                for (int axis = 0; axis < 3; axis++) {
+                    auto candidate = try_split_spatial(axis);
+                    if (!candidate)
+                        continue;
+                    if (best_spatial_split.has_value() && candidate.has_value()) {
+                        auto split = best_spatial_split.value();
+                        auto candidate_split = candidate.value();
+                        // debug("size: {} candidate: axis={}, cost={}", size, axis, candidate_split.min_cost);
+                        if (split.min_cost > candidate_split.min_cost) {
+                            best_spatial_split = candidate;
                         }
-                        return b <= best_split.value().split;
-                    });
-                    AKR_ASSERT((mid != &primitives[begin]) && (mid != &primitives[end - 1] + 1));
-                    // debug("left:{} right:{}", mid - &primitives[begin], &primitives[end - 1] + 1 - mid);
+                    } else {
+                        best_spatial_split = candidate;
+                    }
+                }
+                std::vector<Index> left_partition, right_partition;
+                std::optional<Bounds3f> left_bounds, right_bounds;
+                int axis;
+                if (best_sah_split.has_value() || best_spatial_split.has_value()) {
+                    bool use_sah;
+                    if (best_sah_split.has_value() && best_spatial_split.has_value()) {
+                        use_sah = best_spatial_split.value().min_cost > best_sah_split.value().min_cost;
+                    } else if (best_spatial_split) {
+                        use_sah = false;
+                    } else {
+                        use_sah = true;
+                    }
+                    if (use_sah) {
+                        auto best_split = best_sah_split.value();
+                        axis = best_split.axis;
+                        for (auto i : primitives) {
+                            auto b = int(centroidBound.offset(get(i).getBoundingBox().centroid())[axis] * nBuckets);
+                            if (b == (int)nBuckets) {
+                                b = (int)nBuckets - 1;
+                            }
+                            if (b <= best_split.split) {
+                                left_partition.emplace_back(i);
+                            } else {
+                                right_partition.emplace_back(i);
+                            }
+                        }
+                    } else {
+                        auto best_split = best_spatial_split.value();
+                        axis = best_split.axis;
+                        std::vector<Index> middle;
+                        Bounds3f left_box, right_box;
+
+                        double split_pos = box.pmin[axis] + (best_split.split + 1) * box.size()[axis] / nBuckets;
+                        for (auto i : primitives) {
+                            auto bbox = get(i).getBoundingBox();
+                            if (bbox.pmax[axis] < split_pos) {
+                                left_partition.emplace_back(i);
+                            } else if (bbox.pmin[axis] > split_pos) {
+                                right_partition.emplace_back(i);
+                            } else {
+                                middle.emplace_back(i);
+                            }
+                        }
+
+                        for (auto i : middle) {
+                            Bounds3f B1 = left_box;
+                            Bounds3f B2 = right_box;
+                            auto bbox = get(i).getBoundingBox();
+                            auto N1 = left_partition.size() + 1;
+                            auto N2 = right_partition.size() + 1;
+                            double Csplit = B1.surface_area() * N1 + B2.surface_area() * N2;
+                            double C1 = B1.merge(bbox).surface_area() * N1 + B2.surface_area() * (N2 - 1);
+                            double C2 = B1.surface_area() * (N1 - 1) + B2.merge(bbox).surface_area() * N2;
+                            if (Csplit < std::min(C1, C2)) {
+                                left_partition.emplace_back(i);
+                                right_partition.emplace_back(i);
+                            } else if (C1 < std::min(C2, Csplit)) {
+                                left_partition.emplace_back(i);
+                                left_box = left_box.merge(bbox);
+                            } else {
+                                right_partition.emplace_back(i);
+                                right_box = right_box.merge(bbox);
+                            }
+                        }
+
+                        left_bounds = left_box;
+                        right_bounds = right_box;
+                    }
                 } else {
-                    if (end - begin >= 16) {
-                        warning("best split cannot be found with {} objects; size: {}", end - begin, size);
+                    if (primitives.size() >= 16) {
+                        warning("best split cannot be found with {} objects; size: {}", primitives.size(), size);
                         if (hsum(size) == 0) {
                             warning("centroid bound is zero");
                         }
                     }
-                    return create_leaf_node(box, begin, end);
+                    return create_leaf_node(box, primitives);
                 }
                 size_t ret;
                 {
@@ -234,18 +368,18 @@ namespace akari {
                     node.count = (uint16_t)-1;
                 }
 
-                if (end - begin > 64 * 1024) {
-                    auto left = std::async(std::launch::async, [&]() {
-                        return (int)recursiveBuild(begin, int(mid - &primitives[0]), depth + 1);
+                if (primitives.size() > 64 * 1024) {
+                    auto left = std::async(std::launch::async, [&]() -> int {
+                        return (int)recursiveBuild(left_bounds, std::move(left_partition), depth + 1);
                     });
-                    auto right = std::async(std::launch::async, [&]() {
-                        return (int)recursiveBuild(int(mid - &primitives[0]), end, depth + 1);
+                    auto right = std::async(std::launch::async, [&]() -> int {
+                        return (int)recursiveBuild(right_bounds, std::move(right_partition), depth + 1);
                     });
                     nodes[ret].left = left.get();
                     nodes[ret].right = right.get();
                 } else {
-                    nodes[ret].left = (int)recursiveBuild(begin, int(mid - &primitives[0]), depth + 1);
-                    nodes[ret].right = (int)recursiveBuild(int(mid - &primitives[0]), end, depth + 1);
+                    nodes[ret].left = (int)recursiveBuild(left_bounds, std::move(left_partition), depth + 1);
+                    nodes[ret].right = (int)recursiveBuild(right_bounds, std::move(right_partition), depth + 1);
                 }
                 AKR_ASSERT(nodes[ret].right >= 0 && nodes[ret].left >= 0);
                 return (int)ret;
@@ -254,7 +388,7 @@ namespace akari {
         AKR_XPU bool intersect_leaf(const BVHNode &node, const Ray3f &ray, Hit &isct) const {
             bool hit = false;
             for (uint32_t i = node.first; i < node.first + node.count; i++) {
-                if (_intersector(ray, _ctor(user_data, primitives[i].idx), isct)) {
+                if (_intersector(ray, _ctor(user_data, refs[i].idx), isct)) {
                     hit = true;
                 }
             }
@@ -307,7 +441,7 @@ namespace akari {
                 }
                 if (node.is_leaf()) {
                     for (uint32_t i = node.first; i < node.first + node.count; i++) {
-                        if (_intersector(ray, _ctor(user_data, primitives[i].idx), isct)) {
+                        if (_intersector(ray, _ctor(user_data, refs[i].idx), isct)) {
                             return true;
                         }
                     }
@@ -336,6 +470,28 @@ namespace akari {
                 box.pmax += Float3(0.000001);
                 return box;
             }
+            [[nodiscard]] std::pair<Bounds3f, Bounds3f> split(const Bounds3f &bound, int axis, Float split) const {
+                auto trig = get_triangle<C>(*mesh, idx);
+                const uint32_t offsets[] = {2, 0, 1};
+                Bounds3f left, right;
+                for (int i = 0; i < 3; i++) {
+                    float3 v0 = trig.vertices[i];
+                    float3 v1 = trig.vertices[offsets[i]];
+                    double p0 = v0[axis];
+                    double p1 = v1[axis];
+                    if (p0 <= split) {
+                        left = left.expand(v0);
+                    } else {
+                        right = right.expand(v0);
+                    }
+                    if ((p0 < split && p1 > split) || (p1 < split && p0 > split)) {
+                        float3 t = lerp(p0, p1, std::max(0.0, std::min(1.0, (split - p0) / (p1 - p0))));
+                        left = left.expand(t);
+                        right = right.expand(t);
+                    }
+                }
+                return std::make_pair(left.intersect(bound), right.intersect(bound));
+            }
         };
         struct TriangleHandleConstructor {
             AKR_XPU auto operator()(const MeshInstance<C> *mesh, int idx) const -> TriangleHandle {
@@ -358,6 +514,14 @@ namespace akari {
             int idx;
 
             [[nodiscard]] AKR_XPU auto getBoundingBox() const { return (*scene)[idx].boundBox; }
+            [[nodiscard]] std::pair<Bounds3f, Bounds3f> split(const Bounds3f &bound, int axis, Float split) const {
+                auto left = (*scene)[idx].boundBox;
+                auto right = left;
+                auto bbox = left;
+                left.pmax[axis] = std::min<Float>(split, bbox.pmax[axis]);
+                right.pmin[axis] = std::max<Float>(split, bbox.pmin[axis]);
+                return std::make_pair(left.intersect(bound), right.intersect(bound));
+            }
         };
 
         struct BVHHandleConstructor {

@@ -41,7 +41,10 @@ namespace akari {
         AKR_XPU static constexpr Float Eps() { return Float(0.001f); }
         AKR_XPU static constexpr Float ShadowEps() { return Float(0.0001f); }
     };
-
+    template <typename T, typename Float>
+    AKR_XPU T lerp(T a, T b, Float t) {
+        return t * b + (Float(1.0) - t) * a;
+    }
     template <typename V, typename V2>
     AKR_XPU inline V lerp3(const V &v0, const V &v1, const V &v2, const V2 &uv) {
         return (1.0f - uv[0] - uv[1]) * v0 + uv[0] * v1 + uv[1] * v2;
@@ -219,7 +222,6 @@ namespace akari {
 
         Float3 normal;
         Float3 T, B;
-
     };
 
     template <typename Float>
@@ -310,6 +312,12 @@ namespace akari {
         AKR_XPU BoundingBox merge(const BoundingBox &b1) const { return merge(*this, b1); }
         AKR_XPU static BoundingBox merge(const BoundingBox &b1, const BoundingBox &b2) {
             return BoundingBox(min(b1.pmin, b2.pmin), max(b1.pmax, b2.pmax));
+        }
+        AKR_XPU BoundingBox intersect(const BoundingBox &rhs) const {
+            return BoundingBox(max(pmin, rhs.pmin), min(pmax, rhs.pmax));
+        }
+        AKR_XPU bool empty()const{
+            return any(pmin > pmax);
         }
         AKR_XPU Point centroid() const { return extents() * 0.5f + pmin; }
         AKR_XPU Float surface_area() const {
