@@ -43,7 +43,7 @@ namespace akari {
     };
     template <typename T, typename Float>
     AKR_XPU T lerp(T a, T b, Float t) {
-        return t * b + (Float(1.0) - t) * a;
+        return a * (Float(1.0) - t) + b * t;
     }
     template <typename V, typename V2>
     AKR_XPU inline V lerp3(const V &v0, const V &v1, const V &v2, const V2 &uv) {
@@ -53,7 +53,7 @@ namespace akari {
     template <typename Float, int N>
     struct Matrix {
         Array<Array<Float, N>, N> rows;
-        AKR_XPU Matrix(Float v = 1.0) {
+        AKR_XPU explicit Matrix(Float v = 1.0) {
             for (int i = 0; i < N; i++) {
                 rows[i][i] = v;
             }
@@ -305,7 +305,15 @@ namespace akari {
             pmin = Point(Constants<Float>::Inf());
             pmax = Point(-Constants<Float>::Inf());
         }
-        AKR_XPU Vector extents() const { return pmax - pmin; }
+        AKR_XPU Vector extents() const {
+            auto sz = pmax - pmin;
+            for (int i = 0; i < 3; i++) {
+                if (sz[i] == 0)
+                    sz[i] = 1e-6;
+            }
+            return sz;
+        }
+        AKR_XPU bool contains(const Point &p) const { return all(p >= pmin && p <= pmax); }
         AKR_XPU Vector size() const { return extents(); }
         AKR_XPU Vector offset(const Point &p) { return (p - pmin) / extents(); }
         AKR_XPU BoundingBox expand(const Point &p) const { return BoundingBox(min(pmin, p), max(pmax, p)); }

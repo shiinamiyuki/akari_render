@@ -36,7 +36,6 @@ namespace pybind11 {
 } // namespace pybind11
 #endif
 
-
 static std::string inputFilename;
 std::string variant = default_variant;
 void parse(int argc, const char **argv) {
@@ -90,8 +89,8 @@ void parse_and_run() {
     AKR_ASSERT_THROW(scene);
     scene->render();
 }
-int main(int argc, const char **argv) {
 
+int main(int argc, const char **argv) {
     try {
         Application app;
         parse(argc, argv);

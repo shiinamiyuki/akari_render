@@ -118,7 +118,7 @@ namespace akari {
         using ArrayStorage<T, N>::operator[];
 
         Array() = default;
-        AKR_XPU Array(const T &x) {
+        AKR_XPU explicit Array(const T &x) {
             for (int i = 0; i < N; i++) {
                 (*this)[i] = x;
             }
@@ -163,6 +163,10 @@ namespace akari {
     AKR_XPU Array &operator assign_op(const Array &rhs) {                                                              \
         *this = *this op rhs;                                                                                          \
         return *this;                                                                                                  \
+    }                                                                                                                  \
+    AKR_XPU Array &operator assign_op(const T &rhs) {                                                                  \
+        *this = *this op Array(rhs);                                                                                   \
+        return *this;                                                                                                  \
     }
         GEN_ARITH_OP(+, +=)
         GEN_ARITH_OP(-, -=)
@@ -187,6 +191,8 @@ namespace akari {
         GEN_CMP_OP(>=)
         GEN_CMP_OP(<)
         GEN_CMP_OP(>)
+        GEN_CMP_OP(&&)
+        GEN_CMP_OP(||)
 #undef GEN_CMP_OP
         AKR_XPU friend Array operator+(const T &v, const Array &rhs) { return Array(v) + rhs; }
         AKR_XPU friend Array operator-(const T &v, const Array &rhs) { return Array(v) - rhs; }
@@ -384,6 +390,10 @@ namespace akari {
     AKR_XPU Self operator op(const Self::value_t &rhs) const { return Self(static_cast<const Base &>(*this) op rhs); } \
     AKR_XPU Self operator assign_op(const Self &rhs) {                                                                 \
         *this = Self(static_cast<Base &>(*this) op static_cast<const Base &>(rhs));                                    \
+        return *this;                                                                                                  \
+    }                                                                                                                  \
+    AKR_XPU Self operator assign_op(const Self::value_t &v) {                                                          \
+        *this assign_op Self(v);                                                                                       \
         return *this;                                                                                                  \
     }
 #define AKR_ARRAY_IMPORT(Base, Self)                                                                                   \
