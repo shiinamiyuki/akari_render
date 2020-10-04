@@ -1,0 +1,16 @@
+{
+    "modules": [
+        {
+            "name": "Test",
+            "type-parameters": {
+                "Spectrum": [
+                    "vec3"
+                ]
+            },
+            "src": [
+                "test.asl"
+            ],
+            "depends": []
+        }
+    ]
+}

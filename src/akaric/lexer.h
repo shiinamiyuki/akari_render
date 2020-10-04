@@ -21,37 +21,25 @@
 // SOFTWARE.
 
 #pragma once
-
-#include <akari/common/variant.h>
-#include <akari/common/color.h>
-#include <akari/core/image.hpp>
-
-namespace akari {
-    AKR_VARIANT class ConstantTexture {
-      public:
-        AKR_IMPORT_TYPES()
-        ConstantTexture(Spectrum v) : value(v) {}
-        Spectrum value;
-        AKR_XPU Spectrum evaluate(const float2 &texcoords) const { return value; }
-        AKR_XPU Float power() const { return luminance(value); }
+#include <akaric/type.h>
+namespace akari::asl {
+    struct SourceLocation {
+        std::string filename;
+        int line = 1, col = 1;
     };
+    enum TokenType { symbol, identifier, keyword, string_literal, int_literal, float_literal, terminator };
+    struct Token {
+        std::string tok;
+        TokenType type;
+        SourceLocation loc;
+    };
+    using TokenStream = std::list<Token>;
+    class Lexer {
+        class Impl;
+        std::shared_ptr<Impl> impl;
 
-    AKR_VARIANT class ImageTexture {
       public:
-        AKR_IMPORT_TYPES()
-        RGBAImage::View image;
-        ImageTexture() = default;
-        AKR_XPU ImageTexture(RGBAImage::View image) : image(image) {}
-        AKR_XPU Spectrum evaluate(const float2 &texcoords) const {
-            float2 tc = fmod(texcoords, Array2f(1.0f));
-            tc.y = 1.0f - tc.y;
-            return image(tc).rgb;
-        }
+        Lexer();
+        const TokenStream &operator()(const std::string &filename, const std::string &s);
     };
-    AKR_VARIANT class Texture : public Variant<ConstantTexture<C>, ImageTexture<C>> {
-      public:
-        AKR_IMPORT_TYPES()
-        using Variant<ConstantTexture<C>, ImageTexture<C>>::Variant;
-        AKR_XPU Spectrum evaluate(const float2 &texcoords) const { AKR_VAR_DISPATCH(evaluate, texcoords); }
-    };
-} // namespace akari
+} // namespace akari::asl

@@ -47,7 +47,6 @@ namespace akari {
 
 #include <functional>
 #include <string_view>
-#include <akari/common/panic.h>
 
 namespace akari {
 
