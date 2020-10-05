@@ -239,7 +239,7 @@ namespace akari::asl::ast {
     };
     using VarDecl = std::shared_ptr<VarDeclNode>;
 
-        using Stmt = std::shared_ptr<StatementNode>;
+    using Stmt = std::shared_ptr<StatementNode>;
     class VarDeclStatementNode : public StatementNode {
       public:
         AKR_DECL_NODE(VarDeclStatementNode)
@@ -361,7 +361,8 @@ namespace akari::asl::ast {
             ASTNode::dump_json(j);
             type->dump_json(j["type"]);
             name->dump_json(j["name"]);
-            body->dump_json(j["body"]);
+            if (body)
+                body->dump_json(j["body"]);
         }
     };
     using FunctionDecl = std::shared_ptr<FunctionDeclNode>;

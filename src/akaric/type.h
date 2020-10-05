@@ -36,10 +36,14 @@ namespace akari::asl::type {
     bool is_parent_of(const std::shared_ptr<Base> &ptr) const { return ptr->isa<std::shared_ptr<Type>>(); }
 
     using Type = std::shared_ptr<TypeNode>;
-    class ParameterTypeNode : public TypeNode {
+    class OpaqueTypeNode : public TypeNode {
       public:
-        AKR_DECL_TYPENODE(ParameterTypeNode)
+        AKR_DECL_TYPENODE(OpaqueTypeNode)
+        OpaqueTypeNode(const std::string & name):name(name){}
+        std::string name;
     };
+    using OpaqueType = std::shared_ptr<OpaqueTypeNode>;
+
     class PrimitiveTypeNode : public TypeNode {
       public:
         virtual size_t width() const { return 0; }
@@ -130,4 +134,5 @@ namespace akari::asl::type {
         bool is_aggregate() const override { return false; }
     };
     using VectorType = std::shared_ptr<VectorTypeNode>;
+
 } // namespace akari::asl::type

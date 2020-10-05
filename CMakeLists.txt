@@ -15,8 +15,6 @@ include_directories(${CMAKE_SOURCE_DIR}/external/json)
 include_directories(${CMAKE_SOURCE_DIR}/external/cxxopts/include)
 include_directories(${CMAKE_SOURCE_DIR}/external/magic_enum/include)
 
-# include_directories(include)
-include_directories(${CMAKE_SOURCE_DIR}/include)
 
 set(AKR_CORE_EXT_LIBS "")
 set(AKR_COMPILE_DEFINITIONS AKR_ENABLE_CPU)
@@ -54,6 +52,13 @@ include_directories(${CMAKE_SOURCE_DIR}/external/pugixml/src)
 add_subdirectory(external/pugixml)
 set(AKR_CORE_EXT_LIBS ${AKR_CORE_EXT_LIBS} pugixml)
 
+# ---------------- Akari Unified Shading Language Compiler
+file(GLOB ASL_COMPILER_SRC src/akaric/*.*)
+add_executable(akaric ${ASL_COMPILER_SRC})
+target_include_directories(akaric PUBLIC src/)
+target_link_libraries(akaric fmt)
+
+
 # ---------------- Begin Build Utils --------------------
 add_executable(akari-configure src/akari/tools/configure.cpp)
 target_link_libraries(akari-configure fmt)
@@ -68,7 +73,7 @@ macro(add_soa_header target source)
     add_custom_command(OUTPUT ${target}
         COMMAND akari-soac ${source} ${target}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        DEPENDS ${source} akari-soac)
+        DEPENDS ${source} akari-soac ${CMAKE_SOURCE_DIR}/src/akari/common/soa.h)
 endmacro()
 
 # ---------------- End Build Utils --------------------

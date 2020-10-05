@@ -21,11 +21,14 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 #pragma once
+#include <sstream>
 #include <akaric/ast.h>
 #include <akaric/parser.h>
 namespace akari::asl {
     struct BuildConfig {};
-    struct ParsedProgram {
+    struct Module {
+        std::string name;
+        std::vector<std::string> type_parameters; 
         std::vector<ast::TopLevel> translation_units;
     };
     class Mangler {
@@ -37,7 +40,9 @@ namespace akari::asl {
                 return fmt::format("ZV{}Z{}nZv", mangle(v->element_type), v->count);
             } else if (ty->isa<type::StructType>()) {
                 return fmt::format("ZS{}Zs", ty->cast<type::StructType>()->name);
-            } else {
+            } else if (ty->isa<type::OpaqueType>()) {
+                return fmt::format("ZO{}Zo", ty->cast<type::OpaqueType>()->name);
+            }else {
                 AKR_ASSERT(false);
             }
         }
@@ -52,12 +57,81 @@ namespace akari::asl {
             return s.append("Zf");
         }
     };
+    class Twine {
+        struct Node {
+            std::string s;
+            std::shared_ptr<Node> prev, next;
+            Node() = default;
+            Node(const std::string &s) : s(s) {}
+            void str(std::ostringstream &os) {
+                if (prev) {
+                    prev->str(os);
+                }
+                os << s;
+                if (next) {
+                    next->str(os);
+                }
+            }
+        };
+        std::shared_ptr<Node> head;
+
+      public:
+        Twine() : Twine(std::string("")) {}
+        Twine(const char *s) : head(std::make_shared<Node>(s)) {}
+        Twine(const std::string &s) : head(std::make_shared<Node>(s)) {}
+        Twine &append(const Twine &s) {
+            if (!head->next) {
+                head->next = s.head;
+            } else {
+                auto node = std::make_shared<Node>();
+                node->prev = head;
+                node->next = s.head;
+                head = node;
+            }
+            return *this;
+        }
+        static Twine concat(const Twine &a, const Twine &b) {
+            Twine cat = a;
+            cat.append(b);
+            return cat;
+        }
+        static Twine concat(const Twine &a, const std::string &s, const Twine &b) {
+            Twine cat;
+            auto node = std::make_shared<Node>(s);
+            node->prev = a.head;
+            node->next = b.head;
+            cat.head = node;
+            return cat;
+        }
+        [[nodiscard]] std::string str() const {
+            std::ostringstream os;
+            // std::vector<std::shared_ptr<Node>> st;
+            // auto node = head;
+            // while (!st.empty() && node) {
+            //     if (node) {
+            //         st.push_back(node);
+            //         node = node->prev;
+            //     } else {
+            //         node = st.back();
+            //         st.pop_back();
+            //         os << node->s;
+            //         node = node->next;
+            //     }
+            // }
+            head->str(os);
+            return os.str();
+        }
+    };
     class CodeGenerator {
       protected:
         struct FunctionRecord {
-            std::vector<type::FunctionType> overloads;
+            std::unordered_map<std::string, type::FunctionType> overloads;
         };
-        Environment<std::string, type::Type> vars;
+        struct ValueRecord {
+            Twine value;
+            type::Type type;
+        };
+        Environment<std::string, ValueRecord> vars;
         std::unordered_map<std::string, type::StructType> structs;
         std::unordered_map<std::string, type::Type> types;
         std::unordered_map<std::string, FunctionRecord> prototypes;
@@ -66,15 +140,33 @@ namespace akari::asl {
         void process_struct_decls();
         void process_prototypes();
         void add_predefined_types();
-        ParsedProgram program;
+        Module module;
         BuildConfig config;
         virtual std::string do_generate() = 0;
-        
+        int indent = 0;
+        template <class... Args>
+        void wl(std::ostringstream &os, const std::string &s, Args &&... args) {
+            for (int i = 0; i < indent; i++) {
+                os << "    ";
+            }
+            os << fmt::format(s, std::forward<Args>(args)...) << "\n";
+        }
+        template <class F>
+        void with_block(F &&f) {
+            indent++;
+            f();
+            indent--;
+        }
+        [[noreturn]] void error(const SourceLocation &loc, std::string &&msg) {
+            throw std::runtime_error(fmt::format("error: {} at {}:{}:{}", msg, loc.filename, loc.line, loc.col));
+        }
+        void add_type_parameters();
       public:
         CodeGenerator();
-        std::string generate(const BuildConfig &config_, const ParsedProgram &program_) {
+        std::string generate(const BuildConfig &config_, const Module &program_) {
             this->config = config_;
-            this->program = program_;
+            this->module = program_;
+            add_type_parameters();
             process_struct_decls();
             process_prototypes();
             return do_generate();
@@ -82,4 +174,5 @@ namespace akari::asl {
     };
 
     std::unique_ptr<CodeGenerator> cpp_generator();
+    std::unique_ptr<CodeGenerator> cuda_generator();
 } // namespace akari::asl

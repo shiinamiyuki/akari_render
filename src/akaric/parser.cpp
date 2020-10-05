@@ -27,6 +27,7 @@
 namespace akari::asl {
     using namespace ast;
     class Parser::Impl {
+        friend class Parser;
         TokenStream ts;
         TokenStream::iterator it;
         Environment<std::string, bool> typenames;
@@ -54,9 +55,7 @@ namespace akari::asl {
             }
             return *q;
         }
-        int ternaryPrec;
-        std::unordered_map<std::string, int> opPrec;
-        std::unordered_map<std::string, int> opAssoc; // 1 for left 0 for right
+        OperatorPrecedence prec;
         std::unordered_set<std::string> assignOps;
         void expect(const std::string &s) {
             if (cur().tok != s) {
@@ -71,7 +70,6 @@ namespace akari::asl {
             // for(auto & t: ts){
             //     std::cout << t.tok << std::endl;
             // }
-            int prec = 0;
             /*
              *   opPrec[","] = prec;
              * prec++;*/
@@ -89,39 +87,7 @@ namespace akari::asl {
             // opPrec["&&="] = prec;
             // opPrec["||="] = prec;
             // prec++;
-            opPrec["?"] = ternaryPrec = prec;
-            prec++;
-            opPrec["||"] = prec;
-            prec++;
-            opPrec["&&"] = prec;
-            prec++;
-            opPrec["|"] = prec;
-            prec++;
-            opPrec["^"] = prec;
-            opPrec["&"] = prec;
-            prec++;
-            opPrec["=="] = prec;
-            opPrec["!="] = prec;
-            prec++;
-            opPrec[">="] = prec;
-            opPrec["<="] = prec;
-            opPrec[">"] = prec;
-            opPrec["<"] = prec;
 
-            prec++;
-            opPrec[">>"] = prec;
-            opPrec["<<"] = prec;
-            prec++;
-            opPrec["+"] = prec;
-            opPrec["-"] = prec;
-            prec++;
-            opPrec["*"] = prec;
-            opPrec["/"] = prec;
-            opPrec["%"] = prec;
-            prec++;
-            opPrec["."] = prec;
-            opAssoc = {{"+", 1},  {"-", 1}, {"*", 1}, {"/", 1},  {"!=", 1}, {"==", 1}, {">", 1}, {">=", 1},
-                       {"<=", 1}, {"<", 1}, {"%", 1}, {"&&", 1}, {"&", 1},  {"||", 1}, {"|", 1}};
             assignOps = {
                 "=", "+=", "-=", "*=", "/=", ">>=", "<<=", "%=", "|=", "&=", "^=", "&&=", "||=",
             };
@@ -153,11 +119,11 @@ namespace akari::asl {
             while (!end()) {
                 auto c = cur();
                 // std::cout << c.tok << std::endl;
-                if (opPrec.find(c.tok) == opPrec.end())
+                if (prec.opPrec.find(c.tok) == prec.opPrec.end())
                     break;
-                if (opPrec[c.tok] >= lev) {
+                if (prec.opPrec[c.tok] >= lev) {
                     consume();
-                    ast::Expr rhs = parse_expr(opAssoc[c.tok] + opPrec[c.tok]);
+                    ast::Expr rhs = parse_expr(prec.opAssoc[c.tok] + prec.opPrec[c.tok]);
                     ast::BinaryExpression op = std::make_shared<ast::BinaryExpressionNode>(c);
                     op->lhs = result;
                     op->rhs = rhs;
@@ -431,7 +397,11 @@ namespace akari::asl {
                 }
             }
             expect(")");
-            func->body = parse_block();
+            if (cur().tok == "{") {
+                func->body = parse_block();
+            } else {
+                expect(";");
+            }
             return func;
         }
         ast::TopLevel operator()(const std::string &filename, const std::string &src) {
@@ -446,13 +416,14 @@ namespace akari::asl {
                 if (typenames.at(cur().tok).has_value()) {
                     top->funcs.emplace_back(parse_func_decl());
                 } else {
-                    error(cur().loc, fmt::format("unknown type name", cur().tok));
+                    error(cur().loc, fmt::format("unknown type name {}", cur().tok));
                 }
             }
             return top;
         }
     };
     Parser::Parser() { impl = std::make_shared<Impl>(); }
+    void Parser::add_type_parameter(const std::string &type) { impl->typenames.insert(type, true); }
     ast::TopLevel Parser::operator()(const std::string &filename, const std::string &src) {
         return (*impl)(filename, src);
     }

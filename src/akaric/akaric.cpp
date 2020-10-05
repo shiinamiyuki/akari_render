@@ -22,6 +22,7 @@
 
 #include <json.hpp>
 #include <cxxopts.hpp>
+#include <fstream>
 #include <akari/core/akari.h>
 #include <akaric/parser.h>
 #include <akaric/codegen.h>
@@ -36,6 +37,7 @@ const char *backend_help = R"(One of:
     If not supplied will be inferred from output file suffix
 )";
 static std::string input, output, backend;
+static bool verbose = false;
 void parse(int argc, const char **argv) {
     try {
         cxxopts::Options options("akaric", " - Akari Unified Shading Language Compiler");
@@ -45,17 +47,23 @@ void parse(int argc, const char **argv) {
             opt("i,input", "Input: A build.json file", cxxopts::value<std::string>());
             opt("o,output", "Output filename", cxxopts::value<std::string>());
             opt("b, backend", backend_help, cxxopts::value<std::string>());
+            opt("v,verbose", "Verbose output (includes debug info)");
             opt("help", "Show this help");
+            options.parse_positional("input");
             auto result = options.parse(argc, argv);
             if (!result.count("input")) {
-                fmt::print(stderr, "Input file must be provided");
                 std::cerr << options.help() << std::endl;
+                fmt::print(stderr, "error: Input file must be provided\n");
                 exit(1);
             }
             if (!result.count("output")) {
-                fmt::print(stderr, "Output file must be provided");
+
                 std::cerr << options.help() << std::endl;
+                fmt::print(stderr, "error: Output file must be provided\n");
                 exit(1);
+            }
+            if (result.count("verbose")) {
+                verbose = true;
             }
             input = result["input"].as<std::string>();
             output = result["output"].as<std::string>();
@@ -75,25 +83,64 @@ void parse(int argc, const char **argv) {
         exit(1);
     }
 }
-int main(int argc, char **argv) {
+int main(int argc, const char **argv) {
     using namespace akari::asl;
     using namespace nlohmann;
     try {
-        Parser parser;
-        const char *test_src =
-            R"(
-        vec3 foo(){
-            return vec3(0);
+        parse(argc, argv);
+        json build_config;
+        {
+            std::ifstream in(input);
+            std::stringstream src;
+            src << in.rdbuf();
+            build_config = json::parse(src.str());
         }
-    )";
-        auto toplevel = parser("test.asl", test_src);
-        json _;
-        toplevel->dump_json(_);
-        std::cout << _.dump(1) << std::endl;
-        auto codegen = cpp_generator();
-        ParsedProgram program;
-        program.translation_units.emplace_back(toplevel);
-        std::cout << codegen->generate(BuildConfig{}, program);
+        if (!build_config.contains("name")) {
+            std::cerr << "module name must be specified" << std::endl;
+            exit(1);
+        }
+        if (!build_config.contains("src")) {
+            std::cerr << "source files must be specified" << std::endl;
+            exit(1);
+        }
+        Parser parser;
+        Module module;
+        module.name = build_config["name"].get<std::string>();
+        if (build_config.contains("type-parameters")) {
+            auto params = build_config["type-parameters"];
+            if (!params.is_array()) {
+                std::cerr << "type-parameters must be array" << std::endl;
+                exit(1);
+            }
+            for (auto &p : params) {
+                module.type_parameters.emplace_back(p.get<std::string>());
+                parser.add_type_parameter(p.get<std::string>());
+            }
+        }
+
+        std::unique_ptr<CodeGenerator> codegen;
+        if (backend == "cpp") {
+            codegen = cpp_generator();
+        } else if (backend == "cuda") {
+            codegen = cuda_generator();
+        } else {
+            std::cerr << backend << " backend is not implemented" << std::endl;
+            exit(1);
+        }
+        for (auto src_file : build_config["src"]) {
+            std::ifstream in(src_file.get<std::string>());
+            std::stringstream src;
+            src << in.rdbuf();
+            auto toplevel = parser(fs::absolute(fs::path(src_file.get<std::string>())).string(), src.str());
+            if (verbose) {
+                json _;
+                toplevel->dump_json(_);
+                std::cout << _.dump(1) << std::endl;
+            }
+            module.translation_units.emplace_back(toplevel);
+        }
+        std::ofstream os(output);
+        os << codegen->generate(BuildConfig{}, module);
     } catch (std::exception &e) {
         std::cerr << e.what() << std::endl;
     }

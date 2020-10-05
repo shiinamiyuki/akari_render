@@ -1,16 +1,9 @@
 {
-    "modules": [
-        {
-            "name": "Test",
-            "type-parameters": {
-                "Spectrum": [
-                    "vec3"
-                ]
-            },
-            "src": [
-                "test.asl"
-            ],
-            "depends": []
-        }
+    "name": "Test",
+    "type-parameters": [
+        "Spectrum"
+    ],
+    "src": [
+        "test.asl"
     ]
 }

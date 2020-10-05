@@ -32,7 +32,7 @@ namespace akari::asl {
       public:
         Parser();
         ast::TopLevel operator()(const std::string &filename, const std::string &src);
-        void add_type_parameter(const std::string &type, const std::vector<std::string> &domain);
+        void add_type_parameter(const std::string &type);
     };
     template <typename K, typename V>
     struct EnvironmentFrame {
@@ -69,5 +69,47 @@ namespace akari::asl {
         }
         std::optional<V> at(const K &k) { return frame->at(k); }
         void insert(const K &k, const V &v) { frame->insert(k, v); }
+    };
+
+    struct OperatorPrecedence {
+        std::unordered_map<std::string, int> opPrec;
+        std::unordered_map<std::string, int> opAssoc;
+        int ternaryPrec;
+        OperatorPrecedence() {
+            int prec = 0;
+            opPrec["?"] = ternaryPrec = prec;
+            prec++;
+            opPrec["||"] = prec;
+            prec++;
+            opPrec["&&"] = prec;
+            prec++;
+            opPrec["|"] = prec;
+            prec++;
+            opPrec["^"] = prec;
+            opPrec["&"] = prec;
+            prec++;
+            opPrec["=="] = prec;
+            opPrec["!="] = prec;
+            prec++;
+            opPrec[">="] = prec;
+            opPrec["<="] = prec;
+            opPrec[">"] = prec;
+            opPrec["<"] = prec;
+
+            prec++;
+            opPrec[">>"] = prec;
+            opPrec["<<"] = prec;
+            prec++;
+            opPrec["+"] = prec;
+            opPrec["-"] = prec;
+            prec++;
+            opPrec["*"] = prec;
+            opPrec["/"] = prec;
+            opPrec["%"] = prec;
+            prec++;
+            opPrec["."] = prec;
+            opAssoc = {{"+", 1},  {"-", 1}, {"*", 1}, {"/", 1},  {"!=", 1}, {"==", 1}, {">", 1}, {">=", 1},
+                       {"<=", 1}, {"<", 1}, {"%", 1}, {"&&", 1}, {"&", 1},  {"||", 1}, {"|", 1}};
+        }
     };
 } // namespace akari::asl
