@@ -126,6 +126,9 @@ namespace akari::asl {
             src = std::move(_s);
             while (cur()) {
                 skip_space();
+                if (!cur()) {
+                    break;
+                }
                 if (isalpha(cur()) || cur() == '_') {
                     std::string s;
                     while (isalnum(cur()) || cur() == '_') {
@@ -133,8 +136,7 @@ namespace akari::asl {
                         advance();
                     }
                     ts.emplace_back(Token{s, identifier, loc});
-                }
-                if (isdigit(cur())) {
+                } else if (isdigit(cur())) {
                     std::string s;
                     TokenType type = int_literal;
                     while (isdigit(cur())) {
@@ -151,15 +153,17 @@ namespace akari::asl {
                         }
                     }
                     ts.emplace_back(Token{s, type, loc});
-                }
-                if (op_char.count(cur())) {
+                } else if (op_char.count(cur())) {
                     ts.emplace_back(parse_symbol());
+                } else {
+                    fprintf(stderr, "stray token %s:%d:=%d\n", loc.filename.c_str(), loc.line, loc.col);
+                    throw std::runtime_error("Lexer error");
                 }
             }
             return ts;
         }
     };
-    Lexer::Lexer() :impl(std::make_shared<Impl>()){}
+    Lexer::Lexer() : impl(std::make_shared<Impl>()) {}
     const TokenStream &Lexer::operator()(const std::string &filename, const std::string &s) {
         return (*impl)(filename, s);
     }

@@ -192,6 +192,7 @@ namespace akari::asl {
                     auto call = std::make_shared<FunctionCallNode>();
                     call->func = e->cast<Identifier>();
                     call->args = parse_args();
+                    call->loc = call->func->loc;
                     return call;
                 }
                 error(cur().loc, "identifier expected in function call");
@@ -233,13 +234,35 @@ namespace akari::asl {
             error(cur().loc, fmt::format("unexpected token {}", cur().tok));
             return nullptr;
         }
+        ast::TypeDecl parse_typedecl() {
+            ast::TypeDecl p = parse_typename();
+            if (cur().tok == "[") {
+                std::vector<Expr> lengths;
+                while (cur().tok == "[") {
+                    consume();
+                    auto length = parse_expr();
+                    expect("]");
+                    lengths.emplace_back(length);
+                }
+                std::reverse(lengths.begin(), lengths.end());
+                for (auto length : lengths) {
+                    auto arr = std::make_shared<ast::ArrayDeclNode>();
+                    arr->loc = p->loc;
+                    arr->element_type = p;
+                    arr->length = length;
+                    p = arr;
+                }
+            }
+            return p;
+        }
         ast::Typename parse_typename() {
             if (typenames.at(cur().tok).has_value()) {
                 auto p = std::make_shared<ast::TypenameNode>(cur());
                 consume();
                 return p;
+            } else {
+                error(cur().loc, fmt::format("unknown typename {}", cur().tok));
             }
-            AKR_ASSERT(false);
         }
         ast::StructDecl parse_struct_decl() {
             expect("struct");
@@ -269,7 +292,7 @@ namespace akari::asl {
             return st;
         }
         ast::VarDecl parse_var_decl() {
-            auto ty = parse_typename();
+            auto ty = parse_typedecl();
             auto iden = parse_identifier();
             if (cur().tok == "=") {
                 consume();
@@ -382,7 +405,7 @@ namespace akari::asl {
         }
         ast::FunctionDecl parse_func_decl() {
             auto func = std::make_shared<FunctionDeclNode>();
-            func->type = parse_typename();
+            func->type = parse_typedecl();
             func->name = parse_identifier();
             expect("(");
             while (!end() && cur().tok != ")") {

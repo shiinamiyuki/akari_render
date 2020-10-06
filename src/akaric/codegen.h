@@ -28,7 +28,7 @@ namespace akari::asl {
     struct BuildConfig {};
     struct Module {
         std::string name;
-        std::vector<std::string> type_parameters; 
+        std::vector<std::string> type_parameters;
         std::vector<ast::TopLevel> translation_units;
     };
     class Mangler {
@@ -42,7 +42,7 @@ namespace akari::asl {
                 return fmt::format("ZS{}Zs", ty->cast<type::StructType>()->name);
             } else if (ty->isa<type::OpaqueType>()) {
                 return fmt::format("ZO{}Zo", ty->cast<type::OpaqueType>()->name);
-            }else {
+            } else {
                 AKR_ASSERT(false);
             }
         }
@@ -129,13 +129,14 @@ namespace akari::asl {
         };
         struct ValueRecord {
             Twine value;
-            type::Type type;
+            type::AnnotatedType annotated_type;
+            type::Type type() const { return annotated_type.type; }
         };
         Environment<std::string, ValueRecord> vars;
         std::unordered_map<std::string, type::StructType> structs;
         std::unordered_map<std::string, type::Type> types;
         std::unordered_map<std::string, FunctionRecord> prototypes;
-        type::Type process_type(const ast::AST &n);
+        type::AnnotatedType process_type(const ast::AST &n);
         type::StructType process_struct_decl(const ast::StructDecl &decl);
         void process_struct_decls();
         void process_prototypes();
@@ -161,6 +162,7 @@ namespace akari::asl {
             throw std::runtime_error(fmt::format("error: {} at {}:{}:{}", msg, loc.filename, loc.line, loc.col));
         }
         void add_type_parameters();
+
       public:
         CodeGenerator();
         std::string generate(const BuildConfig &config_, const Module &program_) {

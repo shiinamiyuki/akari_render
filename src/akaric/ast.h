@@ -23,11 +23,16 @@
 #include <json.hpp>
 #include <akaric/base.h>
 #include <akaric/lexer.h>
+#include <akaric/type.h>
 #include <fmt/format.h>
+#include <vector>
+#include <variant>
 namespace akari::asl::ast {
     using namespace nlohmann;
     class ASTNode : public Base {
       public:
+        ASTNode() = default;
+        ASTNode(SourceLocation loc) : loc(loc) {}
         SourceLocation loc;
         virtual void dump_json(json &j) const {
             j = json::object();
@@ -54,8 +59,11 @@ namespace akari::asl::ast {
         }
     };
     using Identifier = std::shared_ptr<IdentifierNode>;
-    class TypeDeclNode : public ASTNode {};
-    using TypeDecl = std::shared_ptr<TypeDeclNode>();
+    class TypeDeclNode : public ASTNode {
+      public:
+        type::Qualifier qualifier = type::Qualifier::none;
+    };
+    using TypeDecl = std::shared_ptr<TypeDeclNode>;
     class TypenameNode : public TypeDeclNode {
       public:
         AKR_DECL_NODE(TypenameNode)
@@ -225,9 +233,9 @@ namespace akari::asl::ast {
     class VarDeclNode : public ASTNode {
       public:
         Identifier var;
-        Typename type;
+        TypeDecl type;
         Expr init;
-        VarDeclNode(Identifier v, Typename type, Expr init = nullptr) : var(v), type(type), init(init) {}
+        VarDeclNode(Identifier v, TypeDecl type, Expr init = nullptr) : var(v), type(type), init(init) { loc = v->loc; }
         AKR_DECL_NODE(VarDeclNode)
         void dump_json(json &j) const {
             ASTNode::dump_json(j);
@@ -354,7 +362,7 @@ namespace akari::asl::ast {
       public:
         Identifier name;
         std::vector<VarDecl> parameters;
-        Typename type;
+        TypeDecl type;
         SeqStmt body;
         AKR_DECL_NODE(VarDeclNode)
         void dump_json(json &j) const {
@@ -383,6 +391,35 @@ namespace akari::asl::ast {
         }
     };
     using StructDecl = std::shared_ptr<StructDeclNode>;
+    class ArrayDeclNode : public TypeDeclNode {
+      public:
+        AKR_DECL_NODE(ArrayDeclNode)
+
+        TypeDecl element_type;
+        Expr length;
+
+        void dump_json(json &j) const {
+            ASTNode::dump_json(j);
+            element_type->dump_json(j["inner"]);
+            length->dump_json(j["length"]);
+        }
+    };
+    using ArrayDecl = std::shared_ptr<ArrayDeclNode>;
+    class BufferObjectNode : public ASTNode {
+      public:
+        AKR_DECL_NODE(BufferObjectNode)
+        int binding = -1;
+        std::string name;
+        std::vector<VarDecl> fields;
+    };
+    using ModuleParameter = std::variant<VarDecl, Typename>;
+    class ModuleDefNode : public ASTNode {
+      public:
+        AKR_DECL_NODE(ModuleDefNode)
+        std::string name;
+        std::vector<ModuleParameter> parameters;
+    };
+    using ModuleDef = std::shared_ptr<ModuleDefNode>;
     class TopLevelNode : public ASTNode {
       public:
         AKR_DECL_NODE(TopLevelNode)

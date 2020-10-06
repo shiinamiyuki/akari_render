@@ -49,7 +49,7 @@ namespace akari::asl {
             types[fmt::format("dvec{}", i)] = create_vec_type(type::float64, i);
         }
     }
-    type::Type CodeGenerator::process_type(const ast::AST &n) {
+    type::AnnotatedType CodeGenerator::process_type(const ast::AST &n) {
         if (n->isa<ast::VarDecl>()) {
             return process_type(n->cast<ast::VarDecl>()->type);
         }
@@ -67,9 +67,10 @@ namespace akari::asl {
             auto func = n->cast<ast::FunctionDecl>();
             auto ty = std::make_shared<type::FunctionTypeNode>();
             for (auto &a : func->parameters) {
-                ty->args.emplace_back(process_type(a->type));
+                ty->args.emplace_back(process_type(a->type).type);
             }
-            ty->ret = process_type(func->type);
+            auto ret = process_type(func->type);
+            ty->ret = ret.type;
             return ty;
         }
         AKR_ASSERT(false);
@@ -81,7 +82,7 @@ namespace akari::asl {
             type::StructField f;
             f.index = (int)st->fields.size();
             f.name = field->var->identifier;
-            f.type = t;
+            f.type = t.type;
             st->fields.emplace_back(f);
             return st;
         }
@@ -100,7 +101,7 @@ namespace akari::asl {
     void CodeGenerator::process_prototypes() {
         for (auto &m : module.translation_units) {
             for (auto &decl : m->funcs) {
-                auto f_ty = process_type(decl)->cast<type::FunctionType>();
+                auto f_ty = process_type(decl).type->cast<type::FunctionType>();
                 prototypes[decl->name->identifier].overloads.emplace(
                     Mangler().mangle(decl->name->identifier, f_ty->args), f_ty);
             }
@@ -113,7 +114,8 @@ namespace akari::asl {
 
       public:
         CodeGenCPP(bool is_cuda) : is_cuda(is_cuda) {}
-        static std::string type_to_str(const type::Type &ty) {
+        static std::string type_to_str(const type::AnnotatedType &anno) {
+            auto ty = anno.type;
             if (ty == type::float32) {
                 return "Float";
             }
@@ -152,7 +154,7 @@ namespace akari::asl {
                 error(var->loc, fmt::format("identifier {} not found", var->identifier));
             }
             auto r = vars.at(var->identifier).value();
-            return {var->identifier, r.type};
+            return {var->identifier, r.annotated_type};
         }
         ValueRecord compile_literal(const ast::Literal &lit) {
             if (lit->isa<ast::FloatLiteral>()) {
@@ -165,50 +167,63 @@ namespace akari::asl {
             }
             AKR_ASSERT(false);
         }
+
+        // type::Type check_binary_expr(const std::string &op, const type::Type &lhs, const type::Type &rhs) {
+
+        //     if (op == "<" || op == "<=" || op == ">" || op == ">=" || op == "!=" || op == "==") {
+        //         if (lhs->isa<type::VectorType>() || rhs->isa<type::VectorType>()) {
+        //             return nullptr;
+        //         }
+        //         return type::boolean;
+        //     }
+        //     if (op == "+" || op == "-" || op == "*" || op == "/") {
+        //         if()
+        //     }
+        // }
         std::tuple<type::Type, ValueRecord, ValueRecord> check_binary_expr(const std::string &op,
                                                                            const SourceLocation &loc,
                                                                            const ValueRecord &lhs,
                                                                            const ValueRecord &rhs) {
             if (op == "||" || op == "&&") {
-                if (lhs.type != type::boolean || rhs.type != type::boolean) {
-                    error(loc, fmt::format("illegal binary op '{}' with {} and {}", op, lhs.type->type_name(),
-                                           rhs.type->type_name()));
+                if (lhs.type() != type::boolean || rhs.type() != type::boolean) {
+                    error(loc, fmt::format("illegal binary op '{}' with {} and {}", op, lhs.type()->type_name(),
+                                           rhs.type()->type_name()));
                 }
                 return std::make_tuple(type::boolean, lhs, rhs);
             }
 
             if (op == "+" || op == "-" || op == "*" || op == "/") {
-                if (lhs.type == rhs.type) {
-                    return std::make_tuple(lhs.type, lhs, rhs);
+                if (lhs.type() == rhs.type()) {
+                    return std::make_tuple(lhs.type(), lhs, rhs);
                 }
-                if (lhs.type->isa<type::VectorType>() && rhs.type->isa<type::PrimitiveType>()) {
-                    auto vt = lhs.type->cast<type::VectorType>();
+                if (lhs.type()->isa<type::VectorType>() && rhs.type()->isa<type::PrimitiveType>()) {
+                    auto vt = lhs.type()->cast<type::VectorType>();
                     auto et = vt->element_type;
-                    if (et != rhs.type) {
-                        error(loc, fmt::format("illegal binary op '{}' with {} and {}", op, lhs.type->type_name(),
-                                               rhs.type->type_name()));
+                    if (et != rhs.type()) {
+                        error(loc, fmt::format("illegal binary op '{}' with {} and {}", op, lhs.type()->type_name(),
+                                               rhs.type()->type_name()));
                     }
-                    return std::make_tuple(lhs.type, lhs, ValueRecord{rhs.value, lhs.type});
-                } else if (rhs.type->isa<type::VectorType>() && lhs.type->isa<type::PrimitiveType>()) {
-                    auto vt = rhs.type->cast<type::VectorType>();
+                    return std::make_tuple(lhs.type(), lhs, ValueRecord{rhs.value, lhs.type()});
+                } else if (rhs.type()->isa<type::VectorType>() && lhs.type()->isa<type::PrimitiveType>()) {
+                    auto vt = rhs.type()->cast<type::VectorType>();
                     auto et = vt->element_type;
-                    if (et != rhs.type) {
-                        error(loc, fmt::format("illegal binary op '{}' with {} and {}", op, lhs.type->type_name(),
-                                               rhs.type->type_name()));
+                    if (et != rhs.type()) {
+                        error(loc, fmt::format("illegal binary op '{}' with {} and {}", op, lhs.type()->type_name(),
+                                               rhs.type()->type_name()));
                     }
-                    return std::make_tuple(rhs.type, ValueRecord{lhs.value, rhs.type}, rhs);
+                    return std::make_tuple(rhs.type(), ValueRecord{lhs.value, rhs.type()}, rhs);
                 } else {
-                    error(loc, fmt::format("illegal binary op '{}' with {} and {}", op, lhs.type->type_name(),
-                                           rhs.type->type_name()));
+                    error(loc, fmt::format("illegal binary op '{}' with {} and {}", op, lhs.type()->type_name(),
+                                           rhs.type()->type_name()));
                 }
             } else if (op == "<" || op == "<=" || op == ">" || op == ">=" || op == "!=" || op == "==") {
-                if (lhs.type->isa<type::VectorType>() || rhs.type->isa<type::VectorType>()) {
-                    error(loc, fmt::format("illegal binary op '{}' with {} and {}", op, lhs.type->type_name(),
-                                           rhs.type->type_name()));
+                if (lhs.type()->isa<type::VectorType>() || rhs.type()->isa<type::VectorType>()) {
+                    error(loc, fmt::format("illegal binary op '{}' with {} and {}", op, lhs.type()->type_name(),
+                                           rhs.type()->type_name()));
                 }
-                if (lhs.type != rhs.type) {
-                    error(loc, fmt::format("illegal binary op '{}' with {} and {}", op, lhs.type->type_name(),
-                                           rhs.type->type_name()));
+                if (lhs.type() != rhs.type()) {
+                    error(loc, fmt::format("illegal binary op '{}' with {} and {}", op, lhs.type()->type_name(),
+                                           rhs.type()->type_name()));
                 }
                 return std::make_tuple(type::boolean, lhs, rhs);
             }
@@ -236,14 +251,14 @@ namespace akari::asl {
             if (this_prec > prec_left) {
                 left = Twine::concat("(", left).append(")");
             }
-            if (this_prec > prec_right) {
+            if (this_prec > prec_right || op == "/" || op == "%" || op == "-") {
                 right = Twine::concat("(", right).append(")");
             }
             return {Twine::concat(left, " " + op + " ", right), ty};
         }
         ValueRecord compile_ctor_call(const ast::ConstructorCall &call) {
             auto type = process_type(call->type);
-            auto ctor_name = type_to_str(type);
+            auto ctor_name = type_to_str(type.type);
             std::vector<ValueRecord> args;
             for (int i = 0; i < call->args.size(); i++) {
                 auto arg = compile_expr(call->args[i]);
@@ -268,11 +283,11 @@ namespace akari::asl {
                 auto arg = compile_expr(call->args[i]);
                 // auto &arg_ty = arg.type;
                 args.emplace_back(arg);
-                arg_types.emplace_back(arg.type);
+                arg_types.emplace_back(arg.type());
             }
             auto mangled_name = Mangler().mangle(func, arg_types);
             if (prototypes.find(func) == prototypes.end()) {
-                error(call->loc, fmt::format("no function named", func));
+                error(call->loc, fmt::format("no function named {}", func));
             }
             auto &rec = prototypes.at(func);
             if (rec.overloads.find(mangled_name) == rec.overloads.end()) {
@@ -294,8 +309,8 @@ namespace akari::asl {
         }
         ValueRecord compile_member_access(const ast::MemberAccess &access) {
             auto agg = compile_expr(access->var);
-            if (agg.type->isa<type::VectorType>()) {
-                auto v = agg.type->cast<type::VectorType>();
+            if (agg.type()->isa<type::VectorType>()) {
+                auto v = agg.type()->cast<type::VectorType>();
                 auto member = access->member;
                 return {agg.value.append("." + member), v->element_type};
             }
@@ -332,7 +347,7 @@ namespace akari::asl {
         }
         void compile_if(std::ostringstream &os, const ast::IfStmt &st) {
             auto cond = compile_expr(st->cond);
-            if (cond.type != type::boolean) {
+            if (cond.type() != type::boolean) {
                 error(st->cond->loc, "if cond must be boolean expression");
             }
             wl(os, "if({})", cond.value.str());
@@ -344,9 +359,9 @@ namespace akari::asl {
         }
         void compile_while(std::ostringstream &os, const ast::WhileStmt &st) {
             auto cond = compile_expr(st->cond);
-            if (cond.type != type::boolean) {
+            if (cond.type() != type::boolean) {
                 error(st->cond->loc,
-                      fmt::format("while cond must be boolean expression but have {}", type_to_str(cond.type)));
+                      fmt::format("while cond must be boolean expression but have {}", type_to_str(cond.type())));
             }
             wl(os, "while({})", cond.value.str());
             auto_indent(st->body, [&] {
@@ -367,6 +382,9 @@ namespace akari::asl {
                 s.append(" = ").append(init.value);
             }
             wl(os, "{};", s.str());
+            if (vars.frame->at(decl->var->identifier)) {
+                error(decl->loc, fmt::format("{} is already defined", decl->var->identifier));
+            }
             vars.insert(decl->var->identifier, {decl->var->identifier, ty});
         }
         void compile_assignment(std::ostringstream &os, const ast::Assignment &asgn) {
@@ -419,7 +437,7 @@ namespace akari::asl {
             wl(os, "}}");
         }
         Twine gen_func_prototype(const ast::FunctionDecl &func, bool is_def) {
-            auto f_ty = process_type(func)->cast<type::FunctionType>();
+            auto f_ty = process_type(func).type->cast<type::FunctionType>();
             Twine s(type_to_str(f_ty->ret));
             s.append(" ").append(func->name->identifier).append("(");
             int cnt = 0;
@@ -433,6 +451,7 @@ namespace akari::asl {
                 if (is_def) {
                     vars.insert(name, {name, process_type(ty)});
                 }
+                cnt++;
             }
             s.append(")");
             return s;

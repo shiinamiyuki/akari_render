@@ -23,8 +23,19 @@
 
 #include <akaric/base.h>
 namespace akari::asl::type {
+    enum Qualifier {
+        none = 0,
+        in = 1,
+        out = 1 << 1,
+        inout = in | out,
+        const_ = 1 << 2,
+        read = 1 << 3,
+        write = 1 << 4,
+        uniform = 1 << 5,
+    };
     class TypeNode : public Base {
       public:
+        Qualifier qualifier = Qualifier::none;
         // scalar, vector, ...
         virtual bool is_float() const { return false; }
         virtual bool is_int() const { return false; }
@@ -39,7 +50,7 @@ namespace akari::asl::type {
     class OpaqueTypeNode : public TypeNode {
       public:
         AKR_DECL_TYPENODE(OpaqueTypeNode)
-        OpaqueTypeNode(const std::string & name):name(name){}
+        OpaqueTypeNode(const std::string &name) : name(name) {}
         std::string name;
     };
     using OpaqueType = std::shared_ptr<OpaqueTypeNode>;
@@ -134,5 +145,11 @@ namespace akari::asl::type {
         bool is_aggregate() const override { return false; }
     };
     using VectorType = std::shared_ptr<VectorTypeNode>;
+
+    struct AnnotatedType {
+        Type type;
+        Qualifier qualifier = Qualifier::none;
+        AnnotatedType(Type type):type(type){}
+    };
 
 } // namespace akari::asl::type
