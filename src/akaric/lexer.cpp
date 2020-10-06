@@ -25,8 +25,8 @@
 #include <set>
 namespace akari::asl {
     static std::set<std::string> keywords = {
-        "in",    "out", "inout", "uniform", "const", "if",       "else",
-        "while", "for", "do",    "return",  "break", "continue", "struct",
+        "in",  "out", "inout",  "uniform", "const",    "if",     "else",   "while",
+        "for", "do",  "return", "break",   "continue", "struct", "buffer", "auto",
     };
     static std::vector<std::set<std::string>> operators = {
         {"&&=", "||=", ">>=", "<<=", "..."},

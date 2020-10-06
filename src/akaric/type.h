@@ -54,7 +54,11 @@ namespace akari::asl::type {
         std::string name;
     };
     using OpaqueType = std::shared_ptr<OpaqueTypeNode>;
-
+    class VoidTypeNode : public TypeNode {
+      public:
+        AKR_DECL_TYPENODE(VoidTypeNode)
+    };
+    using VoidType = std::shared_ptr<VoidTypeNode>;
     class PrimitiveTypeNode : public TypeNode {
       public:
         virtual size_t width() const { return 0; }
@@ -112,6 +116,7 @@ namespace akari::asl::type {
     extern PrimitiveType uint32;
     extern PrimitiveType float32;
     extern PrimitiveType float64;
+    extern VoidType void_;
 
     struct StructField {
         std::string name;
@@ -149,7 +154,8 @@ namespace akari::asl::type {
     struct AnnotatedType {
         Type type;
         Qualifier qualifier = Qualifier::none;
-        AnnotatedType(Type type):type(type){}
+        AnnotatedType(Type type) : type(type) {}
+        AnnotatedType(Type type, Qualifier qualifier) : type(type), qualifier(qualifier) {}
     };
 
 } // namespace akari::asl::type

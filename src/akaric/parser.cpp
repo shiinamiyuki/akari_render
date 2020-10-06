@@ -26,6 +26,7 @@
 #include <unordered_set>
 namespace akari::asl {
     using namespace ast;
+    static std::unordered_set<std::string> qualifiers = {"in", "out", "inout", "const", "uniform"};
     class Parser::Impl {
         friend class Parser;
         TokenStream ts;
@@ -91,6 +92,7 @@ namespace akari::asl {
             assignOps = {
                 "=", "+=", "-=", "*=", "/=", ">>=", "<<=", "%=", "|=", "&=", "^=", "&&=", "||=",
             };
+            typenames.insert("void", true);
             typenames.insert("bool", true);
             typenames.insert("int", true);
             typenames.insert("uint", true);
@@ -255,9 +257,29 @@ namespace akari::asl {
             }
             return p;
         }
+        bool is_qualifier() { return qualifiers.find(cur().tok) != qualifiers.end(); }
         ast::Typename parse_typename() {
-            if (typenames.at(cur().tok).has_value()) {
+            if (typenames.at(cur().tok).has_value() || is_qualifier()) {
+                type::Qualifier qualifier = type::Qualifier::none;
+                while (is_qualifier()) {
+                    auto q = cur().tok;
+                    consume();
+                    if (q == "uniform") {
+                        qualifier = type::Qualifier(qualifier | type::Qualifier::uniform);
+                    } else if (q == "in") {
+                        qualifier = type::Qualifier(qualifier | type::Qualifier::in);
+                    } else if (q == "out") {
+                        qualifier = type::Qualifier(qualifier | type::Qualifier::out);
+                    } else if (q == "inout") {
+                        qualifier = type::Qualifier(qualifier | type::Qualifier::inout);
+                    }else if (q == "const") {
+                        qualifier = type::Qualifier(qualifier | type::Qualifier::const_);
+                    } else {
+                        AKR_ASSERT(false);
+                    }
+                }
                 auto p = std::make_shared<ast::TypenameNode>(cur());
+                p->qualifier = qualifier;
                 consume();
                 return p;
             } else {
@@ -300,6 +322,11 @@ namespace akari::asl {
                 return std::make_shared<VarDeclNode>(iden, ty, init);
             }
             return std::make_shared<VarDeclNode>(iden, ty, nullptr);
+        }
+        ast::ParameterDecl parse_parameter_decl() {
+            auto ty = parse_typedecl();
+            auto iden = parse_identifier();
+            return std::make_shared<ParameterDeclNode>(iden, ty);
         }
         ast::VarDeclStmt parse_var_decl_stmt() {
             auto st = std::make_shared<VarDeclStatementNode>(parse_var_decl());
@@ -409,7 +436,7 @@ namespace akari::asl {
             func->name = parse_identifier();
             expect("(");
             while (!end() && cur().tok != ")") {
-                func->parameters.emplace_back(parse_var_decl());
+                func->parameters.emplace_back(parse_parameter_decl());
                 if (cur().tok == ",") {
                     consume();
                     if (cur().tok == ")") {

@@ -35,6 +35,10 @@ float TanTheta(vec3 w){
 }
 float sqrt(float v);
 
+void setZero(inout float v){
+    v = 0.0;
+}
+
 float GGX_D(float alpha, vec3 m) {
     if (m.y <= 0.0)
         return 0.0;

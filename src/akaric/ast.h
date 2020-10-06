@@ -229,7 +229,20 @@ namespace akari::asl::ast {
             operand->dump_json(j["operand"]);
         }
     };
-
+    class ParameterDeclNode : public ASTNode {
+      public:
+        Identifier var;
+        TypeDecl type;
+        ParameterDeclNode(Identifier v, TypeDecl type) : var(v), type(type) { loc = v->loc; }
+        AKR_DECL_NODE(ParameterDeclNode)
+        void dump_json(json &j) const {
+            ASTNode::dump_json(j);
+            if (var)
+                var->dump_json(j["var"]);
+            type->dump_json(j["type"]);
+        }
+    };
+    using ParameterDecl = std::shared_ptr<ParameterDeclNode>;
     class VarDeclNode : public ASTNode {
       public:
         Identifier var;
@@ -361,7 +374,7 @@ namespace akari::asl::ast {
     class FunctionDeclNode : public ASTNode {
       public:
         Identifier name;
-        std::vector<VarDecl> parameters;
+        std::vector<ParameterDecl> parameters;
         TypeDecl type;
         SeqStmt body;
         AKR_DECL_NODE(VarDeclNode)

@@ -44,6 +44,10 @@ namespace akari::asl {
             return sqrt(Tan2Theta(w));
         }
         __host__ __device__ Float sqrt(Float v);
+        __host__ __device__ void setZero(Float & v)
+        {
+            v = 0.0;
+        }
         __host__ __device__ Float GGX_D(Float alpha, Float3 m)
         {
             if(m.y <= 0.0)

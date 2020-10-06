@@ -37,6 +37,7 @@ namespace akari::asl {
         }
     }
     void CodeGenerator::add_predefined_types() {
+        types["void"] = type::void_;
         types["bool"] = type::boolean;
         types["int"] = type::int32;
         types["uint"] = type::uint32;
@@ -49,6 +50,7 @@ namespace akari::asl {
             types[fmt::format("dvec{}", i)] = create_vec_type(type::float64, i);
         }
     }
+    type::Qualifier process_qualifier(const ast::TypeDecl &decl) { return decl->qualifier; }
     type::AnnotatedType CodeGenerator::process_type(const ast::AST &n) {
         if (n->isa<ast::VarDecl>()) {
             return process_type(n->cast<ast::VarDecl>()->type);
@@ -58,7 +60,8 @@ namespace akari::asl {
             if (!types.count(ty->name)) {
                 throw std::runtime_error(fmt::format("definition of type {} not found", ty->name));
             }
-            return types.at(ty->name);
+            auto t = types.at(ty->name);
+            return type::AnnotatedType{t, process_qualifier(ty)};
         }
         if (n->isa<ast::StructDecl>()) {
             return process_struct_decl(n->cast<ast::StructDecl>());
@@ -114,8 +117,7 @@ namespace akari::asl {
 
       public:
         CodeGenCPP(bool is_cuda) : is_cuda(is_cuda) {}
-        static std::string type_to_str(const type::AnnotatedType &anno) {
-            auto ty = anno.type;
+        static std::string _type_to_str(const type::Type &ty) {
             if (ty == type::float32) {
                 return "Float";
             }
@@ -147,7 +149,22 @@ namespace akari::asl {
             if (ty->isa<type::StructType>()) {
                 return ty->cast<type::StructType>()->name;
             }
+            if (ty->isa<type::VoidType>()) {
+                return "void";
+            }
             AKR_ASSERT(false);
+        }
+
+        static std::string type_to_str(const type::AnnotatedType &anno) {
+            auto ty = anno.type;
+            auto s = _type_to_str(ty);
+            if (anno.qualifier & type::Qualifier::out) {
+                s = s + " &";
+            }
+            if (anno.qualifier & type::Qualifier::const_) {
+                s = "const " + s;
+            }
+            return s;
         }
         ValueRecord compile_var(const ast::Identifier &var) {
             if (!vars.at(var->identifier).has_value()) {

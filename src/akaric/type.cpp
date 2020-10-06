@@ -29,5 +29,6 @@ namespace akari::asl {
         PrimitiveType uint32 = std::make_shared<PrimitiveTypeUint32>();
         PrimitiveType float32 = std::make_shared<PrimitiveTypeFloat32>();
         PrimitiveType float64 = std::make_shared<PrimitiveTypeFloat64>();
+        VoidType void_ = std::make_shared<VoidTypeNode>();
     } // namespace type
 } // namespace akari::asl
