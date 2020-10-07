@@ -26,26 +26,10 @@
 #include <akaric/parser.h>
 namespace akari::asl {
     struct BuildConfig {};
-    struct ModuleInstance;
-    using ModuleArgument = std::variant<int, type::Type>;
     struct Module {
         std::string name;
-        struct Parameter {
-            bool is_type_parameter;
-            std::string name;
-        };
-        std::vector<Parameter> parameters;
-        ast::TopLevel body;
-        std::vector<std::shared_ptr<ModuleInstance>> imported_modules;
-
-        static std::shared_ptr<ModuleInstance> instantiate(const std::shared_ptr<Module> &module,
-                                                           std::vector<ModuleArgument> args);
-    };
-    struct ModuleInstance {
-        std::string name;
-        std::weak_ptr<Module> module;
-        std::vector<ModuleArgument> args;
-        ast::TopLevel body;
+        std::vector<std::string> type_parameters;
+        std::vector<ast::TopLevel> translation_units;
     };
 
     class Mangler {
@@ -139,42 +123,8 @@ namespace akari::asl {
             return os.str();
         }
     };
-    struct ModuledName {
-        std::vector<std::string> modules;
-        std::string name;
-        ModuledName() = default;
-        ModuledName(const char *name) : name(name) {}
-        ModuledName(std::string name) : name(name) {}
-        ModuledName(std::vector<std::string> modules, std::string name) : modules(modules), name(name) {}
-        struct Hash {
-            size_t operator()(const ModuledName &name) const {
-                auto h = std::hash<std::string>();
-                size_t x = h(name.name);
-                for (auto &m : name.modules) {
-                    x = x ^ h(m);
-                }
-                return x;
-            }
-        };
-        struct Eq {
-            bool operator()(const ModuledName &a, const ModuledName &b) const {
-                if (a.name != b.name)
-                    return false;
-                if (a.modules.size() != b.modules.size())
-                    return false;
-                for (size_t i = 0; i < a.modules.size(); i++) {
-                    if (a.modules[i] != b.modules[i])
-                        return false;
-                }
-                return true;
-            }
-        };
-    };
-
     class CodeGenerator {
       protected:
-        template <typename T>
-        using ModuledMap = std::unordered_map<ModuledName, T, ModuledName::Hash, ModuledName::Eq>;
         struct FunctionRecord {
             std::unordered_map<std::string, type::FunctionType> overloads;
         };
@@ -184,15 +134,15 @@ namespace akari::asl {
             type::Type type() const { return annotated_type.type; }
         };
         Environment<std::string, ValueRecord> vars;
-        ModuledMap<type::StructType> structs;
-        ModuledMap<type::Type> types;
-        ModuledMap<FunctionRecord> prototypes;
+        std::unordered_map<std::string, type::StructType> structs;
+        std::unordered_map<std::string, type::Type> types;
+        std::unordered_map<std::string, FunctionRecord> prototypes;
         type::AnnotatedType process_type(const ast::AST &n);
         type::StructType process_struct_decl(const ast::StructDecl &decl);
         void process_struct_decls();
         void process_prototypes();
         void add_predefined_types();
-        std::shared_ptr<Module> module;
+        Module module;
         BuildConfig config;
         virtual std::string do_generate() = 0;
         int indent = 0;
@@ -216,7 +166,7 @@ namespace akari::asl {
 
       public:
         CodeGenerator();
-        std::string generate(const BuildConfig &config_, const std::shared_ptr<Module> &module_) {
+        std::string generate(const BuildConfig &config_, const Module &module_) {
             this->config = config_;
             this->module = module_;
             add_type_parameters();

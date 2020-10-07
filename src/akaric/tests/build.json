@@ -1,0 +1,10 @@
+{
+    "name": "Test",
+    "type-parameters": [
+        "Spectrum"
+    ],
+    "src": [
+        "test.asl",
+        "foo.asl"
+    ]
+}

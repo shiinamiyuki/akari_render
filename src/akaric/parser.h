@@ -24,7 +24,10 @@
 #include <optional>
 #include <akaric/ast.h>
 namespace akari::asl {
-
+    struct TranslationUnit {
+        std::string filename;
+        ast::TopLevel tree;
+    };
     class Parser {
         class Impl;
 
@@ -40,16 +43,15 @@ namespace akari::asl {
 
       private:
         std::unordered_map<std::string, ParseRecord> parsed_modules;
-        std::vector<std::string> module_search_path;
+        std::unordered_set<std::string> type_parameters;
         const std::unordered_set<std::string> &resolve_typenames(const std::string &full_path);
-        fs::path resolve_module(const fs::path &current_file, const std::string &module);
         void init_parse_record(const std::string &full_path);
         ast::TopLevel parse(const std::string &full_path);
-        
 
       public:
         Parser();
-        ast::TopLevel operator()(const std::string &filename);
+        std::vector<TranslationUnit> operator()(const std::vector<std::string> &filenames);
+        void add_type_parameter(const std::string &type) { type_parameters.insert(type); }
     };
 
     struct OperatorPrecedence {

@@ -20,6 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <json.hpp>
 #include <cxxopts.hpp>
 #include <fstream>
 #include <akari/core/akari.h>
@@ -43,7 +44,7 @@ void parse(int argc, const char **argv) {
         options.show_positional_help();
         {
             auto opt = options.allow_unrecognised_options().add_options();
-            opt("i,input", "Input filename", cxxopts::value<std::string>());
+            opt("i,input", "Input: A build.json file", cxxopts::value<std::string>());
             opt("o,output", "Output filename", cxxopts::value<std::string>());
             opt("b, backend", backend_help, cxxopts::value<std::string>());
             opt("v,verbose", "Verbose output (includes debug info)");
@@ -54,8 +55,6 @@ void parse(int argc, const char **argv) {
                 std::cerr << options.help() << std::endl;
                 fmt::print(stderr, "error: Input file must be provided\n");
                 exit(1);
-            } else {
-                input = result["input"].as<std::string>();
             }
             if (!result.count("output")) {
 
@@ -66,7 +65,7 @@ void parse(int argc, const char **argv) {
             if (result.count("verbose")) {
                 verbose = true;
             }
-
+            input = result["input"].as<std::string>();
             output = result["output"].as<std::string>();
             if (!result.count("backend")) {
                 auto ext = fs::path(output).extension().string();
@@ -89,7 +88,35 @@ int main(int argc, const char **argv) {
     using namespace nlohmann;
     try {
         parse(argc, argv);
+        json build_config;
+        {
+            std::ifstream in(input);
+            std::stringstream src;
+            src << in.rdbuf();
+            build_config = json::parse(src.str());
+        }
+        if (!build_config.contains("name")) {
+            std::cerr << "module name must be specified" << std::endl;
+            exit(1);
+        }
+        if (!build_config.contains("src")) {
+            std::cerr << "source files must be specified" << std::endl;
+            exit(1);
+        }
         Parser parser;
+        Module module;
+        module.name = build_config["name"].get<std::string>();
+        if (build_config.contains("type-parameters")) {
+            auto params = build_config["type-parameters"];
+            if (!params.is_array()) {
+                std::cerr << "type-parameters must be array" << std::endl;
+                exit(1);
+            }
+            for (auto &p : params) {
+                module.type_parameters.emplace_back(p.get<std::string>());
+                parser.add_type_parameter(p.get<std::string>());
+            }
+        }
 
         std::unique_ptr<CodeGenerator> codegen;
         if (backend == "cpp") {
@@ -100,17 +127,19 @@ int main(int argc, const char **argv) {
             std::cerr << backend << " backend is not implemented" << std::endl;
             exit(1);
         }
-
-        auto toplevel = parser(input);
-        if (verbose) {
-            json _;
-            toplevel->dump_json(_);
-            std::cout << _.dump(1) << std::endl;
+        std::vector<std::string> sources;
+        for (auto src_file : build_config["src"]) {
+            sources.emplace_back(src_file.get<std::string>());
         }
-        // module.translation_units.emplace_back(toplevel);
-        auto module = std::make_shared<Module>();
-        module->body = toplevel;
-        module->name = toplevel->module_def.name;
+        auto out = parser(sources);
+        for (auto &unit : out) {
+            if (verbose) {
+                json _;
+                unit.tree->dump_json(_);
+                std::cout << _.dump(1) << std::endl;
+            }
+            module.translation_units.emplace_back(unit.tree);
+        }
         std::ofstream os(output);
         os << codegen->generate(BuildConfig{}, module);
     } catch (std::exception &e) {

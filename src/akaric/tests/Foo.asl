@@ -1,5 +1,3 @@
-module Foo;
-
-int foo(){
-    return 0;
+vec3 sqr(vec3 x){
+    return x * x;
 }

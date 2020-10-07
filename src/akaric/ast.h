@@ -60,25 +60,7 @@ namespace akari::asl::ast {
         }
     };
     using Identifier = std::shared_ptr<IdentifierNode>;
-    class ModuleIdentifierNode : public ExpressionNode {
-      public:
-        AKR_DECL_NODE(ModuleIdentifierNode)
-        ModuleIdentifierNode()=default;
-        ModuleIdentifierNode(const Identifier & i):identifier(i){
-          loc = i->loc;
-        }
-        std::vector<std::string> module_chain;
-        Identifier identifier;
-        void dump_json(json &j) const {
-            ASTNode::dump_json(j);
-            identifier->dump_json(j["identifier"]);
-            j["module_chain"] = json::array();
-            for (auto &s : module_chain) {
-                j["module_chain"].push_back(s);
-            }
-        }
-    };
-    using ModuleIdentifier = std::shared_ptr<ModuleIdentifierNode>;
+
     class TypeDeclNode : public ASTNode {
       public:
         type::Qualifier qualifier = type::Qualifier::none;
@@ -98,25 +80,7 @@ namespace akari::asl::ast {
         }
     };
     using Typename = std::shared_ptr<TypenameNode>;
-    class ModuleTypenameNode : public TypeDeclNode {
-      public:
-        AKR_DECL_NODE(ModuleTypenameNode)
-        ModuleTypenameNode()=default;
-        ModuleTypenameNode(Typename type):name(type){
-          loc = type->loc;
-        }
-        std::vector<std::string> module_chain;
-        Typename name;
-        void dump_json(json &j) const {
-            ASTNode::dump_json(j);
-            name->dump_json(j["identifier"]);
-            j["module_chain"] = json::array();
-            for (auto &s : module_chain) {
-                j["module_chain"].push_back(s);
-            }
-        }
-    };
-    using ModuleTypename = std::shared_ptr<ModuleTypenameNode>;
+
     class LiteralNode : public ExpressionNode {
       public:
         AKR_DECL_NODE(LiteralNode)
@@ -172,7 +136,7 @@ namespace akari::asl::ast {
     class FunctionCallNode : public ExpressionNode {
       public:
         AKR_DECL_NODE(FunctionCallNode)
-        ModuleIdentifier func;
+        Identifier func;
         std::vector<Expr> args;
         void dump_json(json &j) const {
             ASTNode::dump_json(j);
@@ -189,7 +153,7 @@ namespace akari::asl::ast {
     class ConstructorCallNode : public ExpressionNode {
       public:
         AKR_DECL_NODE(ConstructorCallNode)
-        ModuleTypename type;
+        Typename type;
         std::vector<Expr> args;
         void dump_json(json &j) const {
             ASTNode::dump_json(j);
@@ -451,23 +415,14 @@ namespace akari::asl::ast {
     using ModuleParameter = std::variant<VarDecl, Typename>;
     class TopLevelNode;
     using TopLevel = std::shared_ptr<TopLevelNode>;
-    struct ModuleDef {
-      public:
-        std::string name;
-        std::vector<ModuleParameter> parameters;
-        std::vector<std::weak_ptr<TopLevelNode>> imported;
-        inline void dump_json(json &j) const;
-    };
     class TopLevelNode : public ASTNode {
       public:
         AKR_DECL_NODE(TopLevelNode)
-        ModuleDef module_def;
         std::vector<FunctionDecl> funcs;
         std::vector<StructDecl> structs;
         std::unordered_set<std::string> typenames;
         void dump_json(json &j) const {
             ASTNode::dump_json(j);
-            module_def.dump_json(j["module"]);
             j["structs"] = json::array();
             for (auto &s : structs) {
                 auto k = json::object();
@@ -482,13 +437,4 @@ namespace akari::asl::ast {
             }
         }
     };
-    inline void ModuleDef::dump_json(json &j) const {
-        j["name"] = name;
-        j["imported"] = json::array();
-        for (auto &i : imported) {
-            if (auto p = i.lock()) {
-                j["imported"].push_back(p->module_def.name);
-            }
-        }
-    }
 } // namespace akari::asl::ast

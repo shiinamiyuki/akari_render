@@ -1,17 +1,9 @@
-module Test;
-// import Another(Spectrum) as Another;
 
 vec3 foo(){
     return vec3(0.0);
 }
 vec3 pow4(vec3 x){
-    int i =0;
-    vec3 p = vec3(1.0);
-    while(i < 4){
-        p *= x;
-        i += 1;
-    }
-    return p;//hello
+    return sqr(x) * sqr(x);
 }
 float CosTheta(vec3 w){
     return w.y;
