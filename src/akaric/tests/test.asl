@@ -1,4 +1,15 @@
-
+struct Light {
+    vec3 pos;
+    vec3 color;
+}
+buffer Light[] lights;
+vec3 L(){
+    vec3 res = vec3(0.0);
+    for(uint i = uint(0); i < lights.length; i+=1){
+        res += lights[i].color;
+    }
+    return res;
+}
 vec3 foo(){
     return vec3(0.0);
 }

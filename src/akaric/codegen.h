@@ -131,6 +131,7 @@ namespace akari::asl {
         struct ValueRecord {
             Twine value;
             type::AnnotatedType annotated_type;
+            ValueRecord() = default;
             type::Type type() const { return annotated_type.type; }
         };
         Environment<std::string, ValueRecord> vars;
@@ -139,6 +140,8 @@ namespace akari::asl {
         std::unordered_map<std::string, FunctionRecord> prototypes;
         type::AnnotatedType process_type(const ast::AST &n);
         type::StructType process_struct_decl(const ast::StructDecl &decl);
+        void process_buffer_decls();
+        void process_uniform_decls();
         void process_struct_decls();
         void process_prototypes();
         void add_predefined_types();
@@ -162,6 +165,9 @@ namespace akari::asl {
         [[noreturn]] void error(const SourceLocation &loc, std::string &&msg) {
             throw std::runtime_error(fmt::format("error: {} at {}:{}:{}", msg, loc.filename, loc.line, loc.col));
         }
+        void warning(const SourceLocation &loc, std::string &&msg) {
+            fmt::print("warning: {} at {}:{}:{}", msg, loc.filename, loc.line, loc.col);
+        }
         void add_type_parameters();
 
       public:
@@ -172,6 +178,8 @@ namespace akari::asl {
             add_type_parameters();
             process_struct_decls();
             process_prototypes();
+            process_buffer_decls();
+            process_uniform_decls();
             return do_generate();
         }
     };

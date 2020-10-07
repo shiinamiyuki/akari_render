@@ -150,7 +150,18 @@ namespace akari::asl::type {
         bool is_aggregate() const override { return false; }
     };
     using VectorType = std::shared_ptr<VectorTypeNode>;
-
+    class ArrayTypeNode : public TypeNode {
+      public:
+        AKR_DECL_TYPENODE(ArrayTypeNode)
+        ArrayTypeNode(Type e, int l) : element_type(e), length(l) {}
+        Type element_type;
+        int length = -1;
+        bool is_float() const override { return element_type->is_float(); }
+        bool is_int() const override { return element_type->is_int(); }
+        bool is_signed_int() const override { return element_type->is_signed_int(); }
+        bool is_aggregate() const override { return false; }
+    };
+    using ArrayType = std::shared_ptr<ArrayTypeNode>;
     struct AnnotatedType {
         Type type;
         Qualifier qualifier = Qualifier::none;

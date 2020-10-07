@@ -401,7 +401,8 @@ namespace akari::asl::ast {
         void dump_json(json &j) const {
             ASTNode::dump_json(j);
             element_type->dump_json(j["inner"]);
-            length->dump_json(j["length"]);
+            if (length)
+                length->dump_json(j["length"]);
         }
     };
     using ArrayDecl = std::shared_ptr<ArrayDeclNode>;
@@ -409,9 +410,26 @@ namespace akari::asl::ast {
       public:
         AKR_DECL_NODE(BufferObjectNode)
         int binding = -1;
-        std::string name;
-        std::vector<VarDecl> fields;
+        BufferObjectNode(VarDecl var) : var(var) { loc = var->loc; }
+        VarDecl var;
+        void dump_json(json &j) const {
+            ASTNode::dump_json(j);
+            var->dump_json(j["var"]);
+        }
     };
+    using BufferObject = std::shared_ptr<BufferObjectNode>;
+    class UniformVarNode : public ASTNode {
+      public:
+        AKR_DECL_NODE(UniformVarNode)
+        int binding = -1;
+        UniformVarNode(VarDecl var) : var(var) { loc = var->loc; }
+        VarDecl var;
+        void dump_json(json &j) const {
+            ASTNode::dump_json(j);
+            var->dump_json(j["var"]);
+        }
+    };
+    using UniformVar = std::shared_ptr<UniformVarNode>;
     using ModuleParameter = std::variant<VarDecl, Typename>;
     class TopLevelNode;
     using TopLevel = std::shared_ptr<TopLevelNode>;
@@ -420,6 +438,8 @@ namespace akari::asl::ast {
         AKR_DECL_NODE(TopLevelNode)
         std::vector<FunctionDecl> funcs;
         std::vector<StructDecl> structs;
+        std::vector<BufferObject> buffers;
+        std::vector<UniformVar> uniforms;
         std::unordered_set<std::string> typenames;
         void dump_json(json &j) const {
             ASTNode::dump_json(j);
@@ -434,6 +454,18 @@ namespace akari::asl::ast {
                 auto k = json::object();
                 s->dump_json(k);
                 j["funcs"].push_back(k);
+            }
+            j["buffers"] = json::array();
+            for (auto &s : buffers) {
+                auto k = json::object();
+                s->dump_json(k);
+                j["buffers"].push_back(k);
+            }
+            j["uniforms"] = json::array();
+            for (auto &s : uniforms) {
+                auto k = json::object();
+                s->dump_json(k);
+                j["uniforms"].push_back(k);
             }
         }
     };

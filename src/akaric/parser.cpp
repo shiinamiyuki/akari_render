@@ -125,8 +125,18 @@ namespace akari::asl {
         [[noreturn]] void error(const SourceLocation &loc, std::string &&msg) {
             throw std::runtime_error(fmt::format("error: {} at {}:{}:{}", msg, loc.filename, loc.line, loc.col));
         }
-        std::string identifier_fullname(const std::string &iden) { return iden; }
-        std::string typename_fullname(const std::string &type) { return type; }
+        ast::BufferObject parse_buffer_decl() {
+            expect("buffer");
+            auto p = std::make_shared<BufferObjectNode>(parse_var_decl());
+            expect(";");
+            return p;
+        }
+        ast::UniformVar parse_uniform_decl() {
+            expect("uniform");
+            auto p = std::make_shared<UniformVarNode>(parse_var_decl());
+            expect(";");
+            return p;
+        }
         ast::Expr parse_expr(int lev = 0) {
             ast::Expr result = parse_postfix_expr();
             while (!end()) {
@@ -254,7 +264,7 @@ namespace akari::asl {
                 std::vector<Expr> lengths;
                 while (cur().tok == "[") {
                     consume();
-                    auto length = parse_expr();
+                    ast::Expr length = cur().tok == "]" ? nullptr : parse_expr();
                     expect("]");
                     lengths.emplace_back(length);
                 }
@@ -323,10 +333,16 @@ namespace akari::asl {
                 expect(";");
             }
             expect("}");
-            expect(";");
+            if (cur().tok == ";")
+                consume();
             return st;
         }
         ast::VarDecl parse_var_decl() {
+            auto ty = parse_typedecl();
+            auto iden = parse_identifier();
+            return std::make_shared<VarDeclNode>(iden, ty, nullptr);
+        }
+        ast::VarDecl parse_var_decl_init() {
             auto ty = parse_typedecl();
             auto iden = parse_identifier();
             if (cur().tok == "=") {
@@ -342,7 +358,7 @@ namespace akari::asl {
             return std::make_shared<ParameterDeclNode>(iden, ty);
         }
         ast::VarDeclStmt parse_var_decl_stmt() {
-            auto st = std::make_shared<VarDeclStatementNode>(parse_var_decl());
+            auto st = std::make_shared<VarDeclStatementNode>(parse_var_decl_init());
             expect(";");
             return st;
         }
@@ -359,7 +375,7 @@ namespace akari::asl {
             expect("for");
             auto w = std::make_shared<ForStatementNode>();
             expect("(");
-            w->init = parse_var_decl();
+            w->init = parse_var_decl_init();
             expect(";");
             w->cond = parse_expr();
             expect(";");
@@ -489,8 +505,11 @@ namespace akari::asl {
             while (!end()) {
                 if (cur().tok == "struct") {
                     top->structs.emplace_back(parse_struct_decl());
-                }
-                if (typenames.find(cur().tok) != typenames.end()) {
+                } else if (cur().tok == "buffer") {
+                    top->buffers.emplace_back(parse_buffer_decl());
+                } else if (cur().tok == "uniform") {
+                    top->uniforms.emplace_back(parse_uniform_decl());
+                } else if (typenames.find(cur().tok) != typenames.end()) {
                     top->funcs.emplace_back(parse_func_decl());
                 } else {
                     error(cur().loc, fmt::format("unknown type name {}", cur().tok));

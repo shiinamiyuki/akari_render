@@ -57,14 +57,27 @@ namespace akari::asl {
         }
         if (n->isa<ast::Typename>()) {
             auto ty = n->cast<ast::Typename>();
-            if (!types.count(ty->name)) {
+            if (types.find(ty->name) == types.end()) {
                 throw std::runtime_error(fmt::format("definition of type {} not found", ty->name));
             }
             auto t = types.at(ty->name);
             return type::AnnotatedType{t, process_qualifier(ty)};
         }
         if (n->isa<ast::StructDecl>()) {
-            return process_struct_decl(n->cast<ast::StructDecl>());
+            return type::AnnotatedType{process_struct_decl(n->cast<ast::StructDecl>()),
+                                       process_qualifier(n->cast<ast::StructDecl>())};
+        }
+        if (n->isa<ast::ArrayDecl>()) {
+            auto ty = n->cast<ast::ArrayDecl>();
+            auto e = process_type(ty->element_type);
+            if (e.qualifier != type::Qualifier::none) {
+                error(ty->loc, "array element type cannot have qualifiers");
+            }
+            int length = -1;
+            if (ty->length) {
+                AKR_ASSERT(false);
+            }
+            return type::AnnotatedType(std::make_shared<type::ArrayTypeNode>(e.type, length), process_qualifier(ty));
         }
         if (n->isa<ast::FunctionDecl>()) {
             auto func = n->cast<ast::FunctionDecl>();
@@ -79,6 +92,9 @@ namespace akari::asl {
         AKR_ASSERT(false);
     }
     type::StructType CodeGenerator::process_struct_decl(const ast::StructDecl &decl) {
+        if (structs.find(decl->struct_name->name) != structs.end()) {
+            return structs.at(decl->struct_name->name);
+        }
         auto st = std::make_shared<type::StructTypeNode>();
         for (auto &field : decl->fields) {
             auto t = process_type(field->type);
@@ -87,7 +103,6 @@ namespace akari::asl {
             f.name = field->var->identifier;
             f.type = t.type;
             st->fields.emplace_back(f);
-            return st;
         }
         st->name = decl->struct_name->name;
         types.emplace(st->name, st);
@@ -98,6 +113,24 @@ namespace akari::asl {
         for (auto &unit : module.translation_units) {
             for (auto &decl : unit->structs) {
                 (void)process_struct_decl(decl);
+            }
+        }
+    }
+    void CodeGenerator::process_buffer_decls() {
+        for (auto &unit : module.translation_units) {
+            for (auto &decl : unit->buffers) {
+                ValueRecord v =
+                    ValueRecord{decl->var->var->identifier, type::AnnotatedType(process_type(decl->var->type))};
+                vars.insert(decl->var->var->identifier, v);
+            }
+        }
+    }
+    void CodeGenerator::process_uniform_decls() {
+        for (auto &unit : module.translation_units) {
+            for (auto &decl : unit->uniforms) {
+                ValueRecord v =
+                    ValueRecord{decl->var->var->identifier, type::AnnotatedType(process_type(decl->var->type))};
+                vars.insert(decl->var->var->identifier, v);
             }
         }
     }
@@ -148,6 +181,14 @@ namespace akari::asl {
             }
             if (ty->isa<type::StructType>()) {
                 return ty->cast<type::StructType>()->name;
+            }
+            if (ty->isa<type::ArrayType>()) {
+                auto arr = ty->cast<type::ArrayType>();
+                if (arr->length == -1) {
+                    return fmt::format("{}*", type_to_str(arr->element_type));
+                } else {
+                    return fmt::format("astd::array<{}, {}>", type_to_str(arr->element_type), arr->length);
+                }
             }
             if (ty->isa<type::VoidType>()) {
                 return "void";
@@ -314,6 +355,9 @@ namespace akari::asl {
                 }
                 error(call->loc, fmt::format("not matching function call to {} with args ({})", func, err));
             }
+            // auto &overload = rec.overloads.at(mangled_name);
+            // for (uint32_t i = 0; i < arg_types.size(); i++) {
+            // }
             Twine s(func + "(");
             for (int i = 0; i < args.size(); i++) {
                 s.append(args[i].value);
@@ -324,12 +368,42 @@ namespace akari::asl {
             s.append(")");
             return {s, rec.overloads.at(mangled_name)->ret};
         }
+        ValueRecord compile_index(const ast::Index &idx) {
+            auto agg = compile_expr(idx->expr);
+            if (!agg.type()->isa<type::ArrayType>()) {
+                error(idx->expr->loc, "operator [] only allowed for arrays");
+            }
+            return ValueRecord{agg.value.append("[").append(compile_expr(idx->idx).value).append("]"),
+                               agg.type()->cast<type::ArrayType>()->element_type};
+        }
         ValueRecord compile_member_access(const ast::MemberAccess &access) {
             auto agg = compile_expr(access->var);
             if (agg.type()->isa<type::VectorType>()) {
                 auto v = agg.type()->cast<type::VectorType>();
                 auto member = access->member;
-                return {agg.value.append("." + member), v->element_type};
+                return {agg.value.append("." + member),
+                        type::AnnotatedType(v->element_type, agg.annotated_type.qualifier)};
+            } else if (agg.type()->isa<type::StructType>()) {
+                auto st = agg.type()->cast<type::StructType>();
+                auto member = access->member;
+                auto it = std::find_if(st->fields.begin(), st->fields.end(),
+                                       [&](auto &field) { return field.name == member; });
+                if (it == st->fields.end()) {
+                    error(access->loc, fmt::format("type {} does not have member {}", st->name, member));
+                }
+                return {agg.value.append("." + member), type::AnnotatedType(it->type, agg.annotated_type.qualifier)};
+            } else if (agg.type()->isa<type::ArrayType>()) {
+                auto arr = agg.type()->cast<type::ArrayType>();
+                auto member = access->member;
+                if (member != "length") {
+                    error(access->loc, fmt::format("array type does not have member {}", member));
+                } else {
+                    if (arr->length >= 0) {
+                        return {std::to_string(arr->length), type::uint32};
+                    } else {
+                        return {agg.value.append(".size()"), type::uint32};
+                    }
+                }
             }
             AKR_ASSERT(false);
         }
@@ -352,6 +426,9 @@ namespace akari::asl {
             }
             if (e->isa<ast::MemberAccess>()) {
                 return compile_member_access(e->cast<ast::MemberAccess>());
+            }
+            if (e->isa<ast::Index>()) {
+                return compile_index(e->cast<ast::Index>());
             }
             AKR_ASSERT(false);
         }
@@ -406,6 +483,9 @@ namespace akari::asl {
         }
         void compile_assignment(std::ostringstream &os, const ast::Assignment &asgn) {
             auto lvalue = compile_expr(asgn->lhs);
+            if ((int)lvalue.annotated_type.qualifier & (int)type::Qualifier::const_) {
+                error(asgn->loc, fmt::format("cannot assign to const value"));
+            }
             auto rvalue = compile_expr(asgn->rhs);
             wl(os, "{} {} {};", lvalue.value.str(), asgn->op, rvalue.value.str());
         }
@@ -413,7 +493,23 @@ namespace akari::asl {
             auto r = compile_expr(ret->expr);
             wl(os, "return {};", r.value.str());
         }
-        void compile_for(std::ostringstream &os, const ast::ForStmt &st) {}
+        void compile_for(std::ostringstream &os, const ast::ForStmt &st) {
+            wl(os, "{{ // for begin");
+            with_block([&] {
+                compile_var_decl(os, st->init);
+                auto cond = compile_expr(st->cond);
+                if (cond.type() != type::boolean) {
+                    error(st->cond->loc,
+                          fmt::format("while cond must be boolean expression but have {}", type_to_str(cond.type())));
+                }
+                wl(os, "while({})", cond.value.str());
+                auto_indent(st->body, [&] {
+                    compile_stmt(os, st->body);
+                    compile_stmt(os, st->step);
+                });
+            });
+            wl(os, "}} // for end");
+        }
         void compile_stmt(std::ostringstream &os, const ast::Stmt &stmt) {
             if (stmt->isa<ast::VarDeclStmt>()) {
                 compile_var_decl(os, stmt->cast<ast::VarDeclStmt>());
@@ -473,12 +569,39 @@ namespace akari::asl {
             s.append(")");
             return s;
         }
+        void compile_buffer(std::ostringstream &os, const ast::BufferObject &buf) {
+            auto type = process_type(buf->var->type).type;
+            if (type->isa<type::ArrayType>()) {
+                auto arr = type->cast<type::ArrayType>();
+                if (arr->length == -1) {
+                    wl(os, "Buffer<{}> {};", type_to_str(arr->element_type), buf->var->var->identifier);
+                } else {
+                    error(buf->loc, "buffer must be an T[]");
+                }
+            } else {
+                error(buf->loc, "buffer must be an T[]");
+            }
+        }
+        void compile_uniform(std::ostringstream &os, const ast::UniformVar &u) {
+            auto type = process_type(u->var->type).type;
+            wl(os, "{} {};", type_to_str(type), u->var->var->identifier);
+        }
+        void compile_struct(std::ostringstream &os, const ast::StructDecl &st) {
+            wl(os, "struct {} {{", st->struct_name->name);
+            with_block([&] {
+                for (auto &field : st->fields) {
+                    wl(os, "{} {};", type_to_str(process_type(field->type)), field->var->identifier);
+                }
+            });
+            wl(os, "}};");
+        }
         void compile_func(std::ostringstream &os, const ast::FunctionDecl &func) {
             auto _ = vars.push();
             auto s = gen_func_prototype(func, func->body != nullptr);
             if (is_cuda) {
                 s = Twine::concat("__host__ __device__ ", s);
             }
+            s = Twine::concat("inline ", s);
             if (func->body) {
                 wl(os, "{}", s.str());
                 compile_block(os, func->body);
@@ -490,6 +613,9 @@ namespace akari::asl {
       public:
         virtual std::string do_generate() {
             std::ostringstream os;
+            wl(os, "#pragma once");
+            wl(os, R"(#include <akari/common/color.h>)");
+            wl(os, R"(#include <akari/common/buffer.h>)");
             wl(os, "namespace akari::asl {{");
             with_block([&]() {
                 wl(os, "template<class C>");
@@ -497,6 +623,21 @@ namespace akari::asl {
                 with_block([&]() {
                     wl(os, "public:");
                     wl(os, "AKR_IMPORT_TYPES()");
+                    for (auto &unit : module.translation_units) {
+                        for (auto &st : unit->structs) {
+                            compile_struct(os, st);
+                        }
+                    }
+                    for (auto &unit : module.translation_units) {
+                        for (auto &buf : unit->buffers) {
+                            compile_buffer(os, buf);
+                        }
+                    }
+                    for (auto &unit : module.translation_units) {
+                        for (auto &u : unit->uniforms) {
+                            compile_uniform(os, u);
+                        }
+                    }
                     for (auto &unit : module.translation_units) {
                         for (auto &func : unit->funcs) {
                             compile_func(os, func);
