@@ -1,4 +1,4 @@
-// module Test(Spectrum, const vec3 Constant = vec3(0));
+module Test;
 // import Another(Spectrum) as Another;
 
 vec3 foo(){
@@ -8,8 +8,8 @@ vec3 pow4(vec3 x){
     int i =0;
     vec3 p = vec3(1.0);
     while(i < 4){
-        p = p * x;
-        i = i + 1;
+        p *= x;
+        i += 1;
     }
     return p;//hello
 }

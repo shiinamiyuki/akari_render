@@ -24,14 +24,22 @@
 #include <iostream>
 #include <fmt/format.h>
 #include <unordered_set>
+#include <fstream>
+#include <sstream>
+#include <regex>
 namespace akari::asl {
     using namespace ast;
     static std::unordered_set<std::string> qualifiers = {"in", "out", "inout", "const", "uniform"};
     class Parser::Impl {
         friend class Parser;
-        TokenStream ts;
-        TokenStream::iterator it;
-        Environment<std::string, bool> typenames;
+        const TokenStream &ts;
+        const std::string &filename;
+        const std::string &src;
+        TokenStream::const_iterator it;
+        std::unordered_set<std::string> typenames;
+        std::unordered_set<std::string> imported_typenames;
+
+        Parser &parser;
         const Token &cur() {
             if (it == ts.end()) {
                 throw std::runtime_error("unexpected EOF");
@@ -64,10 +72,12 @@ namespace akari::asl {
             }
             consume();
         }
+        std::string module_name;
 
       public:
-        Impl() {
-
+        Impl(Parser &parser, const TokenStream &ts, const std::string &filename, const std::string &src)
+            : parser(parser), ts(ts), filename(filename), src(src) {
+            it = ts.cbegin();
             // for(auto & t: ts){
             //     std::cout << t.tok << std::endl;
             // }
@@ -92,29 +102,35 @@ namespace akari::asl {
             assignOps = {
                 "=", "+=", "-=", "*=", "/=", ">>=", "<<=", "%=", "|=", "&=", "^=", "&&=", "||=",
             };
-            typenames.insert("void", true);
-            typenames.insert("bool", true);
-            typenames.insert("int", true);
-            typenames.insert("uint", true);
-            typenames.insert("float", true);
-            typenames.insert("double", true);
+            typenames.insert("void");
+            typenames.insert("bool");
+            typenames.insert("int");
+            typenames.insert("uint");
+            typenames.insert("float");
+            typenames.insert("double");
             for (int i = 1; i <= 4; i++) {
-                typenames.insert(fmt::format("ivec{}", i), true);
-                typenames.insert(fmt::format("bvec{}", i), true);
-                typenames.insert(fmt::format("vec{}", i), true);
-                typenames.insert(fmt::format("dvec{}", i), true);
+                typenames.insert(fmt::format("ivec{}", i));
+                typenames.insert(fmt::format("bvec{}", i));
+                typenames.insert(fmt::format("vec{}", i));
+                typenames.insert(fmt::format("dvec{}", i));
             }
             for (int m = 2; m <= 4; m++) {
                 for (int n = 2; n <= 4; n++) {
-                    typenames.insert(fmt::format("imat{}{}", n, m), true);
-                    typenames.insert(fmt::format("bmat{}{}", n, m), true);
-                    typenames.insert(fmt::format("mat{}{}", n, m), true);
-                    typenames.insert(fmt::format("dmat{}{}", n, m), true);
+                    typenames.insert(fmt::format("imat{}{}", n, m));
+                    typenames.insert(fmt::format("bmat{}{}", n, m));
+                    typenames.insert(fmt::format("mat{}{}", n, m));
+                    typenames.insert(fmt::format("dmat{}{}", n, m));
                 }
             }
         }
         [[noreturn]] void error(const SourceLocation &loc, std::string &&msg) {
             throw std::runtime_error(fmt::format("error: {} at {}:{}:{}", msg, loc.filename, loc.line, loc.col));
+        }
+        std::string identifier_fullname(const std::string & iden){
+            return iden;
+        }
+        std::string typename_fullname(const std::string & type){
+            return type;
         }
         ast::Expr parse_expr(int lev = 0) {
             ast::Expr result = parse_postfix_expr();
@@ -134,6 +150,33 @@ namespace akari::asl {
                     break;
             }
             return result;
+        }
+        ModuleDef parse_module_def() {
+            expect("module");
+            auto name = parse_identifier();
+            if (name->identifier != module_name) {
+                error(name->loc, fmt::format("module name must be the same as filename (found {})", name->identifier));
+            }
+            auto m = ModuleDef();
+            m.name = name->identifier;
+            expect(";");
+            while (cur().tok == "import") {
+                consume();
+                std::string import_module;
+                while (cur().type == TokenType::identifier) {
+                    import_module.append(cur().tok);
+                    consume();
+                    if (cur().tok == ";")
+                        break;
+                    expect(".");
+                }
+                expect(";");
+                if (import_module.empty()) {
+                    error(name->loc, fmt::format("import module must be specified", name->identifier));
+                }
+                auto path = parser.resolve_module(filename, import_module);
+            }
+            return m;
         }
         ast::Identifier parse_identifier() {
             if (cur().type == identifier) {
@@ -161,10 +204,10 @@ namespace akari::asl {
             return args;
         }
         ast::Expr parse_postfix_expr() {
-            if (typenames.at(cur().tok).has_value()) {
+            if (typenames.find(cur().tok) != typenames.end()) {
                 auto ty = parse_typename();
                 auto call = std::make_shared<ConstructorCallNode>();
-                call->type = ty;
+                call->type = std::make_shared<ModuleTypenameNode>(ty);
                 call->args = parse_args();
                 return call;
             }
@@ -192,7 +235,7 @@ namespace akari::asl {
             if (cur().tok == "(") {
                 if (e->isa<Identifier>()) {
                     auto call = std::make_shared<FunctionCallNode>();
-                    call->func = e->cast<Identifier>();
+                    call->func = std::make_shared<ModuleIdentifierNode>(e->cast<Identifier>());
                     call->args = parse_args();
                     call->loc = call->func->loc;
                     return call;
@@ -259,7 +302,7 @@ namespace akari::asl {
         }
         bool is_qualifier() { return qualifiers.find(cur().tok) != qualifiers.end(); }
         ast::Typename parse_typename() {
-            if (typenames.at(cur().tok).has_value() || is_qualifier()) {
+            if (typenames.find(cur().tok) != typenames.end() || is_qualifier()) {
                 type::Qualifier qualifier = type::Qualifier::none;
                 while (is_qualifier()) {
                     auto q = cur().tok;
@@ -272,7 +315,7 @@ namespace akari::asl {
                         qualifier = type::Qualifier(qualifier | type::Qualifier::out);
                     } else if (q == "inout") {
                         qualifier = type::Qualifier(qualifier | type::Qualifier::inout);
-                    }else if (q == "const") {
+                    } else if (q == "const") {
                         qualifier = type::Qualifier(qualifier | type::Qualifier::const_);
                     } else {
                         AKR_ASSERT(false);
@@ -286,14 +329,15 @@ namespace akari::asl {
                 error(cur().loc, fmt::format("unknown typename {}", cur().tok));
             }
         }
+        // std::pair<ast::ModuleIdentifier, ast::ModuleTypename> parse_module_function_or_typename() {}
         ast::StructDecl parse_struct_decl() {
             expect("struct");
             std::unordered_set<std::string> fields;
             if (cur().type == identifier) {
-                if (typenames.at(cur().tok).has_value()) {
+                if (typenames.find(cur().tok) != typenames.end()) {
                     error(cur().loc, fmt::format("{} redefined", cur().tok));
                 }
-                typenames.insert(cur().tok, true);
+                typenames.insert(cur().tok);
             } else {
                 error(cur().loc, "identifier expected");
             }
@@ -398,7 +442,7 @@ namespace akari::asl {
             return st;
         }
         ast::Stmt parse_stmt() {
-            if (typenames.at(cur().tok).has_value()) {
+            if (typenames.find(cur().tok) != typenames.end()) {
                 return parse_var_decl_stmt();
             }
             if (cur().tok == "while") {
@@ -454,27 +498,94 @@ namespace akari::asl {
             }
             return func;
         }
-        ast::TopLevel operator()(const std::string &filename, const std::string &src) {
-            ts = Lexer()(filename, src);
-            it = ts.begin();
-
+        std::unordered_set<std::string> find_typenames() {
+            std::unordered_set<std::string> s;
+            for (auto _it = ts.begin(); _it != ts.end(); _it++) {
+                if (_it->tok == "struct") {
+                    auto _tmp = _it;
+                    _tmp++;
+                    auto next = _tmp;
+                    if (next == ts.end() || next->type != TokenType::identifier) {
+                        error(_it->loc, "name expected");
+                    } else {
+                        s.insert(_it->tok);
+                    }
+                }
+            }
+            return s;
+        }
+        ast::TopLevel parse() {
+            module_name = fs::path(filename).stem().string();
             auto top = std::make_shared<TopLevelNode>();
+            top->module_def = parse_module_def();
             while (!end()) {
                 if (cur().tok == "struct") {
                     top->structs.emplace_back(parse_struct_decl());
                 }
-                if (typenames.at(cur().tok).has_value()) {
+                if (typenames.find(cur().tok) != typenames.end()) {
                     top->funcs.emplace_back(parse_func_decl());
                 } else {
                     error(cur().loc, fmt::format("unknown type name {}", cur().tok));
                 }
             }
+            top->typenames = typenames;
             return top;
         }
     };
-    Parser::Parser() { impl = std::make_shared<Impl>(); }
-    void Parser::add_type_parameter(const std::string &type) { impl->typenames.insert(type, true); }
-    ast::TopLevel Parser::operator()(const std::string &filename, const std::string &src) {
-        return (*impl)(filename, src);
+    Parser::Parser() {}
+    ast::TopLevel Parser::parse(const std::string &full_path) {
+        init_parse_record(full_path);
+        auto &rec = parsed_modules.at(full_path);
+        if (rec.tree) {
+            return rec.tree;
+        }
+        Impl impl(*this, rec.ts, rec.filename, rec.src);
+        for (auto &t : rec.typenames) {
+            impl.typenames.insert(t);
+        }
+        rec.tree = impl.parse();
+        return rec.tree;
+    }
+    void Parser::init_parse_record(const std::string &filename) {
+        if (parsed_modules.find(filename) == parsed_modules.end()) {
+            std::ifstream in(filename);
+            std::stringstream buf;
+            buf << in.rdbuf();
+            std::string src = buf.str();
+            ParseRecord rec;
+            rec.ts = Lexer()(filename, src);
+            rec.filename = filename;
+            rec.src = src;
+            Impl impl(*this, rec.ts, filename, src);
+            rec.typenames = impl.find_typenames();
+            parsed_modules[filename] = rec;
+        }
+    }
+    fs::path Parser::resolve_module(const fs::path &current_file, const std::string &module) {
+        fs::path try_path = fs::absolute(current_file).parent_path();
+        auto rel_path = std::regex_replace(module, std::regex("\\."), "/") + ".asl";
+        try_path /= rel_path;
+        if (fs::exists(try_path)) {
+            return try_path;
+        }
+        for (auto &search_path : module_search_path) {
+            try_path = search_path;
+            try_path /= rel_path;
+            if (fs::exists(try_path)) {
+                return try_path;
+            }
+        }
+        throw std::runtime_error(
+            fmt::format("cannot resolve module while importing {} to {}", module, current_file.string()));
+    }
+    const std::unordered_set<std::string> &Parser::resolve_typenames(const std::string &filename) {
+        init_parse_record(filename);
+        return parsed_modules.at(filename).typenames;
+    }
+    ast::TopLevel Parser::operator()(const std::string &filename) {
+        auto full_path = fs::absolute(fs::path(filename)).string();
+        init_parse_record(full_path);
+        parse(full_path);
+        return parsed_modules.at(full_path).tree;
     }
 } // namespace akari::asl

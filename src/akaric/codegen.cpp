@@ -32,9 +32,9 @@ namespace akari::asl {
         return v;
     }
     void CodeGenerator::add_type_parameters() {
-        for (auto &p : module.type_parameters) {
-            types[p] = std::make_shared<type::OpaqueTypeNode>(p);
-        }
+        // for (auto &p : module.type_parameters) {
+        //     types[p] = std::make_shared<type::OpaqueTypeNode>(p);
+        // }
     }
     void CodeGenerator::add_predefined_types() {
         types["void"] = type::void_;
@@ -95,19 +95,16 @@ namespace akari::asl {
         return st;
     }
     void CodeGenerator::process_struct_decls() {
-        for (auto &m : module.translation_units) {
-            for (auto &decl : m->structs) {
-                (void)process_struct_decl(decl);
-            }
+        for (auto &decl : module->body->structs) {
+            (void)process_struct_decl(decl);
         }
     }
     void CodeGenerator::process_prototypes() {
-        for (auto &m : module.translation_units) {
-            for (auto &decl : m->funcs) {
-                auto f_ty = process_type(decl).type->cast<type::FunctionType>();
-                prototypes[decl->name->identifier].overloads.emplace(
-                    Mangler().mangle(decl->name->identifier, f_ty->args), f_ty);
-            }
+
+        for (auto &decl : module->body->funcs) {
+            auto f_ty = process_type(decl).type->cast<type::FunctionType>();
+            prototypes[decl->name->identifier].overloads.emplace(Mangler().mangle(decl->name->identifier, f_ty->args),
+                                                                 f_ty);
         }
     }
     class CodeGenCPP : public CodeGenerator {
@@ -292,7 +289,7 @@ namespace akari::asl {
             return {s, type};
         }
         ValueRecord compile_func_call(const ast::FunctionCall &call) {
-            auto func = call->func->identifier;
+            auto func = call->func->identifier->identifier;
 
             std::vector<ValueRecord> args;
             std::vector<type::Type> arg_types;
@@ -493,14 +490,12 @@ namespace akari::asl {
             wl(os, "namespace akari::asl {{");
             with_block([&]() {
                 wl(os, "template<class C>");
-                wl(os, "class {} {{", module.name);
+                wl(os, "class {} {{", module->name);
                 with_block([&]() {
                     wl(os, "public:");
                     wl(os, "AKR_IMPORT_TYPES()");
-                    for (auto &unit : module.translation_units) {
-                        for (auto &func : unit->funcs) {
-                            compile_func(os, func);
-                        }
+                    for (auto &func : module->body->funcs) {
+                        compile_func(os, func);
                     }
                 });
                 wl(os, "}};");

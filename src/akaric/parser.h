@@ -27,48 +27,29 @@ namespace akari::asl {
 
     class Parser {
         class Impl;
-        std::shared_ptr<Impl> impl;
+
+      public:
+        struct ParseRecord {
+            std::string filename, src;
+            TokenStream ts;
+            ast::TopLevel tree;
+            std::unordered_set<std::string> typenames;
+            bool parse_typenames = false;
+            bool parse_body = false;
+        };
+
+      private:
+        std::unordered_map<std::string, ParseRecord> parsed_modules;
+        std::vector<std::string> module_search_path;
+        const std::unordered_set<std::string> &resolve_typenames(const std::string &full_path);
+        fs::path resolve_module(const fs::path &current_file, const std::string &module);
+        void init_parse_record(const std::string &full_path);
+        ast::TopLevel parse(const std::string &full_path);
+        
 
       public:
         Parser();
-        ast::TopLevel operator()(const std::string &filename, const std::string &src);
-        void add_type_parameter(const std::string &type);
-    };
-    template <typename K, typename V>
-    struct EnvironmentFrame {
-        std::unordered_map<K, V> map;
-        std::shared_ptr<EnvironmentFrame<K, V>> parent;
-        std::optional<V> at(const K &k) {
-            if (map.count(k)) {
-                return map.at(k);
-            }
-            if (parent) {
-                return parent->at(k);
-            }
-            return std::nullopt;
-        }
-        void insert(const K &k, const V &v) { map.emplace(k, v); }
-    };
-    template <typename K, typename V>
-    struct Environment {
-        std::shared_ptr<EnvironmentFrame<K, V>> frame;
-        Environment() { frame = std::make_shared<EnvironmentFrame<K, V>>(); }
-        void _push() {
-            auto prev = frame;
-            frame = std::make_shared<EnvironmentFrame<K, V>>();
-            frame->parent = prev;
-        }
-        void _pop() { frame = frame->parent; }
-        struct Guard {
-            Environment &self;
-            ~Guard() { self._pop(); }
-        };
-        Guard push() {
-            _push();
-            return Guard{*this};
-        }
-        std::optional<V> at(const K &k) { return frame->at(k); }
-        void insert(const K &k, const V &v) { frame->insert(k, v); }
+        ast::TopLevel operator()(const std::string &filename);
     };
 
     struct OperatorPrecedence {

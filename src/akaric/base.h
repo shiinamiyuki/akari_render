@@ -25,6 +25,7 @@
 #include <vector>
 #include <unordered_map>
 #include <stdexcept>
+#include <optional>
 #include <akari/core/akari.h>
 #include <akaric/panic.h>
 namespace akari::asl {
@@ -61,4 +62,41 @@ namespace akari::asl {
 #define AKR_DECL_NODE(Type)                                                                                            \
     std::string type_name() const { return #Type; }                                                                    \
     bool is_parent_of(const std::shared_ptr<Base> &ptr) const { return ptr->isa<std::shared_ptr<Type>>(); }
+    template <typename K, typename V, class Hash, class KeyEqual>
+    struct EnvironmentFrame {
+        std::unordered_map<K, V, Hash, KeyEqual> map;
+        std::shared_ptr<EnvironmentFrame<K, V, Hash, KeyEqual>> parent;
+        std::optional<V> at(const K &k) {
+            if (map.count(k)) {
+                return map.at(k);
+            }
+            if (parent) {
+                return parent->at(k);
+            }
+            return std::nullopt;
+        }
+        void insert(const K &k, const V &v) { map.emplace(k, v); }
+    };
+
+    template <typename K, typename V, class Hash = std::hash<K>, class KeyEqual = std::equal_to<K>>
+    struct Environment {
+        std::shared_ptr<EnvironmentFrame<K, V, Hash, KeyEqual>> frame;
+        Environment() { frame = std::make_shared<EnvironmentFrame<K, V, Hash, KeyEqual>>(); }
+        void _push() {
+            auto prev = frame;
+            frame = std::make_shared<EnvironmentFrame<K, V, Hash, KeyEqual>>();
+            frame->parent = prev;
+        }
+        void _pop() { frame = frame->parent; }
+        struct Guard {
+            Environment &self;
+            ~Guard() { self._pop(); }
+        };
+        Guard push() {
+            _push();
+            return Guard{*this};
+        }
+        std::optional<V> at(const K &k) { return frame->at(k); }
+        void insert(const K &k, const V &v) { frame->insert(k, v); }
+    };
 } // namespace akari::asl
