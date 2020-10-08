@@ -26,7 +26,7 @@
 namespace akari::asl {
     static std::set<std::string> keywords = {"in",     "out",  "inout",  "uniform", "const", "if",       "else",
                                              "while",  "for",  "do",     "return",  "break", "continue", "struct",
-                                             "buffer", "auto", "switch", "case",    "true",  "false"};
+                                             "buffer", "auto", "switch", "case",    "true",  "false",    "let"};
     static std::vector<std::set<std::string>> operators = {
         {"&&=", "||=", ">>=", "<<=", "..."},
         {"&&", "||", "++", "--", "+=", "-=", "*=", "/=", "%=", "|=", "&=", "^=", ">=", "<=", "!=", "==", "->", ">>",
@@ -111,10 +111,10 @@ namespace akari::asl {
             if (!i)
                 return;
             if (i == 1 || i == 2) {
-                while (cur() != '\n')
+                while (cur() && cur() != '\n')
                     advance();
             } else if (i == 3) {
-                while (!(cur() == '*' && peek() == '/'))
+                while (cur() && !(cur() == '*' && peek() == '/'))
                     advance();
                 advance();
                 advance();

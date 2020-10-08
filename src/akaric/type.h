@@ -173,7 +173,7 @@ namespace akari::asl::type {
     class OptionalTypeNode : public TypeNode {
       public:
         AKR_DECL_TYPENODE(OptionalTypeNode)
-        OptionalTypeNode(Type element_types) : element_types(element_types) {}
+        OptionalTypeNode(Type element_types) : element_type(element_types) {}
         Type element_type;
     };
     using OptionalType = std::shared_ptr<OptionalTypeNode>;
@@ -183,5 +183,53 @@ namespace akari::asl::type {
         AnnotatedType(Type type) : type(type) {}
         AnnotatedType(Type type, Qualifier qualifier) : type(type), qualifier(qualifier) {}
     };
+    template <typename T1, typename T2>
+    struct PairHash {
+        size_t operator()(const std::pair<T1, T2> &pair) const{
+            return std::hash<T1>()(pair.first) ^ std::hash<T2>()(pair.second);
+        }
+    };
+    class Context {
+        struct TupleHash {
+            size_t operator()(const std::vector<type::Type> &types) const {
+                size_t s = 0;
+                for (auto &t : types) {
+                    s ^= std::hash<type::Type>()(t);
+                }
+                return s;
+            }
+        };
+        struct TupleEqual {
+            bool operator()(const std::vector<type::Type> &a, const std::vector<type::Type> &b) const {
+                if (a.size() != b.size())
+                    return false;
+                for (size_t i = 0; i < a.size(); i++) {
+                    if (a[i] != b[i])
+                        return false;
+                }
+                return true;
+            }
+        };
+        std::unordered_map<std::pair<type::Type, int>, type::ArrayType, PairHash<type::Type, int>> array_cache;
+        std::unordered_map<std::vector<type::Type>, type::TupleType, TupleHash, TupleEqual> tuple_cache;
 
+      public:
+        type::ArrayType make_array(type::Type t, int length) {
+            auto pair = std::make_pair(t, length);
+            auto it = array_cache.find(pair);
+            if (array_cache.end() == it) {
+                array_cache[pair] = std::make_shared<ArrayTypeNode>(t, length);
+                return array_cache[pair];
+            }
+            return it->second;
+        }
+        type::TupleType make_tuple(const std::vector<type::Type> &types) {
+            auto it = tuple_cache.find(types);
+            if (tuple_cache.end() == it) {
+                tuple_cache[types] = std::make_shared<TupleTypeNode>(types);
+                return tuple_cache[types];
+            }
+            return it->second;
+        }
+    };
 } // namespace akari::asl::type

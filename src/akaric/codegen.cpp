@@ -79,7 +79,19 @@ namespace akari::asl {
             if (ty->length) {
                 length = eval_const_int(ty->length);
             }
-            return type::AnnotatedType(std::make_shared<type::ArrayTypeNode>(e.type, length), process_qualifier(ty));
+            return type::AnnotatedType(type_ctx.make_array(e.type, length), process_qualifier(ty));
+        }
+        if (n->isa<ast::TupleDecl>()) {
+            auto ty = n->cast<ast::TupleDecl>();
+            std::vector<type::Type> elements;
+            for (auto e : ty->elements) {
+                auto et = process_type(e);
+                if (et.qualifier != type::Qualifier::none) {
+                    error(ty->loc, "tuple element type cannot have qualifiers");
+                }
+                elements.emplace_back(et.type);
+            }
+            return type::AnnotatedType(type_ctx.make_tuple(elements), process_qualifier(ty));
         }
         if (n->isa<ast::FunctionDecl>()) {
             auto func = n->cast<ast::FunctionDecl>();
@@ -111,45 +123,41 @@ namespace akari::asl {
         structs[st->name] = st;
         return st;
     }
+    std::string CodeGenerator::generate(const BuildConfig &config_, const Module &module_) {
+        this->config = config_;
+        this->module = module_;
+        add_type_parameters();
+        for (auto &unit : module.translation_units) {
+            for (auto &def : unit->defs) {
+                if (def->isa<ast::StructDecl>()) {
+                    (void)process_struct_decl(def->cast<ast::StructDecl>());
+                } else if (def->isa<ast::ConstDecl>()) {
+                    auto decl = def->cast<ast::ConstDecl>();
+                    ValueRecord v =
+                        ValueRecord{decl->var->var->identifier, type::AnnotatedType(process_type(decl->var->type))};
+                    vars.insert(decl->var->var->identifier, v);
+                    if (v.type() == type::int32 || v.type() == type::uint32) {
 
-    void CodeGenerator::process_struct_decls() {
-        for (auto &unit : module.translation_units) {
-            for (auto &decl : unit->structs) {
-                (void)process_struct_decl(decl);
-            }
-        }
-    }
-    void CodeGenerator::process_const_decls() {
-        for (auto &unit : module.translation_units) {
-            for (auto &decl : unit->consts) {
-                ValueRecord v =
-                    ValueRecord{decl->var->var->identifier, type::AnnotatedType(process_type(decl->var->type))};
-                vars.insert(decl->var->var->identifier, v);
-                if (v.type() == type::int32 || v.type() == type::uint32) {
-                   
-                    const_ints.insert(decl->var->var->identifier, eval_const_int(decl->var->init));
+                        const_ints.insert(decl->var->var->identifier, eval_const_int(decl->var->init));
+                    }
+                } else if (def->isa<ast::BufferObject>()) {
+                    auto decl = def->cast<ast::BufferObject>();
+                    ValueRecord v =
+                        ValueRecord{decl->var->var->identifier, type::AnnotatedType(process_type(decl->var->type))};
+                    vars.insert(decl->var->var->identifier, v);
+                } else if (def->isa<ast::UniformVar>()) {
+                    auto decl = def->cast<ast::UniformVar>();
+                    ValueRecord v =
+                        ValueRecord{decl->var->var->identifier, type::AnnotatedType(process_type(decl->var->type))};
+                    vars.insert(decl->var->var->identifier, v);
                 }
             }
         }
+        process_prototypes();
+
+        return do_generate();
     }
-    void CodeGenerator::process_buffer_decls() {
-        for (auto &unit : module.translation_units) {
-            for (auto &decl : unit->buffers) {
-                ValueRecord v =
-                    ValueRecord{decl->var->var->identifier, type::AnnotatedType(process_type(decl->var->type))};
-                vars.insert(decl->var->var->identifier, v);
-            }
-        }
-    }
-    void CodeGenerator::process_uniform_decls() {
-        for (auto &unit : module.translation_units) {
-            for (auto &decl : unit->uniforms) {
-                ValueRecord v =
-                    ValueRecord{decl->var->var->identifier, type::AnnotatedType(process_type(decl->var->type))};
-                vars.insert(decl->var->var->identifier, v);
-            }
-        }
-    }
+
     void CodeGenerator::process_prototypes() {
         for (auto &unit : module.translation_units) {
             for (auto &decl : unit->funcs) {
@@ -192,10 +200,80 @@ namespace akari::asl {
         bool loop_pred = false;
         bool is_cuda;
         OperatorPrecedence prec;
+        std::unordered_map<type::Type, std::string> type_mangler_cached;
 
       public:
         CodeGenCPP(bool is_cuda) : is_cuda(is_cuda) {}
-        static std::string _type_to_str(const type::Type &ty) {
+        std::string type_mangler(const type::Type &ty) {
+            if (type_mangler_cached.find(ty) != type_mangler_cached.end()) {
+                return type_mangler_cached.at(ty);
+            }
+            auto s = type_mangler_do(ty);
+            type_mangler_cached[ty] = s;
+            return s;
+        }
+        std::string type_mangler_do(const type::Type &ty) {
+            if (ty == type::float32) {
+                return "Float";
+            }
+            if (ty == type::float64) {
+                return "double";
+            }
+            if (ty == type::int32) {
+                return "int";
+            }
+            if (ty == type::uint32) {
+                return "uint";
+            }
+            if (ty == type::boolean) {
+                return "bool";
+            }
+            if (ty->isa<type::OpaqueType>()) {
+                return ty->cast<type::OpaqueType>()->name;
+            }
+            if (ty->isa<type::VectorType>()) {
+                auto v = ty->cast<type::VectorType>();
+                auto et = v->element_type;
+                auto n = v->count;
+                if (ty == type::uint32) {
+                    return fmt::format("uint{}", n);
+                } else {
+                    return fmt::format("{}{}", type_mangler(et), n);
+                }
+            }
+            if (ty->isa<type::StructType>()) {
+                return "struct_" + ty->cast<type::StructType>()->name;
+            }
+            if (ty->isa<type::ArrayType>()) {
+                auto arr = ty->cast<type::ArrayType>();
+                if (arr->length == -1) {
+                    return fmt::format("DArray_", type_mangler(arr->element_type));
+                } else {
+                    return fmt::format("Array_{}_{}", type_mangler(arr->element_type), arr->length);
+                }
+            }
+            if (ty->isa<type::TupleType>()) {
+                auto tuple = ty->cast<type::TupleType>();
+                Twine s("Tuple");
+                for (auto &e : tuple->element_types) {
+                    s.append("_" + type_mangler(e));
+                }
+                auto m = s.str();
+                CodeBlock block;
+                {
+                    block.wl("struct {} {{", m);
+                    int cnt = 0;
+                    for (auto &e : tuple->element_types) {
+                        block.wl("    {} _{};", _type_to_str(e), cnt++);
+                    }
+                    block.wl("}};");
+                };
+                misc_defs.emplace_back(std::move(block));
+                return m;
+            }
+            AKR_ASSERT(false);
+        }
+        std::string _type_to_str(const type::Type &ty) {
             if (ty == type::float32) {
                 return "Float";
             }
@@ -235,13 +313,18 @@ namespace akari::asl {
                     return fmt::format("astd::array<{}, {}>", type_to_str(arr->element_type), arr->length);
                 }
             }
+            if (ty->isa<type::TupleType>()) {
+                auto tuple = ty->cast<type::TupleType>();
+                auto mangled = type_mangler(tuple);
+                return mangled;
+            }
             if (ty->isa<type::VoidType>()) {
                 return "void";
             }
             AKR_ASSERT(false);
         }
 
-        static std::string type_to_str(const type::AnnotatedType &anno) {
+        std::string type_to_str(const type::AnnotatedType &anno) {
             auto ty = anno.type;
             auto s = _type_to_str(ty);
             if (anno.qualifier & type::Qualifier::out) {
@@ -468,6 +551,37 @@ namespace akari::asl {
             return ValueRecord{agg.value.append("[").append(compile_expr(idx->idx).value).append("]"),
                                agg.type()->cast<type::ArrayType>()->element_type};
         }
+        ValueRecord compile_tuple(const ast::TupleExpression &tuple) {
+            std::vector<ValueRecord> elements;
+            std::vector<type::Type> _types;
+            for (auto e : tuple->expr) {
+                auto v = compile_expr(e);
+                elements.emplace_back(v);
+                _types.emplace_back(v.type());
+            }
+            auto tuple_type = type_ctx.make_tuple(_types);
+            Twine s(_type_to_str(tuple_type));
+            s.append("{");
+            for (auto &e : elements) {
+                s.append(e.value).append(", ");
+            }
+            s.append("}");
+            return ValueRecord{s, type::AnnotatedType(tuple_type)};
+        }
+        ValueRecord compile_member_access(const ast::TupleAccess &access) {
+            auto agg = compile_expr(access->var);
+            if (agg.type()->isa<type::TupleType>()) {
+                auto t = agg.type()->cast<type::TupleType>();
+                if ((size_t)access->member < t->element_types.size()) {
+                    return {agg.value.append("." + std::to_string(access->member)),
+                            type::AnnotatedType(t->element_types[access->member], agg.annotated_type.qualifier)};
+                } else {
+                    error(access->loc, fmt::format("tuple type does not have member {}", access->member));
+                }
+            } else {
+                error(access->loc, "tuple type expected");
+            }
+        }
         ValueRecord compile_member_access(const ast::MemberAccess &access) {
             auto agg = compile_expr(access->var);
             if (agg.type()->isa<type::VectorType>()) {
@@ -525,153 +639,219 @@ namespace akari::asl {
             if (e->isa<ast::MemberAccess>()) {
                 return compile_member_access(e->cast<ast::MemberAccess>());
             }
+            if (e->isa<ast::TupleAccess>()) {
+                return compile_member_access(e->cast<ast::TupleAccess>());
+            }
             if (e->isa<ast::Index>()) {
                 return compile_index(e->cast<ast::Index>());
+            }
+            if (e->isa<ast::TupleExpression>()) {
+                return compile_tuple(e->cast<ast::TupleExpression>());
             }
             AKR_ASSERT(false);
         }
         template <class F>
-        void auto_indent(ast::Stmt st, F &&f) {
+        void auto_indent(CodeBlock &block, ast::Stmt st, F &&f) {
             if (st->isa<ast::SeqStmt>()) {
                 f();
             } else
-                with_block([&] { f(); });
+                block.with_block([&] { f(); });
         }
-        void compile_if(std::ostringstream &os, const ast::IfStmt &st) {
+        void compile_if(CodeBlock &block, const ast::IfStmt &st) {
             auto cond = compile_expr(st->cond);
             if (cond.type() != type::boolean) {
                 error(st->cond->loc, "if cond must be boolean expression");
             }
-            wl(os, "if({})", cond.value.str());
-            auto_indent(st->if_true, [&] { compile_stmt(os, st->if_true); });
+            block.wl("if({})", cond.value.str());
+            auto_indent(block, st->if_true, [&] { compile_stmt(block, st->if_true); });
             if (st->if_false) {
-                wl(os, "else");
-                auto_indent(st->if_false, [&] { compile_stmt(os, st->if_false); });
+                block.wl("else");
+                auto_indent(block, st->if_false, [&] { compile_stmt(block, st->if_false); });
             }
         }
-        void compile_while(std::ostringstream &os, const ast::WhileStmt &st) {
+        void compile_while(CodeBlock &block, const ast::WhileStmt &st) {
             auto cond = compile_expr(st->cond);
             if (cond.type() != type::boolean) {
                 error(st->cond->loc,
                       fmt::format("while cond must be boolean expression but have {}", type_to_str(cond.type())));
             }
-            wl(os, "while({})", cond.value.str());
-            auto_indent(st->body, [&] {
+            block.wl("while({})", cond.value.str());
+            auto_indent(block, st->body, [&] {
                 loop_pred = true;
-                compile_stmt(os, st->body);
+                compile_stmt(block, st->body);
                 loop_pred = false;
             });
         }
-        void compile_var_decl(std::ostringstream &os, const ast::VarDeclStmt &stmt) {
+        void compile_var_decl(CodeBlock &block, const ast::VarDeclStmt &stmt) {
             auto decl = stmt->decl;
-            return compile_var_decl(os, decl);
+            return compile_var_decl(block, decl);
         }
-        void compile_var_decl(std::ostringstream &os, const ast::VarDecl &decl) {
+        void compile_var_decl(CodeBlock &block, const ast::LetDeclStmt &stmt) {
+            auto init = compile_expr(stmt->init);
+            type::Type ty;
+            if (stmt->type) {
+                auto expected = process_type(stmt->type).type;
+                if (expected != init.type()) {
+                    error(stmt->var->loc,
+                          fmt::format("{} expected but found {}", type_to_str(expected), type_to_str(init.type())));
+                }
+                ty = expected;
+            } else {
+                ty = init.type();
+            }
+            block.wl("{} {} = {};", type_to_str(ty), stmt->var->identifier, init.value.str());
+        }
+        void compile_var_decl(CodeBlock &block, const ast::VarDecl &decl) {
             auto ty = process_type(decl->type);
             Twine s(type_to_str(ty) + " " + decl->var->identifier);
             if (decl->init) {
                 auto init = compile_expr(decl->init);
                 s.append(" = ").append(init.value);
             }
-            wl(os, "{};", s.str());
+            block.wl("{};", s.str());
             if (vars.frame->at(decl->var->identifier)) {
                 error(decl->loc, fmt::format("{} is already defined", decl->var->identifier));
             }
             vars.insert(decl->var->identifier, {decl->var->identifier, ty});
         }
-        void compile_assignment(std::ostringstream &os, const ast::Assignment &asgn) {
+        // void destructure(std::vector<std::string> lines, const ast::TupleExpression &lhs, const ast::Expr &rhs) {
+
+        // }
+        void compile_assignment(CodeBlock &block, const ast::Destructure &des) {
+            // std::vector<std::string> lines;
+            // destructure(lines, des->lhs, des->rhs);
+            auto rhs = compile_expr(des->rhs);
+            int tmp = temp_counter++;
+            block.wl("{} __Gen_tmp{} = {};", type_to_str(rhs.annotated_type), tmp, rhs.value.str());
+            auto vars_ = des->lhs;
+            if (rhs.type()->isa<type::StructType>()) {
+                auto st = rhs.type()->cast<type::StructType>();
+                if (vars_->expr.size() != st->fields.size()) {
+                    error(des->loc,
+                          fmt::format("RHS has {} components but LHS has {}", st->fields.size(), vars_->expr.size()));
+                }
+                for (size_t i = 0; i < st->fields.size(); i++) {
+                    if (!vars_->expr[i]->isa<ast::Identifier>()) {
+                        error(vars_->loc, "nested destructuring is not allowed");
+                    }
+                    auto var = vars_->expr[i]->cast<ast::Identifier>();
+                    block.wl("{} {} = __Gen_tmp{}.{};", type_to_str(st->fields[i].type), var->identifier, temp_counter,
+                             st->fields[i].name);
+                }
+            } else if (rhs.type()->isa<type::TupleType>()) {
+                auto st = rhs.type()->cast<type::TupleType>();
+                if (vars_->expr.size() != st->element_types.size()) {
+                    error(des->loc, fmt::format("RHS has {} components but LHS has {}", st->element_types.size(),
+                                                vars_->expr.size()));
+                }
+                for (size_t i = 0; i < st->element_types.size(); i++) {
+                    if (!vars_->expr[i]->isa<ast::Identifier>()) {
+                        error(vars_->loc, "nested destructuring is not allowed");
+                    }
+                    auto var = vars_->expr[i]->cast<ast::Identifier>();
+                    block.wl("{} {} = __Gen_tmp{}._{};", type_to_str(st->element_types[i]), var->identifier, temp_counter, i);
+                }
+            } else {
+                error(des->rhs->loc, "only destructuring of struct or tuple is allowed");
+            }
+        }
+        void compile_assignment(CodeBlock &block, const ast::Assignment &asgn) {
             auto lvalue = compile_expr(asgn->lhs);
             if ((int)lvalue.annotated_type.qualifier & (int)type::Qualifier::const_) {
                 error(asgn->loc, fmt::format("cannot assign to const value"));
             }
             auto rvalue = compile_expr(asgn->rhs);
-            wl(os, "{} {} {};", lvalue.value.str(), asgn->op, rvalue.value.str());
+            block.wl("{} {} {};", lvalue.value.str(), asgn->op, rvalue.value.str());
         }
-        void compile_call_stmt(std::ostringstream &os, const ast::CallStmt &call) {
-            wl(os, "{};", compile_expr(call->call).value.str());
+        void compile_call_stmt(CodeBlock &block, const ast::CallStmt &call) {
+            block.wl("{};", compile_expr(call->call).value.str());
         }
-        void compile_ret(std::ostringstream &os, const ast::Return &ret) {
+        void compile_ret(CodeBlock &block, const ast::Return &ret) {
             auto r = compile_expr(ret->expr);
-            wl(os, "return {};", r.value.str());
+            block.wl("return {};", r.value.str());
         }
-        void compile_switch(std::ostringstream &os, const ast::SwitchStmt &st) {
+        void compile_switch(CodeBlock &block, const ast::SwitchStmt &st) {
             auto cond = compile_expr(st->cond);
             if (!cond.type()->is_int()) {
                 error(st->cond->loc,
                       fmt::format("switch cond must be int expression but have {}", type_to_str(cond.type())));
             }
-            wl(os, "switch({})", cond.value.str());
-            wl(os, "{{");
+            block.wl("switch({})", cond.value.str());
+            block.wl("{{");
             for (auto c : st->cases) {
                 for (auto &label : c.first) {
                     if (label.is_default) {
-                        wl(os, "default:");
+                        block.wl("default:");
                     } else
-                        wl(os, "case {}:", compile_expr(label.value).value.str());
-                    compile_block(os, c.second);
+                        block.wl("case {}:", compile_expr(label.value).value.str());
+                    compile_block(block, c.second);
                 }
             }
-            wl(os, "}}");
+            block.wl("}}");
         }
-        void compile_for(std::ostringstream &os, const ast::ForStmt &st) {
-            wl(os, "{{ // for begin");
+        void compile_for(CodeBlock &block, const ast::ForStmt &st) {
+            block.wl("{{ // for begin");
             with_block([&] {
-                compile_var_decl(os, st->init);
+                compile_var_decl(block, st->init);
                 auto cond = compile_expr(st->cond);
                 if (cond.type() != type::boolean) {
                     error(st->cond->loc,
                           fmt::format("while cond must be boolean expression but have {}", type_to_str(cond.type())));
                 }
-                wl(os, "while({})", cond.value.str());
-                auto_indent(st->body, [&] {
-                    compile_stmt(os, st->body);
-                    compile_stmt(os, st->step);
+                block.wl("while({})", cond.value.str());
+                auto_indent(block, st->body, [&] {
+                    compile_stmt(block, st->body);
+                    compile_stmt(block, st->step);
                 });
             });
-            wl(os, "}} // for end");
+            block.wl("}} // for end");
         }
-        void compile_stmt(std::ostringstream &os, const ast::Stmt &stmt) {
+        void compile_stmt(CodeBlock &block, const ast::Stmt &stmt) {
             if (stmt->isa<ast::VarDeclStmt>()) {
-                compile_var_decl(os, stmt->cast<ast::VarDeclStmt>());
+                compile_var_decl(block, stmt->cast<ast::VarDeclStmt>());
+            } else if (stmt->isa<ast::LetDeclStmt>()) {
+                compile_var_decl(block, stmt->cast<ast::LetDeclStmt>());
             } else if (stmt->isa<ast::Assignment>()) {
-                compile_assignment(os, stmt->cast<ast::Assignment>());
+                compile_assignment(block, stmt->cast<ast::Assignment>());
+            } else if (stmt->isa<ast::Destructure>()) {
+                compile_assignment(block, stmt->cast<ast::Destructure>());
             } else if (stmt->isa<ast::CallStmt>()) {
-                compile_call_stmt(os, stmt->cast<ast::CallStmt>());
+                compile_call_stmt(block, stmt->cast<ast::CallStmt>());
             } else if (stmt->isa<ast::Return>()) {
-                compile_ret(os, stmt->cast<ast::Return>());
+                compile_ret(block, stmt->cast<ast::Return>());
             } else if (stmt->isa<ast::SeqStmt>()) {
-                compile_block(os, stmt->cast<ast::SeqStmt>());
+                compile_block(block, stmt->cast<ast::SeqStmt>());
             } else if (stmt->isa<ast::IfStmt>()) {
-                compile_if(os, stmt->cast<ast::IfStmt>());
+                compile_if(block, stmt->cast<ast::IfStmt>());
             } else if (stmt->isa<ast::WhileStmt>()) {
-                compile_while(os, stmt->cast<ast::WhileStmt>());
+                compile_while(block, stmt->cast<ast::WhileStmt>());
             } else if (stmt->isa<ast::ForStmt>()) {
-                compile_for(os, stmt->cast<ast::ForStmt>());
+                compile_for(block, stmt->cast<ast::ForStmt>());
             } else if (stmt->isa<ast::SwitchStmt>()) {
-                compile_switch(os, stmt->cast<ast::SwitchStmt>());
+                compile_switch(block, stmt->cast<ast::SwitchStmt>());
             } else if (stmt->isa<ast::BreakStmt>()) {
                 if (!loop_pred) {
                     error(stmt->loc, "`continue` outside of loop!");
                 }
-                wl(os, "break;");
+                block.wl("break;");
             } else if (stmt->isa<ast::ContinueStmt>()) {
                 if (!loop_pred) {
                     error(stmt->loc, "`continue` outside of loop!");
                 }
-                wl(os, "continue;");
+                block.wl("continue;");
             } else {
                 AKR_ASSERT(false);
             }
         }
-        void compile_block(std::ostringstream &os, const ast::SeqStmt &stmt) {
-            wl(os, "{{");
-            with_block([&] {
+        void compile_block(CodeBlock &block, const ast::SeqStmt &stmt) {
+            block.wl("{{");
+            block.with_block([&] {
                 auto _ = vars.push();
                 for (auto &s : stmt->stmts) {
-                    compile_stmt(os, s);
+                    compile_stmt(block, s);
                 }
             });
-            wl(os, "}}");
+            block.wl("}}");
         }
         Twine gen_func_prototype(const ast::FunctionDecl &func, bool is_def) {
             auto f_ty = process_type(func).type->cast<type::FunctionType>();
@@ -693,57 +873,68 @@ namespace akari::asl {
             s.append(")");
             return s;
         }
-        void compile_buffer(std::ostringstream &os, const ast::BufferObject &buf) {
+        CodeBlock compile_buffer(const ast::BufferObject &buf) {
+            CodeBlock block;
             auto type = process_type(buf->var->type).type;
             if (type->isa<type::ArrayType>()) {
                 auto arr = type->cast<type::ArrayType>();
                 if (arr->length == -1) {
-                    wl(os, "Buffer<{}> {};", type_to_str(arr->element_type), buf->var->var->identifier);
+                    block.wl("Buffer<{}> {};", type_to_str(arr->element_type), buf->var->var->identifier);
                 } else {
                     error(buf->loc, "buffer must be an T[]");
                 }
             } else {
                 error(buf->loc, "buffer must be an T[]");
             }
+            return block;
         }
-        void compile_buffer_binder(std::ostringstream &os, const ast::BufferObject &buf) {
+        CodeBlock compile_buffer_binder(const ast::BufferObject &buf) {
+            CodeBlock block;
             auto type = process_type(buf->var->type).type;
             if (type->isa<type::ArrayType>()) {
                 auto arr = type->cast<type::ArrayType>();
                 if (arr->length == -1) {
-                    wl(os, "std::vector<{}> {};", type_to_str(arr->element_type), buf->var->var->identifier);
+                    block.wl("std::vector<{}> {};", type_to_str(arr->element_type), buf->var->var->identifier);
                 } else {
                     error(buf->loc, "buffer must be an T[]");
                 }
             } else {
                 error(buf->loc, "buffer must be an T[]");
             }
+            return block;
         }
         void compile_buffer_binder_bind(std::ostringstream &os, const ast::BufferObject &buf) {
             wl(os, "{}.copy(binder.{})", buf->var->var->identifier, buf->var->var->identifier);
         }
-        void compile_uniform(std::ostringstream &os, const ast::UniformVar &u) {
+        CodeBlock compile_uniform(const ast::UniformVar &u) {
             auto type = process_type(u->var->type).type;
-            wl(os, "{} {};", type_to_str(type), u->var->var->identifier);
+            CodeBlock block;
+            block.wl("{} {};", type_to_str(type), u->var->var->identifier);
+            return block;
         }
-        void compile_const(std::ostringstream &os, const ast::ConstVar &cst) {
+        CodeBlock compile_const(const ast::ConstVar &cst) {
             auto type = process_type(cst->var->type).type;
-            wl(os, "const {} {} = {};", type_to_str(type), cst->var->var->identifier,
-               compile_expr(cst->var->init).value.str());
+            CodeBlock block;
+            block.wl("const {} {} = {};", type_to_str(type), cst->var->var->identifier,
+                     compile_expr(cst->var->init).value.str());
+            return block;
         }
-        void compile_struct(std::ostringstream &os, const ast::StructDecl &st) {
-            wl(os, "struct {} {{", st->struct_name->name);
-            with_block([&] {
+        CodeBlock compile_struct(const ast::StructDecl &st) {
+            CodeBlock block;
+            block.wl("struct {} {{", st->struct_name->name);
+            block.with_block([&] {
                 for (auto &field : st->fields) {
-                    wl(os, "{} {};", type_to_str(process_type(field->type)), field->var->identifier);
+                    block.wl("{} {};", type_to_str(process_type(field->type)), field->var->identifier);
                 }
             });
-            wl(os, "}};");
+            block.wl("}};");
+            return block;
         }
-        void compile_func(std::ostringstream &os, const ast::FunctionDecl &func) {
+        CodeBlock compile_func(const ast::FunctionDecl &func) {
             if (func->is_intrinsic) {
-                return;
+                return {};
             }
+            CodeBlock block;
             auto _ = vars.push();
             auto s = gen_func_prototype(func, func->body != nullptr);
             if (is_cuda) {
@@ -751,11 +942,12 @@ namespace akari::asl {
             }
             s = Twine::concat("inline ", s);
             if (func->body) {
-                wl(os, "{}", s.str());
-                compile_block(os, func->body);
+                block.wl("{}", s.str());
+                compile_block(block, func->body);
             } else {
-                wl(os, "{};", s.str());
+                block.wl("{};", s.str());
             }
+            return block;
         }
 
       public:
@@ -775,35 +967,32 @@ namespace akari::asl {
                     wl(os, "public:");
                     wl(os, "AKR_IMPORT_TYPES()");
                     for (auto &unit : module.translation_units) {
-                        for (auto &st : unit->structs) {
-                            compile_struct(os, st);
+                        for (auto &def : unit->defs) {
+                            CodeBlock block;
+                            if (def->isa<ast::UniformVar>()) {
+                                block = compile_uniform(def->cast<ast::UniformVar>());
+                            } else if (def->isa<ast::BufferObject>()) {
+                                block = compile_buffer(def->cast<ast::BufferObject>());
+                            } else if (def->isa<ast::ConstVar>()) {
+                                block = compile_const(def->cast<ast::ConstVar>());
+                            } else if (def->isa<ast::StructDecl>()) {
+                                block = compile_struct(def->cast<ast::StructDecl>());
+                            } else if (def->isa<ast::FunctionDecl>()) {
+                                block = compile_func(def->cast<ast::FunctionDecl>());
+                            }
+                            for (auto &def_ : misc_defs) {
+                                write(os, def_);
+                            }
+                            write(os, block);
                         }
                     }
-                    for (auto &unit : module.translation_units) {
-                        for (auto &buf : unit->buffers) {
-                            compile_buffer(os, buf);
-                        }
-                    }
-                    for (auto &unit : module.translation_units) {
-                        for (auto &u : unit->uniforms) {
-                            compile_uniform(os, u);
-                        }
-                    }
-                    for (auto &unit : module.translation_units) {
-                        for (auto &u : unit->consts) {
-                            compile_const(os, u);
-                        }
-                    }
-                    for (auto &unit : module.translation_units) {
-                        for (auto &func : unit->funcs) {
-                            compile_func(os, func);
-                        }
-                    }
+
                     wl(os, "struct BufferBinder {{");
                     with_block([&]() {
                         for (auto &unit : module.translation_units) {
                             for (auto &buf : unit->buffers) {
-                                compile_buffer_binder(os, buf);
+                                auto block = compile_buffer_binder(buf);
+                                write(os, block);
                             }
                         }
                     });

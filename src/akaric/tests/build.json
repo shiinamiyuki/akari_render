@@ -4,8 +4,6 @@
         "Spectrum"
     ],
     "src": [
-        "builtins.asl",
-        "test.asl",
-        "foo.asl"
+        "test.asl"
     ]
 }

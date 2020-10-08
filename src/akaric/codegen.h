@@ -123,6 +123,7 @@ namespace akari::asl {
             return os.str();
         }
     };
+
     class CodeGenerator {
       protected:
         struct FunctionRecord {
@@ -141,15 +142,28 @@ namespace akari::asl {
         };
         Environment<std::string, ValueRecord> vars;
         Environment<std::string, int> const_ints;
+        struct CodeBlock {
+            std::vector<std::pair<int, std::string>> lines;
+            int indent = 0;
+            template <class... Args>
+            void wl(const std::string &s, Args &&... args) {
+                lines.emplace_back(indent, fmt::format(s, std::forward<Args>(args)...));
+            }
+            template <class F>
+            void with_block(F &&f) {
+                indent++;
+                f();
+                indent--;
+            }
+        };
+        int temp_counter = 0;
+        std::vector<CodeBlock> misc_defs;
         std::unordered_map<std::string, type::StructType> structs;
         std::unordered_map<std::string, type::Type> types;
         std::unordered_map<std::string, FunctionRecord> prototypes;
+        type::Context type_ctx;
         type::AnnotatedType process_type(const ast::AST &n);
         type::StructType process_struct_decl(const ast::StructDecl &decl);
-        void process_buffer_decls();
-        void process_uniform_decls();
-        void process_struct_decls();
-        void process_const_decls();
         void process_prototypes();
         void add_predefined_types();
         Module module;
@@ -169,6 +183,13 @@ namespace akari::asl {
             f();
             indent--;
         }
+        void write(std::ostringstream &os, const CodeBlock &block) {
+            for (auto &line : block.lines) {
+                for (int i = 0; i < line.first + indent; i++)
+                    os << "    ";
+                os << line.second << "\n";
+            }
+        }
         [[noreturn]] void error(const SourceLocation &loc, std::string &&msg) {
             throw std::runtime_error(fmt::format("error: {} at {}:{}:{}", msg, loc.filename, loc.line, loc.col));
         }
@@ -180,18 +201,7 @@ namespace akari::asl {
 
       public:
         CodeGenerator();
-        std::string generate(const BuildConfig &config_, const Module &module_) {
-            this->config = config_;
-            this->module = module_;
-            add_type_parameters();
-            process_const_decls();
-            process_struct_decls();
-            process_uniform_decls();
-            process_buffer_decls();            
-            process_prototypes();
-
-            return do_generate();
-        }
+        std::string generate(const BuildConfig &config_, const Module &module_);
     };
 
     std::unique_ptr<CodeGenerator> cpp_generator();

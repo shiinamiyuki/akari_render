@@ -151,6 +151,19 @@ namespace akari::asl::ast {
         }
     };
     using MemberAccess = std::shared_ptr<MemberAccessNode>;
+
+    class TupleAccessNode : public ExpressionNode {
+      public:
+        AKR_DECL_NODE(TupleAccessNode)
+        Expr var;
+        int member;
+        void dump_json(json &j) const {
+            ASTNode::dump_json(j);
+            var->dump_json(j["var"]);
+            j["member"] = member;
+        }
+    };
+    using TupleAccess = std::shared_ptr<TupleAccessNode>;
     class FunctionCallNode : public ExpressionNode {
       public:
         AKR_DECL_NODE(FunctionCallNode)
@@ -216,6 +229,14 @@ namespace akari::asl::ast {
         }
     };
     using ConditionalExpression = std::shared_ptr<ConditionalExpressionNode>;
+    class TupleExpressionNode : public ExpressionNode {
+      public:
+        std::vector<Expr> expr;
+        AKR_DECL_NODE(TupleExpressionNode)
+        TupleExpressionNode(std::vector<Expr> expr) : expr(expr) {}
+        void dump_json(json &j) const { ASTNode::dump_json(j); }
+    };
+    using TupleExpression = std::shared_ptr<TupleExpressionNode>;
     class AssignmentNode : public StatementNode {
       public:
         std::string op;
@@ -233,6 +254,19 @@ namespace akari::asl::ast {
         }
     };
     using Assignment = std::shared_ptr<AssignmentNode>;
+    class DestructureNode : public StatementNode {
+      public:
+        TupleExpression lhs;
+        Expr rhs;
+        AKR_DECL_NODE(DestructureNode)
+        DestructureNode(TupleExpression lhs, Expr rhs) : lhs(lhs), rhs(rhs) { loc = lhs->loc; }
+        void dump_json(json &j) const {
+            ASTNode::dump_json(j);
+            lhs->dump_json(j["lhs"]);
+            rhs->dump_json(j["rhs"]);
+        }
+    };
+    using Destructure = std::shared_ptr<DestructureNode>;
     class FunctionCallStatement : public StatementNode {
       public:
         FunctionCall call;
@@ -290,7 +324,6 @@ namespace akari::asl::ast {
         }
     };
     using VarDecl = std::shared_ptr<VarDeclNode>;
-
     using Stmt = std::shared_ptr<StatementNode>;
     class VarDeclStatementNode : public StatementNode {
       public:
@@ -303,6 +336,23 @@ namespace akari::asl::ast {
         }
     };
     using VarDeclStmt = std::shared_ptr<VarDeclStatementNode>;
+    class LetDeclStatementNode : public StatementNode {
+      public:
+        Identifier var;
+        TypeDecl type;
+        Expr init;
+        LetDeclStatementNode(Identifier v, TypeDecl type, Expr init) : var(v), type(type), init(init) { loc = v->loc; }
+        AKR_DECL_NODE(LetDeclStatementNode)
+        void dump_json(json &j) const {
+            ASTNode::dump_json(j);
+            var->dump_json(j["var"]);
+            if (type)
+                type->dump_json(j["type"]);
+
+            init->dump_json(j["init"]);
+        }
+    };
+    using LetDeclStmt = std::shared_ptr<LetDeclStatementNode>;
     class ExpressionStatementNode : public StatementNode {
       public:
         AKR_DECL_NODE(ExpressionStatementNode)
@@ -516,6 +566,7 @@ namespace akari::asl::ast {
         std::vector<BufferObject> buffers;
         std::vector<UniformVar> uniforms;
         std::vector<ConstVar> consts;
+        std::vector<AST> defs;
         std::unordered_set<std::string> typenames;
         void dump_json(json &j) const {
             ASTNode::dump_json(j);

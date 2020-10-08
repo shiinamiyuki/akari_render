@@ -209,13 +209,26 @@ namespace akari::asl {
             auto e = parse_atom();
             while (!end() && (cur().tok == "." || cur().tok == "[")) {
                 if (cur().tok == ".") {
-                    auto access = std::make_shared<MemberAccessNode>();
-                    access->loc = cur().loc;
+                    auto loc = cur().loc;
+
                     consume();
-                    auto m = parse_identifier();
-                    access->var = e;
-                    access->member = m->identifier;
-                    e = access;
+                    if (cur().type == TokenType::identifier) {
+                        auto access = std::make_shared<MemberAccessNode>();
+                        access->loc = loc;
+                        auto m = parse_identifier();
+                        access->var = e;
+                        access->member = m->identifier;
+                        e = access;
+                    } else if (cur().type == TokenType::int_literal) {
+                        auto access = std::make_shared<TupleAccessNode>();
+                        access->loc = loc;
+                        access->var = e;
+                        access->member = std::stoi(cur().tok);
+                        e = access;
+                        consume();
+                    } else {
+                        error(cur().loc, "unexpected token in member access expression");
+                    }
                 }
                 if (cur().tok == "[") {
                     consume();
@@ -239,10 +252,22 @@ namespace akari::asl {
             }
             return e;
         }
+        ast::TupleExpression parse_tuple() {
+            expect("(");
+            std::vector<ast::Expr> elements;
+            elements.push_back(parse_expr());
+            expect(",");
+            while (cur().tok != ")") {
+                elements.push_back(parse_expr());
+                if (cur().tok != ")")
+                    expect(",");
+            }
+            expect(")");
+            return std::make_shared<TupleExpressionNode>(elements);
+        }
         ast::Expr parse_atom() {
             if (cur().type == identifier) {
                 auto iden = parse_identifier();
-
                 return iden;
             }
             if (cur().tok == "-" || cur().tok == "!" || cur().tok == "~") {
@@ -253,7 +278,21 @@ namespace akari::asl {
             }
             if (cur().tok == "(") {
                 consume();
-                auto e = parse_expr();
+                ast::Expr e = parse_expr();
+                if (cur().tok == ",") {
+                    std::vector<ast::Expr> elements;
+                    elements.push_back(e);
+                    consume();
+                    if (cur().tok != ")") {
+                        elements.push_back(parse_expr());
+                        while (cur().tok == ",") {
+                            consume();
+                            elements.push_back(parse_expr());
+                        }
+                    }
+                    expect(")");
+                    return std::make_shared<TupleExpressionNode>(elements);
+                }
                 expect(")");
                 return e;
             }
@@ -295,6 +334,8 @@ namespace akari::asl {
                 std::vector<ast::TypeDecl> elements;
                 while (cur().tok != ")") {
                     elements.emplace_back(parse_typedecl());
+                    if (cur().tok != ")")
+                        expect(",");
                 }
                 expect(")");
                 return std::make_shared<TupleDeclNode>(loc, std::move(elements));
@@ -412,6 +453,28 @@ namespace akari::asl {
             expect(";");
             return st;
         }
+        ast::Stmt parse_let_decl_stmt() {
+            expect("let");
+            if (cur().tok == "(") {
+                // destructure
+                auto pattern = parse_tuple();
+                expect("=");
+                auto expr = parse_expr();
+                auto n = std::make_shared<DestructureNode>(pattern, expr);
+                expect(";");
+                return n;
+            }
+            auto iden = parse_identifier();
+            ast::TypeDecl ty;
+            if (cur().tok == ":") {
+                consume();
+                ty = parse_typedecl();
+            }
+            expect("=");
+            auto let = std::make_shared<LetDeclStatementNode>(iden, ty, parse_expr());
+            expect(";");
+            return let;
+        }
         Label parse_label() {
             if (cur().tok != "case" && cur().tok != "default") {
                 error(cur().loc, fmt::format("expect 'case' or 'default' but found {}", cur().tok));
@@ -515,6 +578,9 @@ namespace akari::asl {
             return st;
         }
         ast::Stmt parse_stmt() {
+            if (cur().tok == "let") {
+                return parse_let_decl_stmt();
+            }
             if (typenames.find(cur().tok) != typenames.end()) {
                 return parse_var_decl_stmt();
             }
@@ -602,16 +668,22 @@ namespace akari::asl {
             while (!end()) {
                 if (cur().tok == "struct") {
                     top->structs.emplace_back(parse_struct_decl());
+                    top->defs.emplace_back(top->structs.back());
                 } else if (cur().tok == "buffer") {
                     top->buffers.emplace_back(parse_buffer_decl());
+                    top->defs.emplace_back(top->buffers.back());
                 } else if (cur().tok == "uniform") {
                     top->uniforms.emplace_back(parse_uniform_decl());
+                    top->defs.emplace_back(top->uniforms.back());
                 } else if (cur().tok == "const") {
                     top->consts.emplace_back(parse_const_decl());
+                    top->defs.emplace_back(top->consts.back());
                 } else if (cur().tok == "__builtin__") {
                     top->funcs.emplace_back(parse_intrinsic());
+                    top->defs.emplace_back(top->funcs.back());
                 } else if (cur().tok == "(" || typenames.find(cur().tok) != typenames.end()) {
                     top->funcs.emplace_back(parse_func_decl());
+                    top->defs.emplace_back(top->funcs.back());
                 } else {
                     error(cur().loc, fmt::format("unknown type name {}", cur().tok));
                 }
