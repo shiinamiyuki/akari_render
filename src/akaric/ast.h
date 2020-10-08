@@ -80,7 +80,14 @@ namespace akari::asl::ast {
         }
     };
     using Typename = std::shared_ptr<TypenameNode>;
-
+    class TupleDeclNode : public TypeDeclNode {
+      public:
+        AKR_DECL_NODE(TupleDeclNode)
+        std::vector<TypeDecl> elements;
+        TupleDeclNode(SourceLocation loc_, std::vector<TypeDecl> elements) : elements(elements) { loc = loc_; }
+        void dump_json(json &j) const { ASTNode::dump_json(j); }
+    };
+    using TupleDecl = std::shared_ptr<TupleDeclNode>;
     class LiteralNode : public ExpressionNode {
       public:
         AKR_DECL_NODE(LiteralNode)
@@ -252,7 +259,7 @@ namespace akari::asl::ast {
             operand->dump_json(j["operand"]);
         }
     };
-     using UnaryExpression = std::shared_ptr<UnaryExpressionNode>;
+    using UnaryExpression = std::shared_ptr<UnaryExpressionNode>;
     class ParameterDeclNode : public ASTNode {
       public:
         Identifier var;

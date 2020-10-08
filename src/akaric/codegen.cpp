@@ -52,6 +52,7 @@ namespace akari::asl {
         }
     }
     type::Qualifier process_qualifier(const ast::TypeDecl &decl) { return decl->qualifier; }
+
     type::AnnotatedType CodeGenerator::process_type(const ast::AST &n) {
         if (n->isa<ast::VarDecl>()) {
             return process_type(n->cast<ast::VarDecl>()->type);
@@ -76,7 +77,7 @@ namespace akari::asl {
             }
             int length = -1;
             if (ty->length) {
-                AKR_ASSERT(false);
+                length = eval_const_int(ty->length);
             }
             return type::AnnotatedType(std::make_shared<type::ArrayTypeNode>(e.type, length), process_qualifier(ty));
         }
@@ -124,6 +125,10 @@ namespace akari::asl {
                 ValueRecord v =
                     ValueRecord{decl->var->var->identifier, type::AnnotatedType(process_type(decl->var->type))};
                 vars.insert(decl->var->var->identifier, v);
+                if (v.type() == type::int32 || v.type() == type::uint32) {
+                   
+                    const_ints.insert(decl->var->var->identifier, eval_const_int(decl->var->init));
+                }
             }
         }
     }
@@ -153,6 +158,34 @@ namespace akari::asl {
                     Mangler().mangle(decl->name->identifier, f_ty->args),
                     FunctionRecord::Entry(f_ty, decl->is_intrinsic));
             }
+        }
+    }
+    int CodeGenerator::eval_const_int(const ast::Expr &e) {
+        if (e->isa<ast::IntLiteral>()) {
+            return e->cast<ast::IntLiteral>()->val;
+        }
+        if (e->isa<ast::Identifier>()) {
+            auto var = e->cast<ast::Identifier>()->identifier;
+            if (auto i = const_ints.at(var)) {
+                return i.value();
+            } else {
+                error(e->loc, fmt::format("{} is not a const int expression", var));
+            }
+        } else if (e->isa<ast::BinaryExpression>()) {
+            auto binexp = e->cast<ast::BinaryExpression>();
+            auto lhs = eval_const_int(binexp->lhs);
+            auto rhs = eval_const_int(binexp->rhs);
+            auto op = binexp->op;
+            if (op == "+") {
+                return lhs + rhs;
+            }
+            if (op == "-") {
+                return lhs - +rhs;
+            } else {
+                error(e->loc, fmt::format("operator {} is not supported in const int expression", op));
+            }
+        } else {
+            error(e->loc, fmt::format("operation not supported in const int expression"));
         }
     }
     class CodeGenCPP : public CodeGenerator {
@@ -219,6 +252,7 @@ namespace akari::asl {
             }
             return s;
         }
+
         ValueRecord compile_var(const ast::Identifier &var) {
             if (!vars.at(var->identifier).has_value()) {
                 error(var->loc, fmt::format("identifier {} not found", var->identifier));
@@ -343,8 +377,9 @@ namespace akari::asl {
                     auto &proto = prototypes.at(func);
                     for (auto &overload : proto.overloads) {
                         if (overload.first == mangled_func) {
-                            return {Twine(func).append("(").append(lhs.value).append(" ,").append(rhs.value).append(")"),
-                                    overload.second.type->ret};
+                            return {
+                                Twine(func).append("(").append(lhs.value).append(" ,").append(rhs.value).append(")"),
+                                overload.second.type->ret};
                         }
                     }
                 }

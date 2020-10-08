@@ -140,6 +140,7 @@ namespace akari::asl {
             type::Type type() const { return annotated_type.type; }
         };
         Environment<std::string, ValueRecord> vars;
+        Environment<std::string, int> const_ints;
         std::unordered_map<std::string, type::StructType> structs;
         std::unordered_map<std::string, type::Type> types;
         std::unordered_map<std::string, FunctionRecord> prototypes;
@@ -175,6 +176,7 @@ namespace akari::asl {
             fmt::print("warning: {} at {}:{}:{}", msg, loc.filename, loc.line, loc.col);
         }
         void add_type_parameters();
+        int eval_const_int(const ast::Expr &e);
 
       public:
         CodeGenerator();
@@ -182,11 +184,12 @@ namespace akari::asl {
             this->config = config_;
             this->module = module_;
             add_type_parameters();
-            process_struct_decls();
-            process_prototypes();
-            process_buffer_decls();
-            process_uniform_decls();
             process_const_decls();
+            process_struct_decls();
+            process_uniform_decls();
+            process_buffer_decls();            
+            process_prototypes();
+
             return do_generate();
         }
     };

@@ -289,6 +289,16 @@ namespace akari::asl {
             return nullptr;
         }
         ast::TypeDecl parse_typedecl() {
+            if (cur().tok == "(") {
+                auto loc = cur().loc;
+                consume();
+                std::vector<ast::TypeDecl> elements;
+                while (cur().tok != ")") {
+                    elements.emplace_back(parse_typedecl());
+                }
+                expect(")");
+                return std::make_shared<TupleDeclNode>(loc, std::move(elements));
+            }
             ast::TypeDecl p = parse_typename();
             if (cur().tok == "[") {
                 std::vector<Expr> lengths;
@@ -363,7 +373,7 @@ namespace akari::asl {
                 expect(";");
             }
             expect("}");
-            if (cur().tok == ";")
+            if (!end() && cur().tok == ";")
                 consume();
             return st;
         }
@@ -600,7 +610,7 @@ namespace akari::asl {
                     top->consts.emplace_back(parse_const_decl());
                 } else if (cur().tok == "__builtin__") {
                     top->funcs.emplace_back(parse_intrinsic());
-                } else if (typenames.find(cur().tok) != typenames.end()) {
+                } else if (cur().tok == "(" || typenames.find(cur().tok) != typenames.end()) {
                     top->funcs.emplace_back(parse_func_decl());
                 } else {
                     error(cur().loc, fmt::format("unknown type name {}", cur().tok));

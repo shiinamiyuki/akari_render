@@ -162,6 +162,21 @@ namespace akari::asl::type {
         bool is_aggregate() const override { return false; }
     };
     using ArrayType = std::shared_ptr<ArrayTypeNode>;
+    class TupleTypeNode : public TypeNode {
+      public:
+        AKR_DECL_TYPENODE(TupleTypeNode)
+        TupleTypeNode(std::vector<Type> element_types) : element_types(element_types) {}
+        std::vector<Type> element_types;
+    };
+    using TupleType = std::shared_ptr<TupleTypeNode>;
+
+    class OptionalTypeNode : public TypeNode {
+      public:
+        AKR_DECL_TYPENODE(OptionalTypeNode)
+        OptionalTypeNode(Type element_types) : element_types(element_types) {}
+        Type element_type;
+    };
+    using OptionalType = std::shared_ptr<OptionalTypeNode>;
     struct AnnotatedType {
         Type type;
         Qualifier qualifier = Qualifier::none;

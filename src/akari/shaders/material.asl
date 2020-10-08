@@ -26,13 +26,17 @@ buffer DiffuseMaterial[] diffuse_materials;
 buffer GlossyMaterial[] glossy_materials;
 
 
-void foo(int material_type){
-    switch(material_type){
-        case MixMaterialType:{
-
-        }
-        default:{
-
-        }
-    }
+struct DiffuseBSDF{
+    Spectrum R;
+}
+const int DiffuseBSDFType = 0;
+struct GlossyBSDF{
+    Spectrum R;
+}
+const int GlossyBSDFType = 1;
+const int NumBSDF = 2;
+struct BSDF {
+    float [NumBSDF] weights;
+    DiffuseBSDF diffuse;
+    GlossyBSDF glossy;
 }
