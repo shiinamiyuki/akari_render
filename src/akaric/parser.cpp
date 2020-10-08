@@ -137,6 +137,12 @@ namespace akari::asl {
             expect(";");
             return p;
         }
+        ast::ConstVar parse_const_decl() {
+            expect("const");
+            auto p = std::make_shared<ConstVarNode>(parse_var_decl_must_init());
+            expect(";");
+            return p;
+        }
         ast::Expr parse_expr(int lev = 0) {
             ast::Expr result = parse_postfix_expr();
             while (!end()) {
@@ -352,6 +358,16 @@ namespace akari::asl {
             }
             return std::make_shared<VarDeclNode>(iden, ty, nullptr);
         }
+        ast::VarDecl parse_var_decl_must_init() {
+            auto ty = parse_typedecl();
+            auto iden = parse_identifier();
+
+            expect("=");
+            auto init = parse_expr();
+            return std::make_shared<VarDeclNode>(iden, ty, init);
+
+            return std::make_shared<VarDeclNode>(iden, ty, nullptr);
+        }
         ast::ParameterDecl parse_parameter_decl() {
             auto ty = parse_typedecl();
             auto iden = parse_identifier();
@@ -459,6 +475,12 @@ namespace akari::asl {
             expect(";");
             return st;
         }
+        ast::FunctionDecl parse_intrinsic() {
+            expect("__builtin__");
+            auto func = parse_func_decl();
+            func->is_intrinsic = true;
+            return func;
+        }
         ast::FunctionDecl parse_func_decl() {
             auto func = std::make_shared<FunctionDeclNode>();
             func->type = parse_typedecl();
@@ -509,6 +531,10 @@ namespace akari::asl {
                     top->buffers.emplace_back(parse_buffer_decl());
                 } else if (cur().tok == "uniform") {
                     top->uniforms.emplace_back(parse_uniform_decl());
+                } else if (cur().tok == "const") {
+                    top->consts.emplace_back(parse_const_decl());
+                } else if (cur().tok == "__builtin__") {
+                    top->funcs.emplace_back(parse_intrinsic());
                 } else if (typenames.find(cur().tok) != typenames.end()) {
                     top->funcs.emplace_back(parse_func_decl());
                 } else {

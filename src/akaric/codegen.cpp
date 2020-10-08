@@ -109,10 +109,20 @@ namespace akari::asl {
         structs[st->name] = st;
         return st;
     }
+
     void CodeGenerator::process_struct_decls() {
         for (auto &unit : module.translation_units) {
             for (auto &decl : unit->structs) {
                 (void)process_struct_decl(decl);
+            }
+        }
+    }
+    void CodeGenerator::process_const_decls() {
+        for (auto &unit : module.translation_units) {
+            for (auto &decl : unit->consts) {
+                ValueRecord v =
+                    ValueRecord{decl->var->var->identifier, type::AnnotatedType(process_type(decl->var->type))};
+                vars.insert(decl->var->var->identifier, v);
             }
         }
     }
@@ -139,7 +149,8 @@ namespace akari::asl {
             for (auto &decl : unit->funcs) {
                 auto f_ty = process_type(decl).type->cast<type::FunctionType>();
                 prototypes[decl->name->identifier].overloads.emplace(
-                    Mangler().mangle(decl->name->identifier, f_ty->args), f_ty);
+                    Mangler().mangle(decl->name->identifier, f_ty->args),
+                    FunctionRecord::Entry(f_ty, decl->is_intrinsic));
             }
         }
     }
@@ -366,7 +377,7 @@ namespace akari::asl {
                 }
             }
             s.append(")");
-            return {s, rec.overloads.at(mangled_name)->ret};
+            return {s, rec.overloads.at(mangled_name).type->ret};
         }
         ValueRecord compile_index(const ast::Index &idx) {
             auto agg = compile_expr(idx->expr);
@@ -586,6 +597,11 @@ namespace akari::asl {
             auto type = process_type(u->var->type).type;
             wl(os, "{} {};", type_to_str(type), u->var->var->identifier);
         }
+        void compile_const(std::ostringstream &os, const ast::ConstVar &cst) {
+            auto type = process_type(cst->var->type).type;
+            wl(os, "const {} {} = {};", type_to_str(type), cst->var->var->identifier,
+               compile_expr(cst->var->init).value.str());
+        }
         void compile_struct(std::ostringstream &os, const ast::StructDecl &st) {
             wl(os, "struct {} {{", st->struct_name->name);
             with_block([&] {
@@ -596,6 +612,9 @@ namespace akari::asl {
             wl(os, "}};");
         }
         void compile_func(std::ostringstream &os, const ast::FunctionDecl &func) {
+            if (func->is_intrinsic) {
+                return;
+            }
             auto _ = vars.push();
             auto s = gen_func_prototype(func, func->body != nullptr);
             if (is_cuda) {
@@ -639,6 +658,11 @@ namespace akari::asl {
                         }
                     }
                     for (auto &unit : module.translation_units) {
+                        for (auto &u : unit->consts) {
+                            compile_const(os, u);
+                        }
+                    }
+                    for (auto &unit : module.translation_units) {
                         for (auto &func : unit->funcs) {
                             compile_func(os, func);
                         }
@@ -646,7 +670,7 @@ namespace akari::asl {
                 });
                 wl(os, "}};");
             });
-            wl(os, "}};");
+            wl(os, "}}");
             return os.str();
         }
     };

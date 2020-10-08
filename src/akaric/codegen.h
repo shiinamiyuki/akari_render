@@ -126,7 +126,12 @@ namespace akari::asl {
     class CodeGenerator {
       protected:
         struct FunctionRecord {
-            std::unordered_map<std::string, type::FunctionType> overloads;
+            struct Entry {
+                type::FunctionType type;
+                bool is_intrinsic = false;
+                Entry(type::FunctionType type, bool is_intrinsic) : type(type), is_intrinsic(is_intrinsic) {}
+            };
+            std::unordered_map<std::string, Entry> overloads;
         };
         struct ValueRecord {
             Twine value;
@@ -143,6 +148,7 @@ namespace akari::asl {
         void process_buffer_decls();
         void process_uniform_decls();
         void process_struct_decls();
+        void process_const_decls();
         void process_prototypes();
         void add_predefined_types();
         Module module;
@@ -180,6 +186,7 @@ namespace akari::asl {
             process_prototypes();
             process_buffer_decls();
             process_uniform_decls();
+            process_const_decls();
             return do_generate();
         }
     };

@@ -2,6 +2,7 @@ struct Light {
     vec3 pos;
     vec3 color;
 }
+const int const_ival = 2;
 buffer Light[] lights;
 vec3 L(){
     vec3 res = vec3(0.0);

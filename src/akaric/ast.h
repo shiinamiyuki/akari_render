@@ -364,6 +364,7 @@ namespace akari::asl::ast {
         std::vector<ParameterDecl> parameters;
         TypeDecl type;
         SeqStmt body;
+        bool is_intrinsic = false;
         AKR_DECL_NODE(VarDeclNode)
         void dump_json(json &j) const {
             ASTNode::dump_json(j);
@@ -394,7 +395,6 @@ namespace akari::asl::ast {
     class ArrayDeclNode : public TypeDeclNode {
       public:
         AKR_DECL_NODE(ArrayDeclNode)
-
         TypeDecl element_type;
         Expr length;
 
@@ -430,6 +430,21 @@ namespace akari::asl::ast {
         }
     };
     using UniformVar = std::shared_ptr<UniformVarNode>;
+    class ConstVarNode : public ASTNode {
+      public:
+        AKR_DECL_NODE(ConstVarNode)
+        int binding = -1;
+        ConstVarNode(VarDecl var) : var(var) {
+            loc = var->loc;
+            var->type->qualifier = type::Qualifier((int)var->type->qualifier | (int)type::Qualifier::const_);
+        }
+        VarDecl var;
+        void dump_json(json &j) const {
+            ASTNode::dump_json(j);
+            var->dump_json(j["var"]);
+        }
+    };
+    using ConstVar = std::shared_ptr<ConstVarNode>;
     using ModuleParameter = std::variant<VarDecl, Typename>;
     class TopLevelNode;
     using TopLevel = std::shared_ptr<TopLevelNode>;
@@ -440,6 +455,7 @@ namespace akari::asl::ast {
         std::vector<StructDecl> structs;
         std::vector<BufferObject> buffers;
         std::vector<UniformVar> uniforms;
+        std::vector<ConstVar> consts;
         std::unordered_set<std::string> typenames;
         void dump_json(json &j) const {
             ASTNode::dump_json(j);
@@ -466,6 +482,12 @@ namespace akari::asl::ast {
                 auto k = json::object();
                 s->dump_json(k);
                 j["uniforms"].push_back(k);
+            }
+            j["consts"] = json::array();
+            for (auto &cst : consts) {
+                auto k = json::object();
+                cst->dump_json(k);
+                j["consts"].push_back(k);
             }
         }
     };

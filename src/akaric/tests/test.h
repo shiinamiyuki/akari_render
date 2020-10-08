@@ -11,6 +11,7 @@ namespace akari::asl {
             Float3 color;
         };
         Buffer<Light> lights;
+        const int const_ival = 2;
         inline __host__ __device__ Float3 L()
         {
             Float3 res = Float3(0.0);
@@ -76,5 +77,9 @@ namespace akari::asl {
         {
             return x * x;
         }
+        inline __host__ __device__ void change_const(Float3 & x)
+        {
+            x.x = 2.0;
+        }
     };
-};
+}
