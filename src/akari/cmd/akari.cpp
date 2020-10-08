@@ -28,6 +28,7 @@
 #include <akari/core/nodes/scene.h>
 #include <akari/core/nodes/scenegraph.h>
 #include <akari/core/parser.h>
+#include <akari/shaders/compute-kernel.out>
 using namespace akari;
 namespace py = pybind11;
 #ifndef AKR_ENABLE_PYTHON

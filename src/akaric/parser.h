@@ -60,8 +60,8 @@ namespace akari::asl {
         int ternaryPrec;
         OperatorPrecedence() {
             int prec = 0;
-            opPrec["?"] = ternaryPrec = prec;
-            prec++;
+            // opPrec["?"] = ternaryPrec = prec;
+            // prec++;
             opPrec["||"] = prec;
             prec++;
             opPrec["&&"] = prec;

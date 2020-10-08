@@ -97,6 +97,17 @@ namespace akari::asl::ast {
     };
     using IntLiteral = std::shared_ptr<IntLiteralNode>;
 
+    class BoolLiteralNode : public LiteralNode {
+      public:
+        AKR_DECL_NODE(BoolLiteralNode)
+        bool val;
+        void dump_json(json &j) const {
+            ASTNode::dump_json(j);
+            j["val"] = val;
+        }
+    };
+    using BoolLiteral = std::shared_ptr<BoolLiteralNode>;
+
     class FloatLiteralNode : public LiteralNode {
       public:
         AKR_DECL_NODE(FloatLiteralNode)
@@ -184,6 +195,20 @@ namespace akari::asl::ast {
         }
     };
     using BinaryExpression = std::shared_ptr<BinaryExpressionNode>;
+    class ConditionalExpressionNode : public ExpressionNode {
+      public:
+        Expr cond;
+        Expr lhs, rhs;
+        AKR_DECL_NODE(ConditionalExpressionNode)
+        ConditionalExpressionNode(Expr cond, Expr lhs, Expr rhs) : cond(cond), lhs(lhs), rhs(rhs) { loc = cond->loc; }
+        void dump_json(json &j) const {
+            ASTNode::dump_json(j);
+            cond->dump_json(j["cond"]);
+            lhs->dump_json(j["lhs"]);
+            rhs->dump_json(j["rhs"]);
+        }
+    };
+    using ConditionalExpression = std::shared_ptr<ConditionalExpressionNode>;
     class AssignmentNode : public StatementNode {
       public:
         std::string op;
@@ -201,6 +226,17 @@ namespace akari::asl::ast {
         }
     };
     using Assignment = std::shared_ptr<AssignmentNode>;
+    class FunctionCallStatement : public StatementNode {
+      public:
+        FunctionCall call;
+        AKR_DECL_NODE(FunctionCallStatement)
+        FunctionCallStatement(FunctionCall call) : call(call) { loc = call->loc; }
+        void dump_json(json &j) const {
+            ASTNode::dump_json(j);
+            call->dump_json(j["call"]);
+        }
+    };
+    using CallStmt = std::shared_ptr<FunctionCallStatement>;
     class UnaryExpressionNode : public ExpressionNode {
       public:
         std::string op;
@@ -216,6 +252,7 @@ namespace akari::asl::ast {
             operand->dump_json(j["operand"]);
         }
     };
+     using UnaryExpression = std::shared_ptr<UnaryExpressionNode>;
     class ParameterDeclNode : public ASTNode {
       public:
         Identifier var;
@@ -284,6 +321,36 @@ namespace akari::asl::ast {
         }
     };
     using IfStmt = std::shared_ptr<IfStatementNode>;
+    struct Label {
+        Expr value;
+        bool is_default = false;
+    };
+    class SeqStatementNode : public StatementNode {
+      public:
+        AKR_DECL_NODE(SeqStatementNode)
+        std::vector<Stmt> stmts;
+        void dump_json(json &j) const {
+            ASTNode::dump_json(j);
+            j["stmts"] = json::array();
+            for (auto &st : stmts) {
+                json s;
+                st->dump_json(s);
+                j["stmts"].push_back(s);
+            }
+        }
+    };
+    using SeqStmt = std::shared_ptr<SeqStatementNode>;
+    class SwitchStatementNode : public StatementNode {
+      public:
+        AKR_DECL_NODE(SwitchStatementNode)
+        Expr cond;
+        std::vector<std::pair<std::vector<Label>, SeqStmt>> cases;
+        void dump_json(json &j) const {
+            ASTNode::dump_json(j);
+            cond->dump_json(j["cond"]);
+        }
+    };
+    using SwitchStmt = std::shared_ptr<SwitchStatementNode>;
     class WhileStatementNode : public StatementNode {
       public:
         AKR_DECL_NODE(WhileStatementNode)
@@ -333,21 +400,7 @@ namespace akari::asl::ast {
         }
     };
     using ForStmt = std::shared_ptr<ForStatementNode>;
-    class SeqStatementNode : public StatementNode {
-      public:
-        AKR_DECL_NODE(SeqStatementNode)
-        std::vector<Stmt> stmts;
-        void dump_json(json &j) const {
-            ASTNode::dump_json(j);
-            j["stmts"] = json::array();
-            for (auto &st : stmts) {
-                json s;
-                st->dump_json(s);
-                j["stmts"].push_back(s);
-            }
-        }
-    };
-    using SeqStmt = std::shared_ptr<SeqStatementNode>;
+
     class ReturnNode : public StatementNode {
       public:
         Expr expr;

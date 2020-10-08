@@ -1,11 +1,3 @@
-vec3 sqr(vec3 x){
-    return x * x;
-}
-
-void change_const(inout vec3 x){
-    x.x = 2.0;
-}
-
  float cos_theta(const vec3 w) { return w.y; }
 
  float abs_cos_theta(const vec3 w) { return abs(cos_theta(w)); }

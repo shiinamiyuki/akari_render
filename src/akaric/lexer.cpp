@@ -24,10 +24,9 @@
 #include <cctype>
 #include <set>
 namespace akari::asl {
-    static std::set<std::string> keywords = {
-        "in",  "out", "inout",  "uniform", "const",    "if",     "else",   "while",
-        "for", "do",  "return", "break",   "continue", "struct", "buffer", "auto",
-    };
+    static std::set<std::string> keywords = {"in",     "out",  "inout",  "uniform", "const", "if",       "else",
+                                             "while",  "for",  "do",     "return",  "break", "continue", "struct",
+                                             "buffer", "auto", "switch", "case",    "true",  "false"};
     static std::vector<std::set<std::string>> operators = {
         {"&&=", "||=", ">>=", "<<=", "..."},
         {"&&", "||", "++", "--", "+=", "-=", "*=", "/=", "%=", "|=", "&=", "^=", ">=", "<=", "!=", "==", "->", ">>",
@@ -135,7 +134,10 @@ namespace akari::asl {
                         s += cur();
                         advance();
                     }
-                    ts.emplace_back(Token{s, identifier, loc});
+                    if (keywords.find(s) != keywords.end()) {
+                        ts.emplace_back(Token{s, keyword, loc});
+                    } else
+                        ts.emplace_back(Token{s, identifier, loc});
                 } else if (isdigit(cur())) {
                     std::string s;
                     TokenType type = int_literal;

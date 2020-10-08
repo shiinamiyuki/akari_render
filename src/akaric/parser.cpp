@@ -161,6 +161,15 @@ namespace akari::asl {
                 } else
                     break;
             }
+            if (cur().tok == "?") {
+                consume();
+                auto cond = result;
+                auto lhs = parse_expr();
+                expect(":");
+                auto rhs = parse_expr();
+                return std::make_shared<ConditionalExpressionNode>(cond, lhs, rhs);
+            }
+
             return result;
         }
 
@@ -258,6 +267,20 @@ namespace akari::asl {
             if (cur().type == float_literal) {
                 auto lit = std::make_shared<ast::FloatLiteralNode>();
                 lit->val = std::stod(cur().tok);
+                lit->loc = cur().loc;
+                consume();
+                return lit;
+            }
+            if (cur().tok == "true") {
+                auto lit = std::make_shared<ast::BoolLiteralNode>();
+                lit->val = true;
+                lit->loc = cur().loc;
+                consume();
+                return lit;
+            }
+            if (cur().tok == "false") {
+                auto lit = std::make_shared<ast::BoolLiteralNode>();
+                lit->val = false;
                 lit->loc = cur().loc;
                 consume();
                 return lit;
@@ -379,6 +402,40 @@ namespace akari::asl {
             expect(";");
             return st;
         }
+        Label parse_label() {
+            if (cur().tok != "case" && cur().tok != "default") {
+                error(cur().loc, fmt::format("expect 'case' or 'default' but found {}", cur().tok));
+            }
+            Label label;
+            if (cur().tok == "default") {
+                consume();
+                label = Label{nullptr, true};
+            } else {
+                consume();
+                label = Label{parse_expr(), false};
+            }
+            expect(":");
+            return label;
+        }
+        ast::SwitchStmt parse_switch() {
+            expect("switch");
+            auto w = std::make_shared<SwitchStatementNode>();
+            expect("(");
+            w->cond = parse_expr();
+            expect(")");
+            expect("{");
+            while (cur().tok != "}") {
+                auto labels = std::vector<Label>();
+                labels.emplace_back(parse_label());
+                while (cur().tok == "case" || cur().tok == "default") {
+                    labels.emplace_back(parse_label());
+                }
+                auto body = parse_block();
+                w->cases.emplace_back(std::make_pair(std::move(labels), body));
+            }
+            expect("}");
+            return w;
+        }
         ast::WhileStmt parse_while() {
             expect("while");
             auto w = std::make_shared<WhileStatementNode>();
@@ -396,7 +453,7 @@ namespace akari::asl {
             expect(";");
             w->cond = parse_expr();
             expect(";");
-            w->step = parse_assignment();
+            w->step = parse_expr_stmt();
             expect(")");
             w->body = parse_stmt();
             return w;
@@ -430,10 +487,14 @@ namespace akari::asl {
             expect(";");
             return ret;
         }
-        ast::Assignment parse_assignment() {
+        ast::Stmt parse_expr_stmt() {
             auto lvalue = parse_postfix_expr();
             if (!assignOps.count(cur().tok)) {
-                error(cur().loc, "assignment op expected");
+                // function call
+                if (!lvalue->isa<ast::FunctionCall>()) {
+                    error(cur().loc, fmt::format("an expression statment but be assignment or function call"));
+                }
+                return std::make_shared<ast::FunctionCallStatement>(lvalue->cast<ast::FunctionCall>());
             }
             auto op = cur();
             consume();
@@ -449,6 +510,9 @@ namespace akari::asl {
             }
             if (cur().tok == "while") {
                 return parse_while();
+            }
+            if (cur().tok == "switch") {
+                return parse_switch();
             }
             if (cur().tok == "for") {
                 return parse_for();
@@ -472,7 +536,7 @@ namespace akari::asl {
                 expect(";");
                 return std::make_shared<ContinueStatementNode>();
             }
-            auto st = parse_assignment();
+            auto st = parse_expr_stmt();
             expect(";");
             return st;
         }

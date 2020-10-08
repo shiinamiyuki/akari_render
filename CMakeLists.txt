@@ -20,9 +20,9 @@ set(AKR_CORE_EXT_LIBS "")
 set(AKR_COMPILE_DEFINITIONS AKR_ENABLE_CPU)
 if(MSVC)
     set(AKR_CXX_FLAGS /std:c++17 /MD  /MP /GL /arch:AVX2 /WX)
-    set(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} /LTCG:INCREMENTAL")
-    set(CMAKE_STATIC_LINKER_FLAGS  "${CMAKE_STATIC_LINKER_FLAGS} /LTCG:INCREMENTAL")
-    set(CMAKE_SHARED_LINKER_FLAGS   "${CMAKE_SHARED_LINKER_FLAGS} /LTCG:INCREMENTAL")
+    set(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} ")
+    set(CMAKE_STATIC_LINKER_FLAGS  "${CMAKE_STATIC_LINKER_FLAGS} ")
+    set(CMAKE_SHARED_LINKER_FLAGS   "${CMAKE_SHARED_LINKER_FLAGS} ")
 else()
     set(CMAKE_CXX_FLAGS -fPIC)
     set(AKR_CXX_FLAGS -mavx2 )
@@ -52,14 +52,17 @@ include_directories(${CMAKE_SOURCE_DIR}/external/pugixml/src)
 add_subdirectory(external/pugixml)
 set(AKR_CORE_EXT_LIBS ${AKR_CORE_EXT_LIBS} pugixml)
 
-
+macro(add_build_util target )
+    add_executable(${target} ${ARGN})
+    set(${target}_SOURCE ${ARGN})
+endmacro()
 # ---------------- Begin Build Utils --------------------
-add_executable(akari-configure src/akari/tools/configure.cpp)
+add_build_util(akari-configure src/akari/tools/configure.cpp)
 target_link_libraries(akari-configure fmt)
 set_target_properties(akari-configure 
         PROPERTIES  CUDA_ARCHITECTURES OFF)
 
-add_executable(akari-soac src/akari/tools/soac.cpp)
+add_build_util(akari-soac src/akari/tools/soac.cpp)
 target_link_libraries(akari-soac fmt)
 set_target_properties(akari-soac
         PROPERTIES  CUDA_ARCHITECTURES OFF)
@@ -67,7 +70,7 @@ macro(add_soa_header target source)
     add_custom_command(OUTPUT ${target}
         COMMAND akari-soac ${source} ${target}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        DEPENDS ${source} ${CMAKE_SOURCE_DIR}/src/akari/common/soa.h)
+        DEPENDS ${akari-soac_SOURCE} ${source} ${CMAKE_SOURCE_DIR}/src/akari/common/soa.h)
 endmacro()
 
 # ---------------- End Build Utils --------------------
@@ -78,7 +81,7 @@ include(cmake/CUDA.cmake)
 
 # ---------------- Akari Unified Shading Language Compiler
 file(GLOB ASL_COMPILER_SRC src/akaric/*.*)
-add_executable(akaric ${ASL_COMPILER_SRC})
+add_build_util(akaric ${ASL_COMPILER_SRC})
 target_include_directories(akaric PUBLIC src/)
 target_link_libraries(akaric fmt)
 
@@ -96,7 +99,7 @@ function(add_shader_module target)
         COMMENT "akaric ${build_config} -b ${backend} -o ${target}"
         COMMAND akaric ${build_config} -b ${backend} -o ${target}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        DEPENDS akaric ${source} ${build_config})
+        DEPENDS ${akaric_SOURCE} ${build_config} ${source})
 endfunction()
 
 
@@ -110,7 +113,7 @@ set(AKR_CONFIG_H ${CMAKE_CURRENT_SOURCE_DIR}/src/akari/common/config.h )
 add_custom_command(OUTPUT ${AKR_CONFIG_H}
     COMMAND akari-configure ${CMAKE_CURRENT_BINARY_DIR}/akari.conf ${AKR_CONFIG_H}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/akari.conf)
+    DEPENDS ${akari-configure_SOURCE} ${CMAKE_CURRENT_BINARY_DIR}/akari.conf)
 
 
 file(GLOB PYBIND11_HEADERS external/pybind11/include/pybind11.h external/pybind11/include/stl.h)
@@ -125,9 +128,8 @@ file(GLOB AKR_KERNEL_GPU_SRC ${AKR_KERNEL_SOA_H} src/akari/kernel/integrators/gp
 
 # ----- Build Shaders ------
 file(GLOB AKR_SHADER_SRC src/akari/shaders/*.asl)
-set(AKR_SHADER_COMPUTE_KERNEL src/akari/shaders/compute-kernel.out)
+set(AKR_SHADER_COMPUTE_KERNEL ${CMAKE_CURRENT_SOURCE_DIR}/src/akari/shaders/compute-kernel.out)
 add_shader_module(${AKR_SHADER_COMPUTE_KERNEL} src/akari/shaders/compute.json ${AKR_SHADER_SRC})
-
 # --------------------------
 
 

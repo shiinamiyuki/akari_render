@@ -235,6 +235,10 @@ namespace akari::asl {
                 auto i = lit->cast<ast::IntLiteral>();
                 return {fmt::format("{}", i->val), type::int32};
             }
+            if (lit->isa<ast::BoolLiteral>()) {
+                auto i = lit->cast<ast::BoolLiteral>();
+                return {fmt::format("{}", i->val ? "true" : "false"), type::boolean};
+            }
             AKR_ASSERT(false);
         }
 
@@ -277,7 +281,7 @@ namespace akari::asl {
                 } else if (rhs.type()->isa<type::VectorType>() && lhs.type()->isa<type::PrimitiveType>()) {
                     auto vt = rhs.type()->cast<type::VectorType>();
                     auto et = vt->element_type;
-                    if (et != rhs.type()) {
+                    if (et != lhs.type()) {
                         error(loc, fmt::format("illegal binary op '{}' with {} and {}", op, lhs.type()->type_name(),
                                                rhs.type()->type_name()));
                     }
@@ -300,11 +304,52 @@ namespace akari::asl {
 
             AKR_ASSERT(false);
         }
+        ValueRecord compile_cond_expr(const ast::ConditionalExpression &e) {
+            auto cond = compile_expr(e->cond);
+            if (cond.type() != type::boolean) {
+                error(e->cond->loc, fmt::format("conditional expression must be boolean expression but have {}",
+                                                type_to_str(cond.type())));
+            }
+            auto lhs = compile_expr(e->lhs);
+            auto rhs = compile_expr(e->rhs);
+            if (lhs.type() != rhs.type()) {
+                error(e->cond->loc, fmt::format("conditional expression must have the same type but have {} and {}",
+                                                type_to_str(lhs.type()), type_to_str(rhs.type())));
+            }
+            return ValueRecord{cond.value.append(" ? ").append(lhs.value).append(" : ").append(rhs.value),
+                               lhs.annotated_type};
+        }
+        ValueRecord compile_unary_expr(const ast::UnaryExpression &e) {
+            auto v = compile_expr(e->operand);
+            return ValueRecord{Twine(e->op).append(v.value), v.annotated_type};
+        }
         ValueRecord compile_binary_expr(const ast::BinaryExpression &e) {
+            static std::unordered_map<std::string, std::string> op2func = {
+                {"+", "__add__"},
+                {"-", "__sub__"},
+                {"*", "__mul__"},
+                {"/", "__div__"},
+            };
             auto binop = e->cast<ast::BinaryExpression>();
             auto op = binop->op;
             auto lhs = compile_expr(binop->lhs);
             auto rhs = compile_expr(binop->rhs);
+
+            // check if overloading presents
+            if (op2func.find(op) != op2func.end()) {
+                auto func = op2func.at(op);
+                auto mangled_func = Mangler().mangle(func, {lhs.type(), rhs.type()});
+                if (prototypes.find(func) != prototypes.end()) {
+                    auto &proto = prototypes.at(func);
+                    for (auto &overload : proto.overloads) {
+                        if (overload.first == mangled_func) {
+                            return {Twine(func).append("(").append(lhs.value).append(" ,").append(rhs.value).append(")"),
+                                    overload.second.type->ret};
+                        }
+                    }
+                }
+            }
+
             int prec_left, prec_right;
             prec_left = prec_right = std::numeric_limits<int>::max();
             if (binop->lhs->isa<ast::BinaryExpression>()) {
@@ -430,6 +475,12 @@ namespace akari::asl {
             if (e->isa<ast::BinaryExpression>()) {
                 return compile_binary_expr(e->cast<ast::BinaryExpression>());
             }
+            if (e->isa<ast::UnaryExpression>()) {
+                return compile_unary_expr(e->cast<ast::UnaryExpression>());
+            }
+            if (e->isa<ast::ConditionalExpression>()) {
+                return compile_cond_expr(e->cast<ast::ConditionalExpression>());
+            }
             if (e->isa<ast::FunctionCall>()) {
                 return compile_func_call(e->cast<ast::FunctionCall>());
             }
@@ -501,9 +552,31 @@ namespace akari::asl {
             auto rvalue = compile_expr(asgn->rhs);
             wl(os, "{} {} {};", lvalue.value.str(), asgn->op, rvalue.value.str());
         }
+        void compile_call_stmt(std::ostringstream &os, const ast::CallStmt &call) {
+            wl(os, "{};", compile_expr(call->call).value.str());
+        }
         void compile_ret(std::ostringstream &os, const ast::Return &ret) {
             auto r = compile_expr(ret->expr);
             wl(os, "return {};", r.value.str());
+        }
+        void compile_switch(std::ostringstream &os, const ast::SwitchStmt &st) {
+            auto cond = compile_expr(st->cond);
+            if (!cond.type()->is_int()) {
+                error(st->cond->loc,
+                      fmt::format("switch cond must be int expression but have {}", type_to_str(cond.type())));
+            }
+            wl(os, "switch({})", cond.value.str());
+            wl(os, "{{");
+            for (auto c : st->cases) {
+                for (auto &label : c.first) {
+                    if (label.is_default) {
+                        wl(os, "default:");
+                    } else
+                        wl(os, "case {}:", compile_expr(label.value).value.str());
+                    compile_block(os, c.second);
+                }
+            }
+            wl(os, "}}");
         }
         void compile_for(std::ostringstream &os, const ast::ForStmt &st) {
             wl(os, "{{ // for begin");
@@ -527,6 +600,8 @@ namespace akari::asl {
                 compile_var_decl(os, stmt->cast<ast::VarDeclStmt>());
             } else if (stmt->isa<ast::Assignment>()) {
                 compile_assignment(os, stmt->cast<ast::Assignment>());
+            } else if (stmt->isa<ast::CallStmt>()) {
+                compile_call_stmt(os, stmt->cast<ast::CallStmt>());
             } else if (stmt->isa<ast::Return>()) {
                 compile_ret(os, stmt->cast<ast::Return>());
             } else if (stmt->isa<ast::SeqStmt>()) {
@@ -537,6 +612,8 @@ namespace akari::asl {
                 compile_while(os, stmt->cast<ast::WhileStmt>());
             } else if (stmt->isa<ast::ForStmt>()) {
                 compile_for(os, stmt->cast<ast::ForStmt>());
+            } else if (stmt->isa<ast::SwitchStmt>()) {
+                compile_switch(os, stmt->cast<ast::SwitchStmt>());
             } else if (stmt->isa<ast::BreakStmt>()) {
                 if (!loop_pred) {
                     error(stmt->loc, "`continue` outside of loop!");
@@ -594,6 +671,22 @@ namespace akari::asl {
                 error(buf->loc, "buffer must be an T[]");
             }
         }
+        void compile_buffer_binder(std::ostringstream &os, const ast::BufferObject &buf) {
+            auto type = process_type(buf->var->type).type;
+            if (type->isa<type::ArrayType>()) {
+                auto arr = type->cast<type::ArrayType>();
+                if (arr->length == -1) {
+                    wl(os, "std::vector<{}> {};", type_to_str(arr->element_type), buf->var->var->identifier);
+                } else {
+                    error(buf->loc, "buffer must be an T[]");
+                }
+            } else {
+                error(buf->loc, "buffer must be an T[]");
+            }
+        }
+        void compile_buffer_binder_bind(std::ostringstream &os, const ast::BufferObject &buf) {
+            wl(os, "{}.copy(binder.{})", buf->var->var->identifier, buf->var->var->identifier);
+        }
         void compile_uniform(std::ostringstream &os, const ast::UniformVar &u) {
             auto type = process_type(u->var->type).type;
             wl(os, "{} {};", type_to_str(type), u->var->var->identifier);
@@ -619,7 +712,7 @@ namespace akari::asl {
             auto _ = vars.push();
             auto s = gen_func_prototype(func, func->body != nullptr);
             if (is_cuda) {
-                s = Twine::concat("__host__ __device__ ", s);
+                s = Twine::concat("AKR_XPU ", s);
             }
             s = Twine::concat("inline ", s);
             if (func->body) {
@@ -634,6 +727,9 @@ namespace akari::asl {
         virtual std::string do_generate() {
             std::ostringstream os;
             wl(os, "#pragma once");
+            if (is_cuda) {
+                wl(os, R"(#include <cuda.h>)");
+            }
             wl(os, R"(#include <akari/common/color.h>)");
             wl(os, R"(#include <akari/common/buffer.h>)");
             wl(os, "namespace akari::asl {{");
@@ -668,6 +764,24 @@ namespace akari::asl {
                             compile_func(os, func);
                         }
                     }
+                    wl(os, "struct BufferBinder {{");
+                    with_block([&]() {
+                        for (auto &unit : module.translation_units) {
+                            for (auto &buf : unit->buffers) {
+                                compile_buffer_binder(os, buf);
+                            }
+                        }
+                    });
+                    wl(os, "}};");
+                    wl(os, "void bind(const BufferBinder& binder){{");
+                    with_block([&]() {
+                        for (auto &unit : module.translation_units) {
+                            for (auto &buf : unit->buffers) {
+                                compile_buffer_binder_bind(os, buf);
+                            }
+                        }
+                    });
+                    wl(os, "}}");
                 });
                 wl(os, "}};");
             });

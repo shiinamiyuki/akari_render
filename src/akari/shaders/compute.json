@@ -5,6 +5,8 @@
     ],
     "src": [
         "builtins.asl",
+        "bsdf.asl",
+        "texture.asl",
         "material.asl"        
     ]
 }
