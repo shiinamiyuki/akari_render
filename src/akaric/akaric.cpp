@@ -131,18 +131,23 @@ int main(int argc, const char **argv) {
         for (auto src_file : build_config["src"]) {
             sources.emplace_back(src_file.get<std::string>());
         }
-        auto out = parser(sources);
-        for (auto &unit : out) {
-            if (verbose) {
-                json _;
-                unit.tree->dump_json(_);
-                std::cout << _.dump(1) << std::endl;
+        {
+            CurrentPathGuard __;
+            fs::current_path(fs::absolute(fs::path(input)).parent_path());
+            auto out = parser(sources);
+            for (auto &unit : out) {
+                if (verbose) {
+                    json _;
+                    unit.tree->dump_json(_);
+                    std::cout << _.dump(1) << std::endl;
+                }
+                module.translation_units.emplace_back(unit.tree);
             }
-            module.translation_units.emplace_back(unit.tree);
         }
         std::ofstream os(output);
         os << codegen->generate(BuildConfig{}, module);
     } catch (std::exception &e) {
         std::cerr << e.what() << std::endl;
+        exit(1);
     }
 }

@@ -46,6 +46,7 @@ namespace akari::asl {
         for (int i = 2; i <= 4; i++) {
             types[fmt::format("vec{}", i)] = create_vec_type(type::float32, i);
             types[fmt::format("ivec{}", i)] = create_vec_type(type::int32, i);
+            types[fmt::format("uvec{}", i)] = create_vec_type(type::uint32, i);
             types[fmt::format("bvec{}", i)] = create_vec_type(type::boolean, i);
             types[fmt::format("dvec{}", i)] = create_vec_type(type::float64, i);
         }

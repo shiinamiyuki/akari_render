@@ -1,0 +1,10 @@
+{
+    "name": "ComputeKernel",
+    "type-parameters": [
+        "Spectrum"
+    ],
+    "src": [
+        "builtins.asl",
+        "material.asl"        
+    ]
+}

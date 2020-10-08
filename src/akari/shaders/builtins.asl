@@ -1,6 +1,11 @@
 __builtin__ vec2 length(vec2 v);
 __builtin__ vec3 length(vec3 v);
 __builtin__ vec4 length(vec4 v);
+
+__builtin__ vec2 normalize(vec2 v);
+__builtin__ vec3 normalize(vec3 v);
+__builtin__ vec4 normalize(vec4 v);
+
 __builtin__ float dot(vec2 u, vec2 v);
 __builtin__ float dot(vec3 u, vec3 v);
 __builtin__ float dot(vec4 u, vec4 v);
@@ -40,3 +45,12 @@ __builtin__ vec4 pow(vec4 x, vec4 y);
 __builtin__ vec2 clamp(vec2 x, vec2 minVal, vec2 maxVal);
 __builtin__ vec3 clamp(vec3 x, vec3 minVal, vec3 maxVal);
 __builtin__ vec4 clamp(vec4 x, vec4 minVal, vec4 maxVal);
+
+
+__builtin__ vec2 clamp(vec2 x, float minVal, float maxVal);
+__builtin__ vec3 clamp(vec3 x, float minVal, float maxVal);
+__builtin__ vec4 clamp(vec4 x, float minVal, float maxVal);
+
+__builtin__ ivec2 clamp(ivec2 x, int minVal, int maxVal);
+__builtin__ ivec3 clamp(ivec3 x, int minVal, int maxVal);
+__builtin__ ivec4 clamp(ivec4 x, int minVal, int maxVal);

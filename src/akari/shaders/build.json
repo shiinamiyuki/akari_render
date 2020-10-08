@@ -1,9 +1,0 @@
-{
-    "name": "GenericKernel",
-    "type-parameters": [
-        "Spectrum"
-    ],
-    "src": [
-        
-    ]
-}

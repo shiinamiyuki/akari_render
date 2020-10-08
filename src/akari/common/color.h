@@ -56,11 +56,11 @@ namespace akari {
     template <typename Float>
     Color<Float, 3> linear_to_srgb(const Color<Float, 3> &L) {
         using Color3f = Color<Float, 3>;
-        return select(L < Color3f(0.0031308), L * 12.92, 1.055 * pow(L, Float(1.0f / 2.4f)) - 0.055);
+        return select(L < Color3f(0.0031308), L * 12.92, 1.055 * pow(L, Color3f(1.0f / 2.4f)) - 0.055);
     }
     template <typename Float>
     Color<Float, 3> srgb_to_linear(const Color<Float, 3> &S) {
         using Color3f = Color<Float, 3>;
-        return select(S < 0.04045, S / 12.92, pow((S + 0.055) / 1.055), Float(2.4));
+        return select(S < 0.04045, S / 12.92, pow((S + 0.055) / 1.055), Color3f(2.4));
     }
 } // namespace akari

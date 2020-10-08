@@ -111,6 +111,7 @@ namespace akari::asl {
                 typenames.insert(fmt::format("ivec{}", i));
                 typenames.insert(fmt::format("bvec{}", i));
                 typenames.insert(fmt::format("vec{}", i));
+                typenames.insert(fmt::format("uvec{}", i));
                 typenames.insert(fmt::format("dvec{}", i));
             }
             for (int m = 2; m <= 4; m++) {
@@ -554,6 +555,9 @@ namespace akari::asl {
         }
         Impl impl(*this, rec.ts, rec.filename, rec.src);
         for (auto &t : rec.typenames) {
+            impl.typenames.insert(t);
+        }
+        for (auto &t : type_parameters) {
             impl.typenames.insert(t);
         }
         rec.tree = impl.parse();

@@ -31,6 +31,7 @@ if (CMAKE_CUDA_COMPILER)
 
     # Willie hears yeh..
     set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xnvlink -suppress-stack-size-warning")
+    
 
 
 

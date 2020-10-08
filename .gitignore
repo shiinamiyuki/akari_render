@@ -15,3 +15,4 @@ out/
 src/akari/common/config.h
 src/akari/kernel/soa.h
 src/akari/kernel/integrators/gpu/workitem-soa.h
+*.out

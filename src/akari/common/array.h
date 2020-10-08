@@ -281,6 +281,10 @@ namespace akari {
         return sqrt(dot(a, a));
     }
     template <typename T, int N>
+    AKR_XPU Array<T, N> mod(const Array<T, N> &x, const Array<T, N> &y) {
+        return x - y * floor(x / y);
+    }
+    template <typename T, int N>
     AKR_XPU Array<T, N> normalize(const Array<T, N> &a) {
         return a / sqrt(dot(a, a));
     }
@@ -322,33 +326,7 @@ namespace akari {
         return ans;                                                                                                    \
     }                                                                                                                  \
     template <typename V, int N, int P>                                                                                \
-    AKR_XPU Array<V, N, P> _##name(const V &v1, const Array<V, N, P> &v2) {                                            \
-        Array<V, N, P> ans;                                                                                            \
-        using std::name;                                                                                               \
-        for (int i = 0; i < N; i++) {                                                                                  \
-            ans[i] = name(v1, v2[i]);                                                                                  \
-        }                                                                                                              \
-        return ans;                                                                                                    \
-    }                                                                                                                  \
-    template <typename V, int N, int P>                                                                                \
-    AKR_XPU Array<V, N, P> _##name(const Array<V, N, P> &v1, const V &v2) {                                            \
-        Array<V, N, P> ans;                                                                                            \
-        using std::name;                                                                                               \
-        for (int i = 0; i < N; i++) {                                                                                  \
-            ans[i] = name(v1[i], v2);                                                                                  \
-        }                                                                                                              \
-        return ans;                                                                                                    \
-    }                                                                                                                  \
-    template <typename V, int N, int P>                                                                                \
     AKR_XPU Array<V, N, P> name(const Array<V, N, P> &v1, const Array<V, N, P> &v2) {                                  \
-        return _##name(v1, v2);                                                                                        \
-    }                                                                                                                  \
-    template <typename V, int N, int P>                                                                                \
-    AKR_XPU Array<V, N, P> name(const V &v1, const Array<V, N, P> &v2) {                                               \
-        return _##name(v1, v2);                                                                                        \
-    }                                                                                                                  \
-    template <typename V, int N, int P>                                                                                \
-    AKR_XPU Array<V, N, P> name(const Array<V, N, P> &v1, const V &v2) {                                               \
         return _##name(v1, v2);                                                                                        \
     }
     using std::abs;
