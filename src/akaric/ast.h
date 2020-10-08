@@ -502,6 +502,19 @@ namespace akari::asl::ast {
         }
     };
     using StructDecl = std::shared_ptr<StructDeclNode>;
+    class TupleStructDeclNode : public TypeDeclNode {
+      public:
+        Typename struct_name;
+        TupleDecl tuple;
+        TupleStructDeclNode(Typename struct_name, TupleDecl tuple) : struct_name(struct_name), tuple(tuple) {}
+        AKR_DECL_NODE(TupleStructDeclNode)
+        void dump_json(json &j) const {
+            ASTNode::dump_json(j);
+            struct_name->dump_json(j["name"]);
+            tuple->dump_json(j["tuple"]);
+        }
+    };
+    using TupleStructDecl = std::shared_ptr<TupleStructDeclNode>;
     class ArrayDeclNode : public TypeDeclNode {
       public:
         AKR_DECL_NODE(ArrayDeclNode)
@@ -562,7 +575,7 @@ namespace akari::asl::ast {
       public:
         AKR_DECL_NODE(TopLevelNode)
         std::vector<FunctionDecl> funcs;
-        std::vector<StructDecl> structs;
+        std::vector<TypeDecl> structs;
         std::vector<BufferObject> buffers;
         std::vector<UniformVar> uniforms;
         std::vector<ConstVar> consts;

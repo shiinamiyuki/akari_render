@@ -327,18 +327,21 @@ namespace akari::asl {
             error(cur().loc, fmt::format("unexpected token {}", cur().tok));
             return nullptr;
         }
+        ast::TupleDecl parse_tuple_decl() {
+            expect("(");
+            auto loc = cur().loc;
+            std::vector<ast::TypeDecl> elements;
+            while (cur().tok != ")") {
+                elements.emplace_back(parse_typedecl());
+                if (cur().tok != ")")
+                    expect(",");
+            }
+            expect(")");
+            return std::make_shared<TupleDeclNode>(loc, std::move(elements));
+        }
         ast::TypeDecl parse_typedecl() {
             if (cur().tok == "(") {
-                auto loc = cur().loc;
-                consume();
-                std::vector<ast::TypeDecl> elements;
-                while (cur().tok != ")") {
-                    elements.emplace_back(parse_typedecl());
-                    if (cur().tok != ")")
-                        expect(",");
-                }
-                expect(")");
-                return std::make_shared<TupleDeclNode>(loc, std::move(elements));
+                return parse_tuple_decl();
             }
             ast::TypeDecl p = parse_typename();
             if (cur().tok == "[") {
@@ -390,7 +393,7 @@ namespace akari::asl {
             }
         }
         // std::pair<ast::ModuleIdentifier, ast::ModuleTypename> parse_module_function_or_typename() {}
-        ast::StructDecl parse_struct_decl() {
+        ast::TypeDecl parse_struct_decl() {
             expect("struct");
             std::unordered_set<std::string> fields;
             if (cur().type == identifier) {
@@ -401,8 +404,16 @@ namespace akari::asl {
             } else {
                 error(cur().loc, "identifier expected");
             }
+            auto name = parse_typename();
+            if (cur().tok == "(") {
+                // tuple struct
+                auto tuple = parse_tuple_decl();
+                auto st = std::make_shared<TupleStructDeclNode>(name, tuple);
+                expect(";");
+                return st;
+            }
             auto st = std::make_shared<StructDeclNode>();
-            st->struct_name = parse_typename();
+            st->struct_name = name;
             expect("{");
             while (!end() && cur().tok != "}") {
                 auto decl = parse_var_decl();

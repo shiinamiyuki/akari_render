@@ -150,6 +150,9 @@ namespace akari::asl {
                     ValueRecord v =
                         ValueRecord{decl->var->var->identifier, type::AnnotatedType(process_type(decl->var->type))};
                     vars.insert(decl->var->var->identifier, v);
+                } else if (def->isa<ast::TupleStructDecl>()) {
+                    auto tuple_decl = def->cast<ast::TupleStructDecl>();
+                    types.emplace(tuple_decl->struct_name->name, process_type(tuple_decl->tuple).type);
                 }
             }
         }
@@ -497,14 +500,22 @@ namespace akari::asl {
                 auto arg = compile_expr(call->args[i]);
                 args.emplace_back(arg);
             }
-            Twine s(ctor_name + "(");
+            std::string begin, end;
+            if (type.type->isa<type::StructType>() || type.type->isa<type::TupleType>()) {
+                begin = "{";
+                end = "}";
+            } else {
+                begin = "(";
+                end = ")";
+            }
+            Twine s(ctor_name + begin);
             for (int i = 0; i < args.size(); i++) {
                 s.append(args[i].value);
                 if (i + 1 < args.size()) {
                     s.append(",");
                 }
             }
-            s.append(")");
+            s.append(end);
             return {s, type};
         }
         ValueRecord compile_func_call(const ast::FunctionCall &call) {
@@ -562,8 +573,12 @@ namespace akari::asl {
             auto tuple_type = type_ctx.make_tuple(_types);
             Twine s(_type_to_str(tuple_type));
             s.append("{");
+            size_t cnt = 0;
             for (auto &e : elements) {
-                s.append(e.value).append(", ");
+                s.append(e.value);
+                if (cnt + 1 < elements.size())
+                    s.append(", ");
+                cnt++;
             }
             s.append("}");
             return ValueRecord{s, type::AnnotatedType(tuple_type)};
@@ -735,7 +750,7 @@ namespace akari::asl {
                         error(vars_->loc, "nested destructuring is not allowed");
                     }
                     auto var = vars_->expr[i]->cast<ast::Identifier>();
-                    block.wl("{} {} = __Gen_tmp{}.{};", type_to_str(st->fields[i].type), var->identifier, temp_counter,
+                    block.wl("{} {} = __Gen_tmp{}.{};", type_to_str(st->fields[i].type), var->identifier, tmp,
                              st->fields[i].name);
                 }
             } else if (rhs.type()->isa<type::TupleType>()) {
@@ -749,7 +764,7 @@ namespace akari::asl {
                         error(vars_->loc, "nested destructuring is not allowed");
                     }
                     auto var = vars_->expr[i]->cast<ast::Identifier>();
-                    block.wl("{} {} = __Gen_tmp{}._{};", type_to_str(st->element_types[i]), var->identifier, temp_counter, i);
+                    block.wl("{} {} = __Gen_tmp{}._{};", type_to_str(st->element_types[i]), var->identifier, tmp, i);
                 }
             } else {
                 error(des->rhs->loc, "only destructuring of struct or tuple is allowed");
@@ -791,7 +806,7 @@ namespace akari::asl {
         }
         void compile_for(CodeBlock &block, const ast::ForStmt &st) {
             block.wl("{{ // for begin");
-            with_block([&] {
+            block.with_block([&] {
                 compile_var_decl(block, st->init);
                 auto cond = compile_expr(st->cond);
                 if (cond.type() != type::boolean) {
@@ -979,10 +994,15 @@ namespace akari::asl {
                                 block = compile_struct(def->cast<ast::StructDecl>());
                             } else if (def->isa<ast::FunctionDecl>()) {
                                 block = compile_func(def->cast<ast::FunctionDecl>());
+                            } else if (def->isa<ast::TupleStructDecl>()) {
+                                auto tuple_decl = def->cast<ast::TupleStructDecl>();
+                                block.wl("using {} = {};", tuple_decl->struct_name->name,
+                                         type_to_str(types.at(tuple_decl->struct_name->name)));
                             }
                             for (auto &def_ : misc_defs) {
                                 write(os, def_);
                             }
+                            misc_defs.clear();
                             write(os, block);
                         }
                     }

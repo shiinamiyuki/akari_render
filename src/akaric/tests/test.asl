@@ -14,9 +14,15 @@ vec3 L(){
 (int, float) test(){
     return (1, 1.0);
 }
+
 void test3(){
     let l = L();
 }
 void test2(){
     let (x, y) = test();
 }
+struct MaterialHandle(int, int);
+MaterialHandle get_handle(){
+    return MaterialHandle(0, 0);
+}
+
