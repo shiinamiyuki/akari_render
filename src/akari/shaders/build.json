@@ -5,7 +5,9 @@
     ],
     "src": [
         "builtins.asl",
-        "bsdf.asl",
+        "sampler.asl",
+        "geom.asl",
+        "microfacet.asl",
         "texture.asl",
         "material.asl"        
     ]

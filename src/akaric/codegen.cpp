@@ -131,8 +131,8 @@ namespace akari::asl {
             for (auto &def : unit->defs) {
                 if (def->isa<ast::StructDecl>()) {
                     (void)process_struct_decl(def->cast<ast::StructDecl>());
-                } else if (def->isa<ast::ConstDecl>()) {
-                    auto decl = def->cast<ast::ConstDecl>();
+                } else if (def->isa<ast::ConstVar>()) {
+                    auto decl = def->cast<ast::ConstVar>();
                     ValueRecord v =
                         ValueRecord{decl->var->var->identifier, type::AnnotatedType(process_type(decl->var->type))};
                     vars.insert(decl->var->var->identifier, v);
@@ -152,7 +152,17 @@ namespace akari::asl {
                     vars.insert(decl->var->var->identifier, v);
                 } else if (def->isa<ast::TupleStructDecl>()) {
                     auto tuple_decl = def->cast<ast::TupleStructDecl>();
-                    types.emplace(tuple_decl->struct_name->name, process_type(tuple_decl->tuple).type);
+                    auto ty = tuple_decl->tuple;
+                    std::vector<type::Type> elements;
+                    for (auto e : ty->elements) {
+                        auto et = process_type(e);
+                        if (et.qualifier != type::Qualifier::none) {
+                            error(ty->loc, "tuple element type cannot have qualifiers");
+                        }
+                        elements.emplace_back(et.type);
+                    }
+                    auto type = type_ctx.make_named_tuple(tuple_decl->struct_name->name, elements);
+                    types.emplace(type->name, type);
                 }
             }
         }
@@ -257,11 +267,16 @@ namespace akari::asl {
             }
             if (ty->isa<type::TupleType>()) {
                 auto tuple = ty->cast<type::TupleType>();
-                Twine s("Tuple");
-                for (auto &e : tuple->element_types) {
-                    s.append("_" + type_mangler(e));
+                std::string m;
+                if (tuple->name.empty()) {
+                    Twine s("Tuple");
+                    for (auto &e : tuple->element_types) {
+                        s.append("_" + type_mangler(e));
+                    }
+                    m = s.str();
+                } else {
+                    m = tuple->name;
                 }
-                auto m = s.str();
                 CodeBlock block;
                 {
                     block.wl("struct {} {{", m);
@@ -287,7 +302,7 @@ namespace akari::asl {
                 return "int";
             }
             if (ty == type::uint32) {
-                return "uint";
+                return "uint32_t";
             }
             if (ty == type::boolean) {
                 return "bool";
@@ -374,6 +389,35 @@ namespace akari::asl {
         //         if()
         //     }
         // }
+        std::tuple<type::Type, ValueRecord, ValueRecord> check_binary_expr_do_vector(const std::string &op,
+                                                                                     const SourceLocation &loc,
+                                                                                     const ValueRecord &lhs,
+                                                                                     const ValueRecord &rhs) {
+            if (lhs.type() == rhs.type()) {
+                return std::make_tuple(lhs.type(), lhs, rhs);
+            }
+            if (lhs.type()->isa<type::VectorType>() && rhs.type()->isa<type::PrimitiveType>()) {
+                auto vt = lhs.type()->cast<type::VectorType>();
+                auto et = vt->element_type;
+                if (et != rhs.type()) {
+                    error(loc, fmt::format("illegal binary op '{}' with {} and {}", op, lhs.type()->type_name(),
+                                           rhs.type()->type_name()));
+                }
+                return std::make_tuple(lhs.type(), lhs, ValueRecord{rhs.value, lhs.type()});
+            } else if (rhs.type()->isa<type::VectorType>() && lhs.type()->isa<type::PrimitiveType>()) {
+                auto vt = rhs.type()->cast<type::VectorType>();
+                auto et = vt->element_type;
+                if (et != lhs.type()) {
+                    error(loc, fmt::format("illegal binary op '{}' with {} and {}", op, lhs.type()->type_name(),
+                                           rhs.type()->type_name()));
+                }
+                return std::make_tuple(rhs.type(), ValueRecord{lhs.value, rhs.type()}, rhs);
+            } else {
+                error(loc, fmt::format("illegal binary op '{}' with {} and {}", op, lhs.type()->type_name(),
+                                       rhs.type()->type_name()));
+            }
+        };
+
         std::tuple<type::Type, ValueRecord, ValueRecord> check_binary_expr(const std::string &op,
                                                                            const SourceLocation &loc,
                                                                            const ValueRecord &lhs,
@@ -387,29 +431,7 @@ namespace akari::asl {
             }
 
             if (op == "+" || op == "-" || op == "*" || op == "/") {
-                if (lhs.type() == rhs.type()) {
-                    return std::make_tuple(lhs.type(), lhs, rhs);
-                }
-                if (lhs.type()->isa<type::VectorType>() && rhs.type()->isa<type::PrimitiveType>()) {
-                    auto vt = lhs.type()->cast<type::VectorType>();
-                    auto et = vt->element_type;
-                    if (et != rhs.type()) {
-                        error(loc, fmt::format("illegal binary op '{}' with {} and {}", op, lhs.type()->type_name(),
-                                               rhs.type()->type_name()));
-                    }
-                    return std::make_tuple(lhs.type(), lhs, ValueRecord{rhs.value, lhs.type()});
-                } else if (rhs.type()->isa<type::VectorType>() && lhs.type()->isa<type::PrimitiveType>()) {
-                    auto vt = rhs.type()->cast<type::VectorType>();
-                    auto et = vt->element_type;
-                    if (et != lhs.type()) {
-                        error(loc, fmt::format("illegal binary op '{}' with {} and {}", op, lhs.type()->type_name(),
-                                               rhs.type()->type_name()));
-                    }
-                    return std::make_tuple(rhs.type(), ValueRecord{lhs.value, rhs.type()}, rhs);
-                } else {
-                    error(loc, fmt::format("illegal binary op '{}' with {} and {}", op, lhs.type()->type_name(),
-                                           rhs.type()->type_name()));
-                }
+                return check_binary_expr_do_vector(op, loc, lhs, rhs);
             } else if (op == "<" || op == "<=" || op == ">" || op == ">=" || op == "!=" || op == "==") {
                 if (lhs.type()->isa<type::VectorType>() || rhs.type()->isa<type::VectorType>()) {
                     error(loc, fmt::format("illegal binary op '{}' with {} and {}", op, lhs.type()->type_name(),
@@ -420,6 +442,12 @@ namespace akari::asl {
                                            rhs.type()->type_name()));
                 }
                 return std::make_tuple(type::boolean, lhs, rhs);
+            } else if (op == "&" || op == "^" || op == "|" || op == "<<" || op == "%" || op == ">>") {
+                if (!lhs.type()->is_int() && !rhs.type()->is_int()) {
+                    error(loc, fmt::format("illegal binary op '{}' with {} and {}", op, lhs.type()->type_name(),
+                                           rhs.type()->type_name()));
+                }
+                return check_binary_expr_do_vector(op, loc, lhs, rhs);
             }
 
             AKR_ASSERT(false);
@@ -441,6 +469,17 @@ namespace akari::asl {
         }
         ValueRecord compile_unary_expr(const ast::UnaryExpression &e) {
             auto v = compile_expr(e->operand);
+            auto op = e->op;
+            if (op == "~") {
+                if (!v.type()->is_int()) {
+                    error(e->loc, fmt::format("operator ~ is not allowed with type {}", type_to_str(v.type())));
+                }
+            }
+            if (op == "!") {
+                if (v.type() != type::boolean) {
+                    error(e->loc, fmt::format("operator ! is not allowed with type {}", type_to_str(v.type())));
+                }
+            }
             return ValueRecord{Twine(e->op).append(v.value), v.annotated_type};
         }
         ValueRecord compile_binary_expr(const ast::BinaryExpression &e) {
@@ -588,7 +627,7 @@ namespace akari::asl {
             if (agg.type()->isa<type::TupleType>()) {
                 auto t = agg.type()->cast<type::TupleType>();
                 if ((size_t)access->member < t->element_types.size()) {
-                    return {agg.value.append("." + std::to_string(access->member)),
+                    return {agg.value.append("._" + std::to_string(access->member)),
                             type::AnnotatedType(t->element_types[access->member], agg.annotated_type.qualifier)};
                 } else {
                     error(access->loc, fmt::format("tuple type does not have member {}", access->member));
@@ -715,6 +754,7 @@ namespace akari::asl {
                 ty = init.type();
             }
             block.wl("{} {} = {};", type_to_str(ty), stmt->var->identifier, init.value.str());
+            vars.insert(stmt->var->identifier, ValueRecord{Twine(stmt->var->identifier), ty});
         }
         void compile_var_decl(CodeBlock &block, const ast::VarDecl &decl) {
             auto ty = process_type(decl->type);
@@ -752,6 +792,7 @@ namespace akari::asl {
                     auto var = vars_->expr[i]->cast<ast::Identifier>();
                     block.wl("{} {} = __Gen_tmp{}.{};", type_to_str(st->fields[i].type), var->identifier, tmp,
                              st->fields[i].name);
+                    vars.insert(var->identifier, ValueRecord{Twine(var->identifier), st->fields[i].type});
                 }
             } else if (rhs.type()->isa<type::TupleType>()) {
                 auto st = rhs.type()->cast<type::TupleType>();
@@ -765,6 +806,7 @@ namespace akari::asl {
                     }
                     auto var = vars_->expr[i]->cast<ast::Identifier>();
                     block.wl("{} {} = __Gen_tmp{}._{};", type_to_str(st->element_types[i]), var->identifier, tmp, i);
+                    vars.insert(var->identifier, ValueRecord{Twine(var->identifier), st->element_types[i]});
                 }
             } else {
                 error(des->rhs->loc, "only destructuring of struct or tuple is allowed");
@@ -800,6 +842,7 @@ namespace akari::asl {
                     } else
                         block.wl("case {}:", compile_expr(label.value).value.str());
                     compile_block(block, c.second);
+                    block.wl("break;");
                 }
             }
             block.wl("}}");
@@ -995,9 +1038,9 @@ namespace akari::asl {
                             } else if (def->isa<ast::FunctionDecl>()) {
                                 block = compile_func(def->cast<ast::FunctionDecl>());
                             } else if (def->isa<ast::TupleStructDecl>()) {
-                                auto tuple_decl = def->cast<ast::TupleStructDecl>();
-                                block.wl("using {} = {};", tuple_decl->struct_name->name,
-                                         type_to_str(types.at(tuple_decl->struct_name->name)));
+                                // auto tuple_decl = def->cast<ast::TupleStructDecl>();
+                                // block.wl("using {} = {};", tuple_decl->struct_name->name,
+                                //          type_to_str(types.at(tuple_decl->struct_name->name)));
                             }
                             for (auto &def_ : misc_defs) {
                                 write(os, def_);

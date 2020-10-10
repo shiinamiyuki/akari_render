@@ -49,6 +49,7 @@ void swap(inout float a, inout float b){
     a = b;
     b = t;
 }
+
  float fr_dielectric(float cosThetaI, float etaI, float etaT) {
     bool entering = cosThetaI > 0.0;
     if (!entering) {

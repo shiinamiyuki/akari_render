@@ -167,6 +167,7 @@ namespace akari::asl::type {
         AKR_DECL_TYPENODE(TupleTypeNode)
         TupleTypeNode(std::vector<Type> element_types) : element_types(element_types) {}
         std::vector<Type> element_types;
+        std::string name; // for tuple struct
     };
     using TupleType = std::shared_ptr<TupleTypeNode>;
 
@@ -185,7 +186,7 @@ namespace akari::asl::type {
     };
     template <typename T1, typename T2>
     struct PairHash {
-        size_t operator()(const std::pair<T1, T2> &pair) const{
+        size_t operator()(const std::pair<T1, T2> &pair) const {
             return std::hash<T1>()(pair.first) ^ std::hash<T2>()(pair.second);
         }
     };
@@ -212,6 +213,9 @@ namespace akari::asl::type {
         };
         std::unordered_map<std::pair<type::Type, int>, type::ArrayType, PairHash<type::Type, int>> array_cache;
         std::unordered_map<std::vector<type::Type>, type::TupleType, TupleHash, TupleEqual> tuple_cache;
+        std::unordered_map<std::vector<type::Type>, std::unordered_map<std::string, type::TupleType>, TupleHash,
+                           TupleEqual>
+            named_tuple_cache;
 
       public:
         type::ArrayType make_array(type::Type t, int length) {
@@ -230,6 +234,24 @@ namespace akari::asl::type {
                 return tuple_cache[types];
             }
             return it->second;
+        }
+        type::TupleType make_named_tuple(const std::string &name, const std::vector<type::Type> &types) {
+            auto it = named_tuple_cache.find(types);
+            if (named_tuple_cache.end() == it) {
+                named_tuple_cache[types] = {};
+                auto ty = std::make_shared<TupleTypeNode>(types);
+                ty->name = name;
+                named_tuple_cache[types][name] = ty;
+                return ty;
+            }
+            auto &tuples = it->second;
+            if (tuples.find(name) == tuples.end()) {
+                auto ty = std::make_shared<TupleTypeNode>(types);
+                ty->name = name;
+                tuples[name] = ty;
+                return ty;
+            }
+            return tuples.at(name);
         }
     };
 } // namespace akari::asl::type

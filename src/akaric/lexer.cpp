@@ -153,6 +153,8 @@ namespace akari::asl {
                             s += cur();
                             advance();
                         }
+                        if (cur() == 'f')
+                            advance();
                     }
                     ts.emplace_back(Token{s, type, loc});
                 } else if (op_char.count(cur())) {

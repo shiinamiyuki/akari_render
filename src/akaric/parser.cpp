@@ -199,8 +199,23 @@ namespace akari::asl {
             return args;
         }
         ast::Expr parse_postfix_expr() {
+            if (cur().tok == "~" || cur().tok == "!" || cur().tok == "-") {
+                return parse_unary();
+            }
             if (typenames.find(cur().tok) != typenames.end()) {
                 auto ty = parse_typename();
+                if (cur().tok == ".") {
+                    // typename.method is a special kind of function name
+                    // translates to typename_method
+                    consume();
+                    auto id = parse_identifier();
+                    id->identifier = ty->name + "_" + id->identifier;
+                    auto call = std::make_shared<FunctionCallNode>();
+                    call->func = id;
+                    call->args = parse_args();
+                    call->loc = call->func->loc;
+                    return call;
+                }
                 auto call = std::make_shared<ConstructorCallNode>();
                 call->type = ty;
                 call->args = parse_args();
@@ -265,16 +280,20 @@ namespace akari::asl {
             expect(")");
             return std::make_shared<TupleExpressionNode>(elements);
         }
+        ast::UnaryExpression parse_unary() {
+            if (cur().tok == "-" || cur().tok == "!" || cur().tok == "~") {
+                auto op = cur();
+                consume();
+                auto e = parse_postfix_expr();
+                return std::make_shared<ast::UnaryExpressionNode>(op, e);
+            } else {
+                error(cur().loc, "illegal token in unary expression");
+            }
+        }
         ast::Expr parse_atom() {
             if (cur().type == identifier) {
                 auto iden = parse_identifier();
                 return iden;
-            }
-            if (cur().tok == "-" || cur().tok == "!" || cur().tok == "~") {
-                auto op = cur();
-                consume();
-                auto e = parse_atom();
-                return std::make_shared<ast::UnaryExpressionNode>(op, e);
             }
             if (cur().tok == "(") {
                 consume();
@@ -637,6 +656,13 @@ namespace akari::asl {
             auto func = std::make_shared<FunctionDeclNode>();
             func->type = parse_typedecl();
             func->name = parse_identifier();
+            if (typenames.find(func->name->identifier) != typenames.end()) {
+                // typename.method
+                expect(".");
+                auto id = parse_identifier();
+                func->name->identifier.append("_").append(id->identifier);
+                func->is_method = true;
+            }
             expect("(");
             while (!end() && cur().tok != ")") {
                 func->parameters.emplace_back(parse_parameter_decl());
@@ -667,7 +693,7 @@ namespace akari::asl {
                     if (next == ts.end() || next->type != TokenType::identifier) {
                         error(_it->loc, "name expected");
                     } else {
-                        s.insert(_it->tok);
+                        s.insert(next->tok);
                     }
                 }
             }
@@ -711,9 +737,14 @@ namespace akari::asl {
             return rec.tree;
         }
         Impl impl(*this, rec.ts, rec.filename, rec.src);
-        for (auto &t : rec.typenames) {
-            impl.typenames.insert(t);
+        for (auto &r : parsed_modules) {
+            if (r.first != full_path) {
+                for (auto &t : r.second.typenames) {
+                    impl.typenames.insert(t);
+                }
+            }
         }
+
         for (auto &t : type_parameters) {
             impl.typenames.insert(t);
         }

@@ -43,7 +43,14 @@ namespace akari::asl {
                 return fmt::format("ZS{}Zs", ty->cast<type::StructType>()->name);
             } else if (ty->isa<type::OpaqueType>()) {
                 return fmt::format("ZO{}Zo", ty->cast<type::OpaqueType>()->name);
-            } else {
+            } else if (ty->isa<type::TupleType>()) {
+                std::string s = "ZT";
+                auto tt = ty->cast<type::TupleType>();
+                for(auto e : tt->element_types){
+                    s.append(mangle(e) + "ZE");
+                }
+                return s.append("Zt");
+            }else {
                 AKR_ASSERT(false);
             }
         }

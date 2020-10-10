@@ -1,7 +1,5 @@
-struct TextureHandle {
-    int type;
-    int index;
-}
+struct TextureHandle(int, int);
+
 struct FloatTexture {
     float value;
 }
@@ -13,6 +11,4 @@ const int RGBTextureType = 2;
 
 buffer FloatTexture[] float_textures;
 buffer RGBTexture[] rgb_textures;
-
-
 

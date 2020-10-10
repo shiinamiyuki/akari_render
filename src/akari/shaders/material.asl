@@ -1,7 +1,4 @@
-struct MaterialHandle {
-    int type;
-    int index;
-}
+struct MaterialHandle(int, int);
 
 struct MixMaterial {
     MaterialHandle first;
@@ -30,10 +27,13 @@ struct DiffuseBSDF{
     Spectrum R;
 }
 const int DiffuseBSDFType = 0;
+
 struct GlossyBSDF{
+    MicrofacetModel model;
     Spectrum R;
 }
 const int GlossyBSDFType = 1;
+
 const int NumBSDF = 2;
 struct BSDF {
     float [NumBSDF] weights;

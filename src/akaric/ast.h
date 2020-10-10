@@ -430,16 +430,6 @@ namespace akari::asl::ast {
         AKR_DECL_NODE(BreakStatementNode)
     };
     using ContinueStmt = std::shared_ptr<ContinueStatementNode>;
-    class ConstDeclNode : public StatementNode {
-      public:
-        AKR_DECL_NODE(ConstDeclNode)
-        VarDecl var;
-        void dump_json(json &j) const {
-            ASTNode::dump_json(j);
-            var->dump_json(j["var"]);
-        }
-    };
-    using ConstDecl = std::shared_ptr<ConstDeclNode>;
 
     class ForStatementNode : public StatementNode {
       public:
@@ -475,6 +465,7 @@ namespace akari::asl::ast {
         TypeDecl type;
         SeqStmt body;
         bool is_intrinsic = false;
+        bool is_method = false;
         AKR_DECL_NODE(VarDeclNode)
         void dump_json(json &j) const {
             ASTNode::dump_json(j);
@@ -482,6 +473,8 @@ namespace akari::asl::ast {
             name->dump_json(j["name"]);
             if (body)
                 body->dump_json(j["body"]);
+            j["is_method"] = is_method;
+            j["is_intrinsic"] = is_intrinsic;
         }
     };
     using FunctionDecl = std::shared_ptr<FunctionDeclNode>;

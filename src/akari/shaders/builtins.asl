@@ -86,4 +86,10 @@ __builtin__ ivec2 clamp(ivec2 x, int minVal, int maxVal);
 __builtin__ ivec3 clamp(ivec3 x, int minVal, int maxVal);
 __builtin__ ivec4 clamp(ivec4 x, int minVal, int maxVal);
 
+__builtin__ float exp(float x);
+__builtin__ float log(float x);
+__builtin__ float sin(float x);
+__builtin__ float cos(float x);
+
+const float Pi = 3.1415926535897932;
 
