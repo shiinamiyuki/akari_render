@@ -129,7 +129,7 @@ file(GLOB AKR_KERNEL_GPU_SRC ${AKR_KERNEL_SOA_H} src/akari/kernel/integrators/gp
 # ----- Build Shaders ------
 file(GLOB AKR_SHADER_SRC src/akari/shaders/*.asl)
 set(AKR_SHADER_COMPUTE_KERNEL ${CMAKE_CURRENT_SOURCE_DIR}/src/akari/shaders/compute-kernel.out)
-add_shader_module(${AKR_SHADER_COMPUTE_KERNEL} src/akari/shaders/compute.json ${AKR_SHADER_SRC})
+add_shader_module(${AKR_SHADER_COMPUTE_KERNEL} src/akari/shaders/build.json ${AKR_SHADER_SRC})
 # --------------------------
 
 
