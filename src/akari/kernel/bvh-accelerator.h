@@ -212,7 +212,7 @@ namespace akari {
                     }
                     if (minCost > 0)
                         return SplitInfo{axis, minCost, overlapped[splitBuckets], splitBuckets,
-                                         box.pmin[axis] + splitBuckets * bucket_size};
+                                         box.pmin[axis] + (splitBuckets + 1) * bucket_size};
                     else
                         return std::nullopt;
                 };
@@ -236,9 +236,7 @@ namespace akari {
                                                    first, nBuckets - 1);
 
                         Ref right_ref = i;
-                        std::vector<Ref> tmp;
                         for (int j = first; j < last; j++) {
-                            tmp.push_back(right_ref);
                             double split = double(box.pmin[axis]) + (j + 1) * bucket_size;
                             auto [left, right] = right_ref.split(axis, split);
                             // AKR_ASSERT(!left.box.empty() && !right.box.empty());
@@ -298,7 +296,7 @@ namespace akari {
                     // }
                     AKR_ASSERT(minCost > 0);
                     return SplitInfo{axis, minCost, Bounds3f(), splitBuckets,
-                                     box.pmin[axis] + splitBuckets * bucket_size};
+                                     box.pmin[axis] + (splitBuckets + 1) * bucket_size};
                 };
                 std::optional<SplitInfo> best_sah_split;
                 for (int axis = 0; axis < 3; axis++) {
@@ -316,7 +314,7 @@ namespace akari {
                         best_sah_split = candidate;
                     }
                 }
-                bool try_spatial = enable_sbvh && depth <= 32;
+                bool try_spatial = enable_sbvh && depth <= 40;
                 if (best_sah_split) {
                     auto lambda = best_sah_split.value().overlapped;
                     double alpha = 1e-5;
@@ -383,12 +381,12 @@ namespace akari {
                             if (i.box.empty())
                                 continue;
                             // AKR_ASSERT(!i.box.empty());
-                            if (bbox.pmax[axis] < split_pos) {
+                            if (bbox.pmax[axis] <= split_pos) {
                                 left_partition.emplace_back(i);
                                 left_box = left_box.merge(bbox);
-                            } else if (bbox.pmin[axis] > split_pos) {
+                            } else if (bbox.pmin[axis] >= split_pos) {
                                 right_partition.emplace_back(i);
-                                right_box = left_box.merge(bbox);
+                                right_box = right_box.merge(bbox);
                             } else {
                                 middle.emplace_back(i);
                             }
@@ -451,7 +449,7 @@ namespace akari {
                     node.count = (uint16_t)-1;
                 }
                 AKR_ASSERT(!left_partition.empty() && !right_partition.empty());
-                if (refs.size() > 64 * 1024) {
+                if (refs.size() > 128 * 1024) {
                     auto left = std::async(std::launch::async, [&]() -> int {
                         return (int)recursiveBuild(std::move(left_partition), depth + 1);
                     });
