@@ -27,7 +27,7 @@
 #include <optional>
 namespace akari {
     template <typename C, class UserData, class Hit, class Intersector, class ShapeHandleConstructor,
-              size_t StackDepth = 32>
+              size_t StackDepth = 64>
     struct TBVHAccelerator {
         AKR_IMPORT_TYPES()
         using Ref = typename ShapeHandleConstructor::value_type;
@@ -58,7 +58,7 @@ namespace akari {
 
         AKR_XPU Ref get(const int idx) { return _ctor(user_data, idx); }
 
-        bool enable_sbvh = false;
+        bool enable_sbvh = true;
         Bounds3f boundBox;
         UserData user_data;
         Intersector _intersector;
@@ -96,11 +96,11 @@ namespace akari {
             }
             return -1;
         }
-        static constexpr size_t nBuckets = 16;
+        static constexpr size_t nBuckets = 32;
         struct SplitInfo {
             int axis;
             double min_cost;
-            double overlapped = 0.0;
+            Bounds3f overlapped;
             int split; // [0, nBuckets)
             double split_pos;
         };
@@ -132,16 +132,19 @@ namespace akari {
                 boundBox = box;
             }
 
-            if (refs.size() <= 4 || depth >= 64) {
-                if (depth == 64) {
+            if (all(box.extents() <= Float3(0.0)) || refs.size() <= 4 || depth >= 62) {
+                if (depth == 62) {
                     warning("BVH exceeds max depth; {} objects", refs.size());
+                }
+                if (refs.size() >= 16) {
+                    warning("leaf node with {} objects", refs.size());
                 }
                 return create_leaf_node(box, refs);
             } else {
                 auto size = centroidBound.size();
 
                 auto try_split_with_axis = [&](int axis) -> std::optional<SplitInfo> {
-                    if (size[axis] == 0) {
+                    if (size[axis] == 0 || box.surface_area() == 0.0) {
                         // debug("box: [{}, {}] size: {}", box.pmin, box.pmin, size);
                         return std::nullopt;
                     }
@@ -160,7 +163,7 @@ namespace akari {
                         buckets[b].bound = buckets[b].bound.merge(i.box);
                     }
                     double cost[nBuckets - 1] = {0};
-                    double overlapped[nBuckets - 1] = {0};
+                    Bounds3f overlapped[nBuckets - 1];
                     for (uint32_t i = 0; i < nBuckets - 1; i++) {
                         Bounds3f b0;
                         Bounds3f b1;
@@ -173,11 +176,11 @@ namespace akari {
                             b1 = b1.merge(buckets[j].bound);
                             count1 += buckets[j].count;
                         }
-                        float cost0 = count0 == 0 ? 0 : count0 * b0.surface_area();
-                        float cost1 = count1 == 0 ? 0 : count1 * b1.surface_area();
+                        float cost0 = count0 == 0 ? 0 : count0 * b0.surface_area() / box.surface_area();
+                        float cost1 = count1 == 0 ? 0 : count1 * b1.surface_area() / box.surface_area();
                         AKR_ASSERT(cost0 >= 0 && cost1 >= 0 && box.surface_area() >= 0);
-                        cost[i] = 0.125f + (cost0 + cost1) / box.surface_area();
-                        overlapped[i] = (b0.intersect(b1)).surface_area();
+                        cost[i] = 0.125f + (cost0 + cost1);
+                        overlapped[i] = (b0.intersect(b1));
                         if (!(cost[i] >= 0)) {
                             debug("#objects {}  {} {} {} {}", refs.size(), cost[i], cost0, cost1, box.surface_area(),
                                   size);
@@ -186,17 +189,27 @@ namespace akari {
                     }
                     int splitBuckets = 0;
                     double minCost = cost[0];
-                    bool all_same = true;
+                    bool cannot_split = false;
+                    for (int i = 0; i < nBuckets; i++) {
+                        cannot_split = cannot_split || buckets[i].count == refs.size();
+                    }
                     for (uint32_t i = 1; i < nBuckets - 1; i++) {
-                        if (cost[i] != cost[i - 1])
-                            all_same = false;
+
                         if (cost[i] <= minCost) {
                             minCost = cost[i];
                             splitBuckets = i;
                         }
                     }
-                    if (all_same)
+                    if (cannot_split) {
+                        // std::lock_guard<std::mutex> _(*m);
+                        // for(int i =0; i <nBuckets;i++){
+                        //     debug("#{} {} {}\n",i, buckets[i].count, buckets[i].bound);
+                        // }
+                        // for(int i =0; i <nBuckets-1;i++){
+                        //     debug("cost[{}] = {}\n",i, cost[i]);
+                        // }
                         return std::nullopt;
+                    }
                     if (minCost > 0)
                         return SplitInfo{axis, minCost, overlapped[splitBuckets], splitBuckets,
                                          box.pmin[axis] + splitBuckets * bucket_size};
@@ -204,6 +217,8 @@ namespace akari {
                         return std::nullopt;
                 };
                 auto try_split_spatial = [&](int axis) -> std::optional<SplitInfo> {
+                    if (size[axis] <= 0.0 || box.surface_area() == 0.0)
+                        return std::nullopt;
                     struct Bucket {
                         int count = 0;
                         Bounds3f bound;
@@ -250,14 +265,16 @@ namespace akari {
                             b1 = b1.merge(bins[j].bound);
                             count1 += bins[j].exit;
                         }
-                        float cost0 = count0 == 0 ? 0 : count0 * b0.surface_area();
-                        float cost1 = count1 == 0 ? 0 : count1 * b1.surface_area();
+                        float cost0 = count0 == 0 ? 0 : count0 * b0.surface_area_ratio(box);
+                        float cost1 = count1 == 0 ? 0 : count1 * b1.surface_area_ratio(box);
 
                         AKR_ASSERT(cost0 >= 0 && cost1 >= 0 && box.surface_area() >= 0);
-                        cost[i] = 0.125f + (cost0 + cost1) / box.surface_area();
+                        cost[i] = 0.125f + (cost0 + cost1);
                         // fmt::print("#{} {} {} {} {} {}\n", i, count0, count1, cost0, cost1, cost[i]);
+
                         AKR_ASSERT(cost[i] >= 0);
                     }
+
                     int splitBuckets = 0;
                     double minCost = cost[0];
                     bool all_same = true;
@@ -272,8 +289,16 @@ namespace akari {
                     if (all_same) {
                         splitBuckets = nBuckets / 2;
                     }
+                    // if (refs.size() <= 40) {
+                    //     std::lock_guard<std::mutex> _(*m);
+                    //     fmt::print("total {}\n", refs.size());
+                    //     for (uint32_t i = 0; i < nBuckets; i++)
+                    //         fmt::print("#{} {} {}\n", i, bins[i].enter, bins[i].exit);
+                    //     fmt::print("split {}\n", splitBuckets);
+                    // }
                     AKR_ASSERT(minCost > 0);
-                    return SplitInfo{axis, minCost, 0.0, splitBuckets, box.pmin[axis] + splitBuckets * bucket_size};
+                    return SplitInfo{axis, minCost, Bounds3f(), splitBuckets,
+                                     box.pmin[axis] + splitBuckets * bucket_size};
                 };
                 std::optional<SplitInfo> best_sah_split;
                 for (int axis = 0; axis < 3; axis++) {
@@ -291,11 +316,11 @@ namespace akari {
                         best_sah_split = candidate;
                     }
                 }
-                bool try_spatial = enable_sbvh;
+                bool try_spatial = enable_sbvh && depth <= 32;
                 if (best_sah_split) {
                     auto lambda = best_sah_split.value().overlapped;
                     double alpha = 1e-5;
-                    if (lambda / boundBox.surface_area() <= alpha) {
+                    if (lambda.surface_area_ratio(boundBox) <= alpha) {
                         try_spatial = false;
                     }
                 }
@@ -320,6 +345,8 @@ namespace akari {
                 if (best_sah_split.has_value() || best_spatial_split.has_value()) {
                     bool use_sah;
                     if (best_sah_split.has_value() && best_spatial_split.has_value()) {
+                        // debug("size: {}, cost 1: {} cost 2:{}", refs.size(), best_sah_split.value().min_cost,
+                        //       best_spatial_split.value().min_cost);
                         use_sah = best_spatial_split.value().min_cost > best_sah_split.value().min_cost;
                     } else if (best_spatial_split) {
                         use_sah = false;
@@ -331,6 +358,7 @@ namespace akari {
                         auto best_split = best_sah_split.value();
                         axis = best_split.axis;
                         for (auto i : refs) {
+
                             // AKR_ASSERT(!i.box.empty());
                             auto b = int(centroidBound.offset(i.box.centroid())[axis] * nBuckets);
                             if (b == (int)nBuckets) {
@@ -344,7 +372,7 @@ namespace akari {
                         }
                     } else {
                         auto best_split = best_spatial_split.value();
-                        fmt::print("{} {}\n", best_split.split, best_split.min_cost);
+                        // fmt::print("{} {}\n", best_split.split, best_split.min_cost);
                         axis = best_split.axis;
                         std::vector<Ref> middle;
                         Bounds3f left_box, right_box;
@@ -352,6 +380,8 @@ namespace akari {
                         double split_pos = best_split.split_pos;
                         for (auto i : refs) {
                             auto bbox = i.box;
+                            if (i.box.empty())
+                                continue;
                             // AKR_ASSERT(!i.box.empty());
                             if (bbox.pmax[axis] < split_pos) {
                                 left_partition.emplace_back(i);
@@ -366,7 +396,15 @@ namespace akari {
 
                         for (auto i : middle) {
                             auto [left, right] = i.split(axis, split_pos);
-                            // AKR_ASSERT(!left.box.empty() && !right.box.empty());
+                            AKR_ASSERT(!left.box.empty() || !right.box.empty());
+                            if (left.box.empty()) {
+                                right_partition.emplace_back(i);
+                                right_box = right_box.merge(i.box);
+                            } else if (right.box.empty()) {
+                                left_partition.emplace_back(i);
+                                left_box = left_box.merge(i.box);
+                            }
+
                             // if(left.empt)
                             Bounds3f B1 = left_box;
                             Bounds3f B2 = right_box;
@@ -447,6 +485,7 @@ namespace akari {
             int sp = 0;
             const BVHNode *p = &nodes[0];
             while (p) {
+                AKR_ASSERT(sp < maxDepth);
                 BVHNode node = *p;
                 auto t = intersectAABB(node.box, ray, invd);
 
@@ -551,8 +590,8 @@ namespace akari {
                 right.pmin[axis] = split;
                 // fmt::print("original: left {} right {} bound:{}\n", left, right, box);
                 // AKR_ASSERT(cnt[0] > 1 && cnt[1] > 1);
-                AKR_ASSERT(!box.empty());
-                AKR_ASSERT(!left.empty() && !right.empty());
+                // AKR_ASSERT(!box.empty());
+                // AKR_ASSERT(!left.empty() && !right.empty());
                 auto _left = left.intersect(box);
                 auto _right = right.intersect(box);
                 // AKR_ASSERT(!_left.empty() && !_right.empty());

@@ -115,7 +115,7 @@ namespace akari {
             }
             pMarginal.emplace(resource, &m[0], nv);
         }
-        Float2 sample_continuous(const Float2 &u, Float *pdf) const {
+        AKR_XPU Float2 sample_continuous(const Float2 &u, Float *pdf) const {
             int v;
             Float pdfs[2];
             auto d1 = pMarginal->sample_continuous(u[0], &pdfs[0], &v);
@@ -123,7 +123,7 @@ namespace akari {
             *pdf = pdfs[0] * pdfs[1];
             return vec2(d0, d1);
         }
-        Float pdf_continuous(const Float2 &p) const {
+        AKR_XPU Float pdf_continuous(const Float2 &p) const {
             auto iu = clamp<int>(p[0] * pConditionalV[0].count(), 0, pConditionalV[0].count() - 1);
             auto iv = clamp<int>(p[1] * pMarginal->count(), 0, pMarginal->count() - 1);
             return pConditionalV[iv].func[iu] / pMarginal->funcInt;

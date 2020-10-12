@@ -306,12 +306,7 @@ namespace akari {
             pmax = Point(-Constants<Float>::Inf());
         }
         AKR_XPU Vector extents() const {
-            auto sz = pmax - pmin;
-            for (int i = 0; i < 3; i++) {
-                if (sz[i] == 0)
-                    sz[i] = 1e-6;
-            }
-            return sz;
+           return pmax - pmin;
         }
         AKR_XPU bool contains(const Point &p) const { return all(p >= pmin && p <= pmax); }
         AKR_XPU Vector size() const { return extents(); }
@@ -319,17 +314,31 @@ namespace akari {
         AKR_XPU BoundingBox expand(const Point &p) const { return BoundingBox(min(pmin, p), max(pmax, p)); }
         AKR_XPU BoundingBox merge(const BoundingBox &b1) const { return merge(*this, b1); }
         AKR_XPU static BoundingBox merge(const BoundingBox &b1, const BoundingBox &b2) {
-            if (b1.empty())
-                return b2;
-            if (b2.empty())
-                return b1;
             return BoundingBox(min(b1.pmin, b2.pmin), max(b1.pmax, b2.pmax));
         }
         AKR_XPU BoundingBox intersect(const BoundingBox &rhs) const {
             return BoundingBox(max(pmin, rhs.pmin), min(pmax, rhs.pmax));
         }
-        AKR_XPU bool empty() const { return any(pmin > pmax); }
+        AKR_XPU bool empty() const { return any(pmin > pmax) || hsum( extents()) == 0; }
         AKR_XPU Point centroid() const { return extents() * 0.5f + pmin; }
+        AKR_XPU Float surface_area_ratio(const BoundingBox & rhs)const{
+            // static_assert(N == 3);
+            // auto e1 = extents();
+            // auto e2 = rhs.extents();
+            // auto s1 = akari::shuffle<1, 2, 0>(e1) * e1;
+            // auto s2 = akari::shuffle<1, 2, 0>(e2) * e2;
+            // Float r = 1.0f;
+            // for(int i =0;i<3;i++){
+            //     if(s1[i] <= 0.0 && s2[i] <= 0.0){
+            //         auto remap = []AKR_XPU(Float x) ->Float{return x <= 0.0 ? 1.0 : x;};
+            //         r *= remap(s1[i]) / remap(s2[i]);
+            //     }else{
+            //         r *= s1[i] / s2[i];
+            //     }
+            // }
+            // return r < 0.0 ? 0.0 : r;
+            return rhs.surface_area() >= 0.0 ? surface_area() / rhs.surface_area() : 0.0;
+        }
         AKR_XPU Float surface_area() const {
             if (empty())
                 return Float(0.0);
