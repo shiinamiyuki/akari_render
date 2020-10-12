@@ -98,23 +98,20 @@ namespace akari {
                 size_t size = 256 * 1024;
                 small_arenas.emplace_back(_arena.alloc_bytes(size), size);
             }
-            auto reporter =
-                std::make_shared<ProgressReporter>(n_tiles.x * n_tiles.y, [=](size_t cur, size_t total) {
-                    bool show = false;
-                    if (spp < 32) {
-                        show = cur % 32 == 0;
-                    } else {
-                        show = true;
-                    }
-
-                    if (show)
-                        show_progress(double(cur) / double(total), 60);
-
-                    if (cur == total) {
-
-                        putchar('\n');
-                    }
-                });
+            int estimate_ray_per_sample = max_depth * 2 + 1;
+            double estimate_ray_per_sec = 0.5 * 1000 * 1000;
+            double estimate_single_tile = estimate_ray_per_sample * tile_size * tile_size / estimate_ray_per_sec;
+            size_t estimate_tiles_per_sec = size_t(1.0 / estimate_single_tile);
+            // debug("estimate_tiles_per_sec:{} total:{}", estimate_tiles_per_sec, n_tiles.x * n_tiles.y);
+            auto reporter = std::make_shared<ProgressReporter>(n_tiles.x * n_tiles.y, [=](size_t cur, size_t total) {
+                bool show = (0 == cur % (estimate_tiles_per_sec));
+                if (show) {
+                    show_progress(double(cur) / double(total), 60);
+                }
+                if (cur == total) {
+                    putchar('\n');
+                }
+            });
             parallel_for_2d(n_tiles, [=, &scene, &mutex, &small_arenas](const int2 &tile_pos, int tid) {
                 (void)tid;
                 Bounds2i tileBounds = Bounds2i{tile_pos * (int)tile_size, (tile_pos + int2(1)) * (int)tile_size};

@@ -64,7 +64,7 @@ namespace akari {
         rtcOccluded1(rtcScene, &context, &rtcRay);
         return rtcRay.tfar == -std::numeric_limits<float>::infinity();
     }
-    AKR_VARIANT bool EmbreeAccelerator<C>::intersect(const Ray<C> &ray, SurfaceHit<C> *intersection) const {
+    AKR_VARIANT bool EmbreeAccelerator<C>::intersect(const Ray<C> &ray, Intersection<C> *intersection) const {
         RTCRayHit rayHit;
         rayHit.ray = toRTCRay(ray);
         rayHit.ray.flags = 0;

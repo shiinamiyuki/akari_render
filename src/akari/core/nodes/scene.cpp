@@ -99,8 +99,14 @@ namespace akari {
         auto res = scene.camera.resolution();
         auto film = Film<C>(res);
         scene.sampler = LCGSampler<C>();
-        auto embree_scene = Box<BVHAccelerator<C>>::make(default_resource());
-        scene.accel = embree_scene.get();
+        auto gpu_accel =  Box<BVHAccelerator<C>>::make(default_resource());
+        std::unique_ptr<EmbreeAccelerator<C>> embree_accel;
+        if (active_device() == gpu_device() || !akari_enable_embree) {
+            scene.accel = gpu_accel.get();
+        } else {
+            embree_accel = std::make_unique<EmbreeAccelerator<C>>();
+            scene.accel = embree_accel.get();
+        }
         scene.commit();
         resource.prefetch();
         auto render_cpu = [&]() {

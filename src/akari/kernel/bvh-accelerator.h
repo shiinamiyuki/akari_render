@@ -132,11 +132,11 @@ namespace akari {
                 boundBox = box;
             }
 
-            if (all(box.extents() <= Float3(0.0)) || refs.size() <= 4 || depth >= 62) {
+            if (all(box.extents() <= Float3(0.0)) || refs.size() <= 2 || depth >= 62) {
                 if (depth == 62) {
                     warning("BVH exceeds max depth; {} objects", refs.size());
                 }
-                if (refs.size() >= 16) {
+                if (refs.size() >= 8) {
                     warning("leaf node with {} objects", refs.size());
                 }
                 return create_leaf_node(box, refs);
@@ -430,7 +430,7 @@ namespace akari {
                         // AKR_ASSERT(right_partition.size() < refs.size());
                     }
                 } else {
-                    if (refs.size() >= 16) {
+                    if (refs.size() >= 8) {
                         warning("best split cannot be found with {} objects; size: {}", refs.size(), size);
                         if (hsum(size) == 0) {
                             warning("centroid bound is zero");
