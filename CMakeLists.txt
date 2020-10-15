@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.12)
 project(AkariRender)
-
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 set(CMAKE_CXX_STANDARD 17)
 option(AKR_BUILD_GUI "Build Gui / Editor" OFF)
 option(AKR_PYTHON_SUPPORT "Enable Python Support" OFF)
@@ -19,7 +19,7 @@ include_directories(${CMAKE_SOURCE_DIR}/external/magic_enum/include)
 set(AKR_CORE_EXT_LIBS "")
 set(AKR_COMPILE_DEFINITIONS AKR_ENABLE_CPU)
 if(MSVC)
-    set(AKR_CXX_FLAGS /std:c++17 /MD  /MP /GL /arch:AVX2 /WX)
+    set(AKR_CXX_FLAGS /std:c++17 /MP /GL /arch:AVX2 /WX)
     set(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} ")
     set(CMAKE_STATIC_LINKER_FLAGS  "${CMAKE_STATIC_LINKER_FLAGS} ")
     set(CMAKE_SHARED_LINKER_FLAGS   "${CMAKE_SHARED_LINKER_FLAGS} ")
@@ -70,7 +70,7 @@ macro(add_soa_header target source)
     add_custom_command(OUTPUT ${target}
         COMMAND akari-soac ${source} ${target}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        DEPENDS ${akari-soac_SOURCE} ${source} ${CMAKE_SOURCE_DIR}/src/akari/common/soa.h)
+        DEPENDS akari-soac ${source} ${CMAKE_SOURCE_DIR}/src/akari/common/soa.h)
 endmacro()
 
 # ---------------- End Build Utils --------------------
@@ -80,27 +80,27 @@ include(cmake/Embree.cmake)
 include(cmake/CUDA.cmake)
 
 # ---------------- Akari Unified Shading Language Compiler
-file(GLOB ASL_COMPILER_SRC src/akaric/*.*)
-add_build_util(akaric ${ASL_COMPILER_SRC})
-target_include_directories(akaric PUBLIC src/)
-target_link_libraries(akaric fmt)
+# file(GLOB ASL_COMPILER_SRC src/akaric/*.*)
+# add_build_util(akaric ${ASL_COMPILER_SRC})
+# target_include_directories(akaric PUBLIC src/)
+# target_link_libraries(akaric fmt)
 
-set_target_CUDA_props(akaric)
+# set_target_CUDA_props(akaric)
 
-function(add_shader_module target)
-    list(SUBLIST ARGN 1 -1 source)
-    list(GET ARGN 0 build_config)
-    if(AKR_ENABLE_CUDA)
-        set(backend "cuda")
-    else()
-        set(backend "cpp")
-    endif()
-    add_custom_command(OUTPUT ${target}
-        COMMENT "akaric ${build_config} -b ${backend} -o ${target}"
-        COMMAND akaric ${build_config} -b ${backend} -o ${target}
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        DEPENDS ${akaric_SOURCE} ${build_config} ${source})
-endfunction()
+# function(add_shader_module target)
+#     list(SUBLIST ARGN 1 -1 source)
+#     list(GET ARGN 0 build_config)
+#     if(AKR_ENABLE_CUDA)
+#         set(backend "cuda")
+#     else()
+#         set(backend "cpp")
+#     endif()
+#     add_custom_command(OUTPUT ${target}
+#         COMMENT "akaric ${build_config} -b ${backend} -o ${target}"
+#         COMMAND akaric ${build_config} -b ${backend} -o ${target}
+#         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+#         DEPENDS ${akaric_SOURCE} ${build_config} ${source})
+# endfunction()
 
 
 
@@ -127,9 +127,9 @@ file(GLOB AKR_KERNEL_CPU_SRC src/akari/kernel/integrators/cpu/*.*)
 file(GLOB AKR_KERNEL_GPU_SRC ${AKR_KERNEL_SOA_H} src/akari/kernel/integrators/gpu/*.* src/akari/kernel/cuda/*.*)
 
 # ----- Build Shaders ------
-file(GLOB AKR_SHADER_SRC src/akari/shaders/*.asl)
-set(AKR_SHADER_COMPUTE_KERNEL ${CMAKE_CURRENT_SOURCE_DIR}/src/akari/shaders/compute-kernel.out)
-add_shader_module(${AKR_SHADER_COMPUTE_KERNEL} src/akari/shaders/build.json ${AKR_SHADER_SRC})
+# file(GLOB AKR_SHADER_SRC src/akari/shaders/*.asl)
+# set(AKR_SHADER_COMPUTE_KERNEL ${CMAKE_CURRENT_SOURCE_DIR}/src/akari/shaders/compute-kernel.out)
+# add_shader_module(${AKR_SHADER_COMPUTE_KERNEL} src/akari/shaders/build.json ${AKR_SHADER_SRC})
 # --------------------------
 
 
@@ -211,8 +211,7 @@ target_include_directories(akari-import PUBLIC src/)
 target_link_libraries(akari-import akari_core)
 set_target_CUDA_props(akari-import)
 
-
-
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 add_subdirectory(external/googletest EXCLUDE_FROM_ALL)
 file(GLOB AKR_TEST src/akari/tests/*.*)
 add_executable(akari-test ${AKR_TEST} src/akari/cmd/akari-test.cpp)
