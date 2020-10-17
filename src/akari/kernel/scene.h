@@ -22,6 +22,7 @@
 
 #pragma once
 #include <akari/common/math.h>
+#include <akari/common/distribution.h>
 #include <akari/kernel/instance.h>
 #include <akari/kernel/camera.h>
 #include <akari/kernel/sampler.h>
@@ -54,7 +55,7 @@ namespace akari {
         Sampler<C> sampler;
         BufferView<AreaLight<C>> area_lights;
         Variant<EmbreeAccelerator<C> *, BVHAccelerator<C> *> accel;
-
+        Distribution1D<C> *light_distribution;
         AKR_XPU bool intersect(const Ray3f &ray, Intersection<C> *isct) const;
         AKR_XPU astd::optional<Intersection<C>> intersect(const Ray3f &ray) const {
             Intersection<C> isct;
@@ -79,11 +80,13 @@ namespace akari {
             if (area_lights.size() == 0) {
                 return {nullptr, Float(0.0f)};
             }
-            size_t idx = area_lights.size() * u[0];
+            Float pdf;
+            size_t idx = light_distribution->sample_discrete(u[0], &pdf);
+            // size_t idx = area_lights.size() * u[0];
             if (idx == area_lights.size()) {
                 idx -= 1;
             }
-            return {&area_lights[idx], Float(1.0 / area_lights.size())};
+            return {&area_lights[idx], pdf};
         }
     };
 } // namespace akari

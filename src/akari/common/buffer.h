@@ -47,7 +47,7 @@ namespace akari {
         using iterator = T *;
         using const_iterator = const T *;
 
-        Buffer(MemoryResource *resource) : resource(resource), allocator(Allocator(resource)) {}
+        Buffer(MemoryResource *resource=default_resource()) : resource(resource), allocator(Allocator(resource)) {}
         Buffer(const Buffer &) = delete;
         // copy host data and resize
         template <typename A>

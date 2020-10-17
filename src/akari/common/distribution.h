@@ -45,6 +45,8 @@ namespace akari {
     }
     AKR_VARIANT
     struct Distribution1D {
+        AKR_IMPORT_TYPES()
+        template <class _C>
         friend struct Distribution2D;
         Distribution1D(MemoryResource *resource, const Float *f, size_t n) : func(resource), cdf(resource) {
             func.copy(f, n);
@@ -100,12 +102,13 @@ namespace akari {
     };
     AKR_VARIANT
     struct Distribution2D {
-        astd::pmr::vector<Distribution1D> pConditionalV;
-        astd::optional<Distribution1D> pMarginal;
+        astd::pmr::vector<Distribution1D<C>> pConditionalV;
+        astd::optional<Distribution1D<C>> pMarginal;
 
       public:
+        AKR_IMPORT_TYPES()
         Distribution2D(MemoryResource *resource, const Float *data, size_t nu, size_t nv)
-            : pConditionalV(astd::pmr::polymorphic_allocator<T>(resource)) {
+            : pConditionalV(astd::pmr::polymorphic_allocator<>(resource)) {
             for (auto v = 0u; v < nv; v++) {
                 pConditionalV.emplace_back(resource, &data[v * nu], nu);
             }

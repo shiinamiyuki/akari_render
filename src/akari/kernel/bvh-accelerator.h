@@ -87,8 +87,10 @@ namespace akari {
             Float3 t0 = (box.pmin - ray.o) * invd;
             Float3 t1 = (box.pmax - ray.o) * invd;
             Float3 tMin = min(t0, t1), tMax = max(t0, t1);
-            if (hmax(tMin) <= hmin(tMax)) {
-                auto t = std::max(ray.tmin, hmax(tMin));
+            auto m0 = hmax(tMin);
+            auto m1 = hmin(tMax);
+            if (m0 <= m1) {
+                auto t = std::max(ray.tmin, m0);
                 if (t >= ray.tmax) {
                     return -1;
                 }

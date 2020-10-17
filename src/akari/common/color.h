@@ -49,7 +49,11 @@ namespace akari {
             return !reduce(*this, [](bool acc, Float f) { return acc || (f > 0.0f); });
         }
     };
-
+    template <typename Float>
+    Float luminance(const Color<Float, 3> &L) {
+        using Color3f = Color<Float, 3>;
+        return dot(L, Color3f(0.2126, 0.7152, 0.0722));
+    }
     template <typename Float>
     Color<Float, 3> linear_to_srgb(const Color<Float, 3> &L) {
         using Color3f = Color<Float, 3>;

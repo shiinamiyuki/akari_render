@@ -49,6 +49,9 @@ namespace akari {
         }
         scene.meshes = {instances.data(), instances.size()};
         std::vector<AreaLight<C>> area_light_buffer;
+        std::vector<Float> power;
+        std::unordered_map<const Texture<C> *, std::future<Float>> ft_integrals;
+        std::unordered_map<const Texture<C> *, Float> integrals;
         for (uint32_t mesh_id = 0; mesh_id < scene.meshes.size(); mesh_id++) {
             MeshInstance<C> &mesh = scene.meshes[mesh_id];
             for (uint32_t prim_id = 0; prim_id < mesh.indices.size() / 3; prim_id++) {
@@ -58,11 +61,33 @@ namespace akari {
                     continue;
                 if (material->template isa<EmissiveMaterial<C>>()) {
                     const EmissiveMaterial<C> *e = material->template get<EmissiveMaterial<C>>();
+                    auto color = e->color;
+                    if (ft_integrals.find(color) == ft_integrals.end()) {
+                        ft_integrals.emplace(color, std::async(std::launch::async, [=] { return color->integral(); }));
+                    }
                     (void)e;
                     area_light_buffer.emplace_back(triangle);
                 }
             }
         }
+        for (auto &pair : ft_integrals) {
+            integrals[pair.first] = pair.second.get();
+        }
+        for (size_t i = 0; i < area_light_buffer.size(); i++) {
+            auto &light = area_light_buffer[i];
+            auto color = light.color;
+            auto I = integrals[color];
+            auto &triangle = light.triangle;
+            Float3 tc[3];
+            for (int j = 0; j < 3; j++)
+                tc[j] = Float3(triangle.texcoords[j].x, triangle.texcoords[j].y, 0.0);
+            auto tc_area = length(cross(tc[1] - tc[0], tc[2] - tc[0])) * 0.5;
+            auto area =
+                length(cross(triangle.vertices[1] - triangle.vertices[0], triangle.vertices[2] - triangle.vertices[0]));
+            power.emplace_back(area * tc_area * I);
+        }
+        light_distribution = Box<Distribution1D<C>>::make(default_resource(), power.data(), power.size());
+        scene.light_distribution = light_distribution.get();
         area_lights.copy(area_light_buffer.data(), area_light_buffer.size());
         scene.area_lights = area_lights.view();
 
@@ -99,7 +124,7 @@ namespace akari {
         auto res = scene.camera.resolution();
         auto film = Film<C>(res);
         scene.sampler = LCGSampler<C>();
-        auto gpu_accel =  Box<BVHAccelerator<C>>::make(default_resource());
+        auto gpu_accel = Box<BVHAccelerator<C>>::make();
         std::unique_ptr<EmbreeAccelerator<C>> embree_accel;
         if (active_device() == gpu_device() || !akari_enable_embree) {
             scene.accel = gpu_accel.get();

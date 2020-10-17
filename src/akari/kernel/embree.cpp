@@ -79,6 +79,7 @@ namespace akari {
         intersection->prim_id = rayHit.hit.primID;
         intersection->geom_id = rayHit.hit.geomID;
         intersection->uv = float2(rayHit.hit.u, rayHit.hit.v);
+        intersection->t = rayHit.ray.tfar;
         return true;
     }
     AKR_RENDER_CLASS(EmbreeAccelerator)

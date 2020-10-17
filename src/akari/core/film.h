@@ -78,7 +78,7 @@ namespace akari {
         Float splatScale = 1.0f;
         explicit Film(const int2 &dimension) : radiance(dimension), weight(dimension) {}
         Tile<C> tile(const Bounds2i &bounds) { return Tile<C>(bounds); }
-        Box<Tile<C>> boxed_tile(const Bounds2i &bounds) { return Box<Tile<C>>::make(default_resource(), bounds); }
+        Box<Tile<C>> boxed_tile(const Bounds2i &bounds) { return Box<Tile<C>>::make( bounds); }
         [[nodiscard]] AKR_XPU int2 resolution() const { return radiance.resolution(); }
 
         [[nodiscard]] AKR_XPU Bounds2i bounds() const { return Bounds2i{int2(0), resolution()}; }

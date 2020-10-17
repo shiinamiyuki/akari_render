@@ -33,6 +33,7 @@ namespace akari {
         ConstantTexture(Spectrum v) : value(v) {}
         Spectrum value;
         AKR_XPU Spectrum evaluate(const float2 &texcoords) const { return value; }
+        Float integral() const { return luminance(value); }
     };
 
     AKR_VARIANT class ImageTexture {
@@ -46,11 +47,21 @@ namespace akari {
             tc.y = 1.0f - tc.y;
             return image(tc).rgb;
         }
+        Float integral() const {
+            Float I = 0;
+            for (size_t i = 0; i < image.resolution().x * image.resolution().y; i++) {
+                I += luminance(image.data()[i].rgb);
+            }
+            return I / (image.resolution().x * image.resolution().y);
+        }
     };
     AKR_VARIANT class Texture : public Variant<ConstantTexture<C>, ImageTexture<C>> {
       public:
         AKR_IMPORT_TYPES()
         using Variant<ConstantTexture<C>, ImageTexture<C>>::Variant;
         AKR_XPU Spectrum evaluate(const float2 &texcoords) const { AKR_VAR_DISPATCH(evaluate, texcoords); }
+        Float integral() const {
+            return dispatch_cpu([=](auto &&arg) { return arg.integral(); });
+        }
     };
 } // namespace akari

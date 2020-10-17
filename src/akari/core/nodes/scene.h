@@ -20,6 +20,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 #pragma once
+#include <akari/common/distribution.h>
+#include <akari/common/box.h>
 #include <akari/core/nodes/scenegraph.h>
 #include <akari/core/nodes/camera.h>
 #include <akari/core/nodes/mesh.h>
@@ -37,6 +39,7 @@ namespace akari {
         std::string output;
         std::shared_ptr<IntegratorNode<C>> integrator;
         Buffer<AreaLight<C>> area_lights;
+        Box<Distribution1D<C>> light_distribution;
         void commit() override;
         Scene<C> compile(MemoryArena<> *arena);
         void render();

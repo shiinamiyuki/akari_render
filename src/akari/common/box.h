@@ -28,7 +28,7 @@ namespace akari {
     template <typename T>
     struct Box {
         using Allocator = astd::pmr::polymorphic_allocator<T>;
-        Box(MemoryResource *resource) : allocator(resource) {}
+        Box(MemoryResource *resource=default_resource()) : allocator(resource) {}
         Box(const Box &) = delete;
         Box(Box &&rhs) : _ptr(rhs._ptr), allocator(std::move(rhs.allocator)) { rhs._ptr = nullptr; }
         Box &operator=(const Box &) = delete;
@@ -40,8 +40,14 @@ namespace akari {
             return *this;
         }
         template <typename... Ts>
-        static Box make(MemoryResource *resource, Ts &&... args) {
+        static Box make_with_resource(MemoryResource *resource, Ts &&... args) {
             Box<T> box(resource);
+            box.emplace(std::forward<Ts>(args)...);
+            return box;
+        }
+        template <typename... Ts>
+        static Box make(Ts &&... args) {
+            Box<T> box(default_resource());
             box.emplace(std::forward<Ts>(args)...);
             return box;
         }

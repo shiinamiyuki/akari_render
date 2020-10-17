@@ -21,13 +21,14 @@
 // SOFTWARE.
 
 #pragma once
+#include <akari/common/fwd.h>
 #ifdef AKR_ENABLE_EMBREE
 #    ifdef _MSC_VER
 #        pragma warning(disable : 4324)
 
 #    endif
 #    include <embree3/rtcore.h>
-#    include <akari/common/fwd.h>
+
 namespace akari {
     AKR_VARIANT struct Intersection;
     AKR_VARIANT
@@ -48,5 +49,9 @@ namespace akari {
             rtcReleaseDevice(device);
         }
     };
+} // namespace akari
+#else
+namespace akari {
+    AKR_VARIANT class EmbreeAccelerator {};
 } // namespace akari
 #endif
