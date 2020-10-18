@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 option(AKR_BUILD_GUI "Build Gui / Editor" OFF)
 option(AKR_PYTHON_SUPPORT "Enable Python Support" OFF)
 option(AKR_ENABLE_EMBREE "Use Embree as ray intersection backend" OFF)
-option(AKR_USE_PREBUILD_EMBREE "Use prebuilt binary" OFF)
+option(AKR_USE_PREBUILT_EMBREE "Use prebuilt binary" OFF)
 option(AKR_ENABLE_ASL "Enable Akari Shading Language for procedural shading" OFF)
 option(AKR_ENABLE_PYTHON "Build Python Binding" OFF)
 
@@ -70,7 +70,7 @@ macro(add_soa_header target source)
     add_custom_command(OUTPUT ${target}
         COMMAND akari-soac ${source} ${target}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        DEPENDS akari-soac ${source} ${CMAKE_SOURCE_DIR}/src/akari/common/soa.h)
+        DEPENDS ${akari-soac_SOURCE} ${source} ${CMAKE_SOURCE_DIR}/src/akari/common/soa.h)
 endmacro()
 
 # ---------------- End Build Utils --------------------

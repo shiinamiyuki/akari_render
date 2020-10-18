@@ -67,10 +67,13 @@ namespace akari {
         astd::pmr::vector<int> indicies;
         astd::pmr::vector<BVHNode> nodes;
         std::shared_ptr<std::mutex> m;
+        std::atomic<uint32_t> n_splits;
+        TBVHAccelerator(const TBVHAccelerator &rhs) : n_splits(rhs.n_splits.load()) {}
         TBVHAccelerator(UserData &&user_data, size_t N, Intersector intersector = Intersector(),
                         ShapeHandleConstructor ctor = ShapeHandleConstructor())
             : user_data(std::move(user_data)), _intersector(std::move(intersector)), _ctor(std::move(ctor)),
-              indicies(TAllocator<int>(default_resource())), nodes(TAllocator<BVHNode>(default_resource())) {
+              indicies(TAllocator<int>(default_resource())), nodes(TAllocator<BVHNode>(default_resource())),
+              n_splits(0) {
             m = std::make_shared<std::mutex>();
             std::vector<Ref> refs;
             for (auto i = 0; i < (int)N; i++) {
@@ -80,7 +83,7 @@ namespace akari {
             }
             info("Building BVH for {} objects", refs.size());
             recursiveBuild(std::move(refs), 0);
-            info("BVHNodes: {}", nodes.size());
+            info("BVHNodes: {} #splits:{}", nodes.size(), n_splits.load());
         }
 
         AKR_XPU static Float intersectAABB(const Bounds3f &box, const Ray3f &ray, const Float3 &invd) {
@@ -265,8 +268,8 @@ namespace akari {
                             b1 = b1.merge(bins[j].bound);
                             count1 += bins[j].exit;
                         }
-                        float cost0 = count0 == 0 ? 0 : count0 * b0.surface_area_ratio(box);
-                        float cost1 = count1 == 0 ? 0 : count1 * b1.surface_area_ratio(box);
+                        float cost0 = count0 == 0 ? 0 : count0 * b0.surface_area() / box.surface_area();
+                        float cost1 = count1 == 0 ? 0 : count1 * b1.surface_area() / box.surface_area();
 
                         AKR_ASSERT(cost0 >= 0 && cost1 >= 0 && box.surface_area() >= 0);
                         cost[i] = 0.125f + (cost0 + cost1);
@@ -320,7 +323,7 @@ namespace akari {
                 if (best_sah_split) {
                     auto lambda = best_sah_split.value().overlapped;
                     double alpha = 1e-5;
-                    if (lambda.surface_area_ratio(boundBox) <= alpha) {
+                    if (lambda.surface_area() / boundBox.surface_area() <= alpha) {
                         try_spatial = false;
                     }
                 }
@@ -415,9 +418,11 @@ namespace akari {
                             double Csplit = B1.surface_area() * N1 + B2.surface_area() * N2;
                             double C1 = B1.merge(bbox).surface_area() * N1 + B2.surface_area() * (N2 - 1);
                             double C2 = B1.surface_area() * (N1 - 1) + B2.merge(bbox).surface_area() * N2;
+                            // debug("{} {} {}\n", Csplit, C1, C2);
                             if (Csplit < std::min(C1, C2)) {
                                 left_partition.emplace_back(left);
                                 right_partition.emplace_back(right);
+                                n_splits++;
                             } else if (C1 < std::min(C2, Csplit)) {
                                 left_partition.emplace_back(i);
                                 left_box = left_box.merge(bbox);
@@ -470,13 +475,16 @@ namespace akari {
         }
         AKR_XPU bool intersect_leaf(const BVHNode &node, const Ray3f &ray, Hit &isct) const {
             bool hit = false;
-            for (uint32_t i = node.first; i < node.first + node.count; i++) {
+            uint32_t first = node.first;
+            uint32_t count = node.count;
+            for (uint32_t i = first; i < first + count; i++) {
                 if (_intersector(ray, _ctor(user_data, indicies[i]), isct)) {
                     hit = true;
                 }
             }
             return hit;
         }
+        
         AKR_XPU bool intersect(const Ray3f &ray, Hit &isct) const {
             bool hit = false;
             auto invd = Float3(1) / ray.d;

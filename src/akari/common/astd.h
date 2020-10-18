@@ -252,7 +252,7 @@ namespace akari::astd {
             }
             template <class T, class... Args>
             void construct(T *p, Args &&... args) {
-                ::new ((void *)p) T(std::forward<Args>(args)...);
+                ::new ((T *)p) T(std::forward<Args>(args)...);
             }
             template <class T, class... Args>
             T *new_object(Args &&... args) {

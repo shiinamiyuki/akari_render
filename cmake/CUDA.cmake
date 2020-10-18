@@ -12,7 +12,7 @@ if (CMAKE_CUDA_COMPILER)
         message(SEND_ERROR "AkariRender requires CUDA version 11.0 or later. If you have multiple versions installed, please update your PATH.")
     endif ()
     enable_language (CUDA)
-
+    
     # FIXME
     include_directories (${CUDAToolkit_INCLUDE_DIRS})  # for regular c++ compiles
 
@@ -69,6 +69,40 @@ if (CMAKE_CUDA_COMPILER)
     endmacro()
     set(AKR_CUDA_LIBS CUDA::cudart CUDA::cuda_driver)
     set(AKR_CXX_FLAGS "") # or nvcc chokes
+
+    if(NOT AKR_OPTIX_PATH)
+        message(FATAL_ERROR "AKR_OPTIX_PATH must be set")
+    endif()
+    include_directories(${AKR_OPTIX_PATH}/include)
+
+    macro (cuda_compile_and_embed output_var cuda_file lib_name)
+        add_library ("${lib_name}" OBJECT "${cuda_file}")
+        set_property (TARGET "${lib_name}" PROPERTY CUDA_PTX_COMPILATION ON)
+        target_compile_options ("${lib_name}"
+        PRIVATE
+            # disable "extern declaration... is treated as a static definition" warning
+            -Xcudafe=--display_error_number -Xcudafe=--diag_suppress=3089
+            )
+        target_compile_definitions("${lib_name}" PRIVATE ${AKR_COMPILE_DEFINITIONS})
+        target_include_directories ("${lib_name}" PRIVATE src ${CMAKE_BINARY_DIR})
+        # target_include_directories ("${lib_name}" SYSTEM PRIVATE ${NANOVDB_INCLUDE})
+        # add_dependencies ("${lib_name}" pbrt_soa_generated)
+        set (c_var_name ${output_var})
+        set (embedded_file ${cuda_file}.ptx_embedded.c)
+        add_custom_command (
+        OUTPUT "${embedded_file}"
+        COMMAND ${CMAKE_COMMAND}
+            "-DBIN_TO_C_COMMAND=${BIN2C}"
+            "-DOBJECTS=$<TARGET_OBJECTS:${lib_name}>"
+            "-DVAR_NAME=${c_var_name}"
+            "-DOUTPUT=${embedded_file}"
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/bin2c_wrapper.cmake
+        VERBATIM
+        DEPENDS "${lib_name}"
+        COMMENT "compiling (and embedding ptx from) ${cuda_file}"
+        )
+        set (${output_var} ${embedded_file})
+    endmacro ()
 else()
     macro (set_target_CUDA_props target)
         set_target_properties(${target} PROPERTIES  CUDA_ARCHITECTURES OFF)

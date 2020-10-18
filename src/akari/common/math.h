@@ -321,24 +321,6 @@ namespace akari {
         }
         AKR_XPU bool empty() const { return any(pmin > pmax) || hsum( extents()) == 0; }
         AKR_XPU Point centroid() const { return extents() * 0.5f + pmin; }
-        AKR_XPU Float surface_area_ratio(const BoundingBox & rhs)const{
-            // static_assert(N == 3);
-            // auto e1 = extents();
-            // auto e2 = rhs.extents();
-            // auto s1 = akari::shuffle<1, 2, 0>(e1) * e1;
-            // auto s2 = akari::shuffle<1, 2, 0>(e2) * e2;
-            // Float r = 1.0f;
-            // for(int i =0;i<3;i++){
-            //     if(s1[i] <= 0.0 && s2[i] <= 0.0){
-            //         auto remap = []AKR_XPU(Float x) ->Float{return x <= 0.0 ? 1.0 : x;};
-            //         r *= remap(s1[i]) / remap(s2[i]);
-            //     }else{
-            //         r *= s1[i] / s2[i];
-            //     }
-            // }
-            // return r < 0.0 ? 0.0 : r;
-            return rhs.surface_area() >= 0.0 ? surface_area() / rhs.surface_area() : 0.0;
-        }
         AKR_XPU Float surface_area() const {
             if (empty())
                 return Float(0.0);
