@@ -9,7 +9,7 @@ AkariRender is a CPU/GPU physically based renderer written in C++17.
 [![Build Status](https://travis-ci.org/shiinamiyuki/AkariRender.svg?branch=master)](https://travis-ci.org/shiinamiyuki/AkariRender)
 
 ## Features
- - Optional GPU rendering using CUDA
+ - Optional GPU rendering using Vulkan RT(WIP) 
  - Optional Embree backend
 
 ## Build from Source
