@@ -58,7 +58,7 @@ namespace akari {
             error("Failed to load mesh: invalid format; expected '{}' but found '{}'", AKR_MESH_MAGIC, buffer);
             return Error("Invalid format");
         }
-        _mesh = std::make_shared<Mesh>(default_resource());
+        _mesh = std::make_shared<Mesh>(Allocator<>(astd::pmr::get_default_resource()));
         size_t vertexCount;
         size_t triangleCount;
         in.read(reinterpret_cast<char *>(&vertexCount), sizeof(size_t));
