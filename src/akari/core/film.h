@@ -23,71 +23,69 @@
 #ifndef AKARIRENDER_FILM_H
 #define AKARIRENDER_FILM_H
 
-#include <akari/common/fwd.h>
+#include <akari/core/fwd.h>
 #include <akari/core/image.hpp>
 #include <akari/core/parallel.h>
-#include <akari/common/buffer.h>
-#include <akari/common/box.h>
+#include <akari/core/color.h>
+#include <akari/core/memory.h>
 
 namespace akari {
-    AKR_VARIANT struct Pixel {
-        AKR_IMPORT_TYPES()
+    struct Pixel {
         Spectrum radiance = Spectrum(0);
         Float weight = 0;
     };
     constexpr size_t TileSize = 16;
-    AKR_VARIANT struct Tile {
-        AKR_IMPORT_TYPES()
+    struct Tile {
+
         Bounds2i bounds{};
-        int2 _size;
-        astd::pmr::vector<Pixel<C>> pixels;
+        ivec2 _size;
+        astd::pmr::vector<Pixel> pixels;
 
-        explicit Tile(const Bounds2i &bounds, MemoryResource *resource = default_resource())
-            : bounds(bounds), _size(bounds.size()), pixels(_size.x * _size.y, TAllocator<Pixel<C>>(resource)) {}
+        explicit Tile(const Bounds2i &bounds)
+            : bounds(bounds), _size(bounds.size()), pixels(_size.x * _size.y) {}
 
-        AKR_XPU auto &operator()(const float2 &p) {
-            auto q = int2(floor(p - float2(bounds.pmin)));
+        auto &operator()(const vec2 &p) {
+            auto q = ivec2(floor(p - vec2(bounds.pmin)));
             return pixels[q.x + q.y * _size.x];
         }
 
-        AKR_XPU auto &operator()(const int2 &p) {
-            auto q = int2(p - bounds.pmin);
+        auto &operator()(const ivec2 &p) {
+            auto q = ivec2(p - bounds.pmin);
             return pixels[q.x + q.y * _size.x];
         }
-        AKR_XPU const auto &operator()(const int2 &p) const {
-            auto q = int2(p - bounds.pmin);
+        const auto &operator()(const ivec2 &p) const {
+            auto q = ivec2(p - bounds.pmin);
             return pixels[q.x + q.y * _size.x];
         }
-        AKR_XPU const auto &operator()(const float2 &p) const {
-            auto q = int2(floor(p - float2(bounds.pmin)));
+        const auto &operator()(const vec2 &p) const {
+            auto q = ivec2(floor(p - vec2(bounds.pmin)));
             return pixels[q.x + q.y * _size.x];
         }
 
-        AKR_XPU void add_sample(const float2 &p, const Spectrum &radiance, Float weight) {
+        void add_sample(const vec2 &p, const Spectrum &radiance, Float weight) {
             auto &pix = (*this)(p);
             pix.weight += weight;
             pix.radiance += radiance;
         }
     };
-    AKR_VARIANT class Film {
-        AKR_IMPORT_TYPES()
+    class Film {
+
         TImage<Spectrum> radiance;
         TImage<Float> weight;
 
       public:
         Float splatScale = 1.0f;
-        explicit Film(const int2 &dimension) : radiance(dimension), weight(dimension) {}
-        Tile<C> tile(const Bounds2i &bounds) { return Tile<C>(bounds); }
-        Box<Tile<C>> boxed_tile(const Bounds2i &bounds) { return Box<Tile<C>>::make( bounds); }
-        [[nodiscard]] AKR_XPU int2 resolution() const { return radiance.resolution(); }
+        explicit Film(const ivec2 &dimension) : radiance(dimension), weight(dimension) {}
+        Tile tile(const Bounds2i &bounds) { return Tile(bounds); }
+        [[nodiscard]] ivec2 resolution() const { return radiance.resolution(); }
 
-        [[nodiscard]] AKR_XPU Bounds2i bounds() const { return Bounds2i{int2(0), resolution()}; }
-        AKR_XPU void merge_tile(const Tile<C> &tile) {
-            const auto lo = max(tile.bounds.pmin, int2(0, 0));
+        [[nodiscard]] Bounds2i bounds() const { return Bounds2i{ivec2(0), resolution()}; }
+        void merge_tile(const Tile &tile) {
+            const auto lo = max(tile.bounds.pmin, ivec2(0, 0));
             const auto hi = min(tile.bounds.pmax, radiance.resolution());
             for (int y = lo.y; y < hi.y; y++) {
                 for (int x = lo.x; x < hi.x; x++) {
-                    auto &pix = tile(int2(x, y));
+                    auto &pix = tile(ivec2(x, y));
                     radiance(x, y) += pix.radiance;
                     weight(x, y) += pix.weight;
                 }

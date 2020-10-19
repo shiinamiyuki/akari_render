@@ -21,8 +21,8 @@
 // SOFTWARE.
 
 #include <akari/core/arena.h>
-#include <akari/common/math.h>
-#include <akari/common/variant.h>
+#include <akari/core/math.h>
+#include <akari/core/variant.h>
 #include "gtest/gtest.h"
 using namespace akari;
 

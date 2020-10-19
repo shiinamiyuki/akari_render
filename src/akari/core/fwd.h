@@ -19,31 +19,14 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-
+#pragma once
 #include <akari/core/akari.h>
-#include <akari/core/application.h>
-#include <akari/core/resource.h>
-#include <akari/core/parallel.h>
-#include <akari/core/logger.h>
-#define NOMINMAX
-#if AKR_PLATFORM_WINDOWS
-#    include <Windows.h>
-#endif
 namespace akari {
-    Application::Application(int argc, const char **argv) {
-        auto cg = core_globals();
+    using Float = float;
+    template <typename Scalar, int N>
+    struct Color;
 
-#if AKR_PLATFORM_WINDOWS
-        char self_proc[MAX_PATH] = {0};
-        auto res = GetModuleFileNameA(nullptr, self_proc, sizeof(self_proc));
-        if (res == 0) {
-            fprintf(stderr, "error retreiving program path; code=%d\n", GetLastError());
-        }
-        cg->program_path = fs::path(std::string(self_proc));
-#endif
-    }
-    Application::~Application() {
-        thread::finalize();
-        ResourceManager::finalize();
-    }
+    using RGB = Color<Float, 3>;
+
+    using Spectrum = RGB;
 } // namespace akari

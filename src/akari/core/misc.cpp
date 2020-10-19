@@ -20,7 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 #define TINYOBJLOADER_IMPLEMENTATION
-#include <akari/common/platform.h>
+#include <akari/core/platform.h>
 #include <akari/core/misc.h>
 namespace akari::misc {
     AKR_EXPORT bool LoadObj(tinyobj::attrib_t *attrib, std::vector<tinyobj::shape_t> *shapes,

@@ -20,7 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 #pragma once
-#include <akari/common/platform.h>
+#include <akari/core/platform.h>
 #include <akari/core/akari.h>
 #include <akari/core/logger.h>
 #include <optional>
@@ -37,7 +37,7 @@ namespace akari::sdl {
         virtual bool is_boolean() const { return false; }
     };
     struct ParserContext;
-    class Array;
+    class Vector;
     class Object;
     class Null;
     class Boolean;
@@ -109,12 +109,12 @@ namespace akari::sdl {
         bool is_object() const override { return true; }
         virtual void object_field(Parser &parser, ParserContext &ctx, const std::string &field, const Value &value) = 0;
     };
-    class AKR_EXPORT Array : public ValueBase {
+    class AKR_EXPORT Vector : public ValueBase {
         std::vector<Value> arr;
         friend struct ParseContext;
 
       public:
-        Array(std::vector<Value> arr = {}) : arr(arr) {}
+        Vector(std::vector<Value> arr = {}) : arr(arr) {}
         const std::vector<Value> &array() const { return arr; }
         bool is_array() const { return true; }
         Value at(int i) {
@@ -261,5 +261,4 @@ namespace akari::sdl {
         void skip_comment(ParserContext &ctx);
         bool is_comment(ParserContext &ctx);
     };
-
 } // namespace akari::sdl

@@ -20,30 +20,28 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/core/akari.h>
-#include <akari/core/application.h>
-#include <akari/core/resource.h>
-#include <akari/core/parallel.h>
-#include <akari/core/logger.h>
-#define NOMINMAX
-#if AKR_PLATFORM_WINDOWS
-#    include <Windows.h>
-#endif
-namespace akari {
-    Application::Application(int argc, const char **argv) {
-        auto cg = core_globals();
+#include <mutex>
+#include <akari/render/scenegraph.h>
 
-#if AKR_PLATFORM_WINDOWS
-        char self_proc[MAX_PATH] = {0};
-        auto res = GetModuleFileNameA(nullptr, self_proc, sizeof(self_proc));
-        if (res == 0) {
-            fprintf(stderr, "error retreiving program path; code=%d\n", GetLastError());
+namespace akari::render {
+    class SceneGraphParserImpl : public SceneGraphParser {
+        using NodePlugin = PluginInterface<SceneNode>;
+        using NodeManager = PluginManager<SceneNode>;
+        NodeManager mgr;
+
+      public:
+        sdl::P<sdl::Object> do_parse_object_creation(sdl::ParserContext &ctx, const std::string &type) override final{
+            auto pi = mgr.load_plugin(type);
+            if (!pi) {
+                throw std::runtime_error("failed to load plugin");
+            }
+            return pi->make_shared();
         }
-        cg->program_path = fs::path(std::string(self_proc));
-#endif
+    };
+    std::shared_ptr<SceneGraphParser> SceneGraphParser::create_parser() {
+        static std::shared_ptr<SceneGraphParserImpl> impl;
+        static std::once_flag flag;
+        std::call_once(flag, [&] { impl = std::make_shared<SceneGraphParserImpl>(); });
+        return impl;
     }
-    Application::~Application() {
-        thread::finalize();
-        ResourceManager::finalize();
-    }
-} // namespace akari
+} // namespace akari::render

@@ -21,12 +21,19 @@
 // SOFTWARE.
 
 #pragma once
-#include <akari/common/mesh.h>
+#include <akari/core/buffer.h>
 #include <akari/core/resource.h>
-#include <akari/common/variant.h>
+#include <akari/core/variant.h>
 namespace akari {
 
-
+    struct Mesh {
+        Buffer<float> vertices, normals, texcoords;
+        Buffer<int> indices;
+        Buffer<int> material_indices;
+        Mesh(MemoryResource *resource)
+            : vertices(resource), normals(resource), texcoords(resource), indices(resource),
+              material_indices(resource) {}
+    };
     class AKR_EXPORT BinaryGeometry : public Resource {
         std::shared_ptr<Mesh> _mesh;
 

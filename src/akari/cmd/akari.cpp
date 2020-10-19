@@ -22,22 +22,21 @@
 
 #include <fstream>
 #include <cxxopts.hpp>
-#include <akari/common/color.h>
+#include <akari/core/color.h>
 #include <akari/core/application.h>
 #include <akari/core/logger.h>
-#include <akari/core/nodes/scene.h>
-#include <akari/core/nodes/scenegraph.h>
 #include <akari/core/parser.h>
+#include <akari/render/scenegraph.h>
 using namespace akari;
-namespace py = pybind11;
+
 #ifndef AKR_ENABLE_PYTHON
 namespace pybind11 {
     class module {};
 } // namespace pybind11
 #endif
-
+namespace py = pybind11;
 static std::string inputFilename;
-std::string variant = default_variant;
+// std::string variant = default_variant;
 void parse(int argc, const char **argv) {
     try {
         cxxopts::Options options("akari", " - AkariRender Command Line Interface");
@@ -59,11 +58,11 @@ void parse(int argc, const char **argv) {
         if (result.count("verbose")) {
             GetDefaultLogger()->log_verbose(true);
         }
-        if (result.count("gpu")) {
-            set_device_gpu();
-        } else {
-            set_device_cpu();
-        }
+        // if (result.count("gpu")) {
+        //     set_device_gpu();
+        // } else {
+        //     set_device_cpu();
+        // }
         if (result.arguments().empty() || result.count("help")) {
             std::cout << options.help() << std::endl;
             exit(0);
@@ -75,26 +74,25 @@ void parse(int argc, const char **argv) {
     }
 }
 
-AKR_VARIANT
+
 void parse_and_run() {
     using namespace sdl;
-    RegisterSceneGraph<C>::register_scene_graph();
-    SceneGraphParser<C> parser;
-    auto module = parser.parse_file(inputFilename, "this");
+    auto  parser = render::SceneGraphParser::create_parser();
+    auto module = parser->parse_file(inputFilename, "this");
     auto it = module->exports.find("scene");
     if (it == module->exports.end()) {
         fatal("variable 'scene' not found");
     }
-    auto scene = dyn_cast<SceneNode<C>>(it->second.object());
-    AKR_ASSERT_THROW(scene);
-    scene->render();
+    // auto scene = dyn_cast<render::SceneNode>(it->second.object());
+    // AKR_ASSERT_THROW(scene);
+    // scene->render();
 }
 
 int main(int argc, const char **argv) {
     try {
-        Application app;
+        Application app(argc, argv);
         parse(argc, argv);
-        AKR_INVOKE_VARIANT(variant, parse_and_run);
+        parse_and_run();
     } catch (std::exception &e) {
         fatal("Exception: {}", e.what());
         exit(1);

@@ -20,13 +20,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/common/buffer.h>
-#include <akari/common/math.h>
+#include <akari/core/buffer.h>
+#include <akari/core/math.h>
 #include "gtest/gtest.h"
 using namespace akari;
 
 TEST(TestBuffer, Basic) {
-    astd::pmr::vector<int3> vec;
+    astd::pmr::vector<ivec3> vec;
     ASSERT_EQ(vec.size(), 0);
     ASSERT_TRUE(vec.data() == nullptr);
     vec.resize(32);
@@ -38,7 +38,7 @@ TEST(TestBuffer, Basic) {
     ASSERT_TRUE(vec.capacity() != 0);
     ASSERT_EQ(vec.size(), 1024);
     for (auto &i : vec) {
-        i = int3(77, 88, 99);
+        i = ivec3(77, 88, 99);
     }
     ASSERT_TRUE(all(vec[64] == vec[1023]));
 }

@@ -23,14 +23,14 @@
 #ifndef AKARIRENDER_LOGGER_H
 #define AKARIRENDER_LOGGER_H
 
-#include <akari/common/platform.h>
-#include <akari/common/color.h>
+#include <akari/core/platform.h>
+#include <akari/core/color.h>
 #include <fmt/format.h>
 template <typename T, int N>
-struct fmt::formatter<akari::Array<T, N>> {
+struct fmt::formatter<akari::Vector<T, N>> {
 
     template <typename FormatContext>
-    auto format(const akari::Array<T, N> &a, FormatContext &ctx) {
+    auto format(const akari::Vector<T, N> &a, FormatContext &ctx) {
         // auto format(const point &p, FormatContext &ctx) -> decltype(ctx.out()) // c++11
         // ctx.out() is an output iterator to write to.
         auto it = format_to(ctx.out(), "[");
@@ -67,16 +67,16 @@ struct fmt::formatter<akari::Array<T, N>> {
     }
 };
 template <typename T, int N>
-struct fmt::formatter<akari::Color<T, N>> : fmt::formatter<akari::Array<T, N>> {
+struct fmt::formatter<akari::Color<T, N>> : fmt::formatter<akari::Vector<T, N>> {
     template <typename FormatCtx>
     auto format(const akari::Color<T, N> &a, FormatCtx &ctx) {
-        return fmt::formatter<akari::Array<T, N>>::format(a, ctx);
+        return fmt::formatter<akari::Vector<T, N>>::format(a, ctx);
     }
 };
-template <typename Point>
-struct fmt::formatter<akari::BoundingBox<Point>> {
+template <typename T, int N>
+struct fmt::formatter<akari::BoundingBox<T, N>> {
     template <typename FormatCtx>
-    auto format(const akari::BoundingBox<Point> &box, FormatCtx &ctx) {
+    auto format(const akari::BoundingBox<T, N> &box, FormatCtx &ctx) {
         return format_to(ctx.out(), "[{}, {}]", box.pmin, box.pmax);
     }
     constexpr auto parse(format_parse_context &ctx) {

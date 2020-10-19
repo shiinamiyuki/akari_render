@@ -19,31 +19,10 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-
-#include <akari/core/akari.h>
-#include <akari/core/application.h>
-#include <akari/core/resource.h>
-#include <akari/core/parallel.h>
-#include <akari/core/logger.h>
-#define NOMINMAX
-#if AKR_PLATFORM_WINDOWS
-#    include <Windows.h>
-#endif
+#pragma once
+#include <akari/core/astd.h>
+#include <list>
 namespace akari {
-    Application::Application(int argc, const char **argv) {
-        auto cg = core_globals();
-
-#if AKR_PLATFORM_WINDOWS
-        char self_proc[MAX_PATH] = {0};
-        auto res = GetModuleFileNameA(nullptr, self_proc, sizeof(self_proc));
-        if (res == 0) {
-            fprintf(stderr, "error retreiving program path; code=%d\n", GetLastError());
-        }
-        cg->program_path = fs::path(std::string(self_proc));
-#endif
-    }
-    Application::~Application() {
-        thread::finalize();
-        ResourceManager::finalize();
-    }
+    template <typename T = astd::byte>
+    using Allocator = astd::pmr::polymorphic_allocator<T>;
 } // namespace akari

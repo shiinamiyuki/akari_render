@@ -63,14 +63,14 @@ std::shared_ptr<Mesh> load_wavefront_obj(const fs::path &path, std::string &gene
 
             // auto mat = materials[shapes[s].mesh.material_ids[f]].name;
             int fv = shapes[s].mesh.num_face_vertices[f];
-            float3 triangle[3];
+            vec3 triangle[3];
             for (int v = 0; v < fv; v++) {
                 tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
                 indices.push_back(idx.vertex_index);
-                triangle[v] = float3(load<float3>(&vertices[3 * idx.vertex_index]));
+                triangle[v] = vec3(load<vec3>(&vertices[3 * idx.vertex_index]));
             }
             material_indices.emplace_back(shapes[s].mesh.material_ids[f]);
-            float3 ng = normalize(cross(triangle[1] - triangle[0], triangle[2] - triangle[0]));
+            vec3 ng = normalize(cross(triangle[1] - triangle[0], triangle[2] - triangle[0]));
             for (int v = 0; v < fv; v++) {
                 tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
                 if (idx.normal_index < 0) {
@@ -99,9 +99,9 @@ std::shared_ptr<Mesh> load_wavefront_obj(const fs::path &path, std::string &gene
     };
     for (auto &obj_mat : obj_materials) {
         auto normalized = normalize_name(obj_mat.name);
-        auto kd = load<float3>(obj_mat.diffuse);
-        auto ks = load<float3>(obj_mat.specular);
-        auto ke = load<float3>(obj_mat.emission);
+        auto kd = load<vec3>(obj_mat.diffuse);
+        auto ks = load<vec3>(obj_mat.specular);
+        auto ke = load<vec3>(obj_mat.emission);
         if (hmax(ke) > 0.001) {
             os << "// OBJ Material: " << obj_mat.name << "\n";
             os << "export " << normalized << " = EmissiveMaterial {\n";

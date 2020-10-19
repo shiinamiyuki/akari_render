@@ -20,30 +20,19 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/core/akari.h>
-#include <akari/core/application.h>
-#include <akari/core/resource.h>
-#include <akari/core/parallel.h>
-#include <akari/core/logger.h>
-#define NOMINMAX
-#if AKR_PLATFORM_WINDOWS
-#    include <Windows.h>
-#endif
-namespace akari {
-    Application::Application(int argc, const char **argv) {
-        auto cg = core_globals();
+#include <akari/core/plugin.h>
+#include <akari/core/parser.h>
+namespace akari::render {
+    class SceneNode : public sdl::Object {
+      public:
+        virtual void commit() {}
+        virtual const char *description() { return "unknown"; }
+        typedef std::shared_ptr<SceneNode> (*CreateFunc)(void);
+    };
 
-#if AKR_PLATFORM_WINDOWS
-        char self_proc[MAX_PATH] = {0};
-        auto res = GetModuleFileNameA(nullptr, self_proc, sizeof(self_proc));
-        if (res == 0) {
-            fprintf(stderr, "error retreiving program path; code=%d\n", GetLastError());
-        }
-        cg->program_path = fs::path(std::string(self_proc));
-#endif
-    }
-    Application::~Application() {
-        thread::finalize();
-        ResourceManager::finalize();
-    }
-} // namespace akari
+    class AKR_EXPORT SceneGraphParser : public sdl::Parser {
+      public:
+        static std::shared_ptr<SceneGraphParser> create_parser();
+    };
+#define AKR_EXPORT_NODE(PLUGIN) AKR_EXPORT_PLUGIN(PLUGIN, akari::render::SceneNode)
+} // namespace akari::render

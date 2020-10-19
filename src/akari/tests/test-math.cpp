@@ -20,13 +20,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/common/math.h>
-#include <akari/common/color.h>
+#include <akari/core/math.h>
+#include <akari/core/color.h>
 #include "gtest/gtest.h"
 using namespace akari;
 TEST(TestMath, Color) {
     using Float = float;
-    AKR_IMPORT_CORE_TYPES()
+    
     Color3f L(0.02, 0.4, 0.8);
     auto x = linear_to_srgb(L);
     ASSERT_LT(x[0], 1.0f);
@@ -35,22 +35,22 @@ TEST(TestMath, Color) {
 }
 TEST(TestMath, Reduce) {
     using Float = float;
-    AKR_IMPORT_CORE_TYPES() {
-        int3 v(1, 2, 3);
+     {
+        ivec3 v(1, 2, 3);
         ASSERT_EQ(hmin(v), 1);
         ASSERT_EQ(hmax(v), 3);
     }
     {
-        Float3 v(1, 2, 3);
+        vec3 v(1, 2, 3);
         ASSERT_EQ(hmin(v), 1);
         ASSERT_EQ(hmax(v), 3);
     }
 }
 TEST(TestMath, Frame) {
     using Float = float;
-    AKR_IMPORT_CORE_TYPES()
-    Frame3f frame(normalize(Float3(0.2, 0.7, 0.4)));
-    Float3 w = normalize(Float3(0.6, 0.3, 0.2));
+    
+    Frame3f frame(normalize(vec3(0.2, 0.7, 0.4)));
+    vec3 w = normalize(vec3(0.6, 0.3, 0.2));
     auto u = frame.local_to_world(w);
     auto v = frame.world_to_local(u);
     ASSERT_FLOAT_EQ(w[0], v[0]);

@@ -24,7 +24,7 @@
 #define AKARIRENDER_PARALLEL_HPP
 
 #include <akari/core/akari.h>
-#include <akari/common/math.h>
+#include <akari/core/math.h>
 #include <atomic>
 #include <functional>
 #include <future>
@@ -54,14 +54,14 @@ namespace akari {
 
     AKR_EXPORT void parallel_for(int count, const std::function<void(uint32_t, uint32_t)> &func, size_t chunkSize = 1);
     AKR_EXPORT size_t num_work_threads();
-    inline void parallel_for_2d(const Point<int, 2> &dim, const std::function<void(Point<int, 2>, uint32_t)> &func,
+    inline void parallel_for_2d(const ivec2 &dim, const std::function<void(ivec2, uint32_t)> &func,
                                 size_t chunkSize = 1) {
         parallel_for(
             dim.x * dim.y,
             [&](uint32_t idx, int tid) {
                 auto x = idx % dim.x;
                 auto y = idx / dim.x;
-                func(Point<int, 2>(x, y), tid);
+                func(ivec2(x, y), tid);
             },
             chunkSize);
     }

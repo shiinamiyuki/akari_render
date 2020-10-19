@@ -25,7 +25,7 @@
 #include <cctype>
 namespace akari::sdl {
     Value::Value() : data(std::make_shared<Null>()) {}
-    Value::Value(const array &a) : data(std::make_shared<Array>(a)) {}
+    Value::Value(const array &a) : data(std::make_shared<Vector>(a)) {}
     Value::Value(bool i) : data(std::make_shared<Boolean>(i)) {}
     Value::Value(int i) : data(std::make_shared<Number>(i)) {}
     Value::Value(double i) : data(std::make_shared<Number>(i)) {}
@@ -35,26 +35,26 @@ namespace akari::sdl {
         if (!is_array()) {
             return array::iterator();
         }
-        return dyn_cast<Array>(data)->array().begin();
+        return dyn_cast<Vector>(data)->array().begin();
     }
     Value::array::const_iterator Value::end() const {
         if (!is_array()) {
             return array::iterator();
         }
-        return dyn_cast<Array>(data)->array().end();
+        return dyn_cast<Vector>(data)->array().end();
     }
 
     Value Value::at(int i) const {
         if (!is_array()) {
             return Value();
         }
-        return dyn_cast<Array>(data)->at(i);
+        return dyn_cast<Vector>(data)->at(i);
     }
     size_t Value::size() const {
         if (!is_array()) {
             return 0;
         }
-        return dyn_cast<Array>(data)->array().size();
+        return dyn_cast<Vector>(data)->array().size();
     }
     P<Object> Value::object() const {
         if (!is_object()) {

@@ -26,84 +26,58 @@
 #include <list>
 #include <vector>
 #include <akari/core/akari.h>
-#include <akari/common/math.h>
-#include <akari/common/color.h>
-#include <akari/common/buffer.h>
+#include <akari/core/math.h>
+#include <akari/core/color.h>
+#include <akari/core/memory.h>
 
 namespace akari {
 
     template <class T>
     class TImage {
         using Float = float;
-        AKR_IMPORT_CORE_TYPES()
+
         astd::pmr::vector<T> _texels;
-        int2 _resolution;
+        ivec2 _resolution;
 
       public:
-        TImage(const int2 &dim = int2(1), astd::pmr::memory_resource *resource = astd::pmr::get_default_resource())
+        TImage(const ivec2 &dim = ivec2(1), astd::pmr::memory_resource *resource = astd::pmr::get_default_resource())
             : _texels(dim[0] * dim[1], astd::pmr::polymorphic_allocator<T>(resource)), _resolution(dim) {}
 
-        AKR_XPU const T &operator()(int x, int y) const {
+        const T &operator()(int x, int y) const {
             x = std::clamp(x, 0, _resolution[0] - 1);
             y = std::clamp(y, 0, _resolution[1] - 1);
             return _texels[x + y * _resolution[0]];
         }
 
-        AKR_XPU T &operator()(int x, int y) {
+        T &operator()(int x, int y) {
             x = std::clamp(x, 0, _resolution[0] - 1);
             y = std::clamp(y, 0, _resolution[1] - 1);
             return _texels[x + y * _resolution[0]];
         }
 
-        AKR_XPU const T &operator()(float x, float y) const { return (*this)(float2(x, y)); }
+        const T &operator()(float x, float y) const { return (*this)(vec2(x, y)); }
 
-        AKR_XPU T &operator()(float x, float y) { return (*this)(float2(x, y)); }
+        T &operator()(float x, float y) { return (*this)(vec2(x, y)); }
 
-        AKR_XPU const T &operator()(const int2 &p) const { return (*this)(p.x, p.y); }
+        const T &operator()(const ivec2 &p) const { return (*this)(p.x, p.y); }
 
-        AKR_XPU T &operator()(const int2 &p) { return (*this)(p.x, p.y); }
+        T &operator()(const ivec2 &p) { return (*this)(p.x, p.y); }
 
-        AKR_XPU const T &operator()(const float2 &p) const { return (*this)(int2(p * float2(_resolution))); }
+        const T &operator()(const vec2 &p) const { return (*this)(ivec2(p * vec2(_resolution))); }
 
-        AKR_XPU T &operator()(const float2 &p) { return (*this)(int2(p * float2(_resolution))); }
+        T &operator()(const vec2 &p) { return (*this)(ivec2(p * vec2(_resolution))); }
 
-        [[nodiscard]] AKR_XPU const astd::pmr::vector<T> &texels() const { return _texels; }
+        [[nodiscard]] const astd::pmr::vector<T> &texels() const { return _texels; }
 
-        void resize(const int2 &size) {
+        void resize(const ivec2 &size) {
             _resolution = size;
             _texels.resize(_resolution[0] * _resolution[1]);
         }
 
-        [[nodiscard]] AKR_XPU int2 resolution() const { return _resolution; }
-        AKR_XPU T *data() { return _texels.data(); }
+        [[nodiscard]] ivec2 resolution() const { return _resolution; }
+        T *data() { return _texels.data(); }
 
-        [[nodiscard]] AKR_XPU const T *data() const { return _texels.data(); }
-
-        struct View {
-            AKR_XPU const T &operator()(int x, int y) const {
-                x = std::clamp(x, 0, _resolution[0] - 1);
-                y = std::clamp(y, 0, _resolution[1] - 1);
-                return _texels[x + y * _resolution[0]];
-            }
-
-            AKR_XPU T &operator()(int x, int y) {
-                x = std::clamp(x, 0, _resolution[0] - 1);
-                y = std::clamp(y, 0, _resolution[1] - 1);
-                return _texels[x + y * _resolution[0]];
-            }
-
-            AKR_XPU const T &operator()(float x, float y) const { return (*this)(float2(x, y)); }
-
-            AKR_XPU const T &operator()(const int2 &p) const { return (*this)(p.x, p.y); }
-
-            AKR_XPU const T &operator()(const float2 &p) const { return (*this)(int2(p * float2(_resolution))); }
-
-            [[nodiscard]] AKR_XPU int2 resolution() const { return _resolution; }
-            [[nodiscard]] AKR_XPU const T *data() const { return _texels; }
-            const T *_texels = nullptr;
-            int2 _resolution = int2(0);
-        };
-        View view() const { return View{data(), resolution()}; }
+        [[nodiscard]] const T *data() const { return _texels.data(); }
     };
 
     class RGBImage : public TImage<Color<float, 3>> {
@@ -112,10 +86,10 @@ namespace akari {
     };
 
     struct alignas(16) RGBA {
-        color3f rgb;
+        RGB rgb;
         float alpha;
         RGBA() = default;
-        AKR_XPU RGBA(float3 rgb, float alpha) : rgb(rgb), alpha(alpha) {}
+        RGBA(vec3 rgb, float alpha) : rgb(rgb), alpha(alpha) {}
     };
     class RGBAImage : public TImage<RGBA> {
       public:

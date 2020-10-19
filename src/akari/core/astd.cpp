@@ -20,10 +20,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/common/astd.h>
-
+#include <akari/core/astd.h>
+#include <akari/core/memory.h>
 namespace akari::astd {
     namespace pmr {
+        
+
         class new_delete_resource_impl : public memory_resource {
           public:
             void *do_allocate(size_t bytes, size_t alignment) {

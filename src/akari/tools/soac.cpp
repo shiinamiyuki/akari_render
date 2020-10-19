@@ -64,9 +64,9 @@ int main(int argc, char **argv) {
             {
                 Block _(indent);
                 if (std::find(templates.begin(), templates.end(), "Float") != templates.end()) {
-                    wl("AKR_IMPORT_CORE_TYPES();");
+                    wl(";");
                 } else if (std::find(templates.begin(), templates.end(), "C") != templates.end()) {
-                    wl("AKR_IMPORT_TYPES()\n");
+                    wl("\n");
                 }
                 wl("size_t _size = 0;");
                 for (auto field : fields.items()) {
@@ -93,7 +93,7 @@ int main(int argc, char **argv) {
                     Block __(indent);
                     wl("Self & self;");
                     wl("int idx;");
-                    wl("AKR_XPU operator value_type(){");
+                    wl(" operator value_type(){");
                     {
                         Block ___(indent);
                         wl("value_type ret;");
@@ -103,7 +103,7 @@ int main(int argc, char **argv) {
                         wl("return ret;");
                     }
                     wl("}");
-                    wl("AKR_XPU const value_type & operator=(const value_type & rhs){");
+                    wl(" const value_type & operator=(const value_type & rhs){");
                     {
                         Block ___(indent);
                         wl("value_type ret;");
@@ -120,7 +120,7 @@ int main(int argc, char **argv) {
                     Block __(indent);
                     wl("Self & self;");
                     wl("int idx;");
-                    wl("AKR_XPU operator value_type(){");
+                    wl(" operator value_type(){");
                     {
                         Block ___(indent);
                         wl("value_type ret;");
@@ -132,9 +132,9 @@ int main(int argc, char **argv) {
                     wl("}");
                 }
                 wl("};");
-                wl("AKR_XPU IndexHelper operator[](int idx){return IndexHelper{*this, idx};}");
-                wl("AKR_XPU ConstIndexHelper operator[](int idx)const{return ConstIndexHelper{*this, idx};}");
-                wl("AKR_XPU size_t size()const{return _size;}");
+                wl(" IndexHelper operator[](int idx){return IndexHelper{*this, idx};}");
+                wl(" ConstIndexHelper operator[](int idx)const{return ConstIndexHelper{*this, idx};}");
+                wl(" size_t size()const{return _size;}");
             }
             wl("};");
         };

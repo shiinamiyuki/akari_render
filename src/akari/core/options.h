@@ -21,8 +21,8 @@
 // SOFTWARE.
 
 #pragma once
-#include <akari/common/fwd.h>
-#include <akari/common/platform.h>
+#include <akari/core/fwd.h>
+#include <akari/core/platform.h>
 namespace akari {
     struct AKR_EXPORT GlobalOptions {
         bool enable_profile = false;

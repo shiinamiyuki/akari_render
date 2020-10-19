@@ -20,30 +20,26 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/core/akari.h>
-#include <akari/core/application.h>
-#include <akari/core/resource.h>
-#include <akari/core/parallel.h>
-#include <akari/core/logger.h>
-#define NOMINMAX
-#if AKR_PLATFORM_WINDOWS
-#    include <Windows.h>
-#endif
-namespace akari {
-    Application::Application(int argc, const char **argv) {
-        auto cg = core_globals();
+#pragma once
+#include <akaric/type.h>
+namespace akari::asl {
+    struct SourceLocation {
+        std::string filename;
+        int line = 1, col = 1;
+    };
+    enum TokenType { pp_include, symbol, identifier, keyword, string_literal, int_literal, float_literal, terminator };
+    struct Token {
+        std::string tok;
+        TokenType type;
+        SourceLocation loc;
+    };
+    using TokenStream = std::list<Token>;
+    class Lexer {
+        class Impl;
+        std::shared_ptr<Impl> impl;
 
-#if AKR_PLATFORM_WINDOWS
-        char self_proc[MAX_PATH] = {0};
-        auto res = GetModuleFileNameA(nullptr, self_proc, sizeof(self_proc));
-        if (res == 0) {
-            fprintf(stderr, "error retreiving program path; code=%d\n", GetLastError());
-        }
-        cg->program_path = fs::path(std::string(self_proc));
-#endif
-    }
-    Application::~Application() {
-        thread::finalize();
-        ResourceManager::finalize();
-    }
-} // namespace akari
+      public:
+        Lexer();
+        const TokenStream &operator()(const std::string &filename, const std::string &s);
+    };
+} // namespace akari::asl

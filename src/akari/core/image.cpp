@@ -34,7 +34,6 @@ namespace akari {
     using RGBSpectrum = Color<float, 3>;
     class DefaultImageWriter : public ImageWriter {
       public:
-        AKR_IMPORT_CORE_TYPES_WITH(float)
         bool write(const RGBAImage &_image, const fs::path &path, const PostProcessor &postProcessor) override {
             const auto ext = path.extension().string();
             RGBAImage image;
@@ -46,8 +45,8 @@ namespace akari {
                 texels.size(),
                 [&](uint32_t i, uint32_t) {
                     auto pixel = static_cast<uint8_t *>(&buffer[i * 3]);
-                    auto rgb = Float3(texels[i].rgb);
-                    rgb = clamp(rgb, Float3(0), Float3(1));
+                    auto rgb = vec3(texels[i].rgb);
+                    rgb = clamp(rgb, vec3(0), vec3(1));
                     for (int comp = 0; comp < 3; comp++) {
                         pixel[comp] = (uint8_t)std::clamp<int>((int)std::round(rgb[comp] * 255.5), 0, 255);
                     }
@@ -76,7 +75,6 @@ namespace akari {
 
     class DefaultImageReader : public ImageReader {
       public:
-        AKR_IMPORT_CORE_TYPES_WITH(float)
         std::shared_ptr<RGBAImage> read(const fs::path &path) override {
             info("Loading {}", path.string());
             std::shared_ptr<RGBAImage> image;
@@ -84,7 +82,7 @@ namespace akari {
             auto ext = path.extension().string();
             if (ext == ".hdr") {
                 const float *data = stbi_loadf(path.string().c_str(), &x, &y, &channel, 3);
-                image = std::make_shared<RGBAImage>(int2(x, y));
+                image = std::make_shared<RGBAImage>(ivec2(x, y));
                 parallel_for(
                     image->resolution().y,
                     [=, &image](uint32_t y, uint32_t) {
@@ -103,7 +101,7 @@ namespace akari {
                     128);
             } else {
                 const auto *data = stbi_load(path.string().c_str(), &x, &y, &channel, 3);
-                image = std::make_shared<RGBAImage>(int2(x, y));
+                image = std::make_shared<RGBAImage>(ivec2(x, y));
                 parallel_for(
                     image->resolution().y,
                     [=, &image](uint32_t y, uint32_t) {

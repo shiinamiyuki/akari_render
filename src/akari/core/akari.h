@@ -22,8 +22,8 @@
 
 #ifndef AKARIRENDER_AKARI_H
 #define AKARIRENDER_AKARI_H
-#include <akari/common/platform.h>
-#include <akari/common/diagnostic.h>
+#include <akari/core/platform.h>
+#include <akari/core/diagnostic.h>
 #ifdef __GNUC__
 #    if __GNUC__ >= 8
 
@@ -47,7 +47,7 @@ namespace akari {
 
 #include <functional>
 #include <string_view>
-#include <akari/common/panic.h>
+#include <akari/core/panic.h>
 
 namespace akari {
 
@@ -84,6 +84,13 @@ namespace akari {
         ~AtScopeExit() { f(); }
     };
     template <typename F>
-    AtScopeExit(F &&f)->AtScopeExit<F>;
+    AtScopeExit(F &&f) -> AtScopeExit<F>;
+
+    struct CoreGlobals {
+        fs::path program_path;
+    };
+    AKR_EXPORT CoreGlobals *core_globals();
+
+   
 } // namespace akari
 #endif // AKARIRENDER_AKARI_H

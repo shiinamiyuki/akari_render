@@ -28,9 +28,9 @@
 #include <mutex>
 #include <atomic>
 #include <unordered_map>
-#include <akari/common/fwd.h>
-#include <akari/common/platform.h>
-#include <akari/common/lock.h>
+#include <akari/core/fwd.h>
+#include <akari/core/platform.h>
+#include <akari/core/lock.h>
 
 namespace akari {
     class Timer {
