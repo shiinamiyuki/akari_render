@@ -166,7 +166,7 @@ namespace akari::render {
       public:
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override {}
-        virtual std::shared_ptr<Accelerator> create_accel(const Scene &scene) {
+        virtual std::shared_ptr<Accelerator> create_accel(const Scene &scene) override {
             auto sbvh = std::make_shared<BVHAccelerator>();
             sbvh->build(scene);
             return sbvh;

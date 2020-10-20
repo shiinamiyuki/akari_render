@@ -69,7 +69,7 @@ namespace akari::render {
       public:
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override;
-        void commit();
+        void commit()override;
         void render();
     };
 } // namespace akari::render

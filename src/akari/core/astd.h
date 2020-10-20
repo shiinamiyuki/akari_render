@@ -23,12 +23,12 @@
 #include <type_traits>
 #include <new>
 #include <iterator>
+#include <cstddef>
 #include <akari/core/def.h>
 #include <akari/core/panic.h>
 #include <akari/core/platform.h>
 #include <math.h>
 #include <list>
-#include <memory_resource>
 #include <mutex>
 
 namespace akari::astd {

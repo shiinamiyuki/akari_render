@@ -101,7 +101,7 @@ namespace akari::render {
                 }
             }
         }
-        Sampler *create_sampler(Allocator<> *allocator) {
+        Sampler *create_sampler(Allocator<> *allocator) override {
             if (generator == "pcg") {
                 return allocator->new_object<PCGSampler>();
             } else if (generator == "lcg") {

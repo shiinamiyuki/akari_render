@@ -103,7 +103,11 @@ namespace akari::render {
 
       public:
         BSDF() = default;
-        explicit BSDF(const Vec3 &ng, const Vec3 &ns) : ng(ng), ns(ns) { frame = Frame(ns); }
+        explicit BSDF(const Vec3 &ng, const Vec3 &ns) : ng(ng), ns(ns) {
+            frame = Frame(ns);
+            (void)this->ng;
+            (void)this->ns;
+        }
         bool null() const { return closure() == nullptr; }
         void set_closure(const BSDFClosure *closure) { closure_ = closure; }
         void set_choice_pdf(Float pdf) { choice_pdf = pdf; }
@@ -154,7 +158,7 @@ namespace akari::render {
         EmissiveMaterial(const Texture *color) : color(color) {}
         const Texture *color = nullptr;
         bool double_sided = false;
-        BSDF get_bsdf(MaterialEvalContext &ctx) const { return BSDF(); }
+        BSDF get_bsdf(MaterialEvalContext &ctx) const override { return BSDF(); }
         bool is_emissive() const override { return true; }
         const EmissiveMaterial *as_emissive() const override { return this; }
     };

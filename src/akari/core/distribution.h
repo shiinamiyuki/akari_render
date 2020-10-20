@@ -94,7 +94,7 @@ namespace akari {
         [[nodiscard]] Float integral() const { return funcInt; }
 
       private:
-        std::pmr::vector<Float> func, cdf;
+        astd::pmr::vector<Float> func, cdf;
         Float funcInt;
     };
 

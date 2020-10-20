@@ -25,7 +25,7 @@
 #include <akari/core/platform.h>
 #include <akari/core/diagnostic.h>
 #ifdef __GNUC__
-#    if __GNUC__ >= 8
+#    if __GNUC__ >= 8 || defined(__clang__)
 
 #        include <filesystem>
 namespace akari {

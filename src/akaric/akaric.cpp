@@ -65,7 +65,7 @@ void parse(int argc, const char **argv) {
                 if (m.length() > 2) {
                     if (m[0] == '-' && m[1] == 'D') {
                         auto def = m.substr(2);
-                        uint32_t split = def.find('=');
+                        auto split = def.find('=');
                         if (split == std::string::npos) {
                             fmt::print("warning: -DNAME is not supported");
                         } else {

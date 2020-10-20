@@ -32,7 +32,7 @@ namespace akari::render {
       public:
         ConstantTexture(Spectrum v) : value(v) {}
         Spectrum evaluate(const ShadingPoint &sp) const override { return value; }
-        Float integral() const { return luminance(value); }
+        Float integral() const override { return luminance(value); }
     };
     class ConstantTextureNode final : public TextureNode {
         Spectrum value;
@@ -55,7 +55,7 @@ namespace akari::render {
             tc.y = 1.0f - tc.y;
             return image(tc).rgb;
         }
-        Float integral() const {
+        Float integral() const override {
             Float I = 0;
             for (int i = 0; i < image.resolution().x * image.resolution().y; i++) {
                 I += luminance(image.data()[i].rgb);
