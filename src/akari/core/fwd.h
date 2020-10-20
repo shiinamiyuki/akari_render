@@ -27,6 +27,6 @@ namespace akari {
     struct Color;
 
     using RGB = Color<Float, 3>;
-
+    using Color3f = Color<Float, 3>;
     using Spectrum = RGB;
 } // namespace akari

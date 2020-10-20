@@ -63,7 +63,7 @@ namespace akari::asl::ast {
 
     class TypeDeclNode : public ASTNode {
       public:
-        type::Qualifier qualifer = type::Qualifier::none;
+        type::Qualifier qualifier = type::Qualifier::none;
     };
     using TypeDecl = std::shared_ptr<TypeDeclNode>;
     class TypenameNode : public TypeDeclNode {
@@ -77,6 +77,7 @@ namespace akari::asl::ast {
         void dump_json(json &j) const {
             ASTNode::dump_json(j);
             j["typename"] = name;
+            j["qualifier"] = (int)qualifier;
         }
     };
     using Typename = std::shared_ptr<TypenameNode>;
@@ -454,6 +455,12 @@ namespace akari::asl::ast {
             ASTNode::dump_json(j);
             type->dump_json(j["type"]);
             name->dump_json(j["name"]);
+            j["parameters"] = json::array();
+            for (auto &p : parameters) {
+                auto k = json::object();
+                p->dump_json(k);
+                j["parameters"].push_back(k);
+            }
             if (body)
                 body->dump_json(j["body"]);
             j["is_method"] = is_method;

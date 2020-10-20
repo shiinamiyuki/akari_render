@@ -50,9 +50,9 @@ std::shared_ptr<Mesh> load_wavefront_obj(const fs::path &path, std::string &gene
         return nullptr;
     }
 
-    std::vector<float> vertices, normals, texcoords;
-    std::vector<int> indices;
-    std::vector<int> material_indices;
+    astd::pmr::vector<float> vertices, normals, texcoords;
+    astd::pmr::vector<int> indices;
+    astd::pmr::vector<int> material_indices;
     vertices.resize(attrib.vertices.size());
     std::memcpy(&vertices[0], &attrib.vertices[0], sizeof(float) * vertices.size());
 
@@ -188,12 +188,12 @@ std::shared_ptr<Mesh> load_wavefront_obj(const fs::path &path, std::string &gene
     }
     os << "  ]\n}\n";
     generated = os.str();
-    mesh = std::make_shared<Mesh>(cpu_device()->host_resource());
-    mesh->indices.copy(indices);
-    mesh->normals.copy(normals);
-    mesh->vertices.copy(vertices);
-    mesh->texcoords.copy(texcoords);
-    mesh->material_indices.copy(material_indices);
+    mesh = std::make_shared<Mesh>(Allocator<>());
+    mesh->indices = indices;
+    mesh->normals = normals;
+    mesh->vertices = vertices;
+    mesh->texcoords = texcoords;
+    mesh->material_indices = material_indices;
     return mesh;
 }
 

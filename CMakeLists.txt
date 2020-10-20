@@ -57,25 +57,6 @@ macro(add_build_util target )
     add_executable(${target} ${ARGN})
     set(${target}_SOURCE ${ARGN})
 endmacro()
-# ---------------- Begin Build Utils --------------------
-# add_build_util(akari-configure src/akari/tools/configure.cpp)
-# target_link_libraries(akari-configure fmt)
-# set_target_properties(akari-configure 
-#         PROPERTIES  CUDA_ARCHITECTURES OFF)
-
-# add_build_util(akari-soac src/akari/tools/soac.cpp)
-# target_link_libraries(akari-soac fmt)
-# set_target_properties(akari-soac
-#         PROPERTIES  CUDA_ARCHITECTURES OFF)
-# macro(add_soa_header target source)
-#     add_custom_command(OUTPUT ${target}
-#         COMMAND akari-soac ${source} ${target}
-#         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-#         DEPENDS akari-soac ${source} ${CMAKE_SOURCE_DIR}/src/akari/common/soa.h)
-# endmacro()
-
-# ---------------- End Build Utils --------------------
-
 
 include(cmake/Embree.cmake)
 
@@ -95,7 +76,7 @@ function(add_shader_module target)
     foreach(src ${sources} )
     # message(STATUS "src= " ${src})
         add_custom_command(OUTPUT ${src}.h
-            COMMAND akaric ${src} -b cpp -o ${src}.h
+            COMMAND akaric ${src} -b cpp -o ${src}.h -DSpectrum=vec3
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
             DEPENDS ${akaric_SOURCE} ${sources})
         list(APPEND TARGET_SOURCE ${src}.h)
@@ -139,10 +120,7 @@ endif()
 
 
 
-#----- Build Shaders ------
-file(GLOB AKR_COMMON_SHADER_SRC src/akari/render/*.glsl)
-add_shader_module(AKR_COMMON_SHADER  ${AKR_COMMON_SHADER_SRC})
-#--------------------------
+add_subdirectory(src/akari/shaders)
 
 file(GLOB AKR_RENDER_SRC src/akari/render/*.* src/akari/render/kernel/akari_kernel_ispc.h)
 add_library(libakari_render SHARED ${AKR_RENDER_SRC})
@@ -162,19 +140,6 @@ function(add_plugin target)
     target_link_libraries(${target} libakari_core)
 endfunction()
 add_subdirectory(src/akari/render)
-
-# set(AKR_KERNEL_SOA_H ${CMAKE_CURRENT_SOURCE_DIR}/src/akari/kernel/soa.h)
-# add_soa_header(${AKR_KERNEL_SOA_H} src/akari/kernel/akari.soa)
-
-# set(AKR_KERNEL_WORKITEM_SOA_H ${CMAKE_CURRENT_SOURCE_DIR}/src/akari/kernel/integrators/gpu/workitem-soa.h)
-# add_soa_header(${AKR_KERNEL_WORKITEM_SOA_H} src/akari/kernel/integrators/gpu/workitem.soa)
-
-# add_library(libakari_core SHARED ${AKR_COMMON_SRC} ${AKR_PYBIND_SRC} ${AKR_KERNEL_SRC}  ${AKR_KERNEL_SOA_H} ${AKR_KERNEL_WORKITEM_SOA_H})
-# target_link_libraries(libakari_core PUBLIC akari_core_base) 
-# if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.16")
-#     set_target_properties(libakari_core PROPERTIES UNITY_BUILD ON)
-# endif()
-
 
 
 add_executable(akari src/akari/cmd/akari.cpp )

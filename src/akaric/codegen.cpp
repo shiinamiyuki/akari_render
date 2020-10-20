@@ -62,8 +62,8 @@ namespace akari::asl {
                 throw std::runtime_error(fmt::format("definition of type {} not found", ty->name));
             }
             auto t = types.at(ty->name);
-            if (ty->qualifer != type::Qualifier::none) {
-                return type_ctx.make_qualified(t, ty->qualifer);
+            if (ty->qualifier != type::Qualifier::none) {
+                return type_ctx.make_qualified(t, ty->qualifier);
             }
             return t;
         }
@@ -142,7 +142,9 @@ namespace akari::asl {
 
         return do_generate();
     }
-
+    void CodeGenerator::add_typedef(const std::string &type, const std::string &def) {
+        types.emplace(type, types.at(def));
+    }
     void CodeGenerator::process_prototypes() {
         for (auto &unit : module.translation_units) {
             for (auto &decl : unit->funcs) {
@@ -407,11 +409,11 @@ namespace akari::asl {
         ValueRecord compile_literal(const ast::Literal &lit) {
             if (lit->isa<ast::FloatLiteral>()) {
                 auto fl = lit->cast<ast::FloatLiteral>();
-                return {fmt::format("{}", fl->val), type::float32};
+                return {fmt::format("float({})", fl->val), type::float32};
             }
             if (lit->isa<ast::IntLiteral>()) {
                 auto i = lit->cast<ast::IntLiteral>();
-                return {fmt::format("{}", i->val), type::int32};
+                return {fmt::format("int32_t({})", i->val), type::int32};
             }
             if (lit->isa<ast::BoolLiteral>()) {
                 auto i = lit->cast<ast::BoolLiteral>();
@@ -657,9 +659,10 @@ namespace akari::asl {
                 }
                 error(call->loc, fmt::format("not matching function call to {} with args ({})", func, err));
             }
-            // auto &overload = rec.overloads.at(mangled_name);
-            // for (uint32_t i = 0; i < arg_types.size(); i++) {
-            // }
+            auto matched_func = rec.overloads.at(mangled_name);
+            if (matched_func.is_intrinsic) {
+                func = "glm::" + func;
+            }
             Twine s(func + "(");
             for (int i = 0; i < args.size(); i++) {
                 s.append(args[i].value);
@@ -672,7 +675,7 @@ namespace akari::asl {
         }
         ValueRecord compile_index(const ast::Index &idx) {
             auto agg = compile_expr(idx->expr);
-            if (!agg.type()->isa<type::ArrayType>()) {
+            if (!type::remove_qualifier(agg.type())->isa<type::ArrayType>()) {
                 error(idx->expr->loc, "operator [] only allowed for arrays");
             }
             return ValueRecord{agg.value.append("[").append(compile_expr(idx->idx).value).append("]"),
@@ -681,12 +684,13 @@ namespace akari::asl {
 
         ValueRecord compile_member_access(const ast::MemberAccess &access) {
             auto agg = compile_expr(access->var);
-            if (agg.type()->isa<type::VectorType>()) {
-                auto v = agg.type()->cast<type::VectorType>();
+            auto ty = type::remove_qualifier(agg.type());
+            if (ty->isa<type::VectorType>()) {
+                auto v = ty->cast<type::VectorType>();
                 auto member = access->member;
                 return {agg.value.append("." + member), v->element_type};
-            } else if (agg.type()->isa<type::StructType>()) {
-                auto st = agg.type()->cast<type::StructType>();
+            } else if (ty->isa<type::StructType>()) {
+                auto st = ty->cast<type::StructType>();
                 auto member = access->member;
                 auto it = std::find_if(st->fields.begin(), st->fields.end(),
                                        [&](auto &field) { return field.name == member; });
@@ -694,8 +698,8 @@ namespace akari::asl {
                     error(access->loc, fmt::format("type {} does not have member {}", st->name, member));
                 }
                 return {agg.value.append("." + member), it->type};
-            } else if (agg.type()->isa<type::ArrayType>()) {
-                auto arr = agg.type()->cast<type::ArrayType>();
+            } else if (ty->isa<type::ArrayType>()) {
+                auto arr = ty->cast<type::ArrayType>();
                 auto member = access->member;
                 if (member != "length") {
                     error(access->loc, fmt::format("array type does not have member {}", member));
@@ -703,7 +707,7 @@ namespace akari::asl {
                     if (arr->length >= 0) {
                         return {std::to_string(arr->length), type::uint32};
                     } else {
-                        return {agg.value.append(".size()"), type::uint32};
+                        return {agg.value.append(".length()"), type::uint32};
                     }
                 }
             }
@@ -784,7 +788,7 @@ namespace akari::asl {
                 auto expected = process_type(decl->type);
                 if (expected != type::remove_qualifier(init.type())) {
                     error(decl->var->loc,
-                          fmt::format("{} expected but found {}", pretty_print(init.type()), pretty_print(expected)));
+                          fmt::format("{} expected but found {}", pretty_print(expected), pretty_print(init.type())));
                 }
                 ty = expected;
             } else {
@@ -793,6 +797,7 @@ namespace akari::asl {
             if (vars.frame->at(decl->var->identifier)) {
                 error(decl->loc, fmt::format("{} is already defined", decl->var->identifier));
             }
+
             block.wl("{} {} = {};", gen_type(ty), decl->var->identifier, init.value.str());
             vars.insert(decl->var->identifier, ValueRecord{Twine(decl->var->identifier), ty});
         }

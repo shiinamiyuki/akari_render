@@ -25,8 +25,6 @@
 #include "gtest/gtest.h"
 using namespace akari;
 TEST(TestMath, Color) {
-    using Float = float;
-    
     Color3f L(0.02, 0.4, 0.8);
     auto x = linear_to_srgb(L);
     ASSERT_LT(x[0], 1.0f);
@@ -34,7 +32,6 @@ TEST(TestMath, Color) {
     ASSERT_LT(x[2], 1.0f);
 }
 TEST(TestMath, Reduce) {
-    using Float = float;
      {
         ivec3 v(1, 2, 3);
         ASSERT_EQ(hmin(v), 1);
@@ -47,9 +44,7 @@ TEST(TestMath, Reduce) {
     }
 }
 TEST(TestMath, Frame) {
-    using Float = float;
-    
-    Frame3f frame(normalize(vec3(0.2, 0.7, 0.4)));
+    Frame frame(normalize(vec3(0.2, 0.7, 0.4)));
     vec3 w = normalize(vec3(0.6, 0.3, 0.2));
     auto u = frame.local_to_world(w);
     auto v = frame.world_to_local(u);

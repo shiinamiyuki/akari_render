@@ -33,22 +33,28 @@ namespace akari::asl {
 
     class Mangler {
         std::string mangle(const type::Type &ty) {
-            if (ty->isa<type::PrimitiveType>()) {
-                return fmt::format("ZP{}Zp", ty->type_name());
+            if (ty == type::float32) {
+                return "f";
+            } else if (ty == type::float64) {
+                return "d";
+            } else if (ty == type::int32) {
+                return "i";
+            } else if (ty == type::uint32) {
+                return "u";
+            } else if (ty == type::boolean) {
+                return "b";
             } else if (ty->isa<type::VectorType>()) {
                 auto v = ty->cast<type::VectorType>();
                 return fmt::format("ZV{}Z{}nZv", mangle(v->element_type), v->count);
             } else if (ty->isa<type::MatrixType>()) {
                 auto m = ty->cast<type::MatrixType>();
                 return fmt::format("ZM{}Zc{}Zr{}Zm", mangle(m->element_type), m->cols, m->rows);
-            }else if (ty->isa<type::StructType>()) {
+            } else if (ty->isa<type::StructType>()) {
                 return fmt::format("ZS{}Zs", ty->cast<type::StructType>()->name);
             } else if (ty->isa<type::OpaqueType>()) {
                 return fmt::format("ZO{}Zo", ty->cast<type::OpaqueType>()->name);
             } else if (auto q = ty->cast<type::QualifiedType>()) {
-                std::string s = "ZQ" + std::to_string((int)q->qualifier);
-                s.append(mangle(q->element_type));
-                return s.append("Zq");
+                return mangle(q->element_type);
             } else {
                 AKR_ASSERT(false);
             }
@@ -208,6 +214,7 @@ namespace akari::asl {
       public:
         CodeGenerator();
         std::string generate(const BuildConfig &config_, const Module &module_);
+        void add_typedef(const std::string &type, const std::string &def);
     };
 
     std::unique_ptr<CodeGenerator> cpp_generator();

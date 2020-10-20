@@ -353,24 +353,34 @@ namespace akari::asl {
         ast::Typename parse_typename() {
             if (typenames.find(cur().tok) != typenames.end() || is_qualifier()) {
                 type::Qualifier qualifier = type::Qualifier::none;
-                if (cur().tok == "in") {
-                    consume();
-                    qualifier = type::Qualifier::none;
-                } else if (cur().tok == "out") {
-                    consume();
-                    qualifier = type::Qualifier::out;
-                } else if (cur().tok == "inout") {
-                    consume();
-                    qualifier = type::Qualifier::inout;
-                } else if (cur().tok == "const") {
-                    consume();
-                    qualifier = type::Qualifier::constant;
+                while (is_qualifier()) {
+                    if (cur().tok == "in") {
+                        if (qualifier == type::Qualifier::none) {
+                            consume();
+                            qualifier = type::Qualifier::in;
+                        }else if (qualifier == type::Qualifier::constant) {
+                            consume();
+                        }else{
+                            error(cur().loc, "conflicting qualifiers");
+                        }
+                    } else if (cur().tok == "out") {
+                        consume();
+                        qualifier = type::Qualifier::out;
+                    } else if (cur().tok == "inout") {
+                        consume();
+                        qualifier = type::Qualifier::inout;
+                    } else if (cur().tok == "const") {
+                        consume();
+                        qualifier = type::Qualifier::constant;
+                    } else {
+                        AKR_ASSERT(false);
+                    }
                 }
                 if (typenames.find(cur().tok) == typenames.end()) {
                     error(cur().loc, "typename expected");
                 }
                 auto p = std::make_shared<ast::TypenameNode>(cur());
-                p->qualifer = qualifier;
+                p->qualifier = qualifier;
                 consume();
                 return p;
             } else {

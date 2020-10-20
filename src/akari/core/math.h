@@ -84,7 +84,7 @@ namespace akari {
     template <typename T, int N, class F>
     T reduce(const Vector<T, N> &vec, F &&f) {
         T acc = vec[0];
-        for (int i = 1; i < n; i++) {
+        for (int i = 1; i < N; i++) {
             acc = f(acc, vec[i]);
         }
         return acc;
@@ -97,10 +97,12 @@ namespace akari {
     T hprod(const Vector<T, N> &vec) {
         return reduce(vec, [](T acc, T cur) -> T { return acc * cur; });
     }
+    using std::min;
     template <typename T, int N>
     T hmin(const Vector<T, N> &vec) {
         return reduce(vec, [](T acc, T cur) -> T { return min(acc, cur); });
     }
+    using std::max;
     template <typename T, int N>
     T hmax(const Vector<T, N> &vec) {
         return reduce(vec, [](T acc, T cur) -> T { return max(acc, cur); });
@@ -116,6 +118,23 @@ namespace akari {
     template <typename T, int N>
     Vector<T, N> select(const Vector<bool, N> &c, const Vector<T, N> &a, const Vector<T, N> &b) {
         return glm::mix(a, b, c);
+    }
+
+    template <typename T>
+    struct vec_trait {};
+
+    template <typename T, int N>
+    struct vec_trait<Vector<T, N>> {
+        using value_type = T;
+        static constexpr int size = N;
+    };
+
+    template <typename T, typename V = typename vec_trait<T>::value_type, int N = vec_trait<T>::size>
+    T load(const V *arr) {
+        T v;
+        for (int i = 0; i < N; i++)
+            v[i] = arr[i];
+        return v;
     }
     struct Ray {
         // Float time = 0.0f;

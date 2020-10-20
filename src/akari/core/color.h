@@ -77,4 +77,6 @@ namespace akari {
         using Color3f = Color<Scalar, 3>;
         return select(glm::lessThan(S, 0.04045), S / 12.92, glm::pow((S + 0.055) / 1.055), Vec3(2.4));
     }
+
+    using Color3f = Color<Float, 3>;
 } // namespace akari

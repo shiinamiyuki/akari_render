@@ -35,7 +35,6 @@ __builtin__ uint min(uint u, uint v);
 
 __builtin__ int max(int u, int v);
 __builtin__ float max(float u, float v);
-__builtin__ float fmax(float u, float v);
 __builtin__ uint max(uint u, uint v);
 
 __builtin__ vec2 fmin(vec2 u, vec2 v);

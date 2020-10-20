@@ -60,8 +60,8 @@ namespace akari::asl {
         virtual ~Base() = default;
     };
 #define AKR_DECL_NODE(Type)                                                                                            \
-    std::string type_name() const { return #Type; }                                                                    \
-    bool is_parent_of(const std::shared_ptr<Base> &ptr) const { return ptr->isa<std::shared_ptr<Type>>(); }
+    std::string type_name() const override { return #Type; }                                                           \
+    bool is_parent_of(const std::shared_ptr<Base> &ptr) const override { return ptr->isa<std::shared_ptr<Type>>(); }
     template <typename K, typename V, class Hash, class KeyEqual>
     struct EnvironmentFrame {
         std::unordered_map<K, V, Hash, KeyEqual> map;

@@ -8,11 +8,11 @@ float cos2_theta(const vec3 w) { return w.y * w.y; }
 
 float sin2_theta(const vec3 w) { return 1.0 - cos2_theta(w); }
 
-float sin_theta(const vec3 w) { return sqrt(fmax(0.0, sin2_theta(w))); }
+float sin_theta(const vec3 w) { return sqrt(max(0.0, sin2_theta(w))); }
 
 float tan2_theta(const vec3 w) { return sin2_theta(w) / cos2_theta(w); }
 
-float tan_theta(const vec3 w) { return sqrt(fmax(0.0, tan2_theta(w))); }
+float tan_theta(const vec3 w) { return sqrt(max(0.0, tan2_theta(w))); }
 
 float cos_phi(const vec3 w) {
     float sinTheta = sin_theta(w);
@@ -32,7 +32,7 @@ bool same_hemisphere(const vec3 wo, const vec3 wi) {
 
 bool refract(const vec3 wi, const vec3 n, float eta, inout vec3 wt) {
     float cosThetaI = dot(n, wi);
-    float sin2ThetaI = fmax(0.0, 1.0 - cosThetaI * cosThetaI);
+    float sin2ThetaI = max(0.0, 1.0 - cosThetaI * cosThetaI);
     float sin2ThetaT = eta * eta * sin2ThetaI;
     if (sin2ThetaT >= 1.0)
         return false;

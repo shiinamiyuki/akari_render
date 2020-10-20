@@ -38,6 +38,7 @@ const char *backend_help = R"(One of:
 )";
 static std::string output, backend;
 static std::vector<std::string> inputs;
+static std::vector<std::pair<std::string, std::string>> typedefs;
 static bool verbose = false;
 void parse(int argc, const char **argv) {
     try {
@@ -60,7 +61,23 @@ void parse(int argc, const char **argv) {
             if (result.count("verbose")) {
                 verbose = true;
             }
-            inputs = result.unmatched();
+            for (auto &m : result.unmatched()) {
+                if (m.length() > 2) {
+                    if (m[0] == '-' && m[1] == 'D') {
+                        auto def = m.substr(2);
+                        int split = def.find('=');
+                        if (split == std::string::npos) {
+                            fmt::print("warning: -DNAME is not supported");
+                        } else {
+                            auto value = def.substr(split + 1);
+                            def = def.substr(0, split);
+                            typedefs.emplace_back(def, value);
+                        }
+                        continue;
+                    }
+                }
+                inputs.emplace_back(m);
+            }
             output = result["output"].as<std::string>();
             if (!result.count("backend")) {
                 auto ext = fs::path(output).extension().string();
@@ -84,6 +101,9 @@ int main(int argc, const char **argv) {
     try {
         parse(argc, argv);
         Parser parser;
+        for (auto &def : typedefs) {
+            parser.add_type_parameter(def.first);
+        }
         Module module;
         module.name = "asl_module";
         std::unique_ptr<CodeGenerator> codegen;
@@ -94,6 +114,9 @@ int main(int argc, const char **argv) {
         } else {
             std::cerr << backend << " backend is not implemented" << std::endl;
             exit(1);
+        }
+        for (auto &def : typedefs) {
+            codegen->add_typedef(def.first, def.second);
         }
         std::vector<std::string> sources;
         for (auto &src_file : inputs) {

@@ -162,7 +162,9 @@ namespace akari::asl::type {
         std::unordered_map<std::tuple<type::Type, int, int>, type::MatrixType, TupleHash<type::Type, int, int>,
                            TupleEq<type::Type, int, int>>
             mat_cache;
-        std::unordered_map<type::Type, type::QualifiedType> q_cache;
+        std::unordered_map<std::pair<type::Type, type::Qualifier>, type::QualifiedType,
+                           PairHash<type::Type, type::Qualifier>>
+            q_cache;
         std::unordered_map<std::pair<type::Type, int>, type::ArrayType, PairHash<type::Type, int>> array_cache;
 
       public:
@@ -194,10 +196,11 @@ namespace akari::asl::type {
             return it->second;
         }
         type::QualifiedType make_qualified(type::Type t, Qualifier qualifer) {
-            auto it = q_cache.find(t);
+            auto pair = std::make_pair(t, qualifer);
+            auto it = q_cache.find(pair);
             if (q_cache.end() == it) {
-                q_cache[t] = std::make_shared<QualifiedTypeNode>(t, qualifer);
-                return q_cache[t];
+                q_cache[pair] = std::make_shared<QualifiedTypeNode>(t, qualifer);
+                return q_cache[pair];
             }
             return it->second;
         }
