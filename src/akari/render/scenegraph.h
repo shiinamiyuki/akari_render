@@ -23,16 +23,36 @@
 #include <akari/core/plugin.h>
 #include <akari/core/parser.h>
 namespace akari::render {
-    class SceneNode : public sdl::Object {
+    class SceneGraphNode : public sdl::Object {
       public:
+        void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
+                          const sdl::Value &value) override {}
         virtual void commit() {}
         virtual const char *description() { return "unknown"; }
-        typedef std::shared_ptr<SceneNode> (*CreateFunc)(void);
+        typedef std::shared_ptr<SceneGraphNode> (*CreateFunc)(void);
     };
 
     class AKR_EXPORT SceneGraphParser : public sdl::Parser {
       public:
+        virtual void register_node(const std::string &name, SceneGraphNode::CreateFunc) = 0;
         static std::shared_ptr<SceneGraphParser> create_parser();
     };
-#define AKR_EXPORT_NODE(PLUGIN, CLASS) AKR_EXPORT_PLUGIN(PLUGIN, CLASS, akari::render::SceneNode)
+    class CameraNode;
+    class MaterialNode;
+    class TextureNode;
+    class MeshNode;
+   
+    template <typename A>
+    A load(const sdl::Value &v) {
+        using T = typename vec_trait<A>::value_type;
+        constexpr int N = vec_trait<A>::size;
+        AKR_ASSERT_THROW(v.is_array());
+        AKR_ASSERT_THROW(v.size() == size_t(N));
+        A a;
+        for (int i = 0; i < N; i++) {
+            a[i] = v.at(i).get<T>().value();
+        }
+        return a;
+    }
+#define AKR_EXPORT_NODE(PLUGIN, CLASS) AKR_EXPORT_PLUGIN(PLUGIN, CLASS, akari::render::SceneGraphNode)
 } // namespace akari::render

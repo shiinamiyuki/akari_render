@@ -23,6 +23,7 @@
 #pragma once
 #include <akari/core/math.h>
 #include <akari/core/memory.h>
+#include <optional>
 namespace akari {
     /*
      * Return the largest index i such that

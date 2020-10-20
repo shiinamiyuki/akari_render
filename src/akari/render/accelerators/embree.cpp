@@ -104,8 +104,7 @@ namespace akari::render {
 
     class EmbreeNode final : public AcceleratorNode {
       public:
-        void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
-                          const sdl::Value &value) override {}
+      
         virtual std::shared_ptr<Accelerator> create_accel(const Scene &scene) {
 #ifdef AKR_ENABLE_EMBREE
             auto accel = std::make_shared<EmbreeAccelerator>();

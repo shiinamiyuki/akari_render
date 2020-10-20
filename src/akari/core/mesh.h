@@ -22,7 +22,6 @@
 
 #pragma once
 #include <akari/core/resource.h>
-#include <akari/core/variant.h>
 #include <akari/core/memory.h>
 namespace akari {
 

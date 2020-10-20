@@ -23,6 +23,7 @@
 #pragma once
 #include <array>
 #include <akari/core/math.h>
+#include <akari/render/scenegraph.h>
 namespace akari::render {
     class Material;
     struct Triangle {
@@ -36,4 +37,8 @@ namespace akari::render {
         Vec3 ns(const vec2 &uv) const { return lerp3(normals[0], normals[1], normals[2], uv); }
         vec2 texcoord(const vec2 &uv) const { return lerp3(texcoords[0], texcoords[1], texcoords[2], uv); }
     };
+    class ShapeNode : public SceneGraphNode {
+      public:
+    };
+
 } // namespace akari::render

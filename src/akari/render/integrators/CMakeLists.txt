@@ -1,0 +1,1 @@
+add_plugin(RTAO SOURCE ao.cpp)

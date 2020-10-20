@@ -83,7 +83,7 @@ void parse_and_run() {
     if (it == module->exports.end()) {
         fatal("variable 'scene' not found");
     }
-    // auto scene = dyn_cast<render::SceneNode>(it->second.object());
+    // auto scene = dyn_cast<render::SceneGraphNode>(it->second.object());
     // AKR_ASSERT_THROW(scene);
     // scene->render();
 }

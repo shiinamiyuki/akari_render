@@ -21,8 +21,18 @@
 // SOFTWARE.
 
 #pragma once
-
-
-namespace akari {
-    
-}
+#include <akari/core/math.h>
+#include <akari/core/distribution.h>
+#include <akari/core/film.h>
+#include <akari/render/scenegraph.h>
+namespace akari::render {
+    class Scene;
+    class Integrator {
+      public:
+        virtual void render(const Scene *scene, Film *out) = 0;
+    };
+    class IntegratorNode : public SceneGraphNode {
+      public:
+        virtual Integrator *create_integrator(Allocator<> *) = 0;
+    };
+} // namespace akari::render

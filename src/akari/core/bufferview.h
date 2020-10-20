@@ -21,11 +21,13 @@
 // SOFTWARE.
 #pragma once
 #include <akari/core/fwd.h>
-
+#include <akari/core/astd.h>
 namespace akari {
     template <typename T>
     struct BufferView {
         BufferView() = default;
+        template<typename Allocator>
+        BufferView(const std::vector<T, Allocator> &vec) : _data(vec.data()), _size(vec.size()) {}
         BufferView(T *data, size_t size) : _data(data), _size(size) {}
         T &operator[](uint32_t i) const { return _data[i]; }
         size_t size() const { return _size; }

@@ -22,15 +22,34 @@
 
 #include <mutex>
 #include <akari/render/scenegraph.h>
+#include <akari/render/scene.h>
+#include <akari/render/camera.h>
+#include <akari/render/integrator.h>
+#include <akari/render/material.h>
+#include <akari/render/mesh.h>
+#include <akari/render/light.h>
 
 namespace akari::render {
     class SceneGraphParserImpl : public SceneGraphParser {
-        using NodePlugin = PluginInterface<SceneNode>;
-        using NodeManager = PluginManager<SceneNode>;
+        using NodePlugin = PluginInterface<SceneGraphNode>;
+        using NodeManager = PluginManager<SceneGraphNode>;
         NodeManager mgr;
+        std::unordered_map<std::string, SceneGraphNode::CreateFunc> registerd_nodes;
 
       public:
-        sdl::P<sdl::Object> do_parse_object_creation(sdl::ParserContext &ctx, const std::string &type) override final{
+        void register_node(const std::string &name, SceneGraphNode::CreateFunc func) override {
+            registerd_nodes.emplace(name, func);
+        }
+        SceneGraphParserImpl() {
+            register_node("ConstantTexture", []() { return dyn_cast<SceneGraphNode>(create_constant_texture()); });
+            register_node("ImageTexture", []() { return dyn_cast<SceneGraphNode>(create_image_texture()); });
+            register_node("RandomSampler",
+                          []() { return dyn_cast<SceneGraphNode>(std::make_shared<RandomSamplerNode>()); });
+        }
+        sdl::P<sdl::Object> do_parse_object_creation(sdl::ParserContext &ctx, const std::string &type) override final {
+            if (registerd_nodes.find(type) != registerd_nodes.end()) {
+                return registerd_nodes.at(type)();
+            }
             auto pi = mgr.load_plugin(type);
             if (!pi) {
                 throw std::runtime_error("failed to load plugin");

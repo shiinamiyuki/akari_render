@@ -79,4 +79,12 @@ namespace akari {
     }
 
     using Color3f = Color<Float, 3>;
+
+    inline Float luminance(const Color3f &rgb) { return dot(rgb, Vec3(0.2126, 0.7152, 0.0722)); }
+
+    template <typename T, int N>
+    struct vec_trait<Color<T, N>> {
+        using value_type = T;
+        static constexpr int size = N;
+    };
 } // namespace akari

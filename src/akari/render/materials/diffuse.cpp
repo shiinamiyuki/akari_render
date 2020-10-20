@@ -20,29 +20,41 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#pragma once
-
-#include <akari/core/color.h>
-#include <akari/core/image.hpp>
 #include <akari/render/scenegraph.h>
-
+#include <akari/render/texture.h>
+#include <akari/render/material.h>
+#include <akari/core/color.h>
+#include <akari/shaders/common.h>
 namespace akari::render {
-    struct ShadingPoint {
-        ShadingPoint() = default;
-        ShadingPoint(const vec2 &tc) : texcoords(tc) {}
-        vec2 texcoords;
-    };
-    class Texture {
+    using namespace shader;
+    class DiffuseMaterial : public Material {
       public:
-        virtual Spectrum evaluate(const ShadingPoint &sp) const = 0;
-        virtual Float integral() const = 0;
+        DiffuseMaterial(const Texture *color) : color(color) {}
+        const Texture *color;
+        BSDF get_bsdf(MaterialEvalContext &ctx) const override {
+            ShadingPoint sp;
+            sp.texcoords = ctx.texcoords;
+            auto R = color->evaluate(sp);
+            BSDF bsdf(ctx.ng, ctx.ns);
+            bsdf.set_closure(ctx.allocator.new_object<DiffuseBSDF>(R));
+            return bsdf;
+        }
     };
-    class TextureNode : public SceneGraphNode {
+
+
+    class DiffuseMaterialNode final : public MaterialNode {
+        std::shared_ptr<TextureNode> color;
+
       public:
-        virtual Texture *create_texture(Allocator<> *) = 0;
+        void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
+                          const sdl::Value &value) override {
+            if (field == "color") {
+                color = resolve_texture(value);
+            }
+        }
+        Material *create_material(Allocator<> *allocator) override {
+            return allocator->new_object<DiffuseMaterial>(color->create_texture(allocator));
+        }
     };
-    AKR_EXPORT std::shared_ptr<TextureNode> create_constant_texture();
-    AKR_EXPORT std::shared_ptr<TextureNode> create_image_texture();
-    AKR_EXPORT std::shared_ptr<TextureNode> create_constant_texture_rgb(const RGB &value);
-    AKR_EXPORT std::shared_ptr<TextureNode> create_image_texture(const std::string &path);
+    AKR_EXPORT_NODE(DiffuseMaterial, DiffuseMaterialNode)
 } // namespace akari::render

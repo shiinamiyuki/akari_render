@@ -29,6 +29,7 @@
 #include <akari/core/memory.h>
 #include <akari/render/sampler.h>
 #include <akari/render/interaction.h>
+#include <akari/render/texture.h>
 #include <optional>
 
 namespace akari::render {
@@ -62,6 +63,37 @@ namespace akari::render {
         [[nodiscard]] virtual BSDFType type() const = 0;
         [[nodiscard]] virtual bool match_flags(BSDFType flag) const { return ((uint32_t)type() & (uint32_t)flag) != 0; }
         virtual Spectrum sample(const vec2 &u, const Vec3 &wo, Vec3 *wi, Float *pdf, BSDFType *sampledType) const = 0;
+    };
+    class DiffuseBSDF : public BSDFClosure {
+        Spectrum R;
+
+      public:
+        DiffuseBSDF(const Spectrum &R) : R(R) {}
+        [[nodiscard]] Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const override {
+            using namespace shader;
+            if (same_hemisphere(wo, wi)) {
+                return cosine_hemisphere_pdf(std::abs(cos_theta(wi)));
+            }
+            return 0.0f;
+        }
+        [[nodiscard]] Spectrum evaluate(const Vec3 &wo, const Vec3 &wi) const override {
+            using namespace shader;
+            if (same_hemisphere(wo, wi)) {
+                return R * shader::InvPi;
+            }
+            return Spectrum(0.0f);
+        }
+        [[nodiscard]] BSDFType type() const override { return BSDFType(BSDF_DIFFUSE | BSDF_REFLECTION); }
+        Spectrum sample(const vec2 &u, const Vec3 &wo, Vec3 *wi, Float *pdf, BSDFType *sampledType) const override {
+            using namespace shader;
+            *wi = cosine_hemisphere_sampling(u);
+            if (!same_hemisphere(wo, *wi)) {
+                wi->y = -wi->y;
+            }
+            *sampledType = type();
+            *pdf = cosine_hemisphere_pdf(std::abs(cos_theta(*wi)));
+            return R * shader::InvPi;
+        }
     };
     class BSDF {
         const BSDFClosure *closure_;
@@ -110,13 +142,39 @@ namespace akari::render {
             : allocator(rsrc), u1(sampler.next2d()), u2(sampler.next2d()), texcoords(texcoords), ng(ng), ns(ns) {}
     };
 
+    class EmissiveMaterial;
     class Material {
       public:
         virtual BSDF get_bsdf(MaterialEvalContext &ctx) const = 0;
+        virtual bool is_emissive() const { return false; }
+        virtual const EmissiveMaterial *as_emissive() const { return nullptr; }
+    };
+    class EmissiveMaterial : public Material {
+      public:
+        const Texture *color = nullptr;
+        bool double_sided = false;
+        BSDF get_bsdf(MaterialEvalContext &ctx) const { return BSDF(); }
+        bool is_emissive() const override { return true; }
+        const EmissiveMaterial *as_emissive() const override { return this; }
+    };
+    class MaterialNode : public SceneGraphNode {
+      public:
+        virtual Material *create_material(Allocator<> *) = 0;
     };
 
-    class MaterialNode : public SceneNode {
-      public:
-        virtual Material *create_material(Allocator<> &allocator);
-    };
+    inline std::shared_ptr<TextureNode> resolve_texture(const sdl::Value &value) {
+        if (value.is_array()) {
+            return create_constant_texture_rgb(load<Color3f>(value));
+        } else if (value.is_number()) {
+            return create_constant_texture_rgb(Color3f(value.get<float>().value()));
+        } else if (value.is_string()) {
+            auto path = value.get<std::string>().value();
+            return create_image_texture(path);
+        } else {
+            AKR_ASSERT_THROW(value.is_object());
+            auto tex = dyn_cast<TextureNode>(value.object());
+            AKR_ASSERT_THROW(tex);
+            return tex;
+        }
+    }
 } // namespace akari::render

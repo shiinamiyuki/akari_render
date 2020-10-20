@@ -42,7 +42,7 @@ namespace akari::render {
         virtual void reset() = 0;
         virtual void build(const Scene &) = 0;
     };
-    class AcceleratorNode : public SceneNode {
+    class AcceleratorNode : public SceneGraphNode {
       public:
         virtual std::shared_ptr<Accelerator> create_accel(const Scene &scene) = 0;
     };

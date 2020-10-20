@@ -25,7 +25,7 @@
 #include <akari/shaders/common.h>
 namespace akari::render {
     using namespace shader;
-    class PerspectiveCamera {
+    class PerspectiveCamera : public Camera {
       public:
         Transform c2w, w2c, r2c, c2r;
         ivec2 _resolution;
@@ -75,4 +75,32 @@ namespace akari::render {
             return sample;
         }
     };
-}
+    class PerspectiveCameraNode final : public CameraNode {
+      public:
+        vec3 position;
+        vec3 rotation;
+        ivec2 resolution = ivec2(512, 512);
+        double fov = radians(80.0f);
+        void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
+                          const sdl::Value &value) override {
+            if (field == "fov") {
+                fov = radians(value.get<double>().value());
+            } else if (field == "rotation") {
+                rotation = radians(load<vec3>(value));
+            } else if (field == "position") {
+                position = load<vec3>(value);
+            } else if (field == "resolution") {
+                resolution = load<ivec2>(value);
+            }
+        }
+        Camera *create_camera(Allocator<> *allocator) override {
+            Transform c2w;
+            c2w = Transform::rotate_z(rotation.z);
+            c2w = Transform::rotate_x(rotation.y) * c2w;
+            c2w = Transform::rotate_y(rotation.x) * c2w;
+            c2w = Transform::translate(position) * c2w;
+            return allocator->new_object<PerspectiveCamera>(resolution, c2w, fov);
+        }
+    };
+    AKR_EXPORT_NODE(PerspectiveCamera, PerspectiveCameraNode)
+} // namespace akari::render

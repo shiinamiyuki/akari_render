@@ -1,0 +1,1 @@
+add_plugin(DiffuseMaterial SOURCE diffuse.cpp)

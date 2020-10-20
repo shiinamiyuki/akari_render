@@ -78,6 +78,32 @@ namespace akari {
         T *data() { return _texels.data(); }
 
         [[nodiscard]] const T *data() const { return _texels.data(); }
+
+        struct View {
+            const T &operator()(int x, int y) const {
+                x = std::clamp(x, 0, _resolution[0] - 1);
+                y = std::clamp(y, 0, _resolution[1] - 1);
+                return _texels[x + y * _resolution[0]];
+            }
+
+            T &operator()(int x, int y) {
+                x = std::clamp(x, 0, _resolution[0] - 1);
+                y = std::clamp(y, 0, _resolution[1] - 1);
+                return _texels[x + y * _resolution[0]];
+            }
+
+            const T &operator()(float x, float y) const { return (*this)(vec2(x, y)); }
+
+            const T &operator()(const ivec2 &p) const { return (*this)(p.x, p.y); }
+
+            const T &operator()(const vec2 &p) const { return (*this)(ivec2(p * vec2(_resolution))); }
+
+            [[nodiscard]] ivec2 resolution() const { return _resolution; }
+            [[nodiscard]] const T *data() const { return _texels; }
+            const T *_texels = nullptr;
+            ivec2 _resolution = ivec2(0);
+        };
+        View view() const { return {data(), resolution()}; }
     };
 
     class RGBImage : public TImage<Color<float, 3>> {

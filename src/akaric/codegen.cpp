@@ -956,7 +956,7 @@ namespace akari::asl {
         CodeBlock compile_const(const ast::ConstVar &cst) {
             auto type = process_type(cst->var->type);
             CodeBlock block;
-            block.wl("const {} {} = {};", gen_type(type), cst->var->var->identifier,
+            block.wl("static const {} {} = {};", gen_type(type), cst->var->var->identifier,
                      compile_expr(cst->var->init).value.str());
             return block;
         }
