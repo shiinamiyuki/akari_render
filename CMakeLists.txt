@@ -69,23 +69,34 @@ target_link_libraries(akaric fmt)
 
 
 
-function(add_shader_module target)
-    list(SUBLIST ARGN 0 -1 sources)
-  
+function(add_shader_module target LIB_TYPE)
+    set(options )
+    set(oneValueArgs )
+    set(multiValueArgs SOURCE SHADER)
+    cmake_parse_arguments(SMODULE "${options}" "${oneValueArgs}"
+    "${multiValueArgs}" ${ARGN} )
     list(APPEND TARGET_SOURCE "")
-    foreach(src ${sources} )
+    foreach(src ${SMODULE_SHADER} )
     # message(STATUS "src= " ${src})
         add_custom_command(OUTPUT ${src}.h
             COMMAND akaric ${src} -b cpp -o ${src}.h -DSpectrum=vec3
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-            DEPENDS ${akaric_SOURCE} ${sources})
+            DEPENDS ${akaric_SOURCE} ${SMODULE_SHADER})
         list(APPEND TARGET_SOURCE ${src}.h)
     endforeach()
-    set_source_files_properties(${TARGET_SOURCE} PROPERTIES LANGUAGE CXX)
-    add_library(${target} STATIC ${TARGET_SOURCE})
+    add_library(${target} ${LIB_TYPE} ${TARGET_SOURCE} ${SMODULE_SOURCE})
     # message(STATUS "target= " ${TARGET_SOURCE})
 endfunction()
 
+if(EXISTS ${CMAKE_BINARY_DIR}/dist)
+else()
+    file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/dist)
+    file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/dist/plugins)
+endif()
+function(copy_to_dist target)
+    add_custom_command(TARGET ${target} POST_BUILD 
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${target}>  ${CMAKE_BINARY_DIR}/dist/)
+endfunction()
 
 file(GLOB PYBIND11_HEADERS external/pybind11/include/pybind11.h external/pybind11/include/stl.h)
 file(GLOB AKR_CORE_SRC src/akari/core/*.*)
@@ -93,7 +104,7 @@ file(GLOB AKR_PYBIND_SRC src/akari/core/nodes/*.*)
 
 
 add_library(libakari_core SHARED ${AKR_COMMON_SRC}  ${AKR_CORE_SRC})
-target_link_libraries(libakari_core PUBLIC  ${AKR_CORE_EXT_LIBS} ${EMBREE_LIBRARY} ${AKR_CUDA_LIBS})
+target_link_libraries(libakari_core PUBLIC  ${AKR_CORE_EXT_LIBS} ${AKR_CUDA_LIBS})
 if(AKR_ENABLE_PYTHON)
     target_link_libraries(libakari_core ${Python_LIBRARIES})
 endif()
@@ -102,6 +113,7 @@ target_compile_definitions(libakari_core PUBLIC ${AKR_COMPILE_DEFINITIONS})
 target_include_directories(libakari_core PUBLIC src/)
 target_include_directories(libakari_core PUBLIC external/pybind11/include)
 target_include_directories(libakari_core PUBLIC ${Python_INCLUDE_DIRS} ${EMBREE_INCLUDE_DIRS})
+copy_to_dist(libakari_core)
 if(AKR_ENABLE_PYTHON)
     target_include_directories(libakari_core ${Python_INCLUDE_DIRS})
 endif()
@@ -127,32 +139,34 @@ add_library(libakari_render SHARED ${AKR_RENDER_SRC})
 add_dependencies(libakari_render AKR_COMMON_SHADER)
 target_include_directories(libakari_render PUBLIC src/)
 target_link_libraries(libakari_render PUBLIC libakari_core)
+copy_to_dist(libakari_render)
 
 function(add_plugin target)
-    list(SUBLIST ARGN 0 -1 FILES)
-    add_library(${target} SHARED ${FILES})
+    add_shader_module(${target} SHARED ${ARGN})
     set_property(TARGET ${target} PROPERTY POSITION_INDEPENDENT_CODE ON)
     set_target_properties(${target} PROPERTIES PREFIX "")
-    set_target_properties(${target} PROPERTIES
-        LIBRARY_OUTPUT_DIRECTORY  "${CMAKE_BINARY_DIR}/plugins/"
-        ARCHIVE_OUTPUT_DIRECTORY  "${CMAKE_BINARY_DIR}/plugins/"
-        RUNTIME_OUTPUT_DIRECTORY   "${CMAKE_BINARY_DIR}/plugins/")
-    target_link_libraries(${target} libakari_core)
+    # set_target_properties(${target} PROPERTIES
+    #     LIBRARY_OUTPUT_DIRECTORY  "${CMAKE_BINARY_DIR}/plugins/"
+    #     ARCHIVE_OUTPUT_DIRECTORY  "${CMAKE_BINARY_DIR}/plugins/"
+    #     RUNTIME_OUTPUT_DIRECTORY   "${CMAKE_BINARY_DIR}/plugins/")
+    target_link_libraries(${target} libakari_render)
+    add_custom_command(TARGET ${target} POST_BUILD 
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${target}>  ${CMAKE_BINARY_DIR}/dist/plugins/)
 endfunction()
-add_subdirectory(src/akari/render)
 
+add_subdirectory(src/akari/render)
 
 add_executable(akari src/akari/cmd/akari.cpp )
 target_include_directories(akari PUBLIC src/)
 target_link_libraries(akari libakari_render)
-
+copy_to_dist(akari)
 
 
 
 add_executable(akari-import src/akari/cmd/akari-import.cpp )
 target_include_directories(akari-import PUBLIC src/)
 target_link_libraries(akari-import libakari_core)
-
+copy_to_dist(akari-import)
 
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 add_subdirectory(external/googletest EXCLUDE_FROM_ALL)
@@ -160,5 +174,5 @@ file(GLOB AKR_TEST src/akari/tests/*.*)
 add_executable(akari-test ${AKR_TEST} src/akari/cmd/akari-test.cpp)
 target_link_libraries(akari-test gtest libakari_core)
 add_test(NAME akari COMMAND akari-test)
-
+copy_to_dist(akari-test)
 

@@ -27,6 +27,7 @@
 #include <akari/core/logger.h>
 #include <akari/core/parser.h>
 #include <akari/render/scenegraph.h>
+#include <akari/render/scene.h>
 using namespace akari;
 
 #ifndef AKR_ENABLE_PYTHON
@@ -83,9 +84,9 @@ void parse_and_run() {
     if (it == module->exports.end()) {
         fatal("variable 'scene' not found");
     }
-    // auto scene = dyn_cast<render::SceneGraphNode>(it->second.object());
-    // AKR_ASSERT_THROW(scene);
-    // scene->render();
+    auto scene = dyn_cast<render::SceneNode>(it->second.object());
+    AKR_ASSERT_THROW(scene);
+    scene->render();
 }
 
 int main(int argc, const char **argv) {

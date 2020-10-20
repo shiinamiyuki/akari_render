@@ -127,7 +127,7 @@ namespace akari {
     }
     template <typename T, int N>
     Vector<T, N> select(const Vector<bool, N> &c, const Vector<T, N> &a, const Vector<T, N> &b) {
-        return glm::mix(a, b, c);
+        return glm::mix(b, a, c);
     }
 
     template <typename T>
@@ -183,14 +183,10 @@ namespace akari {
     struct Transform {
         Mat4 m, minv;
         Mat3 m3, m3inv;
-        Transform() = default;
+        Transform() : Transform(glm::mat4(1.0)) {}
         Transform(const Mat4 &m) : Transform(m, glm::inverse(m)) {}
         Transform(const Mat4 &m, const Mat4 &minv) : m(m), minv(minv) {
-            for (int i = 0; i < 3; i++) {
-                for (int j = 0; j < 3; j++) {
-                    m3[i][j] = m[i][j];
-                }
-            }
+            m3 = glm::mat3(m);
             m3inv = glm::inverse(m3);
         }
         Transform inverse() const { return Transform(minv, m); }
@@ -277,15 +273,6 @@ namespace akari {
             }
         }
     };
-
-    template <typename Float>
-    inline Float degrees(Float x) {
-        return x * InvPi * 180.0f;
-    }
-    template <typename Float>
-    inline Float radians(Float x) {
-        return x * Pi / 180.0f;
-    }
 
     using Bounds2f = BoundingBox<Float, 2>;
     using Bounds3f = BoundingBox<Float, 3>;

@@ -131,6 +131,9 @@ namespace akari::render {
         } else if (field == "sampler") {
             sampler = dyn_cast<SamplerNode>(value.object());
             AKR_ASSERT_THROW(sampler);
+        } else if (field == "accelerator") {
+            accel = dyn_cast<AcceleratorNode>(value.object());
+            AKR_ASSERT_THROW(accel);
         }
     }
 } // namespace akari::render

@@ -39,7 +39,7 @@ namespace akari {
         if (res == 0) {
             fprintf(stderr, "error retreiving program path; code=%d\n", GetLastError());
         }
-        cg->program_path = fs::path(std::string(self_proc));
+        cg->program_path = fs::absolute(fs::path(std::string(self_proc)));
 #endif
     }
     Application::~Application() {

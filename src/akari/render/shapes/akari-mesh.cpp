@@ -28,7 +28,7 @@
 #include <akari/shaders/common.h>
 #include <akari/core/mesh.h>
 namespace akari::render {
-    class AkariMesh : public MeshNode {
+    class AkariMesh final : public MeshNode {
       public:
         std::string path;
         AkariMesh() = default;
@@ -81,4 +81,5 @@ namespace akari::render {
             }
         }
     };
+    AKR_EXPORT_NODE(AkariMesh, AkariMesh)
 } // namespace akari::render

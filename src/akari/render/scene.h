@@ -54,7 +54,7 @@ namespace akari::render {
         }
     };
 
-    class AKR_EXPORT SceneNode : SceneGraphNode {
+    class AKR_EXPORT SceneNode : public SceneGraphNode {
         std::vector<MeshInstance> instances;
         std::shared_ptr<CameraNode> camera;
         std::shared_ptr<SamplerNode> sampler;

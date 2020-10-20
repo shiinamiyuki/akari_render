@@ -151,6 +151,7 @@ namespace akari::render {
     };
     class EmissiveMaterial : public Material {
       public:
+        EmissiveMaterial(const Texture *color) : color(color) {}
         const Texture *color = nullptr;
         bool double_sided = false;
         BSDF get_bsdf(MaterialEvalContext &ctx) const { return BSDF(); }
@@ -177,4 +178,20 @@ namespace akari::render {
             return tex;
         }
     }
+
+    class EmissiveMaterialNode : public MaterialNode {
+      public:
+        bool double_sided = false;
+        std::shared_ptr<TextureNode> color;
+        Material *create_material(Allocator<> *allocator) override {
+            auto tex = color->create_texture(allocator);
+            return allocator->new_object<EmissiveMaterial>(tex);
+        }
+        void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
+                          const sdl::Value &value) override {
+            if (field == "color") {
+                color = resolve_texture(value);
+            }
+        }
+    };
 } // namespace akari::render

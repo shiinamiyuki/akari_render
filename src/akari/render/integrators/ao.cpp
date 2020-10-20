@@ -54,16 +54,14 @@ namespace akari::render {
                             return Spectrum(0);
                         }
                     }
+                    // debug("{} {}",trig.ng(),trig.ng() * 0.5f + 0.5f );
                     return Spectrum(1);
-                    // return trig.ng() * 0.5 + 0.5;
                 }
                 return Spectrum(0);
-                // debug("{}\n", ray.d);
-                // return Spectrum(ray.d * 0.5f + 0.5f);
             };
             debug("resolution: {}, tile size: {}, tiles: {}", film->resolution(), tile_size, n_tiles);
             std::mutex mutex;
-            std::vector<astd::pmr::monotonic_buffer_resource*> resources;
+            std::vector<astd::pmr::monotonic_buffer_resource *> resources;
             for (size_t i = 0; i < std::thread::hardware_concurrency(); i++) {
                 resources.emplace_back(new astd::pmr::monotonic_buffer_resource(astd::pmr::get_default_resource()));
             }
@@ -89,12 +87,12 @@ namespace akari::render {
                 film->merge_tile(tile);
                 resources[tid]->release();
             });
-            for(auto rsrc: resources){
+            for (auto rsrc : resources) {
                 delete rsrc;
             }
         }
     };
-    class AOIntegratorNode : public IntegratorNode {
+    class AOIntegratorNode final : public IntegratorNode {
       public:
         int spp = 16;
         int tile_size = 16;
@@ -112,5 +110,6 @@ namespace akari::render {
             }
         }
     };
+    AKR_EXPORT_NODE(RTAO, AOIntegratorNode)
 
 } // namespace akari::render

@@ -33,7 +33,7 @@ namespace akari::render {
         const Material *material = nullptr;
         Vec3 p(const vec2 &uv) const { return lerp3(vertices[0], vertices[1], vertices[2], uv); }
         Float area() const { return length(cross(vertices[1] - vertices[0], vertices[2] - vertices[0])) * 0.5f; }
-        Vec3 ng() const { return Vec3(normalize(cross(vertices[1] - vertices[0], vertices[2] - vertices[0]))); }
+        Vec3 ng() const { return normalize(cross(vertices[1] - vertices[0], vertices[2] - vertices[0])); }
         Vec3 ns(const vec2 &uv) const { return lerp3(normals[0], normals[1], normals[2], uv); }
         vec2 texcoord(const vec2 &uv) const { return lerp3(texcoords[0], texcoords[1], texcoords[2], uv); }
     };

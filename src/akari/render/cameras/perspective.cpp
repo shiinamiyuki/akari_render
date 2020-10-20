@@ -19,7 +19,7 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-
+#include <akari/core/logger.h>
 #include <akari/render/scenegraph.h>
 #include <akari/render/camera.h>
 #include <akari/shaders/common.h>
@@ -72,6 +72,7 @@ namespace akari::render {
             ray.d = c2w.apply_vector(ray.d);
             sample.normal = c2w.apply_normal(Vec3(0, 0, -1.0f));
             sample.ray = ray;
+            
             return sample;
         }
     };
@@ -80,11 +81,11 @@ namespace akari::render {
         vec3 position;
         vec3 rotation;
         ivec2 resolution = ivec2(512, 512);
-        double fov = radians(80.0f);
+        double fov = glm::radians(80.0f);
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override {
             if (field == "fov") {
-                fov = radians(value.get<double>().value());
+                fov = glm::radians(value.get<double>().value());
             } else if (field == "rotation") {
                 rotation = radians(load<vec3>(value));
             } else if (field == "position") {

@@ -601,13 +601,8 @@ namespace akari::asl {
             Twine s, left, right;
             left = L.value;
             right = R.value;
-            auto this_prec = prec.opPrec[e->op];
-            if (this_prec > prec_left) {
-                left = Twine::concat("(", left).append(")");
-            }
-            if (this_prec > prec_right || op == "/" || op == "%" || op == "-") {
-                right = Twine::concat("(", right).append(")");
-            }
+            left = Twine::concat("(", left);
+            right.append(")");
             return {Twine::concat(left, " " + op + " ", right), ty};
         }
         ValueRecord compile_ctor_call(const ast::ConstructorCall &call) {

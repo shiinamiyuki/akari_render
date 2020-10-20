@@ -55,7 +55,6 @@ namespace akari {
     template <typename T>
     class PluginInterface {
       public:
-        const char *name;
         virtual const PluginDescriptor *descriptor() const = 0;
         virtual std::shared_ptr<T> make_shared() const = 0;
         virtual std::unique_ptr<T> make_unique() const = 0;
@@ -63,7 +62,7 @@ namespace akari {
     };
     template <typename T>
     class AKR_EXPORT PluginManager {
-        fs::path prefix = fs::absolute(fs::path("./plugins/"));
+        fs::path prefix = core_globals()->program_path.parent_path() / "plugins";
         std::unordered_map<std::string, const PluginInterface<T> *> plugins;
         std::list<std::shared_ptr<SharedLibrary>> sharedLibraries;
 
@@ -81,8 +80,8 @@ namespace akari {
                 return false;
             }
             const PluginInterface<T> *info = p();
-            plugins.emplace(info->name, info);
-            sharedLibraries.emplace_back(std::move(lib));
+            plugins.emplace(info->descriptor()->name, info);
+            sharedLibraries.emplace_back(lib);
             return true;
         }
         const PluginInterface<T> *load_plugin(const std::string &name) {

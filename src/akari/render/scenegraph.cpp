@@ -41,10 +41,13 @@ namespace akari::render {
             registerd_nodes.emplace(name, func);
         }
         SceneGraphParserImpl() {
-            register_node("ConstantTexture", []() { return dyn_cast<SceneGraphNode>(create_constant_texture()); });
-            register_node("ImageTexture", []() { return dyn_cast<SceneGraphNode>(create_image_texture()); });
+            register_node("ConstantTexture", [] { return dyn_cast<SceneGraphNode>(create_constant_texture()); });
+            register_node("ImageTexture", [] { return dyn_cast<SceneGraphNode>(create_image_texture()); });
             register_node("RandomSampler",
-                          []() { return dyn_cast<SceneGraphNode>(std::make_shared<RandomSamplerNode>()); });
+                          [] { return dyn_cast<SceneGraphNode>(std::make_shared<RandomSamplerNode>()); });
+            register_node("EmissiveMaterial",
+                          [] { return dyn_cast<SceneGraphNode>(std::make_shared<EmissiveMaterialNode>()); });
+            register_node("Scene", [] { return dyn_cast<SceneGraphNode>(std::make_shared<SceneNode>()); });
         }
         sdl::P<sdl::Object> do_parse_object_creation(sdl::ParserContext &ctx, const std::string &type) override final {
             if (registerd_nodes.find(type) != registerd_nodes.end()) {

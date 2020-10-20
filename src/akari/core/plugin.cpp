@@ -27,7 +27,12 @@
 #    include <Windows.h>
 
 namespace akari {
-    void SharedLibrary::load(const char *path) { handle = LoadLibraryA(path); }
+    void SharedLibrary::load(const char *path) {
+        handle = LoadLibraryA(path);
+        if (!handle) {
+            error("LoadLibraryA(\"{}\") failed with code={}", path, GetLastError());
+        }
+    }
 
     void *SharedLibrary::function(const char *name) {
         auto func = (void *)GetProcAddress((HMODULE)handle, name);
@@ -55,6 +60,4 @@ namespace akari {
 
 #endif
 
-namespace akari {
-    
-}
+namespace akari {}
