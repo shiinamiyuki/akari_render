@@ -20,3 +20,15 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#pragma once
+#include <akari/core/math.h>
+#include <akari/core/distribution.h>
+#include <akari/render/accelerator.h>
+#include <akari/render/instance.h>
+namespace akari::render {
+
+    class Scene {
+      public:
+        BufferView<MeshInstance> meshes;
+    };
+} // namespace akari::render

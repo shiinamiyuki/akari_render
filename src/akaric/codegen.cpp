@@ -675,20 +675,28 @@ namespace akari::asl {
         }
         ValueRecord compile_index(const ast::Index &idx) {
             auto agg = compile_expr(idx->expr);
-            if (!type::remove_qualifier(agg.type())->isa<type::ArrayType>()) {
-                error(idx->expr->loc, "operator [] only allowed for arrays");
+            auto ty = type::remove_qualifier(agg.type());
+            type::Qualifier qualifier = type::qualifier_v(agg.type());
+            if (ty->isa<type::ArrayType>()) {
+                return ValueRecord{agg.value.append("[").append(compile_expr(idx->idx).value).append("]"),
+                                   type_ctx.make_qualified(ty->cast<type::ArrayType>()->element_type, qualifier)};
             }
-            return ValueRecord{agg.value.append("[").append(compile_expr(idx->idx).value).append("]"),
-                               agg.type()->cast<type::ArrayType>()->element_type};
+            if (ty->isa<type::VectorType>()) {
+                return ValueRecord{agg.value.append("[").append(compile_expr(idx->idx).value).append("]"),
+                                   type_ctx.make_qualified(ty->cast<type::VectorType>()->element_type, qualifier)};
+            }
+            error(idx->loc, fmt::format("index operation is legal for type {}", pretty_print(agg.type())));
         }
 
         ValueRecord compile_member_access(const ast::MemberAccess &access) {
             auto agg = compile_expr(access->var);
             auto ty = type::remove_qualifier(agg.type());
+            auto qualifier = type::qualifier_v(agg.type());
             if (ty->isa<type::VectorType>()) {
                 auto v = ty->cast<type::VectorType>();
                 auto member = access->member;
-                return {agg.value.append("." + member), v->element_type};
+                return {agg.value.append("." + member), 
+                    type_ctx.make_qualified(v->element_type, qualifier)};
             } else if (ty->isa<type::StructType>()) {
                 auto st = ty->cast<type::StructType>();
                 auto member = access->member;
@@ -697,7 +705,7 @@ namespace akari::asl {
                 if (it == st->fields.end()) {
                     error(access->loc, fmt::format("type {} does not have member {}", st->name, member));
                 }
-                return {agg.value.append("." + member), it->type};
+                return {agg.value.append("." + member), type_ctx.make_qualified(it->type, qualifier)};
             } else if (ty->isa<type::ArrayType>()) {
                 auto arr = ty->cast<type::ArrayType>();
                 auto member = access->member;
@@ -705,9 +713,9 @@ namespace akari::asl {
                     error(access->loc, fmt::format("array type does not have member {}", member));
                 } else {
                     if (arr->length >= 0) {
-                        return {std::to_string(arr->length), type::uint32};
+                        return {std::to_string(arr->length), type_ctx.make_qualified(type::uint32, qualifier)};
                     } else {
-                        return {agg.value.append(".length()"), type::uint32};
+                        return {agg.value.append(".length()"), type_ctx.make_qualified(type::uint32, qualifier)};
                     }
                 }
             }
@@ -782,6 +790,12 @@ namespace akari::asl {
             return compile_var_decl(block, decl);
         }
         void compile_var_decl(CodeBlock &block, const ast::VarDecl &decl) {
+            if (!decl->init) {
+                auto ty = process_type(decl->type);
+                block.wl("{} {} = {}();", gen_type(ty), decl->var->identifier, gen_type(ty));
+                vars.insert(decl->var->identifier, ValueRecord{Twine(decl->var->identifier), ty});
+                return;
+            }
             auto init = compile_expr(decl->init);
             type::Type ty;
             if (decl->type) {

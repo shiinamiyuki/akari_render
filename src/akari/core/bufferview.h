@@ -19,4 +19,24 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+#pragma once
+#include <akari/core/fwd.h>
 
+namespace akari {
+    template <typename T>
+    struct BufferView {
+        BufferView() = default;
+        BufferView(T *data, size_t size) : _data(data), _size(size) {}
+        T &operator[](uint32_t i) const { return _data[i]; }
+        size_t size() const { return _size; }
+        T *begin() const { return _data; }
+        T *end() const { return _data + _size; }
+        const T *cbegin() const { return _data; }
+        const T *cend() const { return _data + _size; }
+
+      private:
+        T *_data = nullptr;
+        size_t _size = 0;
+    };
+
+} // namespace akari

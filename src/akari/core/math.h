@@ -73,7 +73,7 @@ namespace akari {
     static constexpr Float Eps = Float(0.001f);
     static constexpr Float ShadowEps = Float(0.0001f);
 
-    template <typename T, int N, typename Float>
+    template <typename T, typename Float>
     T lerp(T a, T b, Float t) {
         return a * (Float(1.0) - t) + b * t;
     }
@@ -88,6 +88,16 @@ namespace akari {
             acc = f(acc, vec[i]);
         }
         return acc;
+    }
+    template <int... args, typename T, int N>
+    auto shuffle(const Vector<T, N> &a) {
+        constexpr int pack[] = {args...};
+        static_assert(((args < N) && ...));
+        Vector<T, sizeof...(args)> s;
+        for (size_t i = 0; i < sizeof...(args); i++) {
+            s[i] = a[pack[i]];
+        }
+        return s;
     }
     template <typename T, int N>
     T hsum(const Vector<T, N> &vec) {
@@ -243,7 +253,7 @@ namespace akari {
         BoundingBox intersect(const BoundingBox &rhs) const {
             return BoundingBox(max(pmin, rhs.pmin), min(pmax, rhs.pmax));
         }
-        bool empty() const { return any(pmin > pmax) || hsum(extents()) == 0; }
+        bool empty() const { return any(glm::greaterThan(pmin, pmax)) || hsum(extents()) == 0; }
         Vector centroid() const { return extents() * 0.5f + pmin; }
         Float surface_area() const {
             if (empty())

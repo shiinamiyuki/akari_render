@@ -37,12 +37,6 @@ __builtin__ int max(int u, int v);
 __builtin__ float max(float u, float v);
 __builtin__ uint max(uint u, uint v);
 
-__builtin__ vec2 fmin(vec2 u, vec2 v);
-__builtin__ vec3 fmin(vec3 u, vec3 v);
-__builtin__ vec4 fmin(vec4 u, vec4 v);
-__builtin__ vec2 fmax(vec2 u, vec2 v);
-__builtin__ vec3 fmax(vec3 u, vec3 v);
-__builtin__ vec4 fmax(vec4 u, vec4 v);
 
 __builtin__ vec2 min(vec2 u, vec2 v);
 __builtin__ vec3 min(vec3 u, vec3 v);
@@ -87,3 +81,30 @@ __builtin__ ivec4 clamp(ivec4 x, int minVal, int maxVal);
 
 
 __builtin__ mat3 transpose(mat3 m);
+
+
+
+__builtin__ float sin(float x);
+__builtin__ vec2 sin(vec2 x);
+__builtin__ vec3 sin(vec3 x);
+__builtin__ vec4 sin(vec4 x);
+
+
+__builtin__ float cos(float x);
+__builtin__ vec2 cos(vec2 x);
+__builtin__ vec3 cos(vec3 x);
+__builtin__ vec4 cos(vec4 x);
+
+
+
+__builtin__ float tan(float x);
+__builtin__ vec2 tan(vec2 x);
+__builtin__ vec3 tan(vec3 x);
+__builtin__ vec4 tan(vec4 x);
+
+
+
+__builtin__ float asin(float x);
+__builtin__ vec2 asin(vec2 x);
+__builtin__ vec3 asin(vec3 x);
+__builtin__ vec4 asin(vec4 x);

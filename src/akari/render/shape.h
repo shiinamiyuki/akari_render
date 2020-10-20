@@ -20,3 +20,20 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#pragma once
+#include <array>
+#include <akari/core/math.h>
+namespace akari::render {
+    class Material;
+    struct Triangle {
+        std::array<Vec3, 3> vertices;
+        std::array<Vec3, 3> normals;
+        std::array<vec2, 3> texcoords;
+        const Material *material = nullptr;
+        Vec3 p(const vec2 &uv) const { return lerp3(vertices[0], vertices[1], vertices[2], uv); }
+        Float area() const { return length(cross(vertices[1] - vertices[0], vertices[2] - vertices[0])) * 0.5f; }
+        Vec3 ng() const { return Vec3(normalize(cross(vertices[1] - vertices[0], vertices[2] - vertices[0]))); }
+        Vec3 ns(const vec2 &uv) const { return lerp3(normals[0], normals[1], normals[2], uv); }
+        vec2 texcoord(const vec2 &uv) const { return lerp3(texcoords[0], texcoords[1], texcoords[2], uv); }
+    };
+} // namespace akari::render

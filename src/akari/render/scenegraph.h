@@ -19,7 +19,7 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-
+#pragma once
 #include <akari/core/plugin.h>
 #include <akari/core/parser.h>
 namespace akari::render {
@@ -34,5 +34,5 @@ namespace akari::render {
       public:
         static std::shared_ptr<SceneGraphParser> create_parser();
     };
-#define AKR_EXPORT_NODE(PLUGIN) AKR_EXPORT_PLUGIN(PLUGIN, akari::render::SceneNode)
+#define AKR_EXPORT_NODE(PLUGIN, CLASS) AKR_EXPORT_PLUGIN(PLUGIN, CLASS, akari::render::SceneNode)
 } // namespace akari::render

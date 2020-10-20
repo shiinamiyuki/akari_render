@@ -56,7 +56,7 @@ namespace akari {
     class PluginInterface {
       public:
         const char *name;
-        virtual PluginDescriptor *descriptor() const = 0;
+        virtual const PluginDescriptor *descriptor() const = 0;
         virtual std::shared_ptr<T> make_shared() const = 0;
         virtual std::unique_ptr<T> make_unique() const = 0;
         virtual ~PluginInterface() = default;
@@ -123,7 +123,7 @@ namespace akari {
     }
 
     template <typename Base, typename T>
-    class PluginInterfaceImpl : PluginInterface<Base> {
+    class PluginInterfaceImpl : public PluginInterface<Base> {
         PluginDescriptor desc;
 
       public:
@@ -133,13 +133,13 @@ namespace akari {
             get_compiler_info(&desc.compiler_info);
             get_build_info(&desc.build_info);
         }
-        PluginDescriptor *descriptor() const override { return &desc; }
+        const PluginDescriptor *descriptor() const override { return &desc; }
         std::shared_ptr<Base> make_shared() const override { return std::make_shared<T>(); }
         std::unique_ptr<Base> make_unique() const override { return std::make_unique<T>(); }
     };
-#define AKR_EXPORT_PLUGIN(PLUGIN, INTERFACE)                                                                           \
-    extern "C" AKR_EXPORT const PluginInterface *akari_plugin_onload() {                                               \
-        static PluginInterfaceImpl<INTERFACE, PLUGIN> pi(#PLUGIN);                                                     \
+#define AKR_EXPORT_PLUGIN(PLUGIN, CLASS, INTERFACE)                                                                    \
+    extern "C" AKR_EXPORT const PluginInterface<INTERFACE> *akari_plugin_onload() {                                    \
+        static PluginInterfaceImpl<INTERFACE, CLASS> pi(#PLUGIN);                                                      \
         return &pi;                                                                                                    \
     }
 } // namespace akari

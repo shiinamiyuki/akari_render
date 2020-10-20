@@ -20,3 +20,30 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#pragma once
+#include <akari/core/math.h>
+#include <akari/render/scenegraph.h>
+#include <optional>
+namespace akari::render {
+    struct Intersection {
+        Float t = Inf;
+        Vec3 ng;
+        Vec2 uv;
+        int geom_id = -1;
+        int prim_id = -1;
+        bool is_instance = false;
+        bool hit() const { return geom_id != -1 && prim_id != -1; }
+    };
+    class Scene;
+    class Accelerator {
+      public:
+        virtual bool occlude(const Ray &ray) const = 0;
+        virtual std::optional<Intersection> intersect(const Ray &ray) const = 0;
+        virtual void reset() = 0;
+        virtual void build(const Scene &) = 0;
+    };
+    class AcceleratorNode : public SceneNode {
+      public:
+        virtual std::shared_ptr<Accelerator> create_accel(const Scene &scene) = 0;
+    };
+} // namespace akari::render

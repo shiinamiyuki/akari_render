@@ -22,7 +22,7 @@
 
 #pragma once
 #include <akari/core/math.h>
-#include <akari/core/buffer.h>
+#include <akari/core/memory.h>
 namespace akari {
     /*
      * Return the largest index i such that
@@ -30,7 +30,7 @@ namespace akari {
      * If no such index i, last is returned
      * */
     template <typename Pred>
-     int upper_bound(int first, int last, Pred pred) {
+    int upper_bound(int first, int last, Pred pred) {
         int lo = first;
         int hi = last;
         while (lo < hi) {
@@ -43,12 +43,10 @@ namespace akari {
         }
         return std::clamp<int>(hi - 1, 0, (last - first) - 2);
     }
-    
+
     struct Distribution1D {
         friend struct Distribution2D;
-        Distribution1D(MemoryResource *resource, const Float *f, size_t n) : func(resource), cdf(resource) {
-            func.copy(f, n);
-            cdf.resize(n + 1);
+        Distribution1D(const Float *f, size_t n) : func(f, f + n), cdf(n + 1) {
             cdf[0] = 0;
             for (size_t i = 0; i < n; i++) {
                 cdf[i + 1] = cdf[i] + func[i] / n;
@@ -65,12 +63,12 @@ namespace akari {
         // y = F^{-1}(u)
         // P(Y <= y) = P(F^{-1}(U) <= u) = P(U <= F(u)) = F(u)
         // Assume: 0 <= i < n
-        [[nodiscard]]  Float pdf_discrete(int i) const { return func[i] / (funcInt * count()); }
-        [[nodiscard]]  Float pdf_continuous(Float x) const {
+        [[nodiscard]] Float pdf_discrete(int i) const { return func[i] / (funcInt * count()); }
+        [[nodiscard]] Float pdf_continuous(Float x) const {
             uint32_t offset = std::clamp<uint32_t>(static_cast<uint32_t>(x * count()), 0, count() - 1);
             return func[offset] / funcInt;
         }
-         int sample_discrete(Float u, Float *pdf = nullptr) {
+        int sample_discrete(Float u, Float *pdf = nullptr) const {
             uint32_t i = upper_bound(0, cdf.size(), [=](int idx) { return cdf[idx] <= u; });
             if (pdf) {
                 *pdf = pdf_discrete(i);
@@ -78,8 +76,8 @@ namespace akari {
             return i;
         }
 
-         Float sample_continuous(Float u, Float *pdf = nullptr, int *p_offset = nullptr) {
-            uint32_t offset = UpperBound(0, cdf.size(), [=] (int idx) { return cdf[idx] <= u; });
+        Float sample_continuous(Float u, Float *pdf = nullptr, int *p_offset = nullptr) const {
+            uint32_t offset = upper_bound(0, cdf.size(), [=](int idx) { return cdf[idx] <= u; });
             if (p_offset) {
                 *p_offset = offset;
             }
@@ -91,31 +89,31 @@ namespace akari {
             return ((float)offset + du) / count();
         }
 
-        [[nodiscard]]  size_t count() const { return func.size(); }
-        [[nodiscard]]  Float integral() const { return funcInt; }
+        [[nodiscard]] size_t count() const { return func.size(); }
+        [[nodiscard]] Float integral() const { return funcInt; }
 
       private:
-        Buffer<Float> func, cdf;
+        std::pmr::vector<Float> func, cdf;
         Float funcInt;
     };
-    
+
     struct Distribution2D {
-        astd::pmr::vector<Distribution1D> pConditionalV;
-        astd::optional<Distribution1D> pMarginal;
+        std::vector<Distribution1D> pConditionalV;
+        std::optional<Distribution1D> pMarginal;
 
       public:
-        Distribution2D(MemoryResource *resource, const Float *data, size_t nu, size_t nv)
-            : pConditionalV(astd::pmr::polymorphic_allocator<T>(resource)) {
+        Distribution2D(const Float *data, size_t nu, size_t nv) {
+            pConditionalV.reserve(nv);
             for (auto v = 0u; v < nv; v++) {
-                pConditionalV.emplace_back(resource, &data[v * nu], nu);
+                pConditionalV.emplace_back(&data[v * nu], nu);
             }
             std::vector<Float> m;
             for (auto v = 0u; v < nv; v++) {
-                m.emplace_back(pConditionalV[v]->funcInt);
+                m.emplace_back(pConditionalV[v].funcInt);
             }
-            pMarginal.emplace(resource, &m[0], nv);
+            pMarginal.emplace(&m[0], nv);
         }
-         Vec2 sample_continuous(const Vec2 &u, Float *pdf) const {
+        Vec2 sample_continuous(const Vec2 &u, Float *pdf) const {
             int v;
             Float pdfs[2];
             auto d1 = pMarginal->sample_continuous(u[0], &pdfs[0], &v);
@@ -123,9 +121,9 @@ namespace akari {
             *pdf = pdfs[0] * pdfs[1];
             return Vec2(d0, d1);
         }
-         Float pdf_continuous(const Vec2 &p) const {
-            auto iu = clamp<int>(p[0] * pConditionalV[0].count(), 0, pConditionalV[0].count() - 1);
-            auto iv = clamp<int>(p[1] * pMarginal->count(), 0, pMarginal->count() - 1);
+        Float pdf_continuous(const Vec2 &p) const {
+            auto iu = std::clamp<int>(p[0] * pConditionalV[0].count(), 0, pConditionalV[0].count() - 1);
+            auto iv = std::clamp<int>(p[1] * pMarginal->count(), 0, pMarginal->count() - 1);
             return pConditionalV[iv].func[iu] / pMarginal->funcInt;
         }
     };

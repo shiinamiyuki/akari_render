@@ -211,7 +211,12 @@ namespace akari::asl::type {
         }
         return ty;
     }
-
+    inline type::Qualifier qualifier_v(type::Type ty) {
+        if (auto m = ty->cast<type::QualifiedType>()) {
+            return m->qualifier;
+        }
+        return type::Qualifier::none;
+    }
     inline type::Type value_type(type::Type ty) {
         if (auto v = ty->cast<type::VectorType>()) {
             return v->element_type;
