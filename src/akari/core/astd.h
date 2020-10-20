@@ -78,6 +78,10 @@ namespace akari::astd {
             bool operator==(const polymorphic_allocator<T> &rhs) const {
                 return resource() == rhs.resource();
             }
+            template <class T>
+            bool operator!=(const polymorphic_allocator<T> &rhs) const {
+                return resource() != rhs.resource();
+            }
             void deallocate(Tp *p, size_t n) { resource()->deallocate(p, n); }
 
             void *allocate_bytes(size_t nbytes, size_t alignment = alignof(max_align_t)) {

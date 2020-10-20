@@ -32,13 +32,14 @@ namespace akari::asl {
     static std::unordered_set<std::string> qualifiers = {"const", "in", "inout", "out"};
     class Parser::Impl {
         friend class Parser;
+         Parser &parser;
         const TokenStream &ts;
         const std::string &filename;
         const std::string &src;
         TokenStream::const_iterator it;
         std::unordered_set<std::string> typenames;
 
-        Parser &parser;
+       
         const Token &cur() {
             if (it == ts.end()) {
                 throw std::runtime_error("unexpected EOF");
@@ -76,6 +77,7 @@ namespace akari::asl {
       public:
         Impl(Parser &parser, const TokenStream &ts, const std::string &filename, const std::string &src)
             : parser(parser), ts(ts), filename(filename), src(src) {
+            (void)this->src;
             it = ts.cbegin();
             // for(auto & t: ts){
             //     std::cout << t.tok << std::endl;

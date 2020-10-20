@@ -52,7 +52,7 @@ namespace akari {
 
     void *SharedLibrary::function(const char *name) { return (void *)dlsym(handle, name); }
 
-    SharedLibrary::~SharedLibraryLoader() {
+    SharedLibrary::~SharedLibrary() {
         if (handle)
             dlclose(handle);
     }

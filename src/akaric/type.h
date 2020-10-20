@@ -34,8 +34,8 @@ namespace akari::asl::type {
         virtual bool is_aggregate() const { return false; }
     };
 #define AKR_DECL_TYPENODE(Type)                                                                                        \
-    std::string type_name() const { return #Type; }                                                                    \
-    bool is_parent_of(const std::shared_ptr<Base> &ptr) const { return ptr->isa<std::shared_ptr<Type>>(); }
+    std::string type_name() const override { return #Type; }                                                           \
+    bool is_parent_of(const std::shared_ptr<Base> &ptr) const override { return ptr->isa<std::shared_ptr<Type>>(); }
 
     using Type = std::shared_ptr<TypeNode>;
     class OpaqueTypeNode : public TypeNode {

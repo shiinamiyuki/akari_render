@@ -589,14 +589,6 @@ namespace akari::asl {
                 }
             }
 
-            int prec_left, prec_right;
-            prec_left = prec_right = std::numeric_limits<int>::max();
-            if (binop->lhs->isa<ast::BinaryExpression>()) {
-                prec_left = prec.opPrec[binop->lhs->cast<ast::BinaryExpression>()->op];
-            }
-            if (binop->rhs->isa<ast::BinaryExpression>()) {
-                prec_right = prec.opPrec[binop->rhs->cast<ast::BinaryExpression>()->op];
-            }
             auto [ty, L, R] = check_binary_expr(op, e->loc, lhs, rhs);
             Twine s, left, right;
             left = L.value;
@@ -609,7 +601,7 @@ namespace akari::asl {
             auto type = process_type(call->type);
             auto ctor_name = gen_type(type);
             std::vector<ValueRecord> args;
-            for (int i = 0; i < call->args.size(); i++) {
+            for (uint32_t i = 0; i < call->args.size(); i++) {
                 auto arg = compile_expr(call->args[i]);
                 args.emplace_back(arg);
             }
@@ -622,7 +614,7 @@ namespace akari::asl {
                 end = ")";
             }
             Twine s(ctor_name + begin);
-            for (int i = 0; i < args.size(); i++) {
+            for (uint32_t i = 0; i < args.size(); i++) {
                 s.append(args[i].value);
                 if (i + 1 < args.size()) {
                     s.append(",");
@@ -636,7 +628,7 @@ namespace akari::asl {
 
             std::vector<ValueRecord> args;
             std::vector<type::Type> arg_types;
-            for (int i = 0; i < call->args.size(); i++) {
+            for (uint32_t i = 0; i < call->args.size(); i++) {
                 auto arg = compile_expr(call->args[i]);
                 // auto &arg_ty = arg.type;
                 args.emplace_back(arg);
@@ -659,7 +651,7 @@ namespace akari::asl {
                 func = "glm::" + func;
             }
             Twine s(func + "(");
-            for (int i = 0; i < args.size(); i++) {
+            for (uint32_t i = 0; i < args.size(); i++) {
                 s.append(args[i].value);
                 if (i + 1 < args.size()) {
                     s.append(",");

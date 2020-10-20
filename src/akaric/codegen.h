@@ -215,6 +215,7 @@ namespace akari::asl {
         CodeGenerator();
         std::string generate(const BuildConfig &config_, const Module &module_);
         void add_typedef(const std::string &type, const std::string &def);
+        virtual ~CodeGenerator()=default;
     };
 
     std::unique_ptr<CodeGenerator> cpp_generator();

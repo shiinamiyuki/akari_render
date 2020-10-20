@@ -57,7 +57,7 @@ namespace akari::render {
         }
         Float integral() const {
             Float I = 0;
-            for (size_t i = 0; i < image.resolution().x * image.resolution().y; i++) {
+            for (int i = 0; i < image.resolution().x * image.resolution().y; i++) {
                 I += luminance(image.data()[i].rgb);
             }
             return I / (image.resolution().x * image.resolution().y);

@@ -31,7 +31,7 @@ namespace akari {
         using Base::Base;
         using value_t = Scalar;
         static constexpr size_t size = N;
-
+        Color(const Base &v) : Base(v) {}
 #define AKR_COLOR_OP(op)                                                                                               \
     Color operator op(const Color &rhs) const { return Color(Base(*this) op Base(rhs)); }                              \
     Color operator op(Scalar rhs) const { return Color(Base(*this) op Base(rhs)); }                                    \
@@ -49,7 +49,7 @@ namespace akari {
     };
     template <typename Scalar, int N>
     Color<Scalar, N> clamp_zero(const Color<Scalar, N> &in) {
-        Color c;
+        Color<Scalar, N> c;
         for (int i = 0; i < N; i++) {
             auto x = in[i];
             if (isnan(x)) {

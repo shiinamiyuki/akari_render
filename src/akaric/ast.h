@@ -54,7 +54,7 @@ namespace akari::asl::ast {
             identifier = t.tok;
             loc = t.loc;
         }
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             j["var"] = identifier;
         }
@@ -74,7 +74,7 @@ namespace akari::asl::ast {
             name = t.tok;
             loc = t.loc;
         }
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             j["typename"] = name;
             j["qualifier"] = (int)qualifier;
@@ -90,7 +90,7 @@ namespace akari::asl::ast {
       public:
         AKR_DECL_NODE(IntLiteralNode)
         int64_t val;
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             j["val"] = val;
         }
@@ -101,7 +101,7 @@ namespace akari::asl::ast {
       public:
         AKR_DECL_NODE(BoolLiteralNode)
         bool val;
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             j["val"] = val;
         }
@@ -113,7 +113,7 @@ namespace akari::asl::ast {
         AKR_DECL_NODE(FloatLiteralNode)
         double val;
         type::PrimitiveType type;
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             j["val"] = val;
         }
@@ -125,7 +125,7 @@ namespace akari::asl::ast {
         AKR_DECL_NODE(IndexNode)
         Expr expr;
         Expr idx;
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             expr->dump_json(j["expr"]);
             idx->dump_json(j["idx"]);
@@ -137,7 +137,7 @@ namespace akari::asl::ast {
         AKR_DECL_NODE(MemberAccessNode)
         Expr var;
         std::string member;
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             var->dump_json(j["var"]);
             j["member"] = member;
@@ -150,7 +150,7 @@ namespace akari::asl::ast {
         AKR_DECL_NODE(FunctionCallNode)
         Identifier func;
         std::vector<Expr> args;
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             j["args"] = json::array();
             for (auto &a : args) {
@@ -167,7 +167,7 @@ namespace akari::asl::ast {
         AKR_DECL_NODE(AsExprNode)
         TypeDecl type;
         Expr expr;
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             expr->dump_json(j["expr"]);
             type->dump_json(j["type"]);
@@ -179,7 +179,7 @@ namespace akari::asl::ast {
         AKR_DECL_NODE(ConstructorCallNode)
         Typename type;
         std::vector<Expr> args;
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             j["args"] = json::array();
             for (auto &a : args) {
@@ -200,7 +200,7 @@ namespace akari::asl::ast {
             op = t.tok;
             loc = t.loc;
         }
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             j["op"] = op;
             lhs->dump_json(j["lhs"]);
@@ -214,7 +214,7 @@ namespace akari::asl::ast {
         Expr lhs, rhs;
         AKR_DECL_NODE(ConditionalExpressionNode)
         ConditionalExpressionNode(Expr cond, Expr lhs, Expr rhs) : cond(cond), lhs(lhs), rhs(rhs) { loc = cond->loc; }
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             cond->dump_json(j["cond"]);
             lhs->dump_json(j["lhs"]);
@@ -227,7 +227,7 @@ namespace akari::asl::ast {
         std::vector<Expr> expr;
         AKR_DECL_NODE(TupleExpressionNode)
         TupleExpressionNode(std::vector<Expr> expr) : expr(expr) {}
-        void dump_json(json &j) const { ASTNode::dump_json(j); }
+        void dump_json(json &j) const override { ASTNode::dump_json(j); }
     };
     using TupleExpression = std::shared_ptr<TupleExpressionNode>;
     class AssignmentNode : public StatementNode {
@@ -239,7 +239,7 @@ namespace akari::asl::ast {
             op = t.tok;
             loc = t.loc;
         }
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             j["op"] = op;
             lhs->dump_json(j["lhs"]);
@@ -253,7 +253,7 @@ namespace akari::asl::ast {
         Expr rhs;
         AKR_DECL_NODE(DestructureNode)
         DestructureNode(TupleExpression lhs, Expr rhs) : lhs(lhs), rhs(rhs) { loc = lhs->loc; }
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             lhs->dump_json(j["lhs"]);
             rhs->dump_json(j["rhs"]);
@@ -265,7 +265,7 @@ namespace akari::asl::ast {
         FunctionCall call;
         AKR_DECL_NODE(FunctionCallStatement)
         FunctionCallStatement(FunctionCall call) : call(call) { loc = call->loc; }
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             call->dump_json(j["call"]);
         }
@@ -281,7 +281,7 @@ namespace akari::asl::ast {
             loc = t.loc;
             operand = e;
         }
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             operand->dump_json(j["operand"]);
         }
@@ -293,7 +293,7 @@ namespace akari::asl::ast {
         TypeDecl type;
         ParameterDeclNode(Identifier v, TypeDecl type) : var(v), type(type) { loc = v->loc; }
         AKR_DECL_NODE(ParameterDeclNode)
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             if (var)
                 var->dump_json(j["var"]);
@@ -308,7 +308,7 @@ namespace akari::asl::ast {
         Expr init;
         VarDeclNode(Identifier v, TypeDecl type, Expr init = nullptr) : var(v), type(type), init(init) { loc = v->loc; }
         AKR_DECL_NODE(VarDeclNode)
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             var->dump_json(j["var"]);
             type->dump_json(j["type"]);
@@ -323,7 +323,7 @@ namespace akari::asl::ast {
         AKR_DECL_NODE(VarDeclStatementNode)
         VarDecl decl;
         VarDeclStatementNode(VarDecl decl) : decl(decl) {}
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             decl->dump_json(j["decl"]);
         }
@@ -334,7 +334,7 @@ namespace akari::asl::ast {
       public:
         AKR_DECL_NODE(ExpressionStatementNode)
         Expr expr;
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             expr->dump_json(j["expr"]);
         }
@@ -346,7 +346,7 @@ namespace akari::asl::ast {
         Expr cond;
         Stmt if_true;
         Stmt if_false;
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             cond->dump_json(j["cond"]);
             if_true->dump_json(j["if_true"]);
@@ -363,7 +363,7 @@ namespace akari::asl::ast {
       public:
         AKR_DECL_NODE(SeqStatementNode)
         std::vector<Stmt> stmts;
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             j["stmts"] = json::array();
             for (auto &st : stmts) {
@@ -379,7 +379,7 @@ namespace akari::asl::ast {
         AKR_DECL_NODE(SwitchStatementNode)
         Expr cond;
         std::vector<std::pair<std::vector<Label>, SeqStmt>> cases;
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             cond->dump_json(j["cond"]);
         }
@@ -390,7 +390,7 @@ namespace akari::asl::ast {
         AKR_DECL_NODE(WhileStatementNode)
         Expr cond;
         Stmt body;
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             cond->dump_json(j["cond"]);
             body->dump_json(j["body"]);
@@ -415,7 +415,7 @@ namespace akari::asl::ast {
         Expr cond;
         Stmt step;
         Stmt body;
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             init->dump_json(j["init"]);
             cond->dump_json(j["cond"]);
@@ -429,7 +429,7 @@ namespace akari::asl::ast {
       public:
         Expr expr;
         AKR_DECL_NODE(ReturnNode)
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             expr->dump_json(j["expr"]);
         }
@@ -451,7 +451,7 @@ namespace akari::asl::ast {
         bool is_intrinsic = false;
         bool is_method = false;
         AKR_DECL_NODE(VarDeclNode)
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             type->dump_json(j["type"]);
             name->dump_json(j["name"]);
@@ -473,7 +473,7 @@ namespace akari::asl::ast {
         Typename struct_name;
         std::vector<VarDecl> fields;
         AKR_DECL_NODE(StructDeclNode)
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             struct_name->dump_json(j["name"]);
             j["fields"] = json::array();
@@ -491,7 +491,7 @@ namespace akari::asl::ast {
         TypeDecl element_type;
         Expr length;
 
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             element_type->dump_json(j["inner"]);
             if (length)
@@ -505,7 +505,7 @@ namespace akari::asl::ast {
         int binding = -1;
         BufferObjectNode(VarDecl var) : var(var) { loc = var->loc; }
         VarDecl var;
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             var->dump_json(j["var"]);
         }
@@ -517,7 +517,7 @@ namespace akari::asl::ast {
         int binding = -1;
         UniformVarNode(VarDecl var) : var(var) { loc = var->loc; }
         VarDecl var;
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             var->dump_json(j["var"]);
         }
@@ -529,7 +529,7 @@ namespace akari::asl::ast {
         int binding = -1;
         ConstVarNode(VarDecl var) : var(var) { loc = var->loc; }
         VarDecl var;
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             var->dump_json(j["var"]);
         }
@@ -549,7 +549,7 @@ namespace akari::asl::ast {
         std::vector<ConstVar> consts;
         std::vector<AST> defs;
         std::unordered_set<std::string> typenames;
-        void dump_json(json &j) const {
+        void dump_json(json &j) const override {
             ASTNode::dump_json(j);
             j["structs"] = json::array();
             for (auto &s : structs) {

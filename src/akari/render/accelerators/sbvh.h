@@ -151,7 +151,7 @@ namespace akari::render {
                         return std::nullopt;
                     }
                     struct Bucket {
-                        int count = 0;
+                        size_t count = 0;
                         Bounds3f bound;
 
                         Bucket() = default;
@@ -169,7 +169,7 @@ namespace akari::render {
                     for (uint32_t i = 0; i < nBuckets - 1; i++) {
                         Bounds3f b0;
                         Bounds3f b1;
-                        int count0 = 0, count1 = 0;
+                        size_t count0 = 0, count1 = 0;
                         for (uint32_t j = 0; j <= i; j++) {
                             b0 = b0.merge(buckets[j].bound);
                             count0 += buckets[j].count;
@@ -192,7 +192,7 @@ namespace akari::render {
                     int splitBuckets = 0;
                     double minCost = cost[0];
                     bool cannot_split = false;
-                    for (int i = 0; i < nBuckets; i++) {
+                    for (uint32_t i = 0; i < nBuckets; i++) {
                         cannot_split = cannot_split || buckets[i].count == refs.size();
                     }
                     for (uint32_t i = 1; i < nBuckets - 1; i++) {
@@ -222,10 +222,10 @@ namespace akari::render {
                     if (size[axis] <= 0.0 || box.surface_area() == 0.0)
                         return std::nullopt;
                     struct Bucket {
-                        int count = 0;
+                        size_t count = 0;
                         Bounds3f bound;
-                        int enter = 0;
-                        int exit = 0;
+                        size_t enter = 0;
+                        size_t exit = 0;
                         Bucket() = default;
                     };
                     Bucket bins[nBuckets] = {};
@@ -256,7 +256,7 @@ namespace akari::render {
                     for (uint32_t i = 0; i < nBuckets - 1; i++) {
                         Bounds3f b0;
                         Bounds3f b1;
-                        int count0 = 0, count1 = 0;
+                        size_t count0 = 0, count1 = 0;
                         for (uint32_t j = 0; j <= i; j++) {
                             b0 = b0.merge(bins[j].bound);
                             count0 += bins[j].enter;
@@ -487,10 +487,9 @@ namespace akari::render {
             auto invd = Vec3(1) / ray.d;
             constexpr size_t maxDepth = StackDepth;
             const BVHNode *stack[maxDepth];
-            int sp = 0;
+            uint32_t sp = 0;
             const BVHNode *p = &nodes[0];
             while (p) {
-                AKR_ASSERT(sp < maxDepth);
                 BVHNode node = *p;
                 auto t = intersectAABB(node.box, ray, invd);
 

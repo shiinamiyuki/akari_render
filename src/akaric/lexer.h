@@ -22,6 +22,7 @@
 
 #pragma once
 #include <akaric/type.h>
+#include <list>
 namespace akari::asl {
     struct SourceLocation {
         std::string filename;

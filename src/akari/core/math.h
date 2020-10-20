@@ -165,9 +165,9 @@ namespace akari {
         Frame() = default;
         static inline void compute_local_frame(const vec3 &v1, vec3 *v2, vec3 *v3) {
             if (std::abs(v1.x) > std::abs(v1.y))
-                *v2 = vec3(-v1.z, (0), v1.x) / sqrt(v1.x * v1.x + v1.z * v1.z);
+                *v2 = vec3(-v1.z, (0), v1.x) / glm::sqrt(v1.x * v1.x + v1.z * v1.z);
             else
-                *v2 = vec3((0), v1.z, -v1.y) / sqrt(v1.y * v1.y + v1.z * v1.z);
+                *v2 = vec3((0), v1.z, -v1.y) / glm::sqrt(v1.y * v1.y + v1.z * v1.z);
             *v3 = normalize(cross(vec3(v1), *v2));
         }
         explicit Frame(const vec3 &v) : normal(v) { compute_local_frame(v, &T, &B); }
@@ -229,19 +229,19 @@ namespace akari {
 
     template <typename T, int N>
     struct BoundingBox {
-        using Vector = Vector<T, N>;
-        Vector pmin, pmax;
+        using V = Vector<T, N>;
+        V pmin, pmax;
         BoundingBox() { reset(); }
-        BoundingBox(const Vector &pmin, const Vector &pmax) : pmin(pmin), pmax(pmax) {}
+        BoundingBox(const V &pmin, const V &pmax) : pmin(pmin), pmax(pmax) {}
         void reset() {
-            pmin = Vector(Inf);
-            pmax = Vector(-Inf);
+            pmin =V(std::numeric_limits<T>::infinity());
+            pmax =V(-std::numeric_limits<T>::infinity());
         }
-        Vector extents() const { return pmax - pmin; }
-        bool contains(const Vector &p) const { return all(p >= pmin && p <= pmax); }
-        Vector size() const { return extents(); }
-        Vector offset(const Vector &p) { return (p - pmin) / extents(); }
-        BoundingBox expand(const Vector &p) const { return BoundingBox(min(pmin, p), max(pmax, p)); }
+        V extents() const { return pmax - pmin; }
+        bool contains(const V &p) const { return all(p >= pmin && p <= pmax); }
+        V size() const { return extents(); }
+        V offset(const V &p) { return (p - pmin) / extents(); }
+        BoundingBox expand(const V &p) const { return BoundingBox(min(pmin, p), max(pmax, p)); }
         BoundingBox merge(const BoundingBox &b1) const { return merge(*this, b1); }
         static BoundingBox merge(const BoundingBox &b1, const BoundingBox &b2) {
             return BoundingBox(min(b1.pmin, b2.pmin), max(b1.pmax, b2.pmax));
@@ -250,7 +250,7 @@ namespace akari {
             return BoundingBox(max(pmin, rhs.pmin), min(pmax, rhs.pmax));
         }
         bool empty() const { return any(glm::greaterThan(pmin, pmax)) || hsum(extents()) == 0; }
-        Vector centroid() const { return extents() * 0.5f + pmin; }
+        V centroid() const { return extents() * 0.5f + pmin; }
         Float surface_area() const {
             if (empty())
                 return Float(0.0);
