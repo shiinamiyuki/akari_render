@@ -79,7 +79,7 @@ namespace akari::render {
         }
     };
 
-    template <typename Derived>
+    // Basic Path Tracing
     class GenericPathTracer {
       public:
         const Scene *scene = nullptr;
@@ -95,8 +95,6 @@ namespace akari::render {
             pdf_B *= pdf_B;
             return pdf_A / (pdf_A + pdf_B);
         }
-        Derived &derived() noexcept { return static_cast<Derived &>(*this); }
-        const Derived &derived() const noexcept { return static_cast<const Derived &>(*this); }
         CameraSample camera_ray(const Camera *camera, const ivec2 &p) noexcept {
             CameraSample sample = camera->generate_ray(sampler->next2d(), sampler->next2d(), p);
             return sample;
@@ -119,7 +117,7 @@ namespace akari::render {
                 auto f = light_sample.I * si.bsdf->evaluate(surface_hit.wo, light_sample.wi) *
                          std::abs(dot(si.ns, light_sample.wi));
                 Float bsdf_pdf = si.bsdf->evaluate_pdf(surface_hit.wo, light_sample.wi);
-                lighting.color = beta * f / light_pdf * mis_weight(light_pdf, bsdf_pdf);
+                lighting.color = f / light_pdf * mis_weight(light_pdf, bsdf_pdf);
                 lighting.shadow_ray = light_sample.shadow_ray;
                 lighting.pdf = light_pdf;
                 return lighting;
@@ -128,8 +126,11 @@ namespace akari::render {
             }
         }
 
-        void on_miss(const Ray &ray) noexcept { derived()._on_miss(ray); }
+        void on_miss(const Ray &ray) noexcept {}
 
+        void accumulate_radiance(const Spectrum &r) { L += r; }
+
+        void accumulate_beta(const Spectrum &k) { beta *= k; }
         // @param mat_pdf: supplied if material is already chosen
         std::optional<SurfaceVertex> on_surface_scatter(SurfaceInteraction &si, const SurfaceHit &surface_hit,
                                                         const std::optional<PathVertex> &prev_vertex) noexcept {
@@ -143,7 +144,7 @@ namespace akari::render {
                 if (emission->double_sided || face_front) {
                     Spectrum I = beta * emission->color->evaluate(ctx.texcoords);
                     if (depth == 0) {
-                        L += I;
+                        accumulate_radiance(I);
                     } else {
                         vec3 prev_p = prev_vertex->p();
                         auto light = scene->get_light(surface_hit.geom_id, surface_hit.prim_id);
@@ -151,9 +152,8 @@ namespace akari::render {
                         ref.ng = prev_vertex->ng();
                         ref.p = prev_vertex->p();
                         auto light_pdf = light->pdf_incidence(ref, -wo) * scene->pdf_light(light);
-                        // printf("%f %f\n", prev_vertex->pdf(), light_pdf);
                         Float weight_bsdf = mis_weight(prev_vertex->pdf(), light_pdf);
-                        L += weight_bsdf * I;
+                        accumulate_radiance(weight_bsdf * I);
                     }
                     return std::nullopt;
                 }
@@ -199,10 +199,10 @@ namespace akari::render {
                 if (has_direct) {
                     auto &direct = *has_direct;
                     if (!is_black(direct.color) && !scene->occlude(direct.shadow_ray)) {
-                        L += direct.color;
+                        accumulate_radiance(beta * direct.color);
                     }
                 }
-                beta *= vertex->beta;
+                accumulate_beta(vertex->beta);
                 depth++;
                 ray = vertex->ray;
                 prev_vertex = PathVertex(*vertex);

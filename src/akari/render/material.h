@@ -39,7 +39,7 @@ namespace akari::render {
         BSDF_TRANSMISSION = 1u << 1u,
         BSDF_DIFFUSE = 1u << 2u,
         BSDF_GLOSSY = 1u << 3u,
-        // BSDF_SPECULAR = 1u << 4u,
+        BSDF_SPECULAR = 1u << 4u,
         BSDF_ALL = BSDF_DIFFUSE | BSDF_GLOSSY | BSDF_REFLECTION | BSDF_TRANSMISSION,
     };
     struct BSDFSample {

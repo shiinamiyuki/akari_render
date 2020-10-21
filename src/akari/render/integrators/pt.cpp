@@ -32,10 +32,7 @@
 #include <akari/render/pathtracer.h>
 
 namespace akari::render {
-    class PathTracer : public GenericPathTracer<PathTracer> {
-      public:
-        void _on_miss(const Ray &ray) noexcept {}
-    };
+
     class PathTracerIntegrator : public Integrator {
         int spp;
         int max_depth;
@@ -64,7 +61,7 @@ namespace akari::render {
                         sampler->set_sample_index(x + y * film->resolution().x);
                         for (int s = 0; s < spp; s++) {
                             sampler->start_next_sample();
-                            PathTracer pt;
+                            GenericPathTracer pt;
                             pt.scene = scene;
                             pt.allocator = &allocator;
                             pt.sampler = sampler;

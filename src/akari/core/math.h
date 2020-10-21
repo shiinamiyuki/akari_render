@@ -70,6 +70,8 @@ namespace akari {
     static constexpr Float Pi2 = Pi / Float(2.0f);
     static constexpr Float Pi4 = Pi / Float(4.0f);
     static constexpr Float InvPi = Float(1.0f) / Pi;
+    static constexpr Float Inv2Pi = Float(1.0) / Pi2;
+    static constexpr Float Inv4Pi = Float(1.0) / Pi4;
     static constexpr Float Eps = Float(0.001f);
     static constexpr Float ShadowEps = Float(0.0001f);
 

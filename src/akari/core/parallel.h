@@ -30,6 +30,7 @@
 #include <future>
 
 namespace akari {
+    
     class AtomicFloat {
         std::atomic<float> val;
 
