@@ -19,4 +19,5 @@
 #    pragma clang diagnostic ignored "-Wattributes"
 #    pragma GCC diagnostic ignored "-Wunused-local-typedefs"
 #    pragma clang diagnostic ignored "-Wunused-local-typedef"
+#    pragma clang diagnostic ignored "-Wparentheses-equality"
 #endif

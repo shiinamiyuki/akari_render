@@ -54,17 +54,17 @@ namespace akari::render {
         Vec3 p() const { return triangle.p(surface_hit.uv); }
         Vec3 ng() const { return triangle.ng(); }
     };
-
-    struct PathVertex : std::variant<SurfaceVertex> {
-        using std::variant<SurfaceVertex>::variant;
+    using _PathVertex = std::variant<SurfaceVertex>;
+    struct PathVertex : _PathVertex {
+        using _PathVertex::_PathVertex;
         Vec3 p() const {
-            return std::visit([](auto &&arg) { return arg.p(); }, *this);
+            return std::visit([](auto &&arg) { return arg.p(); }, static_cast<const _PathVertex &>(*this));
         }
         Vec3 ng() const {
-            return std::visit([](auto &&arg) { return arg.ng(); }, *this);
+            return std::visit([](auto &&arg) { return arg.ng(); }, static_cast<const _PathVertex &>(*this));
         }
         Float pdf() const {
-            return std::visit([](auto &&arg) { return arg.pdf; }, *this);
+            return std::visit([](auto &&arg) { return arg.pdf; }, static_cast<const _PathVertex &>(*this));
         }
         const Light *light(const Scene *scene) const {
             return std::visit(
@@ -75,7 +75,7 @@ namespace akari::render {
                     }
                     return nullptr;
                 },
-                *this);
+                static_cast<const _PathVertex &>(*this));
         }
     };
 
