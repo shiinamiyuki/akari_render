@@ -29,30 +29,36 @@
 #include <akari/core/memory.h>
 #include <akari/render/shape.h>
 #include <akari/render/texture.h>
+#include <akari/render/endpoint.h>
 #include <optional>
 
 namespace akari::render {
+
+    struct LightSampleContext {
+        vec2 u;
+        Vec3 p;
+    };
     struct LightSample {
         Vec3 ng = Vec3(0.0f);
         Vec3 wi; // w.r.t to the luminated surface; normalized
         Float pdf = 0.0f;
-        Spectrum L;
+        Spectrum I;
         Ray shadow_ray;
     };
-    struct LightSampleContext {
-
-        vec2 u;
-        Vec3 p;
+    struct LightRaySample {
+        Ray ray;
+        Spectrum E;
+        vec3 ng;
+        vec2 uv; // 2D parameterized position
+        Float pdfPos = 0.0, pdfDir = 0.0;
     };
-
     struct DirectLighting {
         Ray shadow_ray;
         Spectrum color;
         Float pdf;
     };
-    class Light {
+    class Light : public EndPoint<LightSample, LightRaySample, LightSampleContext> {
       public:
-        virtual LightSample sample(const LightSampleContext &ctx) const = 0;
     };
     class AreaLight final : public Light {
       public:
@@ -64,7 +70,16 @@ namespace akari::render {
             color = triangle.material->as_emissive()->color;
             double_sided = triangle.material->as_emissive()->double_sided;
         }
-        LightSample sample(const LightSampleContext &ctx) const override {
+        Float pdf_incidence(const ReferencePoint &ref, const vec3 &wi) const override {
+            Ray ray(ref.p, wi);
+            auto hit = triangle.intersect(ray);
+            if (!hit) {
+                return 0.0f;
+            }
+            Float SA = triangle.area() * (-glm::dot(wi, triangle.ng())) / (hit->first * hit->first);
+            return 1.0f / SA;
+        }
+        LightSample sample_incidence(const LightSampleContext &ctx) const override {
             auto coords = shader::uniform_sample_triangle(ctx.u);
             auto p = triangle.p(coords);
             LightSample sample;
@@ -72,10 +87,10 @@ namespace akari::render {
             sample.wi = p - ctx.p;
             auto dist_sqr = dot(sample.wi, sample.wi);
             sample.wi /= sqrt(dist_sqr);
-            sample.L = color->evaluate(triangle.texcoord(coords));
+            sample.I = color->evaluate(triangle.texcoord(coords));
             sample.pdf = dist_sqr / max(Float(0.0), -dot(sample.wi, sample.ng)) / triangle.area();
             sample.shadow_ray = Ray(p, -sample.wi, Eps / std::abs(dot(sample.wi, sample.ng)),
-                                      sqrt(dist_sqr) * (Float(1.0f) - ShadowEps));
+                                    sqrt(dist_sqr) * (Float(1.0f) - ShadowEps));
             return sample;
         }
     };

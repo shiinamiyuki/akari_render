@@ -39,6 +39,8 @@ namespace akari::render {
     }
     Scene SceneNode::create_scene(Allocator<> *allocator) {
         lights.clear();
+        light_id_map.clear();
+        light_pdf_map.clear();
         Scene scene;
         scene.camera = camera->create_camera(allocator);
         for (auto &shape : shapes) {
@@ -63,7 +65,9 @@ namespace akari::render {
                         ft_integrals.emplace(color, std::async(std::launch::async, [=] { return color->integral(); }));
                     }
                     (void)e;
-                    area_lights.emplace_back(allocator->new_object<AreaLight>(triangle));
+                    auto light = allocator->new_object<AreaLight>(triangle);
+                    area_lights.emplace_back(light);
+                    light_id_map.emplace(std::make_pair(mesh_id, prim_id), light);
                 }
             }
         }
@@ -87,8 +91,14 @@ namespace akari::render {
             lights.emplace_back(i);
         }
         light_distribution = std::make_unique<Distribution1D>(power.data(), power.size());
+        AKR_ASSERT(lights.size() == power.size());
+        for (size_t i = 0; i < lights.size(); i++) {
+            light_pdf_map[lights[i]] = light_distribution->pdf_discrete(i);
+        }
         scene.light_distribution = light_distribution.get();
         scene.lights = BufferView(lights.data(), lights.size());
+        scene.light_id_map = &light_id_map;
+        scene.light_pdf_map = &light_pdf_map;
         return scene;
     }
     void SceneNode::render() {

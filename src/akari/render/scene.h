@@ -33,6 +33,15 @@ namespace akari::render {
     class Camera;
     class Light;
     class Sampler;
+    template <typename T1, typename T2>
+    struct PairHash {
+        size_t operator()(const std::pair<T1, T2> &pair) const {
+            return std::hash<T1>()(pair.first) ^ std::hash<T2>()(pair.second);
+        }
+    };
+
+    using LightIdMap = std::unordered_map<std::pair<int32_t, int32_t>, const Light *, PairHash<uint32_t, uint32_t>>;
+    using LightPdfMap = std::unordered_map<const Light *, Float>;
     class Scene {
       public:
         BufferView<MeshInstance> meshes;
@@ -41,6 +50,8 @@ namespace akari::render {
         const Accelerator *accel = nullptr;
         const Camera *camera = nullptr;
         const Sampler *sampler = nullptr;
+        const LightIdMap *light_id_map = nullptr;
+        const LightPdfMap *light_pdf_map = nullptr;
         std::optional<Intersection> intersect(const Ray &ray) const { return accel->intersect(ray); }
         bool occlude(const Ray &ray) const { return accel->occlude(ray); }
         Triangle get_triangle(int mesh_id, int prim_id) const {
@@ -63,6 +74,21 @@ namespace akari::render {
             }
             return {lights[idx], pdf};
         }
+        Float pdf_light(const Light *light) const {
+            auto it = light_pdf_map->find(light);
+            if (it != light_pdf_map->end()) {
+                return it->second;
+            }
+            return 0.0;
+        }
+        const Light *get_light(int mesh_id, int prim_id) const {
+            auto pair = std::make_pair(mesh_id, prim_id);
+            auto it = light_id_map->find(pair);
+            if (it == light_id_map->end()) {
+                return nullptr;
+            }
+            return it->second;
+        }
     };
 
     class AKR_EXPORT SceneNode : public SceneGraphNode {
@@ -75,6 +101,8 @@ namespace akari::render {
         std::shared_ptr<AcceleratorNode> accel;
         std::shared_ptr<IntegratorNode> integrator;
         std::vector<const Light *> lights;
+        LightPdfMap light_pdf_map;
+        LightIdMap light_id_map;
         Scene create_scene(Allocator<> *);
 
       public:

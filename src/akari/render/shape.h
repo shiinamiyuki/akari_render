@@ -36,6 +36,34 @@ namespace akari::render {
         Vec3 ng() const { return normalize(cross(vertices[1] - vertices[0], vertices[2] - vertices[0])); }
         Vec3 ns(const vec2 &uv) const { return lerp3(normals[0], normals[1], normals[2], uv); }
         vec2 texcoord(const vec2 &uv) const { return lerp3(texcoords[0], texcoords[1], texcoords[2], uv); }
+
+        std::optional<std::pair<Float, Vec2>> intersect(const Ray &ray) const {
+            auto &v0 = vertices[0];
+            auto &v1 = vertices[1];
+            auto &v2 = vertices[2];
+            Vec3 e1 = (v1 - v0);
+            Vec3 e2 = (v2 - v0);
+            Float a, f, u, v;
+            auto h = cross(ray.d, e2);
+            a = dot(e1, h);
+            if (a > Float(-1e-6f) && a < Float(1e-6f))
+                return std::nullopt;
+            f = 1.0f / a;
+            auto s = ray.o - v0;
+            u = f * dot(s, h);
+            if (u < 0.0 || u > 1.0)
+                return std::nullopt;
+            auto q = cross(s, e1);
+            v = f * dot(ray.d, q);
+            if (v < 0.0 || u + v > 1.0)
+                return std::nullopt;
+            Float t = f * dot(e2, q);
+            if (t > ray.tmin && t < ray.tmax) {
+                return std::make_pair(t, Vec2(u, v));
+            } else {
+                return std::nullopt;
+            }
+        }
     };
     class ShapeNode : public SceneGraphNode {
       public:

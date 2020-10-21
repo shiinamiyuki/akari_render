@@ -26,7 +26,7 @@
 #include <akari/render/scene.h>
 namespace akari::render {
     class BSDF;
-    struct Intersection;
+   
     struct SurfaceInteraction {
         Triangle triangle;
         Vec3 p;

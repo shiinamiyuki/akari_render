@@ -20,7 +20,7 @@
 // OUT OF OR IN CON
 
 #pragma once
-
+#include <variant>
 #include <akari/render/scene.h>
 #include <akari/render/camera.h>
 #include <akari/render/integrator.h>
@@ -41,10 +41,42 @@ namespace akari::render {
             : uv(isct.uv), wo(-ray.d), geom_id(isct.geom_id), prim_id(isct.prim_id) {}
     };
 
-    struct ScatteringEvent {
+    struct SurfaceVertex {
+        Triangle triangle;
+        SurfaceHit surface_hit;
         Ray ray;
         Spectrum beta;
-        Float pdf;
+        BSDF *bsdf = nullptr;
+        Float pdf = 0.0;
+        SurfaceVertex() = default;
+        SurfaceVertex(const Triangle &triangle, const SurfaceHit &surface_hit)
+            : triangle(triangle), surface_hit(surface_hit) {}
+        Vec3 p() const { return triangle.p(surface_hit.uv); }
+        Vec3 ng() const { return triangle.ng(); }
+    };
+
+    struct PathVertex : std::variant<SurfaceVertex> {
+        using std::variant<SurfaceVertex>::variant;
+        Vec3 p() const {
+            return std::visit([](auto &&arg) { return arg.p(); }, *this);
+        }
+        Vec3 ng() const {
+            return std::visit([](auto &&arg) { return arg.ng(); }, *this);
+        }
+        Float pdf() const {
+            return std::visit([](auto &&arg) { return arg.pdf; }, *this);
+        }
+        const Light *light(const Scene *scene) const {
+            return std::visit(
+                [=](auto &&arg) -> const Light * {
+                    using T = std::decay_t<decltype(arg)>;
+                    if constexpr (std::is_same_v<T, SurfaceVertex>) {
+                        return scene->get_light(arg.surface_hit.geom_id, arg.surface_hit.prim_id);
+                    }
+                    return nullptr;
+                },
+                *this);
+        }
     };
 
     template <typename Derived>
@@ -57,6 +89,12 @@ namespace akari::render {
         Allocator<> *allocator = nullptr;
         int depth = 0;
         int max_depth = 5;
+
+        static Float mis_weight(Float pdf_A, Float pdf_B) {
+            pdf_A *= pdf_A;
+            pdf_B *= pdf_B;
+            return pdf_A / (pdf_A + pdf_B);
+        }
         Derived &derived() noexcept { return static_cast<Derived &>(*this); }
         const Derived &derived() const noexcept { return static_cast<const Derived &>(*this); }
         CameraSample camera_ray(const Camera *camera, const ivec2 &p) noexcept {
@@ -74,13 +112,14 @@ namespace akari::render {
                 LightSampleContext light_ctx;
                 light_ctx.u = sampler->next2d();
                 light_ctx.p = si.p;
-                LightSample light_sample = light->sample(light_ctx);
+                LightSample light_sample = light->sample_incidence(light_ctx);
                 if (light_sample.pdf <= 0.0)
                     return std::nullopt;
                 light_pdf *= light_sample.pdf;
-                auto f = light_sample.L * si.bsdf->evaluate(surface_hit.wo, light_sample.wi) *
+                auto f = light_sample.I * si.bsdf->evaluate(surface_hit.wo, light_sample.wi) *
                          std::abs(dot(si.ns, light_sample.wi));
-                lighting.color = beta * f / light_pdf;
+                Float bsdf_pdf = si.bsdf->evaluate_pdf(surface_hit.wo, light_sample.wi);
+                lighting.color = beta * f / light_pdf * mis_weight(light_pdf, bsdf_pdf);
                 lighting.shadow_ray = light_sample.shadow_ray;
                 lighting.pdf = light_pdf;
                 return lighting;
@@ -92,23 +131,35 @@ namespace akari::render {
         void on_miss(const Ray &ray) noexcept { derived()._on_miss(ray); }
 
         // @param mat_pdf: supplied if material is already chosen
-        std::optional<ScatteringEvent> on_surface_scatter(SurfaceInteraction &si,
-                                                          const SurfaceHit &surface_hit) noexcept {
+        std::optional<SurfaceVertex> on_surface_scatter(SurfaceInteraction &si, const SurfaceHit &surface_hit,
+                                                        const std::optional<PathVertex> &prev_vertex) noexcept {
             auto *material = surface_hit.material;
             auto wo = surface_hit.wo;
             MaterialEvalContext ctx(allocator, sampler, si);
             if (material->is_emissive()) {
 
-                if (depth == 0) {
-                    auto *emission = material->as_emissive();
-                    bool face_front = dot(-wo, si.ng) < 0.0f;
-                    if (emission->double_sided || face_front) {
-                        L += beta * emission->color->evaluate(ctx.texcoords);
-                        return std::nullopt;
+                auto *emission = material->as_emissive();
+                bool face_front = dot(wo, si.ng) > 0.0f;
+                if (emission->double_sided || face_front) {
+                    Spectrum I = beta * emission->color->evaluate(ctx.texcoords);
+                    if (depth == 0) {
+                        L += I;
+                    } else {
+                        vec3 prev_p = prev_vertex->p();
+                        auto light = scene->get_light(surface_hit.geom_id, surface_hit.prim_id);
+                        ReferencePoint ref;
+                        ref.ng = prev_vertex->ng();
+                        ref.p = prev_vertex->p();
+                        auto light_pdf = light->pdf_incidence(ref, -wo) * scene->pdf_light(light);
+                        // printf("%f %f\n", prev_vertex->pdf(), light_pdf);
+                        Float weight_bsdf = mis_weight(prev_vertex->pdf(), light_pdf);
+                        L += weight_bsdf * I;
                     }
+                    return std::nullopt;
                 }
+
             } else if (depth < max_depth) {
-                ScatteringEvent event;
+                SurfaceVertex vertex(si.triangle, surface_hit);
                 si.bsdf = allocator->new_object<BSDF>(material->get_bsdf(ctx));
 
                 BSDFSampleContext sample_ctx(sampler->next2d(), wo);
@@ -117,16 +168,18 @@ namespace akari::render {
                 if (sample.pdf == 0.0f) {
                     return std::nullopt;
                 }
-                event.ray = Ray(si.p, sample.wi, Eps / std::abs(glm::dot(si.ng, sample.wi)));
-                event.beta = sample.f * std::abs(glm::dot(si.ng, sample.wi)) / sample.pdf;
-                event.pdf = sample.pdf;
-                return event;
+                vertex.bsdf = si.bsdf;
+                vertex.ray = Ray(si.p, sample.wi, Eps / std::abs(glm::dot(si.ng, sample.wi)));
+                vertex.beta = sample.f * std::abs(glm::dot(si.ng, sample.wi)) / sample.pdf;
+                vertex.pdf = sample.pdf;
+                return vertex;
             }
             return std::nullopt;
         }
         void run_megakernel(const Camera *camera, const ivec2 &p) noexcept {
             auto camera_sample = camera_ray(camera, p);
             Ray ray = camera_sample.ray;
+            std::optional<PathVertex> prev_vertex;
             while (true) {
                 auto hit = scene->intersect(ray);
                 if (!hit) {
@@ -138,8 +191,8 @@ namespace akari::render {
                 surface_hit.material = trig.material;
                 SurfaceInteraction si(surface_hit.uv, trig);
 
-                auto has_event = on_surface_scatter(si, surface_hit);
-                if (!has_event) {
+                auto vertex = on_surface_scatter(si, surface_hit, prev_vertex);
+                if (!vertex) {
                     break;
                 }
                 std::optional<DirectLighting> has_direct = compute_direct_lighting(si, surface_hit, select_light());
@@ -149,10 +202,10 @@ namespace akari::render {
                         L += direct.color;
                     }
                 }
-                auto event = *has_event;
-                beta *= event.beta;
+                beta *= vertex->beta;
                 depth++;
-                ray = event.ray;
+                ray = vertex->ray;
+                prev_vertex = PathVertex(*vertex);
             }
         }
     };
