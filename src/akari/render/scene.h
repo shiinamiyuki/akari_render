@@ -40,9 +40,9 @@ namespace akari::render {
         const Distribution1D *light_distribution = nullptr;
         const Accelerator *accel = nullptr;
         const Camera *camera = nullptr;
-        const Sampler * sampler = nullptr;
+        const Sampler *sampler = nullptr;
         std::optional<Intersection> intersect(const Ray &ray) const { return accel->intersect(ray); }
-        bool occlude(const Ray &ray) const;
+        bool occlude(const Ray &ray) const { return accel->occlude(ray); }
         Triangle get_triangle(int mesh_id, int prim_id) const {
             auto &mesh = meshes[mesh_id];
             Triangle trig = akari::render::get_triangle(mesh, prim_id);
@@ -51,6 +51,17 @@ namespace akari::render {
                 trig.material = mesh.materials[mat_idx];
             }
             return trig;
+        }
+        std::pair<const Light *, Float> select_light(const vec2 &u) const {
+            if (lights.size() == 0) {
+                return {nullptr, Float(0.0f)};
+            }
+            Float pdf;
+            size_t idx = light_distribution->sample_discrete(u[0], &pdf);
+            if (idx == lights.size()) {
+                idx -= 1;
+            }
+            return {lights[idx], pdf};
         }
     };
 
@@ -69,7 +80,7 @@ namespace akari::render {
       public:
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override;
-        void commit()override;
+        void commit() override;
         void render();
     };
 } // namespace akari::render

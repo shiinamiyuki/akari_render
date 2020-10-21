@@ -117,8 +117,8 @@ namespace akari {
     T hmax(const Vector<T, N> &vec) {
         return reduce(vec, [](T acc, T cur) -> T { return max(acc, cur); });
     }
-    template <typename T, int N, class F>
-    auto foldl(const Vector<T, N> &vec, T init, F &&f) {
+    template <typename T, int N, typename R, class F>
+    R foldl(const Vector<T, N> &vec, R init, F &&f) {
         auto acc = f(init, vec[0]);
         for (int i = 1; i < N; i++) {
             acc = f(acc, vec[i]);

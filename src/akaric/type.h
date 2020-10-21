@@ -90,6 +90,10 @@ namespace akari::asl::type {
         QualifiedTypeNode(Type e, Qualifier qualifier = Qualifier::none) : element_type(e), qualifier(qualifier) {}
         Type element_type;
         Qualifier qualifier;
+        bool is_float() const override { return element_type->is_float(); }
+        bool is_int() const override { return element_type->is_int(); }
+        bool is_signed_int() const override { return element_type->is_signed_int(); }
+        bool is_aggregate() const override { return element_type->is_aggregate(); }
     };
     using QualifiedType = std::shared_ptr<QualifiedTypeNode>;
     class VectorTypeNode : public TypeNode {

@@ -24,11 +24,52 @@
 
 namespace akari::asl {
     namespace type {
-        PrimitiveType boolean = std::make_shared<PrimitiveTypeNode>();
-        PrimitiveType int32 = std::make_shared<PrimitiveTypeNode>();
-        PrimitiveType uint32 = std::make_shared<PrimitiveTypeNode>();
-        PrimitiveType float32 = std::make_shared<PrimitiveTypeNode>();
-        PrimitiveType float64 = std::make_shared<PrimitiveTypeNode>();
+        class PrimitiveTypeFloat64 : public PrimitiveTypeNode {
+          public:
+            AKR_DECL_TYPENODE(PrimitiveTypeFloat64)
+            bool is_float() const override { return true; }
+            bool is_int() const override { return false; }
+            bool is_signed_int() const override { return false; }
+            bool is_aggregate() const override { return false; }
+        };
+        class PrimitiveTypeFloat32 : public PrimitiveTypeFloat64 {
+          public:
+            AKR_DECL_TYPENODE(PrimitiveTypeFloat32)
+            bool is_float() const override { return true; }
+            bool is_int() const override { return false; }
+            bool is_signed_int() const override { return false; }
+            bool is_aggregate() const override { return false; }
+        };
+
+        class PrimitiveTypeInt32 : public PrimitiveTypeNode {
+          public:
+            AKR_DECL_TYPENODE(PrimitiveTypeInt32)
+            bool is_float() const override { return false; }
+            bool is_int() const override { return true; }
+            bool is_signed_int() const override { return true; }
+            bool is_aggregate() const override { return false; }
+        };
+        class PrimitiveTypeUint32 : public PrimitiveTypeNode {
+          public:
+            AKR_DECL_TYPENODE(PrimitiveTypeUint32)
+            bool is_float() const override { return false; }
+            bool is_int() const override { return true; }
+            bool is_signed_int() const override { return false; }
+            bool is_aggregate() const override { return false; }
+        };
+        class PrimitiveTypeBoolean : public PrimitiveTypeUint32 {
+          public:
+            AKR_DECL_TYPENODE(PrimitiveTypeBoolean)
+            bool is_float() const override { return false; }
+            bool is_int() const override { return true; }
+            bool is_signed_int() const override { return false; }
+            bool is_aggregate() const override { return false; }
+        };
+        PrimitiveType boolean = std::make_shared<PrimitiveTypeBoolean>();
+        PrimitiveType int32 = std::make_shared<PrimitiveTypeInt32>();
+        PrimitiveType uint32 = std::make_shared<PrimitiveTypeUint32>();
+        PrimitiveType float32 = std::make_shared<PrimitiveTypeFloat32>();
+        PrimitiveType float64 = std::make_shared<PrimitiveTypeFloat64>();
         VoidType void_ = std::make_shared<VoidTypeNode>();
     } // namespace type
 } // namespace akari::asl

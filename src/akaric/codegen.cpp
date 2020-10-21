@@ -760,9 +760,9 @@ namespace akari::asl {
         }
         void compile_while(CodeBlock &block, const ast::WhileStmt &st) {
             auto cond = compile_expr(st->cond);
-            if (cond.type() != type::boolean) {
+            if (type::remove_qualifier(cond.type()) != type::boolean) {
                 error(st->cond->loc,
-                      fmt::format("while cond must be boolean expression but have {}", gen_type(cond.type())));
+                      fmt::format("while cond must be boolean expression but have {}", pretty_print(cond.type())));
             }
             block.wl("while({})", cond.value.str());
             auto_indent(block, st->body, [&] {
@@ -821,7 +821,7 @@ namespace akari::asl {
             auto cond = compile_expr(st->cond);
             if (!cond.type()->is_int()) {
                 error(st->cond->loc,
-                      fmt::format("switch cond must be int expression but have {}", gen_type(cond.type())));
+                      fmt::format("switch cond must be int expression but have {}", pretty_print(cond.type())));
             }
             block.wl("switch({})", cond.value.str());
             block.wl("{{");
@@ -845,7 +845,7 @@ namespace akari::asl {
                 auto cond = compile_expr(st->cond);
                 if (cond.type() != type::boolean) {
                     error(st->cond->loc,
-                          fmt::format("while cond must be boolean expression but have {}", gen_type(cond.type())));
+                          fmt::format("while cond must be boolean expression but have {}", pretty_print(cond.type())));
                 }
                 block.wl("while({})", cond.value.str());
                 auto_indent(block, st->body, [&] {

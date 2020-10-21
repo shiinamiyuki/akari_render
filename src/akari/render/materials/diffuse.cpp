@@ -36,7 +36,7 @@ namespace akari::render {
             sp.texcoords = ctx.texcoords;
             auto R = color->evaluate(sp);
             BSDF bsdf(ctx.ng, ctx.ns);
-            bsdf.set_closure(ctx.allocator.new_object<DiffuseBSDF>(R));
+            bsdf.set_closure(ctx.allocator->new_object<DiffuseBSDF>(R));
             return bsdf;
         }
     };

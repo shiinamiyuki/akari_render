@@ -30,9 +30,117 @@
 #include <math.h>
 #include <list>
 #include <mutex>
+#include <vector>
 
 namespace akari::astd {
     enum class byte : unsigned char {};
+
+    struct nullopt_t {};
+    inline constexpr nullopt_t nullopt{};
+    template <typename T>
+    class optional {
+      public:
+        using value_type = T;
+        optional(nullopt_t) : optional() {}
+        optional() = default;
+
+        optional(const T &v) : set(true) { new (ptr()) T(v); }
+
+        optional(T &&v) : set(true) { new (ptr()) T(std::move(v)); }
+
+        optional(const optional &v) : set(v.has_value()) {
+            if (v.has_value())
+                new (ptr()) T(v.value());
+        }
+
+        optional(optional &&v) : set(v.has_value()) {
+            if (v.has_value()) {
+                new (ptr()) T(std::move(v.value()));
+                v.reset();
+            }
+        }
+
+        optional &operator=(const T &v) {
+            reset();
+            new (ptr()) T(v);
+            set = true;
+            return *this;
+        }
+
+        optional &operator=(T &&v) {
+            reset();
+            new (ptr()) T(std::move(v));
+            set = true;
+            return *this;
+        }
+
+        optional &operator=(const optional &v) {
+            reset();
+            if (v.has_value()) {
+                new (ptr()) T(v.value());
+                set = true;
+            }
+            return *this;
+        }
+        template <typename... Ts>
+        void emplace(Ts &&... args) {
+            reset();
+            new (ptr()) T(std::forward<Ts>(args)...);
+            set = true;
+        }
+
+        optional &operator=(optional &&v) {
+            reset();
+            if (v.has_value()) {
+                new (ptr()) T(std::move(v.value()));
+                set = true;
+                v.reset();
+            }
+            return *this;
+        }
+
+        ~optional() { reset(); }
+
+        explicit operator bool() const { return set; }
+
+        T value_or(const T &alt) const { return set ? value() : alt; }
+
+        T *operator->() { return &value(); }
+
+        const T *operator->() const { return &value(); }
+
+        T &operator*() { return value(); }
+
+        const T &operator*() const { return value(); }
+
+        T &value() {
+            AKR_CHECK(set);
+            return *ptr();
+        }
+
+        const T &value() const {
+            AKR_CHECK(set);
+            return *ptr();
+        }
+
+        void reset() {
+            if (set) {
+                value().~T();
+                set = false;
+            }
+        }
+
+        bool has_value() const { return set; }
+
+      private:
+        T *ptr() { return reinterpret_cast<T *>(&optionalValue); }
+
+        const T *ptr() const { return reinterpret_cast<const T *>(&optionalValue); }
+
+        std::aligned_storage_t<sizeof(T), alignof(T)> optionalValue;
+        bool set = false;
+    };
+
     // MSVC has incomplete pmr support ...
     namespace pmr {
         class AKR_EXPORT memory_resource {

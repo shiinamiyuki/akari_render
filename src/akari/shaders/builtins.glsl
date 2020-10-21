@@ -95,6 +95,9 @@ __builtin__ vec2 cos(vec2 x);
 __builtin__ vec3 cos(vec3 x);
 __builtin__ vec4 cos(vec4 x);
 
+__builtin__ float exp(float x);
+__builtin__ float log(float x);
+
 
 
 __builtin__ float tan(float x);

@@ -46,7 +46,6 @@ namespace akari::render {
     };
 
     struct DirectLighting {
-
         Ray shadow_ray;
         Spectrum color;
         Float pdf;

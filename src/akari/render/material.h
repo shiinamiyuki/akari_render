@@ -134,16 +134,15 @@ namespace akari::render {
         }
     };
     struct MaterialEvalContext {
-        Allocator<> allocator;
+        Allocator<> *allocator;
         vec2 u1, u2;
         vec2 texcoords;
         Vec3 ng, ns;
-        MaterialEvalContext(astd::pmr::monotonic_buffer_resource *rsrc) : allocator(rsrc) {}
-        MaterialEvalContext(astd::pmr::monotonic_buffer_resource *rsrc, Sampler &sampler, const SurfaceInteraction &si)
-            : MaterialEvalContext(rsrc, sampler, si.texcoords, si.ng, si.ns) {}
-        MaterialEvalContext(astd::pmr::monotonic_buffer_resource *rsrc, Sampler &sampler, const vec2 &texcoords,
-                            const Vec3 &ng, const Vec3 &ns)
-            : allocator(rsrc), u1(sampler.next2d()), u2(sampler.next2d()), texcoords(texcoords), ng(ng), ns(ns) {}
+        MaterialEvalContext(Allocator<> *allocator, Sampler *sampler, const SurfaceInteraction &si)
+            : MaterialEvalContext(allocator, sampler, si.texcoords, si.ng, si.ns) {}
+        MaterialEvalContext(Allocator<> *allocator, Sampler *sampler, const vec2 &texcoords, const Vec3 &ng,
+                            const Vec3 &ns)
+            : allocator(allocator), u1(sampler->next2d()), u2(sampler->next2d()), texcoords(texcoords), ng(ng), ns(ns) {}
     };
 
     class EmissiveMaterial;
