@@ -98,7 +98,7 @@ namespace akari::render {
             return rtcRay.tfar == -std::numeric_limits<float>::infinity();
         }
         void reset() override { rtcReleaseScene(rtcScene); }
-        Bounds3f world_bounds() const {
+        Bounds3f world_bounds() const override{
             RTCBounds bounds;
             rtcGetSceneBounds(rtcScene, &bounds);
             return Bounds3f(vec3(bounds.lower_x, bounds.lower_y, bounds.lower_z),

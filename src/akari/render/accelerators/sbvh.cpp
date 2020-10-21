@@ -161,7 +161,7 @@ namespace akari::render {
             topLevelBVH.reset();
             meshBVHs.clear();
         }
-        Bounds3f world_bounds() const { return topLevelBVH->boundBox; }
+        Bounds3f world_bounds() const override { return topLevelBVH->boundBox; }
     };
     class SBVHAcceleratorNode final : public AcceleratorNode {
       public:

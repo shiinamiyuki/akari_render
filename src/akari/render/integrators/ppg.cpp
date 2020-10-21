@@ -717,7 +717,7 @@ namespace akari::render {
 
                 info("Learning pass {}, spp:{}", pass + 1, samples);
                 accumulatedSamples += samples;
-                parallel_for_2d(n_tiles, [=, &mutex, &resources](const ivec2 &tile_pos, int tid) {
+                parallel_for_2d(n_tiles, [=, &resources](const ivec2 &tile_pos, int tid) {
                     Allocator<> allocator(resources[tid]);
                     Bounds2i tileBounds = Bounds2i{tile_pos * (int)tile_size, (tile_pos + ivec2(1)) * (int)tile_size};
                     auto tile = film->tile(tileBounds);
