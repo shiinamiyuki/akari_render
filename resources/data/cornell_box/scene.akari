@@ -18,7 +18,7 @@ export scene = Scene {
     shapes: [
         $cbox.mesh
     ],
-    accelerator: SBVH{}
+    accelerator: Embree{},
     sampler: RandomSampler{}
 }
 
