@@ -19,37 +19,11 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-
-#include <akari/core/akari.h>
-#include <akari/core/application.h>
-#include <akari/core/resource.h>
-#include <akari/core/parallel.h>
-#include <akari/core/logger.h>
-#define NOMINMAX
-#ifdef AKR_PLATFORM_WINDOWS
-#    include <Windows.h>
-#elif defined(AKR_PLATFORM_LINUX)
-#    include <unistd.h>
-#endif
-namespace akari {
-    Application::Application(int argc, const char **argv) {
-        auto cg = core_globals();
-
-#ifdef AKR_PLATFORM_WINDOWS
-        char self_proc[MAX_PATH] = {0};
-        auto res = GetModuleFileNameA(nullptr, self_proc, sizeof(self_proc));
-        if (res == 0) {
-            fprintf(stderr, "error retreiving program path; code=%d\n", GetLastError());
-        }
-        cg->program_path = fs::absolute(fs::path(std::string(self_proc)));
-#elif defined(AKR_PLATFORM_LINUX)
-        char self_proc[PATH_MAX + 1] = {0};
-        readlink("/proc/self/exe", self_proc, PATH_MAX + 1);
-        cg->program_path = fs::absolute(fs::path(std::string(self_proc)));
-#endif
+#include <akari/render/scenegraph.h>
+#include <akari/render/material.h>
+namespace akari::render {
+    NullBSDF *null_bsdf() {
+        static NullBSDF bsdf;
+        return &bsdf;
     }
-    Application::~Application() {
-        thread::finalize();
-        ResourceManager::finalize();
-    }
-} // namespace akari
+} // namespace akari::render

@@ -72,7 +72,7 @@ namespace akari::render {
             ray.d = c2w.apply_vector(ray.d);
             sample.normal = c2w.apply_normal(Vec3(0, 0, -1.0f));
             sample.ray = ray;
-            
+
             return sample;
         }
     };
@@ -95,11 +95,13 @@ namespace akari::render {
             }
         }
         Camera *create_camera(Allocator<> *allocator) override {
-            Transform c2w;
-            c2w = Transform::rotate_z(rotation.z);
-            c2w = Transform::rotate_x(rotation.y) * c2w;
-            c2w = Transform::rotate_y(rotation.x) * c2w;
-            c2w = Transform::translate(position) * c2w;
+            // Transform c2w;
+            // c2w = Transform::rotate_z(rotation.z);
+            // c2w = Transform::rotate_x(rotation.y) * c2w;
+            // c2w = Transform::rotate_y(rotation.x) * c2w;
+            // c2w = Transform::translate(position) * c2w;
+            TRSTransform TRS{position, rotation, Vec3(1.0)};
+            auto c2w = TRS();
             return allocator->new_object<PerspectiveCamera>(resolution, c2w, fov);
         }
     };

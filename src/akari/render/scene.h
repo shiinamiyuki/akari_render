@@ -27,6 +27,7 @@
 #include <akari/render/integrator.h>
 #include <akari/render/instance.h>
 #include <akari/render/sampler.h>
+#include <akari/render/light.h>
 namespace akari::render {
     class Accelerator;
     class MeshNode;
@@ -47,11 +48,12 @@ namespace akari::render {
         BufferView<MeshInstance> meshes;
         BufferView<const Light *> lights;
         const Distribution1D *light_distribution = nullptr;
-        const Accelerator *accel = nullptr;
+        std::shared_ptr<Accelerator> accel = nullptr;
         const Camera *camera = nullptr;
         const Sampler *sampler = nullptr;
         const LightIdMap *light_id_map = nullptr;
         const LightPdfMap *light_pdf_map = nullptr;
+        std::unique_ptr<InfiniteAreaLight> envmap;
         std::optional<Intersection> intersect(const Ray &ray) const { return accel->intersect(ray); }
         bool occlude(const Ray &ray) const { return accel->occlude(ray); }
         Triangle get_triangle(int mesh_id, int prim_id) const {
@@ -90,7 +92,14 @@ namespace akari::render {
             return it->second;
         }
     };
-
+    class TextureNode;
+    class AKR_EXPORT EnvMapNode : public SceneGraphNode {
+      public:
+        TRSTransform transform;
+        std::shared_ptr<TextureNode> envmap;
+        void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
+                          const sdl::Value &value);
+    };
     class AKR_EXPORT SceneNode : public SceneGraphNode {
         std::vector<MeshInstance> instances;
         std::shared_ptr<CameraNode> camera;
@@ -103,8 +112,10 @@ namespace akari::render {
         std::vector<const Light *> lights;
         LightPdfMap light_pdf_map;
         LightIdMap light_id_map;
-        Scene create_scene(Allocator<> *);
-
+        TRSTransform envmap_transform;
+        std::shared_ptr<EnvMapNode> envmap;
+        Scene scene;
+        void init_scene(Allocator<> *allocator);
       public:
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override;

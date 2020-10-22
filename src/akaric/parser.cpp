@@ -32,14 +32,13 @@ namespace akari::asl {
     static std::unordered_set<std::string> qualifiers = {"const", "in", "inout", "out"};
     class Parser::Impl {
         friend class Parser;
-         Parser &parser;
+        Parser &parser;
         const TokenStream &ts;
         const std::string &filename;
         const std::string &src;
         TokenStream::const_iterator it;
         std::unordered_set<std::string> typenames;
 
-       
         const Token &cur() {
             if (it == ts.end()) {
                 throw std::runtime_error("unexpected EOF");
@@ -134,7 +133,7 @@ namespace akari::asl {
             expect(";");
             return p;
         }
-        ast::Expr parse_expr(int lev = 0) {
+        ast::Expr parse_binary_expr(int lev = 0) {
             ast::Expr result = parse_postfix_expr();
             while (!end()) {
                 auto c = cur();
@@ -143,7 +142,7 @@ namespace akari::asl {
                     break;
                 if (prec.opPrec[c.tok] >= lev) {
                     consume();
-                    ast::Expr rhs = parse_expr(prec.opAssoc[c.tok] + prec.opPrec[c.tok]);
+                    ast::Expr rhs = parse_binary_expr(prec.opAssoc[c.tok] + prec.opPrec[c.tok]);
                     ast::BinaryExpression op = std::make_shared<ast::BinaryExpressionNode>(c);
                     op->lhs = result;
                     op->rhs = rhs;
@@ -151,6 +150,11 @@ namespace akari::asl {
                 } else
                     break;
             }
+
+            return result;
+        }
+        ast::Expr parse_expr() {
+            ast::Expr result = parse_binary_expr();
             if (cur().tok == "?") {
                 consume();
                 auto cond = result;
@@ -159,7 +163,6 @@ namespace akari::asl {
                 auto rhs = parse_expr();
                 return std::make_shared<ConditionalExpressionNode>(cond, lhs, rhs);
             }
-
             return result;
         }
 
@@ -360,9 +363,9 @@ namespace akari::asl {
                         if (qualifier == type::Qualifier::none) {
                             consume();
                             qualifier = type::Qualifier::in;
-                        }else if (qualifier == type::Qualifier::constant) {
+                        } else if (qualifier == type::Qualifier::constant) {
                             consume();
-                        }else{
+                        } else {
                             error(cur().loc, "conflicting qualifiers");
                         }
                     } else if (cur().tok == "out") {

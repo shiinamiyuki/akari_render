@@ -37,16 +37,16 @@ namespace akari::render {
         AKR_ASSERT_THROW(camera);
         camera->commit();
     }
-    Scene SceneNode::create_scene(Allocator<> *allocator) {
+    void SceneNode::init_scene(Allocator<> *allocator) {
         lights.clear();
         light_id_map.clear();
         light_pdf_map.clear();
-        Scene scene;
         scene.camera = camera->create_camera(allocator);
         for (auto &shape : shapes) {
             instances.emplace_back(shape->create_instance(allocator));
         }
         scene.meshes = {instances.data(), instances.size()};
+        scene.accel = accel->create_accel(scene);
         std::vector<const AreaLight *> area_lights;
         std::vector<Float> power;
         std::unordered_map<const Texture *, std::future<Float>> ft_integrals;
@@ -71,6 +71,15 @@ namespace akari::render {
                 }
             }
         }
+        const Texture *envmap_texture = nullptr;
+        if (envmap) {
+            envmap_texture = envmap->envmap->create_texture(allocator);
+            AKR_ASSERT_THROW(envmap_texture);
+            if (ft_integrals.find(envmap_texture) == ft_integrals.end()) {
+                ft_integrals.emplace(envmap_texture,
+                                     std::async(std::launch::async, [=] { return envmap_texture->integral(); }));
+            }
+        }
         for (auto &pair : ft_integrals) {
             integrals[pair.first] = pair.second.get();
         }
@@ -87,8 +96,15 @@ namespace akari::render {
                 glm::cross(triangle.vertices[1] - triangle.vertices[0], triangle.vertices[2] - triangle.vertices[0]));
             power.emplace_back(area * tc_area * I);
         }
+        if (envmap) {
+            scene.envmap = InfiniteAreaLight::create(scene, envmap->transform, envmap_texture);
+            power.emplace_back(scene.envmap->power());
+        }
         for (auto i : area_lights) {
             lights.emplace_back(i);
+        }
+        if (envmap) {
+            lights.emplace_back(scene.envmap.get());
         }
         light_distribution = std::make_unique<Distribution1D>(power.data(), power.size());
         AKR_ASSERT(lights.size() == power.size());
@@ -99,7 +115,6 @@ namespace akari::render {
         scene.lights = BufferView(lights.data(), lights.size());
         scene.light_id_map = &light_id_map;
         scene.light_pdf_map = &light_pdf_map;
-        return scene;
     }
     void SceneNode::render() {
         // Thanks to python hijacking SIGINT handler;
@@ -110,9 +125,7 @@ namespace akari::render {
         info("preparing scene");
         astd::pmr::monotonic_buffer_resource resource(astd::pmr::get_default_resource());
         Allocator<> allocator(&resource);
-        auto scene = create_scene(&allocator);
-        std::shared_ptr<Accelerator> real_accel = accel->create_accel(scene);
-        scene.accel = real_accel.get();
+        init_scene(&allocator);
         scene.sampler = sampler->create_sampler(&allocator);
         auto real_integrator = integrator->create_integrator(&allocator);
         auto res = scene.camera->resolution();
@@ -144,6 +157,18 @@ namespace akari::render {
         } else if (field == "accelerator") {
             accel = dyn_cast<AcceleratorNode>(value.object());
             AKR_ASSERT_THROW(accel);
+        } else if (field == "envmap") {
+            envmap = dyn_cast<EnvMapNode>(value.object());
+            AKR_ASSERT_THROW(envmap);
+        }
+    }
+    void EnvMapNode::object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
+                                  const sdl::Value &value) {
+        if (field == "envmap") {
+            envmap = resolve_texture(value);
+            AKR_ASSERT_THROW(envmap);
+        } else if (field == "rotation") {
+            transform.rotation = radians(load<vec3>(value));
         }
     }
 } // namespace akari::render

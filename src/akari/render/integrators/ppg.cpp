@@ -586,7 +586,7 @@ namespace akari::render {
                 auto *emission = material->as_emissive();
                 bool face_front = dot(wo, si.ng) > 0.0f;
                 if (emission->double_sided || face_front) {
-                    Spectrum I = emission->color->evaluate(ctx.texcoords);
+                    Spectrum I = emission->color->evaluate(ctx.sp);
                     if (depth == 0) {
                         accumulate_radiance_wo_beta(I);
                     } else {
@@ -801,6 +801,8 @@ namespace akari::render {
                 spp = value.get<int>().value();
             } else if (field == "max_depth") {
                 max_depth = value.get<int>().value();
+            } else if (field == "training_samples") {
+                training_samples = value.get<int>().value();
             }
         }
     };

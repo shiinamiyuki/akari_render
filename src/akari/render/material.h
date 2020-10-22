@@ -61,9 +61,20 @@ namespace akari::render {
         [[nodiscard]] virtual Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const = 0;
         [[nodiscard]] virtual Spectrum evaluate(const Vec3 &wo, const Vec3 &wi) const = 0;
         [[nodiscard]] virtual BSDFType type() const = 0;
-        [[nodiscard]] virtual bool match_flags(BSDFType flag) const { return ((uint32_t)type() & (uint32_t)flag) != 0; }
+        [[nodiscard]] bool match_flags(BSDFType flag) const { return ((uint32_t)type() & (uint32_t)flag) != 0; }
         virtual Spectrum sample(const vec2 &u, const Vec3 &wo, Vec3 *wi, Float *pdf, BSDFType *sampledType) const = 0;
     };
+    class NullBSDF : public BSDFClosure {
+        [[nodiscard]] virtual Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const { return 0.0; }
+        [[nodiscard]] virtual Spectrum evaluate(const Vec3 &wo, const Vec3 &wi) const { return Spectrum(0.0); }
+        [[nodiscard]] virtual BSDFType type() const { return BSDF_NONE; }
+        virtual Spectrum sample(const vec2 &u, const Vec3 &wo, Vec3 *wi, Float *pdf, BSDFType *sampledType) const {
+            *sampledType = BSDF_NONE;
+            *pdf = 0.0;
+            return Spectrum(0.0);
+        }
+    };
+    AKR_EXPORT NullBSDF *null_bsdf();
     class DiffuseBSDF : public BSDFClosure {
         Spectrum R;
 
@@ -93,6 +104,39 @@ namespace akari::render {
             *sampledType = type();
             *pdf = cosine_hemisphere_pdf(std::abs(cos_theta(*wi)));
             return R * shader::InvPi;
+        }
+    };
+
+    class MixBSDF : public BSDFClosure {
+      public:
+        Float fraction;
+        const BSDFClosure *bsdf_A = null_bsdf();
+        const BSDFClosure *bsdf_B = null_bsdf();
+        MixBSDF() = default;
+        MixBSDF(Float fraction, const BSDFClosure *bsdf_A, const BSDFClosure *bsdf_B)
+            : fraction(fraction), bsdf_A(bsdf_A), bsdf_B(bsdf_B) {}
+        [[nodiscard]] Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const override {
+            return (1.0 - fraction) * bsdf_A->evaluate_pdf(wo, wi) + fraction * bsdf_B->evaluate_pdf(wo, wi);
+        }
+        [[nodiscard]] Spectrum evaluate(const Vec3 &wo, const Vec3 &wi) const override {
+            return (1.0 - fraction) * bsdf_A->evaluate(wo, wi) + fraction * bsdf_B->evaluate(wo, wi);
+        }
+        [[nodiscard]] BSDFType type() const override { return BSDFType(bsdf_A->type() | bsdf_B->type()); }
+        Spectrum sample(const vec2 &u, const Vec3 &wo, Vec3 *wi, Float *pdf, BSDFType *sampledType) const override {
+            Float pdf_inner = 0;
+            Float pdf_select = 0;
+            Spectrum f;
+            if (u[0] < fraction) {
+                vec2 u_(u[0] / fraction, u[1]);
+                pdf_select = fraction;
+                f = bsdf_A->sample(u_, wo, wi, &pdf_inner, sampledType);
+            } else {
+                vec2 u_((u[0] - fraction) / (1.0 - fraction), u[1]);
+                pdf_select = 1.0 - fraction;
+                f = bsdf_B->sample(u_, wo, wi, &pdf_inner, sampledType);
+            }
+            *pdf = pdf_inner * pdf_select;
+            return f;
         }
     };
     class BSDF {
@@ -136,28 +180,34 @@ namespace akari::render {
     struct MaterialEvalContext {
         Allocator<> *allocator;
         vec2 u1, u2;
-        vec2 texcoords;
+        ShadingPoint sp;
         Vec3 ng, ns;
         MaterialEvalContext(Allocator<> *allocator, Sampler *sampler, const SurfaceInteraction &si)
             : MaterialEvalContext(allocator, sampler, si.texcoords, si.ng, si.ns) {}
         MaterialEvalContext(Allocator<> *allocator, Sampler *sampler, const vec2 &texcoords, const Vec3 &ng,
                             const Vec3 &ns)
-            : allocator(allocator), u1(sampler->next2d()), u2(sampler->next2d()), texcoords(texcoords), ng(ng), ns(ns) {}
+            : allocator(allocator), u1(sampler->next2d()), u2(sampler->next2d()), sp(texcoords), ng(ng), ns(ns) {}
     };
 
     class EmissiveMaterial;
     class Material {
       public:
-        virtual BSDF get_bsdf(MaterialEvalContext &ctx) const = 0;
+        virtual BSDFClosure *evaluate(MaterialEvalContext &ctx) const = 0;
         virtual bool is_emissive() const { return false; }
         virtual const EmissiveMaterial *as_emissive() const { return nullptr; }
+        BSDF get_bsdf(MaterialEvalContext &ctx) const {
+            auto closure = evaluate(ctx);
+            BSDF bsdf(ctx.ng, ctx.ns);
+            bsdf.set_closure(closure);
+            return bsdf;
+        }
     };
     class EmissiveMaterial : public Material {
       public:
         EmissiveMaterial(const Texture *color) : color(color) {}
         const Texture *color = nullptr;
         bool double_sided = false;
-        BSDF get_bsdf(MaterialEvalContext &ctx) const override { return BSDF(); }
+        BSDFClosure *evaluate(MaterialEvalContext &ctx) const override { return nullptr; }
         bool is_emissive() const override { return true; }
         const EmissiveMaterial *as_emissive() const override { return this; }
     };
@@ -195,6 +245,45 @@ namespace akari::render {
             if (field == "color") {
                 color = resolve_texture(value);
             }
+        }
+    };
+
+    class MixMaterial : public Material {
+      public:
+        MixMaterial(const Texture *fraction, const Material *mat_A, const Material *mat_B)
+            : fraction(fraction), mat_A(mat_A), mat_B(mat_B) {}
+        const Texture *fraction = nullptr;
+        const Material *mat_A = nullptr;
+        const Material *mat_B = nullptr;
+        BSDFClosure *evaluate(MaterialEvalContext &ctx) const override {
+            auto closure = ctx.allocator->new_object<MixBSDF>(fraction->evaluate(ctx.sp)[0], mat_A->evaluate(ctx),
+                                                              mat_B->evaluate(ctx));
+            return closure;
+        }
+    };
+
+    class MixMaterialNode final : public MaterialNode {
+        std::shared_ptr<TextureNode> fraction;
+        std::shared_ptr<MaterialNode> mat_A;
+        std::shared_ptr<MaterialNode> mat_B;
+
+      public:
+        void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
+                          const sdl::Value &value) override {
+            if (field == "fraction" || field == "frac") {
+                fraction = resolve_texture(value);
+            } else if (field == "first") {
+                mat_A = dyn_cast<MaterialNode>(value.object());
+                AKR_ASSERT_THROW(mat_A);
+            } else if (field == "second") {
+                mat_B = dyn_cast<MaterialNode>(value.object());
+                AKR_ASSERT_THROW(mat_A);
+            }
+        }
+        Material *create_material(Allocator<> *allocator) override {
+            return allocator->new_object<MixMaterial>(fraction->create_texture(allocator),
+                                                      mat_A->create_material(allocator),
+                                                      mat_B->create_material(allocator));
         }
     };
 } // namespace akari::render

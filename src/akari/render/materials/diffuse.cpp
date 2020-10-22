@@ -31,13 +31,9 @@ namespace akari::render {
       public:
         DiffuseMaterial(const Texture *color) : color(color) {}
         const Texture *color;
-        BSDF get_bsdf(MaterialEvalContext &ctx) const override {
-            ShadingPoint sp;
-            sp.texcoords = ctx.texcoords;
-            auto R = color->evaluate(sp);
-            BSDF bsdf(ctx.ng, ctx.ns);
-            bsdf.set_closure(ctx.allocator->new_object<DiffuseBSDF>(R));
-            return bsdf;
+        BSDFClosure * evaluate(MaterialEvalContext &ctx) const override {
+            auto R = color->evaluate(ctx.sp);
+            return ctx.allocator->new_object<DiffuseBSDF>(R);
         }
     };
 

@@ -126,38 +126,40 @@ namespace akari::render {
             }
         }
 
-        void on_miss(const Ray &ray) noexcept {}
+        void on_miss(const Ray &ray, const std::optional<PathVertex> &prev_vertex) noexcept {
+            if (scene->envmap) {
+                on_hit_light(scene->envmap.get(), -ray.d, ShadingPoint(), prev_vertex);
+            }
+        }
 
         void accumulate_radiance(const Spectrum &r) { L += r; }
 
+        void on_hit_light(const Light *light, const Vec3 &wo, const ShadingPoint &sp,
+                          const std::optional<PathVertex> &prev_vertex) {
+            Spectrum I = beta * light->Le(wo, sp);
+            if (depth == 0) {
+                accumulate_radiance(I);
+            } else {
+                vec3 prev_p = prev_vertex->p();
+                ReferencePoint ref;
+                ref.ng = prev_vertex->ng();
+                ref.p = prev_vertex->p();
+                auto light_pdf = light->pdf_incidence(ref, -wo) * scene->pdf_light(light);
+                Float weight_bsdf = mis_weight(prev_vertex->pdf(), light_pdf);
+                accumulate_radiance(weight_bsdf * I);
+            }
+        }
         void accumulate_beta(const Spectrum &k) { beta *= k; }
         // @param mat_pdf: supplied if material is already chosen
         std::optional<SurfaceVertex> on_surface_scatter(SurfaceInteraction &si, const SurfaceHit &surface_hit,
                                                         const std::optional<PathVertex> &prev_vertex) noexcept {
             auto *material = surface_hit.material;
-            auto wo = surface_hit.wo;
+            auto &wo = surface_hit.wo;
             MaterialEvalContext ctx(allocator, sampler, si);
             if (material->is_emissive()) {
-
-                auto *emission = material->as_emissive();
-                bool face_front = dot(wo, si.ng) > 0.0f;
-                if (emission->double_sided || face_front) {
-                    Spectrum I = beta * emission->color->evaluate(ctx.texcoords);
-                    if (depth == 0) {
-                        accumulate_radiance(I);
-                    } else {
-                        vec3 prev_p = prev_vertex->p();
-                        auto light = scene->get_light(surface_hit.geom_id, surface_hit.prim_id);
-                        ReferencePoint ref;
-                        ref.ng = prev_vertex->ng();
-                        ref.p = prev_vertex->p();
-                        auto light_pdf = light->pdf_incidence(ref, -wo) * scene->pdf_light(light);
-                        Float weight_bsdf = mis_weight(prev_vertex->pdf(), light_pdf);
-                        accumulate_radiance(weight_bsdf * I);
-                    }
-                    return std::nullopt;
-                }
-
+                auto light = scene->get_light(surface_hit.geom_id, surface_hit.prim_id);
+                on_hit_light(light, wo, ctx.sp, prev_vertex);
+                return std::nullopt;
             } else if (depth < max_depth) {
                 SurfaceVertex vertex(si.triangle, surface_hit);
                 si.bsdf = allocator->new_object<BSDF>(material->get_bsdf(ctx));
@@ -183,7 +185,7 @@ namespace akari::render {
             while (true) {
                 auto hit = scene->intersect(ray);
                 if (!hit) {
-                    on_miss(ray);
+                    on_miss(ray, prev_vertex);
                     break;
                 }
                 SurfaceHit surface_hit(ray, *hit);

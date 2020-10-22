@@ -23,10 +23,10 @@
 #include <akari/core/math.h>
 #include <akari/render/material.h>
 #include <akari/render/shape.h>
-#include <akari/render/scene.h>
+#include <akari/render/accelerator.h>
 namespace akari::render {
     class BSDF;
-   
+
     struct SurfaceInteraction {
         Triangle triangle;
         Vec3 p;

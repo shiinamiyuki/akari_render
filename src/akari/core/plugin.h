@@ -68,10 +68,10 @@ namespace akari {
 
       public:
         bool load_path(const std::string &path) {
-            info("loading {}\n", path);
+            info("loading {}", path);
             auto lib = std::make_shared<SharedLibrary>(path.c_str());
             if (!lib) {
-                error("cannot load {}\n", path);
+                error("cannot load {}", path);
                 return false;
             }
             auto p = (PluginInterface<T> * (*)()) lib->function("akari_plugin_onload");

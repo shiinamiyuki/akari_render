@@ -111,3 +111,10 @@ __builtin__ float asin(float x);
 __builtin__ vec2 asin(vec2 x);
 __builtin__ vec3 asin(vec3 x);
 __builtin__ vec4 asin(vec4 x);
+
+__builtin__ float acos(float x);
+__builtin__ vec2 acos(vec2 x);
+__builtin__ vec3 acos(vec3 x);
+__builtin__ vec4 acos(vec4 x);
+
+__builtin__ float atan(float y, float x);

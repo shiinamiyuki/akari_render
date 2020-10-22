@@ -21,7 +21,7 @@
 // SOFTWARE.
 
 #include "builtins.glsl"
-
+#include "constants.glsl"
 float cos_theta(const vec3 w) { return w.y; }
 
 float abs_cos_theta(const vec3 w) { return abs(cos_theta(w)); }
@@ -110,4 +110,15 @@ Spectrum fr_conductor(float cosThetaI, const Spectrum etaI, const Spectrum etaT,
     Spectrum Rp = Rs * (t3 - t4) / (t3 + t4);
 
     return 0.5 * (Rp + Rs);
+}
+
+vec3 spherical_to_xyz(float sinTheta, float cosTheta, float phi) {
+    return vec3(sinTheta * cos(phi), cosTheta, sinTheta * sin(phi));
+}
+
+float spherical_theta(const vec3 v) { return acos(clamp(v.y, -1.0, 1.0)); }
+
+float spherical_phi(const vec3 v) {
+    float p = atan(v.z, v.x);
+    return p < 0.0 ? (p + 2.0 * Pi) : p;
 }

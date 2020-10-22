@@ -25,6 +25,13 @@
 #include <cmath>
 #include <algorithm>
 #include <cstring>
+#define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
+#define GLM_FORCE_PURE
+#define GLM_FORCE_INTRINSICS
+#define GLM_FORCE_SSE2
+#define GLM_FORCE_SSE3
+#define GLM_FORCE_AVX
+#define GLM_FORCE_AVX2
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
@@ -70,8 +77,8 @@ namespace akari {
     static constexpr Float Pi2 = Pi / Float(2.0f);
     static constexpr Float Pi4 = Pi / Float(4.0f);
     static constexpr Float InvPi = Float(1.0f) / Pi;
-    static constexpr Float Inv2Pi = Float(1.0) / Pi2;
-    static constexpr Float Inv4Pi = Float(1.0) / Pi4;
+    static constexpr Float Inv2Pi = Float(1.0) / (2.0 * Pi);
+    static constexpr Float Inv4Pi = Float(1.0) / (4.0 * Pi);
     static constexpr Float Eps = Float(0.001f);
     static constexpr Float ShadowEps = Float(0.0001f);
 
@@ -236,8 +243,8 @@ namespace akari {
         BoundingBox() { reset(); }
         BoundingBox(const V &pmin, const V &pmax) : pmin(pmin), pmax(pmax) {}
         void reset() {
-            pmin =V(std::numeric_limits<T>::infinity());
-            pmax =V(-std::numeric_limits<T>::infinity());
+            pmin = V(std::numeric_limits<T>::infinity());
+            pmax = V(-std::numeric_limits<T>::infinity());
         }
         V extents() const { return pmax - pmin; }
         bool contains(const V &p) const { return all(p >= pmin && p <= pmax); }
@@ -281,4 +288,20 @@ namespace akari {
 
     using Bounds2i = BoundingBox<int, 2>;
     using Bounds3i = BoundingBox<int, 3>;
+
+    struct TRSTransform {
+        Vec3 translation;
+        Vec3 rotation;
+        Vec3 scale = Vec3(1.0, 1.0, 1.0);
+
+        Transform operator()() const {
+            Transform T;
+            T = Transform::scale(scale);
+            T = Transform::rotate_z(rotation.z) * T;
+            T = Transform::rotate_x(rotation.y) * T;
+            T = Transform::rotate_y(rotation.x) * T;
+            T = Transform::translate(translation) * T;
+            return T;
+        }
+    };
 } // namespace akari
