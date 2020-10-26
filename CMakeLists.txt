@@ -8,6 +8,8 @@ option(AKR_ENABLE_EMBREE "Use Embree as ray intersection backend" OFF)
 option(AKR_USE_PREBUILD_EMBREE "Use prebuilt binary" OFF)
 option(AKR_ENABLE_ASL "Enable Akari Shading Language for procedural shading" OFF)
 option(AKR_ENABLE_PYTHON "Build Python Binding" OFF)
+option(AKR_ENABLE_OIDN "Use Intel OpenImageDenoise" OFF)
+option(AKR_USE_PREBUILD_OIDN "Use prebuilt Intel OpenImageDenoise" OFF)
 
 include_directories(${CMAKE_SOURCE_DIR}/external/glm)
 include_directories(${CMAKE_SOURCE_DIR}/external/misc)
@@ -59,7 +61,7 @@ macro(add_build_util target )
 endmacro()
 
 include(cmake/Embree.cmake)
-
+include(cmake/OIDN.cmake)
 
 # ---------------- Akari Unified Shading Language Compiler
 file(GLOB ASL_COMPILER_SRC src/akaric/*.*)
