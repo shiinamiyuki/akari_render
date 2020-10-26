@@ -55,12 +55,12 @@ namespace akari::render {
             int estimate_ray_per_sample = max_depth * 2 + 1;
             double estimate_ray_per_sec = 0.5 * 1000 * 1000;
             double estimate_single_tile = spp * estimate_ray_per_sample * tile_size * tile_size / estimate_ray_per_sec;
-            size_t estimate_tiles_per_sec = size_t(1.0 / estimate_single_tile);
+            size_t estimate_tiles_per_sec = std::max<size_t>(1, size_t(1.0 / estimate_single_tile));
             debug("estimate_tiles_per_sec:{} total:{}", estimate_tiles_per_sec, n_tiles.x * n_tiles.y);
             auto reporter = std::make_shared<ProgressReporter>(n_tiles.x * n_tiles.y, [=](size_t cur, size_t total) {
                 bool show = (0 == cur % (estimate_tiles_per_sec));
                 if (show) {
-                    double tiles_per_sec = cur / timer.elapsed_seconds();
+                    double tiles_per_sec = cur / std::max(1e-7, timer.elapsed_seconds());
                     double remaining = (total - cur) / tiles_per_sec;
                     show_progress(double(cur) / double(total), 60, timer.elapsed_seconds(), remaining);
                 }
