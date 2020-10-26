@@ -122,6 +122,11 @@ namespace akari::render {
         auto _prev_SIGINT_handler = signal(SIGINT, SIG_DFL);
         auto _restore_handler = AtScopeExit([=]() { signal(SIGINT, _prev_SIGINT_handler); });
         commit();
+        if (spp_override > 0) {
+            if (!integrator->set_spp(spp_override)) {
+                warning("cannot override spp");
+            }
+        }
         info("preparing scene");
         astd::pmr::monotonic_buffer_resource resource(astd::pmr::get_default_resource());
         Allocator<> allocator(&resource);
@@ -130,6 +135,7 @@ namespace akari::render {
         auto real_integrator = integrator->create_integrator(&allocator);
         auto res = scene.camera->resolution();
         auto film = Film(res);
+
         Timer timer;
         real_integrator->render(&scene, &film);
         info("render done ({}s)", timer.elapsed_seconds());

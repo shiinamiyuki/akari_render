@@ -805,6 +805,7 @@ namespace akari::render {
                 training_samples = value.get<int>().value();
             }
         }
+        bool set_spp(int spp)override{return false;}
     };
     AKR_EXPORT_NODE(GuidedPath, GuidedPathIntegratorNode)
 } // namespace akari::render

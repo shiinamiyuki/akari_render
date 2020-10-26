@@ -37,7 +37,7 @@ namespace pybind11 {
 #endif
 namespace py = pybind11;
 static std::string inputFilename;
-// std::string variant = default_variant;
+static int spp = 0;
 void parse(int argc, const char **argv) {
     try {
         cxxopts::Options options("akari", " - AkariRender Command Line Interface");
@@ -46,6 +46,7 @@ void parse(int argc, const char **argv) {
             auto opt = options.allow_unrecognised_options().add_options();
             opt("i,input", "Input Scene Description File", cxxopts::value<std::string>());
             opt("v,verbose", "Use verbose output");
+            opt("spp", "Override scene spp setting", cxxopts::value<int>());
             opt("gpu", "Use gpu rendering");
             opt("help", "Show this help");
         }
@@ -55,6 +56,9 @@ void parse(int argc, const char **argv) {
             fatal("Input file must be provided");
             std::cout << options.help() << std::endl;
             exit(0);
+        }
+        if (result.count("spp")) {
+            spp = result["spp"].as<int>();
         }
         if (result.count("verbose")) {
             GetDefaultLogger()->log_verbose(true);
@@ -75,10 +79,9 @@ void parse(int argc, const char **argv) {
     }
 }
 
-
 void parse_and_run() {
     using namespace sdl;
-    auto  parser = render::SceneGraphParser::create_parser();
+    auto parser = render::SceneGraphParser::create_parser();
     auto module = parser->parse_file(inputFilename, "this");
     auto it = module->exports.find("scene");
     if (it == module->exports.end()) {
@@ -86,6 +89,9 @@ void parse_and_run() {
     }
     auto scene = dyn_cast<render::SceneNode>(it->second.object());
     AKR_ASSERT_THROW(scene);
+    if (spp > 0) {
+        scene->set_spp(spp);
+    }
     scene->render();
 }
 

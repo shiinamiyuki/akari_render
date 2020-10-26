@@ -107,6 +107,59 @@ namespace akari::render {
         }
     };
 
+    class MicrofacetReflection : public BSDFClosure {
+
+        Spectrum R;
+        shader::MicrofacetModel model;
+
+      public:
+        MicrofacetReflection(const Spectrum &R, Float roughness)
+            : R(R), model(shader::microfacet_new(shader::MicrofacetGGX, roughness)) {}
+        [[nodiscard]] Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const override {
+            if (shader::same_hemisphere(wo, wi)) {
+                auto wh = normalize(wo + wi);
+                return shader::microfacet_evaluate_pdf(model, wh) / (Float(4.0f) * dot(wo, wh));
+            }
+            return 0.0f;
+        }
+        [[nodiscard]] Spectrum evaluate(const Vec3 &wo, const Vec3 &wi) const override {
+            if (shader::same_hemisphere(wo, wi)) {
+                Float cosThetaO = shader::abs_cos_theta(wo);
+                Float cosThetaI = shader::abs_cos_theta(wi);
+                auto wh = (wo + wi);
+                if (cosThetaI == 0 || cosThetaO == 0)
+                    return Spectrum(0);
+                if (wh.x == 0 && wh.y == 0 && wh.z == 0)
+                    return Spectrum(0);
+                wh = normalize(wh);
+                if (wh.y < 0) {
+                    wh = -wh;
+                }
+                auto F = 1.0f; // fresnel->evaluate(dot(wi, wh));
+               
+                return R * (shader::microfacet_D(model, wh) * shader::microfacet_G(model, wo, wi, wh) * F /
+                            (Float(4.0f) * cosThetaI * cosThetaO));
+            }
+            return Spectrum(0.0f);
+        }
+        [[nodiscard]] BSDFType type() const override { return BSDFType(BSDF_GLOSSY | BSDF_REFLECTION); }
+        Spectrum sample(const vec2 &u, const Vec3 &wo, Vec3 *wi, Float *pdf, BSDFType *sampledType) const override {
+            *sampledType = type();
+            auto wh = shader::microfacet_sample_wh(model, wo, u);
+            *wi = glm::reflect(-wo, wh);
+            if (!shader::same_hemisphere(wo, *wi)) {
+                *pdf = 0;
+                return Spectrum(0);
+            } else {
+                if (wh.y < 0) {
+                    wh = -wh;
+                }
+                *pdf = shader::microfacet_evaluate_pdf(model, wh) / (Float(4.0f) * abs(dot(wo, wh)));
+            }
+            return evaluate(wo, *wi);
+        }
+    };
+
     class MixBSDF : public BSDFClosure {
       public:
         Float fraction;
@@ -129,11 +182,11 @@ namespace akari::render {
             if (u[0] < fraction) {
                 vec2 u_(u[0] / fraction, u[1]);
                 pdf_select = fraction;
-                f = bsdf_A->sample(u_, wo, wi, &pdf_inner, sampledType);
+                f = bsdf_B->sample(u_, wo, wi, &pdf_inner, sampledType);
             } else {
                 vec2 u_((u[0] - fraction) / (1.0 - fraction), u[1]);
                 pdf_select = 1.0 - fraction;
-                f = bsdf_B->sample(u_, wo, wi, &pdf_inner, sampledType);
+                f = bsdf_A->sample(u_, wo, wi, &pdf_inner, sampledType);
             }
             *pdf = pdf_inner * pdf_select;
             return f;
@@ -277,7 +330,7 @@ namespace akari::render {
                 AKR_ASSERT_THROW(mat_A);
             } else if (field == "second") {
                 mat_B = dyn_cast<MaterialNode>(value.object());
-                AKR_ASSERT_THROW(mat_A);
+                AKR_ASSERT_THROW(mat_B);
             }
         }
         Material *create_material(Allocator<> *allocator) override {

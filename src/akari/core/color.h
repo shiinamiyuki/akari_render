@@ -62,6 +62,14 @@ namespace akari {
         return c;
     }
     template <typename Scalar, int N>
+    Color<Scalar, N> min(const Color<Scalar, N> &in, const Color<Scalar, N> &v) {
+        Color<Scalar, N> c;
+        for (int i = 0; i < N; i++) {
+            c[i] = std::min(in[i], v[i]);
+        }
+        return c;
+    }
+    template <typename Scalar, int N>
     bool is_black(const Color<Scalar, N> &color) {
         return !foldl(color, false, [](bool acc, Scalar f) { return acc || (f > 0.0f); });
     }

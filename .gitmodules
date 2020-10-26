@@ -22,3 +22,6 @@
 [submodule "external/pugixml"]
 	path = external/pugixml
 	url = https://github.com/zeux/pugixml
+[submodule "external/openexr"]
+	path = external/openexr
+	url = https://github.com/AcademySoftwareFoundation/openexr

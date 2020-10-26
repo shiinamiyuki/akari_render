@@ -30,35 +30,21 @@
 #include <akari/render/mesh.h>
 #include <akari/shaders/common.h>
 namespace akari::render {
-    class AmbientOcclusion : public Integrator {
+    class AOVIntegrator : public Integrator {
         const int tile_size = 16;
-        int spp = 16;
-        float occlude = std::numeric_limits<float>::infinity();
 
       public:
-        AmbientOcclusion(int spp, float occlude) : spp(spp), occlude(occlude) {}
+        enum AOV {
+            albedo,
+            normal,
+        };
+        int spp = 16;
+        AOV aov;
+        AOVIntegrator(int spp, AOV aov) : spp(spp), aov(aov) {}
         void render(const Scene *scene, Film *film) override {
             using namespace shader;
             AKR_ASSERT_THROW(glm::all(glm::equal(film->resolution(), scene->camera->resolution())));
             auto n_tiles = ivec2(film->resolution() + ivec2(tile_size - 1)) / ivec2(tile_size);
-            auto Li = [=](Ray ray, Sampler &sampler) -> Spectrum {
-                (void)scene;
-                if (auto intersection = scene->intersect(ray)) {
-                    auto trig = scene->get_triangle(intersection->geom_id, intersection->prim_id);
-                    Frame frame(trig.ng());
-                    auto w = cosine_hemisphere_sampling(sampler.next2d());
-                    w = frame.local_to_world(w);
-                    ray = Ray(trig.p(intersection->uv), w);
-                    if (auto r = scene->intersect(ray)) {
-                        if (r->t < occlude) {
-                            return Spectrum(0);
-                        }
-                    }
-                    // debug("{} {}",trig.ng(),trig.ng() * 0.5f + 0.5f );
-                    return Spectrum(1);
-                }
-                return Spectrum(0);
-            };
             debug("resolution: {}, tile size: {}, tiles: {}", film->resolution(), tile_size, n_tiles);
             std::mutex mutex;
             std::vector<astd::pmr::monotonic_buffer_resource *> resources;
@@ -78,8 +64,17 @@ namespace akari::render {
                             sampler->start_next_sample();
                             CameraSample sample =
                                 camera->generate_ray(sampler->next2d(), sampler->next2d(), ivec2(x, y));
-                            auto L = Li(sample.ray, *sampler);
-                            tile.add_sample(vec2(x, y), L, 1.0f);
+                            Spectrum value;
+                            if (auto isct = scene->intersect(sample.ray)) {
+                                switch (aov) {
+                                case AOV::albedo:
+                                case AOV::normal:
+                                    value = sample.normal;
+                                    break;
+                                }
+                            }
+
+                            tile.add_sample(vec2(x, y), value, 1.0f);
                         }
                     }
                 }
@@ -92,21 +87,18 @@ namespace akari::render {
             }
         }
     };
-    class AOIntegratorNode final : public IntegratorNode {
+    class AOVIntegratorNode final : public IntegratorNode {
       public:
         int spp = 16;
-        int tile_size = 16;
-        float occlude = std::numeric_limits<float>::infinity();
+        AOVIntegrator::AOV aov = AOVIntegrator::albedo;
         Integrator *create_integrator(Allocator<> *alllocator) override {
-            return alllocator->new_object<AmbientOcclusion>(spp, occlude);
+            return alllocator->new_object<AOVIntegrator>(spp, aov);
         }
         const char *description() override { return "[Ambient Occlution]"; }
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override {
             if (field == "spp") {
                 spp = value.get<int>().value();
-            } else if (field == "occlude") {
-                occlude = value.get<float>().value();
             }
         }
         bool set_spp(int spp_) override {
@@ -114,6 +106,6 @@ namespace akari::render {
             return true;
         }
     };
-    AKR_EXPORT_NODE(RTAO, AOIntegratorNode)
+    AKR_EXPORT_NODE(AOV, AOVIntegratorNode)
 
 } // namespace akari::render

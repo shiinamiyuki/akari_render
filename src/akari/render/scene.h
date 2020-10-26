@@ -101,6 +101,7 @@ namespace akari::render {
                           const sdl::Value &value);
     };
     class AKR_EXPORT SceneNode : public SceneGraphNode {
+        int spp_override = 0;
         std::vector<MeshInstance> instances;
         std::shared_ptr<CameraNode> camera;
         std::shared_ptr<SamplerNode> sampler;
@@ -121,5 +122,8 @@ namespace akari::render {
                           const sdl::Value &value) override;
         void commit() override;
         void render();
+        void set_spp(int spp){
+            spp_override = spp;
+        }
     };
 } // namespace akari::render

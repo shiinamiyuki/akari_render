@@ -22,6 +22,7 @@
 
 #include <mutex>
 #include <akari/core/parallel.h>
+#include <akari/core/progress.hpp>
 #include <akari/core/profiler.h>
 #include <akari/render/scene.h>
 #include <akari/render/camera.h>
@@ -50,6 +51,23 @@ namespace akari::render {
             for (size_t i = 0; i < std::thread::hardware_concurrency(); i++) {
                 resources.emplace_back(new astd::pmr::monotonic_buffer_resource(astd::pmr::get_default_resource()));
             }
+            Timer timer;
+            int estimate_ray_per_sample = max_depth * 2 + 1;
+            double estimate_ray_per_sec = 0.5 * 1000 * 1000;
+            double estimate_single_tile = estimate_ray_per_sample * tile_size * tile_size / estimate_ray_per_sec;
+            size_t estimate_tiles_per_sec = size_t(1.0 / estimate_single_tile);
+            debug("estimate_tiles_per_sec:{} total:{}", estimate_tiles_per_sec, n_tiles.x * n_tiles.y);
+            auto reporter = std::make_shared<ProgressReporter>(n_tiles.x * n_tiles.y, [=](size_t cur, size_t total) {
+                bool show = (0 == cur % (estimate_tiles_per_sec));
+                if (show) {
+                    double tiles_per_sec = cur / timer.elapsed_seconds();
+                    double remaining = (total - cur) / tiles_per_sec;
+                    show_progress(double(cur) / double(total), 60, timer.elapsed_seconds(), remaining);
+                }
+                if (cur == total) {
+                    putchar('\n');
+                }
+            });
             parallel_for_2d(n_tiles, [=, &mutex, &resources](const ivec2 &tile_pos, int tid) {
                 Allocator<> allocator(resources[tid]);
                 Bounds2i tileBounds = Bounds2i{tile_pos * (int)tile_size, (tile_pos + ivec2(1)) * (int)tile_size};
@@ -69,12 +87,13 @@ namespace akari::render {
                             pt.beta = Spectrum(1.0);
                             pt.max_depth = max_depth;
                             pt.run_megakernel(camera, ivec2(x, y));
-                            tile.add_sample(vec2(x, y), pt.L, 1.0f);
+                            tile.add_sample(vec2(x, y), min(clamp_zero(pt.L), Spectrum(10)), 1.0f);
                         }
                     }
                 }
                 std::lock_guard<std::mutex> _(mutex);
                 film->merge_tile(tile);
+                reporter->update();
                 resources[tid]->release();
             });
             for (auto rsrc : resources) {
@@ -97,6 +116,10 @@ namespace akari::render {
             } else if (field == "max_depth") {
                 max_depth = value.get<int>().value();
             }
+        }
+        bool set_spp(int spp_) override {
+            spp = spp_;
+            return true;
         }
     };
     AKR_EXPORT_NODE(Path, PathIntegratorNode)

@@ -26,6 +26,20 @@
 #include <cstdio>
 #include <functional>
 namespace akari {
+    inline void show_progress(double progress, size_t width, double elpased, double remaining) {
+        printf("[");
+        size_t pos = size_t(width * progress);
+        for (size_t i = 0; i < width; ++i) {
+            if (i < pos)
+                printf("=");
+            else if (i == pos)
+                printf(">");
+            else
+                printf(" ");
+        }
+        printf("] %2d %% (%.3fs|%.3fs)\r", int(progress * 100.0), elpased, remaining);
+        fflush(stdout);
+    }
     inline void show_progress(double progress, size_t width) {
         printf("[");
         size_t pos = size_t(width * progress);
@@ -38,9 +52,8 @@ namespace akari {
                 printf(" ");
         }
         printf("] %2d %%\r", int(progress * 100.0));
-        fflush(stdin);
+        fflush(stdout);
     }
-
     struct ProgressReporter {
         explicit ProgressReporter(size_t total)
             : total(total), callback([](size_t cur, size_t total) { show_progress(double(cur) / total, 70); }) {}
