@@ -113,6 +113,7 @@ namespace akari::render {
             spp = spp_;
             return true;
         }
+        int get_spp() const override { return spp; }
     };
     AKR_EXPORT_NODE(RTAO, AOIntegratorNode)
 

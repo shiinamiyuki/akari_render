@@ -35,7 +35,7 @@ namespace akari::render {
         vec2 texcoords;
 
         SurfaceInteraction(const Intersection &isct, const Triangle &triangle)
-            : triangle(triangle), p(triangle.p(isct.uv)), ng(isct.ng), ns(triangle.ns(isct.uv)),
+            : triangle(triangle), p(triangle.p(isct.uv)), ng(triangle.ng()), ns(triangle.ns(isct.uv)),
               texcoords(triangle.texcoord(isct.uv)) {}
         SurfaceInteraction(const vec2 &uv, const Triangle &triangle)
             : triangle(triangle), p(triangle.p(uv)), ng(triangle.ng()), ns(triangle.ns(uv)),

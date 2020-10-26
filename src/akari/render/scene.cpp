@@ -28,6 +28,7 @@
 #include <akari/render/material.h>
 #include <akari/render/mesh.h>
 #include <akari/render/light.h>
+#include <akari/render/denoiser.h>
 namespace akari::render {
     void SceneNode::commit() {
         for (auto &shape : shapes) {
@@ -133,13 +134,45 @@ namespace akari::render {
         init_scene(&allocator);
         scene.sampler = sampler->create_sampler(&allocator);
         auto real_integrator = integrator->create_integrator(&allocator);
-        auto res = scene.camera->resolution();
+        ivec2 res = scene.camera->resolution();
+        // if (super_sampling_k > 1) {
+        //     auto s = std::sqrt(super_sampling_k);
+        //     if (s * s != super_sampling_k) {
+        //         error("super sampling factor must be square number (got {})", super_sampling_k);
+        //         std::exit(1);
+        //     }
+        //     res *= s;
+        // }
         auto film = Film(res);
 
         Timer timer;
         real_integrator->render(&scene, &film);
         info("render done ({}s)", timer.elapsed_seconds());
-        film.write_image(fs::path(output));
+        if (!run_denoiser_) {
+            film.write_image(fs::path(output));
+        } else {
+            film.write_image(fs::path(output + std::string(".unfiltered.png")));
+            AOV aov;
+            auto render_aov = [&](const char *name) {
+                auto aov_integrator_node = make_aov_integrator(std::min(64, integrator->get_spp()), name);
+                auto integrator = aov_integrator_node->create_integrator(&allocator);
+                Film aov_film(res);
+                integrator->render(&scene, &aov_film);
+                aov.aovs[name] = aov_film.to_rgba_image();
+            };
+            aov.aovs["color"] = film.to_rgba_image();
+            render_aov("normal");
+            render_aov("albedo");
+            PluginManager<Denoiser> denoisers;
+            info("denoising...");
+            auto pi = denoisers.load_plugin("OIDNDenoiser");
+            auto denoiser = pi->make_shared();
+            auto output_image = denoiser->denoise(&scene, aov);
+            if (output_image) {
+                default_image_writer()->write(*output_image, fs::path(output), GammaCorrection());
+            }
+            denoiser = nullptr;
+        }
     }
 
     void SceneNode::object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,

@@ -136,7 +136,7 @@ namespace akari::render {
                     wh = -wh;
                 }
                 auto F = 1.0f; // fresnel->evaluate(dot(wi, wh));
-               
+
                 return R * (shader::microfacet_D(model, wh) * shader::microfacet_G(model, wo, wi, wh) * F /
                             (Float(4.0f) * cosThetaI * cosThetaO));
             }
@@ -248,6 +248,7 @@ namespace akari::render {
         virtual BSDFClosure *evaluate(MaterialEvalContext &ctx) const = 0;
         virtual bool is_emissive() const { return false; }
         virtual const EmissiveMaterial *as_emissive() const { return nullptr; }
+        virtual Spectrum albedo(const ShadingPoint &sp) const = 0;
         BSDF get_bsdf(MaterialEvalContext &ctx) const {
             auto closure = evaluate(ctx);
             BSDF bsdf(ctx.ng, ctx.ns);
@@ -263,6 +264,7 @@ namespace akari::render {
         BSDFClosure *evaluate(MaterialEvalContext &ctx) const override { return nullptr; }
         bool is_emissive() const override { return true; }
         const EmissiveMaterial *as_emissive() const override { return this; }
+        Spectrum albedo(const ShadingPoint &sp) const override { return color->evaluate(sp); }
     };
     class MaterialNode : public SceneGraphNode {
       public:
@@ -312,6 +314,9 @@ namespace akari::render {
             auto closure = ctx.allocator->new_object<MixBSDF>(fraction->evaluate(ctx.sp)[0], mat_A->evaluate(ctx),
                                                               mat_B->evaluate(ctx));
             return closure;
+        }
+        Spectrum albedo(const ShadingPoint &sp) const override {
+            return lerp(mat_A->albedo(sp), mat_B->albedo(sp), fraction->evaluate(sp)[0]);
         }
     };
 

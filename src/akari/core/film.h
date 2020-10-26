@@ -41,8 +41,7 @@ namespace akari {
         ivec2 _size;
         astd::pmr::vector<Pixel> pixels;
 
-        explicit Tile(const Bounds2i &bounds)
-            : bounds(bounds), _size(bounds.size()), pixels(_size.x * _size.y) {}
+        explicit Tile(const Bounds2i &bounds) : bounds(bounds), _size(bounds.size()), pixels(_size.x * _size.y) {}
 
         auto &operator()(const vec2 &p) {
             auto q = ivec2(floor(p - vec2(bounds.pmin)));
@@ -91,8 +90,7 @@ namespace akari {
                 }
             }
         }
-
-        void write_image(const fs::path &path, const PostProcessor &postProcessor = GammaCorrection()) const {
+        RGBAImage to_rgba_image() const {
             RGBAImage image(resolution());
             parallel_for(
                 radiance.resolution().y,
@@ -107,6 +105,10 @@ namespace akari {
                     }
                 },
                 1024);
+                return image;
+        }
+        void write_image(const fs::path &path, const PostProcessor &postProcessor = GammaCorrection()) const {
+            RGBAImage image = to_rgba_image();
             default_image_writer()->write(image, path, postProcessor);
         }
     };

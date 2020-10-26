@@ -106,6 +106,7 @@ namespace akari::sdl {
         friend struct ParserContext;
 
       public:
+        virtual ~Object() = default;
         bool is_object() const override { return true; }
         virtual void object_field(Parser &parser, ParserContext &ctx, const std::string &field, const Value &value) = 0;
     };

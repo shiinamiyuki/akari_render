@@ -35,5 +35,9 @@ namespace akari::render {
       public:
         virtual Integrator *create_integrator(Allocator<> *) = 0;
         virtual bool set_spp(int spp) = 0;
+        virtual int get_spp() const = 0;
     };
+
+    AKR_EXPORT std::shared_ptr<IntegratorNode> make_aov_integrator();
+    AKR_EXPORT std::shared_ptr<IntegratorNode> make_aov_integrator(int spp, const char *aov);
 } // namespace akari::render

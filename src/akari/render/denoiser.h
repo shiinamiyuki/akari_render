@@ -22,28 +22,23 @@
 
 #pragma once
 #include <akari/core/math.h>
+#include <akari/core/distribution.h>
+#include <akari/core/image.hpp>
+#include <akari/core/film.h>
+#include <akari/render/scene.h>
 #include <akari/render/scenegraph.h>
-#include <optional>
+
 namespace akari::render {
-    struct Intersection {
-        Float t = Inf;
-        Vec2 uv;
-        int geom_id = -1;
-        int prim_id = -1;
-        bool is_instance = false;
-        bool hit() const { return geom_id != -1 && prim_id != -1; }
+    namespace AOVKind {
+        static constexpr uint32_t albedo = 1;
+        static constexpr uint32_t normal = 2;
+    }; // namespace AOVKind
+    struct AOV {
+        std::unordered_map<std::string, RGBAImage> aovs;
     };
-    class Scene;
-    class Accelerator {
+    class Denoiser {
       public:
-        virtual bool occlude(const Ray &ray) const = 0;
-        virtual std::optional<Intersection> intersect(const Ray &ray) const = 0;
-        virtual void reset() = 0;
-        virtual void build(const Scene &) = 0;
-        virtual Bounds3f world_bounds() const = 0;
-    };
-    class AcceleratorNode : public SceneGraphNode {
-      public:
-        virtual std::shared_ptr<Accelerator> create_accel(const Scene &scene) = 0;
+        virtual std::optional<RGBAImage> denoise(const Scene *scene, AOV &aov) = 0;
+        virtual ~Denoiser() = default;
     };
 } // namespace akari::render

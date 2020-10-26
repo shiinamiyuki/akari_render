@@ -37,6 +37,10 @@ namespace akari::render {
             auto r = roughness->evaluate(ctx.sp)[0];
             return ctx.allocator->new_object<MicrofacetReflection>(R, r);
         }
+        Spectrum albedo(const ShadingPoint &sp) const override {
+            auto R = color->evaluate(sp);
+            return R;
+        }
     };
 
     class GlossyMaterialNode final : public MaterialNode {

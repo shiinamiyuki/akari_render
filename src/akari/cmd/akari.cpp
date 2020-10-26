@@ -38,6 +38,7 @@ namespace pybind11 {
 namespace py = pybind11;
 static std::string inputFilename;
 static int spp = 0;
+static bool denoise = false;
 void parse(int argc, const char **argv) {
     try {
         cxxopts::Options options("akari", " - AkariRender Command Line Interface");
@@ -47,6 +48,7 @@ void parse(int argc, const char **argv) {
             opt("i,input", "Input Scene Description File", cxxopts::value<std::string>());
             opt("v,verbose", "Use verbose output");
             opt("spp", "Override scene spp setting", cxxopts::value<int>());
+            opt("denoise", "Run denoiser");
             opt("gpu", "Use gpu rendering");
             opt("help", "Show this help");
         }
@@ -62,6 +64,9 @@ void parse(int argc, const char **argv) {
         }
         if (result.count("verbose")) {
             GetDefaultLogger()->log_verbose(true);
+        }
+        if (result.count("denoise")) {
+            denoise = true;
         }
         // if (result.count("gpu")) {
         //     set_device_gpu();
@@ -91,6 +96,9 @@ void parse_and_run() {
     AKR_ASSERT_THROW(scene);
     if (spp > 0) {
         scene->set_spp(spp);
+    }
+    if (denoise) {
+        scene->run_denosier(denoise);
     }
     scene->render();
 }

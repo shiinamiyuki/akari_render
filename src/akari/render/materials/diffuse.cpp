@@ -31,12 +31,15 @@ namespace akari::render {
       public:
         DiffuseMaterial(const Texture *color) : color(color) {}
         const Texture *color;
-        BSDFClosure * evaluate(MaterialEvalContext &ctx) const override {
+        BSDFClosure *evaluate(MaterialEvalContext &ctx) const override {
             auto R = color->evaluate(ctx.sp);
             return ctx.allocator->new_object<DiffuseBSDF>(R);
         }
+        Spectrum albedo(const ShadingPoint &sp) const override {
+            auto R = color->evaluate(sp);
+            return R;
+        }
     };
-
 
     class DiffuseMaterialNode final : public MaterialNode {
         std::shared_ptr<TextureNode> color;

@@ -53,7 +53,7 @@ namespace akari::render {
             }
             Timer timer;
             int estimate_ray_per_sample = max_depth * 2 + 1;
-            double estimate_ray_per_sec = 0.5 * 1000 * 1000;
+            double estimate_ray_per_sec = 5 * 1000 * 1000;
             double estimate_single_tile = spp * estimate_ray_per_sample * tile_size * tile_size / estimate_ray_per_sec;
             size_t estimate_tiles_per_sec = std::max<size_t>(1, size_t(1.0 / estimate_single_tile));
             debug("estimate_tiles_per_sec:{} total:{}", estimate_tiles_per_sec, n_tiles.x * n_tiles.y);
@@ -121,6 +121,7 @@ namespace akari::render {
             spp = spp_;
             return true;
         }
+        int get_spp() const override { return spp; }
     };
     AKR_EXPORT_NODE(Path, PathIntegratorNode)
 } // namespace akari::render

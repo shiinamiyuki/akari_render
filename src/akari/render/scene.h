@@ -116,14 +116,17 @@ namespace akari::render {
         TRSTransform envmap_transform;
         std::shared_ptr<EnvMapNode> envmap;
         Scene scene;
+        bool run_denoiser_ = false;
+        int super_sampling_k = 0;
         void init_scene(Allocator<> *allocator);
+
       public:
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override;
         void commit() override;
         void render();
-        void set_spp(int spp){
-            spp_override = spp;
-        }
+        void set_spp(int spp) { spp_override = spp; }
+        void run_denosier(bool v) { run_denoiser_ = v; }
+        void super_sample(int k) { super_sampling_k = k; }
     };
 } // namespace akari::render

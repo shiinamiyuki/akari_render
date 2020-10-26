@@ -23,12 +23,14 @@
 #include <mutex>
 #include <akari/core/parallel.h>
 #include <akari/core/profiler.h>
+#include <akari/core/logger.h>
 #include <akari/render/scene.h>
 #include <akari/render/camera.h>
 #include <akari/render/integrator.h>
 #include <akari/render/material.h>
 #include <akari/render/mesh.h>
 #include <akari/shaders/common.h>
+// #include <akari/render/denoiser.h>
 namespace akari::render {
     class AOVIntegrator : public Integrator {
         const int tile_size = 16;
@@ -64,12 +66,17 @@ namespace akari::render {
                             sampler->start_next_sample();
                             CameraSample sample =
                                 camera->generate_ray(sampler->next2d(), sampler->next2d(), ivec2(x, y));
-                            Spectrum value;
+                            Spectrum value = Spectrum(0.0);
                             if (auto isct = scene->intersect(sample.ray)) {
+                                auto trig = scene->get_triangle(isct->geom_id, isct->prim_id);
                                 switch (aov) {
-                                case AOV::albedo:
+                                case AOV::albedo: {
+                                    auto mat = trig.material;
+                                    ShadingPoint sp(trig.texcoord(isct->uv));
+                                    value = mat->albedo(sp);
+                                } break;
                                 case AOV::normal:
-                                    value = sample.normal;
+                                    value = trig.ng();
                                     break;
                                 }
                             }
@@ -100,12 +107,34 @@ namespace akari::render {
             if (field == "spp") {
                 spp = value.get<int>().value();
             }
+            if (field == "aov") {
+                auto v = value.get<std::string>().value();
+                if (v == "albedo") {
+                    aov = AOVIntegrator::albedo;
+                } else if (v == "normal") {
+                    aov = AOVIntegrator::normal;
+                }
+            }
         }
         bool set_spp(int spp_) override {
             spp = spp_;
             return true;
         }
+        int get_spp() const override { return spp; }
     };
-    AKR_EXPORT_NODE(AOV, AOVIntegratorNode)
+    AKR_EXPORT std::shared_ptr<IntegratorNode> make_aov_integrator() { return std::make_shared<AOVIntegratorNode>(); }
+    AKR_EXPORT std::shared_ptr<IntegratorNode> make_aov_integrator(int spp, const char *aov_) {
+        auto aov = std::string(aov_);
+        auto integrator = std::make_shared<AOVIntegratorNode>();
+        if (aov == "normal") {
+            integrator->aov = AOVIntegrator::normal;
+        } else if (aov == "albedo") {
+            integrator->aov = AOVIntegrator::albedo;
+        } else {
+            error("invalid aov: {}", aov);
+        }
 
+        integrator->spp = spp;
+        return integrator;
+    }
 } // namespace akari::render
