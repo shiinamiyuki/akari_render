@@ -9,13 +9,29 @@ AkariRender is a CPU/GPU physically based renderer written in C++17.
 [![Build Status](https://travis-ci.org/shiinamiyuki/AkariRender.svg?branch=master)](https://travis-ci.org/shiinamiyuki/AkariRender)
 
 ## Features
- - Optional GPU rendering using Vulkan RT(WIP) 
+ - Optional GPU rendering using CUDA + Optix7(WIP) 
  - Optional Embree backend
+ - Optional denoiser using OpenImageDenoise
 
 ## Build from Source
 ```bash
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
+```
+
+### To use Embree
+```bash
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release -DAKR_ENABLE_EMBREE=ON
+```
+
+### To use OIDN
+```bash
+cd external
+git clone --recursive https://github.com/OpenImageDenoise/oidn
+cd ..
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release -DAKR_ENABLE_OIDN=ON
 ```
 
 

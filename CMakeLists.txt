@@ -3,7 +3,7 @@ project(AkariRender)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 set(CMAKE_CXX_STANDARD 17)
 option(AKR_BUILD_GUI "Build Gui / Editor" OFF)
-option(AKR_PYTHON_SUPPORT "Enable Python Support" OFF)
+option(AKR_NO_GPU "Turn off GPU support" OFF)
 option(AKR_ENABLE_EMBREE "Use Embree as ray intersection backend" OFF)
 option(AKR_USE_PREBUILD_EMBREE "Use prebuilt binary" OFF)
 option(AKR_ENABLE_ASL "Enable Akari Shading Language for procedural shading" OFF)
@@ -62,7 +62,7 @@ endmacro()
 
 include(cmake/Embree.cmake)
 include(cmake/OIDN.cmake)
-
+include(cmake/CUDA.cmake)
 
 
 
@@ -83,6 +83,7 @@ file(GLOB AKR_PYBIND_SRC src/akari/core/nodes/*.*)
 
 add_library(libakari_core SHARED ${AKR_COMMON_SRC}  ${AKR_CORE_SRC})
 target_link_libraries(libakari_core PUBLIC  ${AKR_CORE_EXT_LIBS} ${AKR_CUDA_LIBS})
+set_target_CUDA_props(libakari_core)
 if(AKR_ENABLE_PYTHON)
     target_link_libraries(libakari_core ${Python_LIBRARIES})
 endif()
@@ -114,6 +115,7 @@ add_library(libakari_render SHARED ${AKR_RENDER_SRC})
 target_include_directories(libakari_render PUBLIC src/)
 target_link_libraries(libakari_render PUBLIC libakari_core)
 copy_to_dist(libakari_render)
+set_target_CUDA_props(libakari_render)
 
 function(add_plugin target)
     add_library(${target} SHARED ${ARGN})
@@ -126,6 +128,7 @@ function(add_plugin target)
     target_link_libraries(${target} libakari_render)
     add_custom_command(TARGET ${target} POST_BUILD 
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${target}>  ${CMAKE_BINARY_DIR}/dist/plugins/)
+    set_target_CUDA_props(${target})
 endfunction()
 
 add_subdirectory(src/akari/render)
@@ -134,6 +137,7 @@ add_subdirectory(src/akari/plugins)
 add_executable(akari src/akari/cmd/akari.cpp )
 target_include_directories(akari PUBLIC src/)
 target_link_libraries(akari libakari_render)
+set_target_CUDA_props(akari)
 copy_to_dist(akari)
 
 
@@ -142,6 +146,7 @@ add_executable(akari-import src/akari/cmd/akari-import.cpp )
 target_include_directories(akari-import PUBLIC src/)
 target_link_libraries(akari-import libakari_core)
 copy_to_dist(akari-import)
+set_target_CUDA_props(akari-import)
 
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 add_subdirectory(external/googletest EXCLUDE_FROM_ALL)
@@ -150,4 +155,5 @@ add_executable(akari-test ${AKR_TEST} src/akari/cmd/akari-test.cpp)
 target_link_libraries(akari-test gtest libakari_core)
 add_test(NAME akari COMMAND akari-test)
 copy_to_dist(akari-test)
+set_target_CUDA_props(akari-test)
 
