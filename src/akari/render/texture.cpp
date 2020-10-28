@@ -23,46 +23,19 @@
 #include <akari/render/texture.h>
 #include <akari/core/color.h>
 #include <akari/core/resource.h>
-#include <akari/core/image.hpp>
 #include <akari/render/common.h>
 namespace akari::render {
-    class ConstantTexture : public Texture {
-        Spectrum value;
 
-      public:
-        ConstantTexture(Spectrum v) : value(v) {}
-        Spectrum evaluate(const ShadingPoint &sp) const override { return value; }
-        Float integral() const override { return luminance(value); }
-    };
     class ConstantTextureNode final : public TextureNode {
         Spectrum value;
 
       public:
         ConstantTextureNode(Spectrum v) : value(v) {}
         Texture *create_texture(Allocator<> *allocator) override {
-            return allocator->new_object<ConstantTexture>(value);
+            return allocator->new_object<Texture>(allocator->new_object<const ConstantTexture>(value));
         }
     };
 
-    class ImageTexture : public Texture {
-        RGBAImage::View image;
-
-      public:
-        ImageTexture(RGBAImage::View image) : image(image) {}
-        Spectrum evaluate(const ShadingPoint &sp) const override {
-            vec2 texcoords = sp.texcoords;
-            vec2 tc = glm::mod(texcoords, vec2(1.0f));
-            tc.y = 1.0f - tc.y;
-            return image(tc).rgb;
-        }
-        Float integral() const override {
-            Float I = 0;
-            for (int i = 0; i < image.resolution().x * image.resolution().y; i++) {
-                I += luminance(image.data()[i].rgb);
-            }
-            return I / (image.resolution().x * image.resolution().y);
-        }
-    };
     class ImageTextureNode final : public TextureNode {
         std::shared_ptr<RGBAImage> image;
 
@@ -79,7 +52,7 @@ namespace akari::render {
             }
         }
         Texture *create_texture(Allocator<> *allocator) override {
-            return allocator->new_object<ImageTexture>(image->view());
+            return allocator->new_object<Texture>(allocator->new_object<const ImageTexture>(image->view()));
         }
     };
     AKR_EXPORT std::shared_ptr<TextureNode> create_constant_texture() {

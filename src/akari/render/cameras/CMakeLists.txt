@@ -1,1 +1,0 @@
-add_plugin(PerspectiveCamera perspective.cpp)

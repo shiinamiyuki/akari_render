@@ -50,6 +50,7 @@ namespace akari::render {
             REG_NODE("MixMaterial", create_mix_material);
             REG_NODE("DiffuseMaterial", create_diffuse_material);
             REG_NODE("GlossyMaterial", create_glossy_material);
+            REG_NODE("PerspectiveCamera", create_perspective_camera);
             register_node("EnvMap", [] { return dyn_cast<SceneGraphNode>(std::make_shared<EnvMapNode>()); });
             register_node("Scene", [] { return dyn_cast<SceneGraphNode>(std::make_shared<SceneNode>()); });
             register_node("AOV", [] { return dyn_cast<SceneGraphNode>(make_aov_integrator()); });

@@ -21,7 +21,7 @@
 // SOFTWARE.
 
 #pragma once
-
+#include <akari/core/variant.h>
 #include <akari/core/color.h>
 #include <akari/core/image.hpp>
 #include <akari/render/scenegraph.h>
@@ -32,14 +32,46 @@ namespace akari::render {
         ShadingPoint(const vec2 &tc) : texcoords(tc) {}
         vec2 texcoords;
     };
-    class Texture {
-      public:
-        virtual Spectrum evaluate(const ShadingPoint &sp) const = 0;
-        virtual Float integral() const = 0;
-    };
+    class Texture;
     class TextureNode : public SceneGraphNode {
       public:
         virtual Texture *create_texture(Allocator<> *) = 0;
+    };
+    class ConstantTexture {
+        Spectrum value;
+
+      public:
+        ConstantTexture(Spectrum v) : value(v) {}
+        AKR_XPU Spectrum evaluate(const ShadingPoint &sp) const { return value; }
+        Float integral() const { return luminance(value); }
+    };
+    class ImageTexture {
+        RGBAImage::View image;
+
+      public:
+        ImageTexture(RGBAImage::View image) : image(image) {}
+        AKR_XPU Spectrum evaluate(const ShadingPoint &sp) const {
+            vec2 texcoords = sp.texcoords;
+            vec2 tc = glm::mod(texcoords, vec2(1.0f));
+            tc.y = 1.0f - tc.y;
+            return image(tc).rgb;
+        }
+        Float integral() const {
+            Float I = 0;
+            for (int i = 0; i < image.resolution().x * image.resolution().y; i++) {
+                I += luminance(image.data()[i].rgb);
+            }
+            return I / (image.resolution().x * image.resolution().y);
+        }
+    };
+
+    class Texture : public Variant<const ImageTexture *, const ConstantTexture *> {
+      public:
+        using Variant::Variant;
+        AKR_XPU Spectrum evaluate(const ShadingPoint &sp) const { AKR_VAR_PTR_DISPATCH(evaluate, sp); }
+        Float integral() const {
+            return dispatch_cpu([&](auto arg) { return arg->integral(); });
+        }
     };
     AKR_EXPORT std::shared_ptr<TextureNode> create_constant_texture();
     AKR_EXPORT std::shared_ptr<TextureNode> create_image_texture();
