@@ -24,24 +24,23 @@
 
 #pragma once
 #include <akari/core/math.h>
+#include <akari/core/variant.h>
 #include <akari/render/scenegraph.h>
 #include <akari/render/common.h>
 #include <akari/core/memory.h>
 #include <akari/render/sampler.h>
 #include <akari/render/interaction.h>
 #include <akari/render/texture.h>
+#include <akari/render/closure.h>
 #include <optional>
 
 namespace akari::render {
-    enum BSDFType : int {
-        BSDF_NONE = 0u,
-        BSDF_REFLECTION = 1u << 0u,
-        BSDF_TRANSMISSION = 1u << 1u,
-        BSDF_DIFFUSE = 1u << 2u,
-        BSDF_GLOSSY = 1u << 3u,
-        BSDF_SPECULAR = 1u << 4u,
-        BSDF_ALL = BSDF_DIFFUSE | BSDF_GLOSSY | BSDF_REFLECTION | BSDF_TRANSMISSION,
-    };
+    class Material;
+    class DiffuseMaterial;
+    class GlossyMaterial;
+    class EmissiveMaterial;
+    class MixMaterial;
+
     struct BSDFSample {
         Vec3 wi = Vec3(0);
         Float pdf = 0.0;
@@ -56,142 +55,6 @@ namespace akari::render {
         BSDFSampleContext(const vec2 &u1, const Vec3 &wo) : u1(u1), wo(wo) {}
     };
 
-    class BSDFClosure {
-      public:
-        [[nodiscard]] virtual Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const = 0;
-        [[nodiscard]] virtual Spectrum evaluate(const Vec3 &wo, const Vec3 &wi) const = 0;
-        [[nodiscard]] virtual BSDFType type() const = 0;
-        [[nodiscard]] bool match_flags(BSDFType flag) const { return ((uint32_t)type() & (uint32_t)flag) != 0; }
-        virtual Spectrum sample(const vec2 &u, const Vec3 &wo, Vec3 *wi, Float *pdf, BSDFType *sampledType) const = 0;
-    };
-    class NullBSDF : public BSDFClosure {
-        [[nodiscard]] virtual Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const { return 0.0; }
-        [[nodiscard]] virtual Spectrum evaluate(const Vec3 &wo, const Vec3 &wi) const { return Spectrum(0.0); }
-        [[nodiscard]] virtual BSDFType type() const { return BSDF_NONE; }
-        virtual Spectrum sample(const vec2 &u, const Vec3 &wo, Vec3 *wi, Float *pdf, BSDFType *sampledType) const {
-            *sampledType = BSDF_NONE;
-            *pdf = 0.0;
-            return Spectrum(0.0);
-        }
-    };
-    AKR_EXPORT NullBSDF *null_bsdf();
-    class DiffuseBSDF : public BSDFClosure {
-        Spectrum R;
-
-      public:
-        DiffuseBSDF(const Spectrum &R) : R(R) {}
-        [[nodiscard]] Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const override {
-            
-            if (same_hemisphere(wo, wi)) {
-                return cosine_hemisphere_pdf(std::abs(cos_theta(wi)));
-            }
-            return 0.0f;
-        }
-        [[nodiscard]] Spectrum evaluate(const Vec3 &wo, const Vec3 &wi) const override {
-            
-            if (same_hemisphere(wo, wi)) {
-                return R * InvPi;
-            }
-            return Spectrum(0.0f);
-        }
-        [[nodiscard]] BSDFType type() const override { return BSDFType(BSDF_DIFFUSE | BSDF_REFLECTION); }
-        Spectrum sample(const vec2 &u, const Vec3 &wo, Vec3 *wi, Float *pdf, BSDFType *sampledType) const override {
-            
-            *wi = cosine_hemisphere_sampling(u);
-            if (!same_hemisphere(wo, *wi)) {
-                wi->y = -wi->y;
-            }
-            *sampledType = type();
-            *pdf = cosine_hemisphere_pdf(std::abs(cos_theta(*wi)));
-            return R * InvPi;
-        }
-    };
-
-    class MicrofacetReflection : public BSDFClosure {
-
-        Spectrum R;
-        MicrofacetModel model;
-
-      public:
-        MicrofacetReflection(const Spectrum &R, Float roughness)
-            : R(R), model(microfacet_new(MicrofacetGGX, roughness)) {}
-        [[nodiscard]] Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const override {
-            if (same_hemisphere(wo, wi)) {
-                auto wh = normalize(wo + wi);
-                return microfacet_evaluate_pdf(model, wh) / (Float(4.0f) * dot(wo, wh));
-            }
-            return 0.0f;
-        }
-        [[nodiscard]] Spectrum evaluate(const Vec3 &wo, const Vec3 &wi) const override {
-            if (same_hemisphere(wo, wi)) {
-                Float cosThetaO = abs_cos_theta(wo);
-                Float cosThetaI = abs_cos_theta(wi);
-                auto wh = (wo + wi);
-                if (cosThetaI == 0 || cosThetaO == 0)
-                    return Spectrum(0);
-                if (wh.x == 0 && wh.y == 0 && wh.z == 0)
-                    return Spectrum(0);
-                wh = normalize(wh);
-                if (wh.y < 0) {
-                    wh = -wh;
-                }
-                auto F = 1.0f; // fresnel->evaluate(dot(wi, wh));
-
-                return R * (microfacet_D(model, wh) * microfacet_G(model, wo, wi, wh) * F /
-                            (Float(4.0f) * cosThetaI * cosThetaO));
-            }
-            return Spectrum(0.0f);
-        }
-        [[nodiscard]] BSDFType type() const override { return BSDFType(BSDF_GLOSSY | BSDF_REFLECTION); }
-        Spectrum sample(const vec2 &u, const Vec3 &wo, Vec3 *wi, Float *pdf, BSDFType *sampledType) const override {
-            *sampledType = type();
-            auto wh = microfacet_sample_wh(model, wo, u);
-            *wi = glm::reflect(-wo, wh);
-            if (!same_hemisphere(wo, *wi)) {
-                *pdf = 0;
-                return Spectrum(0);
-            } else {
-                if (wh.y < 0) {
-                    wh = -wh;
-                }
-                *pdf = microfacet_evaluate_pdf(model, wh) / (Float(4.0f) * abs(dot(wo, wh)));
-            }
-            return evaluate(wo, *wi);
-        }
-    };
-
-    class MixBSDF : public BSDFClosure {
-      public:
-        Float fraction;
-        const BSDFClosure *bsdf_A = null_bsdf();
-        const BSDFClosure *bsdf_B = null_bsdf();
-        MixBSDF() = default;
-        MixBSDF(Float fraction, const BSDFClosure *bsdf_A, const BSDFClosure *bsdf_B)
-            : fraction(fraction), bsdf_A(bsdf_A), bsdf_B(bsdf_B) {}
-        [[nodiscard]] Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const override {
-            return (1.0 - fraction) * bsdf_A->evaluate_pdf(wo, wi) + fraction * bsdf_B->evaluate_pdf(wo, wi);
-        }
-        [[nodiscard]] Spectrum evaluate(const Vec3 &wo, const Vec3 &wi) const override {
-            return (1.0 - fraction) * bsdf_A->evaluate(wo, wi) + fraction * bsdf_B->evaluate(wo, wi);
-        }
-        [[nodiscard]] BSDFType type() const override { return BSDFType(bsdf_A->type() | bsdf_B->type()); }
-        Spectrum sample(const vec2 &u, const Vec3 &wo, Vec3 *wi, Float *pdf, BSDFType *sampledType) const override {
-            Float pdf_inner = 0;
-            Float pdf_select = 0;
-            Spectrum f;
-            if (u[0] < fraction) {
-                vec2 u_(u[0] / fraction, u[1]);
-                pdf_select = fraction;
-                f = bsdf_B->sample(u_, wo, wi, &pdf_inner, sampledType);
-            } else {
-                vec2 u_((u[0] - fraction) / (1.0 - fraction), u[1]);
-                pdf_select = 1.0 - fraction;
-                f = bsdf_A->sample(u_, wo, wi, &pdf_inner, sampledType);
-            }
-            *pdf = pdf_inner * pdf_select;
-            return f;
-        }
-    };
     class BSDF {
         const BSDFClosure *closure_;
         Vec3 ng, ns;
@@ -241,30 +104,32 @@ namespace akari::render {
                             const Vec3 &ns)
             : allocator(allocator), u1(sampler->next2d()), u2(sampler->next2d()), sp(texcoords), ng(ng), ns(ns) {}
     };
-
-    class EmissiveMaterial;
-    class Material {
+    class Material : public Variant<const DiffuseMaterial *, const GlossyMaterial *, const EmissiveMaterial *,
+                                    const MixMaterial *> {
       public:
-        virtual BSDFClosure *evaluate(MaterialEvalContext &ctx) const = 0;
-        virtual bool is_emissive() const { return false; }
-        virtual const EmissiveMaterial *as_emissive() const { return nullptr; }
-        virtual Spectrum albedo(const ShadingPoint &sp) const = 0;
-        BSDF get_bsdf(MaterialEvalContext &ctx) const {
+        using Variant::Variant;
+        AKR_XPU BSDFClosure *evaluate(MaterialEvalContext &ctx) const;
+        AKR_XPU Spectrum albedo(const ShadingPoint &sp) const;
+        AKR_XPU bool is_emissive() const { return this->isa<const EmissiveMaterial *>(); }
+        AKR_XPU const EmissiveMaterial *as_emissive() const { return *this->get<const EmissiveMaterial *>(); }
+        AKR_XPU BSDF get_bsdf(MaterialEvalContext &ctx) const {
             auto closure = evaluate(ctx);
             BSDF bsdf(ctx.ng, ctx.ns);
             bsdf.set_closure(closure);
             return bsdf;
         }
     };
-    class EmissiveMaterial : public Material {
+
+    class EmissiveMaterial;
+    class EmissiveMaterial {
       public:
         EmissiveMaterial(const Texture *color) : color(color) {}
         const Texture *color = nullptr;
         bool double_sided = false;
-        BSDFClosure *evaluate(MaterialEvalContext &ctx) const override { return nullptr; }
-        bool is_emissive() const override { return true; }
-        const EmissiveMaterial *as_emissive() const override { return this; }
-        Spectrum albedo(const ShadingPoint &sp) const override { return color->evaluate(sp); }
+        BSDFClosure *evaluate(MaterialEvalContext &ctx) const { return nullptr; }
+        bool is_emissive() const { return true; }
+        const EmissiveMaterial *as_emissive() const { return this; }
+        Spectrum albedo(const ShadingPoint &sp) const { return color->evaluate(sp); }
     };
     class MaterialNode : public SceneGraphNode {
       public:
@@ -287,38 +152,53 @@ namespace akari::render {
         }
     }
 
-    class EmissiveMaterialNode : public MaterialNode {
-      public:
-        bool double_sided = false;
-        std::shared_ptr<TextureNode> color;
-        Material *create_material(Allocator<> *allocator) override {
-            auto tex = color->create_texture(allocator);
-            return allocator->new_object<EmissiveMaterial>(tex);
-        }
-        void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
-                          const sdl::Value &value) override {
-            if (field == "color") {
-                color = resolve_texture(value);
-            }
-        }
-    };
-
-    class MixMaterial : public Material {
+    class MixMaterial {
       public:
         MixMaterial(const Texture *fraction, const Material *mat_A, const Material *mat_B)
             : fraction(fraction), mat_A(mat_A), mat_B(mat_B) {}
         const Texture *fraction = nullptr;
         const Material *mat_A = nullptr;
         const Material *mat_B = nullptr;
-        BSDFClosure *evaluate(MaterialEvalContext &ctx) const override {
+        BSDFClosure *evaluate(MaterialEvalContext &ctx) const {
             auto closure = ctx.allocator->new_object<MixBSDF>(fraction->evaluate(ctx.sp)[0], mat_A->evaluate(ctx),
                                                               mat_B->evaluate(ctx));
             return closure;
         }
-        Spectrum albedo(const ShadingPoint &sp) const override {
+        Spectrum albedo(const ShadingPoint &sp) const {
             return lerp(mat_A->albedo(sp), mat_B->albedo(sp), fraction->evaluate(sp)[0]);
         }
     };
+    class DiffuseMaterial {
+      public:
+        DiffuseMaterial(const Texture *color) : color(color) {}
+        const Texture *color;
+        BSDFClosure *evaluate(MaterialEvalContext &ctx) const {
+            auto R = color->evaluate(ctx.sp);
+            return ctx.allocator->new_object<DiffuseBSDF>(R);
+        }
+        Spectrum albedo(const ShadingPoint &sp) const {
+            auto R = color->evaluate(sp);
+            return R;
+        }
+    };
+    class GlossyMaterial {
+      public:
+        GlossyMaterial(const Texture *color, const Texture *roughness) : color(color), roughness(roughness) {}
+        const Texture *color;
+        const Texture *roughness;
+        BSDFClosure *evaluate(MaterialEvalContext &ctx) const {
+            auto R = color->evaluate(ctx.sp);
+            auto r = roughness->evaluate(ctx.sp)[0];
+            return ctx.allocator->new_object<MicrofacetReflection>(R, r);
+        }
+        Spectrum albedo(const ShadingPoint &sp) const {
+            auto R = color->evaluate(sp);
+            return R;
+        }
+    };
 
-    AKR_EXPORT std::shared_ptr<MaterialNode> make_mix_material();
+    AKR_EXPORT std::shared_ptr<MaterialNode> create_diffuse_material();
+    AKR_EXPORT std::shared_ptr<MaterialNode> create_glossy_material();
+    AKR_EXPORT std::shared_ptr<MaterialNode> create_emissive_material();
+    AKR_EXPORT std::shared_ptr<MaterialNode> create_mix_material();
 } // namespace akari::render

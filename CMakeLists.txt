@@ -129,6 +129,7 @@ function(add_plugin target)
 endfunction()
 
 add_subdirectory(src/akari/render)
+add_subdirectory(src/akari/plugins)
 
 add_executable(akari src/akari/cmd/akari.cpp )
 target_include_directories(akari PUBLIC src/)

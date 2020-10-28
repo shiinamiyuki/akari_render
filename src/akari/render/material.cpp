@@ -22,11 +22,13 @@
 #include <akari/render/scenegraph.h>
 #include <akari/render/material.h>
 namespace akari::render {
-    NullBSDF *null_bsdf() {
-        static NullBSDF bsdf;
-        return &bsdf;
+    AKR_XPU BSDFClosure *Material::evaluate(MaterialEvalContext &ctx) const {
+        AKR_VAR_PTR_DISPATCH(evaluate, ctx);
     }
-        class MixMaterialNode final : public MaterialNode {
+    AKR_XPU Spectrum Material::albedo(const ShadingPoint &sp) const {
+        AKR_VAR_PTR_DISPATCH(albedo, sp);
+    }
+    class MixMaterialNode final : public MaterialNode {
         std::shared_ptr<TextureNode> fraction;
         std::shared_ptr<MaterialNode> mat_A;
         std::shared_ptr<MaterialNode> mat_B;
@@ -45,11 +47,66 @@ namespace akari::render {
             }
         }
         Material *create_material(Allocator<> *allocator) override {
-            return allocator->new_object<MixMaterial>(fraction->create_texture(allocator),
-                                                      mat_A->create_material(allocator),
-                                                      mat_B->create_material(allocator));
+            return allocator->new_object<Material>(allocator->new_object<const MixMaterial>(
+                fraction->create_texture(allocator), mat_A->create_material(allocator),
+                mat_B->create_material(allocator)));
         }
     };
+    class GlossyMaterialNode final : public MaterialNode {
+        std::shared_ptr<TextureNode> color;
+        std::shared_ptr<TextureNode> roughness;
 
-    std::shared_ptr<MaterialNode> make_mix_material() { return std::make_shared<MixMaterialNode>(); }
+      public:
+        GlossyMaterialNode() { roughness = create_constant_texture_rgb(Vec3(0.001)); }
+        void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
+                          const sdl::Value &value) override {
+            if (field == "color") {
+                color = resolve_texture(value);
+            } else if (field == "roughness") {
+                roughness = resolve_texture(value);
+            }
+        }
+        Material *create_material(Allocator<> *allocator) override {
+            return allocator->new_object<Material>(allocator->new_object<const GlossyMaterial>(
+                color->create_texture(allocator), roughness->create_texture(allocator)));
+        }
+    };
+    class DiffuseMaterialNode final : public MaterialNode {
+        std::shared_ptr<TextureNode> color;
+
+      public:
+        void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
+                          const sdl::Value &value) override {
+            if (field == "color") {
+                color = resolve_texture(value);
+            }
+        }
+        Material *create_material(Allocator<> *allocator) override {
+            return allocator->new_object<Material>(
+                allocator->new_object<const DiffuseMaterial>(color->create_texture(allocator)));
+        }
+    };
+    class EmissiveMaterialNode : public MaterialNode {
+      public:
+        bool double_sided = false;
+        std::shared_ptr<TextureNode> color;
+        Material *create_material(Allocator<> *allocator) override {
+            auto tex = color->create_texture(allocator);
+            return allocator->new_object<Material>(allocator->new_object<const EmissiveMaterial>(tex));
+        }
+        void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
+                          const sdl::Value &value) override {
+            if (field == "color") {
+                color = resolve_texture(value);
+            }
+        }
+    };
+    AKR_EXPORT std::shared_ptr<MaterialNode> create_diffuse_material() {
+        return std::make_shared<DiffuseMaterialNode>();
+    }
+    AKR_EXPORT std::shared_ptr<MaterialNode> create_glossy_material() { return std::make_shared<GlossyMaterialNode>(); }
+    AKR_EXPORT std::shared_ptr<MaterialNode> create_emissive_material() {
+        return std::make_shared<EmissiveMaterialNode>();
+    }
+    AKR_EXPORT std::shared_ptr<MaterialNode> create_mix_material() { return std::make_shared<MixMaterialNode>(); }
 } // namespace akari::render

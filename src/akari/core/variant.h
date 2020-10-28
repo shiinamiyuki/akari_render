@@ -23,14 +23,17 @@
 #include <type_traits>
 #include <algorithm>
 #include <cstring>
-#include <akari/common/panic.h>
-#include <akari/common/platform.h>
+#include <akari/core/panic.h>
+#include <akari/core/platform.h>
 namespace akari {
     template <typename... T>
     struct TypeIndex {
         template <typename U, typename Tp, typename... Rest>
         struct GetIndex_ {
-            static const int value = std::is_same<Tp, U>::value ? 0 : 1 + GetIndex_<U, Rest...>::value;
+            static const int value =
+                std::is_same<Tp, U>::value
+                    ? 0
+                    : ((GetIndex_<U, Rest...>::value == -1) ? -1 : 1 + GetIndex_<U, Rest...>::value);
         };
         template <typename U, typename Tp>
         struct GetIndex_<U, Tp> {
@@ -83,8 +86,9 @@ namespace akari {
         static constexpr size_t num_types = nTypes;
         Variant() = default;
 
-        template <typename U, typename = std::enable_if_t<Index::template GetIndex<U>::value != -1, void>>
+        template <typename U>
         AKR_XPU Variant(const U &u) {
+            static_assert(Index::template GetIndex<U>::value != -1, "U is not in T...");
             new (&data) U(u);
             index = Index::template GetIndex<U>::value;
         }
@@ -97,7 +101,7 @@ namespace akari {
         }
         AKR_XPU int typeindex() const { return index; }
         template <typename U>
-        AKR_XPU static int indexof() {
+        AKR_XPU constexpr static int indexof() {
             return Index::template GetIndex<U>::value;
         }
         AKR_XPU Variant &operator=(const Variant &v) noexcept {
@@ -242,6 +246,11 @@ namespace akari {
     return this->dispatch([&, this](auto &&self) {                                                                     \
         (void)this;                                                                                                    \
         return self.method(__VA_ARGS__);                                                                               \
+    });
+#define AKR_VAR_PTR_DISPATCH(method, ...)                                                                              \
+    return this->dispatch([&, this](auto &&self) {                                                                     \
+        (void)this;                                                                                                    \
+        return self->method(__VA_ARGS__);                                                                              \
     });
     };
 
