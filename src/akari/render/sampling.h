@@ -10,10 +10,10 @@ namespace akari::render {
         float r = float();
         if ((glm::abs(uOffset.x) > glm::abs(uOffset.y))) {
             r = uOffset.x;
-            theta = (Pi4 * (uOffset.y / uOffset.x));
+            theta = (PiOver4 * (uOffset.y / uOffset.x));
         } else {
             r = uOffset.y;
-            theta = (Pi2 - (Pi4 * (uOffset.x / uOffset.y)));
+            theta = (PiOver2 - (PiOver4 * (uOffset.x / uOffset.y)));
         }
         return (r * glm::vec2(glm::cos(theta), glm::sin(theta)));
     }

@@ -22,12 +22,7 @@
 #include <akari/render/scenegraph.h>
 #include <akari/render/material.h>
 namespace akari::render {
-    AKR_XPU BSDFClosure *Material::evaluate(MaterialEvalContext &ctx) const {
-        AKR_VAR_PTR_DISPATCH(evaluate, ctx);
-    }
-    AKR_XPU Spectrum Material::albedo(const ShadingPoint &sp) const {
-        AKR_VAR_PTR_DISPATCH(albedo, sp);
-    }
+  
     class MixMaterialNode final : public MaterialNode {
         std::shared_ptr<TextureNode> fraction;
         std::shared_ptr<MaterialNode> mat_A;

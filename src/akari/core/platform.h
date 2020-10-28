@@ -34,6 +34,7 @@ namespace akari {
 #    pragma warning(disable : 4996) // Secure SCL warnings
 #    pragma warning(disable : 5030)
 #    pragma warning(disable : 4324)
+#    pragma warning(disable : 4201)
 #    define AKR_FORCEINLINE __forceinline
 #else
 #    if defined _WIN32 || defined __CYGWIN__

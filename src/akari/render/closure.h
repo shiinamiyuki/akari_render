@@ -41,35 +41,28 @@ namespace akari::render {
         BSDF_SPECULAR = 1u << 4u,
         BSDF_ALL = BSDF_DIFFUSE | BSDF_GLOSSY | BSDF_REFLECTION | BSDF_TRANSMISSION,
     };
-    class BSDFClosure {
-      public:
-        [[nodiscard]] virtual Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const = 0;
-        [[nodiscard]] virtual Spectrum evaluate(const Vec3 &wo, const Vec3 &wi) const = 0;
-        [[nodiscard]] virtual BSDFType type() const = 0;
-        [[nodiscard]] bool match_flags(BSDFType flag) const { return ((uint32_t)type() & (uint32_t)flag) != 0; }
-        virtual Spectrum sample(const vec2 &u, const Vec3 &wo, Vec3 *wi, Float *pdf, BSDFType *sampledType) const = 0;
-    };
-    class DiffuseBSDF : public BSDFClosure {
+    class BSDFClosure;
+    class DiffuseBSDF {
         Spectrum R;
 
       public:
         DiffuseBSDF(const Spectrum &R) : R(R) {}
-        [[nodiscard]] Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const override {
+        [[nodiscard]] AKR_XPU Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const {
 
             if (same_hemisphere(wo, wi)) {
                 return cosine_hemisphere_pdf(std::abs(cos_theta(wi)));
             }
             return 0.0f;
         }
-        [[nodiscard]] Spectrum evaluate(const Vec3 &wo, const Vec3 &wi) const override {
+        [[nodiscard]] AKR_XPU Spectrum evaluate(const Vec3 &wo, const Vec3 &wi) const {
 
             if (same_hemisphere(wo, wi)) {
                 return R * InvPi;
             }
             return Spectrum(0.0f);
         }
-        [[nodiscard]] BSDFType type() const override { return BSDFType(BSDF_DIFFUSE | BSDF_REFLECTION); }
-        Spectrum sample(const vec2 &u, const Vec3 &wo, Vec3 *wi, Float *pdf, BSDFType *sampledType) const override {
+        [[nodiscard]] AKR_XPU BSDFType type() const { return BSDFType(BSDF_DIFFUSE | BSDF_REFLECTION); }
+        AKR_XPU Spectrum sample(const vec2 &u, const Vec3 &wo, Vec3 *wi, Float *pdf, BSDFType *sampledType) const {
 
             *wi = cosine_hemisphere_sampling(u);
             if (!same_hemisphere(wo, *wi)) {
@@ -81,7 +74,7 @@ namespace akari::render {
         }
     };
 
-    class MicrofacetReflection : public BSDFClosure {
+    class MicrofacetReflection {
 
         Spectrum R;
         MicrofacetModel model;
@@ -89,14 +82,14 @@ namespace akari::render {
       public:
         MicrofacetReflection(const Spectrum &R, Float roughness)
             : R(R), model(microfacet_new(MicrofacetGGX, roughness)) {}
-        [[nodiscard]] Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const override {
+        [[nodiscard]] AKR_XPU Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const {
             if (same_hemisphere(wo, wi)) {
                 auto wh = normalize(wo + wi);
                 return microfacet_evaluate_pdf(model, wh) / (Float(4.0f) * dot(wo, wh));
             }
             return 0.0f;
         }
-        [[nodiscard]] Spectrum evaluate(const Vec3 &wo, const Vec3 &wi) const override {
+        [[nodiscard]] AKR_XPU Spectrum evaluate(const Vec3 &wo, const Vec3 &wi) const {
             if (same_hemisphere(wo, wi)) {
                 Float cosThetaO = abs_cos_theta(wo);
                 Float cosThetaI = abs_cos_theta(wi);
@@ -116,8 +109,8 @@ namespace akari::render {
             }
             return Spectrum(0.0f);
         }
-        [[nodiscard]] BSDFType type() const override { return BSDFType(BSDF_GLOSSY | BSDF_REFLECTION); }
-        Spectrum sample(const vec2 &u, const Vec3 &wo, Vec3 *wi, Float *pdf, BSDFType *sampledType) const override {
+        [[nodiscard]] AKR_XPU BSDFType type() const { return BSDFType(BSDF_GLOSSY | BSDF_REFLECTION); }
+        AKR_XPU Spectrum sample(const vec2 &u, const Vec3 &wo, Vec3 *wi, Float *pdf, BSDFType *sampledType) const {
             *sampledType = type();
             auto wh = microfacet_sample_wh(model, wo, u);
             *wi = glm::reflect(-wo, wh);
@@ -134,7 +127,7 @@ namespace akari::render {
         }
     };
 
-    class MixBSDF : public BSDFClosure {
+    class MixBSDF {
       public:
         Float fraction;
         const BSDFClosure *bsdf_A = nullptr;
@@ -142,29 +135,50 @@ namespace akari::render {
         MixBSDF() = default;
         MixBSDF(Float fraction, const BSDFClosure *bsdf_A, const BSDFClosure *bsdf_B)
             : fraction(fraction), bsdf_A(bsdf_A), bsdf_B(bsdf_B) {}
-        [[nodiscard]] Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const override {
-            return (1.0 - fraction) * bsdf_A->evaluate_pdf(wo, wi) + fraction * bsdf_B->evaluate_pdf(wo, wi);
+        [[nodiscard]] AKR_XPU Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const;
+        [[nodiscard]] AKR_XPU Spectrum evaluate(const Vec3 &wo, const Vec3 &wi) const;
+        [[nodiscard]] AKR_XPU BSDFType type() const;
+        AKR_XPU Spectrum sample(const vec2 &u, const Vec3 &wo, Vec3 *wi, Float *pdf, BSDFType *sampledType) const;
+    };
+
+    class BSDFClosure : public Variant<MixBSDF, DiffuseBSDF, MicrofacetReflection> {
+      public:
+        using Variant::Variant;
+        [[nodiscard]] AKR_XPU Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const {
+            AKR_VAR_DISPATCH(evaluate_pdf, wo, wi);
         }
-        [[nodiscard]] Spectrum evaluate(const Vec3 &wo, const Vec3 &wi) const override {
-            return (1.0 - fraction) * bsdf_A->evaluate(wo, wi) + fraction * bsdf_B->evaluate(wo, wi);
+        [[nodiscard]] AKR_XPU Spectrum evaluate(const Vec3 &wo, const Vec3 &wi) const {
+            AKR_VAR_DISPATCH(evaluate, wo, wi);
         }
-        [[nodiscard]] BSDFType type() const override { return BSDFType(bsdf_A->type() | bsdf_B->type()); }
-        Spectrum sample(const vec2 &u, const Vec3 &wo, Vec3 *wi, Float *pdf, BSDFType *sampledType) const override {
-            Float pdf_inner = 0;
-            Float pdf_select = 0;
-            Spectrum f;
-            if (u[0] < fraction) {
-                vec2 u_(u[0] / fraction, u[1]);
-                pdf_select = fraction;
-                f = bsdf_B->sample(u_, wo, wi, &pdf_inner, sampledType);
-            } else {
-                vec2 u_((u[0] - fraction) / (1.0 - fraction), u[1]);
-                pdf_select = 1.0 - fraction;
-                f = bsdf_A->sample(u_, wo, wi, &pdf_inner, sampledType);
-            }
-            *pdf = pdf_inner * pdf_select;
-            return f;
+        [[nodiscard]] AKR_XPU BSDFType type() const { AKR_VAR_DISPATCH(type); }
+        [[nodiscard]] AKR_XPU bool match_flags(BSDFType flag) const { return ((uint32_t)type() & (uint32_t)flag) != 0; }
+        AKR_XPU Spectrum sample(const vec2 &u, const Vec3 &wo, Vec3 *wi, Float *pdf, BSDFType *sampledType) const {
+            AKR_VAR_DISPATCH(sample, u, wo, wi, pdf, sampledType);
         }
     };
 
+    [[nodiscard]] AKR_XPU inline Float MixBSDF::evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const {
+        return (1.0 - fraction) * bsdf_A->evaluate_pdf(wo, wi) + fraction * bsdf_B->evaluate_pdf(wo, wi);
+    }
+    [[nodiscard]] AKR_XPU inline Spectrum MixBSDF::evaluate(const Vec3 &wo, const Vec3 &wi) const {
+        return (1.0 - fraction) * bsdf_A->evaluate(wo, wi) + fraction * bsdf_B->evaluate(wo, wi);
+    }
+    [[nodiscard]] AKR_XPU inline BSDFType MixBSDF::type() const { return BSDFType(bsdf_A->type() | bsdf_B->type()); }
+    AKR_XPU inline Spectrum MixBSDF::sample(const vec2 &u, const Vec3 &wo, Vec3 *wi, Float *pdf,
+                                            BSDFType *sampledType) const {
+        Float pdf_inner = 0;
+        Float pdf_select = 0;
+        Spectrum f;
+        if (u[0] < fraction) {
+            vec2 u_(u[0] / fraction, u[1]);
+            pdf_select = fraction;
+            f = bsdf_B->sample(u_, wo, wi, &pdf_inner, sampledType);
+        } else {
+            vec2 u_((u[0] - fraction) / (1.0 - fraction), u[1]);
+            pdf_select = 1.0 - fraction;
+            f = bsdf_A->sample(u_, wo, wi, &pdf_inner, sampledType);
+        }
+        *pdf = pdf_inner * pdf_select;
+        return f;
+    }
 } // namespace akari::render

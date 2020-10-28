@@ -56,7 +56,7 @@ namespace akari::render {
     };
 
     class BSDF {
-        const BSDFClosure *closure_;
+        BSDFClosure closure_;
         Vec3 ng, ns;
         Frame frame;
         Float choice_pdf = 1.0f;
@@ -68,26 +68,26 @@ namespace akari::render {
             (void)this->ng;
             (void)this->ns;
         }
-        bool null() const { return closure() == nullptr; }
-        void set_closure(const BSDFClosure *closure) { closure_ = closure; }
+        bool null() const { return closure().null(); }
+        void set_closure(const BSDFClosure &closure) { closure_ = closure; }
         void set_choice_pdf(Float pdf) { choice_pdf = pdf; }
-        const BSDFClosure *closure() const { return closure_; }
+        const BSDFClosure &closure() const { return closure_; }
         [[nodiscard]] Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const {
-            auto pdf = closure()->evaluate_pdf(frame.world_to_local(wo), frame.world_to_local(wi));
+            auto pdf = closure().evaluate_pdf(frame.world_to_local(wo), frame.world_to_local(wi));
             return pdf * choice_pdf;
         }
         [[nodiscard]] Spectrum evaluate(const Vec3 &wo, const Vec3 &wi) const {
-            auto f = closure()->evaluate(frame.world_to_local(wo), frame.world_to_local(wi));
+            auto f = closure().evaluate(frame.world_to_local(wo), frame.world_to_local(wi));
             return f;
         }
 
-        [[nodiscard]] BSDFType type() const { return closure()->type(); }
-        [[nodiscard]] bool match_flags(BSDFType flag) const { return closure()->match_flags(flag); }
+        [[nodiscard]] BSDFType type() const { return closure().type(); }
+        [[nodiscard]] bool match_flags(BSDFType flag) const { return closure().match_flags(flag); }
         BSDFSample sample(const BSDFSampleContext &ctx) const {
             auto wo = frame.world_to_local(ctx.wo);
             Vec3 wi;
             BSDFSample sample;
-            sample.f = closure()->sample(ctx.u1, wo, &wi, &sample.pdf, &sample.sampled);
+            sample.f = closure().sample(ctx.u1, wo, &wi, &sample.pdf, &sample.sampled);
             sample.wi = frame.local_to_world(wi);
             sample.pdf *= choice_pdf;
             return sample;
@@ -108,8 +108,8 @@ namespace akari::render {
                                     const MixMaterial *> {
       public:
         using Variant::Variant;
-        AKR_XPU BSDFClosure *evaluate(MaterialEvalContext &ctx) const;
-        AKR_XPU Spectrum albedo(const ShadingPoint &sp) const;
+        AKR_XPU inline BSDFClosure evaluate(MaterialEvalContext &ctx) const;
+        AKR_XPU inline Spectrum albedo(const ShadingPoint &sp) const;
         AKR_XPU bool is_emissive() const { return this->isa<const EmissiveMaterial *>(); }
         AKR_XPU const EmissiveMaterial *as_emissive() const { return *this->get<const EmissiveMaterial *>(); }
         AKR_XPU BSDF get_bsdf(MaterialEvalContext &ctx) const {
@@ -126,7 +126,7 @@ namespace akari::render {
         EmissiveMaterial(const Texture *color) : color(color) {}
         const Texture *color = nullptr;
         bool double_sided = false;
-        BSDFClosure *evaluate(MaterialEvalContext &ctx) const { return nullptr; }
+        BSDFClosure evaluate(MaterialEvalContext &ctx) const { return BSDFClosure(); }
         bool is_emissive() const { return true; }
         const EmissiveMaterial *as_emissive() const { return this; }
         Spectrum albedo(const ShadingPoint &sp) const { return color->evaluate(sp); }
@@ -159,9 +159,10 @@ namespace akari::render {
         const Texture *fraction = nullptr;
         const Material *mat_A = nullptr;
         const Material *mat_B = nullptr;
-        BSDFClosure *evaluate(MaterialEvalContext &ctx) const {
-            auto closure = ctx.allocator->new_object<MixBSDF>(fraction->evaluate(ctx.sp)[0], mat_A->evaluate(ctx),
-                                                              mat_B->evaluate(ctx));
+        BSDFClosure evaluate(MaterialEvalContext &ctx) const {
+            auto closure =
+                MixBSDF(fraction->evaluate(ctx.sp)[0], ctx.allocator->new_object<BSDFClosure>(mat_A->evaluate(ctx)),
+                        ctx.allocator->new_object<BSDFClosure>(mat_B->evaluate(ctx)));
             return closure;
         }
         Spectrum albedo(const ShadingPoint &sp) const {
@@ -172,9 +173,9 @@ namespace akari::render {
       public:
         DiffuseMaterial(const Texture *color) : color(color) {}
         const Texture *color;
-        BSDFClosure *evaluate(MaterialEvalContext &ctx) const {
+        BSDFClosure evaluate(MaterialEvalContext &ctx) const {
             auto R = color->evaluate(ctx.sp);
-            return ctx.allocator->new_object<DiffuseBSDF>(R);
+            return DiffuseBSDF(R);
         }
         Spectrum albedo(const ShadingPoint &sp) const {
             auto R = color->evaluate(sp);
@@ -186,17 +187,20 @@ namespace akari::render {
         GlossyMaterial(const Texture *color, const Texture *roughness) : color(color), roughness(roughness) {}
         const Texture *color;
         const Texture *roughness;
-        BSDFClosure *evaluate(MaterialEvalContext &ctx) const {
+        BSDFClosure evaluate(MaterialEvalContext &ctx) const {
             auto R = color->evaluate(ctx.sp);
             auto r = roughness->evaluate(ctx.sp)[0];
-            return ctx.allocator->new_object<MicrofacetReflection>(R, r);
+            return MicrofacetReflection(R, r);
         }
         Spectrum albedo(const ShadingPoint &sp) const {
             auto R = color->evaluate(sp);
             return R;
         }
     };
-
+    AKR_XPU inline BSDFClosure Material::evaluate(MaterialEvalContext &ctx) const {
+        AKR_VAR_PTR_DISPATCH(evaluate, ctx);
+    }
+    AKR_XPU inline Spectrum Material::albedo(const ShadingPoint &sp) const { AKR_VAR_PTR_DISPATCH(albedo, sp); }
     AKR_EXPORT std::shared_ptr<MaterialNode> create_diffuse_material();
     AKR_EXPORT std::shared_ptr<MaterialNode> create_glossy_material();
     AKR_EXPORT std::shared_ptr<MaterialNode> create_emissive_material();
