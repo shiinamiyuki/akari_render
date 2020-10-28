@@ -88,7 +88,7 @@ namespace akari::render {
             return sample;
         }
     };
-    class Camera : Variant<const PerspectiveCamera *> {
+    class Camera : public Variant<const PerspectiveCamera *> {
       public:
         using Variant::Variant;
         AKR_XPU CameraSample generate_ray(const vec2 &u1, const vec2 &u2, const ivec2 &raster) const {

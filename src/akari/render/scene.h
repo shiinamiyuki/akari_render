@@ -22,6 +22,7 @@
 
 #pragma once
 #include <akari/core/math.h>
+#include <akari/core/box.h>
 #include <akari/core/distribution.h>
 #include <akari/render/accelerator.h>
 #include <akari/render/integrator.h>
@@ -53,7 +54,8 @@ namespace akari::render {
         const Sampler *sampler = nullptr;
         const LightIdMap *light_id_map = nullptr;
         const LightPdfMap *light_pdf_map = nullptr;
-        std::unique_ptr<InfiniteAreaLight> envmap;
+        Box<const InfiniteAreaLight> envmap_box;
+        const Light * envmap = nullptr;
         std::optional<Intersection> intersect(const Ray &ray) const { return accel->intersect(ray); }
         bool occlude(const Ray &ray) const { return accel->occlude(ray); }
         Triangle get_triangle(int mesh_id, int prim_id) const {
@@ -115,7 +117,7 @@ namespace akari::render {
         LightIdMap light_id_map;
         TRSTransform envmap_transform;
         std::shared_ptr<EnvMapNode> envmap;
-        Scene scene;
+        Box<Scene> scene;
         bool run_denoiser_ = false;
         int super_sampling_k = 0;
         void init_scene(Allocator<> *allocator);

@@ -29,7 +29,7 @@ namespace akari::render {
         Vec3 p;
         Vec3 ng;
     };
-    template <class RayIncidenceSample, class RayEmissionSample, class IncidenceSampleContext>
+    template <class Derived, class RayIncidenceSample, class RayEmissionSample, class IncidenceSampleContext>
     class EndPoint {
       public:
         /*
@@ -48,15 +48,17 @@ namespace akari::render {
           float pdfPos, pdfDir;
       };
         */
-        virtual Float pdf_incidence(const ReferencePoint &ref, const vec3 &wi) const {
-            AKR_PANIC("pdf_incidence not implemented!");
+        Float pdf_incidence(const ReferencePoint &ref, const vec3 &wi) const {
+            return static_cast<const Derived *>(this)->pdf_incidence(ref, wi);
         }
-        virtual std::pair<Float, Float> pdf_emission(const Ray &ray) const {
-            AKR_PANIC("pdf_emission not implemented!");
+        std::pair<Float, Float> pdf_emission(const Ray &ray) const {
+            return static_cast<const Derived *>(this)->pdf_emission(ray);
         }
-        virtual RayIncidenceSample sample_incidence(const IncidenceSampleContext &ctx) const = 0;
-        virtual RayEmissionSample sample_emission(const vec2 &u1, const vec2 &u2) const {
-            AKR_PANIC("sample_emission not implemented!");
+        RayIncidenceSample sample_incidence(const IncidenceSampleContext &ctx) const {
+            return static_cast<const Derived *>(this)->sample_incidence(ctx);
+        }
+        RayEmissionSample sample_emission(const vec2 &u1, const vec2 &u2) const {
+            return static_cast<const Derived *>(this)->sample_emission(u1, u2);
         }
     };
 } // namespace akari::render

@@ -26,16 +26,16 @@
 #include <akari/render/scene.h>
 
 namespace akari::render {
-    std::unique_ptr<InfiniteAreaLight> InfiniteAreaLight::create(const Scene &scene, const TRSTransform &transform,
+    Box<const InfiniteAreaLight> InfiniteAreaLight::create(const Scene &scene, const TRSTransform &transform,
                                                                  const Texture *texture, Allocator<> allocator) {
         auto distribution_map_resolution = InfiniteAreaLight::distribution_map_resolution;
-        auto light = std::make_unique<InfiniteAreaLight>();
-        light->l2w = transform();
-        light->w2l = light->l2w.inverse();
+        InfiniteAreaLight light;
+        light.l2w = transform();
+        light.w2l = light.l2w.inverse();
         info("Updating importance map");
-        light->world_bounds = scene.accel->world_bounds();
-        auto center = light->world_bounds.centroid();
-        auto world_radius = glm::length(center - light->world_bounds.pmin);
+        light.world_bounds = scene.accel->world_bounds();
+        auto center = light.world_bounds.centroid();
+        auto world_radius = glm::length(center - light.world_bounds.pmin);
         std::vector<Float> v(distribution_map_resolution * distribution_map_resolution);
         AtomicFloat sum(0.0f);
         parallel_for(
@@ -53,10 +53,10 @@ namespace akari::render {
                 sum.add(s);
             },
             256);
-        light->texture = texture;
-        light->distribution = std::make_unique<Distribution2D>(&v[0], distribution_map_resolution,
+        light.texture = texture;
+        light.distribution = std::make_unique<Distribution2D>(&v[0], distribution_map_resolution,
                                                                distribution_map_resolution, allocator);
-        light->_power = sum.value() / v.size() * 4 * Pi * world_radius * world_radius;
-        return light;
+        light._power = sum.value() / v.size() * 4 * Pi * world_radius * world_radius;
+        return make_pmr_box<const InfiniteAreaLight>(allocator, std::move(light));
     }
 } // namespace akari::render

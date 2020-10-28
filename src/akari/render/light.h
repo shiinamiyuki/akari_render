@@ -25,6 +25,7 @@
 #include <akari/render/scenegraph.h>
 #include <akari/render/common.h>
 #include <akari/core/memory.h>
+#include <akari/core/box.h>
 #include <akari/render/shape.h>
 #include <akari/render/texture.h>
 #include <akari/render/material.h>
@@ -56,11 +57,8 @@ namespace akari::render {
         Spectrum color;
         Float pdf;
     };
-    class Light : public EndPoint<LightSample, LightRaySample, LightSampleContext> {
-      public:
-        virtual Spectrum Le(const Vec3 &wo, const ShadingPoint &sp) const = 0;
-    };
-    class AreaLight final : public Light {
+
+    class AreaLight {
       public:
         const Texture *color;
         bool double_sided = false;
@@ -72,14 +70,14 @@ namespace akari::render {
             double_sided = triangle.material->as_emissive()->double_sided;
             ng = triangle.ng();
         }
-        Spectrum Le(const Vec3 &wo, const ShadingPoint &sp) const override {
+        AKR_XPU Spectrum Le(const Vec3 &wo, const ShadingPoint &sp) const {
             bool face_front = dot(wo, ng) > 0.0;
             if (double_sided || face_front) {
                 return color->evaluate(sp);
             }
             return Spectrum(0.0);
         }
-        Float pdf_incidence(const ReferencePoint &ref, const vec3 &wi) const override {
+        AKR_XPU Float pdf_incidence(const ReferencePoint &ref, const vec3 &wi) const {
             Ray ray(ref.p, wi);
             auto hit = triangle.intersect(ray);
             if (!hit) {
@@ -88,7 +86,7 @@ namespace akari::render {
             Float SA = triangle.area() * (-glm::dot(wi, triangle.ng())) / (hit->first * hit->first);
             return 1.0f / SA;
         }
-        LightSample sample_incidence(const LightSampleContext &ctx) const override {
+        AKR_XPU LightSample sample_incidence(const LightSampleContext &ctx) const {
             auto coords = uniform_sample_triangle(ctx.u);
             auto p = triangle.p(coords);
             LightSample sample;
@@ -104,7 +102,7 @@ namespace akari::render {
         }
     };
 
-    class AKR_EXPORT InfiniteAreaLight : public Light {
+    class AKR_EXPORT InfiniteAreaLight {
         Transform w2l, l2w;
         static constexpr size_t distribution_map_resolution = 4096;
         std::unique_ptr<Distribution2D> distribution = nullptr;
@@ -120,13 +118,13 @@ namespace akari::render {
             return vec2(phi * Inv2Pi, 1.0f - theta * InvPi);
         }
         Float power() const { return _power; }
-        Spectrum Le(const Vec3 &wo, const ShadingPoint &) const override {
+        AKR_XPU Spectrum Le(const Vec3 &wo, const ShadingPoint &) const {
             auto uv = get_uv(w2l.apply_vector(-wo));
             ShadingPoint sp;
             sp.texcoords = uv;
             return texture->evaluate(sp);
         }
-        Float pdf_incidence(const ReferencePoint &ref, const vec3 &wi) const override {
+        AKR_XPU Float pdf_incidence(const ReferencePoint &ref, const vec3 &wi) const {
             if (!distribution)
                 return 0.0f;
             auto w = w2l.apply_vector(wi);
@@ -137,7 +135,7 @@ namespace akari::render {
                 return 0.0f;
             return distribution->pdf_continuous(vec2(phi * Inv2Pi, 1.0f - theta * InvPi)) / (2 * Pi * Pi * sinTheta);
         }
-        LightSample sample_incidence(const LightSampleContext &ctx) const override {
+        AKR_XPU LightSample sample_incidence(const LightSampleContext &ctx) const {
             LightSample sample;
             Float mapPdf = 0.0f;
             if (!distribution) {
@@ -165,7 +163,24 @@ namespace akari::render {
             sample.shadow_ray = Ray(ctx.p, sample.wi, Eps, Inf);
             return sample;
         }
-        static std::unique_ptr<InfiniteAreaLight> create(const Scene &scene, const TRSTransform &transform,
+        static Box<const InfiniteAreaLight> create(const Scene &scene, const TRSTransform &transform,
                                                          const Texture *texture, Allocator<>);
+    };
+
+    class Light : public Variant<const AreaLight *, const InfiniteAreaLight *> {
+      public:
+        using Variant::Variant;
+        AKR_XPU Spectrum Le(const Vec3 &wo, const ShadingPoint &sp) const { AKR_VAR_PTR_DISPATCH(Le, wo, sp); }
+        AKR_XPU LightSample sample_incidence(const LightSampleContext &ctx) const {
+            AKR_VAR_PTR_DISPATCH(sample_incidence, ctx);
+        }
+        AKR_XPU Float pdf_incidence(const ReferencePoint &ref, const vec3 &wi) const {
+            AKR_VAR_PTR_DISPATCH(pdf_incidence, ref, wi);
+        }
+        std::pair<Float, Float> pdf_emission(const Ray &ray) const { AKR_PANIC("pdf_emission not implemented!"); }
+
+        LightRaySample sample_emission(const vec2 &u1, const vec2 &u2) const {
+            AKR_PANIC("sample_emission not implemented!");
+        }
     };
 } // namespace akari::render

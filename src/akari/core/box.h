@@ -27,6 +27,7 @@ namespace akari {
     template <typename T>
     struct Box {
         using Deleter = std::function<void(T *)>;
+        Box() = default;
         Box(Deleter deleter) : deleter(deleter) {}
         Box(T *ptr, Deleter deleter) : _ptr(ptr), deleter(deleter) {}
         Box(const Box &) = delete;
@@ -56,13 +57,20 @@ namespace akari {
         Deleter deleter;
     };
     template <typename T, typename... Ts>
-    Box<T> make_pmr_box(Ts &&... args) {
+    Box<T> make_box(Ts &&... args) {
         auto rsrc = astd::pmr::get_default_resource();
-        Allocator alloc(rsrc);
+        Allocator<> alloc(rsrc);
         return Box<T>(alloc.new_object<T>(std::forward<Ts>(args)...), [=](T *p) {
-            Allocator alloc_(rsrc);
+            Allocator<> alloc_(rsrc);
             alloc_.destroy(p);
-            alloc_.deallocate(p, 1);
+            alloc_.deallocate_object(const_cast<std::remove_const_t<T> *>(p), 1);
+        });
+    }
+    template <typename T, typename... Ts>
+    Box<T> make_pmr_box(Allocator<> alloc, Ts &&... args) {
+        return Box<T>(alloc.new_object<T>(std::forward<Ts>(args)...), [=](T *p) mutable {
+            alloc.destroy(p);
+            alloc.deallocate_object(const_cast<std::remove_const_t<T> *>(p), 1);
         });
     }
 } // namespace akari

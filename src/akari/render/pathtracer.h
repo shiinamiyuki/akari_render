@@ -128,7 +128,7 @@ namespace akari::render {
 
         void on_miss(const Ray &ray, const std::optional<PathVertex> &prev_vertex) noexcept {
             if (scene->envmap) {
-                on_hit_light(scene->envmap.get(), -ray.d, ShadingPoint(), prev_vertex);
+                on_hit_light(scene->envmap, -ray.d, ShadingPoint(), prev_vertex);
             }
         }
 

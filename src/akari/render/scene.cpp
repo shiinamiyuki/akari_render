@@ -42,20 +42,21 @@ namespace akari::render {
         lights.clear();
         light_id_map.clear();
         light_pdf_map.clear();
-        scene.camera = camera->create_camera(allocator);
+        scene = make_pmr_box<Scene>(*allocator);
+        scene->camera = camera->create_camera(allocator);
         for (auto &shape : shapes) {
             instances.emplace_back(shape->create_instance(allocator));
         }
-        scene.meshes = {instances.data(), instances.size()};
-        scene.accel = accel->create_accel(scene);
-        std::vector<const AreaLight *> area_lights;
+        scene->meshes = {instances.data(), instances.size()};
+        scene->accel = accel->create_accel(*scene);
+        std::vector<const Light *> area_lights;
         std::vector<Float> power;
         std::unordered_map<const Texture *, std::future<Float>> ft_integrals;
         std::unordered_map<const Texture *, Float> integrals;
-        for (uint32_t mesh_id = 0; mesh_id < scene.meshes.size(); mesh_id++) {
-            MeshInstance &mesh = scene.meshes[mesh_id];
+        for (uint32_t mesh_id = 0; mesh_id < scene->meshes.size(); mesh_id++) {
+            MeshInstance &mesh = scene->meshes[mesh_id];
             for (uint32_t prim_id = 0; prim_id < mesh.indices.size() / 3; prim_id++) {
-                auto triangle = scene.get_triangle(mesh_id, prim_id);
+                auto triangle = scene->get_triangle(mesh_id, prim_id);
                 auto material = triangle.material;
                 if (!material)
                     continue;
@@ -66,7 +67,7 @@ namespace akari::render {
                         ft_integrals.emplace(color, std::async(std::launch::async, [=] { return color->integral(); }));
                     }
                     (void)e;
-                    auto light = allocator->new_object<AreaLight>(triangle);
+                    auto light = allocator->new_object<Light>(allocator->new_object<const AreaLight>(triangle));
                     area_lights.emplace_back(light);
                     light_id_map.emplace(std::make_pair(mesh_id, prim_id), light);
                 }
@@ -85,7 +86,7 @@ namespace akari::render {
             integrals[pair.first] = pair.second.get();
         }
         for (size_t i = 0; i < area_lights.size(); i++) {
-            auto light = area_lights[i];
+            auto light = *area_lights[i]->get<const AreaLight*>();
             auto color = light->color;
             auto I = integrals[color];
             auto &triangle = light->triangle;
@@ -98,24 +99,25 @@ namespace akari::render {
             power.emplace_back(area * tc_area * I);
         }
         if (envmap) {
-            scene.envmap = InfiniteAreaLight::create(scene, envmap->transform, envmap_texture, Allocator<>());
-            power.emplace_back(scene.envmap->power());
+            scene->envmap_box = InfiniteAreaLight::create(*scene, envmap->transform, envmap_texture, *allocator);
+            scene->envmap = allocator->new_object<const Light>(scene->envmap_box.get());
+            power.emplace_back(scene->envmap_box->power());
         }
         for (auto i : area_lights) {
             lights.emplace_back(i);
         }
         if (envmap) {
-            lights.emplace_back(scene.envmap.get());
+            lights.emplace_back(scene->envmap);
         }
-        light_distribution = std::make_unique<Distribution1D>(power.data(), power.size(), Allocator<>());
+        light_distribution = std::make_unique<Distribution1D>(power.data(), power.size(), *allocator);
         AKR_ASSERT(lights.size() == power.size());
         for (size_t i = 0; i < lights.size(); i++) {
             light_pdf_map[lights[i]] = light_distribution->pdf_discrete(i);
         }
-        scene.light_distribution = light_distribution.get();
-        scene.lights = BufferView(lights.data(), lights.size());
-        scene.light_id_map = &light_id_map;
-        scene.light_pdf_map = &light_pdf_map;
+        scene->light_distribution = light_distribution.get();
+        scene->lights = BufferView(lights.data(), lights.size());
+        scene->light_id_map = &light_id_map;
+        scene->light_pdf_map = &light_pdf_map;
     }
     void SceneNode::render() {
         // Thanks to python hijacking SIGINT handler;
@@ -132,9 +134,9 @@ namespace akari::render {
         astd::pmr::monotonic_buffer_resource resource(astd::pmr::get_default_resource());
         Allocator<> allocator(&resource);
         init_scene(&allocator);
-        scene.sampler = sampler->create_sampler(&allocator);
+        scene->sampler = sampler->create_sampler(&allocator);
         auto real_integrator = integrator->create_integrator(&allocator);
-        ivec2 res = scene.camera->resolution();
+        ivec2 res = scene->camera->resolution();
         // if (super_sampling_k > 1) {
         //     auto s = std::sqrt(super_sampling_k);
         //     if (s * s != super_sampling_k) {
@@ -146,7 +148,7 @@ namespace akari::render {
         auto film = Film(res);
 
         Timer timer;
-        real_integrator->render(&scene, &film);
+        real_integrator->render(scene.get(), &film);
         info("render done ({}s)", timer.elapsed_seconds());
         if (!run_denoiser_) {
             film.write_image(fs::path(output));
@@ -157,7 +159,7 @@ namespace akari::render {
                 auto aov_integrator_node = make_aov_integrator(std::min(64, integrator->get_spp()), name);
                 auto integrator = aov_integrator_node->create_integrator(&allocator);
                 Film aov_film(res);
-                integrator->render(&scene, &aov_film);
+                integrator->render(scene.get(), &aov_film);
                 aov.aovs[name] = aov_film.to_rgba_image();
             };
             aov.aovs["color"] = film.to_rgba_image();
@@ -167,7 +169,7 @@ namespace akari::render {
             info("denoising...");
             auto pi = denoisers.load_plugin("OIDNDenoiser");
             auto denoiser = pi->make_shared();
-            auto output_image = denoiser->denoise(&scene, aov);
+            auto output_image = denoiser->denoise(scene.get(), aov);
             if (output_image) {
                 default_image_writer()->write(*output_image, fs::path(output), GammaCorrection());
             }
