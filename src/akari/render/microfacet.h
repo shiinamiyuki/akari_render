@@ -3,10 +3,10 @@
 #include <akari/core/math.h>
 #include <akari/render/geometry.h>
 namespace akari::render {
-    static const int32_t MicrofacetGGX = int32_t(0);
-    static const int32_t MicrofacetBeckmann = int32_t(1);
-    static const int32_t MicrofacetPhong = int32_t(2);
-    inline float BeckmannD(float alpha, const glm::vec3 &m) {
+    AKR_XPU static const int32_t MicrofacetGGX = int32_t(0);
+    AKR_XPU static const int32_t MicrofacetBeckmann = int32_t(1);
+    AKR_XPU static const int32_t MicrofacetPhong = int32_t(2);
+    AKR_XPU inline float BeckmannD(float alpha, const glm::vec3 &m) {
         if ((m.y <= float(0.0)))
             return float(0.0);
         float c = cos2_theta(m);
@@ -14,7 +14,7 @@ namespace akari::render {
         float a2 = (alpha * alpha);
         return (glm::exp((-t / a2)) / (((Pi * a2) * c) * c));
     }
-    inline float BeckmannG1(float alpha, const glm::vec3 &v, const glm::vec3 &m) {
+    AKR_XPU inline float BeckmannG1(float alpha, const glm::vec3 &v, const glm::vec3 &m) {
         if (((glm::dot(v, m) * v.y) <= float(0.0))) {
             return float(0.0);
         }
@@ -26,7 +26,7 @@ namespace akari::render {
             return float(1.0);
         }
     }
-    inline float PhongG1(float alpha, const glm::vec3 &v, const glm::vec3 &m) {
+    AKR_XPU inline float PhongG1(float alpha, const glm::vec3 &v, const glm::vec3 &m) {
         if (((glm::dot(v, m) * v.y) <= float(0.0))) {
             return float(0.0);
         }
@@ -38,12 +38,12 @@ namespace akari::render {
             return float(1.0);
         }
     }
-    inline float PhongD(float alpha, const glm::vec3 &m) {
+    AKR_XPU inline float PhongD(float alpha, const glm::vec3 &m) {
         if ((m.y <= float(0.0)))
             return float(0.0);
         return (((alpha + float(2.0)) / (float(2.0) * Pi)) * glm::pow(m.y, alpha));
     }
-    inline float GGX_D(float alpha, const glm::vec3 &m) {
+    AKR_XPU inline float GGX_D(float alpha, const glm::vec3 &m) {
         if ((m.y <= float(0.0)))
             return float(0.0);
         float a2 = (alpha * alpha);
@@ -52,7 +52,7 @@ namespace akari::render {
         float at = (a2 + t2);
         return (a2 / ((((Pi * c2) * c2) * at) * at));
     }
-    inline float GGX_G1(float alpha, const glm::vec3 &v, const glm::vec3 &m) {
+    AKR_XPU inline float GGX_G1(float alpha, const glm::vec3 &v, const glm::vec3 &m) {
         if (((glm::dot(v, m) * v.y) <= float(0.0))) {
             return float(0.0);
         }
@@ -62,7 +62,7 @@ namespace akari::render {
         int32_t type;
         float alpha;
     };
-    inline MicrofacetModel microfacet_new(int32_t type, float roughness) {
+    AKR_XPU inline MicrofacetModel microfacet_new(int32_t type, float roughness) {
         float alpha = float();
         if ((type == MicrofacetPhong)) {
             alpha = ((float(2.0) / (roughness * roughness)) - float(2.0));
@@ -71,7 +71,7 @@ namespace akari::render {
         }
         return MicrofacetModel{type, alpha};
     }
-    inline float microfacet_D(const MicrofacetModel &model, const glm::vec3 &m) {
+    AKR_XPU inline float microfacet_D(const MicrofacetModel &model, const glm::vec3 &m) {
         int32_t type = model.type;
         float alpha = model.alpha;
         switch (type) {
@@ -87,7 +87,7 @@ namespace akari::render {
         }
         return float(0.0);
     }
-    inline float microfacet_G1(const MicrofacetModel &model, const glm::vec3 &v, const glm::vec3 &m) {
+    AKR_XPU inline float microfacet_G1(const MicrofacetModel &model, const glm::vec3 &v, const glm::vec3 &m) {
         int32_t type = model.type;
         float alpha = model.alpha;
         switch (type) {
@@ -103,11 +103,12 @@ namespace akari::render {
         }
         return float(0.0);
     }
-    inline float microfacet_G(const MicrofacetModel &model, const glm::vec3 &i, const glm::vec3 &o,
-                              const glm::vec3 &m) {
+    AKR_XPU inline float microfacet_G(const MicrofacetModel &model, const glm::vec3 &i, const glm::vec3 &o,
+                                      const glm::vec3 &m) {
         return (microfacet_G1(model, i, m) * microfacet_G1(model, o, m));
     }
-    inline glm::vec3 microfacet_sample_wh(const MicrofacetModel &model, const glm::vec3 &wo, const glm::vec2 &u) {
+    AKR_XPU inline glm::vec3 microfacet_sample_wh(const MicrofacetModel &model, const glm::vec3 &wo,
+                                                  const glm::vec2 &u) {
         int32_t type = model.type;
         float alpha = model.alpha;
         float phi = ((float(2.0) * Pi) * u.y);
@@ -134,7 +135,7 @@ namespace akari::render {
             wh = -wh;
         return wh;
     }
-    inline float microfacet_evaluate_pdf(const MicrofacetModel &m, const glm::vec3 &wh) {
+    AKR_XPU inline float microfacet_evaluate_pdf(const MicrofacetModel &m, const glm::vec3 &wh) {
         return (microfacet_D(m, wh) * abs_cos_theta(wh));
     }
 } // namespace akari::render

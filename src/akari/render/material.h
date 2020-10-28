@@ -320,28 +320,5 @@ namespace akari::render {
         }
     };
 
-    class MixMaterialNode final : public MaterialNode {
-        std::shared_ptr<TextureNode> fraction;
-        std::shared_ptr<MaterialNode> mat_A;
-        std::shared_ptr<MaterialNode> mat_B;
-
-      public:
-        void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
-                          const sdl::Value &value) override {
-            if (field == "fraction" || field == "frac") {
-                fraction = resolve_texture(value);
-            } else if (field == "first") {
-                mat_A = dyn_cast<MaterialNode>(value.object());
-                AKR_ASSERT_THROW(mat_A);
-            } else if (field == "second") {
-                mat_B = dyn_cast<MaterialNode>(value.object());
-                AKR_ASSERT_THROW(mat_B);
-            }
-        }
-        Material *create_material(Allocator<> *allocator) override {
-            return allocator->new_object<MixMaterial>(fraction->create_texture(allocator),
-                                                      mat_A->create_material(allocator),
-                                                      mat_B->create_material(allocator));
-        }
-    };
+    AKR_EXPORT std::shared_ptr<MaterialNode> make_mix_material();
 } // namespace akari::render

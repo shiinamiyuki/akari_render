@@ -2,7 +2,7 @@
 #pragma once
 #include <akari/core/math.h>
 namespace akari::render {
-    inline glm::vec2 concentric_disk_sampling(const glm::vec2 &u) {
+    AKR_XPU inline glm::vec2 concentric_disk_sampling(const glm::vec2 &u) {
         glm::vec2 uOffset = ((float(2.0) * u) - glm::vec2(int32_t(1), int32_t(1)));
         if (((uOffset.x == float(0.0)) && (uOffset.y == float(0.0))))
             return glm::vec2(int32_t(0), int32_t(0));
@@ -17,24 +17,24 @@ namespace akari::render {
         }
         return (r * glm::vec2(glm::cos(theta), glm::sin(theta)));
     }
-    inline glm::vec3 cosine_hemisphere_sampling(const glm::vec2 &u) {
+    AKR_XPU inline glm::vec3 cosine_hemisphere_sampling(const glm::vec2 &u) {
         glm::vec2 uv = concentric_disk_sampling(u);
         float r = glm::dot(uv, uv);
         float h = glm::sqrt(glm::max(float(float(0.0)), float((float(1.0) - r))));
         return glm::vec3(uv.x, h, uv.y);
     }
-    inline float cosine_hemisphere_pdf(float cosTheta) { return (cosTheta * InvPi); }
-    inline float uniform_sphere_pdf() { return (float(1.0) / (float(4.0) * Pi)); }
-    inline glm::vec3 uniform_sphere_sampling(const glm::vec2 &u) {
+    AKR_XPU inline float cosine_hemisphere_pdf(float cosTheta) { return (cosTheta * InvPi); }
+    AKR_XPU inline float uniform_sphere_pdf() { return (float(1.0) / (float(4.0) * Pi)); }
+    AKR_XPU inline glm::vec3 uniform_sphere_sampling(const glm::vec2 &u) {
         float z = (float(1.0) - (float(2.0) * u[int32_t(0)]));
         float r = glm::sqrt(glm::max(float(0.0), (float(1.0) - (z * z))));
         float phi = ((float(2.0) * Pi) * u[int32_t(1)]);
         return glm::vec3((r * glm::cos(phi)), (r * glm::sin(phi)), z);
     }
-    inline glm::vec2 uniform_sample_triangle(const glm::vec2 &u) {
+    AKR_XPU inline glm::vec2 uniform_sample_triangle(const glm::vec2 &u) {
         float su0 = glm::sqrt(u[int32_t(0)]);
         float b0 = (float(1.0) - su0);
         float b1 = (u[int32_t(1)] * su0);
         return glm::vec2(b0, b1);
     }
-} // namespace akari::shader
+} // namespace akari::render

@@ -25,23 +25,8 @@
 #include <akari/render/material.h>
 #include <akari/core/color.h>
 #include <akari/render/common.h>
+#include <akari/render/materials/glossy.h>
 namespace akari::render {
-    
-    class GlossyMaterial : public Material {
-      public:
-        GlossyMaterial(const Texture *color, const Texture *roughness) : color(color), roughness(roughness) {}
-        const Texture *color;
-        const Texture *roughness;
-        BSDFClosure *evaluate(MaterialEvalContext &ctx) const override {
-            auto R = color->evaluate(ctx.sp);
-            auto r = roughness->evaluate(ctx.sp)[0];
-            return ctx.allocator->new_object<MicrofacetReflection>(R, r);
-        }
-        Spectrum albedo(const ShadingPoint &sp) const override {
-            auto R = color->evaluate(sp);
-            return R;
-        }
-    };
 
     class GlossyMaterialNode final : public MaterialNode {
         std::shared_ptr<TextureNode> color;

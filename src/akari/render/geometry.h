@@ -24,26 +24,27 @@
 
 #pragma once
 #include <akari/core/math.h>
+#include <akari/core/astd.h>
 namespace akari::render {
-    inline float cos_theta(const glm::vec3 &w) { return w.y; }
-    inline float abs_cos_theta(const glm::vec3 &w) { return glm::abs(cos_theta(w)); }
-    inline float cos2_theta(const glm::vec3 &w) { return (w.y * w.y); }
-    inline float sin2_theta(const glm::vec3 &w) { return (float(1.0) - cos2_theta(w)); }
-    inline float sin_theta(const glm::vec3 &w) { return glm::sqrt(glm::max(float(0.0), sin2_theta(w))); }
-    inline float tan2_theta(const glm::vec3 &w) { return (sin2_theta(w) / cos2_theta(w)); }
-    inline float tan_theta(const glm::vec3 &w) { return glm::sqrt(glm::max(float(0.0), tan2_theta(w))); }
-    inline float cos_phi(const glm::vec3 &w) {
+    AKR_XPU inline float cos_theta(const glm::vec3 &w) { return w.y; }
+    AKR_XPU inline float abs_cos_theta(const glm::vec3 &w) { return glm::abs(cos_theta(w)); }
+    AKR_XPU inline float cos2_theta(const glm::vec3 &w) { return (w.y * w.y); }
+    AKR_XPU inline float sin2_theta(const glm::vec3 &w) { return (float(1.0) - cos2_theta(w)); }
+    AKR_XPU inline float sin_theta(const glm::vec3 &w) { return glm::sqrt(glm::max(float(0.0), sin2_theta(w))); }
+    AKR_XPU inline float tan2_theta(const glm::vec3 &w) { return (sin2_theta(w) / cos2_theta(w)); }
+    AKR_XPU inline float tan_theta(const glm::vec3 &w) { return glm::sqrt(glm::max(float(0.0), tan2_theta(w))); }
+    AKR_XPU inline float cos_phi(const glm::vec3 &w) {
         float sinTheta = sin_theta(w);
         return (sinTheta == float(0.0)) ? float(1.0) : glm::clamp((w.x / sinTheta), -float(1.0), float(1.0));
     }
-    inline float sin_phi(const glm::vec3 &w) {
+    AKR_XPU inline float sin_phi(const glm::vec3 &w) {
         float sinTheta = sin_theta(w);
         return (sinTheta == float(0.0)) ? float(0.0) : glm::clamp((w.z / sinTheta), -float(1.0), float(1.0));
     }
-    inline float cos2_phi(const glm::vec3 &w) { return (cos_phi(w) * cos_phi(w)); }
-    inline float sin2_phi(const glm::vec3 &w) { return (sin_phi(w) * sin_phi(w)); }
-    inline bool same_hemisphere(const glm::vec3 &wo, const glm::vec3 &wi) { return ((wo.y * wi.y) >= float(0.0)); }
-    inline bool refract(const glm::vec3 &wi, const glm::vec3 &n, float eta, glm::vec3 &wt) {
+    AKR_XPU inline float cos2_phi(const glm::vec3 &w) { return (cos_phi(w) * cos_phi(w)); }
+    AKR_XPU inline float sin2_phi(const glm::vec3 &w) { return (sin_phi(w) * sin_phi(w)); }
+    AKR_XPU inline bool same_hemisphere(const glm::vec3 &wo, const glm::vec3 &wi) { return ((wo.y * wi.y) >= float(0.0)); }
+    AKR_XPU inline bool refract(const glm::vec3 &wi, const glm::vec3 &n, float eta, glm::vec3 &wt) {
         float cosThetaI = glm::dot(n, wi);
         float sin2ThetaI = glm::max(float(0.0), (float(1.0) - (cosThetaI * cosThetaI)));
         float sin2ThetaT = ((eta * eta) * sin2ThetaI);
@@ -53,15 +54,10 @@ namespace akari::render {
         wt = ((eta * -wi) + (((eta * cosThetaI) - cosThetaT) * n));
         return true;
     }
-    inline void swap(float &a, float &b) {
-        float t = a;
-        a = b;
-        b = t;
-    }
-    inline float fr_dielectric(float cosThetaI, float etaI, float etaT) {
+    AKR_XPU inline float fr_dielectric(float cosThetaI, float etaI, float etaT) {
         bool entering = (cosThetaI > float(0.0));
         if (!entering) {
-            swap(etaI, etaT);
+            astd::swap(etaI, etaT);
             cosThetaI = glm::abs(cosThetaI);
         }
         float sinThetaI = glm::sqrt(glm::max(float(0.0), (float(1.0) - (cosThetaI * cosThetaI))));
@@ -73,7 +69,7 @@ namespace akari::render {
         float Rper = (((etaI * cosThetaI) - (etaT * cosThetaT)) / ((etaI * cosThetaI) + (etaT * cosThetaT)));
         return (float(0.5) * ((Rpar * Rpar) + (Rper * Rper)));
     }
-    inline glm::vec3 fr_conductor(float cosThetaI, const glm::vec3 &etaI, const glm::vec3 &etaT, const glm::vec3 &k) {
+    AKR_XPU inline glm::vec3 fr_conductor(float cosThetaI, const glm::vec3 &etaI, const glm::vec3 &etaT, const glm::vec3 &k) {
         float CosTheta2 = (cosThetaI * cosThetaI);
         float SinTheta2 = (float(1.0) - CosTheta2);
         glm::vec3 Eta = (etaT / etaI);
@@ -92,13 +88,13 @@ namespace akari::render {
         return (float(0.5) * (Rp + Rs));
     }
 
-    inline vec3 spherical_to_xyz(float sinTheta, float cosTheta, float phi) {
+    AKR_XPU inline vec3 spherical_to_xyz(float sinTheta, float cosTheta, float phi) {
         return glm::vec3(sinTheta * glm::cos(phi), cosTheta, sinTheta * glm::sin(phi));
     }
 
-    inline float spherical_theta(const vec3& v) { return glm::acos(glm::clamp(v.y, -1.0f, 1.0f)); }
+    AKR_XPU inline float spherical_theta(const vec3& v) { return glm::acos(glm::clamp(v.y, -1.0f, 1.0f)); }
 
-    inline float spherical_phi(const glm::vec3 v) {
+    AKR_XPU inline float spherical_phi(const glm::vec3 v) {
         float p = glm::atan(v.z, v.x);
         return p < 0.0 ? (p + 2.0 * Pi) : p;
     }

@@ -19,28 +19,28 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-
+#pragma once
 #include <akari/render/scenegraph.h>
 #include <akari/render/texture.h>
 #include <akari/render/material.h>
 #include <akari/core/color.h>
 #include <akari/render/common.h>
-#include <akari/render/materials/diffuse.h>
 namespace akari::render {
     
-    class DiffuseMaterialNode final : public MaterialNode {
-        std::shared_ptr<TextureNode> color;
-
+    class GlossyMaterial : public Material {
       public:
-        void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
-                          const sdl::Value &value) override {
-            if (field == "color") {
-                color = resolve_texture(value);
-            }
+        GlossyMaterial(const Texture *color, const Texture *roughness) : color(color), roughness(roughness) {}
+        const Texture *color;
+        const Texture *roughness;
+        BSDFClosure *evaluate(MaterialEvalContext &ctx) const override {
+            auto R = color->evaluate(ctx.sp);
+            auto r = roughness->evaluate(ctx.sp)[0];
+            return ctx.allocator->new_object<MicrofacetReflection>(R, r);
         }
-        Material *create_material(Allocator<> *allocator) override {
-            return allocator->new_object<DiffuseMaterial>(color->create_texture(allocator));
+        Spectrum albedo(const ShadingPoint &sp) const override {
+            auto R = color->evaluate(sp);
+            return R;
         }
     };
-    AKR_EXPORT_NODE(DiffuseMaterial, DiffuseMaterialNode)
-} // namespace akari::render
+
+}

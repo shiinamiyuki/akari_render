@@ -47,7 +47,7 @@ namespace akari::render {
                           [] { return dyn_cast<SceneGraphNode>(std::make_shared<RandomSamplerNode>()); });
             register_node("EmissiveMaterial",
                           [] { return dyn_cast<SceneGraphNode>(std::make_shared<EmissiveMaterialNode>()); });
-            register_node("MixMaterial", [] { return dyn_cast<SceneGraphNode>(std::make_shared<MixMaterialNode>()); });
+            register_node("MixMaterial", [] { return dyn_cast<SceneGraphNode>(make_mix_material()); });
             register_node("EnvMap", [] { return dyn_cast<SceneGraphNode>(std::make_shared<EnvMapNode>()); });
             register_node("Scene", [] { return dyn_cast<SceneGraphNode>(std::make_shared<SceneNode>()); });
             register_node("AOV", [] { return dyn_cast<SceneGraphNode>(make_aov_integrator()); });
@@ -69,4 +69,6 @@ namespace akari::render {
         std::call_once(flag, [&] { impl = std::make_shared<SceneGraphParserImpl>(); });
         return impl;
     }
+
+
 } // namespace akari::render
