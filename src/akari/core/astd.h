@@ -214,7 +214,7 @@ namespace akari::astd {
         class polymorphic_allocator {
           public:
             using value_type = Tp;
-            polymorphic_allocator() noexcept { memoryResource = new_delete_resource(); }
+            polymorphic_allocator() noexcept { memoryResource = get_default_resource(); }
             polymorphic_allocator(memory_resource *r) : memoryResource(r) {}
             polymorphic_allocator(const polymorphic_allocator &other) = default;
             template <class U>
@@ -761,6 +761,6 @@ namespace akari::astd {
     };
     namespace pmr {
         template <typename T>
-        using vector = std::vector<T, polymorphic_allocator<T>>;
+        using vector = astd::vector<T, polymorphic_allocator<T>>;
     }
 } // namespace akari::astd

@@ -166,6 +166,6 @@ namespace akari::render {
             return sample;
         }
         static std::unique_ptr<InfiniteAreaLight> create(const Scene &scene, const TRSTransform &transform,
-                                                         const Texture *texture);
+                                                         const Texture *texture, Allocator<>);
     };
 } // namespace akari::render

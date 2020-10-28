@@ -27,7 +27,7 @@
 
 namespace akari::render {
     std::unique_ptr<InfiniteAreaLight> InfiniteAreaLight::create(const Scene &scene, const TRSTransform &transform,
-                                                                 const Texture *texture) {
+                                                                 const Texture *texture, Allocator<> allocator) {
         auto distribution_map_resolution = InfiniteAreaLight::distribution_map_resolution;
         auto light = std::make_unique<InfiniteAreaLight>();
         light->l2w = transform();
@@ -54,8 +54,8 @@ namespace akari::render {
             },
             256);
         light->texture = texture;
-        light->distribution =
-            std::make_unique<Distribution2D>(&v[0], distribution_map_resolution, distribution_map_resolution);
+        light->distribution = std::make_unique<Distribution2D>(&v[0], distribution_map_resolution,
+                                                               distribution_map_resolution, allocator);
         light->_power = sum.value() / v.size() * 4 * Pi * world_radius * world_radius;
         return light;
     }

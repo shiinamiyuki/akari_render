@@ -40,8 +40,8 @@ namespace akari {
         ivec2 _resolution;
 
       public:
-        TImage(const ivec2 &dim = ivec2(1), astd::pmr::memory_resource *resource = astd::pmr::get_default_resource())
-            : _texels(dim[0] * dim[1], astd::pmr::polymorphic_allocator<T>(resource)), _resolution(dim) {}
+        TImage(const ivec2 &dim = ivec2(1), Allocator<> allocator = Allocator<>())
+            : _texels(dim[0] * dim[1], allocator), _resolution(dim) {}
 
         const T &operator()(int x, int y) const {
             x = std::clamp(x, 0, _resolution[0] - 1);
