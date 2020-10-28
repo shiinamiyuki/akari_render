@@ -1,3 +1,3 @@
-add_plugin(RTAO SOURCE ao.cpp)
-add_plugin(Path SOURCE pt.cpp)
-add_plugin(GuidedPath SOURCE ppg.cpp)
+add_plugin(RTAO  ao.cpp)
+add_plugin(Path  pt.cpp)
+add_plugin(GuidedPath  ppg.cpp)

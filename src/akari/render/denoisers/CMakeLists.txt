@@ -1,5 +1,5 @@
 if(AKR_ENABLE_OIDN)
-    add_plugin(OIDNDenoiser SOURCE oidn.cpp)
+    add_plugin(OIDNDenoiser oidn.cpp)
     target_include_directories(OIDNDenoiser PUBLIC ${OIDN_INCLUDE_DIRS})
     target_link_libraries(OIDNDenoiser OpenImageDenoise)
     add_custom_command(TARGET OIDNDenoiser POST_BUILD 

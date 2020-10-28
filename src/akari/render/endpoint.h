@@ -23,7 +23,7 @@
 #pragma once
 #include <akari/core/math.h>
 #include <akari/render/scenegraph.h>
-#include <akari/shaders/common.h>
+#include <akari/render/common.h>
 namespace akari::render {
     struct ReferencePoint {
         Vec3 p;

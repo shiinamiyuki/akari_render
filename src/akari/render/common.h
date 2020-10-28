@@ -21,26 +21,7 @@
 // SOFTWARE.
 
 #pragma once
-#include <akaric/type.h>
-#include <list>
-namespace akari::asl {
-    struct SourceLocation {
-        std::string filename;
-        int line = 1, col = 1;
-    };
-    enum TokenType { pp_include, symbol, identifier, keyword, string_literal, int_literal, float_literal, terminator };
-    struct Token {
-        std::string tok;
-        TokenType type;
-        SourceLocation loc;
-    };
-    using TokenStream = std::list<Token>;
-    class Lexer {
-        class Impl;
-        std::shared_ptr<Impl> impl;
 
-      public:
-        Lexer();
-        const TokenStream &operator()(const std::string &filename, const std::string &s);
-    };
-} // namespace akari::asl
+#include <akari/render/sampling.h>
+#include <akari/render/geometry.h>
+#include <akari/render/microfacet.h>

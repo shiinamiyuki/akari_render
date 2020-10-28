@@ -29,7 +29,7 @@
 #include <akari/render/integrator.h>
 #include <akari/render/material.h>
 #include <akari/render/mesh.h>
-#include <akari/shaders/common.h>
+#include <akari/render/common.h>
 #include <akari/render/pathtracer.h>
 
 namespace akari::render {
@@ -42,7 +42,7 @@ namespace akari::render {
       public:
         PathTracerIntegrator(int spp, int max_depth) : spp(spp), max_depth(max_depth) {}
         void render(const Scene *scene, Film *film) override {
-            using namespace shader;
+            
             AKR_ASSERT_THROW(glm::all(glm::equal(film->resolution(), scene->camera->resolution())));
             auto n_tiles = ivec2(film->resolution() + ivec2(tile_size - 1)) / ivec2(tile_size);
             debug("resolution: {}, tile size: {}, tiles: {}", film->resolution(), tile_size, n_tiles);

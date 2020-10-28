@@ -25,7 +25,7 @@
 #pragma once
 #include <akari/core/math.h>
 #include <akari/render/scenegraph.h>
-#include <akari/shaders/common.h>
+#include <akari/render/common.h>
 #include <akari/core/memory.h>
 #include <akari/render/sampler.h>
 #include <akari/render/interaction.h>
@@ -81,51 +81,51 @@ namespace akari::render {
       public:
         DiffuseBSDF(const Spectrum &R) : R(R) {}
         [[nodiscard]] Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const override {
-            using namespace shader;
+            
             if (same_hemisphere(wo, wi)) {
                 return cosine_hemisphere_pdf(std::abs(cos_theta(wi)));
             }
             return 0.0f;
         }
         [[nodiscard]] Spectrum evaluate(const Vec3 &wo, const Vec3 &wi) const override {
-            using namespace shader;
+            
             if (same_hemisphere(wo, wi)) {
-                return R * shader::InvPi;
+                return R * InvPi;
             }
             return Spectrum(0.0f);
         }
         [[nodiscard]] BSDFType type() const override { return BSDFType(BSDF_DIFFUSE | BSDF_REFLECTION); }
         Spectrum sample(const vec2 &u, const Vec3 &wo, Vec3 *wi, Float *pdf, BSDFType *sampledType) const override {
-            using namespace shader;
+            
             *wi = cosine_hemisphere_sampling(u);
             if (!same_hemisphere(wo, *wi)) {
                 wi->y = -wi->y;
             }
             *sampledType = type();
             *pdf = cosine_hemisphere_pdf(std::abs(cos_theta(*wi)));
-            return R * shader::InvPi;
+            return R * InvPi;
         }
     };
 
     class MicrofacetReflection : public BSDFClosure {
 
         Spectrum R;
-        shader::MicrofacetModel model;
+        MicrofacetModel model;
 
       public:
         MicrofacetReflection(const Spectrum &R, Float roughness)
-            : R(R), model(shader::microfacet_new(shader::MicrofacetGGX, roughness)) {}
+            : R(R), model(microfacet_new(MicrofacetGGX, roughness)) {}
         [[nodiscard]] Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const override {
-            if (shader::same_hemisphere(wo, wi)) {
+            if (same_hemisphere(wo, wi)) {
                 auto wh = normalize(wo + wi);
-                return shader::microfacet_evaluate_pdf(model, wh) / (Float(4.0f) * dot(wo, wh));
+                return microfacet_evaluate_pdf(model, wh) / (Float(4.0f) * dot(wo, wh));
             }
             return 0.0f;
         }
         [[nodiscard]] Spectrum evaluate(const Vec3 &wo, const Vec3 &wi) const override {
-            if (shader::same_hemisphere(wo, wi)) {
-                Float cosThetaO = shader::abs_cos_theta(wo);
-                Float cosThetaI = shader::abs_cos_theta(wi);
+            if (same_hemisphere(wo, wi)) {
+                Float cosThetaO = abs_cos_theta(wo);
+                Float cosThetaI = abs_cos_theta(wi);
                 auto wh = (wo + wi);
                 if (cosThetaI == 0 || cosThetaO == 0)
                     return Spectrum(0);
@@ -137,7 +137,7 @@ namespace akari::render {
                 }
                 auto F = 1.0f; // fresnel->evaluate(dot(wi, wh));
 
-                return R * (shader::microfacet_D(model, wh) * shader::microfacet_G(model, wo, wi, wh) * F /
+                return R * (microfacet_D(model, wh) * microfacet_G(model, wo, wi, wh) * F /
                             (Float(4.0f) * cosThetaI * cosThetaO));
             }
             return Spectrum(0.0f);
@@ -145,16 +145,16 @@ namespace akari::render {
         [[nodiscard]] BSDFType type() const override { return BSDFType(BSDF_GLOSSY | BSDF_REFLECTION); }
         Spectrum sample(const vec2 &u, const Vec3 &wo, Vec3 *wi, Float *pdf, BSDFType *sampledType) const override {
             *sampledType = type();
-            auto wh = shader::microfacet_sample_wh(model, wo, u);
+            auto wh = microfacet_sample_wh(model, wo, u);
             *wi = glm::reflect(-wo, wh);
-            if (!shader::same_hemisphere(wo, *wi)) {
+            if (!same_hemisphere(wo, *wi)) {
                 *pdf = 0;
                 return Spectrum(0);
             } else {
                 if (wh.y < 0) {
                     wh = -wh;
                 }
-                *pdf = shader::microfacet_evaluate_pdf(model, wh) / (Float(4.0f) * abs(dot(wo, wh)));
+                *pdf = microfacet_evaluate_pdf(model, wh) / (Float(4.0f) * abs(dot(wo, wh)));
             }
             return evaluate(wo, *wi);
         }

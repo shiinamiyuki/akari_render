@@ -21,6 +21,7 @@
 // SOFTWARE.
 #pragma once
 #include <akari/core/akari.h>
+#include <akari/core/def.h>
 namespace akari {
     using Float = float;
     template <typename Scalar, int N>

@@ -27,7 +27,7 @@
 #include <akari/render/material.h>
 #include <akari/render/mesh.h>
 #include <akari/render/light.h>
-#include <akari/shaders/common.h>
+#include <akari/render/common.h>
 
 namespace akari::render {
     struct SurfaceHit {

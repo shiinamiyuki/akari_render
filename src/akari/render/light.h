@@ -23,7 +23,7 @@
 #pragma once
 #include <akari/core/math.h>
 #include <akari/render/scenegraph.h>
-#include <akari/shaders/common.h>
+#include <akari/render/common.h>
 #include <akari/core/memory.h>
 #include <akari/render/shape.h>
 #include <akari/render/texture.h>
@@ -89,7 +89,7 @@ namespace akari::render {
             return 1.0f / SA;
         }
         LightSample sample_incidence(const LightSampleContext &ctx) const override {
-            auto coords = shader::uniform_sample_triangle(ctx.u);
+            auto coords = uniform_sample_triangle(ctx.u);
             auto p = triangle.p(coords);
             LightSample sample;
             sample.ng = triangle.ng();
@@ -114,9 +114,9 @@ namespace akari::render {
 
       public:
         static vec2 get_uv(const vec3 &wi) {
-            auto theta = shader::spherical_theta(wi);
+            auto theta = spherical_theta(wi);
             // auto sinTheta = std::sin(theta);
-            auto phi = shader::spherical_phi(wi);
+            auto phi = spherical_phi(wi);
             return vec2(phi * Inv2Pi, 1.0f - theta * InvPi);
         }
         Float power() const { return _power; }
@@ -130,9 +130,9 @@ namespace akari::render {
             if (!distribution)
                 return 0.0f;
             auto w = w2l.apply_vector(wi);
-            auto theta = shader::spherical_theta(w);
+            auto theta = spherical_theta(w);
             auto sinTheta = std::sin(theta);
-            auto phi = shader::spherical_phi(w);
+            auto phi = spherical_phi(w);
             if (sinTheta == 0.0f)
                 return 0.0f;
             return distribution->pdf_continuous(vec2(phi * Inv2Pi, 1.0f - theta * InvPi)) / (2 * Pi * Pi * sinTheta);
@@ -156,7 +156,7 @@ namespace akari::render {
             auto phi = uv[0] * 2.0f * Pi;
             Float cosTheta = std::cos(theta);
             Float sinTheta = std::sin(theta);
-            sample.wi = l2w.apply_vector(shader::spherical_to_xyz(sinTheta, cosTheta, phi));
+            sample.wi = l2w.apply_vector(spherical_to_xyz(sinTheta, cosTheta, phi));
             if (sinTheta == 0.0f)
                 sample.pdf = 0.0f;
             else

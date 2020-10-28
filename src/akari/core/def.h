@@ -27,7 +27,28 @@
 AKR_ENABLE_GPU
 AKR_ENABLE_CPU (always on)
 AKR_ENABLE_EMBREE
+AKR_GPU_BACKEND_CUDA
+AKR_GPU_BACKEND_SYCL
+AKR_GPU_BACKEND_METAL
 AKR_PLATFORM_WINDOWS
 AKR_PLATFORM_LINUX
 */
 
+#define AKR_CPU
+#define AKR_GPU
+
+#if defined(__CUDA_ARCH__)
+#    define AKR_GPU_CODE
+#endif
+
+#ifdef AKR_ENABLE_GPU
+#    ifdef AKR_GPU_BACKEND_CUDA
+#        ifdef __NVCC__
+#            undef AKR_CPU
+#            undef AKR_GPU
+#            define AKR_CPU __host__
+#            define AKR_GPU __device__
+#        endif
+#    endif
+#endif
+#define AKR_XPU AKR_GPU AKR_CPU

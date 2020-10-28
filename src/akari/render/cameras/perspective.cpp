@@ -22,9 +22,9 @@
 #include <akari/core/logger.h>
 #include <akari/render/scenegraph.h>
 #include <akari/render/camera.h>
-#include <akari/shaders/common.h>
+#include <akari/render/common.h>
 namespace akari::render {
-    using namespace shader;
+    
     class PerspectiveCamera : public Camera {
       public:
         Transform c2w, w2c, r2c, c2r;

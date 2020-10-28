@@ -24,7 +24,7 @@
 #include <akari/core/color.h>
 #include <akari/core/resource.h>
 #include <akari/core/image.hpp>
-#include <akari/shaders/common.h>
+#include <akari/render/common.h>
 namespace akari::render {
     class ConstantTexture : public Texture {
         Spectrum value;

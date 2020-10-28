@@ -1,2 +1,2 @@
-add_plugin(ConstantTexture SOURCE constant-texture.cpp )
-add_plugin(ImageTexture SOURCE image-texture.cpp )
+add_plugin(ConstantTexture constant-texture.cpp )
+add_plugin(ImageTexture image-texture.cpp )

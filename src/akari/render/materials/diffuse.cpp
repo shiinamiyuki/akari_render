@@ -24,9 +24,9 @@
 #include <akari/render/texture.h>
 #include <akari/render/material.h>
 #include <akari/core/color.h>
-#include <akari/shaders/common.h>
+#include <akari/render/common.h>
 namespace akari::render {
-    using namespace shader;
+    
     class DiffuseMaterial : public Material {
       public:
         DiffuseMaterial(const Texture *color) : color(color) {}

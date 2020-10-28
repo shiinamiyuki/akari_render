@@ -24,24 +24,38 @@
 #include <cstdio>
 #include <cstdlib>
 #include <akari/core/def.h>
+
 namespace akari {
     namespace astd {
-        [[noreturn]] inline void abort();
-    }
-    [[noreturn]] inline void panic(const char *file, int line, const char *msg) {
+        [[noreturn]] AKR_XPU inline void abort() {
+#ifdef AKR_GPU_CODE
+            asm("trap;");
+#else
+            std::abort();
+#endif
+        }
+    } // namespace astd
+    [[noreturn]] AKR_XPU inline void panic(const char *file, int line, const char *msg) {
+#ifdef AKR_GPU_CODE
+        printf("PANIC at %s:%d: %s\n", file, line, msg);
+        astd::abort();
+#else
         fprintf(stderr, "PANIC at %s:%d: %s\n", file, line, msg);
-        std::abort();
+        astd::abort();
+#endif
     }
 
 #define AKR_PANIC(msg) panic(__FILE__, __LINE__, msg)
-
-#define AKR_CHECK(expr)                                                                                                \
-    do {                                                                                                               \
-        if (!(expr)) {                                                                                                 \
-            fprintf(stderr, #expr " not satisfied at %s:%d\n", __FILE__, __LINE__);                                    \
-        }                                                                                                              \
-    } while (0)
-
+#ifdef AKR_GPU_CODE
+#    define AKR_CHECK(expr)
+#else
+#    define AKR_CHECK(expr)                                                                                            \
+        do {                                                                                                           \
+            if (!(expr)) {                                                                                             \
+                fprintf(stderr, #expr " not satisfied at %s:%d\n", __FILE__, __LINE__);                                \
+            }                                                                                                          \
+        } while (0)
+#endif
 #define AKR_ASSERT(expr)                                                                                               \
     do {                                                                                                               \
         if (!(expr)) {                                                                                                 \

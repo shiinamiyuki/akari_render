@@ -1,1 +1,1 @@
-add_plugin(AkariMesh SOURCE akari-mesh.cpp)
+add_plugin(AkariMesh akari-mesh.cpp)

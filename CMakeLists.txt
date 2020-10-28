@@ -63,33 +63,8 @@ endmacro()
 include(cmake/Embree.cmake)
 include(cmake/OIDN.cmake)
 
-# ---------------- Akari Unified Shading Language Compiler
-file(GLOB ASL_COMPILER_SRC src/akaric/*.*)
-add_build_util(akaric ${ASL_COMPILER_SRC})
-target_include_directories(akaric PUBLIC src/)
-target_link_libraries(akaric fmt)
 
 
-
-function(add_shader_module target LIB_TYPE)
-    set(options )
-    set(oneValueArgs )
-    set(multiValueArgs SOURCE SHADER)
-    cmake_parse_arguments(SMODULE "${options}" "${oneValueArgs}"
-    "${multiValueArgs}" ${ARGN} )
-    list(APPEND TARGET_SOURCE "")
-    foreach(src ${SMODULE_SHADER} )
-    # message(STATUS "src= " ${src})
-        add_custom_command(OUTPUT ${src}.h
-            COMMAND akaric ${src} -b cpp -o ${src}.h -DSpectrum=vec3
-            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-            DEPENDS ${akaric_SOURCE} ${SMODULE_SHADER})
-        list(APPEND TARGET_SOURCE ${src}.h)
-    endforeach()
-    add_library(${target} ${LIB_TYPE} ${TARGET_SOURCE} ${SMODULE_SOURCE})
-    target_include_directories(${target} PUBLIC ${CMAKE_SOURCE_DIR}/src/)
-    # message(STATUS "target= " ${TARGET_SOURCE})
-endfunction()
 
 if(EXISTS ${CMAKE_BINARY_DIR}/dist)
 else()
@@ -134,18 +109,14 @@ endif()
 endif()
 
 
-
-add_subdirectory(src/akari/shaders)
-
 file(GLOB AKR_RENDER_SRC src/akari/render/*.* src/akari/render/kernel/akari_kernel_ispc.h)
 add_library(libakari_render SHARED ${AKR_RENDER_SRC})
-add_dependencies(libakari_render AKR_COMMON_SHADER)
 target_include_directories(libakari_render PUBLIC src/)
 target_link_libraries(libakari_render PUBLIC libakari_core)
 copy_to_dist(libakari_render)
 
 function(add_plugin target)
-    add_shader_module(${target} SHARED ${ARGN})
+    add_library(${target} SHARED ${ARGN})
     set_property(TARGET ${target} PROPERTY POSITION_INDEPENDENT_CODE ON)
     set_target_properties(${target} PROPERTIES PREFIX "")
     # set_target_properties(${target} PROPERTIES

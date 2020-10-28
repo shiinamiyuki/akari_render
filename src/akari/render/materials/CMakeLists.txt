@@ -1,2 +1,2 @@
-add_plugin(DiffuseMaterial SOURCE diffuse.cpp)
-add_plugin(GlossyMaterial SOURCE glossy.cpp)
+add_plugin(DiffuseMaterial  diffuse.cpp)
+add_plugin(GlossyMaterial glossy.cpp)

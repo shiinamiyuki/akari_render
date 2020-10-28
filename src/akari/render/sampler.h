@@ -25,7 +25,7 @@
 #pragma once
 #include <akari/core/math.h>
 #include <akari/render/scenegraph.h>
-#include <akari/shaders/common.h>
+#include <akari/render/common.h>
 #include <akari/core/memory.h>
 #include <optional>
 

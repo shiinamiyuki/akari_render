@@ -25,7 +25,7 @@
 #include <akari/render/material.h>
 #include <akari/render/mesh.h>
 #include <akari/core/color.h>
-#include <akari/shaders/common.h>
+#include <akari/render/common.h>
 #include <akari/core/mesh.h>
 namespace akari::render {
     class AkariMesh final : public MeshNode {
