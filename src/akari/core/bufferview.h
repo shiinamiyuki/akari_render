@@ -24,9 +24,9 @@
 #include <akari/core/astd.h>
 namespace akari {
     template <typename T>
-    struct BufferView {
+    struct AKR_EXPORT BufferView {
         BufferView() = default;
-        template<typename Allocator>
+        template <typename Allocator>
         BufferView(const std::vector<T, Allocator> &vec) : _data(vec.data()), _size(vec.size()) {}
         BufferView(T *data, size_t size) : _data(data), _size(size) {}
         T &operator[](uint32_t i) const { return _data[i]; }
@@ -35,6 +35,7 @@ namespace akari {
         T *end() const { return _data + _size; }
         const T *cbegin() const { return _data; }
         const T *cend() const { return _data + _size; }
+        T *const &data() const { return _data; }
 
       private:
         T *_data = nullptr;

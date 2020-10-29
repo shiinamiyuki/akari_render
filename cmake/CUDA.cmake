@@ -24,7 +24,9 @@ if (CMAKE_CUDA_COMPILER)
     set (AKR_CUDA_DIAG_FLAGS "${AKR_CUDA_DIAG_FLAGS} -Xcudafe --diag_suppress=virtual_function_decl_hidden")
     set (AKR_CUDA_DIAG_FLAGS "${AKR_CUDA_DIAG_FLAGS} -Xcudafe --diag_suppress=integer_sign_change")
     set (AKR_CUDA_DIAG_FLAGS "${AKR_CUDA_DIAG_FLAGS} -Xcudafe --diag_suppress=declared_but_not_referenced")
+    set (AKR_CUDA_DIAG_FLAGS "${AKR_CUDA_DIAG_FLAGS} -Xcudafe --diag_suppress=field_without_dll_interface")
     # WAR invalid warnings about this with "if constexpr"
+    set (AKR_CUDA_DIAG_FLAGS "${AKR_CUDA_DIAG_FLAGS} -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored")
     set (AKR_CUDA_DIAG_FLAGS "${AKR_CUDA_DIAG_FLAGS} -Xcudafe --diag_suppress=implicit_return_from_non_void_function")
     set (AKR_CUDA_DIAG_FLAGS "${AKR_CUDA_DIAG_FLAGS} --expt-relaxed-constexpr")
     set (AKR_CUDA_DIAG_FLAGS "${AKR_CUDA_DIAG_FLAGS} --extended-lambda")
@@ -70,9 +72,77 @@ if (CMAKE_CUDA_COMPILER)
     endmacro()
     set(AKR_CUDA_LIBS CUDA::cudart CUDA::cuda_driver)
     set(AKR_CXX_FLAGS "") # or nvcc chokes
+
+    if(NOT AKR_OPTIX_PATH)
+        message(FATAL_ERROR "AKR_OPTIX_PATH must be set")
+    endif()
+    include_directories(${AKR_OPTIX_PATH}/include)
+
+    # from pbrt-v4
+
+    # from Ingo's configure_optix.cmake (Apache licensed)
+    find_program (BIN2C bin2c DOC "Path to the CUDA SDK bin2c executable.")
+
+    # this macro defines cmake rules that execute the following four steps:
+    # 1) compile the given cuda file ${cuda_file} to an intermediary PTX file
+    # 2) use the 'bin2c' tool (that comes with CUDA) to
+    #    create a second intermediary (.c-)file which defines a const string variable
+    #    (named '${c_var_name}') whose (constant) value is the PTX output
+    #    from the previous step.
+    # 3) compile the given .c file to an intermediary object file (why thus has
+    #    that PTX string 'embedded' as a global constant.
+    # 4) assign the name of the intermediary .o file to the cmake variable
+    #    'output_var', which can then be added to cmake targets.
+    macro (cuda_compile_and_embed output_var cuda_file lib_name)
+      add_library ("${lib_name}" OBJECT "${cuda_file}")
+      set_target_CUDA_props(${lib_name})
+      set_property (TARGET "${lib_name}" PROPERTY CUDA_PTX_COMPILATION ON)
+      target_compile_options ("${lib_name}"
+        PRIVATE
+            # disable "extern declaration... is treated as a static definition" warning
+            -Xcudafe=--display_error_number -Xcudafe=--diag_suppress=3089
+            )
+      # CUDA integration in Visual Studio seems broken as even if "Use
+      # Host Preprocessor Definitions" is checked, the host preprocessor
+      # definitions are still not used when compiling device code.
+      # To work around that, define the macros using --define-macro to
+      # avoid CMake identifying those as macros and using the proper (but
+      # broken) way of specifying them.
+      if (${CMAKE_GENERATOR} MATCHES "^Visual Studio")
+        # As NDEBUG is specified globally as a definition, we need to
+        # manually add it due to the bug mentioned earlier and due to it
+        # not being found in PBRT_DEFINITIONS.
+        set (cuda_definitions "--define-macro=NDEBUG")
+        foreach (arg ${PBRT_DEFINITIONS})
+          list (APPEND cuda_definitions "--define-macro=${arg}")
+        endforeach ()
+        target_compile_options("${lib_name}" PRIVATE ${cuda_definitions})
+      else ()
+        target_compile_definitions("${lib_name}" PRIVATE ${PBRT_DEFINITIONS})
+      endif()
+      target_include_directories ("${lib_name}" PRIVATE src ${CMAKE_BINARY_DIR})
+      target_include_directories ("${lib_name}" SYSTEM PRIVATE ${NANOVDB_INCLUDE})
+      set (c_var_name ${output_var})
+      set (embedded_file ${cuda_file}.ptx_embedded.c)
+      add_custom_command (
+        OUTPUT "${embedded_file}"
+        COMMAND ${CMAKE_COMMAND}
+          "-DBIN_TO_C_COMMAND=${BIN2C}"
+          "-DOBJECTS=$<TARGET_OBJECTS:${lib_name}>"
+          "-DVAR_NAME=${c_var_name}"
+          "-DOUTPUT=${embedded_file}"
+          -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/bin2c_wrapper.cmake
+        VERBATIM
+        DEPENDS "${lib_name}" $<TARGET_OBJECTS:${lib_name}>
+        COMMENT "Embedding PTX generated from ${cuda_file}"
+      )
+      set (${output_var} ${embedded_file})
+    endmacro ()
+    
 else()
     macro (set_target_CUDA_props target)
         set_target_properties(${target} PROPERTIES  CUDA_ARCHITECTURES OFF)
     endmacro()
+    message (STATUS "CUDA not found")
 endif()
 endif()

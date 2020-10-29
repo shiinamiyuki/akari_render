@@ -20,8 +20,29 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/render/cuda/gpuaccel.h>
+#pragma once
 
-namespace akari::render {
-    
-}
+#include <akari/core/math.h>
+#include <akari/render/cuda/util.h>
+#include <akari/render/scene.h>
+#include <optix.h>
+#include <optix_host.h>
+
+namespace akari::gpu {
+    using render::Scene;
+    using render::MeshInstance;
+    class AKR_EXPORT GPUAccel {
+        struct OptixState {
+            OptixDeviceContext context;
+            OptixTraversableHandle gas_handle;
+        };
+        OptixState state;
+        void init_optix();
+        OptixBuildInput build(const MeshInstance &instance);
+        void build(const std::vector<OptixBuildInput> &inputs);
+
+      public:
+        GPUAccel() { init_optix(); }
+        void build(const Scene *scene);
+    };
+} // namespace akari::gpu

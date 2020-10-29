@@ -25,7 +25,8 @@
 #include <cmath>
 #include <algorithm>
 #include <cstring>
-#ifdef AKE_GPU_BACKEND_CUDA
+#if defined(AKR_GPU_BACKEND_CUDA) || defined(__CUDACC__) || defined(__NVCC__)
+#    include <cuda.h>
 #    define GLM_FORCE_CUDA
 #else
 #    define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
@@ -75,15 +76,15 @@ namespace akari {
     using Mat2 = Mat<Float, 2>;
     using Mat3 = Mat<Float, 3>;
     using Mat4 = Mat<Float, 4>;
-#ifdef AKE_GPU_BACKEND_CUDA
-#    define Inf    (std::numeric_limits<Float>::infinity())
-#    define Pi     (Float(3.1415926535897932384f))
-#    define PiOver2    (Pi / Float(2.0f))
-#    define PiOver4    (Pi / Float(4.0f))
-#    define InvPi  (Float(1.0f) / Pi)
-#    define Inv2Pi (Float(1.0) / (2.0 * Pi))
-#    define Inv4Pi (Float(1.0) / (4.0 * Pi))
-#    define Eps    (Float(0.001f))
+#ifdef AKR_GPU_BACKEND_CUDA
+#    define Inf       (std::numeric_limits<Float>::infinity())
+#    define Pi        (Float(3.1415926535897932384f))
+#    define PiOver2   (Pi / Float(2.0f))
+#    define PiOver4   (Pi / Float(4.0f))
+#    define InvPi     (Float(1.0f) / Pi)
+#    define Inv2Pi    (Float(1.0) / (2.0 * Pi))
+#    define Inv4Pi    (Float(1.0) / (4.0 * Pi))
+#    define Eps       (Float(0.001f))
 #    define ShadowEps (Float(0.0001f))
 #else
     static constexpr Float Inf = std::numeric_limits<Float>::infinity();

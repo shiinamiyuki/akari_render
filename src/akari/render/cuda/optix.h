@@ -20,8 +20,4 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/render/cuda/gpuaccel.h>
-
-namespace akari::render {
-    
-}
+#pragma once

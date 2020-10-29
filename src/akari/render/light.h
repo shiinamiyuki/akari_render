@@ -102,7 +102,7 @@ namespace akari::render {
         }
     };
 
-    class AKR_EXPORT InfiniteAreaLight {
+    class InfiniteAreaLight {
         Transform w2l, l2w;
         static constexpr size_t distribution_map_resolution = 4096;
         std::unique_ptr<Distribution2D> distribution = nullptr;
@@ -111,7 +111,7 @@ namespace akari::render {
         Float _power = 0.0;
 
       public:
-        static vec2 get_uv(const vec3 &wi) {
+        AKR_XPU static vec2 get_uv(const vec3 &wi) {
             auto theta = spherical_theta(wi);
             // auto sinTheta = std::sin(theta);
             auto phi = spherical_phi(wi);
@@ -163,7 +163,7 @@ namespace akari::render {
             sample.shadow_ray = Ray(ctx.p, sample.wi, Eps, Inf);
             return sample;
         }
-        static Box<const InfiniteAreaLight> create(const Scene &scene, const TRSTransform &transform,
+        AKR_EXPORT static Box<const InfiniteAreaLight> create(const Scene &scene, const TRSTransform &transform,
                                                          const Texture *texture, Allocator<>);
     };
 

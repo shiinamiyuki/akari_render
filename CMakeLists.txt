@@ -81,7 +81,8 @@ file(GLOB AKR_CORE_SRC src/akari/core/*.*)
 file(GLOB AKR_PYBIND_SRC src/akari/core/nodes/*.*)
 
 
-add_library(libakari_core SHARED ${AKR_COMMON_SRC}  ${AKR_CORE_SRC})
+
+add_library(libakari_core SHARED ${AKR_CORE_SRC})
 target_link_libraries(libakari_core PUBLIC  ${AKR_CORE_EXT_LIBS} ${AKR_CUDA_LIBS})
 set_target_CUDA_props(libakari_core)
 if(AKR_ENABLE_PYTHON)
@@ -110,12 +111,22 @@ endif()
 endif()
 
 
-file(GLOB AKR_RENDER_SRC src/akari/render/*.* src/akari/render/kernel/akari_kernel_ispc.h)
-add_library(libakari_render SHARED ${AKR_RENDER_SRC})
+file(GLOB AKR_RENDER_SRC src/akari/render/*.*)
+if(AKR_ENABLE_CUDA)
+    file(GLOB AKR_RENDER_CUDA_SRC src/akari/render/cuda/*.*)
+    cuda_compile_and_embed (AKR_EMBEDDED_PTX src/akari/render/cuda/optix.cu optix.cu)
+    add_library (libakari_embedded_ptx STATIC
+      ${AKR_EMBEDDED_PTX}
+    )
+endif()
+add_library(libakari_render SHARED ${AKR_RENDER_SRC} ${AKR_RENDER_CUDA_SRC})
 target_include_directories(libakari_render PUBLIC src/)
 target_link_libraries(libakari_render PUBLIC libakari_core)
 copy_to_dist(libakari_render)
 set_target_CUDA_props(libakari_render)
+if(AKR_ENABLE_CUDA)
+    add_dependencies(libakari_render libakari_embedded_ptx)
+endif()
 
 function(add_plugin target)
     add_library(${target} SHARED ${ARGN})

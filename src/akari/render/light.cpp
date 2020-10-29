@@ -28,7 +28,6 @@
 namespace akari::render {
     Box<const InfiniteAreaLight> InfiniteAreaLight::create(const Scene &scene, const TRSTransform &transform,
                                                                  const Texture *texture, Allocator<> allocator) {
-        auto distribution_map_resolution = InfiniteAreaLight::distribution_map_resolution;
         InfiniteAreaLight light;
         light.l2w = transform();
         light.w2l = light.l2w.inverse();

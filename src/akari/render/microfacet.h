@@ -3,9 +3,9 @@
 #include <akari/core/math.h>
 #include <akari/render/geometry.h>
 namespace akari::render {
-    AKR_XPU static const int32_t MicrofacetGGX = int32_t(0);
-    AKR_XPU static const int32_t MicrofacetBeckmann = int32_t(1);
-    AKR_XPU static const int32_t MicrofacetPhong = int32_t(2);
+    static const int32_t MicrofacetGGX = int32_t(0);
+    static const int32_t MicrofacetBeckmann = int32_t(1);
+    static const int32_t MicrofacetPhong = int32_t(2);
     AKR_XPU inline float BeckmannD(float alpha, const glm::vec3 &m) {
         if ((m.y <= float(0.0)))
             return float(0.0);
