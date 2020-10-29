@@ -38,15 +38,24 @@ namespace akari::gpu {
             OptixModule ptx_module = 0;
             OptixPipelineCompileOptions pipeline_compile_options = {};
             OptixPipeline pipeline = 0;
+            OptixProgramGroup raygen_group;
+            OptixProgramGroup radiance_closest_hit_group;
+            OptixProgramGroup radiance_miss_group;
+            OptixProgramGroup shadow_miss_group;
+            OptixProgramGroup shadow_any_hit_group;
+            OptixShaderBindingTable mega_kernel_sbt = {};
         };
         OptixState state;
+        Allocator<> allocator;
         void init_optix();
         OptixBuildInput build(const MeshInstance &instance);
         void build(const std::vector<OptixBuildInput> &inputs);
         void build_ptx_module();
+        void build_pipeline();
+        void build_sbt();
 
       public:
-        GPUAccel() { init_optix(); }
+        GPUAccel(Allocator<> allocator) : allocator(allocator) { init_optix(); }
         void build(const Scene *scene);
     };
 } // namespace akari::gpu

@@ -47,4 +47,14 @@ namespace akari {
             std::abort();                                                                                              \
         }                                                                                                              \
     })()
+#define OPTIX_CHECK_LOG(EXPR)                                                                                          \
+    ([&] {                                                                                                             \
+        auto res = (EXPR);                                                                                             \
+        if (res != OPTIX_SUCCESS) {                                                                                    \
+            fatal("Optix error: {} ", optixGetErrorString(res));                                                       \
+            fatal("Calling {} at {}:{}", #EXPR, __FILE__, __LINE__);                                                   \
+            fatal("log: {}", log);                                                                                     \
+            std::abort();                                                                                              \
+        }                                                                                                              \
+    })()
 } // namespace akari

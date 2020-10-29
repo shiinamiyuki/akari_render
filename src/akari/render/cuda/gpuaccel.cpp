@@ -113,12 +113,99 @@ namespace akari::gpu {
         triangle_input.triangleArray.sbtIndexOffsetStrideInBytes = 0;
         return triangle_input;
     }
+    void GPUAccel::build_pipeline() {
+        OptixProgramGroupOptions program_group_options = {};
+
+        char log[2048];
+        size_t sizeof_log = sizeof(log);
+
+        {
+            OptixProgramGroupDesc raygen_prog_group_desc = {};
+            raygen_prog_group_desc.kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
+            raygen_prog_group_desc.raygen.module = state.ptx_module;
+            raygen_prog_group_desc.raygen.entryFunctionName = "__raygen__rg";
+
+            OPTIX_CHECK_LOG(optixProgramGroupCreate(state.context, &raygen_prog_group_desc,
+                                                    1, // num program groups
+                                                    &program_group_options, log, &sizeof_log, &state.raygen_group));
+        }
+
+        {
+            OptixProgramGroupDesc miss_prog_group_desc = {};
+            miss_prog_group_desc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
+            miss_prog_group_desc.miss.module = state.ptx_module;
+            miss_prog_group_desc.miss.entryFunctionName = "__miss__radiance";
+            sizeof_log = sizeof(log);
+            OPTIX_CHECK_LOG(optixProgramGroupCreate(state.context, &miss_prog_group_desc,
+                                                    1, // num program groups
+                                                    &program_group_options, log, &sizeof_log,
+                                                    &state.radiance_miss_group));
+            memset(&miss_prog_group_desc, 0, sizeof(OptixProgramGroupDesc));
+            miss_prog_group_desc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
+            miss_prog_group_desc.miss.module = state.ptx_module;
+            miss_prog_group_desc.miss.entryFunctionName = "__miss__radiance";
+            OPTIX_CHECK_LOG(optixProgramGroupCreate(state.context, &miss_prog_group_desc,
+                                                    1, // num program groups
+                                                    &program_group_options, log, &sizeof_log,
+                                                    &state.shadow_miss_group));
+        }
+
+        {
+            OptixProgramGroupDesc hit_prog_group_desc = {};
+            hit_prog_group_desc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
+            hit_prog_group_desc.hitgroup.moduleCH = state.ptx_module;
+            hit_prog_group_desc.hitgroup.entryFunctionNameCH = "__closesthit__radiance";
+            sizeof_log = sizeof(log);
+            OPTIX_CHECK_LOG(optixProgramGroupCreate(state.context, &hit_prog_group_desc,
+                                                    1, // num program groups
+                                                    &program_group_options, log, &sizeof_log,
+                                                    &state.radiance_closest_hit_group));
+
+            memset(&hit_prog_group_desc, 0, sizeof(OptixProgramGroupDesc));
+            hit_prog_group_desc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
+            hit_prog_group_desc.hitgroup.moduleCH = state.ptx_module;
+            hit_prog_group_desc.hitgroup.entryFunctionNameCH = "__anyhit__shadow";
+            sizeof_log = sizeof(log);
+            OPTIX_CHECK(optixProgramGroupCreate(state.context, &hit_prog_group_desc,
+                                                1, // num program groups
+                                                &program_group_options, log, &sizeof_log, &state.shadow_any_hit_group));
+        }
+
+        OptixProgramGroup program_groups[] = {state.raygen_group, state.radiance_closest_hit_group,
+                                              state.shadow_any_hit_group, state.radiance_miss_group,
+                                              state.shadow_miss_group};
+        OptixPipelineLinkOptions pipeline_link_options = {};
+        pipeline_link_options.maxTraceDepth = 2;
+#ifndef NDEBUG
+        pipeline_link_options.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_FULL;
+#else
+        pipeline_link_options.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_NONE;
+#endif
+        OPTIX_CHECK_LOG(optixPipelineCreate(state.context, &state.pipeline_compile_options, &pipeline_link_options,
+                                            program_groups, sizeof(program_groups) / sizeof(program_groups[0]), log,
+                                            &sizeof_log, &state.pipeline));
+    }
+    void GPUAccel::build_sbt() {
+        {
+            RaygenRecord *raygen_record = allocator.new_object<RaygenRecord>();
+            OPTIX_CHECK(optixSbtRecordPackHeader(state.radiance_closest_hit_group, raygen_record));
+            state.mega_kernel_sbt.raygenRecord = (CUdeviceptr)raygen_record;
+        }
+        {
+            MissRecord *miss_record = allocator.new_object<MissRecord>();
+            OPTIX_CHECK(optixSbtRecordPackHeader(state.radiance_closest_hit_group, miss_record));
+            state.mega_kernel_sbt.missRecordBase = (CUdeviceptr)miss_record;
+            state.mega_kernel_sbt.missRecordStrideInBytes = sizeof(MissRecord);
+            state.mega_kernel_sbt.missRecordCount = 2;
+        }
+    }
     void GPUAccel::build(const Scene *scene) {
         std::vector<OptixBuildInput> inputs;
         for (auto &instance : scene->meshes) {
             inputs.emplace_back(build(instance));
         }
         build(inputs);
+        build_ptx_module();
     }
     void GPUAccel::build_ptx_module() {
         OptixModuleCompileOptions module_compile_options = {};
@@ -144,7 +231,8 @@ namespace akari::gpu {
 
         char log[2048];
         size_t sizeof_log = sizeof(log);
-        OPTIX_CHECK(optixModuleCreateFromPTX(state.context, &module_compile_options, &state.pipeline_compile_options,
-                                             ptx.data(), ptx.size(), log, &sizeof_log, &state.ptx_module));
+        OPTIX_CHECK_LOG(optixModuleCreateFromPTX(state.context, &module_compile_options,
+                                                 &state.pipeline_compile_options, ptx.data(), ptx.size(), log,
+                                                 &sizeof_log, &state.ptx_module));
     }
 } // namespace akari::gpu
