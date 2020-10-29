@@ -152,7 +152,7 @@ namespace akari::render {
         void accumulate_beta(const Spectrum &k) { beta *= k; }
         // @param mat_pdf: supplied if material is already chosen
         astd::optional<SurfaceVertex> on_surface_scatter(SurfaceInteraction &si, const SurfaceHit &surface_hit,
-                                                        const astd::optional<PathVertex> &prev_vertex) noexcept {
+                                                         const astd::optional<PathVertex> &prev_vertex) noexcept {
             auto *material = surface_hit.material;
             auto &wo = surface_hit.wo;
             MaterialEvalContext ctx(allocator, sampler, si);
@@ -191,8 +191,20 @@ namespace akari::render {
                 SurfaceHit surface_hit(ray, *hit);
                 auto trig = scene->get_triangle(surface_hit.geom_id, surface_hit.prim_id);
                 surface_hit.material = trig.material;
-                SurfaceInteraction si(surface_hit.uv, trig);
 
+                SurfaceInteraction si(surface_hit.uv, trig);
+                {
+                    Float u = sampler->next1d();
+                    Float tr = trig.material->tr(ShadingPoint(si.texcoords));
+                    if (tr > 0) {
+                        if (u < tr) {
+                            ray = Ray(si.p, ray.d);
+                            continue;
+                        } else {
+                            prev_vertex = astd::nullopt;
+                        }
+                    }
+                }
                 auto vertex = on_surface_scatter(si, surface_hit, prev_vertex);
                 if (!vertex) {
                     break;

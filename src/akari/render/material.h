@@ -120,6 +120,7 @@ namespace akari::render {
             bsdf.set_closure(closure);
             return bsdf;
         }
+        AKR_XPU Float tr(const ShadingPoint &sp) const;
     };
 
     class EmissiveMaterial;
@@ -130,6 +131,7 @@ namespace akari::render {
         bool double_sided = false;
         AKR_XPU BSDFClosure evaluate(MaterialEvalContext &ctx) const { return BSDFClosure(); }
         AKR_XPU Spectrum albedo(const ShadingPoint &sp) const { return color->evaluate(sp); }
+        AKR_XPU Float tr(const ShadingPoint &sp) const { return color->tr(sp); }
     };
     class MaterialNode : public SceneGraphNode {
       public:
@@ -138,7 +140,12 @@ namespace akari::render {
 
     inline std::shared_ptr<TextureNode> resolve_texture(const sdl::Value &value) {
         if (value.is_array()) {
-            return create_constant_texture_rgb(load<Color3f>(value));
+            if (value.size() == 3)
+                return create_constant_texture_rgb(load<Color3f>(value));
+            else {
+                vec4 rgba = load<vec4>(value);
+                return create_constant_texture_rgba(RGBA(Color3f(rgba.x, rgba.y, rgba.z), rgba.w));
+            }
         } else if (value.is_number()) {
             return create_constant_texture_rgb(Color3f(value.get<float>().value()));
         } else if (value.is_string()) {
@@ -173,6 +180,9 @@ namespace akari::render {
         AKR_XPU Spectrum albedo(const ShadingPoint &sp) const {
             return lerp(mat_A->albedo(sp), mat_B->albedo(sp), fraction->evaluate(sp)[0]);
         }
+        AKR_XPU Float tr(const ShadingPoint &sp) const {
+            return lerp(mat_A->tr(sp), mat_B->tr(sp), fraction->evaluate(sp)[0]);
+        }
     };
     class DiffuseMaterial {
       public:
@@ -186,6 +196,7 @@ namespace akari::render {
             auto R = color->evaluate(sp);
             return R;
         }
+        AKR_XPU Float tr(const ShadingPoint &sp) const { return color->tr(sp); }
     };
     class GlossyMaterial {
       public:
@@ -201,11 +212,13 @@ namespace akari::render {
             auto R = color->evaluate(sp);
             return R;
         }
+        AKR_XPU Float tr(const ShadingPoint &sp) const { return color->tr(sp); }
     };
     AKR_XPU inline BSDFClosure Material::evaluate(MaterialEvalContext &ctx) const {
         AKR_VAR_PTR_DISPATCH(evaluate, ctx);
     }
     AKR_XPU inline Spectrum Material::albedo(const ShadingPoint &sp) const { AKR_VAR_PTR_DISPATCH(albedo, sp); }
+    AKR_XPU inline Float Material::tr(const ShadingPoint &sp) const { AKR_VAR_PTR_DISPATCH(tr, sp); }
     AKR_EXPORT std::shared_ptr<MaterialNode> create_diffuse_material();
     AKR_EXPORT std::shared_ptr<MaterialNode> create_glossy_material();
     AKR_EXPORT std::shared_ptr<MaterialNode> create_emissive_material();

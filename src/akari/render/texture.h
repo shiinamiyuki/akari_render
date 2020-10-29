@@ -39,11 +39,13 @@ namespace akari::render {
     };
     class ConstantTexture {
         Spectrum value;
+        Float alpha = 0;
 
       public:
-        AKR_XPU ConstantTexture(Spectrum v) : value(v) {}
+        AKR_XPU ConstantTexture(Spectrum v, Float alpha) : value(v), alpha(alpha) {}
         AKR_XPU Spectrum evaluate(const ShadingPoint &sp) const { return value; }
         Float integral() const { return luminance(value); }
+        AKR_XPU Float tr(const ShadingPoint &sp) const { return std::max<Float>(0.0, 1.0f - alpha); }
     };
     class ImageTexture {
         RGBAImage::View image;
@@ -63,6 +65,12 @@ namespace akari::render {
             }
             return I / (image.resolution().x * image.resolution().y);
         }
+        AKR_XPU Float tr(const ShadingPoint &sp) const {
+            vec2 texcoords = sp.texcoords;
+            vec2 tc = glm::mod(texcoords, vec2(1.0f));
+            tc.y = 1.0f - tc.y;
+            return std::max<Float>(0.0, 1.0f - image(tc).alpha);
+        }
     };
 
     class Texture : public Variant<const ImageTexture *, const ConstantTexture *> {
@@ -72,9 +80,11 @@ namespace akari::render {
         Float integral() const {
             return dispatch_cpu([&](auto arg) { return arg->integral(); });
         }
+        AKR_XPU Float tr(const ShadingPoint &sp) const { AKR_VAR_PTR_DISPATCH(tr, sp); }
     };
     AKR_EXPORT std::shared_ptr<TextureNode> create_constant_texture();
     AKR_EXPORT std::shared_ptr<TextureNode> create_image_texture();
+    AKR_EXPORT std::shared_ptr<TextureNode> create_constant_texture_rgba(const RGBA &value);
     AKR_EXPORT std::shared_ptr<TextureNode> create_constant_texture_rgb(const RGB &value);
     AKR_EXPORT std::shared_ptr<TextureNode> create_image_texture(const std::string &path);
 } // namespace akari::render

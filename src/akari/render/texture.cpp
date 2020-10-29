@@ -28,11 +28,12 @@ namespace akari::render {
 
     class ConstantTextureNode final : public TextureNode {
         Spectrum value;
+        Float alpha;
 
       public:
-        ConstantTextureNode(Spectrum v) : value(v) {}
+        ConstantTextureNode(Spectrum v, Float alpha = 1.0) : value(v), alpha(alpha) {}
         Texture *create_texture(Allocator<> *allocator) override {
-            return allocator->new_object<Texture>(allocator->new_object<const ConstantTexture>(value));
+            return allocator->new_object<Texture>(allocator->new_object<const ConstantTexture>(value, alpha));
         }
     };
 
@@ -60,7 +61,10 @@ namespace akari::render {
     }
     AKR_EXPORT std::shared_ptr<TextureNode> create_image_texture() { return std::make_shared<ImageTextureNode>(); }
     AKR_EXPORT std::shared_ptr<TextureNode> create_constant_texture_rgb(const RGB &value) {
-        return std::make_shared<ConstantTextureNode>(value);
+        return std::make_shared<ConstantTextureNode>(value, 1.0);
+    }
+    AKR_EXPORT std::shared_ptr<TextureNode> create_constant_texture_rgba(const RGBA &value) {
+        return std::make_shared<ConstantTextureNode>(value.rgb, value.alpha);
     }
     AKR_EXPORT std::shared_ptr<TextureNode> create_image_texture(const std::string &path) {
         return std::make_shared<ImageTextureNode>(path);

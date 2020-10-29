@@ -100,7 +100,7 @@ namespace akari::render {
             power.emplace_back(area * tc_area * I);
         }
         if (envmap) {
-            scene->envmap_box = InfiniteAreaLight::create(*scene, envmap->transform, envmap_texture, *allocator);
+            scene->envmap_box = InfiniteAreaLight::create(*scene, envmap->transform, envmap_texture, Allocator<>());
             scene->envmap = allocator->new_object<const Light>(scene->envmap_box.get());
             power.emplace_back(scene->envmap_box->power());
         }
@@ -110,7 +110,7 @@ namespace akari::render {
         if (envmap) {
             lights.emplace_back(scene->envmap);
         }
-        light_distribution = std::make_unique<Distribution1D>(power.data(), power.size(), *allocator);
+        light_distribution = std::make_unique<Distribution1D>(power.data(), power.size(), Allocator<>());
         AKR_ASSERT(lights.size() == power.size());
         for (size_t i = 0; i < lights.size(); i++) {
             light_pdf_map->insert(lights[i], light_distribution->pdf_discrete(i));

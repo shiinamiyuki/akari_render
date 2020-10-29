@@ -44,7 +44,7 @@ namespace akari::render {
         AOV aov;
         AOVIntegrator(int spp, AOV aov) : spp(spp), aov(aov) {}
         void render(const Scene *scene, Film *film) override {
-            
+
             AKR_ASSERT_THROW(glm::all(glm::equal(film->resolution(), scene->camera->resolution())));
             auto n_tiles = ivec2(film->resolution() + ivec2(tile_size - 1)) / ivec2(tile_size);
             debug("resolution: {}, tile size: {}, tiles: {}", film->resolution(), tile_size, n_tiles);
@@ -67,20 +67,33 @@ namespace akari::render {
                             CameraSample sample =
                                 camera->generate_ray(sampler->next2d(), sampler->next2d(), ivec2(x, y));
                             Spectrum value = Spectrum(0.0);
-                            if (auto isct = scene->intersect(sample.ray)) {
-                                auto trig = scene->get_triangle(isct->geom_id, isct->prim_id);
-                                switch (aov) {
-                                case AOV::albedo: {
-                                    auto mat = trig.material;
-                                    ShadingPoint sp(trig.texcoord(isct->uv));
-                                    value = mat->albedo(sp);
-                                } break;
-                                case AOV::normal:
-                                    value = trig.ng();
+                            auto ray = sample.ray;
+                            while (true) {
+                                if (auto isct = scene->intersect(ray)) {
+                                    auto trig = scene->get_triangle(isct->geom_id, isct->prim_id);
+                                    Float u = sampler->next1d();
+                                    Float tr = trig.material->tr(ShadingPoint(trig.texcoord(isct->uv)));
+                                    if (tr > 0) {
+                                        if (u < tr) {
+                                            ray = Ray(trig.p(isct->uv), ray.d);
+                                            continue;
+                                        }
+                                    }
+                                    switch (aov) {
+                                    case AOV::albedo: {
+                                        auto mat = trig.material;
+                                        ShadingPoint sp(trig.texcoord(isct->uv));
+                                        value = mat->albedo(sp);
+                                    } break;
+                                    case AOV::normal:
+                                        value = trig.ng();
+                                        break;
+                                    }
+                                    break;
+                                } else {
                                     break;
                                 }
                             }
-
                             tile.add_sample(vec2(x, y), value, 1.0f);
                         }
                     }

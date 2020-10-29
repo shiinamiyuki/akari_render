@@ -99,8 +99,10 @@ namespace akari {
                         }
                     },
                     128);
+                stbi_image_free((void *)data);
             } else {
-                const auto *data = stbi_load(path.string().c_str(), &x, &y, &channel, 3);
+                const auto *data = stbi_load(path.string().c_str(), &x, &y, &channel, 0);
+                info("channel={}", channel);
                 image = std::make_shared<RGBAImage>(ivec2(x, y));
                 parallel_for(
                     image->resolution().y,
@@ -110,14 +112,20 @@ namespace akari {
                             if (channel == 1) {
                                 rgb = RGBSpectrum((float)data[x + y * image->resolution().x] / 255.0f);
                             } else {
-                                rgb[0] = (float)data[3 * (x + y * image->resolution().x) + 0] / 255.0f;
-                                rgb[1] = (float)data[3 * (x + y * image->resolution().x) + 1] / 255.0f;
-                                rgb[2] = (float)data[3 * (x + y * image->resolution().x) + 2] / 255.0f;
+                                rgb[0] = (float)data[channel * (x + y * image->resolution().x) + 0] / 255.0f;
+                                rgb[1] = (float)data[channel * (x + y * image->resolution().x) + 1] / 255.0f;
+                                rgb[2] = (float)data[channel * (x + y * image->resolution().x) + 2] / 255.0f;
                             }
-                            (*image)(x, y) = RGBA(rgb, 1.0f);
+                            if (channel == 3) {
+                                (*image)(x, y) = RGBA(rgb, 1.0f);
+                            } else {
+                                (*image)(x, y) =
+                                    RGBA(rgb, (float)data[channel * (x + y * image->resolution().x) + 3] / 255.0f);
+                            }
                         }
                     },
                     128);
+                stbi_image_free((void *)data);
             }
             return image;
         }

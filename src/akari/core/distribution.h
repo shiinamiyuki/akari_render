@@ -101,13 +101,13 @@ namespace akari {
     };
 
     struct Distribution2D {
+        Allocator<> allocator;
         astd::pmr::vector<Distribution1D> pConditionalV;
         Box<Distribution1D> pMarginal;
-        Allocator<> allocator;
 
       public:
         Distribution2D(const Float *data, size_t nu, size_t nv, Allocator<> allocator_)
-            : pConditionalV(allocator), allocator(allocator_) {
+            : allocator(allocator_), pConditionalV(allocator) {
             pConditionalV.reserve(nv);
             for (auto v = 0u; v < nv; v++) {
                 pConditionalV.emplace_back(&data[v * nu], nu, allocator);
