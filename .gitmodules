@@ -25,3 +25,6 @@
 [submodule "external/openexr"]
 	path = external/openexr
 	url = https://github.com/AcademySoftwareFoundation/openexr
+[submodule "external/assimp"]
+	path = external/assimp
+	url = https://github.com/assimp/assimp
