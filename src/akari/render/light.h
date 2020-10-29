@@ -92,12 +92,12 @@ namespace akari::render {
             LightSample sample;
             sample.ng = triangle.ng();
             sample.wi = p - ctx.p;
-            auto dist_sqr = dot(sample.wi, sample.wi);
+            auto dist_sqr = glm::dot(sample.wi, sample.wi);
             sample.wi /= sqrt(dist_sqr);
             sample.I = color->evaluate(triangle.texcoord(coords));
-            sample.pdf = dist_sqr / max(Float(0.0), -dot(sample.wi, sample.ng)) / triangle.area();
+            sample.pdf = dist_sqr / std::max(Float(0.0), -dot(sample.wi, sample.ng)) / triangle.area();
             sample.shadow_ray = Ray(p, -sample.wi, Eps / std::abs(dot(sample.wi, sample.ng)),
-                                    sqrt(dist_sqr) * (Float(1.0f) - ShadowEps));
+                                    std::sqrt(dist_sqr) * (Float(1.0f) - ShadowEps));
             return sample;
         }
     };

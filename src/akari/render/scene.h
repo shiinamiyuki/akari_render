@@ -24,6 +24,7 @@
 #include <akari/core/math.h>
 #include <akari/core/box.h>
 #include <akari/core/distribution.h>
+#include <akari/core/containers.h>
 #include <akari/render/accelerator.h>
 #include <akari/render/integrator.h>
 #include <akari/render/instance.h>
@@ -37,13 +38,14 @@ namespace akari::render {
     class Sampler;
     template <typename T1, typename T2>
     struct PairHash {
-        size_t operator()(const std::pair<T1, T2> &pair) const {
-            return std::hash<T1>()(pair.first) ^ std::hash<T2>()(pair.second);
-        }
+        AKR_XPU uint64_t operator()(const std::pair<T1, T2> &pair) const { return hash(pair.first, pair.second); }
     };
-
-    using LightIdMap = std::unordered_map<std::pair<int32_t, int32_t>, const Light *, PairHash<uint32_t, uint32_t>>;
-    using LightPdfMap = std::unordered_map<const Light *, Float>;
+    template <typename T>
+    struct PointerHash {
+        AKR_XPU uint64_t operator()(const T *v) { return hash(v); }
+    };
+    using LightIdMap = HashMap<std::pair<int32_t, int32_t>, const Light *, PairHash<uint32_t, uint32_t>, Allocator<>>;
+    using LightPdfMap = HashMap<const Light *, Float, PointerHash<const Light>, Allocator<>>;
     class Scene {
       public:
         BufferView<MeshInstance> meshes;
@@ -55,10 +57,10 @@ namespace akari::render {
         const LightIdMap *light_id_map = nullptr;
         const LightPdfMap *light_pdf_map = nullptr;
         Box<const InfiniteAreaLight> envmap_box;
-        const Light * envmap = nullptr;
-        std::optional<Intersection> intersect(const Ray &ray) const { return accel->intersect(ray); }
+        const Light *envmap = nullptr;
+        astd::optional<Intersection> intersect(const Ray &ray) const { return accel->intersect(ray); }
         bool occlude(const Ray &ray) const { return accel->occlude(ray); }
-        Triangle get_triangle(int mesh_id, int prim_id) const {
+        AKR_XPU Triangle get_triangle(int mesh_id, int prim_id) const {
             auto &mesh = meshes[mesh_id];
             Triangle trig = akari::render::get_triangle(mesh, prim_id);
             auto mat_idx = mesh.material_indices[prim_id];
@@ -67,7 +69,7 @@ namespace akari::render {
             }
             return trig;
         }
-        std::pair<const Light *, Float> select_light(const vec2 &u) const {
+        AKR_XPU astd::pair<const Light *, Float> select_light(const vec2 &u) const {
             if (lights.size() == 0) {
                 return {nullptr, Float(0.0f)};
             }
@@ -78,20 +80,20 @@ namespace akari::render {
             }
             return {lights[idx], pdf};
         }
-        Float pdf_light(const Light *light) const {
-            auto it = light_pdf_map->find(light);
-            if (it != light_pdf_map->end()) {
-                return it->second;
+        AKR_XPU Float pdf_light(const Light *light) const {
+            auto it = light_pdf_map->lookup(light);
+            if (it) {
+                return *it;
             }
             return 0.0;
         }
-        const Light *get_light(int mesh_id, int prim_id) const {
+        AKR_XPU const Light *get_light(int mesh_id, int prim_id) const {
             auto pair = std::make_pair(mesh_id, prim_id);
-            auto it = light_id_map->find(pair);
-            if (it == light_id_map->end()) {
+            auto it = light_id_map->lookup(pair);
+            if (!it.has_value()) {
                 return nullptr;
             }
-            return it->second;
+            return *it;
         }
     };
     class TextureNode;
@@ -113,8 +115,8 @@ namespace akari::render {
         std::shared_ptr<AcceleratorNode> accel;
         std::shared_ptr<IntegratorNode> integrator;
         std::vector<const Light *> lights;
-        LightPdfMap light_pdf_map;
-        LightIdMap light_id_map;
+        Box<LightPdfMap> light_pdf_map;
+        Box<LightIdMap> light_id_map;
         TRSTransform envmap_transform;
         std::shared_ptr<EnvMapNode> envmap;
         Box<Scene> scene;
@@ -123,6 +125,7 @@ namespace akari::render {
         void init_scene(Allocator<> *allocator);
 
       public:
+        
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override;
         void commit() override;

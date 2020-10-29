@@ -71,7 +71,7 @@ namespace akari::render {
             }
             rtcCommitScene(rtcScene);
         }
-        std::optional<Intersection> intersect(const Ray &ray) const override {
+        astd::optional<Intersection> intersect(const Ray &ray) const override {
             RTCRayHit rayHit;
             rayHit.ray = toRTCRay(ray);
             rayHit.ray.flags = 0;
@@ -82,7 +82,7 @@ namespace akari::render {
             rtcInitIntersectContext(&context);
             rtcIntersect1(rtcScene, &context, &rayHit);
             if (rayHit.hit.geomID == RTC_INVALID_GEOMETRY_ID || rayHit.hit.primID == RTC_INVALID_GEOMETRY_ID)
-                return std::nullopt;
+                return astd::nullopt;
             Intersection intersection;
             intersection.prim_id = rayHit.hit.primID;
             intersection.geom_id = rayHit.hit.geomID;

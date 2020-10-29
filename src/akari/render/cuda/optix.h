@@ -21,3 +21,5 @@
 // SOFTWARE.
 
 #pragma once
+
+#include <akari/render/scene.h>

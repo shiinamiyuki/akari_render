@@ -99,7 +99,7 @@ namespace akari {
 #endif
     template <typename T, typename Float>
     AKR_XPU T lerp(T a, T b, Float t) {
-        return a * (Float(1.0) - t) + b * t;
+        return a * ((Float(1.0)) - t) + b * t;
     }
     template <typename V, typename V2>
     AKR_XPU inline V lerp3(const V &v0, const V &v1, const V &v2, const V2 &uv) {

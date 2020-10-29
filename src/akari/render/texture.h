@@ -29,7 +29,7 @@
 namespace akari::render {
     struct ShadingPoint {
         ShadingPoint() = default;
-        ShadingPoint(const vec2 &tc) : texcoords(tc) {}
+        AKR_XPU ShadingPoint(const vec2 &tc) : texcoords(tc) {}
         vec2 texcoords;
     };
     class Texture;
@@ -41,7 +41,7 @@ namespace akari::render {
         Spectrum value;
 
       public:
-        ConstantTexture(Spectrum v) : value(v) {}
+        AKR_XPU ConstantTexture(Spectrum v) : value(v) {}
         AKR_XPU Spectrum evaluate(const ShadingPoint &sp) const { return value; }
         Float integral() const { return luminance(value); }
     };
@@ -49,7 +49,7 @@ namespace akari::render {
         RGBAImage::View image;
 
       public:
-        ImageTexture(RGBAImage::View image) : image(image) {}
+        AKR_XPU ImageTexture(RGBAImage::View image) : image(image) {}
         AKR_XPU Spectrum evaluate(const ShadingPoint &sp) const {
             vec2 texcoords = sp.texcoords;
             vec2 tc = glm::mod(texcoords, vec2(1.0f));

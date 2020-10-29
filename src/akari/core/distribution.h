@@ -23,6 +23,7 @@
 #pragma once
 #include <akari/core/math.h>
 #include <akari/core/memory.h>
+#include <akari/core/box.h>
 #include <optional>
 namespace akari {
     /*
@@ -101,10 +102,12 @@ namespace akari {
 
     struct Distribution2D {
         astd::pmr::vector<Distribution1D> pConditionalV;
-        astd::optional<Distribution1D> pMarginal;
+        Box<Distribution1D> pMarginal;
+        Allocator<> allocator;
 
       public:
-        Distribution2D(const Float *data, size_t nu, size_t nv, Allocator<> allocator) : pConditionalV(allocator) {
+        Distribution2D(const Float *data, size_t nu, size_t nv, Allocator<> allocator_)
+            : pConditionalV(allocator), allocator(allocator_) {
             pConditionalV.reserve(nv);
             for (auto v = 0u; v < nv; v++) {
                 pConditionalV.emplace_back(&data[v * nu], nu, allocator);
@@ -113,7 +116,7 @@ namespace akari {
             for (auto v = 0u; v < nv; v++) {
                 m.emplace_back(pConditionalV[v].funcInt);
             }
-            pMarginal.emplace(&m[0], nv, allocator);
+            pMarginal = make_pmr_box<Distribution1D>(allocator, &m[0], nv, allocator);
         }
         AKR_XPU Vec2 sample_continuous(const Vec2 &u, Float *pdf) const {
             int v;

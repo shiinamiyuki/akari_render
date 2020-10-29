@@ -24,6 +24,9 @@
 #include <optix.h>
 #include <optix_function_table_definition.h>
 #include <optix_stubs.h>
+extern "C" {
+extern unsigned char AKR_EMBEDDED_PTX[];
+}
 namespace akari::gpu {
     using namespace render;
     struct alignas(OPTIX_SBT_RECORD_ALIGNMENT) RaygenRecord {
@@ -102,7 +105,7 @@ namespace akari::gpu {
         triangle_input.triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
         triangle_input.triangleArray.vertexStrideInBytes = sizeof(float) * 3;
         triangle_input.triangleArray.numVertices = static_cast<uint32_t>(instance.vertices.size() / 3);
-        triangle_input.triangleArray.vertexBuffers = reinterpret_cast<CUdeviceptr const*>(&instance.vertices.data());
+        triangle_input.triangleArray.vertexBuffers = reinterpret_cast<CUdeviceptr const *>(&instance.vertices.data());
         triangle_input.triangleArray.flags = triangle_input_flags;
         triangle_input.triangleArray.numSbtRecords = 1;
         triangle_input.triangleArray.sbtIndexOffsetBuffer = reinterpret_cast<CUdeviceptr>(nullptr);
@@ -116,5 +119,32 @@ namespace akari::gpu {
             inputs.emplace_back(build(instance));
         }
         build(inputs);
+    }
+    void GPUAccel::build_ptx_module() {
+        OptixModuleCompileOptions module_compile_options = {};
+        module_compile_options.maxRegisterCount = OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT;
+        module_compile_options.optLevel = OPTIX_COMPILE_OPTIMIZATION_DEFAULT;
+        module_compile_options.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO;
+
+        state.pipeline_compile_options.usesMotionBlur = false;
+        state.pipeline_compile_options.traversableGraphFlags = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_GAS;
+        state.pipeline_compile_options.numPayloadValues = 2;
+        state.pipeline_compile_options.numAttributeValues = 2;
+
+#ifndef NDEBUG // Enables debug exceptions during optix launches. This may incur significant performance cost and should
+               // only be done during development.
+        state.pipeline_compile_options.exceptionFlags =
+            OPTIX_EXCEPTION_FLAG_DEBUG | OPTIX_EXCEPTION_FLAG_TRACE_DEPTH | OPTIX_EXCEPTION_FLAG_STACK_OVERFLOW;
+#else
+        state.pipeline_compile_options.exceptionFlags = OPTIX_EXCEPTION_FLAG_NONE;
+#endif
+        state.pipeline_compile_options.pipelineLaunchParamsVariableName = "params";
+
+        const std::string_view ptx((const char *)AKR_EMBEDDED_PTX);
+
+        char log[2048];
+        size_t sizeof_log = sizeof(log);
+        OPTIX_CHECK(optixModuleCreateFromPTX(state.context, &module_compile_options, &state.pipeline_compile_options,
+                                             ptx.data(), ptx.size(), log, &sizeof_log, &state.ptx_module));
     }
 } // namespace akari::gpu

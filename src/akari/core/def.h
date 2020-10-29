@@ -43,12 +43,11 @@ AKR_PLATFORM_LINUX
 
 #ifdef AKR_ENABLE_GPU
 #    ifdef AKR_GPU_BACKEND_CUDA
-#        ifdef __NVCC__
-#            undef AKR_CPU
-#            undef AKR_GPU
-#            define AKR_CPU __host__
-#            define AKR_GPU __device__
-#        endif
+#        include <cuda_runtime.h>
+#        undef AKR_CPU
+#        undef AKR_GPU
+#        define AKR_CPU __host__
+#        define AKR_GPU __device__
 #    endif
 #endif
 #define AKR_XPU AKR_GPU AKR_CPU

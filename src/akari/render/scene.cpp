@@ -39,9 +39,10 @@ namespace akari::render {
         camera->commit();
     }
     void SceneNode::init_scene(Allocator<> *allocator) {
+        light_pdf_map = make_pmr_box<LightPdfMap>(*allocator, *allocator);
+        light_id_map = make_pmr_box<LightIdMap>(*allocator, *allocator);
+
         lights.clear();
-        light_id_map.clear();
-        light_pdf_map.clear();
         scene = make_pmr_box<Scene>(*allocator);
         scene->camera = camera->create_camera(allocator);
         for (auto &shape : shapes) {
@@ -69,7 +70,7 @@ namespace akari::render {
                     (void)e;
                     auto light = allocator->new_object<Light>(allocator->new_object<const AreaLight>(triangle));
                     area_lights.emplace_back(light);
-                    light_id_map.emplace(std::make_pair(mesh_id, prim_id), light);
+                    light_id_map->insert(std::make_pair(mesh_id, prim_id), light);
                 }
             }
         }
@@ -86,7 +87,7 @@ namespace akari::render {
             integrals[pair.first] = pair.second.get();
         }
         for (size_t i = 0; i < area_lights.size(); i++) {
-            auto light = *area_lights[i]->get<const AreaLight*>();
+            auto light = *area_lights[i]->get<const AreaLight *>();
             auto color = light->color;
             auto I = integrals[color];
             auto &triangle = light->triangle;
@@ -112,12 +113,12 @@ namespace akari::render {
         light_distribution = std::make_unique<Distribution1D>(power.data(), power.size(), *allocator);
         AKR_ASSERT(lights.size() == power.size());
         for (size_t i = 0; i < lights.size(); i++) {
-            light_pdf_map[lights[i]] = light_distribution->pdf_discrete(i);
+            light_pdf_map->insert(lights[i], light_distribution->pdf_discrete(i));
         }
         scene->light_distribution = light_distribution.get();
         scene->lights = BufferView(lights.data(), lights.size());
-        scene->light_id_map = &light_id_map;
-        scene->light_pdf_map = &light_pdf_map;
+        scene->light_id_map = light_id_map.get();
+        scene->light_pdf_map = light_pdf_map.get();
     }
     void SceneNode::render() {
         // Thanks to python hijacking SIGINT handler;
@@ -175,6 +176,9 @@ namespace akari::render {
             }
             denoiser = nullptr;
         }
+        scene.reset();
+        light_pdf_map.reset();
+        light_id_map.reset();
     }
 
     void SceneNode::object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,

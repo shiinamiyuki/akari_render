@@ -530,11 +530,11 @@ namespace akari::render {
             CameraSample sample = camera->generate_ray(sampler->next2d(), sampler->next2d(), p);
             return sample;
         }
-        std::pair<const Light *, Float> select_light() noexcept { return scene->select_light(sampler->next2d()); }
+        astd::pair<const Light *, Float> select_light() noexcept { return scene->select_light(sampler->next2d()); }
 
-        std::optional<DirectLighting>
+        astd::optional<DirectLighting>
         compute_direct_lighting(SurfaceInteraction &si, const SurfaceHit &surface_hit,
-                                const std::pair<const Light *, Float> &selected) noexcept {
+                                const astd::pair<const Light *, Float> &selected) noexcept {
             auto [light, light_pdf] = selected;
             if (light) {
                 DirectLighting lighting;
@@ -543,7 +543,7 @@ namespace akari::render {
                 light_ctx.p = si.p;
                 LightSample light_sample = light->sample_incidence(light_ctx);
                 if (light_sample.pdf <= 0.0)
-                    return std::nullopt;
+                    return astd::nullopt;
                 light_pdf *= light_sample.pdf;
                 auto f = light_sample.I * si.bsdf->evaluate(surface_hit.wo, light_sample.wi) *
                          std::abs(dot(si.ns, light_sample.wi));
@@ -557,7 +557,7 @@ namespace akari::render {
                     sTree->deposit(si.p, light_sample.wi, luminance(Spectrum(weight * light_sample.I / light_pdf)));
                 return lighting;
             } else {
-                return std::nullopt;
+                return astd::nullopt;
             }
         }
 
@@ -577,8 +577,8 @@ namespace akari::render {
             }
         }
         // @param mat_pdf: supplied if material is already chosen
-        std::optional<SurfaceVertex> on_surface_scatter(SurfaceInteraction &si, const SurfaceHit &surface_hit,
-                                                        const std::optional<PathVertex> &prev_vertex) noexcept {
+        astd::optional<SurfaceVertex> on_surface_scatter(SurfaceInteraction &si, const SurfaceHit &surface_hit,
+                                                        const astd::optional<PathVertex> &prev_vertex) noexcept {
             auto *material = surface_hit.material;
             auto wo = surface_hit.wo;
             MaterialEvalContext ctx(allocator, sampler, si);
@@ -599,7 +599,7 @@ namespace akari::render {
                         Float weight_bsdf = mis_weight(prev_vertex->pdf(), light_pdf);
                         accumulate_radiance_wo_beta(weight_bsdf * I);
                     }
-                    return std::nullopt;
+                    return astd::nullopt;
                 }
             } else if (depth < max_depth) {
                 auto u0 = sampler->next1d();
@@ -629,7 +629,7 @@ namespace akari::render {
                 AKR_CHECK(sample.pdf >= 0.0);
                 AKR_CHECK(hmin(sample.f) >= 0.0f);
                 if (std::isnan(sample.pdf) || sample.pdf == 0.0f) {
-                    return std::nullopt;
+                    return astd::nullopt;
                 }
                 vertex.bsdf = si.bsdf;
                 vertex.ray = Ray(si.p, sample.wi, Eps / std::abs(glm::dot(si.ng, sample.wi)));
@@ -637,12 +637,12 @@ namespace akari::render {
                 vertex.pdf = sample.pdf;
                 return vertex;
             }
-            return std::nullopt;
+            return astd::nullopt;
         }
         void run_megakernel(const Camera *camera, const ivec2 &p) noexcept {
             auto camera_sample = camera_ray(camera, p);
             Ray ray = camera_sample.ray;
-            std::optional<PathVertex> prev_vertex;
+            astd::optional<PathVertex> prev_vertex;
             while (true) {
                 auto hit = scene->intersect(ray);
                 if (!hit) {
@@ -658,7 +658,7 @@ namespace akari::render {
                 if (!vertex) {
                     break;
                 }
-                std::optional<DirectLighting> has_direct = compute_direct_lighting(si, surface_hit, select_light());
+                astd::optional<DirectLighting> has_direct = compute_direct_lighting(si, surface_hit, select_light());
                 if (has_direct) {
                     auto &direct = *has_direct;
                     if (!is_black(direct.color) && !scene->occlude(direct.shadow_ray)) {

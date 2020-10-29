@@ -46,7 +46,7 @@ namespace akari::render {
         Spectrum R;
 
       public:
-        DiffuseBSDF(const Spectrum &R) : R(R) {}
+        AKR_XPU DiffuseBSDF(const Spectrum &R) : R(R) {}
         [[nodiscard]] AKR_XPU Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const {
 
             if (same_hemisphere(wo, wi)) {
@@ -80,7 +80,7 @@ namespace akari::render {
         MicrofacetModel model;
 
       public:
-        MicrofacetReflection(const Spectrum &R, Float roughness)
+        AKR_XPU MicrofacetReflection(const Spectrum &R, Float roughness)
             : R(R), model(microfacet_new(MicrofacetGGX, roughness)) {}
         [[nodiscard]] AKR_XPU Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const {
             if (same_hemisphere(wo, wi)) {

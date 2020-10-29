@@ -45,7 +45,7 @@ namespace akari::astd {
     pair(T1 &&, T2 &&) -> pair<T1, T2>;
 
     template <typename T1, typename T2>
-    AKR_XPU pair<T1, T2> make_pair(T1 &&a, T2 &&b) {
+    AKR_XPU pair<T1, T2> make_pair(T1 a, T2 b) {
         return pair<T1, T2>{a, b};
     }
 

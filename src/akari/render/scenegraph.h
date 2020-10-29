@@ -23,7 +23,7 @@
 #include <akari/core/plugin.h>
 #include <akari/core/parser.h>
 namespace akari::render {
-    class SceneGraphNode : public sdl::Object {
+    class AKR_EXPORT SceneGraphNode : public sdl::Object {
       public:
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override {}

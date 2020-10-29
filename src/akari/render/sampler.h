@@ -27,16 +27,20 @@
 #include <akari/render/scenegraph.h>
 #include <akari/render/common.h>
 #include <akari/core/memory.h>
+#include <akari/core/variant.h>
 #include <optional>
 
 namespace akari::render {
-    class Sampler {
+    class PCGSampler;
+    class LCGSampler;
+    class Sampler : public Variant<PCGSampler *, LCGSampler *> {
       public:
-        virtual Float next1d() = 0;
-        vec2 next2d() { return vec2(next1d(), next1d()); }
-        virtual void start_next_sample() = 0;
-        virtual void set_sample_index(uint64_t idx) = 0;
-        virtual Sampler *clone(Allocator<> *allocator) const = 0;
+        using Variant::Variant;
+        AKR_XPU Float inline next1d();
+        AKR_XPU inline vec2 next2d();
+        AKR_XPU inline void start_next_sample();
+        AKR_XPU inline void set_sample_index(uint64_t idx);
+        inline Sampler *clone(Allocator<> *allocator) const;
     };
     class SamplerNode : public SceneGraphNode {
       public:
@@ -47,8 +51,8 @@ namespace akari::render {
         uint64_t state = 0x4d595df4d0f33173; // Or something seed-dependent
         static uint64_t const multiplier = 6364136223846793005u;
         static uint64_t const increment = 1442695040888963407u; // Or an arbitrary odd constant
-        static uint32_t rotr32(uint32_t x, unsigned r) { return x >> r | x << (-r & 31); }
-        uint32_t pcg32(void) {
+        static AKR_XPU uint32_t rotr32(uint32_t x, unsigned r) { return x >> r | x << (-r & 31); }
+        AKR_XPU uint32_t pcg32(void) {
             uint64_t x = state;
             unsigned count = (unsigned)(x >> 59); // 59 = 64 - 5
 
@@ -56,31 +60,35 @@ namespace akari::render {
             x ^= x >> 18;                              // 18 = (64 - 27)/2
             return rotr32((uint32_t)(x >> 27), count); // 27 = 32 - 5
         }
-        void pcg32_init(uint64_t seed) {
+        AKR_XPU void pcg32_init(uint64_t seed) {
             state = seed + increment;
             (void)pcg32();
         }
 
       public:
-        void set_sample_index(uint64_t idx) override { pcg32_init(idx); }
-        Float next1d() override { return Float(pcg32()) / (float)0xffffffff; }
+        AKR_XPU void set_sample_index(uint64_t idx) { pcg32_init(idx); }
+        AKR_XPU Float next1d() { return Float(pcg32()) / (float)0xffffffff; }
 
-        void start_next_sample() override {}
-        PCGSampler(uint64_t seed = 0u) { pcg32_init(seed); }
-        Sampler *clone(Allocator<> *allocator) const override { return allocator->new_object<PCGSampler>(*this); }
+        AKR_XPU void start_next_sample() {}
+        AKR_XPU PCGSampler(uint64_t seed = 0u) { pcg32_init(seed); }
+        Sampler *clone(Allocator<> *allocator) const {
+            return allocator->new_object<Sampler>(allocator->new_object<PCGSampler>(*this));
+        }
     };
     class LCGSampler : public Sampler {
         uint32_t seed;
 
       public:
-        void set_sample_index(uint64_t idx) override { seed = idx & 0xffffffff; }
-        Float next1d() override {
+        AKR_XPU void set_sample_index(uint64_t idx) { seed = idx & 0xffffffff; }
+        AKR_XPU Float next1d() {
             seed = (1103515245 * seed + 12345);
             return (Float)seed / (Float)0xFFFFFFFF;
         }
-        void start_next_sample() override {}
-        LCGSampler(uint64_t seed = 0u) : seed(seed) {}
-        Sampler *clone(Allocator<> *allocator) const override { return allocator->new_object<LCGSampler>(*this); }
+        AKR_XPU void start_next_sample() {}
+        AKR_XPU LCGSampler(uint64_t seed = 0u) : seed(seed) {}
+        Sampler *clone(Allocator<> *allocator) const {
+            return allocator->new_object<Sampler>(allocator->new_object<LCGSampler>(*this));
+        }
     };
 
     class RandomSamplerNode : public SamplerNode {
@@ -103,11 +111,16 @@ namespace akari::render {
         }
         Sampler *create_sampler(Allocator<> *allocator) override {
             if (generator == "pcg") {
-                return allocator->new_object<PCGSampler>();
+                return allocator->new_object<Sampler>(allocator->new_object<PCGSampler>());
             } else if (generator == "lcg") {
-                return allocator->new_object<LCGSampler>();
+                return allocator->new_object<Sampler>(allocator->new_object<LCGSampler>());
             } else
                 AKR_ASSERT_THROW(false);
         }
     };
+    inline Sampler *Sampler::clone(Allocator<> *allocator) const { AKR_VAR_PTR_DISPATCH(clone, allocator); }
+    AKR_XPU inline Float Sampler::next1d() { AKR_VAR_PTR_DISPATCH(next1d); }
+    AKR_XPU inline vec2 Sampler::next2d() { return vec2(next1d(), next1d()); }
+    AKR_XPU inline void Sampler::start_next_sample() { AKR_VAR_PTR_DISPATCH(start_next_sample); }
+    AKR_XPU inline void Sampler::set_sample_index(uint64_t idx) { AKR_VAR_PTR_DISPATCH(set_sample_index, idx); }
 } // namespace akari::render

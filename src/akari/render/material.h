@@ -128,8 +128,8 @@ namespace akari::render {
         EmissiveMaterial(const Texture *color) : color(color) {}
         const Texture *color = nullptr;
         bool double_sided = false;
-        BSDFClosure evaluate(MaterialEvalContext &ctx) const { return BSDFClosure(); }
-        Spectrum albedo(const ShadingPoint &sp) const { return color->evaluate(sp); }
+        AKR_XPU BSDFClosure evaluate(MaterialEvalContext &ctx) const { return BSDFClosure(); }
+        AKR_XPU Spectrum albedo(const ShadingPoint &sp) const { return color->evaluate(sp); }
     };
     class MaterialNode : public SceneGraphNode {
       public:
@@ -159,13 +159,18 @@ namespace akari::render {
         const Texture *fraction = nullptr;
         const Material *mat_A = nullptr;
         const Material *mat_B = nullptr;
-        AKR_EXPORT BSDFClosure evaluate(MaterialEvalContext &ctx) const {
+        AKR_XPU BSDFClosure evaluate(MaterialEvalContext &ctx) const {
+#ifdef AKR_GPU_CODE
+            // GPU can not allocate temp buffer
+            astd::abort();
+#else
             auto closure =
                 MixBSDF(fraction->evaluate(ctx.sp)[0], ctx.allocator->new_object<BSDFClosure>(mat_A->evaluate(ctx)),
                         ctx.allocator->new_object<BSDFClosure>(mat_B->evaluate(ctx)));
             return closure;
+#endif
         }
-        AKR_EXPORT Spectrum albedo(const ShadingPoint &sp) const {
+        AKR_XPU Spectrum albedo(const ShadingPoint &sp) const {
             return lerp(mat_A->albedo(sp), mat_B->albedo(sp), fraction->evaluate(sp)[0]);
         }
     };
@@ -173,11 +178,11 @@ namespace akari::render {
       public:
         DiffuseMaterial(const Texture *color) : color(color) {}
         const Texture *color;
-        BSDFClosure evaluate(MaterialEvalContext &ctx) const {
+        AKR_XPU BSDFClosure evaluate(MaterialEvalContext &ctx) const {
             auto R = color->evaluate(ctx.sp);
             return DiffuseBSDF(R);
         }
-        Spectrum albedo(const ShadingPoint &sp) const {
+        AKR_XPU Spectrum albedo(const ShadingPoint &sp) const {
             auto R = color->evaluate(sp);
             return R;
         }
@@ -187,12 +192,12 @@ namespace akari::render {
         GlossyMaterial(const Texture *color, const Texture *roughness) : color(color), roughness(roughness) {}
         const Texture *color;
         const Texture *roughness;
-        BSDFClosure evaluate(MaterialEvalContext &ctx) const {
+        AKR_XPU BSDFClosure evaluate(MaterialEvalContext &ctx) const {
             auto R = color->evaluate(ctx.sp);
             auto r = roughness->evaluate(ctx.sp)[0];
             return MicrofacetReflection(R, r);
         }
-        Spectrum albedo(const ShadingPoint &sp) const {
+        AKR_XPU Spectrum albedo(const ShadingPoint &sp) const {
             auto R = color->evaluate(sp);
             return R;
         }

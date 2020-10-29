@@ -29,17 +29,21 @@
 #include <optix_host.h>
 
 namespace akari::gpu {
-    using render::Scene;
     using render::MeshInstance;
+    using render::Scene;
     class AKR_EXPORT GPUAccel {
         struct OptixState {
             OptixDeviceContext context;
             OptixTraversableHandle gas_handle;
+            OptixModule ptx_module = 0;
+            OptixPipelineCompileOptions pipeline_compile_options = {};
+            OptixPipeline pipeline = 0;
         };
         OptixState state;
         void init_optix();
         OptixBuildInput build(const MeshInstance &instance);
         void build(const std::vector<OptixBuildInput> &inputs);
+        void build_ptx_module();
 
       public:
         GPUAccel() { init_optix(); }
