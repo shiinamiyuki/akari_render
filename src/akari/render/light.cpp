@@ -27,7 +27,7 @@
 
 namespace akari::render {
     Box<const InfiniteAreaLight> InfiniteAreaLight::create(const Scene &scene, const TRSTransform &transform,
-                                                           Texture texture, Allocator<> allocator) {
+                                                                 const Texture *texture, Allocator<> allocator) {
         InfiniteAreaLight light;
         light.l2w = transform();
         light.w2l = light.l2w.inverse();
@@ -45,7 +45,7 @@ namespace akari::render {
                     vec2 uv(i, j);
                     uv /= vec2(distribution_map_resolution, distribution_map_resolution);
                     ShadingPoint sp(uv);
-                    Spectrum L = texture.evaluate(sp);
+                    Spectrum L = texture->evaluate(sp);
                     v[i + j * distribution_map_resolution] = luminance(L);
                     s += luminance(L);
                 }
@@ -54,7 +54,7 @@ namespace akari::render {
             256);
         light.texture = texture;
         light.distribution = std::make_unique<Distribution2D>(&v[0], distribution_map_resolution,
-                                                              distribution_map_resolution, allocator);
+                                                               distribution_map_resolution, allocator);
         light._power = sum.value() / v.size() * 4 * Pi * world_radius * world_radius;
         return make_pmr_box<const InfiniteAreaLight>(allocator, std::move(light));
     }

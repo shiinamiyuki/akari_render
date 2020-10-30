@@ -40,15 +40,16 @@ namespace akari::render {
     struct PairHash {
         AKR_XPU uint64_t operator()(const std::pair<T1, T2> &pair) const { return hash(pair.first, pair.second); }
     };
-    struct LightHash {
-        AKR_XPU uint64_t operator()(const Light &v) { return hash(v); }
+    template <typename T>
+    struct PointerHash {
+        AKR_XPU uint64_t operator()(const T *v) { return hash(v); }
     };
-    using LightIdMap = HashMap<std::pair<int32_t, int32_t>, Light, PairHash<uint32_t, uint32_t>, Allocator<>>;
-    using LightPdfMap = HashMap<Light, Float, LightHash, Allocator<>>;
+    using LightIdMap = HashMap<std::pair<int32_t, int32_t>, const Light *, PairHash<uint32_t, uint32_t>, Allocator<>>;
+    using LightPdfMap = HashMap<const Light *, Float, PointerHash<const Light>, Allocator<>>;
     class Scene {
       public:
         BufferView<MeshInstance> meshes;
-        BufferView<Light> lights;
+        BufferView<const Light *> lights;
         const Distribution1D *light_distribution = nullptr;
         std::shared_ptr<Accelerator> accel = nullptr;
         const Camera *camera = nullptr;
@@ -56,7 +57,7 @@ namespace akari::render {
         const LightIdMap *light_id_map = nullptr;
         const LightPdfMap *light_pdf_map = nullptr;
         Box<const InfiniteAreaLight> envmap_box;
-        Light envmap;
+        const Light *envmap = nullptr;
         astd::optional<Intersection> intersect(const Ray &ray) const { return accel->intersect(ray); }
         bool occlude(const Ray &ray) const { return accel->occlude(ray); }
         AKR_XPU Triangle get_triangle(int mesh_id, int prim_id) const {
@@ -68,9 +69,9 @@ namespace akari::render {
             }
             return trig;
         }
-        AKR_XPU astd::pair<Light, Float> select_light(const vec2 &u) const {
+        AKR_XPU astd::pair<const Light *, Float> select_light(const vec2 &u) const {
             if (lights.size() == 0) {
-                return {Light(), Float(0.0f)};
+                return {nullptr, Float(0.0f)};
             }
             Float pdf;
             size_t idx = light_distribution->sample_discrete(u[0], &pdf);
@@ -79,18 +80,18 @@ namespace akari::render {
             }
             return {lights[idx], pdf};
         }
-        AKR_XPU Float pdf_light(const Light &light) const {
+        AKR_XPU Float pdf_light(const Light *light) const {
             auto it = light_pdf_map->lookup(light);
             if (it) {
                 return *it;
             }
             return 0.0;
         }
-        AKR_XPU Light get_light(int mesh_id, int prim_id) const {
+        AKR_XPU const Light *get_light(int mesh_id, int prim_id) const {
             auto pair = std::make_pair(mesh_id, prim_id);
             auto it = light_id_map->lookup(pair);
             if (!it.has_value()) {
-                return Light();
+                return nullptr;
             }
             return *it;
         }
@@ -113,7 +114,7 @@ namespace akari::render {
         std::unique_ptr<Distribution1D> light_distribution;
         std::shared_ptr<AcceleratorNode> accel;
         std::shared_ptr<IntegratorNode> integrator;
-        std::vector<Light> lights;
+        std::vector<const Light *> lights;
         Box<LightPdfMap> light_pdf_map;
         Box<LightIdMap> light_id_map;
         TRSTransform envmap_transform;
@@ -124,6 +125,7 @@ namespace akari::render {
         void init_scene(Allocator<> *allocator);
 
       public:
+        
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override;
         void commit() override;

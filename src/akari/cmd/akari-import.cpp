@@ -23,31 +23,10 @@
 #include <fstream>
 #include <regex>
 #include <cxxopts.hpp>
-#include <assimp/Importer.hpp>  // C++ importer interface
-#include <assimp/scene.h>       // Output data structure
-#include <assimp/postprocess.h> // Post processing flags
 #include <akari/core/logger.h>
 #include <akari/core/mesh.h>
 #include <akari/core/misc.h>
 using namespace akari;
-std::shared_ptr<Mesh> load_assimp(const fs::path &path, std::string &generated) {
-    Assimp::Importer importer;
-    fs::path parent_path = fs::absolute(path).parent_path();
-    fs::path file = path.filename();
-    CurrentPathGuard _;
-    if (!parent_path.empty())
-        fs::current_path(parent_path);
-
-    const aiScene *scene =
-        importer.ReadFile(file.string(), aiProcess_CalcTangentSpace | aiProcess_Triangulate |
-                                             aiProcess_JoinIdenticalVertices | aiProcess_SortByPType);
-    if (!scene) {
-        fatal("failed to import {}  {}", path.string(), importer.GetErrorString());
-        return nullptr;
-    }
-    std::shared_ptr<Mesh> mesh;
-    return mesh;
-}
 std::shared_ptr<Mesh> load_wavefront_obj(const fs::path &path, std::string &generated) {
     info("loading {}", fs::absolute(path).string());
     std::shared_ptr<Mesh> mesh;

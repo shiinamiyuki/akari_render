@@ -60,20 +60,20 @@ namespace akari::render {
 
     class AreaLight {
       public:
-        Texture color;
+        const Texture *color;
         bool double_sided = false;
         Triangle triangle;
         vec3 ng;
         AreaLight() = default;
         AreaLight(Triangle triangle) : triangle(triangle) {
-            color = triangle.material.as_emissive()->color;
-            double_sided = triangle.material.as_emissive()->double_sided;
+            color = triangle.material->as_emissive()->color;
+            double_sided = triangle.material->as_emissive()->double_sided;
             ng = triangle.ng();
         }
         AKR_XPU Spectrum Le(const Vec3 &wo, const ShadingPoint &sp) const {
             bool face_front = dot(wo, ng) > 0.0;
             if (double_sided || face_front) {
-                return color.evaluate(sp);
+                return color->evaluate(sp);
             }
             return Spectrum(0.0);
         }
@@ -94,7 +94,7 @@ namespace akari::render {
             sample.wi = p - ctx.p;
             auto dist_sqr = glm::dot(sample.wi, sample.wi);
             sample.wi /= sqrt(dist_sqr);
-            sample.I = color.evaluate(triangle.texcoord(coords));
+            sample.I = color->evaluate(triangle.texcoord(coords));
             sample.pdf = dist_sqr / std::max(Float(0.0), -dot(sample.wi, sample.ng)) / triangle.area();
             sample.shadow_ray = Ray(p, -sample.wi, Eps / std::abs(dot(sample.wi, sample.ng)),
                                     std::sqrt(dist_sqr) * (Float(1.0f) - ShadowEps));
@@ -107,7 +107,7 @@ namespace akari::render {
         static constexpr size_t distribution_map_resolution = 4096;
         std::unique_ptr<Distribution2D> distribution = nullptr;
         Bounds3f world_bounds;
-        Texture texture;
+        const Texture *texture = nullptr;
         Float _power = 0.0;
 
       public:
@@ -122,7 +122,7 @@ namespace akari::render {
             auto uv = get_uv(w2l.apply_vector(-wo));
             ShadingPoint sp;
             sp.texcoords = uv;
-            return texture.evaluate(sp);
+            return texture->evaluate(sp);
         }
         AKR_XPU Float pdf_incidence(const ReferencePoint &ref, const vec3 &wi) const {
             if (!distribution)
@@ -159,12 +159,12 @@ namespace akari::render {
                 sample.pdf = 0.0f;
             else
                 sample.pdf = mapPdf / (2 * Pi * Pi * sinTheta);
-            sample.I = texture.evaluate(ShadingPoint{uv});
+            sample.I = texture->evaluate(ShadingPoint{uv});
             sample.shadow_ray = Ray(ctx.p, sample.wi, Eps, Inf);
             return sample;
         }
         AKR_EXPORT static Box<const InfiniteAreaLight> create(const Scene &scene, const TRSTransform &transform,
-                                                              Texture texture, Allocator<>);
+                                                         const Texture *texture, Allocator<>);
     };
 
     class Light : public Variant<const AreaLight *, const InfiniteAreaLight *> {
@@ -182,6 +182,5 @@ namespace akari::render {
         LightRaySample sample_emission(const vec2 &u1, const vec2 &u2) const {
             AKR_PANIC("sample_emission not implemented!");
         }
-        AKR_XPU bool operator==(const Light &rhs) const { return std::memcmp(this, &rhs, sizeof(Light)) == 0; }
     };
 } // namespace akari::render

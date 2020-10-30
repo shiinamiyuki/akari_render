@@ -25,7 +25,6 @@
 #include <cstring>
 #include <akari/core/panic.h>
 #include <akari/core/platform.h>
-#include <akari/core/astd.h>
 namespace akari {
     template <typename... T>
     struct TypeIndex {
@@ -86,6 +85,7 @@ namespace akari {
         using Index = TypeIndex<T...>;
         static constexpr size_t num_types = nTypes;
         Variant() = default;
+
         template <typename U>
         AKR_XPU Variant(const U &u) {
             static_assert(Index::template GetIndex<U>::value != -1, "U is not in T...");

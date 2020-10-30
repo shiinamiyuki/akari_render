@@ -22,7 +22,7 @@
 #include <akari/render/scenegraph.h>
 #include <akari/render/material.h>
 namespace akari::render {
-
+  
     class MixMaterialNode final : public MaterialNode {
         std::shared_ptr<TextureNode> fraction;
         std::shared_ptr<MaterialNode> mat_A;
@@ -41,10 +41,10 @@ namespace akari::render {
                 AKR_ASSERT_THROW(mat_B);
             }
         }
-        Material create_material(Allocator<> *allocator) override {
-            return allocator->new_object<const MixMaterial>(fraction->create_texture(allocator),
-                                                            mat_A->create_material(allocator),
-                                                            mat_B->create_material(allocator));
+        Material *create_material(Allocator<> *allocator) override {
+            return allocator->new_object<Material>(allocator->new_object<const MixMaterial>(
+                fraction->create_texture(allocator), mat_A->create_material(allocator),
+                mat_B->create_material(allocator)));
         }
     };
     class GlossyMaterialNode final : public MaterialNode {
@@ -61,9 +61,9 @@ namespace akari::render {
                 roughness = resolve_texture(value);
             }
         }
-        Material create_material(Allocator<> *allocator) override {
-            return allocator->new_object<const GlossyMaterial>(color->create_texture(allocator),
-                                                               roughness->create_texture(allocator));
+        Material *create_material(Allocator<> *allocator) override {
+            return allocator->new_object<Material>(allocator->new_object<const GlossyMaterial>(
+                color->create_texture(allocator), roughness->create_texture(allocator)));
         }
     };
     class DiffuseMaterialNode final : public MaterialNode {
@@ -76,17 +76,18 @@ namespace akari::render {
                 color = resolve_texture(value);
             }
         }
-        Material create_material(Allocator<> *allocator) override {
-            return allocator->new_object<const DiffuseMaterial>(color->create_texture(allocator));
+        Material *create_material(Allocator<> *allocator) override {
+            return allocator->new_object<Material>(
+                allocator->new_object<const DiffuseMaterial>(color->create_texture(allocator)));
         }
     };
     class EmissiveMaterialNode : public MaterialNode {
       public:
         bool double_sided = false;
         std::shared_ptr<TextureNode> color;
-        Material create_material(Allocator<> *allocator) override {
+        Material *create_material(Allocator<> *allocator) override {
             auto tex = color->create_texture(allocator);
-            return allocator->new_object<const EmissiveMaterial>(tex);
+            return allocator->new_object<Material>(allocator->new_object<const EmissiveMaterial>(tex));
         }
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override {

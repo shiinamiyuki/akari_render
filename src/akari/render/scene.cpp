@@ -50,52 +50,44 @@ namespace akari::render {
         }
         scene->meshes = {instances.data(), instances.size()};
         scene->accel = accel->create_accel(*scene);
-        std::vector<Light> area_lights;
+        std::vector<const Light *> area_lights;
         std::vector<Float> power;
-        struct TextureHash {
-            uint64_t operator()(const Texture &tex) const { return hash(&tex); }
-        };
-        struct TextureEq {
-            uint64_t operator()(const Texture &a, const Texture &b) const {
-                return std::memcmp(&a, &b, sizeof(Texture)) == 0;
-            }
-        };
-        std::unordered_map<Texture, std::future<Float>, TextureHash, TextureEq> ft_integrals;
-        std::unordered_map<Texture, Float, TextureHash, TextureEq> integrals;
+        std::unordered_map<const Texture *, std::future<Float>> ft_integrals;
+        std::unordered_map<const Texture *, Float> integrals;
         for (uint32_t mesh_id = 0; mesh_id < scene->meshes.size(); mesh_id++) {
             MeshInstance &mesh = scene->meshes[mesh_id];
             for (uint32_t prim_id = 0; prim_id < mesh.indices.size() / 3; prim_id++) {
                 auto triangle = scene->get_triangle(mesh_id, prim_id);
                 auto material = triangle.material;
-                if (material.null())
+                if (!material)
                     continue;
-                if (material.is_emissive()) {
-                    const EmissiveMaterial *e = material.as_emissive();
+                if (material->is_emissive()) {
+                    const EmissiveMaterial *e = material->as_emissive();
                     auto color = e->color;
                     if (ft_integrals.find(color) == ft_integrals.end()) {
-                        ft_integrals.emplace(color, std::async(std::launch::async, [=] { return color.integral(); }));
+                        ft_integrals.emplace(color, std::async(std::launch::async, [=] { return color->integral(); }));
                     }
                     (void)e;
-                    auto light = allocator->new_object<const AreaLight>(triangle);
+                    auto light = allocator->new_object<Light>(allocator->new_object<const AreaLight>(triangle));
                     area_lights.emplace_back(light);
                     light_id_map->insert(std::make_pair(mesh_id, prim_id), light);
                 }
             }
         }
-        Texture envmap_texture;
+        const Texture *envmap_texture = nullptr;
         if (envmap) {
             envmap_texture = envmap->envmap->create_texture(allocator);
-            AKR_ASSERT_THROW(!envmap_texture.null());
+            AKR_ASSERT_THROW(envmap_texture);
             if (ft_integrals.find(envmap_texture) == ft_integrals.end()) {
                 ft_integrals.emplace(envmap_texture,
-                                     std::async(std::launch::async, [=] { return envmap_texture.integral(); }));
+                                     std::async(std::launch::async, [=] { return envmap_texture->integral(); }));
             }
         }
         for (auto &pair : ft_integrals) {
             integrals[pair.first] = pair.second.get();
         }
         for (size_t i = 0; i < area_lights.size(); i++) {
-            auto light = *area_lights[i].get<const AreaLight *>();
+            auto light = *area_lights[i]->get<const AreaLight *>();
             auto color = light->color;
             auto I = integrals[color];
             auto &triangle = light->triangle;
@@ -109,7 +101,7 @@ namespace akari::render {
         }
         if (envmap) {
             scene->envmap_box = InfiniteAreaLight::create(*scene, envmap->transform, envmap_texture, Allocator<>());
-            scene->envmap = scene->envmap_box.get();
+            scene->envmap = allocator->new_object<const Light>(scene->envmap_box.get());
             power.emplace_back(scene->envmap_box->power());
         }
         for (auto i : area_lights) {

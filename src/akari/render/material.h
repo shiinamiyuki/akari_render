@@ -142,16 +142,16 @@ namespace akari::render {
     class EmissiveMaterial;
     class EmissiveMaterial {
       public:
-        EmissiveMaterial(Texture color) : color(color) {}
-        Texture color;
+        EmissiveMaterial(const Texture *color) : color(color) {}
+        const Texture *color = nullptr;
         bool double_sided = false;
         AKR_XPU BSDFClosure evaluate(MaterialEvalContext &ctx) const { return BSDFClosure(); }
-        AKR_XPU Spectrum albedo(const ShadingPoint &sp) const { return color.evaluate(sp); }
-        AKR_XPU Float tr(const ShadingPoint &sp) const { return color.tr(sp); }
+        AKR_XPU Spectrum albedo(const ShadingPoint &sp) const { return color->evaluate(sp); }
+        AKR_XPU Float tr(const ShadingPoint &sp) const { return color->tr(sp); }
     };
     class MaterialNode : public SceneGraphNode {
       public:
-        virtual Material create_material(Allocator<> *) = 0;
+        virtual Material *create_material(Allocator<> *) = 0;
     };
 
     inline std::shared_ptr<TextureNode> resolve_texture(const sdl::Value &value) {
@@ -177,58 +177,58 @@ namespace akari::render {
 
     class MixMaterial {
       public:
-        MixMaterial(Texture fraction, Material mat_A, Material mat_B)
+        MixMaterial(const Texture *fraction, const Material *mat_A, const Material *mat_B)
             : fraction(fraction), mat_A(mat_A), mat_B(mat_B) {}
-        Texture fraction;
-        Material mat_A;
-        Material mat_B;
+        const Texture *fraction = nullptr;
+        const Material *mat_A = nullptr;
+        const Material *mat_B = nullptr;
         AKR_XPU BSDFClosure evaluate(MaterialEvalContext &ctx) const {
 #ifdef AKR_GPU_CODE
             // GPU can not allocate temp buffer
             astd::abort();
 #else
             auto closure =
-                MixBSDF(fraction.evaluate(ctx.sp)[0], ctx.allocator->new_object<BSDFClosure>(mat_A.evaluate(ctx)),
-                        ctx.allocator->new_object<BSDFClosure>(mat_B.evaluate(ctx)));
+                MixBSDF(fraction->evaluate(ctx.sp)[0], ctx.allocator->new_object<BSDFClosure>(mat_A->evaluate(ctx)),
+                        ctx.allocator->new_object<BSDFClosure>(mat_B->evaluate(ctx)));
             return closure;
 #endif
         }
         AKR_XPU Spectrum albedo(const ShadingPoint &sp) const {
-            return lerp(mat_A.albedo(sp), mat_B.albedo(sp), fraction.evaluate(sp)[0]);
+            return lerp(mat_A->albedo(sp), mat_B->albedo(sp), fraction->evaluate(sp)[0]);
         }
         AKR_XPU Float tr(const ShadingPoint &sp) const {
-            return lerp(mat_A.tr(sp), mat_B.tr(sp), fraction.evaluate(sp)[0]);
+            return lerp(mat_A->tr(sp), mat_B->tr(sp), fraction->evaluate(sp)[0]);
         }
     };
     class DiffuseMaterial {
       public:
-        DiffuseMaterial(Texture color) : color(color) {}
-        Texture color;
+        DiffuseMaterial(const Texture *color) : color(color) {}
+        const Texture *color;
         AKR_XPU BSDFClosure evaluate(MaterialEvalContext &ctx) const {
-            auto R = color.evaluate(ctx.sp);
+            auto R = color->evaluate(ctx.sp);
             return DiffuseBSDF(R);
         }
         AKR_XPU Spectrum albedo(const ShadingPoint &sp) const {
-            auto R = color.evaluate(sp);
+            auto R = color->evaluate(sp);
             return R;
         }
-        AKR_XPU Float tr(const ShadingPoint &sp) const { return color.tr(sp); }
+        AKR_XPU Float tr(const ShadingPoint &sp) const { return color->tr(sp); }
     };
     class GlossyMaterial {
       public:
-        GlossyMaterial(Texture color, Texture roughness) : color(color), roughness(roughness) {}
-        Texture color;
-        Texture roughness;
+        GlossyMaterial(const Texture *color, const Texture *roughness) : color(color), roughness(roughness) {}
+        const Texture *color;
+        const Texture *roughness;
         AKR_XPU BSDFClosure evaluate(MaterialEvalContext &ctx) const {
-            auto R = color.evaluate(ctx.sp);
-            auto r = roughness.evaluate(ctx.sp)[0];
+            auto R = color->evaluate(ctx.sp);
+            auto r = roughness->evaluate(ctx.sp)[0];
             return MicrofacetReflection(R, r);
         }
         AKR_XPU Spectrum albedo(const ShadingPoint &sp) const {
-            auto R = color.evaluate(sp);
+            auto R = color->evaluate(sp);
             return R;
         }
-        AKR_XPU Float tr(const ShadingPoint &sp) const { return color.tr(sp); }
+        AKR_XPU Float tr(const ShadingPoint &sp) const { return color->tr(sp); }
     };
     AKR_XPU inline BSDFClosure Material::evaluate(MaterialEvalContext &ctx) const {
         AKR_VAR_PTR_DISPATCH(evaluate, ctx);
