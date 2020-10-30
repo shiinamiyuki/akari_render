@@ -38,7 +38,7 @@ namespace akari::render {
       public:
         AmbientOcclusion(int spp, float occlude) : spp(spp), occlude(occlude) {}
         void render(const Scene *scene, Film *film) override {
-            
+
             AKR_ASSERT_THROW(glm::all(glm::equal(film->resolution(), scene->camera->resolution())));
             auto n_tiles = ivec2(film->resolution() + ivec2(tile_size - 1)) / ivec2(tile_size);
             auto Li = [=](Ray ray, Sampler &sampler) -> Spectrum {
@@ -70,15 +70,14 @@ namespace akari::render {
                 Bounds2i tileBounds = Bounds2i{tile_pos * (int)tile_size, (tile_pos + ivec2(1)) * (int)tile_size};
                 auto tile = film->tile(tileBounds);
                 auto &camera = scene->camera;
-                auto sampler = scene->sampler->clone(&allocator);
+                auto sampler = scene->sampler;
                 for (int y = tile.bounds.pmin.y; y < tile.bounds.pmax.y; y++) {
                     for (int x = tile.bounds.pmin.x; x < tile.bounds.pmax.x; x++) {
-                        sampler->set_sample_index(x + y * film->resolution().x);
+                        sampler.set_sample_index(x + y * film->resolution().x);
                         for (int s = 0; s < spp; s++) {
-                            sampler->start_next_sample();
-                            CameraSample sample =
-                                camera->generate_ray(sampler->next2d(), sampler->next2d(), ivec2(x, y));
-                            auto L = Li(sample.ray, *sampler);
+                            sampler.start_next_sample();
+                            CameraSample sample = camera->generate_ray(sampler.next2d(), sampler.next2d(), ivec2(x, y));
+                            auto L = Li(sample.ray, sampler);
                             tile.add_sample(vec2(x, y), L, 1.0f);
                         }
                     }

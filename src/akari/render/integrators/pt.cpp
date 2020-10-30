@@ -73,28 +73,28 @@ namespace akari::render {
                 Bounds2i tileBounds = Bounds2i{tile_pos * (int)tile_size, (tile_pos + ivec2(1)) * (int)tile_size};
                 auto tile = film->tile(tileBounds);
                 auto camera = scene->camera;
-                auto sampler = scene->sampler->clone(&allocator);
+                auto sampler = scene->sampler;
                 for (int y = tile.bounds.pmin.y; y < tile.bounds.pmax.y; y++) {
                     for (int x = tile.bounds.pmin.x; x < tile.bounds.pmax.x; x++) {
-                        sampler->set_sample_index(x + y * film->resolution().x);
+                        sampler.set_sample_index(x + y * film->resolution().x);
                         for (int s = 0; s < spp; s++) {
-                            sampler->start_next_sample();
+                            sampler.start_next_sample();
                             GenericPathTracer pt;
                             pt.scene = scene;
                             pt.allocator = &allocator;
-                            pt.sampler = sampler;
+                            pt.sampler = &sampler;
                             pt.L = Spectrum(0.0);
                             pt.beta = Spectrum(1.0);
                             pt.max_depth = max_depth;
                             pt.run_megakernel(camera, ivec2(x, y));
                             tile.add_sample(vec2(x, y), min(clamp_zero(pt.L), Spectrum(10)), 1.0f);
+                            resources[tid]->release();
                         }
                     }
                 }
                 std::lock_guard<std::mutex> _(mutex);
                 film->merge_tile(tile);
                 reporter->update();
-                resources[tid]->release();
             });
             for (auto rsrc : resources) {
                 delete rsrc;

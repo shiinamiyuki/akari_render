@@ -53,7 +53,7 @@ namespace akari::render {
         const Distribution1D *light_distribution = nullptr;
         std::shared_ptr<Accelerator> accel = nullptr;
         const Camera *camera = nullptr;
-        const Sampler *sampler = nullptr;
+        Sampler sampler;
         const LightIdMap *light_id_map = nullptr;
         const LightPdfMap *light_pdf_map = nullptr;
         Box<const InfiniteAreaLight> envmap_box;

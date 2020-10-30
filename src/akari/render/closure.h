@@ -48,6 +48,7 @@ namespace akari::render {
     };
     AKR_XPU inline BSDFType operator&(BSDFType a, BSDFType b) { return BSDFType((int)a & (int)b); }
     AKR_XPU inline BSDFType operator|(BSDFType a, BSDFType b) { return BSDFType((int)a | (int)b); }
+    AKR_XPU inline BSDFType operator~(BSDFType a) { return BSDFType(~(uint32_t)a); }
     class BSDFClosure;
     class DiffuseBSDF {
         Spectrum R;

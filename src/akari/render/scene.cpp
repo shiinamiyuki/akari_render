@@ -135,7 +135,7 @@ namespace akari::render {
         astd::pmr::monotonic_buffer_resource resource(astd::pmr::get_default_resource());
         Allocator<> allocator(&resource);
         init_scene(&allocator);
-        scene->sampler = sampler->create_sampler(&allocator);
+        scene->sampler = sampler->create_sampler();
         auto real_integrator = integrator->create_integrator(&allocator);
         ivec2 res = scene->camera->resolution();
         // if (super_sampling_k > 1) {
