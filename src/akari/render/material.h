@@ -29,7 +29,6 @@
 #include <akari/render/common.h>
 #include <akari/core/memory.h>
 #include <akari/render/sampler.h>
-#include <akari/render/interaction.h>
 #include <akari/render/texture.h>
 #include <akari/render/closure.h>
 #include <optional>
@@ -40,12 +39,13 @@ namespace akari::render {
     class GlossyMaterial;
     class EmissiveMaterial;
     class MixMaterial;
+    struct SurfaceInteraction;
 
     struct BSDFSample {
         Vec3 wi = Vec3(0);
         Float pdf = 0.0;
         Spectrum f = Spectrum(0.0f);
-        BSDFType sampled = BSDF_NONE;
+        BSDFType sampled = BSDFType::Unset;
     };
 
     struct BSDFSampleContext {
@@ -95,14 +95,12 @@ namespace akari::render {
     };
     struct MaterialEvalContext {
         Allocator<> *allocator;
-        vec2 u1, u2;
+        vec2 u1;
         ShadingPoint sp;
         Vec3 ng, ns;
-        AKR_XPU MaterialEvalContext(Allocator<> *allocator, Sampler *sampler, const SurfaceInteraction &si)
-            : MaterialEvalContext(allocator, sampler, si.texcoords, si.ng, si.ns) {}
         AKR_XPU MaterialEvalContext(Allocator<> *allocator, Sampler *sampler, const vec2 &texcoords, const Vec3 &ng,
                                     const Vec3 &ns)
-            : allocator(allocator), u1(sampler->next2d()), u2(sampler->next2d()), sp(texcoords), ng(ng), ns(ns) {}
+            : allocator(allocator), u1(sampler->next2d()), sp(texcoords), ng(ng), ns(ns) {}
     };
     class Material : public Variant<const DiffuseMaterial *, const GlossyMaterial *, const EmissiveMaterial *,
                                     const MixMaterial *> {
@@ -115,10 +113,28 @@ namespace akari::render {
         AKR_XPU bool is_mix() const { return this->isa<const MixMaterial *>(); }
         AKR_XPU const MixMaterial *as_mix() const { return *this->get<const MixMaterial *>(); }
         AKR_XPU BSDF get_bsdf(MaterialEvalContext &ctx) const {
-            auto closure = evaluate(ctx);
-            BSDF bsdf(ctx.ng, ctx.ns);
-            bsdf.set_closure(closure);
-            return bsdf;
+            auto tr_ = tr(ctx.sp);
+            bool pass_through = false;
+            Float pass_through_pdf = 0.0;
+            if (tr_ > 0.0) {
+                pass_through = ctx.u1[1] < tr_;
+                pass_through_pdf = tr_;
+            }
+            if (!pass_through) {
+                auto closure = evaluate(ctx);
+                BSDF bsdf(ctx.ng, ctx.ns);
+                bsdf.set_closure(closure);
+                if (pass_through_pdf != 0.0) {
+                    bsdf.set_choice_pdf(1.0f - pass_through_pdf);
+                }
+                return bsdf;
+            } else {
+                auto closure = PassThrough(Spectrum(1));
+                BSDF bsdf(ctx.ng, ctx.ns);
+                bsdf.set_closure(closure);
+                bsdf.set_choice_pdf(pass_through_pdf);
+                return bsdf;
+            }
         }
         AKR_XPU Float tr(const ShadingPoint &sp) const;
     };

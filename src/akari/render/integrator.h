@@ -27,6 +27,17 @@
 #include <akari/render/scenegraph.h>
 namespace akari::render {
     class Scene;
+    /*
+    AOVS:
+      color
+      normal
+      albedo
+      first-diffuse-normal
+      first-diffuse-albedo
+    */
+    struct RenderOutput {
+        std::unordered_map<std::string, std::shared_ptr<Film>> aovs;
+    };
     class Integrator {
       public:
         virtual void render(const Scene *scene, Film *out) = 0;

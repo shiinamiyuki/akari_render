@@ -581,7 +581,7 @@ namespace akari::render {
                                                         const astd::optional<PathVertex> &prev_vertex) noexcept {
             auto *material = surface_hit.material;
             auto wo = surface_hit.wo;
-            MaterialEvalContext ctx(allocator, sampler, si);
+             MaterialEvalContext ctx = si.mat_eval_ctx(allocator, sampler);
             if (material->is_emissive()) {
                 auto *emission = material->as_emissive();
                 bool face_front = dot(wo, si.ng) > 0.0f;

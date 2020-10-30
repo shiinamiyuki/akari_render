@@ -25,6 +25,7 @@
 #include <akari/render/camera.h>
 #include <akari/render/integrator.h>
 #include <akari/render/material.h>
+#include <akari/render/interaction.h>
 #include <akari/render/mesh.h>
 #include <akari/render/light.h>
 #include <akari/render/common.h>
@@ -46,36 +47,43 @@ namespace akari::render {
         SurfaceHit surface_hit;
         Ray ray;
         Spectrum beta;
-        BSDF *bsdf = nullptr;
+        BSDF bsdf;
         Float pdf = 0.0;
+        BSDFType sampled_lobe = BSDFType::Unset;
         SurfaceVertex() = default;
-        SurfaceVertex(const Triangle &triangle, const SurfaceHit &surface_hit)
+        AKR_XPU SurfaceVertex(const Triangle &triangle, const SurfaceHit &surface_hit)
             : triangle(triangle), surface_hit(surface_hit) {}
-        Vec3 p() const { return triangle.p(surface_hit.uv); }
-        Vec3 ng() const { return triangle.ng(); }
+        AKR_XPU Vec3 p() const { return triangle.p(surface_hit.uv); }
+        AKR_XPU Vec3 ng() const { return triangle.ng(); }
     };
-    using _PathVertex = std::variant<SurfaceVertex>;
-    struct PathVertex : _PathVertex {
-        using _PathVertex::_PathVertex;
-        Vec3 p() const {
-            return std::visit([](auto &&arg) { return arg.p(); }, static_cast<const _PathVertex &>(*this));
+    struct PathVertex : Variant<SurfaceVertex> {
+        using Variant::Variant;
+        AKR_XPU Vec3 p() const {
+            return dispatch([](auto &&arg) { return arg.p(); });
         }
-        Vec3 ng() const {
-            return std::visit([](auto &&arg) { return arg.ng(); }, static_cast<const _PathVertex &>(*this));
+        AKR_XPU Vec3 ng() const {
+            return dispatch([](auto &&arg) { return arg.ng(); });
         }
-        Float pdf() const {
-            return std::visit([](auto &&arg) { return arg.pdf; }, static_cast<const _PathVertex &>(*this));
+        AKR_XPU Float pdf() const {
+            return dispatch([](auto &&arg) { return arg.pdf; });
         }
-        const Light *light(const Scene *scene) const {
-            return std::visit(
-                [=](auto &&arg) -> const Light * {
-                    using T = std::decay_t<decltype(arg)>;
-                    if constexpr (std::is_same_v<T, SurfaceVertex>) {
-                        return scene->get_light(arg.surface_hit.geom_id, arg.surface_hit.prim_id);
-                    }
-                    return nullptr;
-                },
-                static_cast<const _PathVertex &>(*this));
+        AKR_XPU BSDFType sampled_lobe() const {
+            return dispatch([=](auto &&arg) -> BSDFType {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, SurfaceVertex>) {
+                    return arg.sampled_lobe;
+                }
+                return BSDFType::Unset;
+            });
+        }
+        AKR_XPU const Light *light(const Scene *scene) const {
+            return dispatch([=](auto &&arg) -> const Light * {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, SurfaceVertex>) {
+                    return scene->get_light(arg.surface_hit.geom_id, arg.surface_hit.prim_id);
+                }
+                return nullptr;
+            });
         }
     };
 
@@ -114,9 +122,9 @@ namespace akari::render {
                 if (light_sample.pdf <= 0.0)
                     return astd::nullopt;
                 light_pdf *= light_sample.pdf;
-                auto f = light_sample.I * si.bsdf->evaluate(surface_hit.wo, light_sample.wi) *
+                auto f = light_sample.I * si.bsdf.evaluate(surface_hit.wo, light_sample.wi) *
                          std::abs(dot(si.ns, light_sample.wi));
-                Float bsdf_pdf = si.bsdf->evaluate_pdf(surface_hit.wo, light_sample.wi);
+                Float bsdf_pdf = si.bsdf.evaluate_pdf(surface_hit.wo, light_sample.wi);
                 lighting.color = f / light_pdf * mis_weight(light_pdf, bsdf_pdf);
                 lighting.shadow_ray = light_sample.shadow_ray;
                 lighting.pdf = light_pdf;
@@ -145,8 +153,12 @@ namespace akari::render {
                 ref.ng = prev_vertex->ng();
                 ref.p = prev_vertex->p();
                 auto light_pdf = light->pdf_incidence(ref, -wo) * scene->pdf_light(light);
-                Float weight_bsdf = mis_weight(prev_vertex->pdf(), light_pdf);
-                accumulate_radiance(weight_bsdf * I);
+                if ((prev_vertex->sampled_lobe() & BSDFType::Specular) != BSDFType::Unset) {
+                    accumulate_radiance(I);
+                } else {
+                    Float weight_bsdf = mis_weight(prev_vertex->pdf(), light_pdf);
+                    accumulate_radiance(weight_bsdf * I);
+                }
             }
         }
         void accumulate_beta(const Spectrum &k) { beta *= k; }
@@ -155,17 +167,17 @@ namespace akari::render {
                                                          const astd::optional<PathVertex> &prev_vertex) noexcept {
             auto *material = surface_hit.material;
             auto &wo = surface_hit.wo;
-            MaterialEvalContext ctx(allocator, sampler, si);
+            MaterialEvalContext ctx = si.mat_eval_ctx(allocator, sampler);
             if (material->is_emissive()) {
                 auto light = scene->get_light(surface_hit.geom_id, surface_hit.prim_id);
                 on_hit_light(light, wo, ctx.sp, prev_vertex);
                 return astd::nullopt;
             } else if (depth < max_depth) {
                 SurfaceVertex vertex(si.triangle, surface_hit);
-                si.bsdf = allocator->new_object<BSDF>(material->get_bsdf(ctx));
+                si.bsdf = material->get_bsdf(ctx);
 
                 BSDFSampleContext sample_ctx(sampler->next2d(), wo);
-                auto sample = si.bsdf->sample(sample_ctx);
+                auto sample = si.bsdf.sample(sample_ctx);
                 AKR_ASSERT(sample.pdf >= 0.0f);
                 if (sample.pdf == 0.0f) {
                     return astd::nullopt;
@@ -193,18 +205,6 @@ namespace akari::render {
                 surface_hit.material = trig.material;
 
                 SurfaceInteraction si(surface_hit.uv, trig);
-                {
-                    Float u = sampler->next1d();
-                    Float tr = trig.material->tr(ShadingPoint(si.texcoords));
-                    if (tr > 0) {
-                        if (u < tr) {
-                            ray = Ray(si.p, ray.d);
-                            continue;
-                        } else {
-                            prev_vertex = astd::nullopt;
-                        }
-                    }
-                }
                 auto vertex = on_surface_scatter(si, surface_hit, prev_vertex);
                 if (!vertex) {
                     break;

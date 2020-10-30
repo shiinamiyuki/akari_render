@@ -23,22 +23,25 @@
 #include <akari/core/math.h>
 #include <akari/render/material.h>
 #include <akari/render/shape.h>
-#include <akari/render/accelerator.h>
 namespace akari::render {
     class BSDF;
 
     struct SurfaceInteraction {
         Triangle triangle;
         Vec3 p;
-        BSDF *bsdf = nullptr;
+        BSDF bsdf;
         Vec3 ng, ns;
         vec2 texcoords;
 
-        SurfaceInteraction(const Intersection &isct, const Triangle &triangle)
+        AKR_XPU SurfaceInteraction(const Intersection &isct, const Triangle &triangle)
             : triangle(triangle), p(triangle.p(isct.uv)), ng(triangle.ng()), ns(triangle.ns(isct.uv)),
               texcoords(triangle.texcoord(isct.uv)) {}
-        SurfaceInteraction(const vec2 &uv, const Triangle &triangle)
+        AKR_XPU SurfaceInteraction(const vec2 &uv, const Triangle &triangle)
             : triangle(triangle), p(triangle.p(uv)), ng(triangle.ng()), ns(triangle.ns(uv)),
               texcoords(triangle.texcoord(uv)) {}
+        AKR_XPU MaterialEvalContext mat_eval_ctx(Allocator<> *allocator, Sampler *sampler) const {
+            return MaterialEvalContext(allocator, sampler, texcoords, ng, ns);
+        }
     };
+
 } // namespace akari::render

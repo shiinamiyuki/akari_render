@@ -116,6 +116,7 @@ namespace akari {
                                 rgb[1] = (float)data[channel * (x + y * image->resolution().x) + 1] / 255.0f;
                                 rgb[2] = (float)data[channel * (x + y * image->resolution().x) + 2] / 255.0f;
                             }
+                            rgb = srgb_to_linear(rgb);
                             if (channel == 3) {
                                 (*image)(x, y) = RGBA(rgb, 1.0f);
                             } else {

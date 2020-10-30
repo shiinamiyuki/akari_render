@@ -29,18 +29,25 @@
 #include <akari/render/common.h>
 #include <akari/core/memory.h>
 #include <akari/render/sampler.h>
-#include <akari/render/interaction.h>
 
 namespace akari::render {
-    enum BSDFType : int {
-        BSDF_NONE = 0u,
-        BSDF_REFLECTION = 1u << 0u,
-        BSDF_TRANSMISSION = 1u << 1u,
-        BSDF_DIFFUSE = 1u << 2u,
-        BSDF_GLOSSY = 1u << 3u,
-        BSDF_SPECULAR = 1u << 4u,
-        BSDF_ALL = BSDF_DIFFUSE | BSDF_GLOSSY | BSDF_REFLECTION | BSDF_TRANSMISSION,
+    enum class BSDFType : int {
+        Unset = 0u,
+        Reflection = 1u << 0,
+        Transmission = 1u << 1,
+        Diffuse = 1u << 2,
+        Glossy = 1u << 3,
+        Specular = 1u << 4,
+        DiffuseReflection = Diffuse | Reflection,
+        DiffuseTransmission = Diffuse | Transmission,
+        GlossyReflection = Glossy | Reflection,
+        GlossyTransmission = Glossy | Transmission,
+        SpecularReflection = Specular | Reflection,
+        SpecularTransmission = Specular | Transmission,
+        All = Diffuse | Glossy | Specular | Reflection | Transmission
     };
+    AKR_XPU inline BSDFType operator&(BSDFType a, BSDFType b) { return BSDFType((int)a & (int)b); }
+    AKR_XPU inline BSDFType operator|(BSDFType a, BSDFType b) { return BSDFType((int)a | (int)b); }
     class BSDFClosure;
     class DiffuseBSDF {
         Spectrum R;
@@ -61,7 +68,7 @@ namespace akari::render {
             }
             return Spectrum(0.0f);
         }
-        [[nodiscard]] AKR_XPU BSDFType type() const { return BSDFType(BSDF_DIFFUSE | BSDF_REFLECTION); }
+        [[nodiscard]] AKR_XPU BSDFType type() const { return BSDFType::DiffuseReflection; }
         AKR_XPU Spectrum sample(const vec2 &u, const Vec3 &wo, Vec3 *wi, Float *pdf, BSDFType *sampledType) const {
 
             *wi = cosine_hemisphere_sampling(u);
@@ -109,7 +116,7 @@ namespace akari::render {
             }
             return Spectrum(0.0f);
         }
-        [[nodiscard]] AKR_XPU BSDFType type() const { return BSDFType(BSDF_GLOSSY | BSDF_REFLECTION); }
+        [[nodiscard]] AKR_XPU BSDFType type() const { return BSDFType::GlossyReflection; }
         AKR_XPU Spectrum sample(const vec2 &u, const Vec3 &wo, Vec3 *wi, Float *pdf, BSDFType *sampledType) const {
             *sampledType = type();
             auto wh = microfacet_sample_wh(model, wo, u);
@@ -140,8 +147,22 @@ namespace akari::render {
         [[nodiscard]] AKR_XPU BSDFType type() const;
         AKR_XPU Spectrum sample(const vec2 &u, const Vec3 &wo, Vec3 *wi, Float *pdf, BSDFType *sampledType) const;
     };
+    class PassThrough {
+        Spectrum R;
 
-    class BSDFClosure : public Variant<MixBSDF, DiffuseBSDF, MicrofacetReflection> {
+      public:
+        AKR_XPU PassThrough(const Spectrum &R) : R(R) {}
+        [[nodiscard]] AKR_XPU Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const { return 0.0f; }
+        [[nodiscard]] AKR_XPU Spectrum evaluate(const Vec3 &wo, const Vec3 &wi) const { return Spectrum(0.0f); }
+        [[nodiscard]] AKR_XPU BSDFType type() const { return BSDFType::SpecularTransmission; }
+        AKR_XPU Spectrum sample(const vec2 &u, const Vec3 &wo, Vec3 *wi, Float *pdf, BSDFType *sampledType) const {
+            *wi = -wo;
+            *sampledType = type();
+            *pdf = 1.0;
+            return R / (std::abs(cos_theta(*wi)));
+        }
+    };
+    class BSDFClosure : public Variant<MixBSDF, DiffuseBSDF, MicrofacetReflection, PassThrough> {
       public:
         using Variant::Variant;
         [[nodiscard]] AKR_XPU Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const {
