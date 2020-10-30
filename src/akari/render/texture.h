@@ -35,7 +35,7 @@ namespace akari::render {
     class Texture;
     class TextureNode : public SceneGraphNode {
       public:
-        virtual Texture *create_texture(Allocator<> *) = 0;
+        virtual Texture create_texture(Allocator<> *) = 0;
     };
     class ConstantTexture {
         Spectrum value;

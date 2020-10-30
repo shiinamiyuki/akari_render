@@ -36,7 +36,7 @@ namespace akari::render {
         Vec3 wo;
         int geom_id = -1;
         int prim_id = -1;
-        const Material *material = nullptr;
+        Material material;
         SurfaceHit() = default;
         SurfaceHit(const Ray &ray, const Intersection &isct)
             : uv(isct.uv), wo(-ray.d), geom_id(isct.geom_id), prim_id(isct.prim_id) {}
@@ -76,13 +76,13 @@ namespace akari::render {
                 return BSDFType::Unset;
             });
         }
-        AKR_XPU const Light *light(const Scene *scene) const {
-            return dispatch([=](auto &&arg) -> const Light * {
+        AKR_XPU Light light(const Scene *scene) const {
+            return dispatch([=](auto &&arg) -> Light {
                 using T = std::decay_t<decltype(arg)>;
                 if constexpr (std::is_same_v<T, SurfaceVertex>) {
                     return scene->get_light(arg.surface_hit.geom_id, arg.surface_hit.prim_id);
                 }
-                return nullptr;
+                return Light();
             });
         }
     };
@@ -107,18 +107,18 @@ namespace akari::render {
             CameraSample sample = camera->generate_ray(sampler->next2d(), sampler->next2d(), p);
             return sample;
         }
-        astd::pair<const Light *, Float> select_light() noexcept { return scene->select_light(sampler->next2d()); }
+        astd::pair<Light, Float> select_light() noexcept { return scene->select_light(sampler->next2d()); }
 
         astd::optional<DirectLighting>
         compute_direct_lighting(SurfaceInteraction &si, const SurfaceHit &surface_hit,
-                                const astd::pair<const Light *, Float> &selected) noexcept {
+                                const astd::pair<Light, Float> &selected) noexcept {
             auto [light, light_pdf] = selected;
-            if (light) {
+            if (!light.null()) {
                 DirectLighting lighting;
                 LightSampleContext light_ctx;
                 light_ctx.u = sampler->next2d();
                 light_ctx.p = si.p;
-                LightSample light_sample = light->sample_incidence(light_ctx);
+                LightSample light_sample = light.sample_incidence(light_ctx);
                 if (light_sample.pdf <= 0.0)
                     return astd::nullopt;
                 light_pdf *= light_sample.pdf;
@@ -135,16 +135,16 @@ namespace akari::render {
         }
 
         void on_miss(const Ray &ray, const astd::optional<PathVertex> &prev_vertex) noexcept {
-            if (scene->envmap) {
+            if (!scene->envmap.null()) {
                 on_hit_light(scene->envmap, -ray.d, ShadingPoint(), prev_vertex);
             }
         }
 
         void accumulate_radiance(const Spectrum &r) { L += r; }
 
-        void on_hit_light(const Light *light, const Vec3 &wo, const ShadingPoint &sp,
+        void on_hit_light(const Light &light, const Vec3 &wo, const ShadingPoint &sp,
                           const astd::optional<PathVertex> &prev_vertex) {
-            Spectrum I = beta * light->Le(wo, sp);
+            Spectrum I = beta * light.Le(wo, sp);
             if (depth == 0) {
                 accumulate_radiance(I);
             } else {
@@ -152,7 +152,7 @@ namespace akari::render {
                 ReferencePoint ref;
                 ref.ng = prev_vertex->ng();
                 ref.p = prev_vertex->p();
-                auto light_pdf = light->pdf_incidence(ref, -wo) * scene->pdf_light(light);
+                auto light_pdf = light.pdf_incidence(ref, -wo) * scene->pdf_light(light);
                 if ((prev_vertex->sampled_lobe() & BSDFType::Specular) != BSDFType::Unset) {
                     accumulate_radiance(I);
                 } else {
@@ -165,16 +165,16 @@ namespace akari::render {
         // @param mat_pdf: supplied if material is already chosen
         astd::optional<SurfaceVertex> on_surface_scatter(SurfaceInteraction &si, const SurfaceHit &surface_hit,
                                                          const astd::optional<PathVertex> &prev_vertex) noexcept {
-            auto *material = surface_hit.material;
+            const auto &material = surface_hit.material;
             auto &wo = surface_hit.wo;
             MaterialEvalContext ctx = si.mat_eval_ctx(allocator, sampler);
-            if (material->is_emissive()) {
+            if (material.is_emissive()) {
                 auto light = scene->get_light(surface_hit.geom_id, surface_hit.prim_id);
                 on_hit_light(light, wo, ctx.sp, prev_vertex);
                 return astd::nullopt;
             } else if (depth < max_depth) {
                 SurfaceVertex vertex(si.triangle, surface_hit);
-                si.bsdf = material->get_bsdf(ctx);
+                si.bsdf = material.get_bsdf(ctx);
 
                 BSDFSampleContext sample_ctx(sampler->next2d(), wo);
                 auto sample = si.bsdf.sample(sample_ctx);

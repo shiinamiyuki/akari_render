@@ -32,8 +32,8 @@ namespace akari::render {
 
       public:
         ConstantTextureNode(Spectrum v, Float alpha = 1.0) : value(v), alpha(alpha) {}
-        Texture *create_texture(Allocator<> *allocator) override {
-            return allocator->new_object<Texture>(allocator->new_object<const ConstantTexture>(value, alpha));
+        Texture create_texture(Allocator<> *allocator) override {
+            return allocator->new_object<const ConstantTexture>(value, alpha);
         }
     };
 
@@ -52,8 +52,8 @@ namespace akari::render {
                 throw std::runtime_error("Error loading image");
             }
         }
-        Texture *create_texture(Allocator<> *allocator) override {
-            return allocator->new_object<Texture>(allocator->new_object<const ImageTexture>(image->view()));
+        Texture create_texture(Allocator<> *allocator) override {
+            return allocator->new_object<const ImageTexture>(image->view());
         }
     };
     AKR_EXPORT std::shared_ptr<TextureNode> create_constant_texture() {

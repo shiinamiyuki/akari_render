@@ -72,7 +72,7 @@ namespace akari::render {
                                 if (auto isct = scene->intersect(ray)) {
                                     auto trig = scene->get_triangle(isct->geom_id, isct->prim_id);
                                     Float u = sampler->next1d();
-                                    Float tr = trig.material->tr(ShadingPoint(trig.texcoord(isct->uv)));
+                                    Float tr = trig.material.tr(ShadingPoint(trig.texcoord(isct->uv)));
                                     if (tr > 0) {
                                         if (u < tr) {
                                             ray = Ray(trig.p(isct->uv), ray.d);
@@ -83,7 +83,7 @@ namespace akari::render {
                                     case AOV::albedo: {
                                         auto mat = trig.material;
                                         ShadingPoint sp(trig.texcoord(isct->uv));
-                                        value = mat->albedo(sp);
+                                        value = mat.albedo(sp);
                                     } break;
                                     case AOV::normal:
                                         value = trig.ng();

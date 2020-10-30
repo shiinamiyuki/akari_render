@@ -31,7 +31,7 @@ namespace akari::render {
         BufferView<float> vertices, normals, texcoords;
         BufferView<int> indices;
         BufferView<int> material_indices;
-        BufferView<const Material *> materials;
+        BufferView<Material> materials;
         struct RayHit {
             Vec2 uv;
             Vec3 ng;

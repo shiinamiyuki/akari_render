@@ -47,7 +47,7 @@ namespace akari::render {
         virtual Sampler *create_sampler(Allocator<> *allocator) = 0;
     };
 
-    class PCGSampler : public Sampler {
+    class PCGSampler {
         uint64_t state = 0x4d595df4d0f33173; // Or something seed-dependent
         static uint64_t const multiplier = 6364136223846793005u;
         static uint64_t const increment = 1442695040888963407u; // Or an arbitrary odd constant
@@ -75,7 +75,7 @@ namespace akari::render {
             return allocator->new_object<Sampler>(allocator->new_object<PCGSampler>(*this));
         }
     };
-    class LCGSampler : public Sampler {
+    class LCGSampler {
         uint32_t seed;
 
       public:
