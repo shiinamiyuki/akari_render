@@ -24,6 +24,7 @@
 #include <stack>
 #include <akari/core/parallel.h>
 #include <akari/core/profiler.h>
+#include <akari/core/progress.hpp>
 #include <akari/render/scene.h>
 #include <akari/render/camera.h>
 #include <akari/render/integrator.h>
@@ -387,18 +388,20 @@ namespace akari::render {
             }
         }
 
-        auto getDTree(vec3 p, std::vector<STreeNode> &nodes) {
+        std::pair<DTreeWrapper *, int> getDTree(vec3 p, std::vector<STreeNode> &nodes) {
             //            AKR_CHECK(0.0f - 1e-6f <= p[axis] && p[axis] <= 1.0f + 1e-6f);
             //            log::log("{} {}\n",axis,p[axis]);
             if (isLeaf()) {
-                return &dTree;
+                return {&dTree, 0};
             } else {
                 if (p[axis] < 0.5f) {
                     p[axis] *= 2.0f;
-                    return nodes.at(_children[0]).getDTree(p, nodes);
+                    auto [tree, depth] = nodes.at(_children[0]).getDTree(p, nodes);
+                    return {tree, depth + 1};
                 } else {
                     p[axis] = (p[axis] - 0.5f) * 2.0f;
-                    return nodes.at(_children[1]).getDTree(p, nodes);
+                    auto [tree, depth] = nodes.at(_children[1]).getDTree(p, nodes);
+                    return {tree, depth + 1};
                 }
             }
         }
@@ -507,6 +510,7 @@ namespace akari::render {
         Spectrum L = Spectrum(0.0);
         Spectrum beta = Spectrum(1.0f);
         Allocator<> *allocator = nullptr;
+        vec3 dtree_voxel_size = vec3(0);
         int depth = 0;
         int max_depth = 5;
         std::shared_ptr<STree> sTree;
@@ -639,8 +643,8 @@ namespace akari::render {
             }
             return astd::nullopt;
         }
-        void run_megakernel(const Camera *camera, const ivec2 &p) noexcept {
-            auto camera_sample = camera_ray(camera, p);
+        void run_megakernel(const Camera *camera, const ivec2 &raster) noexcept {
+            auto camera_sample = camera_ray(camera, raster);
             Ray ray = camera_sample.ray;
             astd::optional<PathVertex> prev_vertex;
             while (true) {
@@ -653,7 +657,9 @@ namespace akari::render {
                 auto trig = scene->get_triangle(surface_hit.geom_id, surface_hit.prim_id);
                 surface_hit.material = trig.material;
                 SurfaceInteraction si(surface_hit.uv, trig);
-                dTree = sTree->dTree(si.p);
+                auto [_dTree, tree_depth] = sTree->dTree(si.p);
+                dTree = _dTree;
+                dtree_voxel_size = sTree->box.size() * glm::pow(vec3(0.5), vec3(tree_depth));
                 auto vertex = on_surface_scatter(si, surface_hit, prev_vertex);
                 if (!vertex) {
                     break;
@@ -666,7 +672,12 @@ namespace akari::render {
                     }
                 }
                 vertices[n_vertices].L = Spectrum(0);
-                vertices[n_vertices].p = si.p;
+                {
+                    vec3 u = vec3(sampler->next1d(), sampler->next1d(), sampler->next1d());
+                    auto p = si.p;
+                    p = sTree->box.clip(p + dtree_voxel_size * (u - vec3(0.5)));
+                    vertices[n_vertices].p = p;
+                }
                 vertices[n_vertices].wi = vertex->ray.d;
                 vertices[n_vertices].beta = Spectrum(1.0 / vertex->pdf);
                 accumulate_beta(vertex->beta);
@@ -772,6 +783,23 @@ namespace akari::render {
                 info("non zero path:{}%", non_zero_path.ratio() * 100);
                 sTree->refine(12000 * std::sqrt(samples));
             }
+            Timer timer;
+            int estimate_ray_per_sample = max_depth * 2 + 1;
+            double estimate_ray_per_sec = 5 * 1000 * 1000;
+            double estimate_single_tile = spp * estimate_ray_per_sample * tile_size * tile_size / estimate_ray_per_sec;
+            size_t estimate_tiles_per_sec = std::max<size_t>(1, size_t(1.0 / estimate_single_tile));
+            debug("estimate_tiles_per_sec:{} total:{}", estimate_tiles_per_sec, n_tiles.x * n_tiles.y);
+            auto reporter = std::make_shared<ProgressReporter>(n_tiles.x * n_tiles.y, [=](size_t cur, size_t total) {
+                bool show = (0 == cur % (estimate_tiles_per_sec));
+                if (show) {
+                    double tiles_per_sec = cur / std::max(1e-7, timer.elapsed_seconds());
+                    double remaining = (total - cur) / tiles_per_sec;
+                    show_progress(double(cur) / double(total), 60, timer.elapsed_seconds(), remaining);
+                }
+                if (cur == total) {
+                    putchar('\n');
+                }
+            });
             non_zero_path.clear();
             parallel_for_2d(n_tiles, [=, &mutex, &resources, &samplers](const ivec2 &tile_pos, int tid) {
                 Allocator<> allocator(resources[tid]);
@@ -803,6 +831,7 @@ namespace akari::render {
                 }
                 std::lock_guard<std::mutex> _(mutex);
                 film->merge_tile(tile);
+                reporter->update();
             });
             info("non zero path:{}%", non_zero_path.ratio() * 100);
             for (auto rsrc : resources) {
@@ -830,7 +859,7 @@ namespace akari::render {
             }
         }
         int get_spp() const override { return spp; }
-        bool set_spp(int spp) override { return false; }
+        bool set_spp(int spp_) override { return false; }
     };
     AKR_EXPORT_NODE(GuidedPath, GuidedPathIntegratorNode)
 } // namespace akari::render

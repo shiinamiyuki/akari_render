@@ -277,6 +277,9 @@ namespace akari {
         AKR_XPU BoundingBox intersect(const BoundingBox &rhs) const {
             return BoundingBox(max(pmin, rhs.pmin), min(pmax, rhs.pmax));
         }
+        AKR_XPU V clip(const V &p)const{
+            return min(max(p, pmin), pmax);
+        }
         AKR_XPU bool empty() const { return any(glm::greaterThan(pmin, pmax)) || hsum(extents()) == 0; }
         AKR_XPU V centroid() const { return extents() * 0.5f + pmin; }
         AKR_XPU Float surface_area() const {

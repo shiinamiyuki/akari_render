@@ -37,10 +37,12 @@ namespace akari::render {
     class PathTracerIntegrator : public Integrator {
         int spp;
         int max_depth;
+        int min_depth;
         const int tile_size = 16;
 
       public:
-        PathTracerIntegrator(int spp, int max_depth) : spp(spp), max_depth(max_depth) {}
+        PathTracerIntegrator(int spp, int min_depth, int max_depth)
+            : spp(spp), min_depth(min_depth), max_depth(max_depth) {}
         void render(const Scene *scene, Film *film) override {
             info("Path Tracer");
             AKR_ASSERT_THROW(glm::all(glm::equal(film->resolution(), scene->camera->resolution())));
@@ -85,6 +87,7 @@ namespace akari::render {
                             pt.sampler = &sampler;
                             pt.L = Spectrum(0.0);
                             pt.beta = Spectrum(1.0);
+                            pt.min_depth = min_depth;
                             pt.max_depth = max_depth;
                             pt.run_megakernel(camera, ivec2(x, y));
                             tile.add_sample(vec2(x, y), min(clamp_zero(pt.L), Spectrum(10)), 1.0f);
@@ -105,8 +108,9 @@ namespace akari::render {
       public:
         int spp = 16;
         int max_depth = 5;
+        int min_depth = 3;
         Integrator *create_integrator(Allocator<> *allocator) override {
-            return allocator->new_object<PathTracerIntegrator>(spp, max_depth);
+            return allocator->new_object<PathTracerIntegrator>(spp, min_depth, max_depth);
         }
         const char *description() override { return "[Path Tracer]"; }
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
@@ -115,6 +119,8 @@ namespace akari::render {
                 spp = value.get<int>().value();
             } else if (field == "max_depth") {
                 max_depth = value.get<int>().value();
+            } else if (field == "min_depth") {
+                min_depth = value.get<int>().value();
             }
         }
         bool set_spp(int spp_) override {

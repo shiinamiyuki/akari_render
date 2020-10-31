@@ -96,6 +96,7 @@ namespace akari::render {
         Spectrum beta = Spectrum(1.0f);
         Allocator<> *allocator = nullptr;
         int depth = 0;
+        int min_depth = 5;
         int max_depth = 5;
 
         static Float mis_weight(Float pdf_A, Float pdf_B) {
@@ -218,6 +219,14 @@ namespace akari::render {
                 }
                 accumulate_beta(vertex->beta);
                 depth++;
+                if (depth > min_depth) {
+                    Float continue_prob = std::min<Float>(1.0, hmax(beta)) * 0.95;
+                    if (continue_prob < sampler->next1d()) {
+                        accumulate_beta(Spectrum(1.0 / continue_prob));
+                    } else {
+                        break;
+                    }
+                }
                 ray = vertex->ray;
                 prev_vertex = PathVertex(*vertex);
             }

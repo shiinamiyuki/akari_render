@@ -17,6 +17,17 @@ include_directories(${CMAKE_SOURCE_DIR}/external/json)
 include_directories(${CMAKE_SOURCE_DIR}/external/cxxopts/include)
 include_directories(${CMAKE_SOURCE_DIR}/external/magic_enum/include)
 
+if(EXISTS ${CMAKE_BINARY_DIR}/dist)
+else()
+    file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/dist)
+    file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/dist/plugins)
+endif()
+function(copy_to_dist target)
+    add_custom_command(TARGET ${target} POST_BUILD 
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${target}>  ${CMAKE_BINARY_DIR}/dist/)
+endfunction()
+
+
 set(CMAKE_SHARED_LIBRARY_PREFIX_CXX "")
 set(CMAKE_STATIC_LIBRARY_PREFIX_CXX "")
 set(AKR_CORE_EXT_LIBS "")
@@ -51,9 +62,10 @@ include_directories(external/fmt-6.1.2/include)
 add_subdirectory(external/fmt-6.1.2)
 set(AKR_CORE_EXT_LIBS ${AKR_CORE_EXT_LIBS} fmt)
 
-include_directories(${CMAKE_SOURCE_DIR}/external/pugixml/src)
-add_subdirectory(external/pugixml)
-set(AKR_CORE_EXT_LIBS ${AKR_CORE_EXT_LIBS} pugixml)
+include_directories(${CMAKE_SOURCE_DIR}/external/assimp/include)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+add_subdirectory(external/assimp)
 
 macro(add_build_util target )
     add_executable(${target} ${ARGN})
@@ -64,17 +76,6 @@ include(cmake/Embree.cmake)
 include(cmake/OIDN.cmake)
 include(cmake/CUDA.cmake)
 
-
-
-if(EXISTS ${CMAKE_BINARY_DIR}/dist)
-else()
-    file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/dist)
-    file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/dist/plugins)
-endif()
-function(copy_to_dist target)
-    add_custom_command(TARGET ${target} POST_BUILD 
-        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${target}>  ${CMAKE_BINARY_DIR}/dist/)
-endfunction()
 
 file(GLOB PYBIND11_HEADERS external/pybind11/include/pybind11.h external/pybind11/include/stl.h)
 file(GLOB AKR_CORE_SRC src/akari/core/*.*)
@@ -124,8 +125,9 @@ target_include_directories(libakari_render PUBLIC src/)
 target_link_libraries(libakari_render PUBLIC libakari_core)
 copy_to_dist(libakari_render)
 set_target_CUDA_props(libakari_render)
+set_target_properties(libakari_render PROPERTIES UNITY_BUILD ON)
 if(AKR_ENABLE_CUDA)
-    add_dependencies(libakari_render libakari_embedded_ptx)
+    target_link_libraries(libakari_render PUBLIC libakari_embedded_ptx)
 endif()
 
 function(add_plugin target)
@@ -155,7 +157,7 @@ copy_to_dist(akari)
 
 add_executable(akari-import src/akari/cmd/akari-import.cpp )
 target_include_directories(akari-import PUBLIC src/)
-target_link_libraries(akari-import libakari_core)
+target_link_libraries(akari-import libakari_core assimp)
 copy_to_dist(akari-import)
 set_target_CUDA_props(akari-import)
 
