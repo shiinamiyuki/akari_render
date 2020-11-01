@@ -58,12 +58,17 @@ namespace akari::render {
             if (field == "fraction" || field == "frac") {
                 fraction = resolve_texture(value);
             } else if (field == "first") {
-                mat_A = dyn_cast<MaterialNode>(value.object());
+                mat_A = sg_dyn_cast<MaterialNode>(value.object());
                 AKR_ASSERT_THROW(mat_A);
             } else if (field == "second") {
-                mat_B = dyn_cast<MaterialNode>(value.object());
+                mat_B = sg_dyn_cast<MaterialNode>(value.object());
                 AKR_ASSERT_THROW(mat_B);
             }
+        }
+        void finalize() override {
+            fraction->finalize();
+            mat_A->finalize();
+            mat_B->finalize();
         }
         std::shared_ptr<const Material> create_material(Allocator<> allocator) override {
             return make_pmr_shared<const MixMaterial>(allocator, fraction->create_texture(allocator),
@@ -82,13 +87,14 @@ namespace akari::render {
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override {
             if (field == "light") {
-                light_ = dyn_cast<LightNode>(value.object());
+                light_ = sg_dyn_cast<LightNode>(value.object());
                 AKR_ASSERT_THROW(light_);
             }
         }
         std::shared_ptr<const Material> create_material(Allocator<> allocator) override {
             return make_pmr_shared<EmissiveMaterial>(allocator, light_);
         }
+        void finalize() override { light_->finalize(); }
     };
     AKR_EXPORT std::shared_ptr<EmissiveMaterialNode> create_emissive_material() {
         return std::make_shared<EmissiveMaterialNodeImpl>();

@@ -171,26 +171,26 @@ namespace akari::render {
     void SceneNode::object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                                  const sdl::Value &value) {
         if (field == "camera") {
-            camera = dyn_cast<CameraNode>(value.object());
+            camera = sg_dyn_cast<CameraNode>(value.object());
             AKR_ASSERT_THROW(camera);
         } else if (field == "output") {
             output = value.get<std::string>().value();
         } else if (field == "integrator") {
-            integrator = dyn_cast<IntegratorNode>(value.object());
+            integrator = sg_dyn_cast<IntegratorNode>(value.object());
             AKR_ASSERT_THROW(integrator);
         } else if (field == "shapes") {
             AKR_ASSERT_THROW(value.is_array());
             for (auto shape : value) {
-                shapes.emplace_back(dyn_cast<MeshNode>(shape.object()));
+                shapes.emplace_back(sg_dyn_cast<MeshNode>(shape.object()));
             }
         } else if (field == "sampler") {
-            sampler = dyn_cast<SamplerNode>(value.object());
+            sampler = sg_dyn_cast<SamplerNode>(value.object());
             AKR_ASSERT_THROW(sampler);
         } else if (field == "accelerator") {
-            accel = dyn_cast<AcceleratorNode>(value.object());
+            accel = sg_dyn_cast<AcceleratorNode>(value.object());
             AKR_ASSERT_THROW(accel);
         } else if (field == "envmap") {
-            envmap = dyn_cast<LightNode>(value.object());
+            envmap = sg_dyn_cast<LightNode>(value.object());
             AKR_ASSERT_THROW(envmap);
         }
     }

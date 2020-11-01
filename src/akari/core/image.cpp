@@ -118,7 +118,6 @@ namespace akari {
                 stbi_image_free((void *)data);
             } else {
                 const auto *data = stbi_load(path.string().c_str(), &x, &y, &channel, 0);
-                info("channel={}", channel);
                 image = std::make_shared<RGBAImage>(ivec2(x, y));
                 parallel_for(
                     image->resolution().y,

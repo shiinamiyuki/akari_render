@@ -195,6 +195,7 @@ namespace akari::sdl {
         ctx.expect("export");
         expect_space(ctx);
         auto var = parse_identifier(ctx);
+        ctx.cur_var = var;
         if (ctx.cur_mod()->exports.find(var) != ctx.cur_mod()->exports.end()) {
             ctx.report_error(fmt::format("{} is already defined", var), ctx.loc);
         }
@@ -204,11 +205,13 @@ namespace akari::sdl {
         auto val = parse(ctx);
         ctx.cur_mod()->exports[var] = val;
         expect_newline(ctx);
+        ctx.cur_var = "";
     }
     void Parser::parse_let(ParserContext &ctx) {
         ctx.expect("let");
         expect_space(ctx);
         auto var = parse_identifier(ctx);
+        ctx.cur_var = var;
         if (ctx.cur_mod()->locals.find(var) != ctx.cur_mod()->locals.end()) {
             ctx.report_error(fmt::format("{} is already defined", var), ctx.loc);
         }
@@ -218,6 +221,7 @@ namespace akari::sdl {
         auto val = parse(ctx);
         ctx.cur_mod()->locals[var] = val;
         expect_newline(ctx);
+        ctx.cur_var = "";
     }
     Value Parser::parse(ParserContext &ctx) {
         auto c = ctx.peek();

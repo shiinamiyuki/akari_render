@@ -87,6 +87,9 @@ namespace akari::render {
                 AKR_ASSERT_THROW(color);
             }
         }
+        void finalize()override{
+            color->finalize();
+        }
     };
     AKR_EXPORT_NODE(AreaLight, AreaLightNode);
 } // namespace akari::render

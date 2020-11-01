@@ -59,7 +59,11 @@ namespace akari::render {
             if (!pi) {
                 throw std::runtime_error("failed to load plugin");
             }
-            return pi->make_shared();
+            auto object = pi->make_shared();
+            if(!ctx.cur_var.empty()){
+                return std::make_shared<NamedNode>(ctx.cur_var, object);
+            }
+            return object;
         }
     };
     std::shared_ptr<SceneGraphParser> SceneGraphParser::create_parser() {

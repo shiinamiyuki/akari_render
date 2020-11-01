@@ -140,6 +140,7 @@ namespace akari::render {
             AKR_CHECK(!triangle.has_value());
             return InfiniteAreaLight::create(*scene, transform, envmap->create_texture(allocator), allocator);
         }
+        void finalize() override { envmap->finalize(); }
     };
     AKR_EXPORT_NODE(EnvMap, EnvMapNode);
 } // namespace akari::render

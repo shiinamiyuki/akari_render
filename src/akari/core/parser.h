@@ -164,7 +164,7 @@ namespace akari::sdl {
     struct AKR_EXPORT ParserContext {
         std::vector<P<Module>> mod_stack;
         P<Module> main;
-
+        std::string cur_var;
         SourceLoc loc;
         const std::string &source;
         size_t pos = 0;

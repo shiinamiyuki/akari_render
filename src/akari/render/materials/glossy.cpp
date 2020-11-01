@@ -41,9 +41,7 @@ namespace akari::render {
             auto R = color->evaluate(sp);
             return R;
         }
-        Float tr(const ShadingPoint &sp) const override {
-           return color->tr(sp);
-        }
+        Float tr(const ShadingPoint &sp) const override { return color->tr(sp); }
     };
 
     class GlossyMaterialNode final : public MaterialNode {
@@ -63,6 +61,10 @@ namespace akari::render {
         std::shared_ptr<const Material> create_material(Allocator<> allocator) override {
             return make_pmr_shared<GlossyMaterial>(allocator, color->create_texture(allocator),
                                                    roughness->create_texture(allocator));
+        }
+        void finalize() override {
+            color->finalize();
+            roughness->finalize();
         }
     };
     AKR_EXPORT_NODE(GlossyMaterial, GlossyMaterialNode)

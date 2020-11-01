@@ -75,7 +75,7 @@ namespace akari::render {
             } else if (field == "materials") {
                 AKR_ASSERT_THROW(value.is_array());
                 for (auto mat : value) {
-                    auto m = dyn_cast<MaterialNode>(mat.object());
+                    auto m = sg_dyn_cast<MaterialNode>(mat.object());
                     AKR_ASSERT(m);
                     materials.emplace_back(m);
                 }

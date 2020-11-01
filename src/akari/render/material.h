@@ -127,7 +127,7 @@ namespace akari::render {
     class AKR_EXPORT EmissiveMaterialNode : public MaterialNode {
       public:
         [[nodiscard]] std::shared_ptr<EmissiveMaterialNode> as_emissive() override {
-            return dyn_cast<EmissiveMaterialNode>(shared_from_this());
+            return sg_dyn_cast<EmissiveMaterialNode>(shared_from_this());
         }
         [[nodiscard]] virtual std::shared_ptr<LightNode> light() = 0;
     };
@@ -147,7 +147,7 @@ namespace akari::render {
             return create_image_texture(path);
         } else {
             AKR_ASSERT_THROW(value.is_object());
-            auto tex = dyn_cast<TextureNode>(value.object());
+            auto tex = sg_dyn_cast<TextureNode>(value.object());
             AKR_ASSERT_THROW(tex);
             return tex;
         }

@@ -55,6 +55,9 @@ namespace akari::render {
         std::shared_ptr<const Material> create_material(Allocator<> allocator) override {
             return make_pmr_shared<DiffuseMaterial>(allocator, color->create_texture(allocator));
         }
+        void finalize() override {
+            color->finalize();
+        }
     };
     AKR_EXPORT_NODE(DiffuseMaterial, DiffuseMaterialNode)
 } // namespace akari::render
