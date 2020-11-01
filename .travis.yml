@@ -12,6 +12,8 @@ matrix:
           sources: ['ubuntu-toolchain-r-test']
           packages: ['clang-7','ninja-build','libc++-7-dev', 'libc++abi-7-dev']
       env: CC=clang-7 CXX=clang++-7
+      script: bash ./scripts/build-linux-cpu.sh
+
     - os: linux
       compiler: clang
       addons:
@@ -19,6 +21,8 @@ matrix:
           sources: ['ubuntu-toolchain-r-test']
           packages: ['clang-8','ninja-build','libc++-8-dev', 'libc++abi-8-dev']
       env: CC=clang-8 CXX=clang++-8
+      script: bash ./scripts/build-linux-cpu.sh
+
     - os: linux
       compiler: clang
       addons:
@@ -26,6 +30,8 @@ matrix:
           sources: ['ubuntu-toolchain-r-test']
           packages: ['clang-9','ninja-build','libc++-9-dev', 'libc++abi-9-dev']
       env: CC=clang-9 CXX=clang++-9
+      script: bash ./scripts/build-linux-cpu.sh
+
     - os: linux
       compiler: clang
       addons:
@@ -33,6 +39,8 @@ matrix:
           sources: ['ubuntu-toolchain-r-test']
           packages: ['clang-10','ninja-build','libc++-10-dev', 'libc++abi-10-dev']
       env: CC=clang-10 CXX=clang++-10
+      script: bash ./scripts/build-linux-cpu.sh
+
     - os: linux
       compiler: gcc
       addons:
@@ -40,6 +48,7 @@ matrix:
           sources: ['ubuntu-toolchain-r-test']
           packages: ['g++-8','ninja-build']
       env: CC=gcc-8 CXX=g++-8
+      script: bash ./scripts/build-linux-cpu.sh
 
     - os: linux
       compiler: gcc
@@ -48,4 +57,7 @@ matrix:
           sources: ['ubuntu-toolchain-r-test']
           packages: ['g++-9','ninja-build']
       env: CC=gcc-9 CXX=g++-9
-script: bash ./scripts/build-linux-cpu.sh
+      script: bash ./scripts/build-linux-cpu.sh
+
+    - os: windows
+      script: ./scripts/build.bat
