@@ -80,6 +80,13 @@ namespace akari::render {
             AKR_CHECK(triangle.has_value());
             return make_pmr_shared<const AreaLight>(allocator, *triangle, color->create_texture(allocator), false);
         }
+         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
+                          const sdl::Value &value) override {
+            if (field == "color") {
+                color = resolve_texture(value);
+                AKR_ASSERT_THROW(color);
+            }
+        }
     };
     AKR_EXPORT_NODE(AreaLight, AreaLightNode);
 } // namespace akari::render

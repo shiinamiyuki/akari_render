@@ -55,6 +55,7 @@ namespace akari::render {
             instance.vertices = BufferView(mesh->vertices.data(), mesh->vertices.size());
             // AKR_ASSERT_THROW(mesh->material_indices.size() == materials.size());
             instance.materials.resize(materials.size());
+            instance.lights.resize(mesh->indices.size() / 3);
             for (size_t i = 0; i < materials.size(); i++) {
                 instance.materials[i] = (materials[i]->create_material(allocator));
             }

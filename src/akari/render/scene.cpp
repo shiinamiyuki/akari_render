@@ -62,6 +62,7 @@ namespace akari::render {
                     auto light = light_node->create(allocator, scene.get(), triangle);
                     power.emplace_back(light->power());
                     lights.emplace_back(light);
+                    mesh.lights[prim_id] = light;
                 }
             }
         }
@@ -149,7 +150,8 @@ namespace akari::render {
         integrator->finalize();
         camera->finalize();
         sampler->finalize();
-        envmap->finalize();
+        if (envmap)
+            envmap->finalize();
         for (auto &shape : shapes) {
             shape->finalize();
         }

@@ -105,7 +105,8 @@ std::shared_ptr<Mesh> load_wavefront_obj(const fs::path &path, std::string &gene
         if (hmax(ke) > 0.001) {
             os << "// OBJ Material: " << obj_mat.name << "\n";
             os << "export " << normalized << " = EmissiveMaterial {\n";
-            os << "  color : [" << ke[0] << "," << ke[1] << "," << ke[2] << "]\n}\n";
+            os << "    light: AreaLight {\n";
+            os << "      color : [" << ke[0] << "," << ke[1] << "," << ke[2] << "]\n  }\n}\n";
             os << "// ======================================== \n\n";
             continue;
         }
