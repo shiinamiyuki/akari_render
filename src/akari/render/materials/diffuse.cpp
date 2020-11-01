@@ -19,42 +19,42 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-#include <akari/core/logger.h>
+
 #include <akari/render/scenegraph.h>
-#include <akari/render/camera.h>
+#include <akari/render/texture.h>
+#include <akari/render/material.h>
+#include <akari/core/color.h>
 #include <akari/render/common.h>
 namespace akari::render {
 
-    class PerspectiveCameraNode final : public CameraNode {
+    class DiffuseMaterial : public Material {
       public:
-        vec3 position;
-        vec3 rotation;
-        ivec2 resolution = ivec2(512, 512);
-        double fov = glm::radians(80.0f);
+        DiffuseMaterial(std::shared_ptr<const Texture> color) : color(color) {}
+        std::shared_ptr<const Texture> color;
+        BSDFClosure *evaluate(MaterialEvalContext &ctx) const override {
+            auto R = color->evaluate(ctx.sp);
+            return ctx.allocator.new_object<DiffuseBSDF>(R);
+        }
+        Spectrum albedo(const ShadingPoint &sp) const override {
+            auto R = color->evaluate(sp);
+            return R;
+        }
+        Float tr(const ShadingPoint &sp) const override { return color->tr(sp); }
+    };
+
+    class DiffuseMaterialNode final : public MaterialNode {
+        std::shared_ptr<TextureNode> color;
+
+      public:
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override {
-            if (field == "fov") {
-                fov = glm::radians(value.get<double>().value());
-            } else if (field == "rotation") {
-                rotation = radians(load<vec3>(value));
-            } else if (field == "position") {
-                position = load<vec3>(value);
-            } else if (field == "resolution") {
-                resolution = load<ivec2>(value);
+            if (field == "color") {
+                color = resolve_texture(value);
             }
         }
-        Camera *create_camera(Allocator<> *allocator) override {
-            // Transform c2w;
-            // c2w = Transform::rotate_z(rotation.z);
-            // c2w = Transform::rotate_x(rotation.y) * c2w;
-            // c2w = Transform::rotate_y(rotation.x) * c2w;
-            // c2w = Transform::translate(position) * c2w;
-            TRSTransform TRS{position, rotation, Vec3(1.0)};
-            auto c2w = TRS();
-            return allocator->new_object<Camera>(allocator->new_object<const PerspectiveCamera>(resolution, c2w, fov));
+        std::shared_ptr<const Material> create_material(Allocator<> allocator) override {
+            return make_pmr_shared<DiffuseMaterial>(allocator, color->create_texture(allocator));
         }
     };
-    AKR_EXPORT std::shared_ptr<CameraNode> create_perspective_camera() {
-        return std::make_shared<PerspectiveCameraNode>();
-    }
+    AKR_EXPORT_NODE(DiffuseMaterial, DiffuseMaterialNode)
 } // namespace akari::render

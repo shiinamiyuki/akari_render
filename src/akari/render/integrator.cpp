@@ -58,20 +58,21 @@ namespace akari::render {
                 Bounds2i tileBounds = Bounds2i{tile_pos * (int)tile_size, (tile_pos + ivec2(1)) * (int)tile_size};
                 auto tile = film->tile(tileBounds);
                 auto &camera = scene->camera;
-                auto sampler = scene->sampler;
+                auto sampler = scene->sampler->clone(Allocator<>());
+
                 for (int y = tile.bounds.pmin.y; y < tile.bounds.pmax.y; y++) {
                     for (int x = tile.bounds.pmin.x; x < tile.bounds.pmax.x; x++) {
-                        sampler.set_sample_index(x + y * film->resolution().x);
+                        sampler->set_sample_index(x + y * film->resolution().x);
                         for (int s = 0; s < spp; s++) {
-                            sampler.start_next_sample();
+                            sampler->start_next_sample();
                             CameraSample sample =
-                                camera->generate_ray(sampler.next2d(), sampler.next2d(), ivec2(x, y));
+                                camera->generate_ray(sampler->next2d(), sampler->next2d(), ivec2(x, y));
                             Spectrum value = Spectrum(0.0);
                             auto ray = sample.ray;
                             while (true) {
                                 if (auto isct = scene->intersect(ray)) {
                                     auto trig = scene->get_triangle(isct->geom_id, isct->prim_id);
-                                    Float u = sampler.next1d();
+                                    Float u = sampler->next1d();
                                     Float tr = trig.material->tr(ShadingPoint(trig.texcoord(isct->uv)));
                                     if (tr > 0) {
                                         if (u < tr) {
@@ -111,8 +112,8 @@ namespace akari::render {
       public:
         int spp = 16;
         AOVIntegrator::AOV aov = AOVIntegrator::albedo;
-        Integrator *create_integrator(Allocator<> *alllocator) override {
-            return alllocator->new_object<AOVIntegrator>(spp, aov);
+        std::shared_ptr<Integrator> create_integrator(Allocator<> allocator) override {
+            return make_pmr_shared<AOVIntegrator>(allocator, spp, aov);
         }
         const char *description() override { return "[Ambient Occlution]"; }
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,

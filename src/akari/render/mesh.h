@@ -4,6 +4,6 @@
 namespace akari::render {
     class MeshNode : public ShapeNode {
       public:
-        virtual MeshInstance create_instance(Allocator<> *) = 0;
+        virtual MeshInstance create_instance(Allocator<>) = 0;
     };
 } // namespace akari::render

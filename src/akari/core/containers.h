@@ -27,7 +27,7 @@
 #include <akari/core/memory.h>
 
 namespace akari {
-    AKR_XPU inline uint64_t murmur_hash64a(const void *key, int len, uint64_t seed) {
+    inline uint64_t murmur_hash64a(const void *key, int len, uint64_t seed) {
         const uint64_t m = 0xc6a4a7935bd1e995ull;
         const int r = 47;
 
@@ -74,56 +74,56 @@ namespace akari {
         return h;
     }
     template <typename T>
-    AKR_XPU uint64_t hash_chain(T v, uint64_t seed = 0) {
+    uint64_t hash_chain(T v, uint64_t seed = 0) {
         T tmp = v;
         return murmur_hash64a(&tmp, sizeof(T), seed);
     }
     template <typename T>
-    AKR_XPU uint64_t hash(T v) {
+    uint64_t hash(T v) {
         return hash_chain(v, 0);
     }
     template <typename T, typename... Ts>
-    AKR_XPU uint64_t hash(T v, Ts... u) {
+    uint64_t hash(T v, Ts... u) {
         return hash_chain(v, hash(u...));
     }
     // from pbrt-v4
     template <typename Key, typename Value, typename Hash,
-              typename Allocator = astd::pmr::polymorphic_allocator<astd::optional<astd::pair<Key, Value>>>>
+              typename Allocator = astd::pmr::polymorphic_allocator<std::optional<std::pair<Key, Value>>>>
     class HashMap {
       public:
         // HashMap Type Definitions
-        using TableEntry = astd::optional<astd::pair<Key, Value>>;
+        using TableEntry = std::optional<std::pair<Key, Value>>;
 
         class Iterator {
           public:
-            AKR_XPU
+            
             Iterator &operator++() {
                 while (++ptr < end && !ptr->has_value())
                     ;
                 return *this;
             }
 
-            AKR_XPU
+            
             Iterator operator++(int) {
                 Iterator old = *this;
                 operator++();
                 return old;
             }
 
-            AKR_XPU
+            
             bool operator==(const Iterator &iter) const { return ptr == iter.ptr; }
-            AKR_XPU
+            
             bool operator!=(const Iterator &iter) const { return ptr != iter.ptr; }
 
-            AKR_XPU
-            astd::pair<Key, Value> &operator*() { return ptr->value(); }
-            AKR_XPU
-            const astd::pair<Key, Value> &operator*() const { return ptr->value(); }
+            
+            std::pair<Key, Value> &operator*() { return ptr->value(); }
+            
+            const std::pair<Key, Value> &operator*() const { return ptr->value(); }
 
-            AKR_XPU
-            astd::pair<Key, Value> *operator->() { return &ptr->value(); }
-            AKR_XPU
-            const astd::pair<Key, Value> *operator->() const { return ptr->value(); }
+            
+            std::pair<Key, Value> *operator->() { return &ptr->value(); }
+            
+            const std::pair<Key, Value> *operator->() const { return ptr->value(); }
 
           private:
             friend class HashMap;
@@ -136,9 +136,9 @@ namespace akari {
         using const_iterator = const iterator;
 
         // HashMap Public Methods
-        AKR_XPU
+        
         size_t size() const { return nStored; }
-        AKR_XPU
+        
         size_t capacity() const { return table.size(); }
         void clear() {
             table.clear();
@@ -159,37 +159,37 @@ namespace akari {
                     offset = FindOffset(key);
                 }
             }
-            table[offset] = astd::make_pair(key, value);
+            table[offset] = std::make_pair(key, value);
         }
-        AKR_XPU
+        
         bool contains(const Key &key) const { return table[FindOffset(key)].has_value(); }
-        AKR_XPU astd::optional<Value> lookup(const Key &key) const {
+        std::optional<Value> lookup(const Key &key) const {
             size_t offset = FindOffset(key);
             if (table[offset].has_value()) {
                 return table[offset]->second;
             }
-            return astd::nullopt;
+            return std::nullopt;
         }
-        AKR_XPU
+        
         const Value &operator[](const Key &key) const {
             size_t offset = FindOffset(key);
             AKR_CHECK(table[offset].has_value());
             return table[offset]->second;
         }
 
-        AKR_XPU
+        
         iterator begin() {
             Iterator iter(table.data(), table.data() + capacity());
             while (iter.ptr < iter.end && !iter.ptr->has_value())
                 ++iter.ptr;
             return iter;
         }
-        AKR_XPU
+        
         iterator end() { return Iterator(table.data() + capacity(), table.data() + capacity()); }
 
       private:
         // HashMap Private Methods
-        AKR_XPU
+        
         size_t FindOffset(const Key &key) const {
             size_t baseOffset = Hash()(key) & (capacity() - 1);
             for (int nProbes = 0;; ++nProbes) {
@@ -222,7 +222,7 @@ namespace akari {
         }
 
         // HashMap Private Members
-        astd::vector<TableEntry, Allocator> table;
+        std::vector<TableEntry, Allocator> table;
         size_t nStored = 0;
     };
 } // namespace akari

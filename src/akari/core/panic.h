@@ -27,7 +27,7 @@
 
 namespace akari {
     namespace astd {
-        [[noreturn]] AKR_XPU inline void abort() {
+        [[noreturn]] inline void abort() {
 #ifdef AKR_GPU_CODE
             asm("trap;");
 #else
@@ -35,7 +35,7 @@ namespace akari {
 #endif
         }
     } // namespace astd
-    [[noreturn]] AKR_XPU inline void panic(const char *file, int line, const char *msg) {
+    [[noreturn]] inline void panic(const char *file, int line, const char *msg) {
 #ifdef AKR_GPU_CODE
         printf("PANIC at %s:%d: %s\n", file, line, msg);
         astd::abort();

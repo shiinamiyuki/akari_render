@@ -75,21 +75,21 @@ namespace akari::render {
                 Bounds2i tileBounds = Bounds2i{tile_pos * (int)tile_size, (tile_pos + ivec2(1)) * (int)tile_size};
                 auto tile = film->tile(tileBounds);
                 auto camera = scene->camera;
-                auto sampler = scene->sampler;
+                auto sampler = scene->sampler->clone(Allocator<>());
                 for (int y = tile.bounds.pmin.y; y < tile.bounds.pmax.y; y++) {
                     for (int x = tile.bounds.pmin.x; x < tile.bounds.pmax.x; x++) {
-                        sampler.set_sample_index(x + y * film->resolution().x);
+                        sampler->set_sample_index(x + y * film->resolution().x);
                         for (int s = 0; s < spp; s++) {
-                            sampler.start_next_sample();
+                            sampler->start_next_sample();
                             GenericPathTracer pt;
                             pt.scene = scene;
-                            pt.allocator = &allocator;
-                            pt.sampler = &sampler;
+                            pt.allocator = allocator;
+                            pt.sampler = sampler.get();
                             pt.L = Spectrum(0.0);
                             pt.beta = Spectrum(1.0);
                             pt.min_depth = min_depth;
                             pt.max_depth = max_depth;
-                            pt.run_megakernel(camera, ivec2(x, y));
+                            pt.run_megakernel(camera.get(), ivec2(x, y));
                             tile.add_sample(vec2(x, y), min(clamp_zero(pt.L), Spectrum(10)), 1.0f);
                             resources[tid]->release();
                         }
@@ -109,8 +109,8 @@ namespace akari::render {
         int spp = 16;
         int max_depth = 5;
         int min_depth = 3;
-        Integrator *create_integrator(Allocator<> *allocator) override {
-            return allocator->new_object<PathTracerIntegrator>(spp, min_depth, max_depth);
+        std::shared_ptr<Integrator> create_integrator(Allocator<> allocator) override {
+            return make_pmr_shared<PathTracerIntegrator>(allocator, spp, min_depth, max_depth);
         }
         const char *description() override { return "[Path Tracer]"; }
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,

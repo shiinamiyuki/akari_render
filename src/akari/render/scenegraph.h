@@ -23,15 +23,61 @@
 #include <akari/core/plugin.h>
 #include <akari/core/parser.h>
 namespace akari::render {
+    template <typename T>
+    struct ObjectCache {
+        template <class F>
+        T &get_cached_or(F &&f) {
+            if (!_storage) {
+                _storage = f();
+            }
+            return _storage.value();
+        }
+        void invalidate() { _storage.reset(); }
+
+      private:
+        std::optional<T> _storage;
+    };
+    class SceneGraphNode;
+    class TraversalCallback {
+      public:
+        friend class SceneGraphNode;
+        virtual void enter(SceneGraphNode *) const {}
+        virtual void leave(SceneGraphNode *) const {}
+    };
     class AKR_EXPORT SceneGraphNode : public sdl::Object {
+      protected:
+        virtual void do_traverse(TraversalCallback *cb) {}
+
       public:
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override {}
+        virtual void on_parameter_change(const std::string &field, const sdl::Value &value) {}
         virtual void commit() {}
         virtual const char *description() { return "unknown"; }
+        virtual void traverse(TraversalCallback *cb) {
+            cb->enter(this);
+            do_traverse(cb);
+            cb->leave(this);
+        }
+        virtual void finalize() {}
+
         typedef std::shared_ptr<SceneGraphNode> (*CreateFunc)(void);
     };
+    class AKR_EXPORT NamedNode : public SceneGraphNode {
+        std::shared_ptr<SceneGraphNode> underlying;
+        std::string name_;
 
+      public:
+        const std::string &name() { return name_; }
+        void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
+                          const sdl::Value &value) override {
+            return underlying->object_field(parser, ctx, field, value);
+        }
+        void commit() override { underlying->commit(); }
+        const char *description() override { return underlying->description(); }
+        void traverse(TraversalCallback *cb) override { underlying->traverse(cb); }
+        void finalize() override { underlying->finalize(); }
+    };
     class AKR_EXPORT SceneGraphParser : public sdl::Parser {
       public:
         virtual void register_node(const std::string &name, SceneGraphNode::CreateFunc) = 0;
@@ -41,7 +87,7 @@ namespace akari::render {
     class MaterialNode;
     class TextureNode;
     class MeshNode;
-   
+
     template <typename A>
     A load(const sdl::Value &v) {
         using T = typename vec_trait<A>::value_type;

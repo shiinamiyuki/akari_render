@@ -23,7 +23,6 @@
 #pragma once
 #include <akari/core/math.h>
 #include <akari/core/memory.h>
-#include <akari/core/box.h>
 #include <optional>
 namespace akari {
     /*
@@ -32,7 +31,7 @@ namespace akari {
      * If no such index i, last is returned
      * */
     template <typename Pred>
-    AKR_XPU int upper_bound(int first, int last, Pred pred) {
+    int upper_bound(int first, int last, Pred pred) {
         int lo = first;
         int hi = last;
         while (lo < hi) {
@@ -66,12 +65,12 @@ namespace akari {
         // y = F^{-1}(u)
         // P(Y <= y) = P(F^{-1}(U) <= u) = P(U <= F(u)) = F(u)
         // Assume: 0 <= i < n
-        [[nodiscard]] AKR_XPU Float pdf_discrete(int i) const { return func[i] / (funcInt * count()); }
-        [[nodiscard]] AKR_XPU Float pdf_continuous(Float x) const {
+        [[nodiscard]] Float pdf_discrete(int i) const { return func[i] / (funcInt * count()); }
+        [[nodiscard]] Float pdf_continuous(Float x) const {
             uint32_t offset = std::clamp<uint32_t>(static_cast<uint32_t>(x * count()), 0, count() - 1);
             return func[offset] / funcInt;
         }
-        AKR_XPU int sample_discrete(Float u, Float *pdf = nullptr) const {
+        int sample_discrete(Float u, Float *pdf = nullptr) const {
             uint32_t i = upper_bound(0, cdf.size(), [=](int idx) { return cdf[idx] <= u; });
             if (pdf) {
                 *pdf = pdf_discrete(i);
@@ -79,7 +78,7 @@ namespace akari {
             return i;
         }
 
-        AKR_XPU Float sample_continuous(Float u, Float *pdf = nullptr, int *p_offset = nullptr) const {
+        Float sample_continuous(Float u, Float *pdf = nullptr, int *p_offset = nullptr) const {
             uint32_t offset = upper_bound(0, cdf.size(), [=](int idx) { return cdf[idx] <= u; });
             if (p_offset) {
                 *p_offset = offset;
@@ -92,8 +91,8 @@ namespace akari {
             return ((float)offset + du) / count();
         }
 
-        [[nodiscard]] AKR_XPU size_t count() const { return func.size(); }
-        [[nodiscard]] AKR_XPU Float integral() const { return funcInt; }
+        [[nodiscard]] size_t count() const { return func.size(); }
+        [[nodiscard]] Float integral() const { return funcInt; }
 
       private:
         astd::pmr::vector<Float> func, cdf;
@@ -118,7 +117,7 @@ namespace akari {
             }
             pMarginal = make_pmr_box<Distribution1D>(allocator, &m[0], nv, allocator);
         }
-        AKR_XPU Vec2 sample_continuous(const Vec2 &u, Float *pdf) const {
+        Vec2 sample_continuous(const Vec2 &u, Float *pdf) const {
             int v;
             Float pdfs[2];
             auto d1 = pMarginal->sample_continuous(u[0], &pdfs[0], &v);
@@ -126,7 +125,7 @@ namespace akari {
             *pdf = pdfs[0] * pdfs[1];
             return Vec2(d0, d1);
         }
-        AKR_XPU Float pdf_continuous(const Vec2 &p) const {
+        Float pdf_continuous(const Vec2 &p) const {
             auto iu = std::clamp<int>(p[0] * pConditionalV[0].count(), 0, pConditionalV[0].count() - 1);
             auto iv = std::clamp<int>(p[1] * pMarginal->count(), 0, pMarginal->count() - 1);
             return pConditionalV[iv].func[iu] / pMarginal->funcInt;

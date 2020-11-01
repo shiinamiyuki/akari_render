@@ -31,7 +31,7 @@ namespace akari {
         SOA() = default;
 
         template <typename Allocator>
-        SOA(int n, Allocator &&allocator) : _size(n) {
+        SOA(int n, Allocator &allocator) : _size(n) {
             array = allocator.template allocate_object<T>(n);
         }
          T &operator[](int i) { return array[i]; }
@@ -51,7 +51,7 @@ namespace akari {
         static constexpr size_t stride = sizeof(A) / sizeof(T);
         SOAVectorXT() = default;
         template <typename Allocator>
-        SOAVectorXT(int n, Allocator &&allocator) : _size(n) {
+        SOAVectorXT(int n, Allocator &allocator) : _size(n) {
             for (int i = 0; i < N; i++)
                 arrays[i] = (T *)allocator.template allocate_object<T>(n);
         }

@@ -38,22 +38,18 @@ namespace akari::render {
         AKR_ASSERT_THROW(camera);
         camera->commit();
     }
-    void SceneNode::init_scene(Allocator<> *allocator) {
-        light_pdf_map = make_pmr_box<LightPdfMap>(*allocator, *allocator);
-        light_id_map = make_pmr_box<LightIdMap>(*allocator, *allocator);
-
+    void SceneNode::init_scene(Allocator<> allocator) {
+        scene = std::make_shared<Scene>();
+        auto &light_pdf_map = scene->light_pdf_map;
         lights.clear();
-        scene = make_pmr_box<Scene>(*allocator);
         scene->camera = camera->create_camera(allocator);
+        auto &instances = scene->meshes;
         for (auto &shape : shapes) {
             instances.emplace_back(shape->create_instance(allocator));
         }
-        scene->meshes = {instances.data(), instances.size()};
         scene->accel = accel->create_accel(*scene);
         std::vector<const Light *> area_lights;
         std::vector<Float> power;
-        std::unordered_map<const Texture *, std::future<Float>> ft_integrals;
-        std::unordered_map<const Texture *, Float> integrals;
         for (uint32_t mesh_id = 0; mesh_id < scene->meshes.size(); mesh_id++) {
             MeshInstance &mesh = scene->meshes[mesh_id];
             for (uint32_t prim_id = 0; prim_id < mesh.indices.size() / 3; prim_id++) {
@@ -61,64 +57,31 @@ namespace akari::render {
                 auto material = triangle.material;
                 if (!material)
                     continue;
-                if (material->is_emissive()) {
-                    const EmissiveMaterial *e = material->as_emissive();
-                    auto color = e->color;
-                    if (ft_integrals.find(color) == ft_integrals.end()) {
-                        ft_integrals.emplace(color, std::async(std::launch::async, [=] { return color->integral(); }));
-                    }
-                    (void)e;
-                    auto light = allocator->new_object<Light>(allocator->new_object<const AreaLight>(triangle));
-                    area_lights.emplace_back(light);
-                    light_id_map->insert(std::make_pair(mesh_id, prim_id), light);
+                if (auto e = material->as_emissive()) {
+                    auto light_node = e->light;
+                    auto light = light_node->create(allocator, scene.get(), triangle);
+                    power.emplace_back(light->power());
+                    lights.emplace_back(light);
                 }
             }
         }
-        const Texture *envmap_texture = nullptr;
+
         if (envmap) {
-            envmap_texture = envmap->envmap->create_texture(allocator);
-            AKR_ASSERT_THROW(envmap_texture);
-            if (ft_integrals.find(envmap_texture) == ft_integrals.end()) {
-                ft_integrals.emplace(envmap_texture,
-                                     std::async(std::launch::async, [=] { return envmap_texture->integral(); }));
-            }
-        }
-        for (auto &pair : ft_integrals) {
-            integrals[pair.first] = pair.second.get();
-        }
-        for (size_t i = 0; i < area_lights.size(); i++) {
-            auto light = *area_lights[i]->get<const AreaLight *>();
-            auto color = light->color;
-            auto I = integrals[color];
-            auto &triangle = light->triangle;
-            Vec3 tc[3];
-            for (int j = 0; j < 3; j++)
-                tc[j] = Vec3(triangle.texcoords[j].x, triangle.texcoords[j].y, 0.0);
-            auto tc_area = length(cross(tc[1] - tc[0], tc[2] - tc[0])) * 0.5;
-            auto area = glm::length(
-                glm::cross(triangle.vertices[1] - triangle.vertices[0], triangle.vertices[2] - triangle.vertices[0]));
-            power.emplace_back(area * tc_area * I);
-        }
-        if (envmap) {
-            scene->envmap_box = InfiniteAreaLight::create(*scene, envmap->transform, envmap_texture, Allocator<>());
-            scene->envmap = allocator->new_object<const Light>(scene->envmap_box.get());
-            power.emplace_back(scene->envmap_box->power());
-        }
-        for (auto i : area_lights) {
-            lights.emplace_back(i);
+            scene->envmap = envmap->create(allocator, scene.get(), std::nullopt);
+            power.emplace_back(scene->envmap->power());
+            lights.emplace_back(scene->envmap);
         }
         if (envmap) {
             lights.emplace_back(scene->envmap);
         }
-        light_distribution = std::make_unique<Distribution1D>(power.data(), power.size(), Allocator<>());
+        auto light_distribution = std::make_unique<Distribution1D>(power.data(), power.size(), Allocator<>());
         AKR_ASSERT(lights.size() == power.size());
         for (size_t i = 0; i < lights.size(); i++) {
-            light_pdf_map->insert(lights[i], light_distribution->pdf_discrete(i));
+            light_pdf_map.emplace(lights[i].get(), light_distribution->pdf_discrete(i));
         }
-        scene->light_distribution = light_distribution.get();
-        scene->lights = BufferView(lights.data(), lights.size());
-        scene->light_id_map = light_id_map.get();
-        scene->light_pdf_map = light_pdf_map.get();
+        scene->light_distribution = std::move(light_distribution);
+        scene->lights = std::move(lights);
+        scene->sampler = sampler->create_sampler(allocator);
     }
     void SceneNode::render() {
         // Thanks to python hijacking SIGINT handler;
@@ -132,11 +95,11 @@ namespace akari::render {
             }
         }
         info("preparing scene");
-        astd::pmr::monotonic_buffer_resource resource(astd::pmr::get_default_resource());
-        Allocator<> allocator(&resource);
-        init_scene(&allocator);
-        scene->sampler = sampler->create_sampler();
-        auto real_integrator = integrator->create_integrator(&allocator);
+
+        Allocator<> allocator(&memory_arena);
+        init_scene(allocator);
+
+        auto real_integrator = integrator->create_integrator(allocator);
         ivec2 res = scene->camera->resolution();
         // if (super_sampling_k > 1) {
         //     auto s = std::sqrt(super_sampling_k);
@@ -158,7 +121,7 @@ namespace akari::render {
             AOV aov;
             auto render_aov = [&](const char *name) {
                 auto aov_integrator_node = make_aov_integrator(std::min(64, integrator->get_spp()), name);
-                auto integrator = aov_integrator_node->create_integrator(&allocator);
+                auto integrator = aov_integrator_node->create_integrator(allocator);
                 Film aov_film(res);
                 integrator->render(scene.get(), &aov_film);
                 aov.aovs[name] = aov_film.to_rgba_image();
@@ -176,11 +139,21 @@ namespace akari::render {
             }
             denoiser = nullptr;
         }
-        scene.reset();
-        light_pdf_map.reset();
-        light_id_map.reset();
-    }
 
+        finalize();
+    }
+    void SceneNode::finalize() {
+        scene.reset();
+        lights.clear();
+        accel->finalize();
+        integrator->finalize();
+        camera->finalize();
+        sampler->finalize();
+        envmap->finalize();
+        for (auto &shape : shapes) {
+            shape->finalize();
+        }
+    }
     void SceneNode::object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                                  const sdl::Value &value) {
         if (field == "camera") {
@@ -203,17 +176,8 @@ namespace akari::render {
             accel = dyn_cast<AcceleratorNode>(value.object());
             AKR_ASSERT_THROW(accel);
         } else if (field == "envmap") {
-            envmap = dyn_cast<EnvMapNode>(value.object());
+            envmap = dyn_cast<LightNode>(value.object());
             AKR_ASSERT_THROW(envmap);
-        }
-    }
-    void EnvMapNode::object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
-                                  const sdl::Value &value) {
-        if (field == "envmap") {
-            envmap = resolve_texture(value);
-            AKR_ASSERT_THROW(envmap);
-        } else if (field == "rotation") {
-            transform.rotation = radians(load<vec3>(value));
         }
     }
 } // namespace akari::render

@@ -21,8 +21,37 @@
 // SOFTWARE.
 #pragma once
 #include <akari/core/astd.h>
-#include <list>
+#include <functional>
 namespace akari {
     template <typename T = astd::byte>
     using Allocator = astd::pmr::polymorphic_allocator<T>;
+
+    template <typename T>
+    using Box = std::unique_ptr<T, std::function<void(T *)>>;
+    template <typename T, typename... Ts>
+    Box<T> make_box(Ts &&... args) {
+        auto rsrc = astd::pmr::get_default_resource();
+        Allocator<> alloc(rsrc);
+        return Box<T>(alloc.new_object<T>(std::forward<Ts>(args)...), [=](T *p) {
+            Allocator<> alloc_(rsrc);
+            alloc_.destroy(p);
+            alloc_.deallocate_object(const_cast<std::remove_const_t<T> *>(p), 1);
+        });
+    }
+    template <typename T, typename... Ts>
+    Box<T> make_pmr_box(Allocator<> alloc, Ts &&... args) {
+        return Box<T>(alloc.new_object<T>(std::forward<Ts>(args)...), [=](T *p) mutable {
+            alloc.destroy(p);
+            alloc.deallocate_object(const_cast<std::remove_const_t<T> *>(p), 1);
+        });
+    }
+
+    template <typename T, typename... Ts>
+    std::shared_ptr<T> make_pmr_shared(Allocator<> alloc, Ts &&... args) {
+        return std::shared_ptr<T>(alloc.new_object<T>(std::forward<Ts>(args)...), [=](T *p) mutable {
+            alloc.destroy(p);
+            alloc.deallocate_object(const_cast<std::remove_const_t<T> *>(p), 1);
+        });
+    }
+
 } // namespace akari

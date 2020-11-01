@@ -26,18 +26,20 @@
 #include <akari/render/scenegraph.h>
 namespace akari::render {
     class Material;
+    class Light;
     struct Triangle {
         astd::array<Vec3, 3> vertices;
         astd::array<Vec3, 3> normals;
         astd::array<vec2, 3> texcoords;
         const Material *material = nullptr;
-        AKR_XPU Vec3 p(const vec2 &uv) const { return lerp3(vertices[0], vertices[1], vertices[2], uv); }
-        AKR_XPU Float area() const { return length(cross(vertices[1] - vertices[0], vertices[2] - vertices[0])) * 0.5f; }
-        AKR_XPU Vec3 ng() const { return normalize(cross(vertices[1] - vertices[0], vertices[2] - vertices[0])); }
-        AKR_XPU Vec3 ns(const vec2 &uv) const { return lerp3(normals[0], normals[1], normals[2], uv); }
-        AKR_XPU vec2 texcoord(const vec2 &uv) const { return lerp3(texcoords[0], texcoords[1], texcoords[2], uv); }
+        const Light *light = nullptr;
+        Vec3 p(const vec2 &uv) const { return lerp3(vertices[0], vertices[1], vertices[2], uv); }
+        Float area() const { return length(cross(vertices[1] - vertices[0], vertices[2] - vertices[0])) * 0.5f; }
+        Vec3 ng() const { return normalize(cross(vertices[1] - vertices[0], vertices[2] - vertices[0])); }
+        Vec3 ns(const vec2 &uv) const { return lerp3(normals[0], normals[1], normals[2], uv); }
+        vec2 texcoord(const vec2 &uv) const { return lerp3(texcoords[0], texcoords[1], texcoords[2], uv); }
 
-        AKR_XPU astd::optional<astd::pair<Float, Vec2>> intersect(const Ray &ray) const {
+        std::optional<std::pair<Float, Vec2>> intersect(const Ray &ray) const {
             auto &v0 = vertices[0];
             auto &v1 = vertices[1];
             auto &v2 = vertices[2];
@@ -47,21 +49,21 @@ namespace akari::render {
             auto h = cross(ray.d, e2);
             a = dot(e1, h);
             if (a > Float(-1e-6f) && a < Float(1e-6f))
-                return astd::nullopt;
+                return std::nullopt;
             f = 1.0f / a;
             auto s = ray.o - v0;
             u = f * dot(s, h);
             if (u < 0.0 || u > 1.0)
-                return astd::nullopt;
+                return std::nullopt;
             auto q = cross(s, e1);
             v = f * dot(ray.d, q);
             if (v < 0.0 || u + v > 1.0)
-                return astd::nullopt;
+                return std::nullopt;
             Float t = f * dot(e2, q);
             if (t > ray.tmin && t < ray.tmax) {
-                return astd::make_pair(t, Vec2(u, v));
+                return std::make_pair(t, Vec2(u, v));
             } else {
-                return astd::nullopt;
+                return std::nullopt;
             }
         }
     };

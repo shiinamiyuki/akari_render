@@ -29,43 +29,52 @@
 namespace akari::render {
     struct ShadingPoint {
         ShadingPoint() = default;
-        AKR_XPU ShadingPoint(const vec2 &tc) : texcoords(tc) {}
+        ShadingPoint(const vec2 &tc) : texcoords(tc) {}
         vec2 texcoords;
     };
-    class Texture;
+
+    class Texture {
+      public:
+        virtual Spectrum evaluate(const ShadingPoint &sp) const = 0;
+        virtual Float integral() const = 0;
+        virtual Float tr(const ShadingPoint &sp) const = 0;
+    };
     class TextureNode : public SceneGraphNode {
       public:
-        virtual Texture *create_texture(Allocator<> *) = 0;
+        virtual std::shared_ptr<const Texture> create_texture(Allocator<>) = 0;
     };
-    class ConstantTexture {
+    class ConstantTexture : public Texture {
         Spectrum value;
         Float alpha = 0;
 
       public:
-        AKR_XPU ConstantTexture(Spectrum v, Float alpha) : value(v), alpha(alpha) {}
-        AKR_XPU Spectrum evaluate(const ShadingPoint &sp) const { return value; }
-        Float integral() const { return luminance(value); }
-        AKR_XPU Float tr(const ShadingPoint &sp) const { return std::max<Float>(0.0, 1.0f - alpha); }
+        ConstantTexture(Spectrum v, Float alpha) : value(v), alpha(alpha) {}
+        Spectrum evaluate(const ShadingPoint &sp) const override { return value; }
+        Float integral() const override { return luminance(value); }
+        Float tr(const ShadingPoint &sp) const override { return std::max<Float>(0.0, 1.0f - alpha); }
     };
-    class ImageTexture {
+    class ImageTexture : public Texture {
         RGBAImage::View image;
+        mutable ObjectCache<Float> integral_;
 
       public:
-        AKR_XPU ImageTexture(RGBAImage::View image) : image(image) {}
-        AKR_XPU Spectrum evaluate(const ShadingPoint &sp) const {
+        ImageTexture(RGBAImage::View image) : image(image) {}
+        Spectrum evaluate(const ShadingPoint &sp) const override {
             vec2 texcoords = sp.texcoords;
             vec2 tc = glm::mod(texcoords, vec2(1.0f));
             tc.y = 1.0f - tc.y;
             return image(tc).rgb;
         }
-        Float integral() const {
-            Float I = 0;
-            for (int i = 0; i < image.resolution().x * image.resolution().y; i++) {
-                I += luminance(image.data()[i].rgb);
-            }
-            return I / (image.resolution().x * image.resolution().y);
+        Float integral() const override {
+            return integral_.get_cached_or([&] {
+                Float I = 0;
+                for (int i = 0; i < image.resolution().x * image.resolution().y; i++) {
+                    I += luminance(image.data()[i].rgb);
+                }
+                return I / (image.resolution().x * image.resolution().y);
+            });
         }
-        AKR_XPU Float tr(const ShadingPoint &sp) const {
+        Float tr(const ShadingPoint &sp) const override {
             vec2 texcoords = sp.texcoords;
             vec2 tc = glm::mod(texcoords, vec2(1.0f));
             tc.y = 1.0f - tc.y;
@@ -73,15 +82,6 @@ namespace akari::render {
         }
     };
 
-    class Texture : public Variant<const ImageTexture *, const ConstantTexture *> {
-      public:
-        using Variant::Variant;
-        AKR_XPU Spectrum evaluate(const ShadingPoint &sp) const { AKR_VAR_PTR_DISPATCH(evaluate, sp); }
-        Float integral() const {
-            return dispatch_cpu([&](auto arg) { return arg->integral(); });
-        }
-        AKR_XPU Float tr(const ShadingPoint &sp) const { AKR_VAR_PTR_DISPATCH(tr, sp); }
-    };
     AKR_EXPORT std::shared_ptr<TextureNode> create_constant_texture();
     AKR_EXPORT std::shared_ptr<TextureNode> create_image_texture();
     AKR_EXPORT std::shared_ptr<TextureNode> create_constant_texture_rgba(const RGBA &value);

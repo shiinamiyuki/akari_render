@@ -38,7 +38,7 @@ namespace akari::render {
     class Accelerator {
       public:
         virtual bool occlude(const Ray &ray) const = 0;
-        virtual astd::optional<Intersection> intersect(const Ray &ray) const = 0;
+        virtual std::optional<Intersection> intersect(const Ray &ray) const = 0;
         virtual void reset() = 0;
         virtual void build(const Scene &) = 0;
         virtual Bounds3f world_bounds() const = 0;

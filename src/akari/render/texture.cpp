@@ -29,17 +29,21 @@ namespace akari::render {
     class ConstantTextureNode final : public TextureNode {
         Spectrum value;
         Float alpha;
+        ObjectCache<std::shared_ptr<const Texture>> tex_cache;
 
       public:
         ConstantTextureNode(Spectrum v, Float alpha = 1.0) : value(v), alpha(alpha) {}
-        Texture *create_texture(Allocator<> *allocator) override {
-            return allocator->new_object<Texture>(allocator->new_object<const ConstantTexture>(value, alpha));
+        std::shared_ptr<const Texture> create_texture(Allocator<> allocator) override {
+            auto tex =
+                tex_cache.get_cached_or([=] { return make_pmr_shared<ConstantTexture>(allocator, value, alpha); });
+            return tex;
         }
     };
 
     class ImageTextureNode final : public TextureNode {
         std::shared_ptr<RGBAImage> image;
-
+        ObjectCache<std::shared_ptr<const Texture>> tex_cache;
+    
       public:
         ImageTextureNode() = default;
         ImageTextureNode(const fs::path &path) {
@@ -52,8 +56,9 @@ namespace akari::render {
                 throw std::runtime_error("Error loading image");
             }
         }
-        Texture *create_texture(Allocator<> *allocator) override {
-            return allocator->new_object<Texture>(allocator->new_object<const ImageTexture>(image->view()));
+        std::shared_ptr<const Texture> create_texture(Allocator<> allocator) override {
+            auto tex = tex_cache.get_cached_or([=] { return make_pmr_shared<ImageTexture>(allocator, image->view()); });
+            return tex;
         }
     };
     AKR_EXPORT std::shared_ptr<TextureNode> create_constant_texture() {

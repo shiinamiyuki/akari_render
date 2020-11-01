@@ -509,7 +509,7 @@ namespace akari::render {
         Sampler *sampler = nullptr;
         Spectrum L = Spectrum(0.0);
         Spectrum beta = Spectrum(1.0f);
-        Allocator<> *allocator = nullptr;
+        Allocator<> allocator;
         vec3 dtree_voxel_size = vec3(0);
         int depth = 0;
         int max_depth = 5;
@@ -534,11 +534,11 @@ namespace akari::render {
             CameraSample sample = camera->generate_ray(sampler->next2d(), sampler->next2d(), p);
             return sample;
         }
-        astd::pair<const Light *, Float> select_light() noexcept { return scene->select_light(sampler->next2d()); }
+        std::pair<const Light *, Float> select_light() noexcept { return scene->select_light(sampler->next2d()); }
 
-        astd::optional<DirectLighting>
+        std::optional<DirectLighting>
         compute_direct_lighting(SurfaceInteraction &si, const SurfaceHit &surface_hit,
-                                const astd::pair<const Light *, Float> &selected) noexcept {
+                                const std::pair<const Light *, Float> &selected) noexcept {
             auto [light, light_pdf] = selected;
             if (light) {
                 DirectLighting lighting;
@@ -547,7 +547,7 @@ namespace akari::render {
                 light_ctx.p = si.p;
                 LightSample light_sample = light->sample_incidence(light_ctx);
                 if (light_sample.pdf <= 0.0)
-                    return astd::nullopt;
+                    return std::nullopt;
                 light_pdf *= light_sample.pdf;
                 auto f = light_sample.I * si.bsdf.evaluate(surface_hit.wo, light_sample.wi) *
                          std::abs(dot(si.ns, light_sample.wi));
@@ -561,7 +561,7 @@ namespace akari::render {
                 //     sTree->deposit(si.p, light_sample.wi, luminance(Spectrum(weight * light_sample.I / light_pdf)));
                 return lighting;
             } else {
-                return astd::nullopt;
+                return std::nullopt;
             }
         }
 
@@ -581,8 +581,8 @@ namespace akari::render {
             }
         }
         // @param mat_pdf: supplied if material is already chosen
-        astd::optional<SurfaceVertex> on_surface_scatter(SurfaceInteraction &si, const SurfaceHit &surface_hit,
-                                                         const astd::optional<PathVertex> &prev_vertex) noexcept {
+        std::optional<SurfaceVertex> on_surface_scatter(SurfaceInteraction &si, const SurfaceHit &surface_hit,
+                                                         const std::optional<PathVertex> &prev_vertex) noexcept {
             auto *material = surface_hit.material;
             auto wo = surface_hit.wo;
             MaterialEvalContext ctx = si.mat_eval_ctx(allocator, sampler);
@@ -603,7 +603,7 @@ namespace akari::render {
                         Float weight_bsdf = mis_weight(prev_vertex->pdf(), light_pdf);
                         accumulate_radiance_wo_beta(weight_bsdf * I);
                     }
-                    return astd::nullopt;
+                    return std::nullopt;
                 }
             } else if (depth < max_depth) {
                 auto u0 = sampler->next1d();
@@ -633,7 +633,7 @@ namespace akari::render {
                 AKR_CHECK(sample.pdf >= 0.0);
                 AKR_CHECK(hmin(sample.f) >= 0.0f);
                 if (std::isnan(sample.pdf) || sample.pdf == 0.0f) {
-                    return astd::nullopt;
+                    return std::nullopt;
                 }
                 vertex.bsdf = si.bsdf;
                 vertex.ray = Ray(si.p, sample.wi, Eps / std::abs(glm::dot(si.ng, sample.wi)));
@@ -641,12 +641,12 @@ namespace akari::render {
                 vertex.pdf = sample.pdf;
                 return vertex;
             }
-            return astd::nullopt;
+            return std::nullopt;
         }
         void run_megakernel(const Camera *camera, const ivec2 &raster) noexcept {
             auto camera_sample = camera_ray(camera, raster);
             Ray ray = camera_sample.ray;
-            astd::optional<PathVertex> prev_vertex;
+            std::optional<PathVertex> prev_vertex;
             while (true) {
                 auto hit = scene->intersect(ray);
                 if (!hit) {
@@ -664,7 +664,7 @@ namespace akari::render {
                 if (!vertex) {
                     break;
                 }
-                astd::optional<DirectLighting> has_direct = compute_direct_lighting(si, surface_hit, select_light());
+                std::optional<DirectLighting> has_direct = compute_direct_lighting(si, surface_hit, select_light());
                 if (has_direct) {
                     auto &direct = *has_direct;
                     if (!is_black(direct.color) && !scene->occlude(direct.shadow_ray)) {
@@ -765,7 +765,7 @@ namespace akari::render {
                                 pt.vertices = allocator.allocate_object<GuidedPathTracer::PPGVertex>(max_depth + 1);
                                 pt.training = true;
                                 pt.scene = scene;
-                                pt.allocator = &allocator;
+                                pt.allocator = allocator;
                                 pt.sampler = &sampler;
                                 pt.L = Spectrum(0.0);
                                 pt.beta = Spectrum(1.0);
@@ -817,7 +817,7 @@ namespace akari::render {
                             pt.n_vertices = 0;
                             pt.vertices = allocator.allocate_object<GuidedPathTracer::PPGVertex>(max_depth + 1);
                             pt.training = false;
-                            pt.allocator = &allocator;
+                            pt.allocator = allocator;
                             pt.sampler = &sampler;
                             pt.L = Spectrum(0.0);
                             pt.beta = Spectrum(1.0);
@@ -844,8 +844,8 @@ namespace akari::render {
         int spp = 16;
         int max_depth = 5;
         int training_samples = 16;
-        Integrator *create_integrator(Allocator<> *allocator) override {
-            return allocator->new_object<GuidedPathTracerIntegrator>(spp, max_depth, training_samples);
+        std::shared_ptr<Integrator>create_integrator(Allocator<> allocator) override {
+            return allocator.new_object<GuidedPathTracerIntegrator>(spp, max_depth, training_samples);
         }
         const char *description() override { return "[Path Tracer]"; }
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,

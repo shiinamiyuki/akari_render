@@ -148,13 +148,13 @@ namespace akari::render {
             }
             topLevelBVH.emplace(MeshBVHes(meshBVHs.data(), meshBVHs.size()), meshBVHs.size());
         }
-        astd::optional<Intersection> intersect(const Ray &ray) const override {
+        std::optional<Intersection> intersect(const Ray &ray) const override {
             Intersection isct;
             auto hit = topLevelBVH->intersect(ray, isct);
             if (hit)
                 return isct;
             else
-                return astd::nullopt;
+                return std::nullopt;
         }
         bool occlude(const Ray &ray) const override { return topLevelBVH->occlude(ray); }
         void reset() override {

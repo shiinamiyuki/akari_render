@@ -27,7 +27,7 @@
 namespace akari::sdl {
     template <typename T>
     using P = std::shared_ptr<T>;
-    class AKR_EXPORT ValueBase {
+    class AKR_EXPORT ValueBase : public std::enable_shared_from_this<ValueBase> {
       public:
         virtual bool is_object() const { return false; }
         virtual bool is_array() const { return false; }

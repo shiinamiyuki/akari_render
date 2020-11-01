@@ -45,7 +45,7 @@ namespace akari::render {
                 throw std::runtime_error("Error loading mesh");
             }
         }
-        MeshInstance create_instance(Allocator<> *allocator) override {
+        MeshInstance create_instance(Allocator<> allocator) override {
             commit();
             MeshInstance instance;
             instance.indices = BufferView(mesh->indices.data(), mesh->indices.size());
@@ -54,7 +54,7 @@ namespace akari::render {
             instance.texcoords = BufferView(mesh->texcoords.data(), mesh->texcoords.size());
             instance.vertices = BufferView(mesh->vertices.data(), mesh->vertices.size());
             // AKR_ASSERT_THROW(mesh->material_indices.size() == materials.size());
-            instance.materials = {allocator->allocate_object<const Material *>(materials.size()), materials.size()};
+            instance.materials.resize(materials.size());
             for (size_t i = 0; i < materials.size(); i++) {
                 instance.materials[i] = (materials[i]->create_material(allocator));
             }

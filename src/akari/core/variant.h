@@ -87,24 +87,24 @@ namespace akari {
         Variant() = default;
 
         template <typename U>
-        AKR_XPU Variant(const U &u) {
+        Variant(const U &u) {
             static_assert(Index::template GetIndex<U>::value != -1, "U is not in T...");
             new (&data) U(u);
             index = Index::template GetIndex<U>::value;
         }
 
-        AKR_XPU Variant(const Variant &v) : index(v.index) {
+        Variant(const Variant &v) : index(v.index) {
             v.dispatch([&](const auto &item) {
                 using U = std::decay_t<decltype(item)>;
                 new (&data) U(item);
             });
         }
-        AKR_XPU int typeindex() const { return index; }
+        int typeindex() const { return index; }
         template <typename U>
-        AKR_XPU constexpr static int indexof() {
+        constexpr static int indexof() {
             return Index::template GetIndex<U>::value;
         }
-        AKR_XPU Variant &operator=(const Variant &v) noexcept {
+        Variant &operator=(const Variant &v) noexcept {
             if (this == &v)
                 return *this;
             if (index != -1)
@@ -118,13 +118,13 @@ namespace akari {
             return *this;
         }
 
-        AKR_XPU Variant(Variant &&v) noexcept : index(v.index) {
+        Variant(Variant &&v) noexcept : index(v.index) {
             index = v.index;
             v.index = -1;
             std::memcpy(&data, &v.data, sizeof(data));
         }
 
-        AKR_XPU Variant &operator=(Variant &&v) noexcept {
+        Variant &operator=(Variant &&v) noexcept {
             if (index != -1)
                 _drop();
             index = v.index;
@@ -134,7 +134,7 @@ namespace akari {
         }
 
         template <typename U>
-        AKR_XPU Variant &operator=(const U &u) {
+        Variant &operator=(const U &u) {
             if (index != -1) {
                 _drop();
             }
@@ -143,20 +143,20 @@ namespace akari {
             index = Index::template GetIndex<U>::value;
             return *this;
         }
-        AKR_XPU bool null() const { return index == -1; }
+        bool null() const { return index == -1; }
         template <typename U>
-        AKR_XPU bool isa() const {
+        bool isa() const {
             static_assert(Index::template GetIndex<U>::value != -1, "U is not in T...");
             return Index::template GetIndex<U>::value == index;
         }
         template <typename U>
-        AKR_XPU U *get() {
+        U *get() {
             static_assert(Index::template GetIndex<U>::value != -1, "U is not in T...");
             return Index::template GetIndex<U>::value != index ? nullptr : reinterpret_cast<U *>(&data);
         }
 
         template <typename U>
-        AKR_XPU const U *get() const {
+        const U *get() const {
             static_assert(Index::template GetIndex<U>::value != -1, "U is not in T...");
             return Index::template GetIndex<U>::value != index ? nullptr : reinterpret_cast<const U *>(&data);
         }
@@ -211,30 +211,21 @@ namespace akari {
         AKR_PANIC("No matching case");                                                                                 \
     }
         template <class Visitor>
-        AKR_XPU auto dispatch(Visitor &&visitor) {
+        auto dispatch(Visitor &&visitor) {
             _GEN_DISPATCH_BODY()
         }
 
         template <class Visitor>
-        AKR_XPU auto dispatch(Visitor &&visitor) const {
+        auto dispatch(Visitor &&visitor) const {
             _GEN_DISPATCH_BODY()
         }
-
-        template <class Visitor>
-        AKR_CPU auto dispatch_cpu(Visitor &&visitor) {
-            _GEN_DISPATCH_BODY()
-        }
-
-        template <class Visitor>
-        AKR_CPU auto dispatch_cpu(Visitor &&visitor) const {_GEN_DISPATCH_BODY()}
-
-        AKR_XPU ~Variant() {
+        ~Variant() {
             if (index != -1)
                 _drop();
         }
 
       private:
-        AKR_XPU void _drop() {
+        void _drop() {
             auto *that = this; // prevent gcc ICE
             dispatch([=](auto &&self) {
                 using U = std::decay_t<decltype(self)>;

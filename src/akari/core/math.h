@@ -98,15 +98,15 @@ namespace akari {
     static constexpr Float ShadowEps = Float(0.0001f);
 #endif
     template <typename T, typename Float>
-    AKR_XPU T lerp(T a, T b, Float t) {
+    T lerp(T a, T b, Float t) {
         return a * ((Float(1.0)) - t) + b * t;
     }
     template <typename V, typename V2>
-    AKR_XPU inline V lerp3(const V &v0, const V &v1, const V &v2, const V2 &uv) {
+    inline V lerp3(const V &v0, const V &v1, const V &v2, const V2 &uv) {
         return (1.0f - uv[0] - uv[1]) * v0 + uv[0] * v1 + uv[1] * v2;
     }
     template <typename T, int N, class F>
-    AKR_XPU T reduce(const Vector<T, N> &vec, F &&f) {
+    T reduce(const Vector<T, N> &vec, F &&f) {
         T acc = vec[0];
         for (int i = 1; i < N; i++) {
             acc = f(acc, vec[i]);
@@ -114,7 +114,7 @@ namespace akari {
         return acc;
     }
     template <int... args, typename T, int N>
-    AKR_XPU auto shuffle(const Vector<T, N> &a) {
+    auto shuffle(const Vector<T, N> &a) {
         constexpr int pack[] = {args...};
         static_assert(((args < N) && ...));
         Vector<T, sizeof...(args)> s;
@@ -124,25 +124,25 @@ namespace akari {
         return s;
     }
     template <typename T, int N>
-    AKR_XPU T hsum(const Vector<T, N> &vec) {
+    T hsum(const Vector<T, N> &vec) {
         return reduce(vec, [](T acc, T cur) -> T { return acc + cur; });
     }
     template <typename T, int N>
-    AKR_XPU T hprod(const Vector<T, N> &vec) {
+    T hprod(const Vector<T, N> &vec) {
         return reduce(vec, [](T acc, T cur) -> T { return acc * cur; });
     }
     using std::min;
     template <typename T, int N>
-    AKR_XPU T hmin(const Vector<T, N> &vec) {
+    T hmin(const Vector<T, N> &vec) {
         return reduce(vec, [](T acc, T cur) -> T { return min(acc, cur); });
     }
     using std::max;
     template <typename T, int N>
-    AKR_XPU T hmax(const Vector<T, N> &vec) {
+    T hmax(const Vector<T, N> &vec) {
         return reduce(vec, [](T acc, T cur) -> T { return max(acc, cur); });
     }
     template <typename T, int N, typename R, class F>
-    AKR_XPU R foldl(const Vector<T, N> &vec, R init, F &&f) {
+    R foldl(const Vector<T, N> &vec, R init, F &&f) {
         auto acc = f(init, vec[0]);
         for (int i = 1; i < N; i++) {
             acc = f(acc, vec[i]);
@@ -150,7 +150,7 @@ namespace akari {
         return acc;
     }
     template <typename T, int N>
-    AKR_XPU Vector<T, N> select(const Vector<bool, N> &c, const Vector<T, N> &a, const Vector<T, N> &b) {
+    Vector<T, N> select(const Vector<bool, N> &c, const Vector<T, N> &a, const Vector<T, N> &b) {
         return glm::mix(b, a, c);
     }
 
@@ -164,7 +164,7 @@ namespace akari {
     };
 
     template <typename T, typename V = typename vec_trait<T>::value_type, int N = vec_trait<T>::size>
-    AKR_XPU T load(const V *arr) {
+    T load(const V *arr) {
         T v;
         for (int i = 0; i < N; i++)
             v[i] = arr[i];
@@ -176,31 +176,31 @@ namespace akari {
         vec3 d;
         Float tmin = -1, tmax = -1;
         Ray() = default;
-        AKR_XPU Ray(const vec3 &o, const vec3 &d, Float tmin = Eps, Float tmax = std::numeric_limits<Float>::infinity())
+        Ray(const vec3 &o, const vec3 &d, Float tmin = Eps, Float tmax = std::numeric_limits<Float>::infinity())
             : o(o), d(d), tmin(tmin), tmax(tmax) {}
-        AKR_XPU static Ray spawn_to(const vec3 &p0, const vec3 &p1) {
+        static Ray spawn_to(const vec3 &p0, const vec3 &p1) {
             vec3 dir = p1 - p0;
             return Ray(p0, dir, Eps, Float(1.0f) - ShadowEps);
         }
-        AKR_XPU vec3 operator()(Float t) const { return o + t * d; }
+        vec3 operator()(Float t) const { return o + t * d; }
     };
 
     struct Frame {
         Frame() = default;
-        AKR_XPU static inline void compute_local_frame(const vec3 &v1, vec3 *v2, vec3 *v3) {
+        static inline void compute_local_frame(const vec3 &v1, vec3 *v2, vec3 *v3) {
             if (std::abs(v1.x) > std::abs(v1.y))
                 *v2 = vec3(-v1.z, (0), v1.x) / glm::sqrt(v1.x * v1.x + v1.z * v1.z);
             else
                 *v2 = vec3((0), v1.z, -v1.y) / glm::sqrt(v1.y * v1.y + v1.z * v1.z);
             *v3 = normalize(cross(vec3(v1), *v2));
         }
-        AKR_XPU explicit Frame(const vec3 &v) : normal(v) { compute_local_frame(v, &T, &B); }
+        explicit Frame(const vec3 &v) : normal(v) { compute_local_frame(v, &T, &B); }
 
-        [[nodiscard]] AKR_XPU vec3 world_to_local(const vec3 &v) const {
+        [[nodiscard]] vec3 world_to_local(const vec3 &v) const {
             return vec3(dot(T, v), dot(normal, v), dot(B, v));
         }
 
-        [[nodiscard]] AKR_XPU vec3 local_to_world(const vec3 &v) const {
+        [[nodiscard]] vec3 local_to_world(const vec3 &v) const {
             return vec3(v.x * T + v.y * vec3(normal) + v.z * B);
         }
 
@@ -211,14 +211,14 @@ namespace akari {
     struct Transform {
         Mat4 m, minv;
         Mat3 m3, m3inv;
-        AKR_XPU Transform() : Transform(glm::mat4(1.0)) {}
-        AKR_XPU Transform(const Mat4 &m) : Transform(m, glm::inverse(m)) {}
-        AKR_XPU Transform(const Mat4 &m, const Mat4 &minv) : m(m), minv(minv) {
+        Transform() : Transform(glm::mat4(1.0)) {}
+        Transform(const Mat4 &m) : Transform(m, glm::inverse(m)) {}
+        Transform(const Mat4 &m, const Mat4 &minv) : m(m), minv(minv) {
             m3 = glm::mat3(m);
             m3inv = glm::inverse(m3);
         }
-        AKR_XPU Transform inverse() const { return Transform(minv, m); }
-        AKR_XPU vec3 apply_point(const vec3 &p) const {
+        Transform inverse() const { return Transform(minv, m); }
+        vec3 apply_point(const vec3 &p) const {
             Vec4 v(p.x, p.y, p.z, 1.0);
             v = m * v;
             vec3 q(v.x, v.y, v.z);
@@ -227,29 +227,29 @@ namespace akari {
             }
             return q;
         }
-        AKR_XPU Transform operator*(const Transform &t) const { return Transform(m * t.m); }
-        AKR_XPU vec3 apply_vector(const vec3 &v) const { return m3 * v; }
-        AKR_XPU vec3 apply_normal(const vec3 &n) const { return transpose(m3inv) * n; }
+        Transform operator*(const Transform &t) const { return Transform(m * t.m); }
+        vec3 apply_vector(const vec3 &v) const { return m3 * v; }
+        vec3 apply_normal(const vec3 &n) const { return transpose(m3inv) * n; }
 
-        AKR_XPU static Transform translate(const vec3 &v) {
+        static Transform translate(const vec3 &v) {
             mat4 m = glm::translate(glm::mat4(1.0), v);
             return Transform(m);
         }
-        AKR_XPU static Transform scale(const vec3 &s) {
+        static Transform scale(const vec3 &s) {
             mat4 m = glm::scale(glm::mat4(1.0), s);
             return Transform(m);
         }
-        AKR_XPU static Transform rotate_x(Float theta) {
+        static Transform rotate_x(Float theta) {
             auto m = glm::rotate(glm::mat4(1.0), theta, vec3(1, 0, 0));
             return Transform(m, glm::transpose(m));
         }
 
-        AKR_XPU static Transform rotate_y(Float theta) {
+        static Transform rotate_y(Float theta) {
             auto m = glm::rotate(glm::mat4(1.0), theta, vec3(0, 1, 0));
             return Transform(m, glm::transpose(m));
         }
 
-        AKR_XPU static Transform rotate_z(Float theta) {
+        static Transform rotate_z(Float theta) {
             auto m = glm::rotate(glm::mat4(1.0), theta, vec3(0, 0, 1));
             return Transform(m, glm::transpose(m));
         }
@@ -259,30 +259,30 @@ namespace akari {
     struct BoundingBox {
         using V = Vector<T, N>;
         V pmin, pmax;
-        AKR_XPU BoundingBox() { reset(); }
-        AKR_XPU BoundingBox(const V &pmin, const V &pmax) : pmin(pmin), pmax(pmax) {}
-        AKR_XPU void reset() {
+        BoundingBox() { reset(); }
+        BoundingBox(const V &pmin, const V &pmax) : pmin(pmin), pmax(pmax) {}
+        void reset() {
             pmin = V(std::numeric_limits<T>::infinity());
             pmax = V(-std::numeric_limits<T>::infinity());
         }
-        AKR_XPU V extents() const { return pmax - pmin; }
-        AKR_XPU bool contains(const V &p) const { return all(p >= pmin && p <= pmax); }
-        AKR_XPU V size() const { return extents(); }
-        AKR_XPU V offset(const V &p) { return (p - pmin) / extents(); }
-        AKR_XPU BoundingBox expand(const V &p) const { return BoundingBox(min(pmin, p), max(pmax, p)); }
-        AKR_XPU BoundingBox merge(const BoundingBox &b1) const { return merge(*this, b1); }
-        AKR_XPU static BoundingBox merge(const BoundingBox &b1, const BoundingBox &b2) {
+        V extents() const { return pmax - pmin; }
+        bool contains(const V &p) const { return all(p >= pmin && p <= pmax); }
+        V size() const { return extents(); }
+        V offset(const V &p) { return (p - pmin) / extents(); }
+        BoundingBox expand(const V &p) const { return BoundingBox(min(pmin, p), max(pmax, p)); }
+        BoundingBox merge(const BoundingBox &b1) const { return merge(*this, b1); }
+        static BoundingBox merge(const BoundingBox &b1, const BoundingBox &b2) {
             return BoundingBox(min(b1.pmin, b2.pmin), max(b1.pmax, b2.pmax));
         }
-        AKR_XPU BoundingBox intersect(const BoundingBox &rhs) const {
+        BoundingBox intersect(const BoundingBox &rhs) const {
             return BoundingBox(max(pmin, rhs.pmin), min(pmax, rhs.pmax));
         }
-        AKR_XPU V clip(const V &p)const{
+        V clip(const V &p)const{
             return min(max(p, pmin), pmax);
         }
-        AKR_XPU bool empty() const { return any(glm::greaterThan(pmin, pmax)) || hsum(extents()) == 0; }
-        AKR_XPU V centroid() const { return extents() * 0.5f + pmin; }
-        AKR_XPU Float surface_area() const {
+        bool empty() const { return any(glm::greaterThan(pmin, pmax)) || hsum(extents()) == 0; }
+        V centroid() const { return extents() * 0.5f + pmin; }
+        Float surface_area() const {
             if (empty())
                 return Float(0.0);
             if constexpr (N == 3) {
@@ -316,7 +316,7 @@ namespace akari {
         Vec3 rotation;
         Vec3 scale = Vec3(1.0, 1.0, 1.0);
 
-        AKR_XPU Transform operator()() const {
+        Transform operator()() const {
             Transform T;
             T = Transform::scale(scale);
             T = Transform::rotate_z(rotation.z) * T;

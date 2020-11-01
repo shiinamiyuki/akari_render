@@ -31,16 +31,16 @@ namespace akari {
         using Base::Base;
         using value_t = Scalar;
         static constexpr size_t size = N;
-        AKR_XPU Color(const Base &v) : Base(v) {}
+        Color(const Base &v) : Base(v) {}
 #define AKR_COLOR_OP(op)                                                                                               \
-    AKR_XPU Color operator op(const Color &rhs) const { return Color(Base(*this) op Base(rhs)); }                      \
-    AKR_XPU Color operator op(Scalar rhs) const { return Color(Base(*this) op Base(rhs)); }                            \
-    AKR_XPU friend Color operator op(Scalar lhs, const Color &rhs) { return Color(Base(lhs) op Base(rhs)); }           \
-    AKR_XPU Color &operator op##=(const Color &rhs) {                                                                  \
+    Color operator op(const Color &rhs) const { return Color(Base(*this) op Base(rhs)); }                      \
+    Color operator op(Scalar rhs) const { return Color(Base(*this) op Base(rhs)); }                            \
+    friend Color operator op(Scalar lhs, const Color &rhs) { return Color(Base(lhs) op Base(rhs)); }           \
+    Color &operator op##=(const Color &rhs) {                                                                  \
         *this = *this op rhs;                                                                                          \
         return *this;                                                                                                  \
     }                                                                                                                  \
-    AKR_XPU Color &operator op##=(Scalar rhs) {                                                                        \
+    Color &operator op##=(Scalar rhs) {                                                                        \
         *this = *this op rhs;                                                                                          \
         return *this;                                                                                                  \
     }
@@ -48,7 +48,7 @@ namespace akari {
 #undef AKR_COLOR_OP
     };
     template <typename Scalar, int N>
-    AKR_XPU Color<Scalar, N> clamp_zero(const Color<Scalar, N> &in) {
+    Color<Scalar, N> clamp_zero(const Color<Scalar, N> &in) {
         Color<Scalar, N> c;
         for (int i = 0; i < N; i++) {
             auto x = in[i];
@@ -62,7 +62,7 @@ namespace akari {
         return c;
     }
     template <typename Scalar, int N>
-    AKR_XPU Color<Scalar, N> min(const Color<Scalar, N> &in, const Color<Scalar, N> &v) {
+    Color<Scalar, N> min(const Color<Scalar, N> &in, const Color<Scalar, N> &v) {
         Color<Scalar, N> c;
         for (int i = 0; i < N; i++) {
             c[i] = std::min(in[i], v[i]);
@@ -70,25 +70,25 @@ namespace akari {
         return c;
     }
     template <typename Scalar, int N>
-    AKR_XPU bool is_black(const Color<Scalar, N> &color) {
+    bool is_black(const Color<Scalar, N> &color) {
         return !foldl(color, false, [](bool acc, Scalar f) { return acc || (f > 0.0f); });
     }
 
     template <typename Scalar>
-    AKR_XPU Color<Scalar, 3> linear_to_srgb(const Color<Scalar, 3> &L) {
+    Color<Scalar, 3> linear_to_srgb(const Color<Scalar, 3> &L) {
         using Color3f = Color<Scalar, 3>;
         return select(glm::lessThan(L, Color3f(0.0031308)), L * 12.92,
                       Float(1.055) * glm::pow(L, Vec3(1.0f / 2.4f)) - Float(0.055));
     }
     template <typename Scalar>
-    AKR_XPU Color<Scalar, 3> srgb_to_linear(const Color<Scalar, 3> &S) {
+    Color<Scalar, 3> srgb_to_linear(const Color<Scalar, 3> &S) {
         using Color3f = Color<Scalar, 3>;
         return select(glm::lessThan(S, Color3f(0.04045)), S / 12.92, glm::pow((S + 0.055) / 1.055, Vec3(2.4)));
     }
 
     using Color3f = Color<Float, 3>;
 
-    AKR_XPU inline Float luminance(const Color3f &rgb) { return dot(rgb, Vec3(0.2126, 0.7152, 0.0722)); }
+    inline Float luminance(const Color3f &rgb) { return dot(rgb, Vec3(0.2126, 0.7152, 0.0722)); }
 
     template <typename T, int N>
     struct vec_trait<Color<T, N>> {
