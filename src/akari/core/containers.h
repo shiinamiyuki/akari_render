@@ -202,7 +202,7 @@ namespace akari {
 
         void Grow() {
             size_t currentCapacity = capacity();
-            astd::vector<TableEntry, Allocator> newTable(std::max<size_t>(64, 2 * currentCapacity),
+            std::vector<TableEntry, Allocator> newTable(std::max<size_t>(64, 2 * currentCapacity),
                                                          table.get_allocator());
             size_t newCapacity = newTable.size();
             for (size_t i = 0; i < currentCapacity; ++i) {

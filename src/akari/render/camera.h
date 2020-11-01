@@ -42,6 +42,7 @@ namespace akari::render {
       public:
         virtual CameraSample generate_ray(const vec2 &u1, const vec2 &u2, const ivec2 &raster) const = 0;
         virtual ivec2 resolution() const = 0;
+        virtual ~Camera() = default;
     };
     class CameraNode : public SceneGraphNode {
       public:

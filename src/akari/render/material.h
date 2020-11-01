@@ -104,6 +104,7 @@ namespace akari::render {
         virtual Float tr(const ShadingPoint &sp) const = 0;
         virtual const EmissiveMaterial *as_emissive() const { return nullptr; }
         BSDF get_bsdf(MaterialEvalContext &ctx) const;
+        virtual ~Material() = default;
     };
     class LightNode;
     class AKR_EXPORT EmissiveMaterial : public Material {
@@ -111,16 +112,16 @@ namespace akari::render {
         std::shared_ptr<LightNode> light;
         EmissiveMaterial(std::shared_ptr<LightNode> light) : light(light) {}
         const EmissiveMaterial *as_emissive() const override { return this; }
-        virtual inline const BSDFClosure *evaluate(MaterialEvalContext &ctx) const { return nullptr; }
-        virtual inline Spectrum albedo(const ShadingPoint &sp) const { return Spectrum(0.0); }
+        virtual inline const BSDFClosure *evaluate(MaterialEvalContext &ctx) const override { return nullptr; }
+        virtual inline Spectrum albedo(const ShadingPoint &sp) const override { return Spectrum(0.0); }
 
-        virtual Float tr(const ShadingPoint &sp) const { return 0.0; }
+        virtual Float tr(const ShadingPoint &sp) const override { return 0.0; }
     };
     class EmissiveMaterialNode;
     class AKR_EXPORT MaterialNode : public SceneGraphNode {
       public:
-        virtual [[nodiscard]] std::shared_ptr<const Material> create_material(Allocator<>) = 0;
-        virtual [[nodiscard]] std::shared_ptr<EmissiveMaterialNode> as_emissive() { return nullptr; }
+        [[nodiscard]] virtual std::shared_ptr<const Material> create_material(Allocator<>) = 0;
+        [[nodiscard]] virtual std::shared_ptr<EmissiveMaterialNode> as_emissive() { return nullptr; }
     };
 
     class AKR_EXPORT EmissiveMaterialNode : public MaterialNode {

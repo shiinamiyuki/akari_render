@@ -38,6 +38,7 @@ namespace akari::render {
         virtual Spectrum evaluate(const ShadingPoint &sp) const = 0;
         virtual Float integral() const = 0;
         virtual Float tr(const ShadingPoint &sp) const = 0;
+        virtual ~Texture() = default;
     };
     class TextureNode : public SceneGraphNode {
       public:

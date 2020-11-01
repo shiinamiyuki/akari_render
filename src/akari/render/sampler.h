@@ -37,6 +37,7 @@ namespace akari::render {
         virtual void start_next_sample() = 0;
         virtual void set_sample_index(uint64_t idx) = 0;
         virtual std::shared_ptr<Sampler> clone(Allocator<> allocator) const = 0;
+        virtual ~Sampler() = default;
     };
     class SamplerNode : public SceneGraphNode {
       public:

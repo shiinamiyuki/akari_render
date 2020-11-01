@@ -41,7 +41,7 @@ namespace akari::render {
             auto phi = spherical_phi(wi);
             return vec2(phi * Inv2Pi, 1.0f - theta * InvPi);
         }
-        Float power() const { return _power; }
+        Float power() const override { return _power; }
         Spectrum Le(const Vec3 &wo, const ShadingPoint &) const override {
             auto uv = get_uv(w2l.apply_vector(-wo));
             ShadingPoint sp;
@@ -127,7 +127,7 @@ namespace akari::render {
         TRSTransform transform;
         std::shared_ptr<TextureNode> envmap;
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
-                          const sdl::Value &value) {
+                          const sdl::Value &value) override {
             if (field == "texture") {
                 envmap = resolve_texture(value);
                 AKR_ASSERT_THROW(envmap);

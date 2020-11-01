@@ -58,5 +58,6 @@ namespace akari::render {
         virtual RayEmissionSample sample_emission(const vec2 &u1, const vec2 &u2) const {
             AKR_PANIC("sample_emission not implemented!");
         }
+        virtual ~EndPoint() = default;
     };
 } // namespace akari::render

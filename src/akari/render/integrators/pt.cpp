@@ -36,8 +36,8 @@ namespace akari::render {
 
     class PathTracerIntegrator : public Integrator {
         int spp;
-        int max_depth;
         int min_depth;
+        int max_depth;
         const int tile_size = 16;
 
       public:

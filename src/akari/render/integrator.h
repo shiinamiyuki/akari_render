@@ -41,10 +41,11 @@ namespace akari::render {
     class Integrator {
       public:
         virtual void render(const Scene *scene, Film *out) = 0;
+        virtual ~Integrator() = default;
     };
     class IntegratorNode : public SceneGraphNode {
       public:
-        virtual std::shared_ptr<Integrator>create_integrator(Allocator<>) = 0;
+        virtual std::shared_ptr<Integrator> create_integrator(Allocator<>) = 0;
         virtual bool set_spp(int spp) = 0;
         virtual int get_spp() const = 0;
     };
