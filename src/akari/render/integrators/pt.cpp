@@ -91,7 +91,7 @@ namespace akari::render {
                             pt.min_depth = min_depth;
                             pt.max_depth = max_depth;
                             pt.run_megakernel(camera.get(), ivec2(x, y));
-                            tile.add_sample(vec2(x, y), min(clamp_zero(pt.L), Spectrum(10)), 1.0f);
+                            tile.add_sample(vec2(x, y), min(clamp_zero(pt.L), Spectrum(ray_clamp)), 1.0f);
                             resources[tid]->release();
                         }
                     }
@@ -112,7 +112,7 @@ namespace akari::render {
         int min_depth = 3;
         Float ray_clamp = 10;
         std::shared_ptr<Integrator> create_integrator(Allocator<> allocator) override {
-            return make_pmr_shared<PathTracerIntegrator>(allocator, spp, min_depth, max_depth,ray_clamp);
+            return make_pmr_shared<PathTracerIntegrator>(allocator, spp, min_depth, max_depth, ray_clamp);
         }
         const char *description() override { return "[Path Tracer]"; }
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,

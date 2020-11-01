@@ -30,21 +30,12 @@
 #include <optional>
 
 namespace akari::render {
-    class Sampler {
-      public:
-        virtual Float next1d() = 0;
-        vec2 next2d() { return vec2(next1d(), next1d()); }
-        virtual void start_next_sample() = 0;
-        virtual void set_sample_index(uint64_t idx) = 0;
-        virtual std::shared_ptr<Sampler> clone(Allocator<> allocator) const = 0;
-        virtual ~Sampler() = default;
-    };
-    class SamplerNode : public SceneGraphNode {
-      public:
-        virtual std::shared_ptr<Sampler> create_sampler(Allocator<> allocator) = 0;
-    };
+    struct Rng {
+        Rng(uint64_t sequence = 0) { pcg32_init(sequence); }
+        uint32_t uniform_u32() { return pcg32(); }
+        double uniform_float() { return pcg32() / double(0xffffffff); }
 
-    class PCGSampler : public Sampler {
+      private:
         uint64_t state = 0x4d595df4d0f33173; // Or something seed-dependent
         static uint64_t const multiplier = 6364136223846793005u;
         static uint64_t const increment = 1442695040888963407u; // Or an arbitrary odd constant
@@ -61,13 +52,30 @@ namespace akari::render {
             state = seed + increment;
             (void)pcg32();
         }
+    };
+    class Sampler {
+      public:
+        virtual Float next1d() = 0;
+        vec2 next2d() { return vec2(next1d(), next1d()); }
+        virtual void start_next_sample() = 0;
+        virtual void set_sample_index(uint64_t idx) = 0;
+        virtual std::shared_ptr<Sampler> clone(Allocator<> allocator) const = 0;
+        virtual ~Sampler() = default;
+    };
+    class SamplerNode : public SceneGraphNode {
+      public:
+        virtual std::shared_ptr<Sampler> create_sampler(Allocator<> allocator) = 0;
+    };
+
+    class PCGSampler : public Sampler {
+        Rng rng;
 
       public:
-        void set_sample_index(uint64_t idx) override { pcg32_init(idx); }
-        Float next1d() override { return Float(pcg32()) / (float)0xffffffff; }
+        void set_sample_index(uint64_t idx) override { rng = Rng(idx); }
+        Float next1d() override { return rng.uniform_float(); }
 
         void start_next_sample() override {}
-        PCGSampler(uint64_t seed = 0u) { pcg32_init(seed); }
+        PCGSampler(uint64_t seed = 0u) : rng(seed) {}
         std::shared_ptr<Sampler> clone(Allocator<> allocator) const override {
             return make_pmr_shared<PCGSampler>(allocator, *this);
         }

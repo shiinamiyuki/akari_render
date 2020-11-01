@@ -224,7 +224,7 @@ namespace akari::render {
       public:
         explicit FresnelSpecular(const Spectrum &R, const Spectrum &T, Float etaA, Float etaB)
             : R(R), T(T), etaA(etaA), etaB(etaB), fresnel(etaA, etaB) {}
-        [[nodiscard]] BSDFType type() const { return BSDFType::SpecularTransmission | BSDFType::SpecularReflection; }
+        [[nodiscard]] BSDFType type() const override{ return BSDFType::SpecularTransmission | BSDFType::SpecularReflection; }
         [[nodiscard]] Float evaluate_pdf(const vec3 &wo, const vec3 &wi) const override { return 0; }
         [[nodiscard]] Spectrum evaluate(const vec3 &wo, const vec3 &wi) const override { return Spectrum(0); }
         [[nodiscard]] std::optional<BSDFSample> sample(const vec2 &u, const Vec3 &wo) const override;
