@@ -81,6 +81,11 @@ namespace akari::render {
                 }
             }
         }
+        void finalize() override {
+            for (auto &mat : materials) {
+                mat->finalize();
+            }
+        }
     };
     AKR_EXPORT_NODE(AkariMesh, AkariMesh)
 } // namespace akari::render

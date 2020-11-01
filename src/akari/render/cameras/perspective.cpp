@@ -53,7 +53,7 @@ namespace akari::render {
             preprocess();
         }
         ivec2 resolution() const { return _resolution; }
-        CameraSample generate_ray(const vec2 &u1, const vec2 &u2, const ivec2 &raster) const {
+        CameraSample generate_ray(const vec2 &u1, const vec2 &u2, const ivec2 &raster) const override {
             CameraSample sample;
             sample.p_lens = concentric_disk_sampling(u1) * lens_radius;
             sample.p_film = vec2(raster) + u2;
@@ -79,7 +79,7 @@ namespace akari::render {
       public:
         vec3 position;
         vec3 rotation;
-        ivec2 resolution = ivec2(512, 512);
+        ivec2 resolution_ = ivec2(512, 512);
         double fov = glm::radians(80.0f);
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override {
@@ -90,14 +90,16 @@ namespace akari::render {
             } else if (field == "position") {
                 position = load<vec3>(value);
             } else if (field == "resolution") {
-                resolution = load<ivec2>(value);
+                resolution_ = load<ivec2>(value);
             }
         }
         std::shared_ptr<const Camera> create_camera(Allocator<> allocator) override {
             TRSTransform TRS{position, rotation, Vec3(1.0)};
             auto c2w = TRS();
-            return make_pmr_shared<PerspectiveCamera>(allocator, resolution, c2w, fov);
+            return make_pmr_shared<PerspectiveCamera>(allocator, resolution_, c2w, fov);
         }
+        ivec2 resolution() const override { return resolution_; }
+        void set_resolution(const ivec2 &res) override { resolution_ = res; }
     };
     AKR_EXPORT_NODE(PerspectiveCamera, PerspectiveCameraNode)
 } // namespace akari::render

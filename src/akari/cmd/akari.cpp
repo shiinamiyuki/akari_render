@@ -38,6 +38,7 @@ namespace pybind11 {
 namespace py = pybind11;
 static std::string inputFilename;
 static int spp = 0;
+static int super_sampling = 0;
 static bool denoise = false;
 void parse(int argc, const char **argv) {
     try {
@@ -47,6 +48,7 @@ void parse(int argc, const char **argv) {
             auto opt = options.allow_unrecognised_options().add_options();
             opt("i,input", "Input Scene Description File", cxxopts::value<std::string>());
             opt("v,verbose", "Use verbose output");
+            opt("ss", "Use super sampling", cxxopts::value<int>());
             opt("spp", "Override scene spp setting", cxxopts::value<int>());
             opt("denoise", "Run denoiser");
             opt("gpu", "Use gpu rendering");
@@ -61,6 +63,9 @@ void parse(int argc, const char **argv) {
         }
         if (result.count("spp")) {
             spp = result["spp"].as<int>();
+        }
+        if (result.count("ss")) {
+            super_sampling = result["ss"].as<int>();
         }
         if (result.count("verbose")) {
             GetDefaultLogger()->log_verbose(true);
@@ -96,6 +101,9 @@ void parse_and_run() {
     AKR_ASSERT_THROW(scene);
     if (spp > 0) {
         scene->set_spp(spp);
+    }
+    if (super_sampling > 1) {
+        scene->super_sample(super_sampling);
     }
     if (denoise) {
         scene->run_denosier(denoise);

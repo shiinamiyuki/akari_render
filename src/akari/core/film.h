@@ -75,7 +75,7 @@ namespace akari {
       public:
         Float splatScale = 1.0f;
         explicit Film(const ivec2 &dimension) : radiance(dimension), weight(dimension) {}
-        Tile tile(const Bounds2i &bounds) { return Tile(bounds); }
+        Tile tile(const Bounds2i &bounds) { return Tile(Bounds2i(ivec2(0), resolution()).intersect(bounds)); }
         [[nodiscard]] ivec2 resolution() const { return radiance.resolution(); }
 
         [[nodiscard]] Bounds2i bounds() const { return Bounds2i{ivec2(0), resolution()}; }
@@ -105,7 +105,7 @@ namespace akari {
                     }
                 },
                 1024);
-                return image;
+            return image;
         }
         void write_image(const fs::path &path, const PostProcessor &postProcessor = GammaCorrection()) const {
             RGBAImage image = to_rgba_image();

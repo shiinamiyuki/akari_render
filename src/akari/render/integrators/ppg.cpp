@@ -589,7 +589,7 @@ namespace akari::render {
             if (si.triangle.light) {
                 auto light = si.triangle.light;
                 Spectrum I = beta * light->Le(wo, ctx.sp);
-                if (depth == 0) {
+                if (depth == 0 || BSDFType::Unset != (prev_vertex->sampled_lobe() & BSDFType::Specular)) {
                     accumulate_radiance_wo_beta(I);
                 } else {
                     vec3 prev_p = prev_vertex->p();
@@ -664,11 +664,13 @@ namespace akari::render {
                 if (!vertex) {
                     break;
                 }
-                std::optional<DirectLighting> has_direct = compute_direct_lighting(si, surface_hit, select_light());
-                if (has_direct) {
-                    auto &direct = *has_direct;
-                    if (!is_black(direct.color) && !scene->occlude(direct.shadow_ray)) {
-                        accumulate_radiance_wo_beta(direct.color);
+                if ((vertex->sampled_lobe & BSDFType::Specular) == BSDFType::Unset) {
+                    std::optional<DirectLighting> has_direct = compute_direct_lighting(si, surface_hit, select_light());
+                    if (has_direct) {
+                        auto &direct = *has_direct;
+                        if (!is_black(direct.color) && !scene->occlude(direct.shadow_ray)) {
+                            accumulate_radiance_wo_beta(direct.color);
+                        }
                     }
                 }
                 vertices[n_vertices].L = Spectrum(0);

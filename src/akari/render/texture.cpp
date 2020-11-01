@@ -38,12 +38,13 @@ namespace akari::render {
                 tex_cache.get_cached_or([=] { return make_pmr_shared<ConstantTexture>(allocator, value, alpha); });
             return tex;
         }
+        void finalize() override { tex_cache.invalidate(); }
     };
 
     class ImageTextureNode final : public TextureNode {
         std::shared_ptr<RGBAImage> image;
         ObjectCache<std::shared_ptr<const Texture>> tex_cache;
-    
+
       public:
         ImageTextureNode() = default;
         ImageTextureNode(const fs::path &path) {
@@ -56,6 +57,7 @@ namespace akari::render {
                 throw std::runtime_error("Error loading image");
             }
         }
+        void finalize() override { tex_cache.invalidate(); }
         std::shared_ptr<const Texture> create_texture(Allocator<> allocator) override {
             auto tex = tex_cache.get_cached_or([=] { return make_pmr_shared<ImageTexture>(allocator, image->view()); });
             return tex;

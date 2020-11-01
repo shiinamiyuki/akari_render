@@ -56,7 +56,30 @@ namespace akari::render {
         Spectrum f = Spectrum(0.0f);
         BSDFType sampled = BSDFType::Unset;
     };
+    class Fresnel {
+      public:
+        virtual Spectrum evaluate(Float cosThetaI) const = 0;
+    };
+    class AKR_EXPORT FresnelNoOp : public Fresnel {
+      public:
+        [[nodiscard]] Spectrum evaluate(Float cosThetaI) const override;
+    };
 
+    class AKR_EXPORT FresnelConductor : public Fresnel {
+        const Spectrum etaI, etaT, k;
+
+      public:
+        FresnelConductor(const Spectrum &etaI, const Spectrum &etaT, const Spectrum &k)
+            : etaI(etaI), etaT(etaT), k(k) {}
+        [[nodiscard]] Spectrum evaluate(Float cosThetaI) const override;
+    };
+    class AKR_EXPORT FresnelDielectric : public Fresnel {
+        const Float etaI, etaT;
+
+      public:
+        FresnelDielectric(const Float &etaI, const Float &etaT) : etaI(etaI), etaT(etaT) {}
+        [[nodiscard]] Spectrum evaluate(Float cosThetaI) const override;
+    };
     class AKR_EXPORT BSDFClosure {
       public:
         [[nodiscard]] virtual Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const = 0;
@@ -152,7 +175,60 @@ namespace akari::render {
             return sample;
         }
     };
+    class SpecularReflection : public BSDFClosure {
+        Spectrum R;
 
+      public:
+        SpecularReflection(const Spectrum &R) : R(R) {}
+        [[nodiscard]] Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const { return 0.0f; }
+        [[nodiscard]] Spectrum evaluate(const Vec3 &wo, const Vec3 &wi) const { return Spectrum(0.0f); }
+        [[nodiscard]] BSDFType type() const { return BSDFType::SpecularReflection; }
+        std::optional<BSDFSample> sample(const vec2 &u, const Vec3 &wo) const {
+            BSDFSample sample;
+            sample.wi = glm::reflect(-wo, vec3(0, 1, 0));
+            sample.sampled = type();
+            sample.pdf = 1.0;
+            sample.f = R / (std::abs(cos_theta(sample.wi)));
+            return sample;
+        }
+    };
+    class SpecularTransmission : public BSDFClosure {
+        Spectrum R;
+        Float eta;
+
+      public:
+        SpecularTransmission(const Spectrum &R, Float eta) : R(R), eta(eta) {}
+        [[nodiscard]] Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const { return 0.0f; }
+        [[nodiscard]] Spectrum evaluate(const Vec3 &wo, const Vec3 &wi) const { return Spectrum(0.0f); }
+        [[nodiscard]] BSDFType type() const { return BSDFType::SpecularTransmission; }
+        std::optional<BSDFSample> sample(const vec2 &u, const Vec3 &wo) const {
+            BSDFSample sample;
+            Float etaIO = same_hemisphere(wo, vec3(0, 1, 0)) ? eta : 1.0f / eta;
+            auto wt = refract(wo, faceforward(wo, vec3(0, 1, 0)), etaIO);
+            if (!wt) {
+                return std::nullopt;
+            }
+            sample.wi = *wt;
+            sample.sampled = type();
+            sample.pdf = 1.0;
+            sample.f = R / (std::abs(cos_theta(sample.wi)));
+            return sample;
+        }
+    };
+
+    class AKR_EXPORT FresnelSpecular : public BSDFClosure {
+        const Spectrum R, T;
+        const Float etaA, etaB;
+        const FresnelDielectric fresnel;
+
+      public:
+        explicit FresnelSpecular(const Spectrum &R, const Spectrum &T, Float etaA, Float etaB)
+            : R(R), T(T), etaA(etaA), etaB(etaB), fresnel(etaA, etaB) {}
+        [[nodiscard]] BSDFType type() const { return BSDFType::SpecularTransmission | BSDFType::SpecularReflection; }
+        [[nodiscard]] Float evaluate_pdf(const vec3 &wo, const vec3 &wi) const override { return 0; }
+        [[nodiscard]] Spectrum evaluate(const vec3 &wo, const vec3 &wi) const override { return Spectrum(0); }
+        [[nodiscard]] std::optional<BSDFSample> sample(const vec2 &u, const Vec3 &wo) const override;
+    };
     class PassThrough : public BSDFClosure {
         Spectrum R;
 

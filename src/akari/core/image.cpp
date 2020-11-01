@@ -70,7 +70,23 @@ namespace akari {
             },
             1024);
     }
-
+    void Convolution::process(const RGBAImage &in, RGBAImage &out) const {
+        out.resize(in.resolution() / stride);
+        parallel_for(
+            out.resolution().y,
+            [&](uint32_t y, uint32_t) {
+                for (int x = 0; x < out.resolution().x; x++) {
+                    RGB sum = RGB(0.0);
+                    for (int y0 = 0; y0 < kernel.resolution().y; y0++) {
+                        for (int x0 = 0; x0 < kernel.resolution().x; x0++) {
+                            sum += in(x * stride.x + x0, y * stride.y + y0).rgb * kernel(x0, y0);
+                        }
+                    }
+                    out(x, y) = RGBA(sum, 1.0);
+                }
+            },
+            1024);
+    }
     std::shared_ptr<ImageWriter> default_image_writer() { return std::make_shared<DefaultImageWriter>(); }
 
     class DefaultImageReader : public ImageReader {

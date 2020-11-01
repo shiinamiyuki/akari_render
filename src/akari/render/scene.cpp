@@ -92,23 +92,24 @@ namespace akari::render {
                 warning("cannot override spp");
             }
         }
+        ivec2 res = camera->resolution();
+        if (super_sampling_k > 1 && run_denoiser_) {
+            auto s = std::sqrt(super_sampling_k);
+            if (s * s != super_sampling_k) {
+                error("super sampling factor must be square number (got {})", super_sampling_k);
+                std::exit(1);
+            }
+            integrator->set_spp(integrator->get_spp() / super_sampling_k);
+            res *= s;
+            camera->set_resolution(res);
+        }
         info("preparing scene");
 
         Allocator<> allocator(&memory_arena);
         init_scene(allocator);
 
-        auto real_integrator = integrator->create_integrator(allocator);
-        ivec2 res = scene->camera->resolution();
-        // if (super_sampling_k > 1) {
-        //     auto s = std::sqrt(super_sampling_k);
-        //     if (s * s != super_sampling_k) {
-        //         error("super sampling factor must be square number (got {})", super_sampling_k);
-        //         std::exit(1);
-        //     }
-        //     res *= s;
-        // }
         auto film = Film(res);
-
+        auto real_integrator = integrator->create_integrator(allocator);
         Timer timer;
         real_integrator->render(scene.get(), &film);
         info("render done ({}s)", timer.elapsed_seconds());
@@ -133,7 +134,21 @@ namespace akari::render {
             auto denoiser = pi->make_shared();
             auto output_image = denoiser->denoise(scene.get(), aov);
             if (output_image) {
-                default_image_writer()->write(*output_image, fs::path(output), GammaCorrection());
+                if (super_sampling_k > 1) {
+                    int s = std::sqrt(super_sampling_k);
+                    TImage<Float> avg_kernel(ivec2(s, s));
+                    for (int i = 0; i < s * s; i++) {
+                        avg_kernel.data()[i] = 1.0 / (s * s);
+                    }
+                    Convolution conv(avg_kernel, ivec2(s, s));
+                    RGBAImage down_sampled_image;
+                    conv.process(*output_image, down_sampled_image);
+                    default_image_writer()->write(*output_image, fs::path(output + std::string(".ss.png")),
+                                                  GammaCorrection());
+                    default_image_writer()->write(down_sampled_image, fs::path(output), GammaCorrection());
+                } else {
+                    default_image_writer()->write(*output_image, fs::path(output), GammaCorrection());
+                }
             }
             denoiser = nullptr;
         }

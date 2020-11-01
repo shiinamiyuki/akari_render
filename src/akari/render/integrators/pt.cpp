@@ -39,10 +39,11 @@ namespace akari::render {
         int min_depth;
         int max_depth;
         const int tile_size = 16;
+        Float ray_clamp;
 
       public:
-        PathTracerIntegrator(int spp, int min_depth, int max_depth)
-            : spp(spp), min_depth(min_depth), max_depth(max_depth) {}
+        PathTracerIntegrator(int spp, int min_depth, int max_depth, Float ray_clamp)
+            : spp(spp), min_depth(min_depth), max_depth(max_depth), ray_clamp(ray_clamp) {}
         void render(const Scene *scene, Film *film) override {
             info("Path Tracer");
             AKR_ASSERT_THROW(glm::all(glm::equal(film->resolution(), scene->camera->resolution())));
@@ -109,8 +110,9 @@ namespace akari::render {
         int spp = 16;
         int max_depth = 5;
         int min_depth = 3;
+        Float ray_clamp = 10;
         std::shared_ptr<Integrator> create_integrator(Allocator<> allocator) override {
-            return make_pmr_shared<PathTracerIntegrator>(allocator, spp, min_depth, max_depth);
+            return make_pmr_shared<PathTracerIntegrator>(allocator, spp, min_depth, max_depth,ray_clamp);
         }
         const char *description() override { return "[Path Tracer]"; }
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
@@ -121,6 +123,8 @@ namespace akari::render {
                 max_depth = value.get<int>().value();
             } else if (field == "min_depth") {
                 min_depth = value.get<int>().value();
+            } else if (field == "clamp") {
+                ray_clamp = value.get<float>().value();
             }
         }
         bool set_spp(int spp_) override {

@@ -146,7 +146,7 @@ namespace akari::render {
         void on_hit_light(const Light *light, const Vec3 &wo, const ShadingPoint &sp,
                           const std::optional<PathVertex> &prev_vertex) {
             Spectrum I = beta * light->Le(wo, sp);
-            if (depth == 0) {
+            if (depth == 0 || BSDFType::Unset != (prev_vertex->sampled_lobe() & BSDFType::Specular)) {
                 accumulate_radiance(I);
             } else {
                 vec3 prev_p = prev_vertex->p();
@@ -187,7 +187,7 @@ namespace akari::render {
                 }
                 vertex.bsdf = si.bsdf;
                 vertex.ray = Ray(si.p, sample->wi, Eps / std::abs(glm::dot(si.ng, sample->wi)));
-                vertex.beta = sample->f * std::abs(glm::dot(si.ng, sample->wi)) / sample->pdf;
+                vertex.beta = sample->f * std::abs(glm::dot(si.ns, sample->wi)) / sample->pdf;
                 vertex.pdf = sample->pdf;
                 return vertex;
             }
@@ -212,11 +212,13 @@ namespace akari::render {
                 if (!vertex) {
                     break;
                 }
-                std::optional<DirectLighting> has_direct = compute_direct_lighting(si, surface_hit, select_light());
-                if (has_direct) {
-                    auto &direct = *has_direct;
-                    if (!is_black(direct.color) && !scene->occlude(direct.shadow_ray)) {
-                        accumulate_radiance(beta * direct.color);
+                if ((vertex->sampled_lobe & BSDFType::Specular) == BSDFType::Unset) {
+                    std::optional<DirectLighting> has_direct = compute_direct_lighting(si, surface_hit, select_light());
+                    if (has_direct) {
+                        auto &direct = *has_direct;
+                        if (!is_black(direct.color) && !scene->occlude(direct.shadow_ray)) {
+                            accumulate_radiance(beta * direct.color);
+                        }
                     }
                 }
                 accumulate_beta(vertex->beta);

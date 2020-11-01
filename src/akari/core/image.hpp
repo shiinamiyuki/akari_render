@@ -136,7 +136,14 @@ namespace akari {
         explicit GammaCorrection() {}
         void process(const RGBAImage &in, RGBAImage &out) const override;
     };
+    class AKR_EXPORT Convolution : public PostProcessor {
+        TImage<Float> kernel;
+        ivec2 stride;
 
+      public:
+        explicit Convolution(TImage<Float> kernel, ivec2 stride) : kernel(kernel), stride(stride) {}
+        void process(const RGBAImage &in, RGBAImage &out) const override;
+    };
     class PostProcessingPipeline : public PostProcessor {
         std::list<std::shared_ptr<PostProcessor>> pipeline;
 

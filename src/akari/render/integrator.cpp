@@ -87,7 +87,7 @@ namespace akari::render {
                                         value = mat->albedo(sp);
                                     } break;
                                     case AOV::normal:
-                                        value = trig.ng();
+                                        value = trig.ns(isct->uv);
                                         break;
                                     }
                                     break;

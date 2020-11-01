@@ -44,16 +44,17 @@ namespace akari::render {
     inline float cos2_phi(const glm::vec3 &w) { return (cos_phi(w) * cos_phi(w)); }
     inline float sin2_phi(const glm::vec3 &w) { return (sin_phi(w) * sin_phi(w)); }
     inline bool same_hemisphere(const glm::vec3 &wo, const glm::vec3 &wi) { return ((wo.y * wi.y) >= float(0.0)); }
-    inline bool refract(const glm::vec3 &wi, const glm::vec3 &n, float eta, glm::vec3 &wt) {
+    inline std::optional<glm::vec3> refract(const glm::vec3 &wi, const glm::vec3 &n, float eta) {
         float cosThetaI = glm::dot(n, wi);
         float sin2ThetaI = glm::max(float(0.0), (float(1.0) - (cosThetaI * cosThetaI)));
         float sin2ThetaT = ((eta * eta) * sin2ThetaI);
         if ((sin2ThetaT >= float(1.0)))
-            return false;
+            return std::nullopt;
         float cosThetaT = glm::sqrt((float(1.0) - sin2ThetaT));
-        wt = ((eta * -wi) + (((eta * cosThetaI) - cosThetaT) * n));
-        return true;
+        auto wt = ((eta * -wi) + (((eta * cosThetaI) - cosThetaT) * n));
+        return wt;
     }
+    inline vec3 faceforward(const vec3 &w, const vec3 &n) { return dot(w, n) < 0.0 ? -n : n; }
     inline float fr_dielectric(float cosThetaI, float etaI, float etaT) {
         bool entering = (cosThetaI > float(0.0));
         if (!entering) {
@@ -92,7 +93,7 @@ namespace akari::render {
         return glm::vec3(sinTheta * glm::cos(phi), cosTheta, sinTheta * glm::sin(phi));
     }
 
-    inline float spherical_theta(const vec3& v) { return glm::acos(glm::clamp(v.y, -1.0f, 1.0f)); }
+    inline float spherical_theta(const vec3 &v) { return glm::acos(glm::clamp(v.y, -1.0f, 1.0f)); }
 
     inline float spherical_phi(const glm::vec3 v) {
         float p = glm::atan(v.z, v.x);

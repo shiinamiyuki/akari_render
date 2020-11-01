@@ -42,10 +42,13 @@ namespace akari::render {
       public:
         virtual CameraSample generate_ray(const vec2 &u1, const vec2 &u2, const ivec2 &raster) const = 0;
         virtual ivec2 resolution() const = 0;
+
         virtual ~Camera() = default;
     };
     class CameraNode : public SceneGraphNode {
       public:
         virtual std::shared_ptr<const Camera> create_camera(Allocator<> allocator) = 0;
+        virtual ivec2 resolution() const = 0;
+        virtual void set_resolution(const ivec2 &res) = 0;
     };
 } // namespace akari::render
