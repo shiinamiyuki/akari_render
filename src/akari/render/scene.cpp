@@ -72,9 +72,6 @@ namespace akari::render {
             power.emplace_back(scene->envmap->power());
             lights.emplace_back(scene->envmap);
         }
-        if (envmap) {
-            lights.emplace_back(scene->envmap);
-        }
         auto light_distribution = std::make_unique<Distribution1D>(power.data(), power.size(), Allocator<>());
         AKR_ASSERT(lights.size() == power.size());
         for (size_t i = 0; i < lights.size(); i++) {

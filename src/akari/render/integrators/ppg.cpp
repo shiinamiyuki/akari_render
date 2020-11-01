@@ -582,63 +582,63 @@ namespace akari::render {
         }
         // @param mat_pdf: supplied if material is already chosen
         std::optional<SurfaceVertex> on_surface_scatter(SurfaceInteraction &si, const SurfaceHit &surface_hit,
-                                                         const std::optional<PathVertex> &prev_vertex) noexcept {
+                                                        const std::optional<PathVertex> &prev_vertex) noexcept {
             auto *material = surface_hit.material;
             auto wo = surface_hit.wo;
             MaterialEvalContext ctx = si.mat_eval_ctx(allocator, sampler);
-            if (material->is_emissive()) {
-                auto *emission = material->as_emissive();
-                bool face_front = dot(wo, si.ng) > 0.0f;
-                if (emission->double_sided || face_front) {
-                    Spectrum I = emission->color->evaluate(ctx.sp);
-                    if (depth == 0) {
-                        accumulate_radiance_wo_beta(I);
-                    } else {
-                        vec3 prev_p = prev_vertex->p();
-                        auto light = scene->get_light(surface_hit.geom_id, surface_hit.prim_id);
-                        ReferencePoint ref;
-                        ref.ng = prev_vertex->ng();
-                        ref.p = prev_vertex->p();
-                        auto light_pdf = light->pdf_incidence(ref, -wo) * scene->pdf_light(light);
-                        Float weight_bsdf = mis_weight(prev_vertex->pdf(), light_pdf);
-                        accumulate_radiance_wo_beta(weight_bsdf * I);
-                    }
-                    return std::nullopt;
+            if (si.triangle.light) {
+                auto light = si.triangle.light;
+                Spectrum I = beta * light->Le(wo, ctx.sp);
+                if (depth == 0) {
+                    accumulate_radiance_wo_beta(I);
+                } else {
+                    vec3 prev_p = prev_vertex->p();
+                    ReferencePoint ref;
+                    ref.ng = prev_vertex->ng();
+                    ref.p = prev_vertex->p();
+                    auto light_pdf = light->pdf_incidence(ref, -wo) * scene->pdf_light(light);
+                    Float weight_bsdf = mis_weight(prev_vertex->pdf(), light_pdf);
+                    accumulate_radiance_wo_beta(weight_bsdf * I);
                 }
+                return std::nullopt;
+
             } else if (depth < max_depth) {
                 auto u0 = sampler->next1d();
                 auto u1 = sampler->next2d();
                 auto u2 = sampler->next2d();
                 SurfaceVertex vertex(si.triangle, surface_hit);
                 si.bsdf = material->get_bsdf(ctx);
-                BSDFSample sample;
+                std::optional<BSDFSample> sample;
                 BSDFSampleContext sample_ctx(u1, wo);
                 if (u0 < bsdfSamplingFraction) {
                     sample = si.bsdf.sample(sample_ctx);
-                    sample.pdf *= bsdfSamplingFraction;
-                    if (BSDFType::Unset == (sample.sampled & BSDFType::Specular)) {
-                        sample.pdf = sample.pdf + (1.0f - bsdfSamplingFraction) * dTree->pdf(sample.wi);
+                    if (!sample)
+                        return std::nullopt;
+                    sample->pdf *= bsdfSamplingFraction;
+                    if (BSDFType::Unset == (sample->sampled & BSDFType::Specular)) {
+                        sample->pdf = sample->pdf + (1.0f - bsdfSamplingFraction) * dTree->pdf(sample->wi);
                     }
                 } else {
+                    sample = BSDFSample{};
                     auto w = dTree->sample(u1, u2);
-                    sample.wi = w;
-                    sample.pdf = dTree->pdf(w);
-                    AKR_CHECK(sample.pdf >= 0);
-                    sample.f = si.bsdf.evaluate(wo, sample.wi);
-                    sample.sampled = (BSDFType::All & ~BSDFType::Specular);
-                    sample.pdf *= 1.0f - bsdfSamplingFraction;
-                    sample.pdf = sample.pdf + bsdfSamplingFraction * si.bsdf.evaluate_pdf(wo, sample.wi);
+                    sample->wi = w;
+                    sample->pdf = dTree->pdf(w);
+                    AKR_CHECK(sample->pdf >= 0);
+                    sample->f = si.bsdf.evaluate(wo, sample->wi);
+                    sample->sampled = (BSDFType::All & ~BSDFType::Specular);
+                    sample->pdf *= 1.0f - bsdfSamplingFraction;
+                    sample->pdf = sample->pdf + bsdfSamplingFraction * si.bsdf.evaluate_pdf(wo, sample->wi);
                 }
-                AKR_CHECK(!std::isnan(sample.pdf));
-                AKR_CHECK(sample.pdf >= 0.0);
-                AKR_CHECK(hmin(sample.f) >= 0.0f);
-                if (std::isnan(sample.pdf) || sample.pdf == 0.0f) {
+                AKR_CHECK(!std::isnan(sample->pdf));
+                AKR_CHECK(sample->pdf >= 0.0);
+                AKR_CHECK(hmin(sample->f) >= 0.0f);
+                if (std::isnan(sample->pdf) || sample->pdf == 0.0f) {
                     return std::nullopt;
                 }
                 vertex.bsdf = si.bsdf;
-                vertex.ray = Ray(si.p, sample.wi, Eps / std::abs(glm::dot(si.ng, sample.wi)));
-                vertex.beta = sample.f * std::abs(glm::dot(si.ng, sample.wi)) / sample.pdf;
-                vertex.pdf = sample.pdf;
+                vertex.ray = Ray(si.p, sample->wi, Eps / std::abs(glm::dot(si.ng, sample->wi)));
+                vertex.beta = sample->f * std::abs(glm::dot(si.ng, sample->wi)) / sample->pdf;
+                vertex.pdf = sample->pdf;
                 return vertex;
             }
             return std::nullopt;
@@ -731,10 +731,10 @@ namespace akari::render {
             for (size_t i = 0; i < std::thread::hardware_concurrency(); i++) {
                 resources.emplace_back(new astd::pmr::monotonic_buffer_resource(astd::pmr::get_default_resource()));
             }
-            std::vector<Sampler> samplers(hprod(film->resolution()));
+            std::vector<std::shared_ptr<Sampler>> samplers(hprod(film->resolution()));
             for (size_t i = 0; i < samplers.size(); i++) {
-                samplers[i] = scene->sampler;
-                samplers[i].set_sample_index(i);
+                samplers[i] = scene->sampler->clone(Allocator<>());
+                samplers[i]->set_sample_index(i);
             }
             uint32_t pass = 0;
             uint32_t accumulatedSamples = 0;
@@ -758,7 +758,7 @@ namespace akari::render {
                         for (int x = tile.bounds.pmin.x; x < tile.bounds.pmax.x; x++) {
                             auto &sampler = samplers[x + y * film->resolution().x];
                             for (int s = 0; s < samples; s++) {
-                                sampler.start_next_sample();
+                                sampler->start_next_sample();
                                 GuidedPathTracer pt;
                                 pt.sTree = sTree;
                                 pt.n_vertices = 0;
@@ -766,11 +766,11 @@ namespace akari::render {
                                 pt.training = true;
                                 pt.scene = scene;
                                 pt.allocator = allocator;
-                                pt.sampler = &sampler;
+                                pt.sampler = sampler.get();
                                 pt.L = Spectrum(0.0);
                                 pt.beta = Spectrum(1.0);
                                 pt.max_depth = max_depth;
-                                pt.run_megakernel(camera, ivec2(x, y));
+                                pt.run_megakernel(camera.get(), ivec2(x, y));
                                 non_zero_path.accumluate(!is_black(pt.L));
                                 resources[tid]->release();
                             }
@@ -810,7 +810,7 @@ namespace akari::render {
                     for (int x = tile.bounds.pmin.x; x < tile.bounds.pmax.x; x++) {
                         auto &sampler = samplers[x + y * film->resolution().x];
                         for (int s = 0; s < spp; s++) {
-                            sampler.start_next_sample();
+                            sampler->start_next_sample();
                             GuidedPathTracer pt;
                             pt.scene = scene;
                             pt.sTree = sTree;
@@ -818,11 +818,11 @@ namespace akari::render {
                             pt.vertices = allocator.allocate_object<GuidedPathTracer::PPGVertex>(max_depth + 1);
                             pt.training = false;
                             pt.allocator = allocator;
-                            pt.sampler = &sampler;
+                            pt.sampler = sampler.get();
                             pt.L = Spectrum(0.0);
                             pt.beta = Spectrum(1.0);
                             pt.max_depth = max_depth;
-                            pt.run_megakernel(camera, ivec2(x, y));
+                            pt.run_megakernel(camera.get(), ivec2(x, y));
                             non_zero_path.accumluate(!is_black(pt.L));
                             tile.add_sample(vec2(x, y), pt.L, 1.0f);
                             resources[tid]->release();
@@ -844,8 +844,8 @@ namespace akari::render {
         int spp = 16;
         int max_depth = 5;
         int training_samples = 16;
-        std::shared_ptr<Integrator>create_integrator(Allocator<> allocator) override {
-            return allocator.new_object<GuidedPathTracerIntegrator>(spp, max_depth, training_samples);
+        std::shared_ptr<Integrator> create_integrator(Allocator<> allocator) override {
+            return make_pmr_shared<GuidedPathTracerIntegrator>(allocator, spp, max_depth, training_samples);
         }
         const char *description() override { return "[Path Tracer]"; }
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
