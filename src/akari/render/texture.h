@@ -23,7 +23,7 @@
 #pragma once
 #include <akari/core/variant.h>
 #include <akari/core/color.h>
-#include <akari/core/image.hpp>
+#include <akari/core/image.h>
 #include <akari/render/scenegraph.h>
 
 namespace akari::render {
@@ -55,31 +55,31 @@ namespace akari::render {
         Float tr(const ShadingPoint &sp) const override { return std::max<Float>(0.0, 1.0f - alpha); }
     };
     class ImageTexture : public Texture {
-        RGBAImage::View image;
+        std::shared_ptr<RGBAImage> image;
         mutable ObjectCache<Float> integral_;
 
       public:
-        ImageTexture(RGBAImage::View image) : image(image) {}
+        ImageTexture(std::shared_ptr<RGBAImage> image) : image(image) {}
         Spectrum evaluate(const ShadingPoint &sp) const override {
             vec2 texcoords = sp.texcoords;
             vec2 tc = glm::mod(texcoords, vec2(1.0f));
             tc.y = 1.0f - tc.y;
-            return image(tc).rgb;
+            return (*image)(tc).rgb;
         }
         Float integral() const override {
             return integral_.get_cached_or([&] {
                 Float I = 0;
-                for (int i = 0; i < image.resolution().x * image.resolution().y; i++) {
-                    I += luminance(image.data()[i].rgb);
+                for (int i = 0; i < image->resolution().x * image->resolution().y; i++) {
+                    I += luminance(image->data()[i].rgb);
                 }
-                return I / (image.resolution().x * image.resolution().y);
+                return I / (image->resolution().x * image->resolution().y);
             });
         }
         Float tr(const ShadingPoint &sp) const override {
             vec2 texcoords = sp.texcoords;
             vec2 tc = glm::mod(texcoords, vec2(1.0f));
             tc.y = 1.0f - tc.y;
-            return std::max<Float>(0.0, 1.0f - image(tc).alpha);
+            return std::max<Float>(0.0, 1.0f - (*image)(tc).alpha);
         }
     };
 

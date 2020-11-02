@@ -120,6 +120,7 @@ namespace akari::render {
             light->_power = sum.value() / v.size() * 4 * Pi * world_radius * world_radius;
             return light;
         }
+        LightType type() const override { return LightType::Generic; }
     };
 
     class AKR_EXPORT EnvMapNode final : public LightNode {

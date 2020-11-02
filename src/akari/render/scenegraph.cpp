@@ -60,7 +60,7 @@ namespace akari::render {
                 throw std::runtime_error("failed to load plugin");
             }
             auto object = pi->make_shared();
-            if(!ctx.cur_var.empty()){
+            if (!ctx.cur_var.empty()) {
                 return std::make_shared<NamedNode>(ctx.cur_var, object);
             }
             return object;

@@ -16,9 +16,6 @@
 [submodule "external/googletest"]
 	path = external/googletest
 	url = https://github.com/google/googletest
-[submodule "external/uWebSockets"]
-	path = external/uWebSockets
-	url = https://github.com/shiinamiyuki/uWebSockets
 [submodule "external/pugixml"]
 	path = external/pugixml
 	url = https://github.com/zeux/pugixml
@@ -28,3 +25,6 @@
 [submodule "external/assimp"]
 	path = external/assimp
 	url = https://github.com/assimp/assimp
+[submodule "external/asio"]
+	path = external/asio
+	url = https://github.com/chriskohlhoff/asio

@@ -59,7 +59,7 @@ namespace akari::render {
         }
         void finalize() override { tex_cache.invalidate(); }
         std::shared_ptr<const Texture> create_texture(Allocator<> allocator) override {
-            auto tex = tex_cache.get_cached_or([=] { return make_pmr_shared<ImageTexture>(allocator, image->view()); });
+            auto tex = tex_cache.get_cached_or([=] { return make_pmr_shared<ImageTexture>(allocator, image); });
             return tex;
         }
     };

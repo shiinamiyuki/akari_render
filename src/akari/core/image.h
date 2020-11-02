@@ -29,30 +29,30 @@
 #include <akari/core/math.h>
 #include <akari/core/color.h>
 #include <akari/core/memory.h>
+#include <akari/core/array.h>
 
 namespace akari {
 
     template <class T>
     class TImage {
-        using Float = float;
-
-        astd::pmr::vector<T> _texels;
-        ivec2 _resolution;
+        using Alloc = astd::pmr::polymorphic_allocator<T>;
+        Array2D<T, Alloc> array;
 
       public:
-        TImage(const ivec2 &dim = ivec2(1), Allocator<> allocator = Allocator<>())
-            : _texels(dim[0] * dim[1], allocator), _resolution(dim) {}
-
+        const Array2D<T, Alloc> &array2d() const { return array; }
+        Array2D<T, Alloc> &array2d() { return array; }
+        TImage(const ivec2 &dim = ivec2(1), Allocator<> allocator = Allocator<>()) : array(dim, allocator) {}
+        TImage(Array2D<T, Alloc> array) : array(std::move(array)) {}
         const T &operator()(int x, int y) const {
-            x = std::clamp(x, 0, _resolution[0] - 1);
-            y = std::clamp(y, 0, _resolution[1] - 1);
-            return _texels[x + y * _resolution[0]];
+            x = std::clamp(x, 0, resolution()[0] - 1);
+            y = std::clamp(y, 0, resolution()[1] - 1);
+            return array(x, y);
         }
 
         T &operator()(int x, int y) {
-            x = std::clamp(x, 0, _resolution[0] - 1);
-            y = std::clamp(y, 0, _resolution[1] - 1);
-            return _texels[x + y * _resolution[0]];
+            x = std::clamp(x, 0, resolution()[0] - 1);
+            y = std::clamp(y, 0, resolution()[1] - 1);
+            return array(x, y);
         }
 
         const T &operator()(float x, float y) const { return (*this)(vec2(x, y)); }
@@ -63,47 +63,16 @@ namespace akari {
 
         T &operator()(const ivec2 &p) { return (*this)(p.x, p.y); }
 
-        const T &operator()(const vec2 &p) const { return (*this)(ivec2(p * vec2(_resolution))); }
+        const T &operator()(const vec2 &p) const { return (*this)(ivec2(p * vec2(resolution()))); }
 
-        T &operator()(const vec2 &p) { return (*this)(ivec2(p * vec2(_resolution))); }
+        T &operator()(const vec2 &p) { return (*this)(ivec2(p * vec2(resolution()))); }
 
-        [[nodiscard]] const astd::pmr::vector<T> &texels() const { return _texels; }
+        void resize(const ivec2 &size) { array.resize(size); }
+        void fill(const T &v) { array.fill(v); }
+        [[nodiscard]] ivec2 resolution() const { return array.dimension(); }
+        T *data() { return array.data(); }
 
-        void resize(const ivec2 &size) {
-            _resolution = size;
-            _texels.resize(_resolution[0] * _resolution[1]);
-        }
-
-        [[nodiscard]] ivec2 resolution() const { return _resolution; }
-        T *data() { return _texels.data(); }
-
-        [[nodiscard]] const T *data() const { return _texels.data(); }
-
-        struct View {
-            const T &operator()(int x, int y) const {
-                x = std::clamp(x, 0, _resolution[0] - 1);
-                y = std::clamp(y, 0, _resolution[1] - 1);
-                return _texels[x + y * _resolution[0]];
-            }
-
-            T &operator()(int x, int y) {
-                x = std::clamp(x, 0, _resolution[0] - 1);
-                y = std::clamp(y, 0, _resolution[1] - 1);
-                return _texels[x + y * _resolution[0]];
-            }
-
-            const T &operator()(float x, float y) const { return (*this)(vec2(x, y)); }
-
-            const T &operator()(const ivec2 &p) const { return (*this)(p.x, p.y); }
-
-            const T &operator()(const vec2 &p) const { return (*this)(ivec2(p * vec2(_resolution))); }
-
-            [[nodiscard]] ivec2 resolution() const { return _resolution; }
-            [[nodiscard]] const T *data() const { return _texels; }
-            const T *_texels = nullptr;
-            ivec2 _resolution = ivec2(0);
-        };
-        View view() const { return {data(), resolution()}; }
+        [[nodiscard]] const T *data() const { return array.data() }
     };
 
     class RGBImage : public TImage<Color<float, 3>> {

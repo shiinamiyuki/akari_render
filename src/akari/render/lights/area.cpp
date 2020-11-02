@@ -68,6 +68,7 @@ namespace akari::render {
             return sample;
         }
         Float power() const override { return triangle.area() * color->integral(); }
+        LightType type() const override { return LightType::Generic; }
     };
 
     class AreaLightNode final : public LightNode {
@@ -80,16 +81,14 @@ namespace akari::render {
             AKR_CHECK(triangle.has_value());
             return make_pmr_shared<const AreaLight>(allocator, *triangle, color->create_texture(allocator), false);
         }
-         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
+        void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override {
             if (field == "color") {
                 color = resolve_texture(value);
                 AKR_ASSERT_THROW(color);
             }
         }
-        void finalize()override{
-            color->finalize();
-        }
+        void finalize() override { color->finalize(); }
     };
     AKR_EXPORT_NODE(AreaLight, AreaLightNode);
 } // namespace akari::render

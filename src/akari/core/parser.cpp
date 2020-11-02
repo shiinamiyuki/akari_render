@@ -22,6 +22,7 @@
 #include <fstream>
 #include <unordered_set>
 #include <akari/core/parser.h>
+#include <akari/core/file.h>
 #include <cctype>
 namespace akari::sdl {
     Value::Value() : data(std::make_shared<Null>()) {}
@@ -169,8 +170,7 @@ namespace akari::sdl {
         auto parent_path = path.parent_path();
         CurrentPathGuard _;
         fs::current_path(parent_path);
-        std::ifstream in(path);
-        std::string src((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        std::string src = read_file_to_str(path);
         return parse_string(src, path, module_name);
     }
     void Parser::parse_import(ParserContext &ctx) {

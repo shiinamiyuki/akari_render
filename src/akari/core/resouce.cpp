@@ -23,7 +23,7 @@
 #include <mutex>
 #include <fmt/format.h>
 #include <akari/core/resource.h>
-#include <akari/core/image.hpp>
+#include <akari/core/image.h>
 
 namespace akari {
 

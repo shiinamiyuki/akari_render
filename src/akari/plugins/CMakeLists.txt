@@ -5,3 +5,9 @@ if(AKR_ENABLE_OIDN)
     copy_to_dist(OIDNDenoiser)
 endif()
 
+if(AKR_ENABLE_NETWORK)
+    add_plugin(NetworkWorld network-node.cpp)
+    target_include_directories(NetworkWorld PUBLIC ${CMAKE_SOURCE_DIR}/external/asio/asio/include)
+    copy_to_dist(NetworkWorld)
+endif()
+

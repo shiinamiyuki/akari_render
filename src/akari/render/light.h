@@ -56,11 +56,20 @@ namespace akari::render {
         Spectrum color;
         Float pdf;
     };
-
+    enum class LightType : uint32_t {
+        Generic = 0, // nothing special
+        DeltaPosition = 1,
+        DeltaDirection = 2,
+        Delta = DeltaDirection | DeltaPosition,
+    };
+    inline LightType operator&(LightType a, LightType b) { return LightType((int)a & (int)b); }
+    inline LightType operator|(LightType a, LightType b) { return LightType((int)a | (int)b); }
+    inline LightType operator~(LightType a) { return LightType(~(uint32_t)a); }
     class Light : public EndPoint<LightSample, LightRaySample, LightSampleContext> {
       public:
         virtual Spectrum Le(const Vec3 &wo, const ShadingPoint &sp) const = 0;
         virtual Float power() const = 0;
+        virtual LightType type() const = 0;
     };
     class Scene;
     class LightNode : public SceneGraphNode {

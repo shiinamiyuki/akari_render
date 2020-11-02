@@ -30,7 +30,7 @@
 #include <future>
 
 namespace akari {
-    
+
     class AtomicFloat {
         std::atomic<float> val;
 
@@ -65,6 +65,28 @@ namespace akari {
                 func(ivec2(x, y), tid);
             },
             chunkSize);
+    }
+    template <class F>
+    void tiled_for_2d(const ivec2 &dim, const ivec2 &tile_size, bool parallel, F &&func) {
+        auto tiles = (dim + tile_size - ivec2(1)) / tile_size;
+        auto body = [&](ivec2 t, uint32_t) {
+            for (int ty = 0; ty < tile_size[1]; ty++) {
+                for (int tx = 0; tx < tile_size[0]; tx++) {
+                    int x = tx + t[0] * tile_size;
+                    int y = ty + t[1] * tile_size;
+                    func(ivec2(x, y));
+                }
+            }
+        };
+        if (parallel) {
+            parallel_for_2d(tiles, body);
+        } else {
+            for (int j = 0; j < tiles[1]; j++) {
+                for (int i = 0; i < tiles[0]; i++) {
+                    body(ivec2(i, j), 0);
+                }
+            }
+        }
     }
     namespace thread {
         AKR_EXPORT void finalize();

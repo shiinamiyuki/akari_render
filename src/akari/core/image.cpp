@@ -20,7 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/core/image.hpp>
+#include <akari/core/image.h>
 #include <memory>
 #include <akari/core/logger.h>
 #include <akari/core/parallel.h>
@@ -38,11 +38,11 @@ namespace akari {
             const auto ext = path.extension().string();
             RGBAImage image;
             postProcessor.process(_image, image);
-            auto &texels = image.texels();
+            auto texels = image.data();
             auto dimension = image.resolution();
-            std::vector<uint8_t> buffer(texels.size() * 3);
+            std::vector<uint8_t> buffer(hprod(dimension) * 3);
             parallel_for(
-                texels.size(),
+                hprod(dimension),
                 [&](uint32_t i, uint32_t) {
                     auto pixel = static_cast<uint8_t *>(&buffer[i * 3]);
                     auto rgb = vec3(texels[i].rgb);

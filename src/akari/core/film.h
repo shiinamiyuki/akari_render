@@ -24,7 +24,7 @@
 #define AKARIRENDER_FILM_H
 
 #include <akari/core/fwd.h>
-#include <akari/core/image.hpp>
+#include <akari/core/image.h>
 #include <akari/core/parallel.h>
 #include <akari/core/color.h>
 #include <akari/core/memory.h>

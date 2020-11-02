@@ -22,6 +22,7 @@
 #pragma once
 #include <akari/core/plugin.h>
 #include <akari/core/parser.h>
+#include <akari/core/file.h>
 namespace akari::render {
     template <typename T>
     struct ObjectCache {
@@ -112,7 +113,7 @@ namespace akari::render {
     std::shared_ptr<U> sg_dyn_cast(const std::shared_ptr<T> &_p) {
         auto p = dyn_cast<SceneGraphNode>(_p);
         static_assert(std::is_base_of_v<SceneGraphNode, U>);
-        return p == nullptr ? nullptr : p->cast<U>();
+        return p == nullptr ? nullptr : p->template cast<U>();
     }
     class AKR_EXPORT SceneGraphParser : public sdl::Parser {
       public:

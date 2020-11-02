@@ -22,6 +22,7 @@
 
 #include <fstream>
 #include <akari/core/mesh.h>
+#include <akari/core/file.h>
 #include <akari/core/logger.h>
 namespace akari {
     const char *AKR_MESH_MAGIC = "AKARI_BINARY_MESH";
@@ -47,13 +48,13 @@ namespace akari {
     }
     Expected<bool> BinaryGeometry::load(const fs::path &path) {
         info("Loading {}", path.string());
-        std::ifstream in(path, std::ios::binary | std::ios::in);
-        if (!in.is_open()) {
+        auto stream = resolve_file(path);
+        if (!stream) {
             error("Cannot open file");
             return Error("No file");
         }
         char buffer[128] = {0};
-        in.read(buffer, strlen(AKR_MESH_MAGIC));
+        stream->read(buffer, strlen(AKR_MESH_MAGIC));
         if (strcmp(buffer, AKR_MESH_MAGIC) != 0) {
             error("Failed to load mesh: invalid format; expected '{}' but found '{}'", AKR_MESH_MAGIC, buffer);
             return Error("Invalid format");
@@ -61,21 +62,21 @@ namespace akari {
         _mesh = std::make_shared<Mesh>(Allocator<>(astd::pmr::get_default_resource()));
         size_t vertexCount;
         size_t triangleCount;
-        in.read(reinterpret_cast<char *>(&vertexCount), sizeof(size_t));
-        in.read(reinterpret_cast<char *>(&triangleCount), sizeof(size_t));
+        stream->read(reinterpret_cast<char *>(&vertexCount), sizeof(size_t));
+        stream->read(reinterpret_cast<char *>(&triangleCount), sizeof(size_t));
         _mesh->vertices.resize(vertexCount * 3);
         AKR_ASSERT(_mesh->vertices.data() != nullptr);
-        in.read(reinterpret_cast<char *>(_mesh->vertices.data()), sizeof(float) * vertexCount * 3);
+        stream->read(reinterpret_cast<char *>(_mesh->vertices.data()), sizeof(float) * vertexCount * 3);
         _mesh->normals.resize(triangleCount * 9);
-        in.read(reinterpret_cast<char *>(_mesh->normals.data()), sizeof(float) * triangleCount * 9);
+        stream->read(reinterpret_cast<char *>(_mesh->normals.data()), sizeof(float) * triangleCount * 9);
         _mesh->texcoords.resize(triangleCount * 6);
-        in.read(reinterpret_cast<char *>(_mesh->texcoords.data()), sizeof(float) * triangleCount * 6);
+        stream->read(reinterpret_cast<char *>(_mesh->texcoords.data()), sizeof(float) * triangleCount * 6);
         _mesh->indices.resize(triangleCount * 3);
-        in.read(reinterpret_cast<char *>(_mesh->indices.data()), sizeof(int) * triangleCount * 3);
+        stream->read(reinterpret_cast<char *>(_mesh->indices.data()), sizeof(int) * triangleCount * 3);
         _mesh->material_indices.resize(triangleCount);
-        in.read(reinterpret_cast<char *>(_mesh->material_indices.data()), sizeof(int) * triangleCount);
+        stream->read(reinterpret_cast<char *>(_mesh->material_indices.data()), sizeof(int) * triangleCount);
         memset(buffer, 0, sizeof(buffer));
-        in.read(buffer, strlen(AKR_MESH_MAGIC));
+        stream->read(buffer, strlen(AKR_MESH_MAGIC));
         if (strcmp(buffer, AKR_MESH_MAGIC) != 0) {
             error("Failed to load mesh: invalid format; expected '{}' but found '{}'", AKR_MESH_MAGIC, buffer);
             return Error("Invalid format");

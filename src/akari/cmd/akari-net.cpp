@@ -9,8 +9,8 @@
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
 //
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
 //
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -19,26 +19,3 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-
-#pragma once
-#include <akari/core/math.h>
-#include <akari/core/distribution.h>
-#include <akari/core/image.h>
-#include <akari/core/film.h>
-#include <akari/render/scene.h>
-#include <akari/render/scenegraph.h>
-
-namespace akari::render {
-    namespace AOVKind {
-        static constexpr uint32_t albedo = 1;
-        static constexpr uint32_t normal = 2;
-    }; // namespace AOVKind
-    struct AOV {
-        std::unordered_map<std::string, RGBAImage> aovs;
-    };
-    class Denoiser {
-      public:
-        virtual std::optional<RGBAImage> denoise(const Scene *scene, AOV &aov) = 0;
-        virtual ~Denoiser() = default;
-    };
-} // namespace akari::render
