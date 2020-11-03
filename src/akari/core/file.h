@@ -82,4 +82,5 @@ namespace akari {
     AKR_EXPORT std::shared_ptr<MultiFileResolver> file_resolver();
     AKR_EXPORT std::unique_ptr<FileStream> resolve_file(const fs::path &path);
     AKR_EXPORT std::string read_file_to_str(const fs::path &path);
+    AKR_EXPORT std::string read_file_to_str(const std::unique_ptr<FileStream> &stream);
 } // namespace akari

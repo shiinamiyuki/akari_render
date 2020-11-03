@@ -19,3 +19,29 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+#include <iostream>
+#include <akari/core/spmd.h>
+#include <akari/core/application.h>
+using namespace akari;
+using namespace akari::spmd;
+int main(int argc, const char **argv) {
+    Application app(argc, argv);
+    PluginManager<AbstractNetworkWorld> mgr;
+    auto pi = mgr.load_plugin("NetworkWorld");
+    auto world = pi->make_shared();
+    if (argc > 1 && std::string_view(argv[1]) == "-m") {
+        std::pair<std::string, int> worker("127.0.0.1", 7001);
+        world->connect({worker});
+    } else {
+        world->listen(7001);
+        auto local = world->local();
+        std::shared_ptr<Node> remote;
+        world->foreach_node([&](auto &node) {
+            if (node != local)
+                remote = node;
+        });
+        auto stream = remote->file_resolver()->resolve("foo.akari");
+        std::cout << read_file_to_str(stream) << std::endl;
+    }
+    world->finalize();
+}

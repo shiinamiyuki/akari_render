@@ -27,7 +27,8 @@
 #include <unordered_set>
 namespace akari::spmd {
     using asio::ip::tcp;
-
+    static constexpr uint32_t FILE_SERVER_TAG = 4000;
+    static constexpr uint32_t INTERNAL_TAG = 32765;
     class FileServer : public std::enable_shared_from_this<FileServer> {
         // std::unordered_set<std::shared_ptr<std::unique_ptr<FileResolver>>> resolvers;
 
@@ -35,12 +36,16 @@ namespace akari::spmd {
         std::shared_ptr<ByteChannel> channel;
         FileServer(std::shared_ptr<ByteChannel> channel) : channel(channel) {}
         void run() {
+            debug("file server listening on {}", channel->record.tag);
             std::thread([=] {
                 auto _ = shared_from_this();
                 (void)_;
                 while (!channel->closed()) {
-                    auto msg = channel->receive_raw();
-                    fs::path path(msg.begin(), msg.end());
+                    auto msg = channel->receive();
+                    if (!msg)
+                        break;
+                    fs::path path(msg->begin(), msg->end());
+                    debug("reading {}", path.string());
                     auto stream = resolve_file(path);
                     auto content = stream->read_all();
                     channel->send(std::string_view(content.data(), content.size()));
@@ -55,8 +60,10 @@ namespace akari::spmd {
         std::unique_ptr<FileStream> resolve(const fs::path &path) override {
             auto s = path.string();
             channel->send(std::string_view(s.data(), s.size()));
-            auto msg = channel->receive_raw();
-            return std::make_unique<ByteFileStream>(std::move(msg));
+            auto msg = channel->receive();
+            if (!msg)
+                return nullptr;
+            return std::make_unique<ByteFileStream>(std::move(*msg));
         }
     };
     class AKR_EXPORT NetworkNode : public Node {
@@ -103,35 +110,45 @@ namespace akari::spmd {
         std::list<std::shared_ptr<NetworkRemoteNode>> remotes;
         // std::mutex m;
         // std::unordered_map<std::shared_ptr<Node>, ChannelRecord> records;
-        struct ChannelRecord {
-            std::shared_ptr<Node> a, b;
-            std::weak_ptr<ByteChannel> channel;
-            tcp::socket *sock = nullptr;
-        };
-
-        std::unordered_map<uint32_t, ChannelRecord> channels;
+        std::mutex ch_mutex;
+        std::unordered_map<ChannelRecord, std::pair<tcp::socket *, std::weak_ptr<ByteChannel>>, ChannelRecord::Hash,
+                           ChannelRecord::Eq>
+            channels;
         std::optional<tcp::acceptor> acceptor_;
-        uint32_t tag_counter = 0;
         std::vector<std::shared_ptr<FileServer>> file_servers;
+        std::vector<std::shared_ptr<ByteChannel>> internals;
+        enum InternalMessage { request_sync, ack_sync };
+        std::atomic_bool is_shutdown = false;
 
       public:
         std::shared_ptr<Node> local() const override { return local_; }
         size_t size() const override { return 1 + remotes.size(); }
-        void foreach_nodes(const NodeVisitor &vis) override {
+        void foreach_node(const NodeVisitor &vis) override {
             vis(local_);
             for (auto &n : remotes) {
                 vis(n);
             }
         }
-
-        ChannelRecord &get_channel(const std::shared_ptr<ByteChannel> &ch) { return channels.at(ch->tag()); }
-        std::shared_ptr<ByteChannel> channel(const std::shared_ptr<Node> &a, const std::shared_ptr<Node> &b) override {
+        std::shared_ptr<ByteChannel> channel(uint32_t tag, const std::shared_ptr<Node> &a,
+                                             const std::shared_ptr<Node> &b) override {
+            std::unique_lock<std::mutex> lock(ch_mutex);
             if (local()->rank() != 0) {
                 if (a != remotes.front() && b != remotes.front()) {
                     AKR_ASSERT("worker node cannot connect to peer");
                 }
             }
-            auto channel = std::make_shared<ByteChannel>(tag_counter++, shared_from_this());
+            ChannelRecord rec;
+            rec.tag = tag;
+            rec.nodes.first = a->rank();
+            rec.nodes.second = b->rank();
+            if (rec.nodes.first > rec.nodes.second) {
+                std::swap(rec.nodes.first, rec.nodes.second);
+            }
+            if (channels.find(rec) != channels.end()) {
+                AKR_ASSERT("channel already created");
+            }
+            auto channel = std::make_shared<ByteChannel>(rec, shared_from_this());
+
             tcp::socket *sock = nullptr;
             if (a != b) {
                 if (a == local()) {
@@ -140,42 +157,57 @@ namespace akari::spmd {
                     sock = &dyn_cast<NetworkRemoteNode>(a)->sock;
                 }
             }
-            channels.emplace(channel->tag(), ChannelRecord{a, b, channel, sock});
+            channels.emplace(rec, std::make_pair(sock, channel));
             return channel;
         }
         void send(const std::shared_ptr<ByteChannel> &channel, std::string_view msg) override {
             AKR_ASSERT(channel->world().get() == this);
-            auto rec = get_channel(channel);
-            if (rec.a == rec.b) {
+            std::unique_lock<std::mutex> lock(ch_mutex);
+            auto rec = channel->record;
+            auto sock = channels[rec].first;
+            lock.unlock();
+            if (rec.nodes.first == rec.nodes.second) {
                 channel->__push(Message(msg.data(), msg.data() + msg.size()));
             } else {
+                auto dest = rec.nodes.first == local()->rank() ? rec.nodes.second : rec.nodes.first;
                 uint64_t sz = msg.size();
-                uint32_t tag = channel->tag();
-                asio::write(*rec.sock, asio::buffer(&tag, sizeof(tag)));
-                asio::write(*rec.sock, asio::buffer(&sz, sizeof(uint64_t)));
-                asio::write(*rec.sock, asio::buffer(msg.data(), msg.size()));
+                uint32_t tag = rec.tag;
+                debug("write {} bytes; {} -> {}; tag={}", sz, local()->rank(), dest, tag);
+                asio::write(*sock, asio::buffer(&tag, sizeof(tag)));
+                asio::write(*sock, asio::buffer(&sz, sizeof(uint64_t)));
+                asio::write(*sock, asio::buffer(msg.data(), msg.size()));
             }
         }
 
-        Message receive(const std::shared_ptr<ByteChannel> &channel) override {
+        std::optional<Message> receive(const std::shared_ptr<ByteChannel> &channel) override {
             AKR_ASSERT(channel->world().get() == this);
-            auto rec = get_channel(channel);
-            if (rec.a == rec.b || channel->has_message()) {
-                return channel->__pop();
-            } else {
-                while (true) {
-                    uint64_t sz;
-                    asio::read(*rec.sock, asio::buffer(&sz, sizeof(uint64_t)));
-                    uint32_t tag;
-                    asio::read(*rec.sock, asio::buffer(&tag, sizeof(tag)));
-                    Message msg(sz);
-                    asio::read(*rec.sock, asio::buffer(msg.data(), msg.size()));
-                    if (channel->tag() == tag) {
-                        return msg;
-                    } else {
-                        channels.at(tag).channel.lock()->__push(std::move(msg));
-                    }
-                }
+            debug("trying to receive from {}", channel->record.tag);
+            auto rec = channel->record;
+            return channel->__pop();
+        }
+        void handle_message(int a, int b, tcp::socket *sock) {
+            if (a > b) {
+                std::swap(a, b);
+            }
+            while (!is_shutdown && sock->is_open()) {
+                debug("reading from socket");
+                uint32_t tag;
+                asio::read(*sock, asio::buffer(&tag, sizeof(tag)));
+                // debug("reading from socket done tag");
+                uint64_t sz;
+                asio::read(*sock, asio::buffer(&sz, sizeof(uint64_t)));
+                // debug("reading from socket done size");
+                Message msg(sz);
+                asio::read(*sock, asio::buffer(msg.data(), msg.size()));
+                debug("receiving {} bytes from {}", sz, tag);
+                ChannelRecord rec{std::make_pair(a, b), tag};
+                std::unique_lock<std::mutex> lock(ch_mutex);
+                channels.at(rec).second.lock()->__push(std::move(msg));
+            }
+        }
+        void handle_messages() {
+            for (auto &remote : remotes) {
+                std::thread([=] { handle_message(local()->rank(), remote->rank(), &remote->sock); }).detach();
             }
         }
         void listen(int port) override {
@@ -185,11 +217,15 @@ namespace akari::spmd {
             acceptor_->accept(sock);
             int rank = 0;
             asio::read(sock, asio::buffer(&rank, sizeof(int)));
+            info("rank={}", rank);
             AKR_ASSERT(rank > 0);
             local_.reset(new NetworkLocalNode(rank));
             remotes.emplace_back(new NetworkRemoteNode(0, std::move(sock)));
-            auto ch = channel(remotes.front(), local());
+            auto ch = channel(FILE_SERVER_TAG, remotes.front(), local());
             remotes.front()->resolver = std::make_shared<NetworkFileResolver>(ch);
+            ch = channel(INTERNAL_TAG, remotes.front(), local());
+            internals.push_back(ch);
+            handle_messages();
         }
         void connect(const std::list<std::pair<std::string, int>> &workers) override {
             local_.reset(new NetworkLocalNode(0));
@@ -203,17 +239,54 @@ namespace akari::spmd {
                 r++;
             }
             for (auto &remote : remotes) {
-                auto ch = channel(remote, local());
+                auto ch = channel(FILE_SERVER_TAG, remote, local());
                 file_servers.emplace_back(new FileServer(ch));
+                ch = channel(INTERNAL_TAG, remote, local());
+                internals.push_back(ch);
+            }
+            for (auto &server : file_servers) {
+                server->run();
+            }
+            handle_messages();
+        }
+        void barrier() override {
+            if (local()->rank() == 0) {
+                for (auto &internal : internals) {
+                    internal->send_object(InternalMessage::request_sync);
+                }
+                for (auto &internal : internals) {
+                    while (true) {
+                        auto msg = *internal->receive_object<InternalMessage>();
+                        if (msg == InternalMessage::ack_sync) {
+                            break;
+                        }
+                    }
+                }
+            } else {
+                AKR_ASSERT(internals.size() == 1);
+                for (auto &internal : internals) {
+                    while (true) {
+                        auto msg = *internal->receive_object<InternalMessage>();
+                        if (msg == InternalMessage::request_sync) {
+                            internal->send_object(InternalMessage::ack_sync);
+                            break; // good
+                        }
+                    }
+                }
             }
         }
         void finalize() override {
-            for (auto &[_, rec] : channels) {
-                if (auto p = rec.channel.lock()) {
+            barrier();
+            for (auto &rec : channels) {
+                if (auto p = rec.second.second.lock()) {
                     p->__close();
                 }
             }
             channels.clear();
+            if (local()->rank() == 0) {
+                file_servers.clear();
+            }
+            remotes.clear();
         }
         void initialize() override {}
     };

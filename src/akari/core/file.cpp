@@ -24,8 +24,7 @@
 #include <mutex>
 #include <sstream>
 namespace akari {
-    AKR_EXPORT std::string read_file_to_str(const fs::path &path) {
-        auto stream = resolve_file(path);
+    AKR_EXPORT std::string read_file_to_str(const std::unique_ptr<FileStream> &stream) {
         auto buf = stream->read_all();
         std::ostringstream os;
         auto it = buf.begin();
@@ -39,6 +38,10 @@ namespace akari {
             }
         }
         return os.str();
+    }
+    AKR_EXPORT std::string read_file_to_str(const fs::path &path) {
+        auto stream = resolve_file(path);
+        return read_file_to_str(stream);
     }
     std::vector<char> FileStream::read_all() {
         std::vector<char> buf(4096);

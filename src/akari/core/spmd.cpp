@@ -28,39 +28,46 @@ namespace akari::spmd {
         std::shared_ptr<Node> local_;
         // std::mutex m;
         // std::unordered_map<std::shared_ptr<Node>, ChannelRecord> records;
-        struct ChannelRecord {
-            std::shared_ptr<Node> a, b;
-            std::weak_ptr<ByteChannel> channel;
-        };
-        std::unordered_map<uint32_t, ChannelRecord> channels;
-        uint32_t tag_counter = 0;
+        std::unordered_map<ChannelRecord, std::weak_ptr<ByteChannel>, ChannelRecord::Hash, ChannelRecord::Eq> channels;
 
       public:
         std::shared_ptr<Node> local() const override { return local_; }
-        void foreach_nodes(const NodeVisitor &vis) override { vis(local_); }
-        std::shared_ptr<ByteChannel> channel(const std::shared_ptr<Node> &a, const std::shared_ptr<Node> &b) override {
-            auto channel = std::make_shared<ByteChannel>(tag_counter++, shared_from_this());
-            channels.emplace(channel->tag(), ChannelRecord{a, b, channel});
+        void foreach_node(const NodeVisitor &vis) override { vis(local_); }
+        std::shared_ptr<ByteChannel> channel(uint32_t tag, const std::shared_ptr<Node> &a,
+                                             const std::shared_ptr<Node> &b) override {
+            ChannelRecord rec;
+            rec.tag = tag;
+            rec.nodes.first = a->rank();
+            rec.nodes.second = b->rank();
+            if (rec.nodes.first > rec.nodes.second) {
+                std::swap(rec.nodes.first, rec.nodes.second);
+            }
+            if (channels.find(rec) != channels.end()) {
+                AKR_ASSERT("channel already created");
+            }
+            auto channel = std::make_shared<ByteChannel>(rec, shared_from_this());
+            channels.emplace(rec, channel);
             return channel;
         }
         void send(const std::shared_ptr<ByteChannel> &channel, std::string_view msg) override {
             AKR_ASSERT(channel->world().get() == this);
             channel->__push(Message(msg.data(), msg.data() + msg.size()));
         }
-        Message receive(const std::shared_ptr<ByteChannel> &channel) override {
+        std::optional<Message> receive(const std::shared_ptr<ByteChannel> &channel) override {
             // std::lock_guard<std::mutex> lock(m);
             return channel->__pop();
         }
         void initialize() override {}
         size_t size() const override { return 1; }
         void finalize() override {
-            for (auto &&[_, rec] : channels) {
-                if (auto ch = rec.channel.lock()) {
+            for (auto &rec : channels) {
+                if (auto ch = rec.second.lock()) {
                     ch->__close();
                 }
             }
             channels.clear();
         }
+        void barrier()override {}
     };
     class AKR_EXPORT LocalNode : public Node {
       public:

@@ -3,7 +3,7 @@
 
 ![](gallery/beauty4k.png)
 
-AkariRender is a CPU/GPU physically based renderer written in C++17.
+AkariRender is a highly modular CPU/GPU physically based renderer written in C++17.
 
 ### Status
 [![Build Status](https://travis-ci.org/shiinamiyuki/AkariRender.svg?branch=master)](https://travis-ci.org/shiinamiyuki/AkariRender)
@@ -12,6 +12,21 @@ AkariRender is a CPU/GPU physically based renderer written in C++17.
  - <del> Optional GPU rendering using CUDA + Optix7(WIP)</del> 
  - Optional Embree backend
  - Optional denoiser using OpenImageDenoise
+ - Optional Network Rendering
+
+## Usage
+```bash
+source setpath.sh
+mkdir workspace && cd workspace
+# import existing mesh; generates a mesh.akari file
+akari-import mesh.obj mesh.akari
+# create the top level scene file
+vim scene.akari
+# render !
+akari scene.akari --spp 64
+# render with denoiser with 4x super sampling
+akari scene.akari --spp 64 --denoise --ss 4
+```
 
 ## Build from Source
 ```bash
