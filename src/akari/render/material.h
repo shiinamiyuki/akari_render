@@ -99,8 +99,10 @@ namespace akari::render {
     class AKR_EXPORT Material {
       public:
         virtual inline const BSDFClosure *evaluate(MaterialEvalContext &ctx) const = 0;
+        // heuristic for denoising
         virtual inline Spectrum albedo(const ShadingPoint &sp) const = 0;
-
+        // heuristic for denoising; 1 for ideal diffuse surface and 0 for ideal specular
+        virtual Float roughness(const ShadingPoint &sp) const = 0;
         virtual Float tr(const ShadingPoint &sp) const = 0;
         virtual const EmissiveMaterial *as_emissive() const { return nullptr; }
         BSDF get_bsdf(MaterialEvalContext &ctx) const;
@@ -114,7 +116,7 @@ namespace akari::render {
         const EmissiveMaterial *as_emissive() const override { return this; }
         virtual inline const BSDFClosure *evaluate(MaterialEvalContext &ctx) const override { return nullptr; }
         virtual inline Spectrum albedo(const ShadingPoint &sp) const override { return Spectrum(0.0); }
-
+        Float roughness(const ShadingPoint &sp) const override { return 1.0; }
         virtual Float tr(const ShadingPoint &sp) const override { return 0.0; }
     };
     class EmissiveMaterialNode;
@@ -165,6 +167,9 @@ namespace akari::render {
             auto closure = ctx.allocator.new_object<MixBSDF>(fraction->evaluate(ctx.sp)[0], mat_A->evaluate(ctx),
                                                              mat_B->evaluate(ctx));
             return closure;
+        }
+        Float roughness(const ShadingPoint &sp) const override {
+            return lerp(mat_A->roughness(sp), mat_B->roughness(sp), fraction->evaluate(sp)[0]);
         }
         Spectrum albedo(const ShadingPoint &sp) const override {
             return lerp(mat_A->albedo(sp), mat_B->albedo(sp), fraction->evaluate(sp)[0]);

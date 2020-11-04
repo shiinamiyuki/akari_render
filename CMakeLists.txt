@@ -10,6 +10,7 @@ option(AKR_ENABLE_ASL "Enable Akari Shading Language for procedural shading" OFF
 option(AKR_ENABLE_PYTHON "Build Python Binding" OFF)
 option(AKR_ENABLE_OIDN "Use Intel OpenImageDenoise" OFF)
 option(AKR_USE_PREBUILD_OIDN "Use prebuilt Intel OpenImageDenoise" OFF)
+option(AKR_ENABLE_EXR "Use OpenEXR for storing HDR images" OFF)
 option(AKR_ENABLE_NETWORK "Enable Network Rendering" OFF)
 
 include_directories(${CMAKE_SOURCE_DIR}/external/glm)
@@ -32,6 +33,7 @@ endfunction()
 set(CMAKE_SHARED_LIBRARY_PREFIX_CXX "")
 set(CMAKE_STATIC_LIBRARY_PREFIX_CXX "")
 set(AKR_CORE_EXT_LIBS "")
+set(AKR_EXT_INCLUDES "")
 set(AKR_COMPILE_DEFINITIONS AKR_ENABLE_CPU)
 if(MSVC)
     set(AKR_CXX_FLAGS /std:c++17 /MP /arch:AVX2 /WX)
@@ -52,21 +54,53 @@ else()
     add_compile_definitions(_ENABLE_EXTENDED_ALIGNED_STORAGE)
 endif()
 
+# assimp attempts to build its own zlib, no good
+set(AKR_EXT_INCLUDES ${AKR_EXT_INCLUDES} ${CMAKE_SOURCE_DIR}/external/assimp/include)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+add_subdirectory(external/assimp)
+
+
+find_package (ZLIB)
+if (NOT ZLIB_FOUND)
+  # Build zlib
+    set (ZLIB_BUILD_STATIC_LIBS ON CACHE BOOL " " FORCE)
+    set (ZLIB_BUILD_SHARED_LIBS OFF CACHE BOOL " " FORCE)
+    add_subdirectory (external/zlib)
+
+    set (ZLIB_LIBRARIES zlibstatic)
+    set (ZLIB_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/zlib ${CMAKE_CURRENT_BINARY_DIR}/external/zlib)
+
+    # try to make openexr happy about this...
+    set (ZLIB_LIBRARY zlibstatic)
+    set (ZLIB_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/zlib ${CMAKE_CURRENT_BINARY_DIR}/external/zlib)
+    set (ZLIB_FOUND TRUE)
+    set(ASSIMP_BUILD_ZLIB OFF CACHE BOOL " " FORCE)
+    include_directories(${ZLIB_INCLUDE_DIRS})  # yuck, but so openexr/ptex can find zlib.h...
+else()
+    set(ASSIMP_BUILD_ZLIB OFF CACHE BOOL " " FORCE)
+endif ()
+set(AKR_CORE_EXT_LIBS ${AKR_CORE_EXT_LIBS} ${ZLIB_LIBRARIES})
+
+
 if(AKR_ENABLE_PYTHON)
     find_package(Python COMPONENTS Interpreter Development)
     add_subdirectory(external/pybind11)
     add_compile_definitions(AKR_ENABLE_PYTHON)
 endif()
-include_directories(external/tinyobjloader)
+if(AKR_ENABLE_OPENEXR)
+    set(ZLIB_LIBRARY zlib_static)
+    set(ZLIB_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/external/zlib)
+    set(PYILMBASE_ENABLE OFF CACHE BOOL " " FORCE)
+    set(AKR_EXT_INCLUDES ${AKR_EXT_INCLUDES} external/openexr)
+    add_subdirectory(external/openexr)
+endif()
 
-include_directories(external/fmt-6.1.2/include)
+set(AKR_EXT_INCLUDES ${AKR_EXT_INCLUDES} external/tinyobjloader)
+
+set(AKR_EXT_INCLUDES ${AKR_EXT_INCLUDES} external/fmt-6.1.2/include)
 add_subdirectory(external/fmt-6.1.2)
 set(AKR_CORE_EXT_LIBS ${AKR_CORE_EXT_LIBS} fmt)
-
-include_directories(${CMAKE_SOURCE_DIR}/external/assimp/include)
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-add_subdirectory(external/assimp)
 
 macro(add_build_util target )
     add_executable(${target} ${ARGN})
@@ -92,7 +126,7 @@ if(AKR_ENABLE_PYTHON)
 endif()
 target_compile_options(libakari_core PUBLIC ${AKR_CXX_FLAGS})
 target_compile_definitions(libakari_core PUBLIC ${AKR_COMPILE_DEFINITIONS})
-target_include_directories(libakari_core PUBLIC src/)
+target_include_directories(libakari_core PUBLIC src/ ${AKR_EXT_INCLUDES})
 target_include_directories(libakari_core PUBLIC external/pybind11/include)
 target_include_directories(libakari_core PUBLIC ${Python_INCLUDE_DIRS} ${EMBREE_INCLUDE_DIRS})
 copy_to_dist(libakari_core)

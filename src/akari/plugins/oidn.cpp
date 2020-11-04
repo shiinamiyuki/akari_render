@@ -32,15 +32,17 @@ namespace akari::render {
             device = oidn::newDevice();
             device.commit();
         }
-        std::optional<RGBAImage> denoise(const Scene *scene, AOV &aov) override {
+        void add_aov_requests(RenderInput &inputs) {
+            inputs.requested_aovs["normal"].required_variance = false;
+            inputs.requested_aovs["albedo"].required_variance = false;
+        }
+        std::optional<RGBAImage> denoise3(RGBAImage &color, RGBAImage &albedo, RGBAImage &normal) {
             oidn::FilterRef filter;
             filter = device.newFilter("RT");
-            auto res = aov.aovs.at("color").resolution();
-            filter.setImage("color", aov.aovs.at("color").data(), oidn::Format::Float3, res.x, res.y, 0, sizeof(RGBA));
-            filter.setImage("albedo", aov.aovs.at("albedo").data(), oidn::Format::Float3, res.x, res.y, 0,
-                            sizeof(RGBA));
-            filter.setImage("normal", aov.aovs.at("normal").data(), oidn::Format::Float3, res.x, res.y, 0,
-                            sizeof(RGBA));
+            auto res = color.resolution();
+            filter.setImage("color", color.data(), oidn::Format::Float3, res.x, res.y, 0, sizeof(RGBA));
+            filter.setImage("albedo", albedo.data(), oidn::Format::Float3, res.x, res.y, 0, sizeof(RGBA));
+            filter.setImage("normal", normal.data(), oidn::Format::Float3, res.x, res.y, 0, sizeof(RGBA));
             auto output = RGBAImage(res);
             filter.setImage("output", output.data(), oidn::Format::Float3, res.x, res.y, 0, sizeof(RGBA));
             filter.set("hdr", true);
@@ -53,6 +55,22 @@ namespace akari::render {
                 error("OIDNDenoiser: {}", errorMessage);
                 return std::nullopt;
             }
+            return output;
+        }
+        std::optional<RGBAImage> denoise(const Scene *scene, RenderOutput &aov) override {
+            oidn::FilterRef filter;
+            RGBAImage color = aov.aovs["color"].value->to_rgba_image();
+            RGBAImage albedo = aov.aovs["albedo"].value->to_rgba_image();
+            RGBAImage normal = aov.aovs["normal"].value->to_rgba_image();
+            RGBAImage first_hit_normal = aov.aovs["first_hit_normal"].value->to_rgba_image();
+            RGBAImage first_hit_albedo = aov.aovs["first_hit_albedo"].value->to_rgba_image();
+            std::optional<RGBAImage> filtered_normal = denoise3(normal, first_hit_albedo, first_hit_normal);
+            std::optional<RGBAImage> filtered_albedo = denoise3(albedo, first_hit_albedo, first_hit_normal);
+            if (!filtered_albedo || !filtered_normal) {
+                return std::nullopt;
+            }
+            normal = aov.aovs["normal"].value->to_rgba_image();
+            auto output = denoise3(color, *filtered_albedo, *filtered_normal);
             info("oidn denoise complete");
             return output;
         }

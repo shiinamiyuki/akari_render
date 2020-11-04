@@ -30,14 +30,14 @@
 #include <akari/render/mesh.h>
 #include <akari/render/common.h>
 namespace akari::render {
-    class AmbientOcclusion : public Integrator {
+    class AmbientOcclusion : public UniAOVIntegrator {
         const int tile_size = 16;
         int spp = 16;
         float occlude = std::numeric_limits<float>::infinity();
 
       public:
         AmbientOcclusion(int spp, float occlude) : spp(spp), occlude(occlude) {}
-        void render(const Scene *scene, Film *film) override {
+        void do_render(const Scene *scene, Film *film) override {
 
             AKR_ASSERT_THROW(glm::all(glm::equal(film->resolution(), scene->camera->resolution())));
             auto n_tiles = ivec2(film->resolution() + ivec2(tile_size - 1)) / ivec2(tile_size);

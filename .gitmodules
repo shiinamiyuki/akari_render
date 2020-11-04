@@ -28,3 +28,6 @@
 [submodule "external/asio"]
 	path = external/asio
 	url = https://github.com/chriskohlhoff/asio
+[submodule "external/zlib"]
+	path = external/zlib
+	url = https://github.com/madler/zlib

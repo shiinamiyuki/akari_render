@@ -40,6 +40,9 @@ namespace akari::render {
             return R;
         }
         Float tr(const ShadingPoint &sp) const override { return color->tr(sp); }
+         Float roughness(const ShadingPoint &sp) const override {
+            return 1.0;
+        }
     };
 
     class DiffuseMaterialNode final : public MaterialNode {

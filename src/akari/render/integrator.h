@@ -21,27 +21,43 @@
 // SOFTWARE.
 
 #pragma once
+#include <unordered_set>
 #include <akari/core/math.h>
 #include <akari/core/distribution.h>
 #include <akari/core/film.h>
 #include <akari/render/scenegraph.h>
 namespace akari::render {
     class Scene;
-    /*
-    AOVS:
-      color
-      normal
-      albedo
-      first-diffuse-normal
-      first-diffuse-albedo
-    */
+    namespace AOVKind {
+        static constexpr std::string_view ALBEDO = "albedo";
+        static constexpr std::string_view NORMAL = "normal";
+        static constexpr std::string_view VARIANCE = "variance";
+        static constexpr std::string_view SHADOW = "shadow";
+    }; // namespace AOVKind
+    struct AOVRecord {
+        std::optional<Film> value;
+        std::optional<Film> variance;
+    };
+    struct AOVRequest {
+        bool required_variance = false;
+    };
     struct RenderOutput {
-        std::unordered_map<std::string, std::shared_ptr<Film>> aovs;
+        std::unordered_map<std::string, AOVRecord> aovs;
+    };
+    struct RenderInput {
+        const Scene *scene;
+        std::unordered_map<std::string, AOVRequest> requested_aovs;
     };
     class Integrator {
       public:
-        virtual void render(const Scene *scene, Film *out) = 0;
+        virtual RenderOutput render(const RenderInput &) = 0;
         virtual ~Integrator() = default;
+    };
+    // only output "color" channel
+    class AKR_EXPORT UniAOVIntegrator : public Integrator {
+      public:
+        virtual void do_render(const Scene *scene, Film *film) = 0;
+        RenderOutput render(const RenderInput &);
     };
     class IntegratorNode : public SceneGraphNode {
       public:
@@ -49,7 +65,6 @@ namespace akari::render {
         virtual bool set_spp(int spp) = 0;
         virtual int get_spp() const = 0;
     };
-
     AKR_EXPORT std::shared_ptr<IntegratorNode> make_aov_integrator();
     AKR_EXPORT std::shared_ptr<IntegratorNode> make_aov_integrator(int spp, const char *aov);
 } // namespace akari::render

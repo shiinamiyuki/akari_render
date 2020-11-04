@@ -27,18 +27,13 @@
 #include <akari/core/film.h>
 #include <akari/render/scene.h>
 #include <akari/render/scenegraph.h>
-
+#include <akari/render/integrator.h>
 namespace akari::render {
-    namespace AOVKind {
-        static constexpr uint32_t albedo = 1;
-        static constexpr uint32_t normal = 2;
-    }; // namespace AOVKind
-    struct AOV {
-        std::unordered_map<std::string, RGBAImage> aovs;
-    };
+
     class Denoiser {
       public:
-        virtual std::optional<RGBAImage> denoise(const Scene *scene, AOV &aov) = 0;
+        virtual void add_aov_requests(RenderInput &inputs) = 0;
+        virtual std::optional<RGBAImage> denoise(const Scene *scene, RenderOutput &aov) = 0;
         virtual ~Denoiser() = default;
     };
 } // namespace akari::render

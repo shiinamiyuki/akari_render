@@ -49,6 +49,7 @@ namespace akari::render {
             return R;
         }
         Float tr(const ShadingPoint &sp) const override { return color->tr(sp); }
+        Float roughness(const ShadingPoint &sp) const override { return 0.0; }
     };
 
     class SpecularMaterialNode final : public MaterialNode {

@@ -30,18 +30,20 @@
 #include <akari/core/memory.h>
 
 namespace akari {
-    struct Pixel {
-        Spectrum radiance = Spectrum(0);
+    template <class T>
+    struct TPixel {
+        T radiance = Spectrum(0);
         Float weight = 0;
     };
     constexpr size_t TileSize = 16;
-    struct Tile {
+    template <class T>
+    struct TTile {
 
         Bounds2i bounds{};
         ivec2 _size;
-        astd::pmr::vector<Pixel> pixels;
+        astd::pmr::vector<TPixel<T>> pixels;
 
-        explicit Tile(const Bounds2i &bounds) : bounds(bounds), _size(bounds.size()), pixels(_size.x * _size.y) {}
+        explicit TTile(const Bounds2i &bounds) : bounds(bounds), _size(bounds.size()), pixels(_size.x * _size.y) {}
 
         auto &operator()(const vec2 &p) {
             auto q = ivec2(floor(p - vec2(bounds.pmin)));
@@ -67,19 +69,19 @@ namespace akari {
             pix.radiance += radiance;
         }
     };
-    class Film {
-
-        TImage<Spectrum> radiance;
+    template <class T>
+    class TFilm {
+        TImage<T> radiance;
         TImage<Float> weight;
 
       public:
         Float splatScale = 1.0f;
-        explicit Film(const ivec2 &dimension) : radiance(dimension), weight(dimension) {}
-        Tile tile(const Bounds2i &bounds) { return Tile(Bounds2i(ivec2(0), resolution()).intersect(bounds)); }
+        explicit TFilm(const ivec2 &dimension) : radiance(dimension), weight(dimension) {}
+        TTile<T> tile(const Bounds2i &bounds) { return TTile<T>(Bounds2i(ivec2(0), resolution()).intersect(bounds)); }
         [[nodiscard]] ivec2 resolution() const { return radiance.resolution(); }
 
         [[nodiscard]] Bounds2i bounds() const { return Bounds2i{ivec2(0), resolution()}; }
-        void merge_tile(const Tile &tile) {
+        void merge_tile(const TTile<T> &tile) {
             const auto lo = max(tile.bounds.pmin, ivec2(0, 0));
             const auto hi = min(tile.bounds.pmax, radiance.resolution());
             for (int y = lo.y; y < hi.y; y++) {
@@ -90,6 +92,7 @@ namespace akari {
                 }
             }
         }
+        template <typename = std::enable_if_t<std::is_same_v<T, Color3f>>>
         RGBAImage to_rgba_image() const {
             RGBAImage image(resolution());
             parallel_for(
@@ -98,19 +101,40 @@ namespace akari {
                     for (int x = 0; x < radiance.resolution().x; x++) {
                         if (weight(x, y) != 0) {
                             auto color = (radiance(x, y)) / weight(x, y);
-                            image(x, y) = RGBA(Color<float, 3>(color), 1);
+                            image(x, y) = RGBA(color, 1.0);
                         } else {
-                            image(x, y) = RGBA(Color<float, 3>(radiance(x, y)), 1);
+                            image(x, y) = RGBA(radiance(x, y), 1.0);
                         }
                     }
                 },
                 1024);
             return image;
         }
+        TImage<T> to_image() const {
+            TImage<T> image(resolution());
+            parallel_for(
+                radiance.resolution().y,
+                [&](uint32_t y, uint32_t) {
+                    for (int x = 0; x < radiance.resolution().x; x++) {
+                        if (weight(x, y) != 0) {
+                            auto color = (radiance(x, y)) / weight(x, y);
+                            image(x, y) = color;
+                        } else {
+                            image(x, y) = radiance(x, y);
+                        }
+                    }
+                },
+                1024);
+            return image;
+        }
+
+        template <typename = std::enable_if_t<std::is_same_v<T, Color3f>>>
         void write_image(const fs::path &path, const PostProcessor &postProcessor = GammaCorrection()) const {
             RGBAImage image = to_rgba_image();
             default_image_writer()->write(image, path, postProcessor);
         }
     };
+    using Film = TFilm<Spectrum>;
+    using Tile = TTile<Spectrum>;
 } // namespace akari
 #endif // AKARIRENDER_FILM_H

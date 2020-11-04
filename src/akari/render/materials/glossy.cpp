@@ -29,12 +29,12 @@ namespace akari::render {
     class GlossyMaterial : public Material {
       public:
         GlossyMaterial(std::shared_ptr<const Texture> color, std::shared_ptr<const Texture> roughness)
-            : color(color), roughness(roughness) {}
+            : color(color), roughness_(roughness) {}
         std::shared_ptr<const Texture> color;
-        std::shared_ptr<const Texture> roughness;
+        std::shared_ptr<const Texture> roughness_;
         BSDFClosure *evaluate(MaterialEvalContext &ctx) const override {
             auto R = color->evaluate(ctx.sp);
-            auto r = roughness->evaluate(ctx.sp)[0];
+            auto r = roughness_->evaluate(ctx.sp)[0];
             return ctx.allocator.new_object<MicrofacetReflection>(R, r);
         }
         Spectrum albedo(const ShadingPoint &sp) const override {
@@ -42,6 +42,7 @@ namespace akari::render {
             return R;
         }
         Float tr(const ShadingPoint &sp) const override { return color->tr(sp); }
+        Float roughness(const ShadingPoint &sp) const override { return roughness_->evaluate(sp)[0]; }
     };
 
     class GlossyMaterialNode final : public MaterialNode {
@@ -62,6 +63,7 @@ namespace akari::render {
             return make_pmr_shared<GlossyMaterial>(allocator, color->create_texture(allocator),
                                                    roughness->create_texture(allocator));
         }
+
         void finalize() override {
             color->finalize();
             roughness->finalize();

@@ -108,31 +108,30 @@ namespace akari::render {
         Allocator<> allocator(&memory_arena);
         init_scene(allocator);
 
-        auto film = Film(res);
         auto real_integrator = integrator->create_integrator(allocator);
         Timer timer;
-        real_integrator->render(scene.get(), &film);
+        RenderInput input;
+        input.scene = scene.get();
+        input.requested_aovs.emplace("color", AOVRequest{});
+        if (run_denoiser_) {
+            input.requested_aovs.emplace("albedo", AOVRequest{});
+            input.requested_aovs.emplace("normal", AOVRequest{});
+            input.requested_aovs.emplace("first_hit_albedo", AOVRequest{});
+            input.requested_aovs.emplace("first_hit_normal", AOVRequest{});
+        }
+        auto render_out = real_integrator->render(input);
         info("render done ({}s)", timer.elapsed_seconds());
-        if (!run_denoiser_) {
-            film.write_image(fs::path(output));
-        } else {
-            film.write_image(fs::path(output + std::string(".unfiltered.png")));
-            AOV aov;
-            auto render_aov = [&](const char *name) {
-                auto aov_integrator_node = make_aov_integrator(std::min(64, integrator->get_spp()), name);
-                auto integrator = aov_integrator_node->create_integrator(allocator);
-                Film aov_film(res);
-                integrator->render(scene.get(), &aov_film);
-                aov.aovs[name] = aov_film.to_rgba_image();
-            };
-            aov.aovs["color"] = film.to_rgba_image();
-            render_aov("normal");
-            render_aov("albedo");
+        std::optional<RGBAImage> output_image;
+        output_image = render_out.aovs["color"].value->to_rgba_image();
+        if (run_denoiser_) {
+            render_out.aovs["color"].value->write_image(fs::path(output + std::string(".color.png")));
+            render_out.aovs["albedo"].value->write_image(fs::path(output + std::string(".albedo.png")));
+            render_out.aovs["normal"].value->write_image(fs::path(output + std::string(".normal.png")));
             PluginManager<Denoiser> denoisers;
             info("denoising...");
             auto pi = denoisers.load_plugin("OIDNDenoiser");
             auto denoiser = pi->make_shared();
-            auto output_image = denoiser->denoise(scene.get(), aov);
+            output_image = denoiser->denoise(scene.get(), render_out);
             if (output_image) {
                 if (super_sampling_k > 1) {
                     int s = std::sqrt(super_sampling_k);
@@ -145,14 +144,13 @@ namespace akari::render {
                     conv.process(*output_image, down_sampled_image);
                     default_image_writer()->write(*output_image, fs::path(output + std::string(".ss.png")),
                                                   GammaCorrection());
-                    default_image_writer()->write(down_sampled_image, fs::path(output), GammaCorrection());
+                    output_image = std::move(down_sampled_image);
                 } else {
-                    default_image_writer()->write(*output_image, fs::path(output), GammaCorrection());
                 }
             }
             denoiser = nullptr;
         }
-
+        default_image_writer()->write(*output_image, fs::path(output), GammaCorrection());
         finalize();
     }
     void SceneNode::finalize() {

@@ -72,8 +72,8 @@ namespace akari {
         auto body = [&](ivec2 t, uint32_t) {
             for (int ty = 0; ty < tile_size[1]; ty++) {
                 for (int tx = 0; tx < tile_size[0]; tx++) {
-                    int x = tx + t[0] * tile_size;
-                    int y = ty + t[1] * tile_size;
+                    int x = tx + t[0] * tile_size[0];
+                    int y = ty + t[1] * tile_size[1];
                     func(ivec2(x, y));
                 }
             }

@@ -32,7 +32,15 @@
 #include <akari/render/common.h>
 // #include <akari/render/denoiser.h>
 namespace akari::render {
-    class AOVIntegrator : public Integrator {
+    RenderOutput UniAOVIntegrator::render(const RenderInput &input) {
+        auto scene = input.scene;
+        RenderOutput out;
+        const auto resolution = scene->camera->resolution();
+        out.aovs["color"].value = Film(resolution);
+        do_render(scene, &out.aovs["color"].value.value());
+        return out;
+    }
+    class AOVIntegrator : public UniAOVIntegrator {
         const int tile_size = 16;
 
       public:
@@ -43,8 +51,7 @@ namespace akari::render {
         int spp = 16;
         AOV aov;
         AOVIntegrator(int spp, AOV aov) : spp(spp), aov(aov) {}
-        void render(const Scene *scene, Film *film) override {
-
+        void do_render(const Scene *scene, Film *film) override {
             AKR_ASSERT_THROW(glm::all(glm::equal(film->resolution(), scene->camera->resolution())));
             auto n_tiles = ivec2(film->resolution() + ivec2(tile_size - 1)) / ivec2(tile_size);
             debug("resolution: {}, tile size: {}, tiles: {}", film->resolution(), tile_size, n_tiles);

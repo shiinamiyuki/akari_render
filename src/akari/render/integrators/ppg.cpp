@@ -710,7 +710,7 @@ namespace akari::render {
         }
         double ratio() const { return double(good.load()) / double(total.load()); }
     };
-    class GuidedPathTracerIntegrator : public Integrator {
+    class GuidedPathTracerIntegrator : public UniAOVIntegrator {
         int spp;
         int max_depth;
         const int tile_size = 16;
@@ -721,7 +721,7 @@ namespace akari::render {
       public:
         GuidedPathTracerIntegrator(int spp, int max_depth, int trainingSamples)
             : spp(spp), max_depth(max_depth), trainingSamples(trainingSamples) {}
-        void render(const Scene *scene, Film *film) override {
+        void do_render(const Scene *scene, Film *film) override {
             sTree.reset(new STree(scene->accel->world_bounds()));
 
             AKR_ASSERT_THROW(glm::all(glm::equal(film->resolution(), scene->camera->resolution())));
