@@ -90,7 +90,7 @@ namespace akari {
         fs::path program_path;
     };
     AKR_EXPORT CoreGlobals *core_globals();
-
-   
+    AKR_EXPORT void akari_init();
+    AKR_EXPORT void akari_finalize();
 } // namespace akari
 #endif // AKARIRENDER_AKARI_H

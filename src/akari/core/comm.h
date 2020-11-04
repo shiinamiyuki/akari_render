@@ -27,7 +27,7 @@
 #include <mutex>
 #include <optional>
 #include <type_traits>
-namespace akari::spmd {
+namespace akari::comm {
     class Node;
     class World;
     using Message = std::vector<char>;
@@ -133,5 +133,10 @@ namespace akari::spmd {
         virtual void listen(int port) = 0;
         virtual void connect(const std::list<std::pair<std::string, int>> &workers) = 0;
     };
+    // *this process*
     AKR_EXPORT std::shared_ptr<World> local_world();
-} // namespace akari::spmd
+
+    AKR_EXPORT std::shared_ptr<World> comm_world();
+    AKR_EXPORT void init_comm_world(const std::shared_ptr<World> &world);
+    AKR_EXPORT void finalize_comm_world();
+} // namespace akari::comm

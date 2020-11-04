@@ -20,10 +20,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <akari/core/spmd.h>
+#include <akari/core/comm.h>
 #include <deque>
 #include <mutex>
-namespace akari::spmd {
+namespace akari::comm {
     class AKR_EXPORT LocalWorld : public World {
         std::shared_ptr<Node> local_;
         // std::mutex m;
@@ -67,7 +67,7 @@ namespace akari::spmd {
             }
             channels.clear();
         }
-        void barrier()override {}
+        void barrier() override {}
     };
     class AKR_EXPORT LocalNode : public Node {
       public:
@@ -86,4 +86,9 @@ namespace akari::spmd {
         std::call_once(flag, [&] { w.reset(new LocalWorld()); });
         return w;
     }
-} // namespace akari::spmd
+
+    static std::shared_ptr<World> comm_world_;
+    AKR_EXPORT std::shared_ptr<World> comm_world() { return comm_world_; }
+    AKR_EXPORT void init_comm_world(const std::shared_ptr<World> &world) { comm_world_ = world; }
+    AKR_EXPORT void finalize_comm_world() { comm_world_->finalize(); }
+} // namespace akari::comm

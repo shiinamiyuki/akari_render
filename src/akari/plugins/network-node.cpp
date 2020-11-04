@@ -23,9 +23,9 @@
 #include <asio.hpp>
 #include <optional>
 #include <akari/core/file.h>
-#include <akari/core/spmd.h>
+#include <akari/core/comm.h>
 #include <unordered_set>
-namespace akari::spmd {
+namespace akari::comm {
     using asio::ip::tcp;
     static constexpr uint32_t FILE_SERVER_TAG = 4000;
     static constexpr uint32_t INTERNAL_TAG = 32765;
@@ -291,4 +291,4 @@ namespace akari::spmd {
         void initialize() override {}
     };
     AKR_EXPORT_PLUGIN(NetworkWorld, NetworkWorld, AbstractNetworkWorld)
-} // namespace akari::spmd
+} // namespace akari::comm

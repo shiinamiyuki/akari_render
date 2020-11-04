@@ -154,15 +154,6 @@ target_link_libraries(akari libakari_render)
 set_target_CUDA_props(akari)
 copy_to_dist(akari)
 
-
-add_executable(akari-net src/akari/cmd/akari-net.cpp )
-target_include_directories(akari-net PUBLIC src/)
-target_link_libraries(akari-net libakari_render)
-set_target_CUDA_props(akari-net)
-copy_to_dist(akari-net)
-
-
-
 add_executable(akari-import src/akari/cmd/akari-import.cpp )
 target_include_directories(akari-import PUBLIC src/)
 target_link_libraries(akari-import libakari_core assimp)

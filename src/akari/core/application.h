@@ -25,9 +25,11 @@
 
 #include <akari/core/platform.h>
 namespace akari {
+    // Utility class with calls akari_init() and akari_finalize()
+    // Put this in your main file
     class AKR_EXPORT Application {
       public:
-        Application(int argc,const char ** argv);
+        Application(int argc, const char **argv);
         ~Application();
     };
 
