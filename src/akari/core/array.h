@@ -21,13 +21,14 @@
 // SOFTWARE.
 #include <akari/core/memory.h>
 #include <akari/core/parallel.h>
-
+#include <numeric>
+#include <execution>
 namespace akari {
     template <typename T, class Allocator = std::allocator<T>>
     class Array2D {
       protected:
-        std::vector<T, Allocator> data_;
         ivec2 dimension_;
+        std::vector<T, Allocator> data_;
 
       public:
         T *data() { return data_.data(); }
@@ -66,7 +67,7 @@ namespace akari {
         return tmp;                                                                                                    \
     }                                                                                                                  \
     friend Array2D operator op(const T &lhs, const Array2D &rhs) {                                                     \
-        auto tmp = Array2D(dimension_);                                                                                \
+        auto tmp = Array2D(rhs.dimension());                                                                           \
         tmp.fill(lhs);                                                                                                 \
         tmp assign_op rhs;                                                                                             \
         return tmp;                                                                                                    \

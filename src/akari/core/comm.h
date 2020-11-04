@@ -26,6 +26,7 @@
 #include <deque>
 #include <mutex>
 #include <optional>
+#include <condition_variable>
 #include <type_traits>
 namespace akari::comm {
     class Node;
@@ -94,11 +95,14 @@ namespace akari::comm {
         virtual void barrier() = 0;
     };
     class ByteChannel : public std::enable_shared_from_this<ByteChannel> {
+      public:
+        const ChannelRecord record;
+
+      private:
         std::shared_ptr<World> world_;
         std::shared_ptr<MessageQueue<Message>> message;
 
       public:
-        const ChannelRecord record;
         ByteChannel(ChannelRecord record, std::shared_ptr<World> world_)
             : record(record), world_(world_), message(new MessageQueue<Message>()) {}
         std::shared_ptr<World> world() const { return world_; }

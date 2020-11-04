@@ -72,7 +72,7 @@ namespace akari {
         [[nodiscard]] ivec2 resolution() const { return array.dimension(); }
         T *data() { return array.data(); }
 
-        [[nodiscard]] const T *data() const { return array.data() }
+        [[nodiscard]] const T *data() const { return array.data(); }
     };
 
     class RGBImage : public TImage<Color<float, 3>> {

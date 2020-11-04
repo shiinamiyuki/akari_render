@@ -592,7 +592,6 @@ namespace akari::render {
                 if (depth == 0 || BSDFType::Unset != (prev_vertex->sampled_lobe() & BSDFType::Specular)) {
                     accumulate_radiance_wo_beta(I);
                 } else {
-                    vec3 prev_p = prev_vertex->p();
                     ReferencePoint ref;
                     ref.ng = prev_vertex->ng();
                     ref.p = prev_vertex->p();
@@ -759,7 +758,7 @@ namespace akari::render {
                     for (int y = tile.bounds.pmin.y; y < tile.bounds.pmax.y; y++) {
                         for (int x = tile.bounds.pmin.x; x < tile.bounds.pmax.x; x++) {
                             auto &sampler = samplers[x + y * film->resolution().x];
-                            for (int s = 0; s < samples; s++) {
+                            for (size_t s = 0; s < samples; s++) {
                                 sampler->start_next_sample();
                                 GuidedPathTracer pt;
                                 pt.sTree = sTree;

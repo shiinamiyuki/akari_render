@@ -89,7 +89,7 @@ namespace akari::render {
         void traverse(TraversalCallback *cb) override { underlying_->traverse(cb); }
         void finalize() override { underlying_->finalize(); }
         bool is_named() const final override { return true; }
-        std::shared_ptr<SceneGraphNode> underlying() { return underlying_; }
+        std::shared_ptr<SceneGraphNode> underlying() const { return underlying_; }
     };
 
     template <typename T>

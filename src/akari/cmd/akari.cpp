@@ -99,8 +99,6 @@ Options:
         Set this process as a worker and listen on <port>
         Default port is 7856
 
-   
-        Set port for listening
     )" << std::endl;
     };
     auto ensure = [=](std::string_view option, int k) {

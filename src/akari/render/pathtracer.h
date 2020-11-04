@@ -149,7 +149,6 @@ namespace akari::render {
             if (depth == 0 || BSDFType::Unset != (prev_vertex->sampled_lobe() & BSDFType::Specular)) {
                 accumulate_radiance(I);
             } else {
-                vec3 prev_p = prev_vertex->p();
                 ReferencePoint ref;
                 ref.ng = prev_vertex->ng();
                 ref.p = prev_vertex->p();
