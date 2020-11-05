@@ -225,4 +225,5 @@ namespace akari {
         std::vector<TableEntry, Allocator> table;
         size_t nStored = 0;
     };
+    
 } // namespace akari

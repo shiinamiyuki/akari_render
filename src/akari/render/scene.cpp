@@ -121,36 +121,65 @@ namespace akari::render {
         }
         auto render_out = real_integrator->render(input);
         info("render done ({}s)", timer.elapsed_seconds());
-        std::optional<RGBAImage> output_image;
-        output_image = render_out.aovs["color"].value->to_rgba_image();
+        std::optional<Image> output_image;
+        output_image = render_out.aovs["color"].value->to_rgb_image();
+        std::unique_ptr<ImageWriter> exr_writer;
+        PluginManager<ImageWriter> exr_writers;
+        auto ext_pi = exr_writers.try_load_plugin("HDRImageWriter");
+        if (ext_pi) {
+            exr_writer = ext_pi->make_unique();
+        }
+        auto write_intermediate = [&](const Film &film, const char *component, bool hdr) {
+            auto image = film.to_rgb_image();
+            auto filename = extend_filename(output, component);
+            ldr_image_writer()->write(image, filename);
+            if (hdr && exr_writer) {
+                exr_writer->write(image, filename.replace_extension(".exr"));
+            }
+        };
+        auto write_intermediate_img = [&](const Image &image, const char *component, bool hdr) {
+            auto filename = extend_filename(output, component);
+            ldr_image_writer()->write(image, filename);
+            if (hdr && exr_writer) {
+                exr_writer->write(image, filename.replace_extension(".exr"));
+            }
+        };
         if (run_denoiser_) {
-            render_out.aovs["color"].value->write_image(fs::path(output + std::string(".color.png")));
-            render_out.aovs["albedo"].value->write_image(fs::path(output + std::string(".albedo.png")));
-            render_out.aovs["normal"].value->write_image(fs::path(output + std::string(".normal.png")));
+            write_intermediate(*render_out.aovs["color"].value, ".color", false);
+            write_intermediate(*render_out.aovs["albedo"].value, ".albedo", false);
+            write_intermediate(*render_out.aovs["normal"].value, ".normal", false);
             PluginManager<Denoiser> denoisers;
             info("denoising...");
             auto pi = denoisers.load_plugin("OIDNDenoiser");
             auto denoiser = pi->make_shared();
             output_image = denoiser->denoise(scene.get(), render_out);
+            AKR_ASSERT(is_rgb_image(*output_image));
             if (output_image) {
                 if (super_sampling_k > 1) {
                     int s = std::sqrt(super_sampling_k);
-                    TImage<Float> avg_kernel(ivec2(s, s));
-                    for (int i = 0; i < s * s; i++) {
-                        avg_kernel.data()[i] = 1.0 / (s * s);
+                    write_intermediate_img(*output_image, "ss", false);
+
+                    Array3D<float> avg_kernel(ivec3(3, s, s));
+                    for (int x = 0; x < s; x++) {
+                        for (int y = 0; y < s; y++) {
+                            avg_kernel(x, y, 0) = 1.0 / (s * s);
+                            avg_kernel(x, y, 1) = 1.0 / (s * s);
+                            avg_kernel(x, y, 2) = 1.0 / (s * s);
+                        }
                     }
-                    Convolution conv(avg_kernel, ivec2(s, s));
-                    RGBAImage down_sampled_image;
-                    conv.process(*output_image, down_sampled_image);
-                    default_image_writer()->write(*output_image, fs::path(output + std::string(".ss.png")),
-                                                  GammaCorrection());
+                    Image down_sampled_image = rgb_image(output_image->resolution() / ivec2(s));
+                    down_sampled_image.array3d() =
+                        std::move(convolve(output_image->array3d(), avg_kernel, ivec3(3, s, s)));
                     output_image = std::move(down_sampled_image);
-                } else {
                 }
             }
             denoiser = nullptr;
         }
-        default_image_writer()->write(*output_image, fs::path(output), GammaCorrection());
+        ldr_image_writer()->write(*output_image, fs::path(output));
+        if(exr_writer){
+            exr_writer->write(*output_image, fs::path(output).replace_extension(".exr"));
+        }
+        exr_writer = nullptr;
         finalize();
     }
     void SceneNode::finalize() {

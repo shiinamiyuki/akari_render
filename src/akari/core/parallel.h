@@ -25,6 +25,7 @@
 
 #include <akari/core/akari.h>
 #include <akari/core/math.h>
+#include <akari/core/util.h>
 #include <atomic>
 #include <functional>
 #include <future>
@@ -52,45 +53,89 @@ namespace akari {
 
         void set(Float v) { val = v; }
     };
-
-    AKR_EXPORT void parallel_for(int count, const std::function<void(uint32_t, uint32_t)> &func, size_t chunkSize = 1);
-    AKR_EXPORT size_t num_work_threads();
-    inline void parallel_for_2d(const ivec2 &dim, const std::function<void(ivec2, uint32_t)> &func,
-                                size_t chunkSize = 1) {
-        parallel_for(
-            dim.x * dim.y,
-            [&](uint32_t idx, int tid) {
-                auto x = idx % dim.x;
-                auto y = idx / dim.x;
-                func(ivec2(x, y), tid);
-            },
-            chunkSize);
-    }
-    template <class F>
-    void tiled_for_2d(const ivec2 &dim, const ivec2 &tile_size, bool parallel, F &&func) {
-        auto tiles = (dim + tile_size - ivec2(1)) / tile_size;
-        auto body = [&](ivec2 t, uint32_t) {
-            for (int ty = 0; ty < tile_size[1]; ty++) {
-                for (int tx = 0; tx < tile_size[0]; tx++) {
-                    int x = tx + t[0] * tile_size[0];
-                    int y = ty + t[1] * tile_size[1];
-                    func(ivec2(x, y));
-                }
-            }
-        };
-        if (parallel) {
-            parallel_for_2d(tiles, body);
-        } else {
-            for (int j = 0; j < tiles[1]; j++) {
-                for (int i = 0; i < tiles[0]; i++) {
-                    body(ivec2(i, j), 0);
-                }
-            }
-        }
-    }
     namespace thread {
+        template <int N>
+        struct BlockedDim {
+            static_assert(N <= 3 && N >= 1);
+            Vector<int, N> dim;
+            Vector<int, N> block;
+        };
+        template <int N>
+        BlockedDim<N> blocked_range(const Vector<int, N> dim, const Vector<int, N> &block = Vector<int, N>(1)) {
+            return BlockedDim<N>{dim, block};
+        }
+        template <int N>
+        BlockedDim<N> blocked_range(const int dim, const int block) {
+            return BlockedDim<N>{Vector<int, N>(dim), Vector<int, N>(block)};
+        }
+        AKR_EXPORT void parallel_for_impl(size_t count, const std::function<void(size_t, uint32_t)> &func,
+                                          size_t chunkSize);
+
+        inline void parallel_for(size_t count, const std::function<void(size_t, uint32_t)> &func) {
+            parallel_for_impl(count, func, 1);
+        }
+        inline void parallel_for(BlockedDim<1> blocked_dim, const std::function<void(size_t, uint32_t)> &func) {
+            parallel_for_impl(blocked_dim.dim[0], func, blocked_dim.block[0]);
+        }
+        AKR_EXPORT size_t num_work_threads();
+        inline void parallel_for(BlockedDim<2> blocked_dim, const std::function<void(ivec2, uint32_t)> &func) {
+            ivec2 tiles = (blocked_dim.dim + blocked_dim.block - ivec2(1)) / blocked_dim.block;
+            parallel_for(tiles.x * tiles.y, [&](size_t idx, int tid) {
+                ivec2 t(idx % tiles.x, idx / tiles.x);
+                for (int ty = 0; ty < blocked_dim.block[1]; ty++) {
+                    for (int tx = 0; tx < blocked_dim.block[0]; tx++) {
+                        int x = tx + t[0] * blocked_dim.block[0];
+                        int y = ty + t[1] * blocked_dim.block[1];
+                        func(ivec2(x, y), tid);
+                    }
+                }
+            });
+        }
+        inline void parallel_for(BlockedDim<3> blocked_dim, const std::function<void(ivec3, uint32_t)> &func) {
+            ivec3 tiles = (blocked_dim.dim + blocked_dim.block - ivec3(1)) / blocked_dim.block;
+            parallel_for(tiles.x * tiles.y * tiles.z, [&](size_t idx, int tid) {
+                auto z_ = idx / (tiles.x * tiles.y);
+                auto y_ = (idx % (tiles.x * tiles.y)) / tiles.x;
+                auto x_ = (idx % (tiles.x * tiles.y)) % tiles.x;
+                ivec3 t(x_, y_, z_);
+                for (int tz = 0; tz < blocked_dim.block[2]; tz++) {
+                    for (int ty = 0; ty < blocked_dim.block[1]; ty++) {
+                        for (int tx = 0; tx < blocked_dim.block[0]; tx++) {
+                            int x = tx + t[0] * blocked_dim.block[0];
+                            int y = ty + t[1] * blocked_dim.block[1];
+                            int z = tz + t[2] * blocked_dim.block[2];
+                            func(ivec3(x, y, z), tid);
+                        }
+                    }
+                }
+            });
+        }
+        template <class ParIter, class F>
+        auto parallel_for_each(ParIter begin, ParIter end, F &&f) -> decltype(*std::declval<ParIter>()) {
+            size_t count = std::distance(begin, end);
+            parallel_for(count, [&](size_t idx, uint32_t) { f(*(begin + idx)); });
+        }
+        // F :: T -> size_t -> T
+        template <class ParIter, class T, class F>
+        T parallel_reduce(ParIter begin, ParIter end, T init, F &&f) {
+            T acc = init;
+            std::mutex m;
+            size_t count = std::distance(begin, end);
+            auto block_size = (count + thread::num_work_threads() - 1) / num_work_threads();
+            parallel_for(thread::num_work_threads(), [&](size_t idx, uint32_t tid) {
+                T cache = init;
+                auto it = begin + tid * block_size;
+                for (size_t i = 0; i < block_size && it < end; i++) {
+                    cache = f(cache, *);
+                    it++;
+                }
+                std::lock_guard<std::mutex> lock(m);
+                acc = f(acc, cache);
+            });
+        }
+        AKR_EXPORT void init(size_t num_threads);
         AKR_EXPORT void finalize();
-    }
+    } // namespace thread
 
     // Wrapper around std::future<T>
     template <typename T>
@@ -116,7 +161,7 @@ namespace akari {
     };
     template <class _Fty, class... _ArgTypes>
     Future<std::invoke_result_t<std::decay_t<_Fty>, std::decay_t<_ArgTypes>...>>
-    async_do(std::launch policy, _Fty &&_Fnarg, _ArgTypes &&... _Args) {
+    async_do(std::launch policy, _Fty &&_Fnarg, _ArgTypes &&..._Args) {
         return std::async(policy, std::forward<_Fty>(_Fnarg), std::forward<_ArgTypes>(_Args)...);
     }
 } // namespace akari

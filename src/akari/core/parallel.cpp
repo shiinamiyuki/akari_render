@@ -28,14 +28,14 @@
 #include <mutex>
 #include <thread>
 
-namespace akari {
-    size_t num_work_threads() { return std::thread::hardware_concurrency(); }
+namespace akari::thread {
+
     struct ParallelForContext {
         std::atomic_uint32_t workIndex;
         size_t count = 0;
         uint32_t chunkSize = 0;
         ParallelForContext() : workIndex(0) {}
-        const std::function<void(uint32_t, uint32_t)> *func = nullptr;
+        const std::function<void(size_t, uint32_t)> *func = nullptr;
         bool done() const { return workIndex >= count; }
         ParallelForContext(const ParallelForContext &rhs)
             : workIndex(rhs.workIndex.load()), count(rhs.count), chunkSize(rhs.chunkSize), func(rhs.func) {}
@@ -115,10 +115,14 @@ namespace akari {
     namespace thread_internal {
         static std::once_flag flag;
         static std::unique_ptr<ParallelForWorkPool> pool;
+        static size_t n_threads = std::thread::hardware_concurrency();
     } // namespace thread_internal
-    void parallel_for(int count, const std::function<void(uint32_t, uint32_t)> &func, size_t chunkSize) {
+    size_t num_work_threads() { return thread_internal::n_threads; }
+    void parallel_for_impl(size_t count, const std::function<void(size_t, uint32_t)> &func, size_t chunkSize) {
         using namespace thread_internal;
-        std::call_once(flag, [&]() { pool = std::make_unique<ParallelForWorkPool>(); });
+        if (!pool) {
+            throw std::runtime_error("thread pool not initialized. call thread::init(num_threads);");
+        }
         ParallelForContext ctx;
         ctx.func = &func;
         ctx.chunkSize = (uint32_t)chunkSize;
@@ -127,10 +131,18 @@ namespace akari {
         pool->enqueue(ctx);
         pool->wait();
     }
-    namespace thread {
-        void finalize() {
-            using namespace thread_internal;
-            pool.reset(nullptr);
+
+    AKR_EXPORT void init(size_t num_threads) {
+        using namespace thread_internal;
+        if (pool) {
+            AKR_PANIC("thread::init(num_threads); called multiple times");
         }
-    } // namespace thread
-} // namespace akari
+        n_threads = num_threads;
+        std::call_once(flag, [&]() { pool = std::make_unique<ParallelForWorkPool>(); });
+    }
+    void finalize() {
+        using namespace thread_internal;
+        pool.reset(nullptr);
+    }
+
+} // namespace akari::thread

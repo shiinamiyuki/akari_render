@@ -33,7 +33,7 @@ namespace akari::render {
     class Denoiser {
       public:
         virtual void add_aov_requests(RenderInput &inputs) = 0;
-        virtual std::optional<RGBAImage> denoise(const Scene *scene, RenderOutput &aov) = 0;
+        virtual std::optional<Image> denoise(const Scene *scene, RenderOutput &aov) = 0;
         virtual ~Denoiser() = default;
     };
 } // namespace akari::render

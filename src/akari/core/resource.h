@@ -26,7 +26,7 @@
 #include <akari/core/akari.h>
 #include <akari/core/platform.h>
 #include <akari/core/error.hpp>
-
+#include <akari/core/image.h>
 namespace akari {
     class AKR_EXPORT Resource {
       public:
@@ -64,13 +64,12 @@ namespace akari {
     };
     AKR_EXPORT std::shared_ptr<ResourceManager> resource_manager();
 
-    class RGBAImage;
     class AKR_EXPORT ImageResource : public Resource {
-        std::shared_ptr<RGBAImage> _image;
+        std::shared_ptr<Image> _image;
 
       public:
         Expected<bool> load(const fs::path &) override;
-        const std::shared_ptr<RGBAImage> &image() const { return _image; }
+        const std::shared_ptr<Image> &image() const { return _image; }
     };
 } // namespace akari
 

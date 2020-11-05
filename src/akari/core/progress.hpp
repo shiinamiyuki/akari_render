@@ -26,8 +26,9 @@
 #include <cstdio>
 #include <functional>
 namespace akari {
-    inline void show_progress(double progress, size_t width, double elpased, double remaining) {
+    inline void show_progress(double progress, double elpased, double remaining) {
         printf("[");
+        size_t width = 80;//terminal_width() - 30;
         size_t pos = size_t(width * progress);
         for (size_t i = 0; i < width; ++i) {
             if (i < pos)

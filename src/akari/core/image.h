@@ -36,49 +36,60 @@ namespace akari {
     template <class T>
     class TImage {
         using Alloc = astd::pmr::polymorphic_allocator<T>;
-        Array2D<T, Alloc> array;
+        using Array = Array3D<T, Alloc>;
+        Array array;
+
+        std::vector<std::string> channel_names_;
 
       public:
-        const Array2D<T, Alloc> &array2d() const { return array; }
-        Array2D<T, Alloc> &array2d() { return array; }
-        TImage(const ivec2 &dim = ivec2(1), Allocator<> allocator = Allocator<>()) : array(dim, allocator) {}
-        TImage(Array2D<T, Alloc> array) : array(std::move(array)) {}
-        const T &operator()(int x, int y) const {
-            x = std::clamp(x, 0, resolution()[0] - 1);
-            y = std::clamp(y, 0, resolution()[1] - 1);
-            return array(x, y);
-        }
-
-        T &operator()(int x, int y) {
-            x = std::clamp(x, 0, resolution()[0] - 1);
-            y = std::clamp(y, 0, resolution()[1] - 1);
-            return array(x, y);
-        }
-
-        const T &operator()(float x, float y) const { return (*this)(vec2(x, y)); }
-
-        T &operator()(float x, float y) { return (*this)(vec2(x, y)); }
-
-        const T &operator()(const ivec2 &p) const { return (*this)(p.x, p.y); }
-
-        T &operator()(const ivec2 &p) { return (*this)(p.x, p.y); }
-
-        const T &operator()(const vec2 &p) const { return (*this)(ivec2(p * vec2(resolution()))); }
-
-        T &operator()(const vec2 &p) { return (*this)(ivec2(p * vec2(resolution()))); }
-
-        void resize(const ivec2 &size) { array.resize(size); }
-        void fill(const T &v) { array.fill(v); }
-        [[nodiscard]] ivec2 resolution() const { return array.dimension(); }
+        const T *data() const { return array.data(); }
         T *data() { return array.data(); }
+        [[nodiscard]] const Array &array3d() const { return array; }
+        [[nodiscard]] Array &array3d() { return array; }
+        const std::string &channel_name(int ch) const { return channel_names_[ch]; }
+        int channels() const { return (int)channel_names_.size(); }
+        TImage(const std::vector<std::string> channel_names_, const ivec2 &dim = ivec2(1),
+               Allocator<> allocator = Allocator<>())
+            : array(ivec3((int)channel_names_.size(), dim.x, dim.y)), channel_names_(channel_names_) {}
+        [[nodiscard]] const T &operator()(int x, int y, int ch) const {
+            x = std::clamp(x, 0, resolution()[0] - 1);
+            y = std::clamp(y, 0, resolution()[1] - 1);
+            return array(ch, x, y);
+        }
 
-        [[nodiscard]] const T *data() const { return array.data(); }
-    };
+        [[nodiscard]] T &operator()(int x, int y, int ch) {
+            x = std::clamp(x, 0, resolution()[0] - 1);
+            y = std::clamp(y, 0, resolution()[1] - 1);
+            return array(ch, x, y);
+        }
 
-    class RGBImage : public TImage<Color<float, 3>> {
-      public:
-        using TImage<Color<float, 3>>::TImage;
+        [[nodiscard]] const T &operator()(float x, float y, int ch) const { return (*this)(vec2(x, y), ch); }
+
+        [[nodiscard]] T &operator()(float x, float y, int ch) { return (*this)(vec2(x, y), ch); }
+
+        [[nodiscard]] const T &operator()(const ivec2 &p, int ch) const { return (*this)(p.x, p.y, ch); }
+
+        [[nodiscard]] T &operator()(const ivec2 &p, int ch) { return (*this)(p.x, p.y, ch); }
+
+        [[nodiscard]] const T &operator()(const vec2 &p, int ch) const {
+            return (*this)(ivec2(p * vec2(resolution())), ch);
+        }
+
+        [[nodiscard]] T &operator()(const vec2 &p, int ch) { return (*this)(ivec2(p * vec2(resolution())), ch); }
+
+        void resize(const ivec2 &size) { array.resize(ivec3(array.dimension().x, size.x, size.y)); }
+
+        void fill(const T &v) { array.fill(v); }
+
+        [[nodiscard]] ivec2 resolution() const { return ivec2(array.dimension().y, array.dimension().z); }
     };
+    using Image = TImage<float>;
+    inline Image rgba_image(const ivec2 &dim) { return Image({"R", "G", "B", "A"}, dim); }
+    inline Image rgb_image(const ivec2 &dim) { return Image({"R", "G", "B"}, dim); }
+    inline bool is_rgb_image(const Image &image) {
+        return image.channels() == 3 && image.channel_name(0) == "R" && image.channel_name(1) == "G" &&
+               image.channel_name(2) == "B";
+    }
 
     struct alignas(16) RGBA {
         RGB rgb;
@@ -86,64 +97,20 @@ namespace akari {
         RGBA() = default;
         RGBA(vec3 rgb, float alpha) : rgb(rgb), alpha(alpha) {}
     };
-    class RGBAImage : public TImage<RGBA> {
-      public:
-        using TImage<RGBA>::TImage;
-    };
-
-    class AKR_EXPORT PostProcessor {
-      public:
-        virtual void process(const RGBAImage &in, RGBAImage &out) const = 0;
-    };
-    class IdentityProcessor : public PostProcessor {
-      public:
-        void process(const RGBAImage &in, RGBAImage &out) const override { out = in; }
-    };
-    class AKR_EXPORT GammaCorrection : public PostProcessor {
-
-      public:
-        explicit GammaCorrection() {}
-        void process(const RGBAImage &in, RGBAImage &out) const override;
-    };
-    class AKR_EXPORT Convolution : public PostProcessor {
-        TImage<Float> kernel;
-        ivec2 stride;
-
-      public:
-        explicit Convolution(TImage<Float> kernel, ivec2 stride) : kernel(kernel), stride(stride) {}
-        void process(const RGBAImage &in, RGBAImage &out) const override;
-    };
-    class PostProcessingPipeline : public PostProcessor {
-        std::list<std::shared_ptr<PostProcessor>> pipeline;
-
-      public:
-        void Add(const std::shared_ptr<PostProcessor> &p) { pipeline.emplace_back(p); }
-        void process(const RGBAImage &in, RGBAImage &out) const override {
-            RGBAImage tmp;
-            for (auto it = pipeline.begin(); it != pipeline.end(); it++) {
-                if (it == pipeline.begin()) {
-                    tmp = in;
-                } else {
-                    tmp = out;
-                }
-                (*it)->process(tmp, out);
-            }
-        }
-    };
 
     class AKR_EXPORT ImageWriter {
       public:
-        virtual bool write(const RGBAImage &image, const fs::path &, const PostProcessor &postProcessor) = 0;
+        virtual bool write(const Image &image, const fs::path &) = 0;
         virtual ~ImageWriter() = default;
     };
 
     class AKR_EXPORT ImageReader {
       public:
-        virtual std::shared_ptr<RGBAImage> read(const fs::path &) = 0;
+        virtual std::shared_ptr<Image> read(const fs::path &) = 0;
         virtual ~ImageReader() = default;
     };
 
-    AKR_EXPORT std::shared_ptr<ImageWriter> default_image_writer();
+    AKR_EXPORT std::shared_ptr<ImageWriter> ldr_image_writer();
     AKR_EXPORT std::shared_ptr<ImageReader> default_image_reader();
 
 } // namespace akari

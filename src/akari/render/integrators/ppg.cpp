@@ -750,7 +750,7 @@ namespace akari::render {
 
                 info("Learning pass {}, spp:{}", pass + 1, samples);
                 accumulatedSamples += samples;
-                parallel_for_2d(n_tiles, [=, &resources, &samplers](const ivec2 &tile_pos, int tid) {
+                thread::parallel_for(thread::blocked_range<2>(n_tiles), [=, &resources, &samplers](const ivec2 &tile_pos, int tid) {
                     Allocator<> allocator(resources[tid]);
                     Bounds2i tileBounds = Bounds2i{tile_pos * (int)tile_size, (tile_pos + ivec2(1)) * (int)tile_size};
                     auto tile = film->tile(tileBounds);
@@ -795,14 +795,14 @@ namespace akari::render {
                 if (show) {
                     double tiles_per_sec = cur / std::max(1e-7, timer.elapsed_seconds());
                     double remaining = (total - cur) / tiles_per_sec;
-                    show_progress(double(cur) / double(total), 60, timer.elapsed_seconds(), remaining);
+                    show_progress(double(cur) / double(total), timer.elapsed_seconds(), remaining);
                 }
                 if (cur == total) {
                     putchar('\n');
                 }
             });
             non_zero_path.clear();
-            parallel_for_2d(n_tiles, [=, &mutex, &resources, &samplers](const ivec2 &tile_pos, int tid) {
+            thread::parallel_for(thread::blocked_range<2>(n_tiles), [=, &mutex, &resources, &samplers](const ivec2 &tile_pos, int tid) {
                 Allocator<> allocator(resources[tid]);
                 Bounds2i tileBounds = Bounds2i{tile_pos * (int)tile_size, (tile_pos + ivec2(1)) * (int)tile_size};
                 auto tile = film->tile(tileBounds);

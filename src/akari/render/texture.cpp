@@ -42,7 +42,7 @@ namespace akari::render {
     };
 
     class ImageTextureNode final : public TextureNode {
-        std::shared_ptr<RGBAImage> image;
+        std::shared_ptr<Image> image;
         ObjectCache<std::shared_ptr<const Texture>> tex_cache;
 
       public:

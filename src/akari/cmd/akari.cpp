@@ -26,6 +26,7 @@
 #include <akari/core/application.h>
 #include <akari/core/logger.h>
 #include <akari/core/parser.h>
+#include <akari/core/parallel.h>
 #include <akari/render/scenegraph.h>
 #include <akari/render/scene.h>
 #include <akari/core/comm.h>
@@ -60,6 +61,7 @@ std::shared_ptr<comm::World> init_master() {
 }
 std::shared_ptr<comm::World> init_local() { return comm::local_world(); }
 static auto init_func = &init_local;
+static size_t num_threads = std::thread::hardware_concurrency();
 
 void parse(int argc, const char **argv) {
     auto print_help = [] {
@@ -117,6 +119,10 @@ Options:
         if (option == "-h" || option == "--help") {
             print_help();
             exit(0);
+        } else if (option == "--threads" || option == "-t") {
+            ensure(option, i + 1);
+            num_threads = std::stoi(argv[i + 1]);
+            i += 2;
         } else if (option == "--spp") {
             ensure(option, i + 1);
             spp = std::stoi(argv[i + 1]);
@@ -183,14 +189,17 @@ void parse_and_run() {
     if (denoise) {
         scene->run_denosier(denoise);
     }
+    info("rendering with {} threads", thread::num_work_threads());
     scene->render();
 }
-
+void display_build_info() { std::cout << info_build() << std::endl; }
 int main(int argc, const char **argv) {
     try {
         Application app(argc, argv);
+        thread::init(num_threads);
         comm::init_comm_world(init_func());
         auto _ = AtScopeExit([&] { comm::finalize_comm_world(); });
+        display_build_info();
         parse(argc, argv);
         parse_and_run();
     } catch (std::exception &e) {

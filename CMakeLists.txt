@@ -10,7 +10,7 @@ option(AKR_ENABLE_ASL "Enable Akari Shading Language for procedural shading" OFF
 option(AKR_ENABLE_PYTHON "Build Python Binding" OFF)
 option(AKR_ENABLE_OIDN "Use Intel OpenImageDenoise" OFF)
 option(AKR_USE_PREBUILD_OIDN "Use prebuilt Intel OpenImageDenoise" OFF)
-option(AKR_ENABLE_EXR "Use OpenEXR for storing HDR images" OFF)
+option(AKR_ENABLE_OPENEXR "Use OpenEXR for storing HDR images" OFF)
 option(AKR_ENABLE_NETWORK "Enable Network Rendering" OFF)
 
 include_directories(${CMAKE_SOURCE_DIR}/external/glm)
@@ -54,32 +54,35 @@ else()
     add_compile_definitions(_ENABLE_EXTENDED_ALIGNED_STORAGE)
 endif()
 
-# assimp attempts to build its own zlib, no good
-set(AKR_EXT_INCLUDES ${AKR_EXT_INCLUDES} ${CMAKE_SOURCE_DIR}/external/assimp/include)
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-add_subdirectory(external/assimp)
+if(AKR_ENABLE_OPENEXR)
+    find_package (ZLIB REQUIRED) # cpp no good
+    # assimp attempts to build its own zlib, no good
+    set(AKR_EXT_INCLUDES ${AKR_EXT_INCLUDES} ${CMAKE_SOURCE_DIR}/external/assimp/include)
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+    set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    add_subdirectory(external/assimp)
+endif()
 
 
-find_package (ZLIB)
-if (NOT ZLIB_FOUND)
-  # Build zlib
-    set (ZLIB_BUILD_STATIC_LIBS ON CACHE BOOL " " FORCE)
-    set (ZLIB_BUILD_SHARED_LIBS OFF CACHE BOOL " " FORCE)
-    add_subdirectory (external/zlib)
 
-    set (ZLIB_LIBRARIES zlibstatic)
-    set (ZLIB_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/zlib ${CMAKE_CURRENT_BINARY_DIR}/external/zlib)
+# if (NOT ZLIB_FOUND)
+#   # Build zlib
+#     set (ZLIB_BUILD_STATIC_LIBS ON CACHE BOOL " " FORCE)
+#     set (ZLIB_BUILD_SHARED_LIBS OFF CACHE BOOL " " FORCE)
+#     add_subdirectory (external/zlib)
 
-    # try to make openexr happy about this...
-    set (ZLIB_LIBRARY zlibstatic)
-    set (ZLIB_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/zlib ${CMAKE_CURRENT_BINARY_DIR}/external/zlib)
-    set (ZLIB_FOUND TRUE)
-    set(ASSIMP_BUILD_ZLIB OFF CACHE BOOL " " FORCE)
-    include_directories(${ZLIB_INCLUDE_DIRS})  # yuck, but so openexr/ptex can find zlib.h...
-else()
-    set(ASSIMP_BUILD_ZLIB OFF CACHE BOOL " " FORCE)
-endif ()
+#     set (ZLIB_LIBRARIES zlib)
+#     set (ZLIB_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/external/zlib ${CMAKE_CURRENT_BINARY_DIR}/external/zlib)
+
+#     # try to make openexr happy about this...
+#     set (ZLIB_LIBRARY zlib)
+#     set (ZLIB_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/zlib ${CMAKE_CURRENT_BINARY_DIR}/external/zlib)
+#     set (ZLIB_FOUND TRUE)
+#     set(ASSIMP_BUILD_ZLIB OFF CACHE BOOL " " FORCE)
+#     include_directories(${ZLIB_INCLUDE_DIRS})  # yuck, but so openexr/ptex can find zlib.h...
+# else()
+#     set(ASSIMP_BUILD_ZLIB OFF CACHE BOOL " " FORCE)
+# endif ()
 set(AKR_CORE_EXT_LIBS ${AKR_CORE_EXT_LIBS} ${ZLIB_LIBRARIES})
 
 
@@ -89,10 +92,15 @@ if(AKR_ENABLE_PYTHON)
     add_compile_definitions(AKR_ENABLE_PYTHON)
 endif()
 if(AKR_ENABLE_OPENEXR)
-    set(ZLIB_LIBRARY zlib_static)
-    set(ZLIB_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/external/zlib)
-    set(PYILMBASE_ENABLE OFF CACHE BOOL " " FORCE)
-    set(AKR_EXT_INCLUDES ${AKR_EXT_INCLUDES} external/openexr)
+    set(ILMBASE_NAMESPACE_VERSIONING OFF CACHE BOOL " " FORCE)
+    set(OPENEXR_NAMESPACE_VERSIONING OFF CACHE BOOL " " FORCE)
+    set(OPENEXR_BUILD_SHARED_LIBS    OFF CACHE BOOL " " FORCE)
+    set(ILMBASE_BUILD_SHARED_LIBS    OFF CACHE BOOL " " FORCE)
+    set(PYILMBASE_ENABLE             OFF CACHE BOOL " " FORCE)
+    set(OPENEXR_BUILD_UTILS          OFF CACHE BOOL " " FORCE)
+    set(BUILD_TESTING                OFF CACHE BOOL " " FORCE)
+    set(INSTALL_OPENEXR_EXAMPLES     OFF CACHE BOOL " " FORCE)
+    set(AKR_EXT_INCLUDES ${AKR_EXT_INCLUDES} external/openexr/OpenEXR/IlmImf)
     add_subdirectory(external/openexr)
 endif()
 
@@ -129,6 +137,7 @@ target_compile_definitions(libakari_core PUBLIC ${AKR_COMPILE_DEFINITIONS})
 target_include_directories(libakari_core PUBLIC src/ ${AKR_EXT_INCLUDES})
 target_include_directories(libakari_core PUBLIC external/pybind11/include)
 target_include_directories(libakari_core PUBLIC ${Python_INCLUDE_DIRS} ${EMBREE_INCLUDE_DIRS})
+add_library(akari::core ALIAS libakari_core)
 copy_to_dist(libakari_core)
 if(AKR_ENABLE_PYTHON)
     target_include_directories(libakari_core ${Python_INCLUDE_DIRS})
@@ -157,10 +166,11 @@ if(AKR_ENABLE_CUDA)
 endif()
 add_library(libakari_render SHARED ${AKR_RENDER_SRC} ${AKR_RENDER_CUDA_SRC})
 target_include_directories(libakari_render PUBLIC src/)
-target_link_libraries(libakari_render PUBLIC libakari_core)
+target_link_libraries(libakari_render PUBLIC akari::core)
 copy_to_dist(libakari_render)
 set_target_CUDA_props(libakari_render)
 set_target_properties(libakari_render PROPERTIES UNITY_BUILD ON)
+add_library(akari::render ALIAS libakari_render)
 if(AKR_ENABLE_CUDA)
     target_link_libraries(libakari_render PUBLIC libakari_embedded_ptx)
 endif()
@@ -173,7 +183,7 @@ function(add_plugin target)
     #     LIBRARY_OUTPUT_DIRECTORY  "${CMAKE_BINARY_DIR}/plugins/"
     #     ARCHIVE_OUTPUT_DIRECTORY  "${CMAKE_BINARY_DIR}/plugins/"
     #     RUNTIME_OUTPUT_DIRECTORY   "${CMAKE_BINARY_DIR}/plugins/")
-    target_link_libraries(${target} libakari_render)
+    target_link_libraries(${target} akari::render)
     add_custom_command(TARGET ${target} POST_BUILD 
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${target}>  ${CMAKE_BINARY_DIR}/dist/plugins/)
     set_target_CUDA_props(${target})

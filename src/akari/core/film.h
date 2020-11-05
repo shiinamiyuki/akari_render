@@ -71,19 +71,19 @@ namespace akari {
     };
     template <class T>
     class TFilm {
-        TImage<T> radiance;
-        TImage<Float> weight;
+        Array2D<T> radiance;
+        Array2D<Float> weight;
 
       public:
         Float splatScale = 1.0f;
         explicit TFilm(const ivec2 &dimension) : radiance(dimension), weight(dimension) {}
         TTile<T> tile(const Bounds2i &bounds) { return TTile<T>(Bounds2i(ivec2(0), resolution()).intersect(bounds)); }
-        [[nodiscard]] ivec2 resolution() const { return radiance.resolution(); }
+        [[nodiscard]] ivec2 resolution() const { return radiance.dimension(); }
 
         [[nodiscard]] Bounds2i bounds() const { return Bounds2i{ivec2(0), resolution()}; }
         void merge_tile(const TTile<T> &tile) {
             const auto lo = max(tile.bounds.pmin, ivec2(0, 0));
-            const auto hi = min(tile.bounds.pmax, radiance.resolution());
+            const auto hi = min(tile.bounds.pmax, resolution());
             for (int y = lo.y; y < hi.y; y++) {
                 for (int x = lo.x; x < hi.x; x++) {
                     auto &pix = tile(ivec2(x, y));
@@ -93,45 +93,30 @@ namespace akari {
             }
         }
         template <typename = std::enable_if_t<std::is_same_v<T, Color3f>>>
-        RGBAImage to_rgba_image() const {
-            RGBAImage image(resolution());
-            parallel_for(
-                radiance.resolution().y,
-                [&](uint32_t y, uint32_t) {
-                    for (int x = 0; x < radiance.resolution().x; x++) {
-                        if (weight(x, y) != 0) {
-                            auto color = (radiance(x, y)) / weight(x, y);
-                            image(x, y) = RGBA(color, 1.0);
-                        } else {
-                            image(x, y) = RGBA(radiance(x, y), 1.0);
-                        }
+        Image to_rgb_image() const {
+            Image image = rgb_image(resolution());
+            thread::parallel_for(resolution().y, [&](uint32_t y, uint32_t) {
+                for (int x = 0; x < resolution().x; x++) {
+                    if (weight(x, y) != 0) {
+                        auto color = (radiance(x, y)) / weight(x, y);
+                        image(x, y, 0) = color[0];
+                        image(x, y, 1) = color[1];
+                        image(x, y, 2) = color[2];
+                    } else {
+                        auto color = radiance(x, y);
+                        image(x, y, 0) = color[0];
+                        image(x, y, 1) = color[1];
+                        image(x, y, 2) = color[2];
                     }
-                },
-                1024);
-            return image;
-        }
-        TImage<T> to_image() const {
-            TImage<T> image(resolution());
-            parallel_for(
-                radiance.resolution().y,
-                [&](uint32_t y, uint32_t) {
-                    for (int x = 0; x < radiance.resolution().x; x++) {
-                        if (weight(x, y) != 0) {
-                            auto color = (radiance(x, y)) / weight(x, y);
-                            image(x, y) = color;
-                        } else {
-                            image(x, y) = radiance(x, y);
-                        }
-                    }
-                },
-                1024);
+                }
+            });
             return image;
         }
 
         template <typename = std::enable_if_t<std::is_same_v<T, Color3f>>>
-        void write_image(const fs::path &path, const PostProcessor &postProcessor = GammaCorrection()) const {
-            RGBAImage image = to_rgba_image();
-            default_image_writer()->write(image, path, postProcessor);
+        void write_image(const fs::path &path) const {
+            auto image = to_rgb_image();
+            ldr_image_writer()->write(image, path);
         }
     };
     using Film = TFilm<Spectrum>;

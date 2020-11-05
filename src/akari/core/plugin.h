@@ -84,7 +84,11 @@ namespace akari {
             sharedLibraries.emplace_back(lib);
             return true;
         }
-        const PluginInterface<T> *load_plugin(const std::string &name) {
+        const PluginInterface<T> *try_load_plugin(const std::string &name) { return load_plugin_impl(name, false); }
+        const PluginInterface<T> *load_plugin(const std::string &name) { return load_plugin_impl(name, true); }
+
+      private:
+        const PluginInterface<T> *load_plugin_impl(const std::string &name, bool required) {
             auto it = plugins.find(name);
             if (it != plugins.end()) {
                 return it->second;
@@ -100,7 +104,8 @@ namespace akari {
                 if (it != plugins.end()) {
                     return it->second;
                 }
-                fatal("Unknown plugin: `{}`\n", name);
+                if (required)
+                    fatal("Unknown plugin: `{}`\n", name);
                 return nullptr;
             }
             return nullptr;

@@ -99,21 +99,18 @@ namespace akari::render {
             auto world_radius = glm::length(center - light->world_bounds.pmin);
             std::vector<Float> v(distribution_map_resolution * distribution_map_resolution);
             AtomicFloat sum(0.0f);
-            parallel_for(
-                distribution_map_resolution,
-                [=, &v, &sum](uint32_t j, uint32_t) {
-                    float s = 0;
-                    for (size_t i = 0; i < distribution_map_resolution; i++) {
-                        vec2 uv(i, j);
-                        uv /= vec2(distribution_map_resolution, distribution_map_resolution);
-                        ShadingPoint sp(uv);
-                        Spectrum L = texture->evaluate(sp);
-                        v[i + j * distribution_map_resolution] = luminance(L);
-                        s += luminance(L);
-                    }
-                    sum.add(s);
-                },
-                256);
+            thread::parallel_for(distribution_map_resolution, [=, &v, &sum](uint32_t j, uint32_t) {
+                float s = 0;
+                for (size_t i = 0; i < distribution_map_resolution; i++) {
+                    vec2 uv(i, j);
+                    uv /= vec2(distribution_map_resolution, distribution_map_resolution);
+                    ShadingPoint sp(uv);
+                    Spectrum L = texture->evaluate(sp);
+                    v[i + j * distribution_map_resolution] = luminance(L);
+                    s += luminance(L);
+                }
+                sum.add(s);
+            });
             light->texture = texture;
             light->distribution = std::make_unique<Distribution2D>(&v[0], distribution_map_resolution,
                                                                    distribution_map_resolution, Allocator<>());
