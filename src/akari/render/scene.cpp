@@ -111,9 +111,13 @@ namespace akari::render {
         auto real_integrator = integrator->create_integrator(allocator);
         Timer timer;
         RenderInput input;
+        input.required_full_aov = required_aovs_;
         input.scene = scene.get();
         input.requested_aovs.emplace("color", AOVRequest{});
         if (run_denoiser_) {
+            if (auto _ = dyn_cast<UniAOVIntegrator>(real_integrator)) {
+                warning("integrator {} has no aov output, aov is rendered separately", integrator->description());
+            }
             input.requested_aovs.emplace("albedo", AOVRequest{});
             input.requested_aovs.emplace("normal", AOVRequest{});
             input.requested_aovs.emplace("first_hit_albedo", AOVRequest{});
@@ -129,7 +133,7 @@ namespace akari::render {
         if (ext_pi) {
             exr_writer = ext_pi->make_unique();
         }
-        auto write_intermediate = [&](const Film &film, const char *component, bool hdr) {
+        auto write_intermediate = [&](const Film &film, const std::string &component, bool hdr) {
             auto image = film.to_rgb_image();
             auto filename = extend_filename(output, component);
             ldr_image_writer()->write(image, filename);
@@ -145,9 +149,23 @@ namespace akari::render {
             }
         };
         if (run_denoiser_) {
-            write_intermediate(*render_out.aovs["color"].value, ".color", false);
-            write_intermediate(*render_out.aovs["albedo"].value, ".albedo", false);
-            write_intermediate(*render_out.aovs["normal"].value, ".normal", false);
+            if (auto _ = dyn_cast<UniAOVIntegrator>(real_integrator)) {
+                auto render_aov = [&](const char *name) {
+                    auto aov_integrator_node = make_aov_integrator(std::min(64, integrator->get_spp()), name);
+                    auto integrator = aov_integrator_node->create_integrator(allocator);
+                    Film aov_film(res);
+                    auto aov_out = integrator->render(input);
+                    render_out.aovs[name].value = aov_film;
+                };
+                render_aov("normal");
+                render_aov("albedo");
+            }
+            for (auto &[aov, rec] : render_out.aovs) {
+                write_intermediate(*rec.value, "." + aov, true);
+                if (rec.variance) {
+                    write_intermediate(*rec.variance, ".var." + aov, true);
+                }
+            }
             PluginManager<Denoiser> denoisers;
             info("denoising...");
             auto pi = denoisers.load_plugin("OIDNDenoiser");
@@ -157,26 +175,25 @@ namespace akari::render {
             if (output_image) {
                 if (super_sampling_k > 1) {
                     int s = std::sqrt(super_sampling_k);
-                    write_intermediate_img(*output_image, "ss", false);
+                    write_intermediate_img(*output_image, ".ss", false);
 
-                    Array3D<float> avg_kernel(ivec3(3, s, s));
+                    Array3D<float> avg_kernel(ivec3(1, s, s));
+                    avg_kernel.fill(0.0);
                     for (int x = 0; x < s; x++) {
                         for (int y = 0; y < s; y++) {
-                            avg_kernel(x, y, 0) = 1.0 / (s * s);
-                            avg_kernel(x, y, 1) = 1.0 / (s * s);
-                            avg_kernel(x, y, 2) = 1.0 / (s * s);
+                            avg_kernel(0, x, y) = 1.0 / (s * s);
                         }
                     }
                     Image down_sampled_image = rgb_image(output_image->resolution() / ivec2(s));
                     down_sampled_image.array3d() =
-                        std::move(convolve(output_image->array3d(), avg_kernel, ivec3(3, s, s)));
+                        std::move(convolve(output_image->array3d(), avg_kernel, ivec3(1, s, s)));
                     output_image = std::move(down_sampled_image);
                 }
             }
             denoiser = nullptr;
         }
         ldr_image_writer()->write(*output_image, fs::path(output));
-        if(exr_writer){
+        if (exr_writer) {
             exr_writer->write(*output_image, fs::path(output).replace_extension(".exr"));
         }
         exr_writer = nullptr;

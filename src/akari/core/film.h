@@ -92,6 +92,11 @@ namespace akari {
                 }
             }
         }
+        void add_sample(const ivec2 &p, const T &sample, Float weight_) {
+            weight(p) += weight_;
+            radiance(p) += sample;
+        }
+
         template <typename = std::enable_if_t<std::is_same_v<T, Color3f>>>
         Image to_rgb_image() const {
             Image image = rgb_image(resolution());

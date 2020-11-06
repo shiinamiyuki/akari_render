@@ -51,7 +51,9 @@ namespace akari {
         cg->program_path = fs::absolute(fs::path(std::string(self_proc)));
 #elif defined(AKR_PLATFORM_LINUX)
         char self_proc[PATH_MAX + 1] = {0};
-        readlink("/proc/self/exe", self_proc, PATH_MAX + 1);
+        if (-1 == readlink("/proc/self/exe", self_proc, PATH_MAX + 1)) {
+            fprintf(stderr, "error retreiving program path; code=%d\n", errno);
+        }
         cg->program_path = fs::absolute(fs::path(std::string(self_proc)));
 #endif
     }

@@ -85,8 +85,13 @@ namespace akari::render {
     class TextureNode;
 
     class AKR_EXPORT SceneNode : public SceneGraphNode {
-        astd::pmr::monotonic_buffer_resource memory_arena;
         int spp_override = 0;
+        bool run_denoiser_ = false;
+        int super_sampling_k = 0;
+        bool required_aovs_ = false;
+
+        astd::pmr::monotonic_buffer_resource memory_arena;
+
         std::shared_ptr<CameraNode> camera;
         std::shared_ptr<SamplerNode> sampler;
         std::vector<std::shared_ptr<MeshNode>> shapes;
@@ -98,8 +103,6 @@ namespace akari::render {
         TRSTransform envmap_transform;
         std::shared_ptr<LightNode> envmap;
         std::shared_ptr<Scene> scene;
-        bool run_denoiser_ = false;
-        int super_sampling_k = 0;
 
         void init_scene(Allocator<> allocator);
 
@@ -113,5 +116,6 @@ namespace akari::render {
         void set_spp(int spp) { spp_override = spp; }
         void run_denosier(bool v) { run_denoiser_ = v; }
         void super_sample(int k) { super_sampling_k = k; }
+        void require_aovs(bool v) { required_aovs_ = v; }
     };
 } // namespace akari::render

@@ -12,6 +12,7 @@ option(AKR_ENABLE_OIDN "Use Intel OpenImageDenoise" OFF)
 option(AKR_USE_PREBUILD_OIDN "Use prebuilt Intel OpenImageDenoise" OFF)
 option(AKR_ENABLE_OPENEXR "Use OpenEXR for storing HDR images" OFF)
 option(AKR_ENABLE_NETWORK "Enable Network Rendering" OFF)
+option(AKR_ENABLE_ASSIMP "Use assimp to import more assets" OFF)
 
 include_directories(${CMAKE_SOURCE_DIR}/external/glm)
 include_directories(${CMAKE_SOURCE_DIR}/external/misc)
@@ -54,14 +55,16 @@ else()
     add_compile_definitions(_ENABLE_EXTENDED_ALIGNED_STORAGE)
 endif()
 
-if(AKR_ENABLE_OPENEXR)
-    find_package (ZLIB REQUIRED) # cpp no good
-    # assimp attempts to build its own zlib, no good
+
+find_package (ZLIB REQUIRED) # cpp no good
+if(AKR_ENABLE_ASSIMP)
+# assimp attempts to build its own zlib, no good
     set(AKR_EXT_INCLUDES ${AKR_EXT_INCLUDES} ${CMAKE_SOURCE_DIR}/external/assimp/include)
     set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
     set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
     add_subdirectory(external/assimp)
 endif()
+
 
 
 
@@ -200,9 +203,13 @@ copy_to_dist(akari)
 
 add_executable(akari-import src/akari/cmd/akari-import.cpp )
 target_include_directories(akari-import PUBLIC src/)
-target_link_libraries(akari-import libakari_core assimp)
 copy_to_dist(akari-import)
 set_target_CUDA_props(akari-import)
+target_link_libraries(akari-import akari::core)
+if(AKR_ENABLE_ASSIMP)
+target_link_libraries(akari-import assimp)
+    target_compile_definitions(akari-import PUBLIC AKR_ENABLE_ASSIMP)
+endif()
 
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 add_subdirectory(external/googletest EXCLUDE_FROM_ALL)

@@ -20,7 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 #include <akari/core/memory.h>
-
+#include <akari/core/parallel.h>
 namespace akari {
     template <typename T, class Allocator = std::allocator<T>>
     class Array2D {
@@ -103,7 +103,7 @@ namespace akari {
         template <class F>
         Array2D map(F &&f) const {
             Array2D out(dimension());
-            thread::parallel_for(blocked_range<2>(out.dimension(), ivec2(64)), parallel,
+            thread::parallel_for(thread::blocked_range<2>(out.dimension(), ivec2(64)),
                                  [&](ivec2 id) { out(id) = f((*this)(id)); });
             return out;
         }
@@ -208,7 +208,7 @@ namespace akari {
         template <class F>
         Array3D map(F &&f) const {
             Array3D out(dimension());
-            thread::parallel_for(blocked_range<3>(out.dimension(), ivec3(64)), parallel,
+            thread::parallel_for(thread::blocked_range<3>(out.dimension(), ivec3(64)),
                                  [&](ivec3 id) { out(id) = f((*this)(id)); });
             return out;
         }

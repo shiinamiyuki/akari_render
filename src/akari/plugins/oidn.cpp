@@ -58,23 +58,29 @@ namespace akari::render {
             return output;
         }
         std::optional<Image> denoise(const Scene *scene, RenderOutput &aov) override {
+            std::optional<Image> output;
             oidn::FilterRef filter;
-
             Image color = aov.aovs["color"].value->to_rgb_image();
             Image albedo = aov.aovs["albedo"].value->to_rgb_image();
             Image normal = aov.aovs["normal"].value->to_rgb_image();
             AKR_ASSERT(is_rgb_image(color));
             AKR_ASSERT(is_rgb_image(albedo));
             AKR_ASSERT(is_rgb_image(normal));
-            Image first_hit_normal = aov.aovs["first_hit_normal"].value->to_rgb_image();
-            Image first_hit_albedo = aov.aovs["first_hit_albedo"].value->to_rgb_image();
-            std::optional<Image> filtered_normal = denoise3(normal, first_hit_albedo, first_hit_normal);
-            std::optional<Image> filtered_albedo = denoise3(albedo, first_hit_albedo, first_hit_normal);
-            if (!filtered_albedo || !filtered_normal) {
-                return std::nullopt;
+            if (aov.aovs.find("first_hit_normal") != aov.aovs.end() &&
+                aov.aovs.find("first_hit_albedo") != aov.aovs.end()) {
+                info("full denoising (normal, albedo, color)");
+                Image first_hit_normal = aov.aovs["first_hit_normal"].value->to_rgb_image();
+                Image first_hit_albedo = aov.aovs["first_hit_albedo"].value->to_rgb_image();
+                std::optional<Image> filtered_normal = denoise3(normal, first_hit_albedo, first_hit_normal);
+                std::optional<Image> filtered_albedo = denoise3(albedo, first_hit_albedo, first_hit_normal);
+                if (!filtered_albedo || !filtered_normal) {
+                    return std::nullopt;
+                }
+                normal = aov.aovs["normal"].value->to_rgb_image();
+                output = denoise3(color, *filtered_albedo, *filtered_normal);
+            } else {
+                output = denoise3(color, albedo, color);
             }
-            normal = aov.aovs["normal"].value->to_rgb_image();
-            auto output = denoise3(color, *filtered_albedo, *filtered_normal);
             info("oidn denoise complete");
             return output;
         }

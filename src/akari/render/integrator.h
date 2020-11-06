@@ -46,6 +46,7 @@ namespace akari::render {
     };
     struct RenderInput {
         const Scene *scene;
+        bool required_full_aov = false;
         std::unordered_map<std::string, AOVRequest> requested_aovs;
     };
     class Integrator {

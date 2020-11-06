@@ -7,6 +7,7 @@
 #    pragma warning(disable : 4146)
 #    pragma warning(disable : 4305)
 #    pragma warning(disable : 4244)
+#    pragma warning(disable : 4723)
 
 #else
 #    pragma GCC diagnostic error "-Wall"

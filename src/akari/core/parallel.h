@@ -80,19 +80,24 @@ namespace akari {
         AKR_EXPORT size_t num_work_threads();
         inline void parallel_for(BlockedDim<2> blocked_dim, const std::function<void(ivec2, uint32_t)> &func) {
             ivec2 tiles = (blocked_dim.dim + blocked_dim.block - ivec2(1)) / blocked_dim.block;
+            size_t total = hprod(blocked_dim.dim);
             parallel_for(tiles.x * tiles.y, [&](size_t idx, int tid) {
                 ivec2 t(idx % tiles.x, idx / tiles.x);
                 for (int ty = 0; ty < blocked_dim.block[1]; ty++) {
                     for (int tx = 0; tx < blocked_dim.block[0]; tx++) {
                         int x = tx + t[0] * blocked_dim.block[0];
                         int y = ty + t[1] * blocked_dim.block[1];
-                        func(ivec2(x, y), tid);
+                        size_t gid = (size_t)x + y * (size_t)blocked_dim.dim[0];
+                        if (gid < total) {
+                            func(ivec2(x, y), tid);
+                        }
                     }
                 }
             });
         }
         inline void parallel_for(BlockedDim<3> blocked_dim, const std::function<void(ivec3, uint32_t)> &func) {
             ivec3 tiles = (blocked_dim.dim + blocked_dim.block - ivec3(1)) / blocked_dim.block;
+            size_t total = hprod(blocked_dim.dim);
             parallel_for(tiles.x * tiles.y * tiles.z, [&](size_t idx, int tid) {
                 auto z_ = idx / (tiles.x * tiles.y);
                 auto y_ = (idx % (tiles.x * tiles.y)) / tiles.x;
@@ -104,7 +109,11 @@ namespace akari {
                             int x = tx + t[0] * blocked_dim.block[0];
                             int y = ty + t[1] * blocked_dim.block[1];
                             int z = tz + t[2] * blocked_dim.block[2];
-                            func(ivec3(x, y, z), tid);
+                            size_t gid = (size_t)x + y * (size_t)blocked_dim.dim[0] +
+                                         (size_t)z * blocked_dim.dim[0] * blocked_dim.dim[1];
+                            if (gid < total) {
+                                func(ivec3(x, y, z), tid);
+                            }
                         }
                     }
                 }
@@ -126,7 +135,7 @@ namespace akari {
                 T cache = init;
                 auto it = begin + tid * block_size;
                 for (size_t i = 0; i < block_size && it < end; i++) {
-                    cache = f(cache, *);
+                    cache = f(cache, *it);
                     it++;
                 }
                 std::lock_guard<std::mutex> lock(m);
@@ -161,7 +170,7 @@ namespace akari {
     };
     template <class _Fty, class... _ArgTypes>
     Future<std::invoke_result_t<std::decay_t<_Fty>, std::decay_t<_ArgTypes>...>>
-    async_do(std::launch policy, _Fty &&_Fnarg, _ArgTypes &&..._Args) {
+    async_do(std::launch policy, _Fty &&_Fnarg, _ArgTypes &&... _Args) {
         return std::async(policy, std::forward<_Fty>(_Fnarg), std::forward<_ArgTypes>(_Args)...);
     }
 } // namespace akari
