@@ -14,11 +14,7 @@ option(AKR_ENABLE_OPENEXR "Use OpenEXR for storing HDR images" OFF)
 option(AKR_ENABLE_NETWORK "Enable Network Rendering" OFF)
 option(AKR_ENABLE_ASSIMP "Use assimp to import more assets" OFF)
 
-include_directories(${CMAKE_SOURCE_DIR}/external/glm)
-include_directories(${CMAKE_SOURCE_DIR}/external/misc)
-include_directories(${CMAKE_SOURCE_DIR}/external/json)
-include_directories(${CMAKE_SOURCE_DIR}/external/cxxopts/include)
-include_directories(${CMAKE_SOURCE_DIR}/external/magic_enum/include)
+
 
 if(EXISTS ${CMAKE_BINARY_DIR}/dist)
 else()
@@ -36,6 +32,14 @@ set(CMAKE_STATIC_LIBRARY_PREFIX_CXX "")
 set(AKR_CORE_EXT_LIBS "")
 set(AKR_EXT_INCLUDES "")
 set(AKR_COMPILE_DEFINITIONS AKR_ENABLE_CPU)
+
+set(AKR_EXT_INCLUDES ${AKR_EXT_INCLUDES} ${CMAKE_SOURCE_DIR}/external/glm)
+set(AKR_EXT_INCLUDES ${AKR_EXT_INCLUDES} ${CMAKE_SOURCE_DIR}/external/cereal/include)
+set(AKR_EXT_INCLUDES ${AKR_EXT_INCLUDES} ${CMAKE_SOURCE_DIR}/external/misc)
+set(AKR_EXT_INCLUDES ${AKR_EXT_INCLUDES} ${CMAKE_SOURCE_DIR}/external/json)
+set(AKR_EXT_INCLUDES ${AKR_EXT_INCLUDES} ${CMAKE_SOURCE_DIR}/external/cxxopts/include)
+set(AKR_EXT_INCLUDES ${AKR_EXT_INCLUDES} ${CMAKE_SOURCE_DIR}/external/magic_enum/include)
+
 if(MSVC)
     set(AKR_CXX_FLAGS /std:c++17 /MP /arch:AVX2 /WX)
     set(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} ")

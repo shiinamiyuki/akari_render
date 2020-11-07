@@ -22,7 +22,8 @@
 
 #include <fstream>
 #include <regex>
-#include <cxxopts.hpp>
+#include <sstream>
+#include <iostream>
 #include <akari/core/logger.h>
 #include <akari/core/mesh.h>
 #include <akari/core/misc.h>
@@ -200,32 +201,19 @@ std::shared_ptr<Mesh> load_wavefront_obj(const fs::path &path, std::string &gene
 
 int main(int argc, const char **argv) {
     try {
-        cxxopts::Options options("akari-import", " - Import OBJ meshes to akari scene description file");
-        options.positional_help("input output").show_positional_help();
-        {
-            auto opt = options.allow_unrecognised_options().add_options();
-            opt("i,input", "Input Scene Description File", cxxopts::value<std::string>());
-            opt("o,output", "Input Scene Description File", cxxopts::value<std::string>());
-            opt("help", "Show this help");
+        auto print_help = [] {
+            std::cout << R"(
+Usage: akari-import <mesh file> <output file>
+
+Options:
+)" << std::endl;
+        };
+        if (argc != 3) {
+            print_help();
+            exit(1);
         }
-        options.parse_positional({"input", "output"});
-        auto result = options.parse(argc, argv);
-        if (!result.count("input")) {
-            fatal("Input file must be provided\n");
-            std::cout << options.help() << std::endl;
-            exit(0);
-        }
-        if (!result.count("output")) {
-            fatal("Output file must be provided\n");
-            std::cout << options.help() << std::endl;
-            exit(0);
-        }
-        if (result.arguments().empty() || result.count("help")) {
-            std::cout << options.help() << std::endl;
-            exit(0);
-        }
-        auto inputFilename = result["input"].as<std::string>();
-        auto outputFilename = result["output"].as<std::string>();
+        std::string inputFilename = argv[1];
+        std::string outputFilename = argv[2];
         auto generated = std::string();
         auto mesh = load_wavefront_obj(fs::path(inputFilename), generated);
         auto res = std::make_shared<BinaryGeometry>(mesh);

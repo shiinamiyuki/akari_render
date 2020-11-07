@@ -1,5 +1,3 @@
-
-#define SOBOL_MAX_DIMENSION 21201
 // MIT License
 //
 // Copyright (c) 2020 椎名深雪
@@ -23,6 +21,7 @@
 // SOFTWARE.
 #include <akari/render/sampler.h>
 
+#define SOBOL_MAX_DIMENSION 21201
 #define SOBOL_BITS 32
 extern const unsigned int SobolMatrix[SOBOL_MAX_DIMENSION][SOBOL_BITS];
 
@@ -70,4 +69,14 @@ namespace akari::render {
             return make_pmr_shared<SobolSampler>(allocator, *this);
         }
     };
+    class SobolSamplerNode final : public SamplerNode {
+
+      public:
+        void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
+                          const sdl::Value &value) override {}
+        std::shared_ptr<Sampler> create_sampler(Allocator<> allocator) override {
+            return make_pmr_shared<SobolSampler>(allocator);
+        }
+    };
+    AKR_EXPORT_NODE(SobolSampler, SobolSamplerNode)
 } // namespace akari::render

@@ -1,1 +1,1 @@
-add_plugin(SobolSampler sobol.cpp sobolmat.cpp)
+add_plugin(SobolSampler sobolmat.cpp sobol.cpp )

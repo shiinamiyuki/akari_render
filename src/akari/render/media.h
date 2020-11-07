@@ -1,5 +1,3 @@
-
-
 // MIT License
 //
 // Copyright (c) 2020 椎名深雪
@@ -34,5 +32,47 @@
 #include <optional>
 
 namespace akari::render {
-    class HGPhaseFunction {};
+    class AKR_EXPORT PhaseFunction {
+      public:
+        virtual Float evaluate(const Vec3 &wo, const Vec3 &wi) const = 0;
+        virtual std::pair<Vec3, Float> sample(const Vec2 &u, const Vec3 &wo) const = 0;
+    };
+    class AKR_EXPORT HGPhaseFunction : public PhaseFunction {
+        const Float g;
+
+      public:
+        HGPhaseFunction(Float g) : g(g) {}
+        Float evaluate(const Vec3 &wo, const Vec3 &wi) const override {
+            const auto cosTheta = dot(wo, wi);
+            const Float denom = 1 + g * g + 2 * g * cosTheta;
+            return Inv4Pi * (1 - g * g) / (denom * std::sqrt(denom));
+        }
+        std::pair<Vec3, Float> sample(const Vec2 &u, const Vec3 &wo) const override {
+            Float cosTheta;
+            if (std::abs(g) < 1e-3f) {
+                cosTheta = 1 - 2 * u[0];
+            } else {
+                const Float g2 = g * g;
+                const Float sq = (1 - g2) / (1 - g + 2 * g * u[0]);
+                cosTheta = (1 + g2 - sq * sq) / (2 * g);
+            }
+            const Float sinTheta = std::sqrt(std::max(0.0f, 1 - cosTheta * cosTheta));
+            const Float phi = 2 * u[1] * Pi;
+            Vec3 v1, v2;
+            Frame frame(wo);
+
+            auto w = spherical_to_xyz(sinTheta, cosTheta, phi);
+            auto wi = frame.local_to_world(w);
+            return std::make_pair(wi, evaluate(wo, wi));
+        }
+    };
+    class Medium {
+      public:
+        virtual const PhaseFunction *evaluate(const Vec3 &p) = 0;
+        virtual Spectrum tr(const Ray &ray, Sampler *sampler) = 0;
+    };
+    class MediumNode : public SceneGraphNode {
+      public:
+        virtual std::shared_ptr<const MediumNode> create_medium(Allocator<>) = 0;
+    };
 } // namespace akari::render
