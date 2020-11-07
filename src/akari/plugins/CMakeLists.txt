@@ -13,3 +13,7 @@ if(AKR_ENABLE_OPENEXR)
     add_plugin(HDRImageWriter hdr-imagewriter.cpp)
     target_link_libraries(HDRImageWriter OpenEXR::IlmImf IlmBase::Imath IlmBase::Half ${ZLIB_LIBRARY})
 endif()
+
+if(AKR_ENABLE_CUDA)
+    add_plugin(OptixDenoiser optix.cpp)
+endif()

@@ -164,23 +164,13 @@ endif()
 
 
 file(GLOB AKR_RENDER_SRC src/akari/render/*.*)
-if(AKR_ENABLE_CUDA)
-    file(GLOB AKR_RENDER_CUDA_SRC src/akari/render/cuda/*.*)
-    cuda_compile_and_embed (AKR_EMBEDDED_PTX src/akari/render/cuda/optix.cu optix.cu)
-    add_library (libakari_embedded_ptx STATIC
-      ${AKR_EMBEDDED_PTX}
-    )
-endif()
-add_library(libakari_render SHARED ${AKR_RENDER_SRC} ${AKR_RENDER_CUDA_SRC})
+add_library(libakari_render SHARED ${AKR_RENDER_SRC})
 target_include_directories(libakari_render PUBLIC src/)
 target_link_libraries(libakari_render PUBLIC akari::core)
 copy_to_dist(libakari_render)
 set_target_CUDA_props(libakari_render)
 set_target_properties(libakari_render PROPERTIES UNITY_BUILD ON)
 add_library(akari::render ALIAS libakari_render)
-if(AKR_ENABLE_CUDA)
-    target_link_libraries(libakari_render PUBLIC libakari_embedded_ptx)
-endif()
 
 function(add_plugin target)
     add_library(${target} SHARED ${ARGN})

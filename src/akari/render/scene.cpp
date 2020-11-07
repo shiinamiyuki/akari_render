@@ -93,7 +93,7 @@ namespace akari::render {
             }
         }
         ivec2 res = camera->resolution();
-        if (super_sampling_k > 1 && run_denoiser_) {
+        if (super_sampling_k > 1 && !denoiser_name.empty()) {
             auto s = std::sqrt(super_sampling_k);
             if (s * s != super_sampling_k) {
                 error("super sampling factor must be square number (got {})", super_sampling_k);
@@ -114,6 +114,7 @@ namespace akari::render {
         input.required_full_aov = required_aovs_;
         input.scene = scene.get();
         input.requested_aovs.emplace("color", AOVRequest{});
+        bool run_denoiser_ = !denoiser_name.empty();
         if (run_denoiser_) {
             if (auto _ = dyn_cast<UniAOVIntegrator>(real_integrator)) {
                 warning("integrator {} has no aov output, aov is rendered separately", integrator->description());
@@ -168,29 +169,39 @@ namespace akari::render {
             }
             PluginManager<Denoiser> denoisers;
             info("denoising...");
-            auto pi = denoisers.load_plugin("OIDNDenoiser");
-            auto denoiser = pi->make_shared();
-            output_image = denoiser->denoise(scene.get(), render_out);
-            AKR_ASSERT(is_rgb_image(*output_image));
-            if (output_image) {
-                if (super_sampling_k > 1) {
-                    int s = std::sqrt(super_sampling_k);
-                    write_intermediate_img(*output_image, ".ss", false);
+            const PluginInterface<Denoiser> *pi = nullptr;
+            if (denoiser_name == "oidn")
+                pi = denoisers.load_plugin("OIDNDenoiser");
+            else if (denoiser_name == "optix")
+                pi = denoisers.load_plugin("OptixDenoiser");
+            else
+                pi = denoisers.load_plugin(denoiser_name);
+            if (pi) {
+                auto denoiser = pi->make_shared();
+                output_image = denoiser->denoise(scene.get(), render_out);
+                AKR_ASSERT(is_rgb_image(*output_image));
+                if (output_image) {
+                    if (super_sampling_k > 1) {
+                        int s = std::sqrt(super_sampling_k);
+                        write_intermediate_img(*output_image, ".ss", false);
 
-                    Array3D<float> avg_kernel(ivec3(1, s, s));
-                    avg_kernel.fill(0.0);
-                    for (int x = 0; x < s; x++) {
-                        for (int y = 0; y < s; y++) {
-                            avg_kernel(0, x, y) = 1.0 / (s * s);
+                        Array3D<float> avg_kernel(ivec3(1, s, s));
+                        avg_kernel.fill(0.0);
+                        for (int x = 0; x < s; x++) {
+                            for (int y = 0; y < s; y++) {
+                                avg_kernel(0, x, y) = 1.0 / (s * s);
+                            }
                         }
+                        Image down_sampled_image = rgb_image(output_image->resolution() / ivec2(s));
+                        down_sampled_image.array3d() =
+                            std::move(convolve(output_image->array3d(), avg_kernel, ivec3(1, s, s)));
+                        output_image = std::move(down_sampled_image);
                     }
-                    Image down_sampled_image = rgb_image(output_image->resolution() / ivec2(s));
-                    down_sampled_image.array3d() =
-                        std::move(convolve(output_image->array3d(), avg_kernel, ivec3(1, s, s)));
-                    output_image = std::move(down_sampled_image);
                 }
+                denoiser = nullptr;
+            } else {
+                error("failed to load denoiser; skip denoising");
             }
-            denoiser = nullptr;
         }
         ldr_image_writer()->write(*output_image, fs::path(output));
         if (exr_writer) {

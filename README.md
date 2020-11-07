@@ -11,7 +11,8 @@ AkariRender is a highly modular CPU/GPU physically based renderer written in C++
 ## Features
  - <del> Optional GPU rendering using CUDA + Optix7(WIP)</del> 
  - Optional Embree backend
- - Optional denoiser using OpenImageDenoise
+ - Optional OpenImageDenoise
+ - Optional Optix AI Denoiser
  - Optional Network Rendering
 
 ## Usage

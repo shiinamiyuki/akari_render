@@ -42,6 +42,7 @@ static std::string inputFilename;
 static int spp = 0;
 static int super_sampling = 0;
 static bool denoise = false;
+static std::string denoiser;
 static bool use_net = false;
 static std::list<std::pair<std::string, int>> workers;
 static PluginManager<comm::AbstractNetworkWorld> comm_plugins;
@@ -79,8 +80,13 @@ Options:
     --spp
         Override spp
     
-    --denoise
+    --denoise <denoiser>
         Run denoiser after rendering
+        <denoiser> is one of:
+            default         The default denoiser (see below)
+            oidn            Intel OpenImageDenoise (default)
+            optix           Optix AI Denoiser
+            <other>         load that specific denoiser plugin
 
     --ss <count>
         Use <count> times super sampling inside render pipeline
@@ -129,7 +135,9 @@ Options:
             i += 2;
         } else if (option == "--denoise") {
             denoise = true;
-            i++;
+            ensure(option, i + 1);
+            denoiser = argv[i + 1];
+            i += 2;
         } else if (option == "--ss") {
             ensure(option, i + 1);
             super_sampling = std::stoi(argv[i + 1]);
@@ -187,7 +195,9 @@ void parse_and_run() {
         scene->super_sample(super_sampling);
     }
     if (denoise) {
-        scene->run_denosier(denoise);
+        if (denoiser == "default")
+            denoiser = "oidn";
+        scene->run_denosier(denoiser);
     }
     info("rendering with {} threads", thread::num_work_threads());
     scene->render();

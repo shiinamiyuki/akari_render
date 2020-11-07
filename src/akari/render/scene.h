@@ -86,7 +86,10 @@ namespace akari::render {
 
     class AKR_EXPORT SceneNode : public SceneGraphNode {
         int spp_override = 0;
-        bool run_denoiser_ = false;
+
+        // optix for OptixDenoiser
+        // oidn for OIDNDenoiser
+        std::string denoiser_name;
         int super_sampling_k = 0;
         bool required_aovs_ = false;
 
@@ -117,7 +120,7 @@ namespace akari::render {
         void finalize() override;
         void render();
         void set_spp(int spp) { spp_override = spp; }
-        void run_denosier(bool v) { run_denoiser_ = v; }
+        void run_denosier(const std::string & s) { denoiser_name = s; }
         void super_sample(int k) { super_sampling_k = k; }
         void require_aovs(bool v) { required_aovs_ = v; }
     };
