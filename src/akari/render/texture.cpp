@@ -47,15 +47,16 @@ namespace akari::render {
         std::shared_ptr<Image> image;
         ObjectCache<std::shared_ptr<const Texture>> tex_cache;
         fs::path image_path;
-
+        std::shared_ptr<ImageResource> rsrc;
       public:
-        AKR_SER(image_path)
+        AKR_SER(image_path, rsrc)
         AKR_SER_CLASS("ImageTexture")
         ImageTextureNode() = default;
         ImageTextureNode(const fs::path &path) : image_path(path) {
             auto res = resource_manager()->load_path<ImageResource>(path);
             if (res) {
-                image = res.extract_value()->image();
+                rsrc = res.extract_value();
+                image = rsrc->image();
             } else {
                 auto err = res.extract_error();
                 error("error loading {}: {}", path.string(), err.what());

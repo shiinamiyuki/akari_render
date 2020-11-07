@@ -62,7 +62,28 @@ namespace akari {
         std::call_once(flag, [&]() { mgr = std::make_shared<ResourceManagerImpl>(); });
         return mgr;
     }
-
+    void ImageResource::save(OutputArchive &ar) const {
+        ar(_image->channels());
+        for (int i = 0; i < _image->channels(); i++) {
+            ar(_image->channel_name(i));
+        }
+        ar(_image->resolution());
+        ar.save_bytes(reinterpret_cast<const char *>(_image->data()),
+                      sizeof(float) * hprod(_image->array3d().dimension()));
+    }
+    void ImageResource::load(InputArchive &ar) {
+        std::vector<std::string> channel_names;
+        int channels;
+        ar(channels);
+        channel_names.resize(channels);
+        for (int i = 0; i < channels; i++) {
+            ar(channel_names[i]);
+        }
+        ivec2 resolution;
+        ar(resolution);
+        _image = std::make_shared<Image>(channel_names, resolution);
+        ar.load_bytes(reinterpret_cast<char *>(_image->data()), sizeof(float) * hprod(_image->array3d().dimension()));
+    }
     Expected<bool> ImageResource::load(const fs::path &path) {
         auto reader = default_image_reader();
         _image = reader->read(path);

@@ -60,10 +60,12 @@ Options:
         fatal("variable 'scene' not found");
     }
     auto scene = dyn_cast<render::SceneNode>(it->second.object());
-    // auto stream = std::make_unique<FStream>(fs::path(outputFilename), Stream::Mode::Write);
-    nlohmann::json j;
-    auto ar = create_output_archive(j);
+    auto stream = std::make_unique<FStream>(fs::path(outputFilename), Stream::Mode::Write);
+    auto ar = create_output_archive(std::move(stream));
     (*ar)(scene);
-    std::ofstream os((fs::path(outputFilename)));
-    os << j.dump(1);
+    // nlohmann::json j;
+    // auto ar = create_output_archive(j);
+    // (*ar)(scene);
+    // std::ofstream os((fs::path(outputFilename)));
+    // os << j.dump(1);
 }

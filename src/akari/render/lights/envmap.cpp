@@ -123,6 +123,7 @@ namespace akari::render {
     class AKR_EXPORT EnvMapNode final : public LightNode {
       public:
         AKR_SER_CLASS("EnvMap")
+        AKR_SER(transform, envmap)
         TRSTransform transform;
         std::shared_ptr<TextureNode> envmap;
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,

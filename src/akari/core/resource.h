@@ -27,6 +27,7 @@
 #include <akari/core/platform.h>
 #include <akari/core/error.hpp>
 #include <akari/core/image.h>
+#include <akari/core/serde.h>
 namespace akari {
     class AKR_EXPORT Resource {
       public:
@@ -64,10 +65,13 @@ namespace akari {
     };
     AKR_EXPORT std::shared_ptr<ResourceManager> resource_manager();
 
-    class AKR_EXPORT ImageResource : public Resource {
+    class AKR_EXPORT ImageResource : public Resource, public Serializable {
         std::shared_ptr<Image> _image;
 
       public:
+        AKR_SER_CLASS("ImageResource")
+        void save(OutputArchive &ar) const override;
+        void load(InputArchive &ar) override;
         Expected<bool> load(const fs::path &) override;
         const std::shared_ptr<Image> &image() const { return _image; }
     };

@@ -43,8 +43,8 @@ namespace akari {
         virtual void save(OutputArchive &ar) const {}
         virtual void load(InputArchive &ar) {}
         // this is used as an unique identifier for its type
-        virtual std::string_view type_str() const = 0;
-        using Constructor = std::function<Serializable *(std::string_view)>;
+        virtual std::string type_str() const = 0;
+        using Constructor = std::function<Serializable *(std::string)>;
     };
     template <class T>
     struct shared_ptr_trait {
@@ -197,7 +197,7 @@ namespace akari {
     void load(InputArchive &ar) { ar(__VA_ARGS__); }                                                                   \
     void save(OutputArchive &ar) const { ar(__VA_ARGS__); }
 #define AKR_SER_CLASS(Self)                                                                                            \
-    std::string_view type_str() const override { return Self; }
+    std::string type_str() const override { return Self; }
 
     // common structs
     template <typename T1, typename T2>
