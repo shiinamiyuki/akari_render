@@ -53,6 +53,8 @@ namespace akari::render {
         std::shared_ptr<MaterialNode> mat_B;
 
       public:
+        AKR_SER_CLASS("MixMaterial")
+        AKR_SER(fraction, mat_A, mat_B)
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override {
             if (field == "fraction" || field == "frac") {
@@ -83,7 +85,7 @@ namespace akari::render {
         std::shared_ptr<LightNode> light_;
 
       public:
-        [[nodiscard]] std::shared_ptr<LightNode> light() override { return light_; }
+        AKR_SER_CLASS("EmissiveMaterial") [[nodiscard]] std::shared_ptr<LightNode> light() override { return light_; }
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override {
             if (field == "light") {

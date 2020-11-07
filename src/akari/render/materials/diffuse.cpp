@@ -40,15 +40,15 @@ namespace akari::render {
             return R;
         }
         Float tr(const ShadingPoint &sp) const override { return color->tr(sp); }
-         Float roughness(const ShadingPoint &sp) const override {
-            return 1.0;
-        }
+        Float roughness(const ShadingPoint &sp) const override { return 1.0; }
     };
 
     class DiffuseMaterialNode final : public MaterialNode {
         std::shared_ptr<TextureNode> color;
 
       public:
+        AKR_SER(color)
+        AKR_SER_CLASS("DiffuseMaterial")
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override {
             if (field == "color") {
@@ -58,9 +58,7 @@ namespace akari::render {
         std::shared_ptr<const Material> create_material(Allocator<> allocator) override {
             return make_pmr_shared<DiffuseMaterial>(allocator, color->create_texture(allocator));
         }
-        void finalize() override {
-            color->finalize();
-        }
+        void finalize() override { color->finalize(); }
     };
     AKR_EXPORT_NODE(DiffuseMaterial, DiffuseMaterialNode)
 } // namespace akari::render

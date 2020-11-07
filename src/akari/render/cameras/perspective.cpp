@@ -81,16 +81,18 @@ namespace akari::render {
         vec3 rotation;
         ivec2 resolution_ = ivec2(512, 512);
         double fov = glm::radians(80.0f);
+        AKR_SER(position, rotation, resolution_, fov)
+        AKR_SER_CLASS("PerspectiveCamera")
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override {
             if (field == "fov") {
                 fov = glm::radians(value.get<double>().value());
             } else if (field == "rotation") {
-                rotation = radians(load<vec3>(value));
+                rotation = radians(render::load<vec3>(value));
             } else if (field == "position") {
-                position = load<vec3>(value);
+                position = render::load<vec3>(value);
             } else if (field == "resolution") {
-                resolution_ = load<ivec2>(value);
+                resolution_ = render::load<ivec2>(value);
             }
         }
         std::shared_ptr<const Camera> create_camera(Allocator<> allocator) override {

@@ -58,7 +58,6 @@ namespace akari::render {
             }
             const Float sinTheta = std::sqrt(std::max(0.0f, 1 - cosTheta * cosTheta));
             const Float phi = 2 * u[1] * Pi;
-            Vec3 v1, v2;
             Frame frame(wo);
 
             auto w = spherical_to_xyz(sinTheta, cosTheta, phi);

@@ -22,7 +22,7 @@
 #include <akari/render/sampler.h>
 
 #define SOBOL_MAX_DIMENSION 21201
-#define SOBOL_BITS 32
+#define SOBOL_BITS          32
 extern const unsigned int SobolMatrix[SOBOL_MAX_DIMENSION][SOBOL_BITS];
 
 static inline uint32_t cmj_hash_simple(uint32_t i, uint32_t p) {
@@ -54,6 +54,7 @@ namespace akari::render {
         int rotation;
 
       public:
+       
         void set_sample_index(uint64_t idx) override {
             Rng rng(idx);
             rotation = rng.uniform_u32();
@@ -72,6 +73,7 @@ namespace akari::render {
     class SobolSamplerNode final : public SamplerNode {
 
       public:
+       AKR_SER_CLASS("SobolSampler")
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override {}
         std::shared_ptr<Sampler> create_sampler(Allocator<> allocator) override {

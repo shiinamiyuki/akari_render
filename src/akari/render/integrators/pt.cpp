@@ -285,6 +285,7 @@ namespace akari::render {
     };
     class PathIntegratorNode final : public IntegratorNode {
       public:
+        AKR_SER_CLASS("Path")
         int spp = 16;
         int max_depth = 5;
         int min_depth = 3;

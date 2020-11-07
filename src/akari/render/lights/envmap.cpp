@@ -122,6 +122,7 @@ namespace akari::render {
 
     class AKR_EXPORT EnvMapNode final : public LightNode {
       public:
+        AKR_SER_CLASS("EnvMap")
         TRSTransform transform;
         std::shared_ptr<TextureNode> envmap;
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
@@ -130,7 +131,7 @@ namespace akari::render {
                 envmap = resolve_texture(value);
                 AKR_ASSERT_THROW(envmap);
             } else if (field == "rotation") {
-                transform.rotation = radians(load<vec3>(value));
+                transform.rotation = radians(render::load<vec3>(value));
             }
         }
         std::shared_ptr<const Light> create(Allocator<> allocator, const Scene *scene,

@@ -100,6 +100,7 @@ namespace akari::render {
         std::string generator = "pcg";
 
       public:
+        AKR_SER_CLASS("RandomSampler")
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override {
             if (field == "generator") {

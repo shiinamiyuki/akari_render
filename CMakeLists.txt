@@ -205,6 +205,12 @@ target_link_libraries(akari libakari_render)
 set_target_CUDA_props(akari)
 copy_to_dist(akari)
 
+add_executable(akari-serde src/akari/cmd/akari-serde.cpp )
+target_include_directories(akari-serde PUBLIC src/)
+target_link_libraries(akari-serde libakari_render)
+set_target_CUDA_props(akari-serde)
+copy_to_dist(akari-serde)
+
 add_executable(akari-import src/akari/cmd/akari-import.cpp )
 target_include_directories(akari-import PUBLIC src/)
 copy_to_dist(akari-import)

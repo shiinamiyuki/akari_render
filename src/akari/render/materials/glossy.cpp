@@ -50,6 +50,8 @@ namespace akari::render {
         std::shared_ptr<TextureNode> roughness;
 
       public:
+        AKR_SER_CLASS("GlossyMaterial")
+         AKR_SER(color, roughness)
         GlossyMaterialNode() { roughness = create_constant_texture_rgb(Vec3(0.001)); }
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override {

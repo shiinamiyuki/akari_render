@@ -23,6 +23,7 @@
 #include <akari/core/plugin.h>
 #include <akari/core/parser.h>
 #include <akari/core/file.h>
+#include <akari/core/serde.h>
 namespace akari::render {
     template <typename T>
     struct ObjectCache {
@@ -46,7 +47,7 @@ namespace akari::render {
         virtual void leave(SceneGraphNode *) const {}
     };
     class NamedNode;
-    class AKR_EXPORT SceneGraphNode : public sdl::Object {
+    class AKR_EXPORT SceneGraphNode : public sdl::Object, public Serializable {
       protected:
         virtual void do_traverse(TraversalCallback *cb) {}
 
@@ -77,6 +78,7 @@ namespace akari::render {
         std::shared_ptr<SceneGraphNode> underlying_;
 
       public:
+        AKR_SER_CLASS("Named")
         NamedNode(std::string name, std::shared_ptr<SceneGraphNode> underlying_)
             : name_(name), underlying_(underlying_) {}
         const std::string &name() { return name_; }

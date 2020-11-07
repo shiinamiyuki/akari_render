@@ -87,10 +87,10 @@ namespace akari {
             return thread::parallel_reduce(data_.begin(), data_.end(), T(0.0), [](T x, T y) { return x * y; });
         }
         T max() const {
-            return thread::parallel_reduce(data_.begin(), data_.end(), T(0.0), [](T x, T y) { return max(x, y); });
+            return thread::parallel_reduce(data_.begin(), data_.end(), T(0.0), [](T x, T y) { return std::max(x, y); });
         }
         T min() const {
-            return thread::parallel_reduce(data_.begin(), data_.end(), T(0.0), [](T x, T y) { return min(x, y); });
+            return thread::parallel_reduce(data_.begin(), data_.end(), T(0.0), [](T x, T y) { return std::min(x, y); });
         }
         void resize(const ivec2 &size) {
             dimension_ = size;
@@ -192,10 +192,10 @@ namespace akari {
             return thread::parallel_reduce(data_.begin(), data_.end(), T(0.0), [](T x, T y) { return x * y; });
         }
         T max() const {
-            return thread::parallel_reduce(data_.begin(), data_.end(), T(0.0), [](T x, T y) { return max(x, y); });
+            return thread::parallel_reduce(data_.begin(), data_.end(), T(0.0), [](T x, T y) { return std::max(x, y); });
         }
         T min() const {
-            return thread::parallel_reduce(data_.begin(), data_.end(), T(0.0), [](T x, T y) { return min(x, y); });
+            return thread::parallel_reduce(data_.begin(), data_.end(), T(0.0), [](T x, T y) { return std::min(x, y); });
         }
         void resize(const ivec3 &size) {
             dimension_ = size;

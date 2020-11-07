@@ -100,13 +100,16 @@ namespace akari::render {
         std::shared_ptr<AcceleratorNode> accel;
         std::shared_ptr<IntegratorNode> integrator;
         std::vector<std::shared_ptr<const Light>> lights;
-        TRSTransform envmap_transform;
         std::shared_ptr<LightNode> envmap;
         std::shared_ptr<Scene> scene;
 
         void init_scene(Allocator<> allocator);
 
       public:
+        AKR_SER_CLASS("Scene")
+        // AKR_SER(camera, sampler, shapes, accel, envmap)
+        void load(InputArchive &ar);
+        void save(OutputArchive &ar) const;
         SceneNode() : memory_arena(astd::pmr::get_default_resource()) {}
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override;

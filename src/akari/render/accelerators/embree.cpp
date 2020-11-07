@@ -98,7 +98,7 @@ namespace akari::render {
             return rtcRay.tfar == -std::numeric_limits<float>::infinity();
         }
         void reset() override { rtcReleaseScene(rtcScene); }
-        Bounds3f world_bounds() const override{
+        Bounds3f world_bounds() const override {
             RTCBounds bounds;
             rtcGetSceneBounds(rtcScene, &bounds);
             return Bounds3f(vec3(bounds.lower_x, bounds.lower_y, bounds.lower_z),
@@ -110,6 +110,7 @@ namespace akari::render {
 
     class EmbreeNode final : public AcceleratorNode {
       public:
+        AKR_SER_CLASS("Embree")
         virtual std::shared_ptr<Accelerator> create_accel(const Scene &scene) {
 #ifdef AKR_ENABLE_EMBREE
             auto accel = std::make_shared<EmbreeAccelerator>();

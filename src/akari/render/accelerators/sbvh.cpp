@@ -165,6 +165,7 @@ namespace akari::render {
     };
     class SBVHAcceleratorNode final : public AcceleratorNode {
       public:
+        AKR_SER_CLASS("SBVH")
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override {}
         virtual std::shared_ptr<Accelerator> create_accel(const Scene &scene) override {

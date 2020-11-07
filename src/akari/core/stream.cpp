@@ -24,7 +24,7 @@
 #include <akari/core/stream.h>
 
 namespace akari {
-    FileStream::FileStream(const fs::path &path, Stream::Mode mode) : mode_(mode) {
+    FStream::FStream(const fs::path &path, Stream::Mode mode) : mode_(mode) {
         if (mode == Stream::Mode::Read) {
             file = std::fstream(path, std::ios::binary | std::ios::in);
         } else if (mode == Stream::Mode::Write) {
@@ -33,18 +33,18 @@ namespace akari {
             file = std::fstream(path, std::ios::binary);
         }
     }
-    size_t FileStream::read(char *buf, size_t size) {
+    size_t FStream::read(char *buf, size_t size) {
         AKR_ASSERT(mode_ == Stream::Mode::Read || mode_ == Stream::Mode::ReadWrite);
         file->read(buf, size);
         return file->gcount();
     }
-    size_t FileStream::write(char *buf, size_t size) {
+    size_t FStream::write(const char *buf, size_t size) {
         AKR_ASSERT(mode_ == Stream::Mode::Write || mode_ == Stream::Mode::ReadWrite);
         file->write(buf, size);
         return file->gcount();
     }
-    Stream::Mode FileStream::mode() { return mode_; }
-    bool FileStream::closed() const { return file.has_value() && !file->eof(); }
+    Stream::Mode FStream::mode() { return mode_; }
+    bool FStream::closed() const { return file.has_value() && !file->eof(); }
 
     size_t ByteStream::read(char *buf, size_t size) {
         auto r = std::min(in.size(), pos + size) - pos;
@@ -52,7 +52,7 @@ namespace akari {
         pos += r;
         return r;
     }
-    size_t ByteStream::write(char *buf, size_t size) {
+    size_t ByteStream::write(const char *buf, size_t size) {
         auto sz = out.size();
         out.resize(sz + size);
         std::memcpy(&out[sz], buf, size);

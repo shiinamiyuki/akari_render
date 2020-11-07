@@ -30,11 +30,14 @@
 namespace akari::render {
     class AkariMesh final : public MeshNode {
       public:
+        AKR_SER_CLASS("AkariMesh")
+        AKR_SER(materials, path)
         std::string path;
         AkariMesh() = default;
         AkariMesh(std::string path) : path(path) {}
         std::shared_ptr<Mesh> mesh;
         std::vector<std::shared_ptr<MaterialNode>> materials;
+
         void commit() override {
             auto exp = resource_manager()->load_path<BinaryGeometry>(path);
             if (exp) {

@@ -750,7 +750,8 @@ namespace akari::render {
 
                 info("Learning pass {}, spp:{}", pass + 1, samples);
                 accumulatedSamples += samples;
-                thread::parallel_for(thread::blocked_range<2>(n_tiles), [=, &resources, &samplers](const ivec2 &tile_pos, int tid) {
+                thread::parallel_for(thread::blocked_range<2>(n_tiles), [=, &resources,
+                                                                         &samplers](const ivec2 &tile_pos, int tid) {
                     Allocator<> allocator(resources[tid]);
                     Bounds2i tileBounds = Bounds2i{tile_pos * (int)tile_size, (tile_pos + ivec2(1)) * (int)tile_size};
                     auto tile = film->tile(tileBounds);
@@ -802,38 +803,39 @@ namespace akari::render {
                 }
             });
             non_zero_path.clear();
-            thread::parallel_for(thread::blocked_range<2>(n_tiles), [=, &mutex, &resources, &samplers](const ivec2 &tile_pos, int tid) {
-                Allocator<> allocator(resources[tid]);
-                Bounds2i tileBounds = Bounds2i{tile_pos * (int)tile_size, (tile_pos + ivec2(1)) * (int)tile_size};
-                auto tile = film->tile(tileBounds);
-                auto camera = scene->camera;
-                for (int y = tile.bounds.pmin.y; y < tile.bounds.pmax.y; y++) {
-                    for (int x = tile.bounds.pmin.x; x < tile.bounds.pmax.x; x++) {
-                        auto &sampler = samplers[x + y * film->resolution().x];
-                        for (int s = 0; s < spp; s++) {
-                            sampler->start_next_sample();
-                            GuidedPathTracer pt;
-                            pt.scene = scene;
-                            pt.sTree = sTree;
-                            pt.n_vertices = 0;
-                            pt.vertices = allocator.allocate_object<GuidedPathTracer::PPGVertex>(max_depth + 1);
-                            pt.training = false;
-                            pt.allocator = allocator;
-                            pt.sampler = sampler.get();
-                            pt.L = Spectrum(0.0);
-                            pt.beta = Spectrum(1.0);
-                            pt.max_depth = max_depth;
-                            pt.run_megakernel(camera.get(), ivec2(x, y));
-                            non_zero_path.accumluate(!is_black(pt.L));
-                            tile.add_sample(vec2(x, y), pt.L, 1.0f);
-                            resources[tid]->release();
+            thread::parallel_for(
+                thread::blocked_range<2>(n_tiles), [=, &mutex, &resources, &samplers](const ivec2 &tile_pos, int tid) {
+                    Allocator<> allocator(resources[tid]);
+                    Bounds2i tileBounds = Bounds2i{tile_pos * (int)tile_size, (tile_pos + ivec2(1)) * (int)tile_size};
+                    auto tile = film->tile(tileBounds);
+                    auto camera = scene->camera;
+                    for (int y = tile.bounds.pmin.y; y < tile.bounds.pmax.y; y++) {
+                        for (int x = tile.bounds.pmin.x; x < tile.bounds.pmax.x; x++) {
+                            auto &sampler = samplers[x + y * film->resolution().x];
+                            for (int s = 0; s < spp; s++) {
+                                sampler->start_next_sample();
+                                GuidedPathTracer pt;
+                                pt.scene = scene;
+                                pt.sTree = sTree;
+                                pt.n_vertices = 0;
+                                pt.vertices = allocator.allocate_object<GuidedPathTracer::PPGVertex>(max_depth + 1);
+                                pt.training = false;
+                                pt.allocator = allocator;
+                                pt.sampler = sampler.get();
+                                pt.L = Spectrum(0.0);
+                                pt.beta = Spectrum(1.0);
+                                pt.max_depth = max_depth;
+                                pt.run_megakernel(camera.get(), ivec2(x, y));
+                                non_zero_path.accumluate(!is_black(pt.L));
+                                tile.add_sample(vec2(x, y), pt.L, 1.0f);
+                                resources[tid]->release();
+                            }
                         }
                     }
-                }
-                std::lock_guard<std::mutex> _(mutex);
-                film->merge_tile(tile);
-                reporter->update();
-            });
+                    std::lock_guard<std::mutex> _(mutex);
+                    film->merge_tile(tile);
+                    reporter->update();
+                });
             info("non zero path:{}%", non_zero_path.ratio() * 100);
             for (auto rsrc : resources) {
                 delete rsrc;
@@ -842,6 +844,7 @@ namespace akari::render {
     };
     class GuidedPathIntegratorNode final : public IntegratorNode {
       public:
+        AKR_SER_CLASS("GuidedPath")
         int spp = 16;
         int max_depth = 5;
         int training_samples = 16;

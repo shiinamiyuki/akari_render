@@ -29,11 +29,12 @@ akari scene.akari --spp 64 --denoise --ss 4
 ```
 
 ## Build from Source
+Required packages: 
+  - zlib if AKR_ENABLE_OPENEXR (I cannot get in source build to work)
+
 ```bash
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
-# when using CUDA + OptiX 7
-cmake .. -DCMAKE_BUILD_TYPE=Release -DAKR_OPTIX_PATH=[path to optix7]
 ```
 
 ### To use Embree

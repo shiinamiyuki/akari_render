@@ -238,4 +238,6 @@ namespace akari::render {
             AKR_ASSERT_THROW(envmap);
         }
     }
+    void SceneNode::load(InputArchive &ar) { ar(camera, sampler, shapes, accel, envmap); }
+    void SceneNode::save(OutputArchive &ar) const { ar(camera, sampler, shapes, accel, envmap); }
 } // namespace akari::render

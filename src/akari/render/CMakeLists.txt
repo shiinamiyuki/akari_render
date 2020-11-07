@@ -5,5 +5,6 @@ add_subdirectory(cameras)
 add_subdirectory(materials)
 add_subdirectory(lights)
 add_subdirectory(samplers)
+add_subdirectory(medium)
 # add_subdirectory(textures)
 

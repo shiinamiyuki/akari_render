@@ -60,56 +60,57 @@ namespace akari::render {
             for (size_t i = 0; i < std::thread::hardware_concurrency(); i++) {
                 resources.emplace_back(new astd::pmr::monotonic_buffer_resource(astd::pmr::get_default_resource()));
             }
-            thread::parallel_for(thread::blocked_range<2>(n_tiles), [=, &mutex, &resources](const ivec2 &tile_pos, int tid) {
-                Allocator<> allocator(resources[tid]);
-                Bounds2i tileBounds = Bounds2i{tile_pos * (int)tile_size, (tile_pos + ivec2(1)) * (int)tile_size};
-                auto tile = film->tile(tileBounds);
-                auto &camera = scene->camera;
-                auto sampler = scene->sampler->clone(Allocator<>());
+            thread::parallel_for(
+                thread::blocked_range<2>(n_tiles), [=, &mutex, &resources](const ivec2 &tile_pos, int tid) {
+                    Allocator<> allocator(resources[tid]);
+                    Bounds2i tileBounds = Bounds2i{tile_pos * (int)tile_size, (tile_pos + ivec2(1)) * (int)tile_size};
+                    auto tile = film->tile(tileBounds);
+                    auto &camera = scene->camera;
+                    auto sampler = scene->sampler->clone(Allocator<>());
 
-                for (int y = tile.bounds.pmin.y; y < tile.bounds.pmax.y; y++) {
-                    for (int x = tile.bounds.pmin.x; x < tile.bounds.pmax.x; x++) {
-                        sampler->set_sample_index(x + y * film->resolution().x);
-                        for (int s = 0; s < spp; s++) {
-                            sampler->start_next_sample();
-                            CameraSample sample =
-                                camera->generate_ray(sampler->next2d(), sampler->next2d(), ivec2(x, y));
-                            Spectrum value = Spectrum(0.0);
-                            auto ray = sample.ray;
-                            while (true) {
-                                if (auto isct = scene->intersect(ray)) {
-                                    auto trig = scene->get_triangle(isct->geom_id, isct->prim_id);
-                                    Float u = sampler->next1d();
-                                    Float tr = trig.material->tr(ShadingPoint(trig.texcoord(isct->uv)));
-                                    if (tr > 0) {
-                                        if (u < tr) {
-                                            ray = Ray(trig.p(isct->uv), ray.d);
-                                            continue;
+                    for (int y = tile.bounds.pmin.y; y < tile.bounds.pmax.y; y++) {
+                        for (int x = tile.bounds.pmin.x; x < tile.bounds.pmax.x; x++) {
+                            sampler->set_sample_index(x + y * film->resolution().x);
+                            for (int s = 0; s < spp; s++) {
+                                sampler->start_next_sample();
+                                CameraSample sample =
+                                    camera->generate_ray(sampler->next2d(), sampler->next2d(), ivec2(x, y));
+                                Spectrum value = Spectrum(0.0);
+                                auto ray = sample.ray;
+                                while (true) {
+                                    if (auto isct = scene->intersect(ray)) {
+                                        auto trig = scene->get_triangle(isct->geom_id, isct->prim_id);
+                                        Float u = sampler->next1d();
+                                        Float tr = trig.material->tr(ShadingPoint(trig.texcoord(isct->uv)));
+                                        if (tr > 0) {
+                                            if (u < tr) {
+                                                ray = Ray(trig.p(isct->uv), ray.d);
+                                                continue;
+                                            }
                                         }
-                                    }
-                                    switch (aov) {
-                                    case AOV::albedo: {
-                                        auto mat = trig.material;
-                                        ShadingPoint sp(trig.texcoord(isct->uv));
-                                        value = mat->albedo(sp);
-                                    } break;
-                                    case AOV::normal:
-                                        value = trig.ns(isct->uv);
+                                        switch (aov) {
+                                        case AOV::albedo: {
+                                            auto mat = trig.material;
+                                            ShadingPoint sp(trig.texcoord(isct->uv));
+                                            value = mat->albedo(sp);
+                                        } break;
+                                        case AOV::normal:
+                                            value = trig.ns(isct->uv);
+                                            break;
+                                        }
+                                        break;
+                                    } else {
                                         break;
                                     }
-                                    break;
-                                } else {
-                                    break;
                                 }
+                                tile.add_sample(vec2(x, y), value, 1.0f);
                             }
-                            tile.add_sample(vec2(x, y), value, 1.0f);
                         }
                     }
-                }
-                std::lock_guard<std::mutex> _(mutex);
-                film->merge_tile(tile);
-                resources[tid]->release();
-            });
+                    std::lock_guard<std::mutex> _(mutex);
+                    film->merge_tile(tile);
+                    resources[tid]->release();
+                });
             for (auto rsrc : resources) {
                 delete rsrc;
             }
@@ -117,6 +118,7 @@ namespace akari::render {
     };
     class AOVIntegratorNode final : public IntegratorNode {
       public:
+        AKR_SER_CLASS("AOVIntegrator")
         int spp = 16;
         AOVIntegrator::AOV aov = AOVIntegrator::albedo;
         std::shared_ptr<Integrator> create_integrator(Allocator<> allocator) override {

@@ -75,6 +75,7 @@ namespace akari::render {
         std::shared_ptr<TextureNode> color;
 
       public:
+        AKR_SER_CLASS("AreaLight")
         // triangle is given if the light is attached to a triangle
         std::shared_ptr<const Light> create(Allocator<> allocator, const Scene *scene,
                                             const std::optional<Triangle> &triangle) override {

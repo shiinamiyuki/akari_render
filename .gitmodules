@@ -1,9 +1,6 @@
 [submodule "external/tinyobjloader"]
 	path = external/tinyobjloader
 	url = https://github.com/tinyobjloader/tinyobjloader
-[submodule "external/cxxopts"]
-	path = external/cxxopts
-	url = https://github.com/jarro2783/cxxopts	
 [submodule "external/magic_enum"]
 	path = external/magic_enum
 	url = https://github.com/Neargye/magic_enum
@@ -16,9 +13,6 @@
 [submodule "external/googletest"]
 	path = external/googletest
 	url = https://github.com/google/googletest
-[submodule "external/pugixml"]
-	path = external/pugixml
-	url = https://github.com/zeux/pugixml
 [submodule "external/openexr"]
 	path = external/openexr
 	url = https://github.com/AcademySoftwareFoundation/openexr

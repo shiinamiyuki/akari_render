@@ -32,6 +32,8 @@ namespace akari::render {
         ObjectCache<std::shared_ptr<const Texture>> tex_cache;
 
       public:
+        AKR_SER_CLASS("ConstantTexture")
+        AKR_SER(value, alpha)
         ConstantTextureNode(Spectrum v, Float alpha = 1.0) : value(v), alpha(alpha) {}
         std::shared_ptr<const Texture> create_texture(Allocator<> allocator) override {
             auto tex =
@@ -44,10 +46,13 @@ namespace akari::render {
     class ImageTextureNode final : public TextureNode {
         std::shared_ptr<Image> image;
         ObjectCache<std::shared_ptr<const Texture>> tex_cache;
+        fs::path image_path;
 
       public:
+        AKR_SER(image_path)
+        AKR_SER_CLASS("ImageTexture")
         ImageTextureNode() = default;
-        ImageTextureNode(const fs::path &path) {
+        ImageTextureNode(const fs::path &path) : image_path(path) {
             auto res = resource_manager()->load_path<ImageResource>(path);
             if (res) {
                 image = res.extract_value()->image();

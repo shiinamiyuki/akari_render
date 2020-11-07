@@ -35,18 +35,18 @@ namespace akari {
       public:
         enum class Mode { Read = 0, Write = 1, ReadWrite = 2 };
         virtual size_t read(char *buf, size_t size) = 0;
-        virtual size_t write(char *buf, size_t size) = 0;
+        virtual size_t write(const char *buf, size_t size) = 0;
         virtual Mode mode() = 0;
         virtual bool closed() const = 0;
     };
-    class AKR_EXPORT FileStream : public Stream {
+    class AKR_EXPORT FStream : public Stream {
         Stream::Mode mode_;
         std::optional<std::fstream> file;
 
       public:
-        FileStream(const fs::path &path, Stream::Mode mode);
+        FStream(const fs::path &path, Stream::Mode mode);
         size_t read(char *buf, size_t size) override;
-        size_t write(char *buf, size_t size) override;
+        size_t write(const char *buf, size_t size) override;
         Mode mode() override;
         bool closed() const override;
     };
@@ -62,7 +62,7 @@ namespace akari {
         ByteStream(std::string_view in, Stream::Mode mode) : mode_(mode), in(in) {}
         const std::vector<char> &buf_out() { return out; }
         size_t read(char *buf, size_t size) override;
-        size_t write(char *buf, size_t size) override;
+        size_t write(const char *buf, size_t size) override;
         Mode mode() override;
         bool closed() const override;
     };
