@@ -193,8 +193,7 @@ namespace akari::render {
                             }
                         }
                         Image down_sampled_image = rgb_image(output_image->resolution() / ivec2(s));
-                        down_sampled_image.array3d() =
-                            std::move(convolve(output_image->array3d(), avg_kernel, ivec3(1, s, s)));
+                        down_sampled_image.array3d() = convolve(output_image->array3d(), avg_kernel, ivec3(1, s, s));
                         output_image = std::move(down_sampled_image);
                     }
                 }

@@ -29,6 +29,7 @@ namespace akari {
       public:
         virtual size_t read(char *buf, size_t bytes) = 0;
         virtual std::vector<char> read_all();
+        virtual ~FileStream() = default;
     };
     class AKR_EXPORT StdFileStream : public FileStream {
         std::ifstream in;
@@ -45,7 +46,7 @@ namespace akari {
         size_t pos = 0;
 
       public:
-        ByteFileStream(std::vector<char> content):content(std::move(content)){}
+        ByteFileStream(std::vector<char> content) : content(std::move(content)) {}
         size_t read(char *buf, size_t bytes) override {
             if (pos + bytes > content.size()) {
                 auto read = content.size() - pos;

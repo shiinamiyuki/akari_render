@@ -52,7 +52,7 @@ namespace akari::render {
             : c2w(c2w), w2c(c2w.inverse()), _resolution(_resolution), fov(fov) {
             preprocess();
         }
-        ivec2 resolution() const { return _resolution; }
+        ivec2 resolution() const override { return _resolution; }
         CameraSample generate_ray(const vec2 &u1, const vec2 &u2, const ivec2 &raster) const override {
             CameraSample sample;
             sample.p_lens = concentric_disk_sampling(u1) * lens_radius;
