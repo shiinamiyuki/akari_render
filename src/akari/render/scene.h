@@ -111,8 +111,8 @@ namespace akari::render {
       public:
         AKR_SER_CLASS("Scene")
         // AKR_SER(camera, sampler, shapes, accel, envmap)
-        void load(InputArchive &ar);
-        void save(OutputArchive &ar) const;
+        void load(InputArchive &ar) override;
+        void save(OutputArchive &ar) const override;
         SceneNode() : memory_arena(astd::pmr::get_default_resource()) {}
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override;
@@ -120,7 +120,7 @@ namespace akari::render {
         void finalize() override;
         void render();
         void set_spp(int spp) { spp_override = spp; }
-        void run_denosier(const std::string & s) { denoiser_name = s; }
+        void run_denosier(const std::string &s) { denoiser_name = s; }
         void super_sample(int k) { super_sampling_k = k; }
         void require_aovs(bool v) { required_aovs_ = v; }
     };

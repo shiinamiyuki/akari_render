@@ -38,6 +38,7 @@ namespace akari {
         virtual size_t write(const char *buf, size_t size) = 0;
         virtual Mode mode() = 0;
         virtual bool closed() const = 0;
+        virtual ~Stream() = default;
     };
     class AKR_EXPORT FStream : public Stream {
         Stream::Mode mode_;

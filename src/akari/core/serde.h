@@ -45,6 +45,7 @@ namespace akari {
         // this is used as an unique identifier for its type
         virtual std::string type_str() const = 0;
         using Constructor = std::function<Serializable *(std::string)>;
+        virtual ~Serializable() = default;
     };
     template <class T>
     struct shared_ptr_trait {
@@ -132,6 +133,7 @@ namespace akari {
                 (*this)(args...);
             }
         }
+        virtual ~OutputArchive() = default;
     };
     class AKR_EXPORT InputArchive {
       public:
@@ -180,6 +182,7 @@ namespace akari {
         virtual std::shared_ptr<Serializable> load() = 0;
         virtual void begin_object() = 0;
         virtual void end_object() = 0;
+        virtual ~InputArchive() = default;
     };
     struct SerdeObjectRecord {
         std::string type_str;
