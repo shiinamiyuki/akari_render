@@ -33,7 +33,7 @@ namespace akari::render {
 
       public:
         AKR_SER_CLASS("ConstantTexture")
-        AKR_SER(value, alpha)
+        AKR_SER_IMPL(value, alpha)
         ConstantTextureNode(Spectrum v, Float alpha = 1.0) : value(v), alpha(alpha) {}
         std::shared_ptr<const Texture> create_texture(Allocator<> allocator) override {
             auto tex =
@@ -49,7 +49,7 @@ namespace akari::render {
         fs::path image_path;
         std::shared_ptr<ImageResource> rsrc;
       public:
-        AKR_SER(image_path, rsrc)
+        AKR_SER_IMPL(image_path, rsrc)
         AKR_SER_CLASS("ImageTexture")
         ImageTextureNode() = default;
         ImageTextureNode(const fs::path &path) : image_path(path) {

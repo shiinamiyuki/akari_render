@@ -54,7 +54,7 @@ namespace akari::render {
 
       public:
         AKR_SER_CLASS("MixMaterial")
-        AKR_SER(fraction, mat_A, mat_B)
+        AKR_SER_IMPL(fraction, mat_A, mat_B)
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override {
             if (field == "fraction" || field == "frac") {

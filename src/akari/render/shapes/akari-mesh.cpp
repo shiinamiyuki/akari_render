@@ -31,7 +31,7 @@ namespace akari::render {
     class AkariMesh final : public MeshNode {
       public:
         AKR_SER_CLASS("AkariMesh")
-        AKR_SER(materials, path)
+        AKR_SER_IMPL(materials, path)
         std::string path;
         AkariMesh() = default;
         AkariMesh(std::string path) : path(path) {}

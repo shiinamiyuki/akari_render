@@ -47,7 +47,7 @@ namespace akari::render {
         std::shared_ptr<TextureNode> color;
 
       public:
-        AKR_SER(color)
+        AKR_SER_IMPL(color)
         AKR_SER_CLASS("DiffuseMaterial")
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override {

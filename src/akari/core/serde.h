@@ -199,6 +199,9 @@ namespace akari {
 #define AKR_SER(...)                                                                                                   \
     void load(InputArchive &ar) { ar(__VA_ARGS__); }                                                                   \
     void save(OutputArchive &ar) const { ar(__VA_ARGS__); }
+#define AKR_SER_IMPL(...)                                                                                              \
+    void load(InputArchive &ar) override { ar(__VA_ARGS__); }                                                          \
+    void save(OutputArchive &ar) const override { ar(__VA_ARGS__); }
 #define AKR_SER_CLASS(Self)                                                                                            \
     std::string type_str() const override { return Self; }
 

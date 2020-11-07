@@ -60,7 +60,7 @@ namespace akari::render {
 
       public:
         AKR_SER_CLASS("SpecularMaterial")
-        AKR_SER(color, eta, mode)
+        AKR_SER_IMPL(color, eta, mode)
         SpecularMaterialNode() {}
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override {

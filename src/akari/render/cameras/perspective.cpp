@@ -81,7 +81,7 @@ namespace akari::render {
         vec3 rotation;
         ivec2 resolution_ = ivec2(512, 512);
         double fov = glm::radians(80.0f);
-        AKR_SER(position, rotation, resolution_, fov)
+        AKR_SER_IMPL(position, rotation, resolution_, fov)
         AKR_SER_CLASS("PerspectiveCamera")
         void object_field(sdl::Parser &parser, sdl::ParserContext &ctx, const std::string &field,
                           const sdl::Value &value) override {
