@@ -65,13 +65,18 @@ namespace akari::render {
             return std::make_pair(wi, evaluate(wo, wi));
         }
     };
+    struct MediumSample {
+        const PhaseFunction *phase = nullptr;
+        Spectrum tr;
+        Vec3 p;
+    };
     class Medium {
       public:
-        virtual const PhaseFunction *evaluate(const Vec3 &p) = 0;
-        virtual Spectrum tr(const Ray &ray, Sampler *sampler) = 0;
+        virtual MediumSample sample(const Ray &ray, Sampler *sampler, Allocator<>) const = 0;
+        virtual Spectrum tr(const Ray &ray, Sampler *sampler) const = 0;
     };
     class MediumNode : public SceneGraphNode {
       public:
-        virtual std::shared_ptr<const MediumNode> create_medium(Allocator<>) = 0;
+        virtual std::shared_ptr<const Medium> create_medium(Allocator<>) = 0;
     };
 } // namespace akari::render

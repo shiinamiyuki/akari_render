@@ -38,7 +38,20 @@ namespace akari::render {
         Vec3 ng() const { return normalize(cross(vertices[1] - vertices[0], vertices[2] - vertices[0])); }
         Vec3 ns(const vec2 &uv) const { return normalize(lerp3(normals[0], normals[1], normals[2], uv)); }
         vec2 texcoord(const vec2 &uv) const { return lerp3(texcoords[0], texcoords[1], texcoords[2], uv); }
+        Vec3 dpdu(Float u) const { return dlerp3du(vertices[0], vertices[1], vertices[2], u); }
+        Vec3 dpdv(Float v) const { return dlerp3du(vertices[0], vertices[1], vertices[2], v); }
 
+        std::pair<Vec3, Vec3> dnduv(const vec2 &uv) const {
+            auto n = ns(uv);
+            Float il = 1.0 / length(n);
+            n *= il;
+            auto dn_du = (normals[1] - normals[0]) * il;
+            auto dn_dv = (normals[2] - normals[0]) * il;
+            dn_du = -n * dot(n, dn_du) + dn_du;
+            dn_dv = -n * dot(n, dn_dv) + dn_dv;
+            return std::make_pair(dn_du, dn_dv);
+        }
+        
         std::optional<std::pair<Float, Vec2>> intersect(const Ray &ray) const {
             auto &v0 = vertices[0];
             auto &v1 = vertices[1];

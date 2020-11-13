@@ -1,3 +1,5 @@
 add_plugin(RTAO  ao.cpp)
 add_plugin(Path  pt.cpp)
+add_plugin(VolPath  volpt.cpp)
 add_plugin(GuidedPath  ppg.cpp)
+add_plugin(ManifoldPath  sms.cpp)

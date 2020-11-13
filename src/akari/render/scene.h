@@ -92,6 +92,7 @@ namespace akari::render {
         std::string denoiser_name;
         int super_sampling_k = 0;
         bool required_aovs_ = false;
+        bool write_aovs_ = false;
 
         astd::pmr::monotonic_buffer_resource memory_arena;
 
@@ -123,5 +124,6 @@ namespace akari::render {
         void run_denosier(const std::string &s) { denoiser_name = s; }
         void super_sample(int k) { super_sampling_k = k; }
         void require_aovs(bool v) { required_aovs_ = v; }
+        void write_aovs(bool v) { write_aovs_ = v; }
     };
 } // namespace akari::render

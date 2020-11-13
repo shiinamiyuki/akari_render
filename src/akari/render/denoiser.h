@@ -36,4 +36,7 @@ namespace akari::render {
         virtual std::optional<Image> denoise(const Scene *scene, RenderOutput &aov) = 0;
         virtual ~Denoiser() = default;
     };
+    
+    AKR_EXPORT Image nlmeans(const Image &image, const Image &guide, const Image &variance, uint32_t F, uint32_t R,
+                             double k);
 } // namespace akari::render

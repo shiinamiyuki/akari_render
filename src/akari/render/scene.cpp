@@ -111,10 +111,13 @@ namespace akari::render {
         auto real_integrator = integrator->create_integrator(allocator);
         Timer timer;
         RenderInput input;
-        input.required_full_aov = required_aovs_;
+        input.required_full_aov = false;
         input.scene = scene.get();
         input.requested_aovs.emplace("color", AOVRequest{});
         bool run_denoiser_ = !denoiser_name.empty();
+        if (run_denoiser_) {
+            input.required_full_aov = true;
+        }
         if (run_denoiser_) {
             if (auto _ = dyn_cast<UniAOVIntegrator>(real_integrator)) {
                 warning("integrator {} has no aov output, aov is rendered separately", integrator->description());
@@ -161,10 +164,12 @@ namespace akari::render {
                 render_aov("normal");
                 render_aov("albedo");
             }
-            for (auto &[aov, rec] : render_out.aovs) {
-                write_intermediate(*rec.value, "." + aov, true);
-                if (rec.variance) {
-                    write_intermediate(*rec.variance, ".var." + aov, true);
+            if (write_aovs_) {
+                for (auto &[aov, rec] : render_out.aovs) {
+                    write_intermediate(*rec.value, "." + aov, true);
+                    if (rec.variance) {
+                        write_intermediate(*rec.variance, ".var." + aov, true);
+                    }
                 }
             }
             PluginManager<Denoiser> denoisers;
@@ -180,21 +185,49 @@ namespace akari::render {
                 auto denoiser = pi->make_shared();
                 output_image = denoiser->denoise(scene.get(), render_out);
                 AKR_ASSERT(is_rgb_image(*output_image));
+                auto downsample = [&](const Image &image) -> Image {
+                    int s = std::sqrt(super_sampling_k);
+                    Array3D<float> avg_kernel(ivec3(1, s, s));
+                    avg_kernel.fill(1.0 / (s * s));
+                    Image down_sampled_image = rgb_image(image.resolution() / ivec2(s));
+                    down_sampled_image.array3d() = convolve(image.array3d(), avg_kernel, ivec3(1, s, s));
+                    return down_sampled_image;
+                };
                 if (output_image) {
                     if (super_sampling_k > 1) {
-                        int s = std::sqrt(super_sampling_k);
                         write_intermediate_img(*output_image, ".ss", false);
-
-                        Array3D<float> avg_kernel(ivec3(1, s, s));
-                        avg_kernel.fill(0.0);
-                        for (int x = 0; x < s; x++) {
-                            for (int y = 0; y < s; y++) {
-                                avg_kernel(0, x, y) = 1.0 / (s * s);
-                            }
+                        output_image = downsample(*output_image);
+                    }
+                }
+                auto has_half = [&](const std::string &aov) {
+                    return render_out.aovs.find(aov + "_A") != render_out.aovs.end() &&
+                           render_out.aovs.find(aov + "_B") != render_out.aovs.end();
+                };
+                if (write_aovs_ && has_half("color")) {
+                    // we will also denoise aovs
+                    auto denoise_half = [&](const std::string &part) -> std::optional<Image> {
+                        RenderOutput half;
+                        half.aovs["color"].value = render_out.aovs.at("color" + part).value;
+                        half.aovs["first_hit_normal"].value = render_out.aovs.at("first_hit_normal").value;
+                        half.aovs["first_hit_albedo"].value = render_out.aovs.at("first_hit_albedo").value;
+                        half.aovs["normal"].value = render_out.aovs.at("normal").value;
+                        half.aovs["albedo"].value = render_out.aovs.at("albedo").value;
+                        half.aovs["color"].value = render_out.aovs.at("color" + part).value;
+                        return denoiser->denoise(scene.get(), half);
+                    };
+                    if (auto color_A = denoise_half("_A")) {
+                        if (super_sampling_k > 1) {
+                            write_intermediate_img(downsample(*color_A), ".color_A.denoised", true);
+                        } else {
+                            write_intermediate_img(*color_A, ".color_A.denoised", true);
                         }
-                        Image down_sampled_image = rgb_image(output_image->resolution() / ivec2(s));
-                        down_sampled_image.array3d() = convolve(output_image->array3d(), avg_kernel, ivec3(1, s, s));
-                        output_image = std::move(down_sampled_image);
+                    }
+                    if (auto color_B = denoise_half("_B")) {
+                        if (super_sampling_k > 1) {
+                            write_intermediate_img(downsample(*color_B), ".color_B.denoised", true);
+                        } else {
+                            write_intermediate_img(*color_B, ".color_B.denoised", true);
+                        }
                     }
                 }
                 denoiser = nullptr;

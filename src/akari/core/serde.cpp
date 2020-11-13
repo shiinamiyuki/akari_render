@@ -84,7 +84,7 @@ namespace akari {
         void save_u64(uint64_t v) override { return save_helper(v); }
         void save_f32(float v) override { return save_helper(v); }
         void save_f64(double v) override { return save_helper(v); }
-        void save_str(const std::string &s) { save_helper(s); }
+        void save_str(const std::string &s) override { save_helper(s); }
         void save_bytes(const char *buf, size_t bytes) override {
             (*j_st.back())[std::to_string(st.back())] = json::array();
             auto &arr = (*j_st.back())[std::to_string(st.back())];
@@ -92,7 +92,7 @@ namespace akari {
                 arr[i] = (int)buf[i];
             }
         }
-        void begin_object() {
+        void begin_object() override {
             json o = json::object();
             auto id = std::to_string(st.back());
             (*j_st.back())[id] = o;
@@ -101,7 +101,7 @@ namespace akari {
             st.push_back(0);
             j_st.push_back(&next);
         }
-        void end_object() {
+        void end_object() override {
             j_st.pop_back();
             st.pop_back();
         }
@@ -128,13 +128,13 @@ namespace akari {
         void save_f32(float v) override { return save_helper(v); }
         void save_f64(double v) override { return save_helper(v); }
         void save_bytes(const char *buf, size_t bytes) override { stream->write(buf, bytes); }
-        void save_str(const std::string &s) {
+        void save_str(const std::string &s) override {
             do_save(s.length());
             save_bytes(s.data(), s.size());
         }
 
-        void begin_object() { do_save(OBJECT_BEGIN); }
-        void end_object() { do_save(OBJECT_END); }
+        void begin_object() override { do_save(OBJECT_BEGIN); }
+        void end_object() override { do_save(OBJECT_END); }
     };
     AKR_EXPORT std::unique_ptr<OutputArchive> create_output_archive(std::unique_ptr<Stream> stream) {
         return std::make_unique<BinaryOutputArchive>(std::move(stream));
@@ -207,14 +207,14 @@ namespace akari {
             : InputArchiveBase(ctor), stream(std::move(stream)) {}
 
         bool load_bytes(char *buf, size_t bytes) override { return bytes == stream->read(buf, bytes); }
-        void begin_object() {
+        void begin_object() override {
             char c = 0;
             stream->read(&c, 1);
             if (c != OBJECT_BEGIN) {
                 AKR_PANIC("expected object begin tag");
             }
         }
-        void end_object() {
+        void end_object() override {
             char c = 0;
             stream->read(&c, 1);
             if (c != OBJECT_END) {

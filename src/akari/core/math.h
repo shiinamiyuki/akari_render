@@ -25,13 +25,14 @@
 #include <cmath>
 #include <algorithm>
 #include <cstring>
-#if defined(AKR_GPU_BACKEND_CUDA) || defined(__CUDACC__) || defined(__NVCC__)
+
+#define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
+#define GLM_FORCE_PURE
+#define GLM_FORCE_INTRINSICS
+#if defined(__CUDACC__) || defined(__NVCC__)
 #    include <cuda.h>
 #    define GLM_FORCE_CUDA
 #else
-#    define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
-#    define GLM_FORCE_PURE
-#    define GLM_FORCE_INTRINSICS
 #    define GLM_FORCE_SSE2
 #    define GLM_FORCE_SSE3
 #    define GLM_FORCE_AVX
@@ -104,6 +105,14 @@ namespace akari {
     template <typename V, typename V2>
     inline V lerp3(const V &v0, const V &v1, const V &v2, const V2 &uv) {
         return (1.0f - uv[0] - uv[1]) * v0 + uv[0] * v1 + uv[1] * v2;
+    }
+    template <typename V, typename V2>
+    inline V dlerp3du(const V &v0, const V &v1, const V &v2, V2 u) {
+        return -v0 + v1;
+    }
+    template <typename V, typename V2>
+    inline V dlerp3dv(const V &v0, const V &v1, const V &v2, V2 v) {
+        return -v0 + v2;
     }
     template <typename T, int N, class F>
     T reduce(const Vector<T, N> &vec, F &&f) {
@@ -196,18 +205,33 @@ namespace akari {
         }
         explicit Frame(const vec3 &v) : normal(v) { compute_local_frame(v, &T, &B); }
 
-        [[nodiscard]] vec3 world_to_local(const vec3 &v) const {
-            return vec3(dot(T, v), dot(normal, v), dot(B, v));
-        }
+        [[nodiscard]] vec3 world_to_local(const vec3 &v) const { return vec3(dot(T, v), dot(normal, v), dot(B, v)); }
 
-        [[nodiscard]] vec3 local_to_world(const vec3 &v) const {
-            return vec3(v.x * T + v.y * vec3(normal) + v.z * B);
-        }
+        [[nodiscard]] vec3 local_to_world(const vec3 &v) const { return vec3(v.x * T + v.y * vec3(normal) + v.z * B); }
 
         vec3 normal;
         vec3 T, B;
     };
 
+    /*
+    A Row major 2x2 matrix
+    */
+    template <typename T>
+    struct Matrix2 {
+        Matrix2(Mat<T, 2> m) : m(m) {}
+        Matrix2() { m = glm::identity<Mat<T, 2>>(); }
+        Matrix2(T x00, T x01, T x10, T x11) { m = Mat<T, 2>(x00, x10, x01, x11); }
+        Matrix2 inverse() const { return Matrix2(glm::inverse(m)); }
+        Vector<T, 2> operator*(const Vector<T, 2> &v) { return m * v; }
+        Matrix2<T> operator*(const Matrix2<T> &n) { return Matrix2(m * n); }
+        T &operator()(int i, int j) { return m[j][i]; }
+        const T &operator()(int i, int j) const { return m[j][i]; }
+
+      private:
+        Mat<T, 2> m;
+    };
+    using Matrix2f = Matrix2<float>;
+    using Matrix2d = Matrix2<double>;
     struct Transform {
         Mat4 m, minv;
         Mat3 m3, m3inv;
@@ -277,9 +301,7 @@ namespace akari {
         BoundingBox intersect(const BoundingBox &rhs) const {
             return BoundingBox(max(pmin, rhs.pmin), min(pmax, rhs.pmax));
         }
-        V clip(const V &p)const{
-            return min(max(p, pmin), pmax);
-        }
+        V clip(const V &p) const { return min(max(p, pmin), pmax); }
         bool empty() const { return any(glm::greaterThan(pmin, pmax)) || hsum(extents()) == 0; }
         V centroid() const { return extents() * 0.5f + pmin; }
         Float surface_area() const {

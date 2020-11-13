@@ -44,6 +44,7 @@ static int super_sampling = 0;
 static bool denoise = false;
 static std::string denoiser;
 static bool use_net = false;
+static bool write_aovs = false;
 static std::list<std::pair<std::string, int>> workers;
 static PluginManager<comm::AbstractNetworkWorld> comm_plugins;
 static int DEFAULT_PORT = 7856;
@@ -92,6 +93,15 @@ Options:
         Use <count> times super sampling inside render pipeline
         Only useful when --denoise is specified
 
+    --aov
+        Write aovs to disk after rendering
+        aovs must include:
+            color, normal, albedo
+        might also have:
+            first_hit_normal, first_hit_albedo
+            and half buffers of all above
+            and variance of all above
+
     -t, --threads <count>
         Render with <count> threads
 
@@ -102,7 +112,7 @@ Options:
         Add a worker for network rendering.
         The worker must be started with --listen <port>
         Default port is 7856
-
+    
     --listen [-p <port>]
         Set this process as a worker and listen on <port>
         Default port is 7856
@@ -133,6 +143,9 @@ Options:
             ensure(option, i + 1);
             spp = std::stoi(argv[i + 1]);
             i += 2;
+        } else if (option == "--aov") {
+            write_aovs = true;
+            i++;
         } else if (option == "--denoise") {
             denoise = true;
             ensure(option, i + 1);
@@ -188,6 +201,7 @@ void parse_and_run() {
     }
     auto scene = dyn_cast<render::SceneNode>(it->second.object());
     AKR_ASSERT_THROW(scene);
+    scene->write_aovs(write_aovs);
     if (spp > 0) {
         scene->set_spp(spp);
     }

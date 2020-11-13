@@ -19,33 +19,11 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-#pragma once
-#include <akari/core/math.h>
-#include <akari/render/material.h>
-#include <akari/render/shape.h>
+
+#include <akari/render/denoiser.h>
 namespace akari::render {
-    class BSDF;
-
-    struct SurfaceInteraction {
-        Triangle triangle;
-        Vec3 p;
-        BSDF bsdf;
-        Vec3 ng, ns;
-        vec2 texcoords;
-        Vec3 dndu, dndv;
-        Vec3 dpdu, dpdv;
-        SurfaceInteraction(const Intersection &isct, const Triangle &triangle)
-            : SurfaceInteraction(isct.uv, triangle) {}
-        SurfaceInteraction(const vec2 &uv, const Triangle &triangle)
-            : triangle(triangle), p(triangle.p(uv)), ng(triangle.ng()), ns(triangle.ns(uv)),
-              texcoords(triangle.texcoord(uv)) {
-            dpdu = triangle.dpdu(uv[0]);
-            dpdv = triangle.dpdu(uv[1]);
-            std::tie(dndu, dndv) = triangle.dnduv(uv);
-        }
-        MaterialEvalContext mat_eval_ctx(Allocator<> allocator, Sampler *sampler) const {
-            return MaterialEvalContext(allocator, sampler, texcoords, ng, ns);
-        }
-    };
-
-} // namespace akari::render
+    // AKR_EXPORT Image nlmeans(const Image &image, const Image &guide, const Image &variance, uint32_t F, uint32_t R,
+    //                          double k){
+        
+    // }
+}

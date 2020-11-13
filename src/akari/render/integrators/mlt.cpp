@@ -19,33 +19,20 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-#pragma once
-#include <akari/core/math.h>
+
+#include <mutex>
+#include <akari/core/parallel.h>
+#include <akari/core/progress.hpp>
+#include <akari/core/profiler.h>
+#include <akari/render/scene.h>
+#include <akari/render/camera.h>
+#include <akari/render/integrator.h>
 #include <akari/render/material.h>
-#include <akari/render/shape.h>
-namespace akari::render {
-    class BSDF;
+#include <akari/render/mesh.h>
+#include <akari/render/common.h>
+#include <akari/render/pathtracer.h>
 
-    struct SurfaceInteraction {
-        Triangle triangle;
-        Vec3 p;
-        BSDF bsdf;
-        Vec3 ng, ns;
-        vec2 texcoords;
-        Vec3 dndu, dndv;
-        Vec3 dpdu, dpdv;
-        SurfaceInteraction(const Intersection &isct, const Triangle &triangle)
-            : SurfaceInteraction(isct.uv, triangle) {}
-        SurfaceInteraction(const vec2 &uv, const Triangle &triangle)
-            : triangle(triangle), p(triangle.p(uv)), ng(triangle.ng()), ns(triangle.ns(uv)),
-              texcoords(triangle.texcoord(uv)) {
-            dpdu = triangle.dpdu(uv[0]);
-            dpdv = triangle.dpdu(uv[1]);
-            std::tie(dndu, dndv) = triangle.dnduv(uv);
-        }
-        MaterialEvalContext mat_eval_ctx(Allocator<> allocator, Sampler *sampler) const {
-            return MaterialEvalContext(allocator, sampler, texcoords, ng, ns);
-        }
+namespace akari {
+    class PSSMLT : public UniAOVIntegrator {
     };
-
-} // namespace akari::render
+}

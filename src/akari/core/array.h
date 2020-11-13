@@ -136,6 +136,13 @@ namespace akari {
         Array3D() : Array3D(ivec3(1)) {}
         Array3D(const ivec3 &size) : Array3D(size, Allocator()) {}
         Array3D(const ivec3 &size, Allocator alloc) : dimension_(size), data_(size.x * size.y * size.z, alloc) {}
+        template <class U, class A>
+        Array3D(const Array3D<U, A> &rhs, Allocator alloc)
+            : dimension_(rhs.dimension()), data_(hprod(dimension_), alloc) {
+            for (int i = 0; i < hprod(dimension_); i++) {
+                data_[i] = rhs.data()[i];
+            }
+        }
         void fill(const T &v) {
             for (auto &i : data_) {
                 i = v;

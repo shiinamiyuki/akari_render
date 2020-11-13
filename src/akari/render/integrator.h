@@ -41,8 +41,22 @@ namespace akari::render {
     struct AOVRequest {
         bool required_variance = false;
     };
+    enum class DenoiseHint {
+        NoDenoise = 0,
+        Color = 1,
+        Albedo = 1 << 1,
+        Normal = 1 << 2,
+        Diffuse = 1 << 3,
+        Glossy = 1 << 4,
+        Specular = 1 << 5,
+        DirectIndirect = 1 << 6
+    };
+    inline DenoiseHint operator&(DenoiseHint a, DenoiseHint b) { return DenoiseHint((int)a & (int)b); }
+    inline DenoiseHint operator|(DenoiseHint a, DenoiseHint b) { return DenoiseHint((int)a | (int)b); }
+    inline DenoiseHint operator~(DenoiseHint a) { return DenoiseHint(~(uint32_t)a); }
     struct RenderOutput {
         std::unordered_map<std::string, AOVRecord> aovs;
+        DenoiseHint hint = DenoiseHint::NoDenoise;
     };
     struct RenderInput {
         const Scene *scene;

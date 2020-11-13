@@ -80,40 +80,41 @@ namespace akari {
         AKR_EXPORT size_t num_work_threads();
         inline void parallel_for(BlockedDim<2> blocked_dim, const std::function<void(ivec2, uint32_t)> &func) {
             ivec2 tiles = (blocked_dim.dim + blocked_dim.block - ivec2(1)) / blocked_dim.block;
-            size_t total = hprod(blocked_dim.dim);
             parallel_for(tiles.x * tiles.y, [&](size_t idx, int tid) {
                 ivec2 t(idx % tiles.x, idx / tiles.x);
                 for (int ty = 0; ty < blocked_dim.block[1]; ty++) {
+                    int y = ty + t[1] * blocked_dim.block[1];
+                    if (y >= blocked_dim.dim[1])
+                        break;
                     for (int tx = 0; tx < blocked_dim.block[0]; tx++) {
                         int x = tx + t[0] * blocked_dim.block[0];
-                        int y = ty + t[1] * blocked_dim.block[1];
-                        size_t gid = (size_t)x + y * (size_t)blocked_dim.dim[0];
-                        if (gid < total) {
-                            func(ivec2(x, y), tid);
-                        }
+                        if (x >= blocked_dim.dim[0])
+                            break;
+                        func(ivec2(x, y), tid);
                     }
                 }
             });
         }
         inline void parallel_for(BlockedDim<3> blocked_dim, const std::function<void(ivec3, uint32_t)> &func) {
             ivec3 tiles = (blocked_dim.dim + blocked_dim.block - ivec3(1)) / blocked_dim.block;
-            size_t total = hprod(blocked_dim.dim);
             parallel_for(tiles.x * tiles.y * tiles.z, [&](size_t idx, int tid) {
                 auto z_ = idx / (tiles.x * tiles.y);
                 auto y_ = (idx % (tiles.x * tiles.y)) / tiles.x;
                 auto x_ = (idx % (tiles.x * tiles.y)) % tiles.x;
                 ivec3 t(x_, y_, z_);
                 for (int tz = 0; tz < blocked_dim.block[2]; tz++) {
+                    int z = tz + t[2] * blocked_dim.block[2];
+                    if (z >= blocked_dim.dim[2])
+                        break;
                     for (int ty = 0; ty < blocked_dim.block[1]; ty++) {
+                        int y = ty + t[1] * blocked_dim.block[1];
+                        if (y >= blocked_dim.dim[1])
+                            break;
                         for (int tx = 0; tx < blocked_dim.block[0]; tx++) {
                             int x = tx + t[0] * blocked_dim.block[0];
-                            int y = ty + t[1] * blocked_dim.block[1];
-                            int z = tz + t[2] * blocked_dim.block[2];
-                            size_t gid = (size_t)x + y * (size_t)blocked_dim.dim[0] +
-                                         (size_t)z * blocked_dim.dim[0] * blocked_dim.dim[1];
-                            if (gid < total) {
-                                func(ivec3(x, y, z), tid);
-                            }
+                            if (x >= blocked_dim.dim[0])
+                                break;
+                            func(ivec3(x, y, z), tid);
                         }
                     }
                 }
