@@ -1,6 +1,6 @@
 mkdir build-linux-cpu
 cd build-linux-cpu
-git clone https://github.com/microsoft/vcpkg
+git clone https://github.com/microsoft/vcpkg --depth 1
 cd vcpkg
 ./bootstrap-vcpkg.sh
 cd ..
