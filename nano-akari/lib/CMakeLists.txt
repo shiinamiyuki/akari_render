@@ -1,0 +1,12 @@
+file(GLOB AKR_LIB_SRC akari/*.*)
+
+add_library(nano-akari STATIC ${AKR_LIB_SRC})
+target_link_libraries(nano-akari PUBLIC ${AKR_EXT_LIBS} )
+target_include_directories(nano-akari PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${AKR_EXT_INCLUDES})
+set_output_dir(nano-akari)
+set_target_properties(nano-akari PROPERTIES UNITY_BUILD ON)
+add_library(pyakari SHARED pyakari/module.cpp pyakari/module.h)
+target_link_libraries(pyakari PUBLIC nano-akari  ${AKR_EXT_LIBS} pybind11::lto pybind11::embed pybind11::module)
+target_include_directories(pyakari PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${pybind11_INCLUDE_DIRS} ${AKR_EXT_INCLUDES})
+set_output_dir(pyakari)
+set_target_properties(pyakari PROPERTIES SUFFIX ".pyd")

@@ -1,0 +1,14 @@
+{
+    "name": "akari-render",
+    "version-string": "0.1.0-dev",
+    "dependencies": [
+        "openimageio",
+        "glm",
+        "cereal",
+        "assimp",
+        "spdlog",
+        "pybind11",
+        "cxxopts",
+        "embree3"
+      ]
+  }
