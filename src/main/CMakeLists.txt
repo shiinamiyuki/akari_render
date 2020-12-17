@@ -1,0 +1,8 @@
+find_package(assimp CONFIG REQUIRED)
+find_package(cxxopts CONFIG REQUIRED)
+add_executable(akari-cli akari-cli.cpp)
+target_link_libraries(akari-cli PRIVATE akari::core)
+set_output_dir(akari-cli)
+add_executable(akari-import akari-import.cpp)
+target_link_libraries(akari-import PRIVATE akari::core assimp::assimp cxxopts::cxxopts)
+set_output_dir(akari-import)

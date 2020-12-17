@@ -263,28 +263,6 @@ namespace akari {
     };
 } // namespace akari
 namespace cereal {
-    template <class Archive, typename T>
-    void save(Archive &ar, const std::optional<T> &optional) {
-        if (!optional) {
-            ar(CEREAL_NVP_("nullopt", true));
-        } else {
-            ar(CEREAL_NVP_("nullopt", false), CEREAL_NVP_("data", *optional));
-        }
-    }
-
-    template <class Archive, typename T>
-    void load(Archive &ar, std::optional<T> &optional) {
-        bool nullopt;
-        ar(CEREAL_NVP_("nullopt", nullopt));
-        if (nullopt) {
-            optional = std::nullopt;
-        } else {
-            T value;
-            ar(CEREAL_NVP_("data", value));
-            optional = std::move(value);
-        }
-    }
-
     template <typename Archive, int N, typename T, glm::qualifier Q>
     void serialize(Archive &ar, glm::vec<N, T, Q> &v) {
         for (int i = 0; i < N; i++) {
@@ -902,37 +880,3 @@ namespace akari {
     };
 } // namespace akari
 
-namespace cereal {
-    template <class Archive, typename... Ts>
-    void save(Archive &ar, const std::variant<Ts...> &variant) {
-        using Index = akari::TypeIndex<Ts...>;
-
-        std::visit(
-            [&](auto &&arg) {
-                using T = std::decay_t<decltype(arg)>;
-                size_t index = Index::template GetIndex<T>::value;
-                ar(CEREAL_NVP_("index", index));
-                ar(CEREAL_NVP_("value", arg));
-            },
-            variant);
-    }
-    template <class Archive, typename Variant, class Index, typename T, typename... Ts>
-    void load_helper(size_t index, Archive &ar, Variant &variant) {
-        if (Index::template GetIndex<T>::value == index) {
-            T v;
-            ar(CEREAL_NVP_("value", v));
-            variant = v;
-        } else if constexpr (sizeof...(Ts) > 0) {
-            load_helper<Archive, Variant, Index, Ts...>(index, ar, variant);
-        } else {
-            throw std::runtime_error("cannot load variant");
-        }
-    }
-    template <class Archive, typename... Ts>
-    void load(Archive &ar, std::variant<Ts...> &variant) {
-        size_t index;
-        ar(CEREAL_NVP_("index", index));
-        using Index = akari::TypeIndex<Ts...>;
-        load_helper<Archive, std::variant<Ts...>, Index, Ts...>(index, ar, variant);
-    }
-} // namespace cereal

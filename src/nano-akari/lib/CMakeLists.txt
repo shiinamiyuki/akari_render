@@ -10,3 +10,5 @@ target_link_libraries(pyakari PUBLIC nano-akari  ${AKR_EXT_LIBS} pybind11::lto p
 target_include_directories(pyakari PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${pybind11_INCLUDE_DIRS} ${AKR_EXT_INCLUDES})
 set_output_dir(pyakari)
 set_target_properties(pyakari PROPERTIES SUFFIX ".pyd")
+add_library(akari::core ALIAS nano-akari)
+add_library(akari::python ALIAS pyakari)
