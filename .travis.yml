@@ -13,7 +13,7 @@ matrix:
           packages: ['clang-7','ninja-build','libc++-7-dev', 'libc++abi-7-dev', 'zip', 'unzip', 'curl','pkg-config', 
                 'libgl1-mesa-dev','libxxf86vm-dev']
       env: CC=clang-7 CXX=clang++-7
-      script: travis_wait 30 bash ./scripts/build-linux-cpu.sh
+      script: travis_wait 40 bash ./scripts/build-linux-cpu.sh
 
     - os: linux
       compiler: clang
@@ -23,7 +23,7 @@ matrix:
           packages: ['clang-8','ninja-build','libc++-8-dev', 'libc++abi-8-dev', 'zip', 'unzip', 'curl','pkg-config',
                  'libgl1-mesa-dev','libxxf86vm-dev']
       env: CC=clang-8 CXX=clang++-8
-      script: travis_wait 30 bash ./scripts/build-linux-cpu.sh
+      script: travis_wait 40 bash ./scripts/build-linux-cpu.sh
 
     - os: linux
       compiler: clang
@@ -32,7 +32,7 @@ matrix:
           sources: ['ubuntu-toolchain-r-test']
           packages: ['clang-9','ninja-build','libc++-9-dev', 'libc++abi-9-dev', 'zip', 'unzip', 'curl','pkg-config', 'libgl1-mesa-dev','libxxf86vm-dev']
       env: CC=clang-9 CXX=clang++-9
-      script: travis_wait 30 bash ./scripts/build-linux-cpu.sh
+      script: travis_wait 40 bash ./scripts/build-linux-cpu.sh
 
     - os: linux
       compiler: clang
@@ -42,7 +42,7 @@ matrix:
           packages: ['clang-10','ninja-build','libc++-10-dev', 'libc++abi-10-dev', 'zip', 'unzip', 'curl','pkg-config', 
                     'libgl1-mesa-dev','libxxf86vm-dev']
       env: CC=clang-10 CXX=clang++-10
-      script: travis_wait 30 bash ./scripts/build-linux-cpu.sh
+      script: travis_wait 40 bash ./scripts/build-linux-cpu.sh
 
     - os: linux
       compiler: gcc
@@ -51,7 +51,7 @@ matrix:
           sources: ['ubuntu-toolchain-r-test']
           packages: ['g++-8','ninja-build', 'zip', 'unzip', 'curl','pkg-config', 'libgl1-mesa-dev','libxxf86vm-dev']
       env: CC=gcc-8 CXX=g++-8
-      script: travis_wait 30 bash ./scripts/build-linux-cpu.sh
+      script: travis_wait 40 bash ./scripts/build-linux-cpu.sh
 
     - os: linux
       compiler: gcc
@@ -60,7 +60,7 @@ matrix:
           sources: ['ubuntu-toolchain-r-test']
           packages: ['g++-9','ninja-build', 'zip', 'unzip', 'curl','pkg-config', 'libgl1-mesa-dev','libxxf86vm-dev']
       env: CC=gcc-9 CXX=g++-9
-      script: travis_wait 30 bash ./scripts/build-linux-cpu.sh
+      script: travis_wait 40 bash ./scripts/build-linux-cpu.sh
 
     # - os: windows
     #   script: ./scripts/build.bat

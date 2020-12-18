@@ -17,4 +17,24 @@ AkariRender is a highly modular CPU/GPU physically based renderer written in C++
 - Realtime Rendering
 
 ## Build
-Requirements: vcpkg
+### If you don't have / don't know vcpkg
+```bash
+git clone --recursive https://github.com/shiinamiyuki/AkariRender
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release # vcpkg will download and install dependencies
+make -j 8
+```
+
+### If you have vcpkg installed
+Pass CMAKE_TOOLCHAIN_FILE to cmake to force using your own vcpkg
+
+Dependencies:
+- OpenImageIO
+- Embree3
+- glm
+- cereal
+- assimp
+- pybind11
+- cxxopts
+
+
