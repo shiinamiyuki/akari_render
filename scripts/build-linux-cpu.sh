@@ -4,7 +4,6 @@ git clone https://github.com/microsoft/vcpkg --depth 1
 cd vcpkg
 ./bootstrap-vcpkg.sh
 ./vcpkg update
-export VCPKG_DEFAULT_TRIPLET=x64-linux-rel
 # prevent travis from terminating our job
 ./vcpkg install embree3:x64-linux
 ./vcpkg install openimageio:x64-linux
