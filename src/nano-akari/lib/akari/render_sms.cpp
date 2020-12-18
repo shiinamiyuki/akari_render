@@ -191,6 +191,9 @@ namespace akari::render {
                 ilo = 1.0 / (ilo);
                 wo *= ilo;
                 Mat2 dc1_dx0, dc2_dx1, dc2_dx2;
+                (void)dc1_dx0;
+                (void)dc2_dx1;
+                (void)dc2_dx2;
                 Float eta = v1.eta;
                 if (dot(wi, v1.ng) < 0.0) {
                     eta = 1.0 / eta;
@@ -443,7 +446,7 @@ namespace akari::render {
     } // namespace sms
     Film render_sms(SMSConfig config, const Scene &scene) {
         Film film(scene.camera->resolution());
-        std::vector<astd::pmr::monotonic_buffer_resource*> buffers;
+        std::vector<astd::pmr::monotonic_buffer_resource *> buffers;
         for (size_t i = 0; i < thread::num_work_threads(); i++) {
             buffers.emplace_back(new astd::pmr::monotonic_buffer_resource(astd::pmr::new_delete_resource()));
         }
@@ -468,7 +471,7 @@ namespace akari::render {
                 film.add_sample(id, L, 1.0);
             }
         });
-        for(auto buf: buffers){
+        for (auto buf : buffers) {
             delete buf;
         }
         spdlog::info("render sms pt done");

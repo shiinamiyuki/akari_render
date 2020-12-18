@@ -55,6 +55,7 @@ namespace akari::render {
                 rtcReleaseScene(rtcScene);
             }
             rtcScene = rtcNewScene(device);
+            rtcSetSceneBuildQuality(rtcScene, RTC_BUILD_QUALITY_HIGH);
             for (auto &mesh : scene_graph->meshes) {
                 const auto m_scene = rtcNewScene(device);
                 {
