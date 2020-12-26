@@ -80,4 +80,34 @@ namespace akari::scene {
             mesh->load();
         }
     }
+    std::vector<P<Object>> SceneGraph::find(const std::string &name) {
+        std::vector<P<Object>> v;
+        for (auto &mesh : meshes) {
+            if (mesh->name == name) {
+                v.emplace_back(mesh);
+            }
+        }
+        if (camera->name == name) {
+            v.emplace_back(camera);
+        }
+
+        auto F = [&](P<Node> node, auto &&self) -> void {
+            if (node->name == name) {
+                v.emplace_back(node);
+            }
+            for (auto &inst : node->instances) {
+                if (inst->name == name) {
+                    v.emplace_back(inst);
+                }
+                if (inst->material->name == name) {
+                    v.emplace_back(inst->material);
+                }
+            }
+            for (auto &child : node->children) {
+                self(child, self);
+            }
+        };
+        F(root, F);
+        return v;
+    }
 } // namespace akari::scene

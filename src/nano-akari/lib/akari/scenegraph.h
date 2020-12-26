@@ -19,7 +19,7 @@ namespace akari::scene {
     template <typename T>
     using P = std::shared_ptr<T>;
 
-    class Object {
+    class Object : public std::enable_shared_from_this<Object>{
       public:
         std::string name;
         AKR_SER(name)
@@ -134,6 +134,7 @@ namespace akari::scene {
             }
         }
         AKR_SER_POLY(Object, transform, instances, children)
+
     };
 
     class Camera : public Object {
@@ -161,5 +162,7 @@ namespace akari::scene {
         std::vector<P<Instance>> instances;
         void commit();
         AKR_SER(camera, meshes, instances, root)
+
+        std::vector<P<Object>> find(const std::string & name);
     };
 } // namespace akari::scene

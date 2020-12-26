@@ -76,6 +76,7 @@ namespace akari::python {
             .def_readwrite("translation", &TRSTransform::translation)
             .def_readwrite("rotation", &TRSTransform::rotation)
             .def_readwrite("scale", &TRSTransform::scale);
+        py::class_<Object, P<Object>>(m, "Object");
         py::class_<Camera, Object, P<Camera>>(m, "Camera").def_readwrite("transform", &Camera::transform);
         py::class_<PerspectiveCamera, Camera, P<PerspectiveCamera>>(m, "PerspectiveCamera")
             .def(py::init<>())
@@ -118,7 +119,8 @@ namespace akari::python {
             .def_readwrite("meshes", &SceneGraph::meshes)
             .def_readwrite("root", &SceneGraph::root)
             .def_readwrite("camera", &SceneGraph::camera)
-            .def_readwrite("instances", &SceneGraph::instances);
+            .def_readwrite("instances", &SceneGraph::instances)
+            .def("find", &SceneGraph::find);
         m.def("save_json_str", [](P<SceneGraph> scene) -> std::string {
             std::ostringstream os;
             {
