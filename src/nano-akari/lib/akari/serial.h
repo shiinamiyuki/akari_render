@@ -22,6 +22,31 @@
 #include <cereal/archives/xml.hpp>
 #include <cereal/archives/binary.hpp>
 
+CEREAL_REGISTER_TYPE(akari::scene::Object);
+
+CEREAL_REGISTER_TYPE(akari::scene::Instance);
+CEREAL_REGISTER_POLYMORPHIC_RELATION(akari::scene::Object, akari::scene::Instance);
+
+CEREAL_REGISTER_TYPE(akari::scene::Node);
+CEREAL_REGISTER_POLYMORPHIC_RELATION(akari::scene::Object, akari::scene::Node);
+
+CEREAL_REGISTER_TYPE(akari::scene::Mesh);
+CEREAL_REGISTER_POLYMORPHIC_RELATION(akari::scene::Object, akari::scene::Mesh);
+
+CEREAL_REGISTER_TYPE(akari::scene::Material);
+CEREAL_REGISTER_POLYMORPHIC_RELATION(akari::scene::Object, akari::scene::Material);
+
+CEREAL_REGISTER_TYPE(akari::scene::FloatTexture);
+CEREAL_REGISTER_POLYMORPHIC_RELATION(akari::scene::Texture, akari::scene::FloatTexture);
+CEREAL_REGISTER_TYPE(akari::scene::RGBTexture);
+CEREAL_REGISTER_POLYMORPHIC_RELATION(akari::scene::Texture, akari::scene::RGBTexture);
+CEREAL_REGISTER_TYPE(akari::scene::ImageTexture);
+CEREAL_REGISTER_POLYMORPHIC_RELATION(akari::scene::Texture, akari::scene::ImageTexture);
+
+CEREAL_REGISTER_TYPE(akari::scene::Camera);
+CEREAL_REGISTER_POLYMORPHIC_RELATION(akari::scene::Object, akari::scene::Camera);
 CEREAL_REGISTER_TYPE(akari::scene::PerspectiveCamera);
-CEREAL_REGISTER_POLYMORPHIC_RELATION( akari::scene::Camera, akari::scene::PerspectiveCamera);
+CEREAL_REGISTER_POLYMORPHIC_RELATION(akari::scene::Camera, akari::scene::PerspectiveCamera);
+
+
 CEREAL_REGISTER_DYNAMIC_INIT(akari);

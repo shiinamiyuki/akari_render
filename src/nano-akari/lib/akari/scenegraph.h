@@ -16,72 +16,16 @@
 #include <akari/macro.h>
 #include <cereal/cereal.hpp>
 namespace akari::scene {
-
     template <typename T>
     using P = std::shared_ptr<T>;
-    class Texture {
-      public:
-        Texture() : value(0.0) {}
-        Texture(Float v) : value(v) {}
-        Texture(Spectrum s) : value(s) {}
-        Texture(std::string s) : value(s) {}
-        std::variant<Float, Spectrum, std::string> value;
-        AKR_SER(value)
-        void clear() { value = Float(0.0); }
-        void set_image_texture(const std::string &path) { value = path; }
-        void set_color(Spectrum color) { value = color; }
-        void set_float(Float v) { value = v; }
-    };
-    class Material {
-      public:
-        P<Texture> color;
-        P<Texture> specular;
-        P<Texture> metallic;
-        P<Texture> roughness;
-        P<Texture> emission;
-        P<Texture> transmission;
-        Material();
-        void commit() {}
-        AKR_SER(color, specular, metallic, roughness, emission, transmission)
-    };
-    struct Mesh {
-        bool loaded = false;
 
+    class Object {
       public:
         std::string name;
-        std::vector<vec3> vertices;
-        std::vector<ivec3> indices;
-        std::vector<vec3> normals;
-        std::vector<vec2> texcoords;
-        std::string path;
-        AKR_SER(name, path)
-
-        void save_to_file(const std::string &file) const;
-        void load();
-        void unload();
+        AKR_SER(name)
+        virtual ~Object() = default;
     };
 
-    class Instance {
-      public:
-        std::string name;
-        TRSTransform transform;
-        P<Mesh> mesh;
-        P<Material> material;
-        void commit() { material->commit(); }
-        AKR_SER(name, transform, mesh, material)
-    };
-    class Node {
-      public:
-        TRSTransform transform;
-        std::vector<P<Instance>> instances;
-        std::vector<P<Node>> children;
-        void commit() {
-            for (auto &child : children) {
-                child->commit();
-            }
-        }
-        AKR_SER(transform, instances, children)
-    };
 #define AKR_DECL_RTTI(Class)                                                                                           \
     template <class T>                                                                                                 \
     bool isa() const {                                                                                                 \
@@ -94,18 +38,112 @@ namespace akari::scene {
     template <class T>                                                                                                 \
     T *as() {                                                                                                          \
         return isa<T>() ? dynamic_cast<T *>(this) : nullptr;                                                           \
-    }
+    }                                                                                                                  \
+    virtual Type type() const = 0;
 #define AKR_DECL_TYPEID(Class, TypeId)                                                                                 \
     static const Type static_type = Type::TypeId;                                                                      \
     Type type() const override { return Type::TypeId; }
-    class Camera {
+
+    // class Texture {
+    //   public:
+    //     Texture() : value(0.0) {}
+    //     Texture(Float v) : value(v) {}
+    //     Texture(Spectrum s) : value(s) {}
+    //     Texture(std::string s) : value(s) {}
+    //     std::variant<Float, Spectrum, std::string> value;
+    //     AKR_SER(value)
+    //     void clear() { value = Float(0.0); }
+    //     void set_image_texture(const std::string &path) { value = path; }
+    //     void set_color(Spectrum color) { value = color; }
+    //     void set_float(Float v) { value = v; }
+    // };
+
+    class Texture : public Object {
+      public:
+        enum class Type { Float, RGB, Image };
+        AKR_DECL_RTTI(Texture)
+        AKR_SER_POLY(Object)
+    };
+    class FloatTexture : public Texture {
+      public:
+        Float value = 0.0;
+        FloatTexture() = default;
+        FloatTexture(Float v) : value(v) {}
+        AKR_SER_POLY(Texture, value)
+        AKR_DECL_TYPEID(FloatTexture, Float)
+    };
+
+    class RGBTexture : public Texture {
+      public:
+        Color3f value;
+        RGBTexture() = default;
+        RGBTexture(Color3f v) : value(v) {}
+        AKR_SER_POLY(Texture, value)
+        AKR_DECL_TYPEID(RGBTexture, RGB)
+    };
+    class ImageTexture : public Texture {
+      public:
+        std::string path;
+        AKR_SER_POLY(Texture, path)
+        AKR_DECL_TYPEID(ImageTexture, Image)
+    };
+    class Material : public Object {
+      public:
+        P<Texture> color;
+        P<Texture> specular;
+        P<Texture> metallic;
+        P<Texture> roughness;
+        P<Texture> emission;
+        P<Texture> transmission;
+        Material();
+        void commit() {}
+        AKR_SER_POLY(Object, color, specular, metallic, roughness, emission, transmission)
+    };
+    class Mesh : public Object {
+        bool loaded = false;
+
+      public:
+        std::vector<vec3> vertices;
+        std::vector<ivec3> indices;
+        std::vector<vec3> normals;
+        std::vector<vec2> texcoords;
+        std::string path;
+        AKR_SER_POLY(Object, path)
+
+        void save_to_file(const std::string &file) const;
+        void load();
+        void unload();
+    };
+
+    class Instance : public Object {
+      public:
+        TRSTransform transform;
+        P<Mesh> mesh;
+        P<Material> material;
+        void commit() { material->commit(); }
+        AKR_SER_POLY(Object, transform, mesh, material)
+    };
+    class Node : public Object {
+      public:
+        TRSTransform transform;
+        std::vector<P<Instance>> instances;
+        std::vector<P<Node>> children;
+        void commit() {
+            for (auto &child : children) {
+                child->commit();
+            }
+        }
+        AKR_SER_POLY(Object, transform, instances, children)
+    };
+
+    class Camera : public Object {
       public:
         enum class Type { Perspective };
         AKR_DECL_RTTI(Camera)
-        virtual Type type() const = 0;
+
         TRSTransform transform;
         ivec2 resolution = ivec2(512, 512);
-        AKR_SER(transform, resolution)
+        AKR_SER_POLY(Object, transform, resolution)
     };
     class PerspectiveCamera final : public Camera {
       public:

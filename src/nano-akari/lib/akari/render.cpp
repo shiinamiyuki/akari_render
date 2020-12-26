@@ -132,16 +132,11 @@ namespace akari::render {
                 return Texture(ConstantTexture(0.0));
             }
             std::optional<Texture> tex;
-            std::visit(
-                [&](auto &&arg) {
-                    using T = std::decay_t<decltype(arg)>;
-                    if constexpr (std::is_same_v<T, Float>) {
-                        tex.emplace(ConstantTexture(arg));
-                    } else if constexpr (std::is_same_v<T, Spectrum>) {
-                        tex.emplace(ConstantTexture(arg));
-                    }
-                },
-                tex_node->value);
+            if (auto ftex = tex_node->as<scene::FloatTexture>()) {
+                tex.emplace(ConstantTexture(ftex->value));
+            } else if (auto rgb_tex = tex_node->as<scene::RGBTexture>()) {
+                tex.emplace(ConstantTexture(rgb_tex->value));
+            }
             return tex.value();
         };
         auto create_mat = [&](const scene::P<scene::Material> &mat_node) -> const Material * {

@@ -38,8 +38,8 @@ P<SceneGraph> import(const std::string &file) {
         aiGetMaterialColor(ai_mat, AI_MATKEY_COLOR_DIFFUSE, &diffuse_color);
         aiGetMaterialColor(ai_mat, AI_MATKEY_COLOR_EMISSIVE, &emission_color);
         auto mat = P<Material>(new Material());
-        mat->color = P<Texture>(new Texture(color4_to_spectrum(diffuse_color)));
-        mat->emission = P<Texture>(new Texture(color4_to_spectrum(emission_color)));
+        mat->color = P<Texture>(new RGBTexture(color4_to_spectrum(diffuse_color)));
+        mat->emission = P<Texture>(new RGBTexture(color4_to_spectrum(emission_color)));
         materials[i] = mat;
     }
     for (uint32_t i = 0; i < ai_scene->mNumMeshes; i++) {

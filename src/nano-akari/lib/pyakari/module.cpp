@@ -18,6 +18,7 @@
 #include <pybind11/stl_bind.h>
 #include <akari/serial.h>
 
+PYBIND11_MAKE_OPAQUE(std::vector<akari::scene::P<akari::scene::Object>>);
 PYBIND11_MAKE_OPAQUE(std::vector<akari::scene::P<akari::scene::Mesh>>);
 PYBIND11_MAKE_OPAQUE(std::vector<akari::scene::P<akari::scene::Instance>>);
 PYBIND11_MAKE_OPAQUE(std::vector<akari::scene::P<akari::scene::Node>>);
@@ -75,34 +76,39 @@ namespace akari::python {
             .def_readwrite("translation", &TRSTransform::translation)
             .def_readwrite("rotation", &TRSTransform::rotation)
             .def_readwrite("scale", &TRSTransform::scale);
-        py::class_<Camera, P<Camera>>(m, "Camera").def_readwrite("transform", &Camera::transform);
+        py::class_<Camera, Object, P<Camera>>(m, "Camera").def_readwrite("transform", &Camera::transform);
         py::class_<PerspectiveCamera, Camera, P<PerspectiveCamera>>(m, "PerspectiveCamera")
             .def(py::init<>())
             .def_readwrite("fov", &PerspectiveCamera::fov)
             .def_readwrite("lens_radius", &PerspectiveCamera::lens_radius)
             .def_readwrite("focal_distance", &PerspectiveCamera::focal_distance);
-        py::class_<Texture, P<Texture>>(m, "Texture")
+        py::class_<Texture, Object, P<Texture>>(m, "Texture");
+        py::class_<FloatTexture, Texture, P<FloatTexture>>(m, "FloatTexture")
             .def(py::init<>())
-            .def("set_image_texture", &Texture::set_image_texture)
-            .def("set_color", &Texture::set_color)
-            .def("set_float", &Texture::set_float);
-        py::class_<Material, P<Material>>(m, "Material")
+            .def_readwrite("value", &FloatTexture::value);
+        py::class_<RGBTexture, Texture, P<RGBTexture>>(m, "RGBTexture")
+            .def(py::init<>())
+            .def_readwrite("value", &RGBTexture::value);
+        py::class_<ImageTexture, Texture, P<ImageTexture>>(m, "ImageTexture")
+            .def(py::init<>())
+            .def_readwrite("path", &ImageTexture::path);
+        py::class_<Material, Object, P<Material>>(m, "Material")
             .def(py::init<>())
             .def_readwrite("color", &Material::color)
             .def_readwrite("specular", &Material::specular)
             .def_readwrite("metallic", &Material::metallic)
             .def_readwrite("emission", &Material::emission)
             .def_readwrite("roughness", &Material::roughness);
-        py::class_<Instance, P<Instance>>(m, "Instance")
+        py::class_<Instance, Object, P<Instance>>(m, "Instance")
             .def(py::init<>())
             .def_readwrite("transform", &Instance::transform)
             .def_readwrite("material", &Instance::material)
             .def_readwrite("mesh", &Instance::mesh);
-        py::class_<Mesh, P<Mesh>>(m, "Mesh")
+        py::class_<Mesh, Object, P<Mesh>>(m, "Mesh")
             .def(py::init<>())
             .def_readwrite("name", &Mesh::name)
             .def_readwrite("path", &Mesh::path);
-        py::class_<Node, P<Node>>(m, "Node")
+        py::class_<Node, Object, P<Node>>(m, "Node")
             .def(py::init<>())
             .def_readwrite("transform", &Node::transform)
             .def_readwrite("instances", &Node::instances)
@@ -177,6 +183,7 @@ namespace akari::python {
                 ar(scene);
             }
         });
+        py::bind_vector<std::vector<P<Object>>>(m, "ObjectArray");
         py::bind_vector<std::vector<P<Mesh>>>(m, "MeshArray");
         py::bind_vector<std::vector<P<Instance>>>(m, "InstanceArray");
         py::bind_vector<std::vector<P<Node>>>(m, "NodeArray");

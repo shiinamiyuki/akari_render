@@ -15,12 +15,12 @@
 #include <akari/scenegraph.h>
 #include <spdlog/spdlog.h>
 namespace akari::scene {
-    Material::Material(){
-        color.reset(new Texture());
-        specular.reset(new Texture());
-        metallic.reset(new Texture());
-        roughness.reset(new Texture());
-        emission.reset(new Texture());
+    Material::Material() {
+        color.reset(new RGBTexture());
+        specular.reset(new FloatTexture(0.0));
+        metallic.reset(new FloatTexture(0.0));
+        roughness.reset(new FloatTexture(0.0));
+        emission.reset(new FloatTexture(0.0));
     }
     static size_t MAGIC = 0x78567856;
     void Mesh::save_to_file(const std::string &file) const {
