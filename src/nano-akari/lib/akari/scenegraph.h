@@ -19,7 +19,7 @@ namespace akari::scene {
     template <typename T>
     using P = std::shared_ptr<T>;
 
-    class Object : public std::enable_shared_from_this<Object>{
+    class Object : public std::enable_shared_from_this<Object> {
       public:
         std::string name;
         AKR_SER(name)
@@ -134,7 +134,6 @@ namespace akari::scene {
             }
         }
         AKR_SER_POLY(Object, transform, instances, children)
-
     };
 
     class Camera : public Object {
@@ -154,15 +153,30 @@ namespace akari::scene {
         Float focal_distance = 0.0;
         AKR_SER_POLY(Camera, fov, lens_radius, focal_distance)
     };
+
+    class Integrator : public Object {
+      public:
+        enum class Type { Path };
+        AKR_DECL_RTTI(Integrator)
+        AKR_SER_POLY(Object)
+    };
+
+    class PathTracer : public Integrator {
+      public:
+        uint32_t spp = 16;
+        AKR_DECL_TYPEID(PathTracer, Path)
+        AKR_SER_POLY(Integrator, spp)
+    };
     class SceneGraph {
       public:
         P<Camera> camera;
+        P<Integrator> integrator;
         P<Node> root;
         std::vector<P<Mesh>> meshes;
         std::vector<P<Instance>> instances;
         void commit();
-        AKR_SER(camera, meshes, instances, root)
+        AKR_SER(camera, integrator, meshes, instances, root)
 
-        std::vector<P<Object>> find(const std::string & name);
+        std::vector<P<Object>> find(const std::string &name);
     };
 } // namespace akari::scene

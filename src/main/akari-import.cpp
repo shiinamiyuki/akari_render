@@ -101,6 +101,7 @@ P<SceneGraph> import(const std::string &file) {
         return node;
     };
     scene->camera.reset(new PerspectiveCamera());
+    scene->camera->name = "camera";
     scene->meshes = meshes;
     scene->root = create_node(ai_scene->mRootNode, create_node);
     printf("imported %zd meshes\n", scene->meshes.size());

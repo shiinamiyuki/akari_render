@@ -76,8 +76,10 @@ namespace akari::python {
             .def_readwrite("translation", &TRSTransform::translation)
             .def_readwrite("rotation", &TRSTransform::rotation)
             .def_readwrite("scale", &TRSTransform::scale);
-        py::class_<Object, P<Object>>(m, "Object");
-        py::class_<Camera, Object, P<Camera>>(m, "Camera").def_readwrite("transform", &Camera::transform);
+        py::class_<Object, P<Object>>(m, "Object").def_readwrite("name", &Object::name);
+        py::class_<Camera, Object, P<Camera>>(m, "Camera")
+            .def_readwrite("transform", &Camera::transform)
+            .def_readwrite("resolution", &Camera::resolution);
         py::class_<PerspectiveCamera, Camera, P<PerspectiveCamera>>(m, "PerspectiveCamera")
             .def(py::init<>())
             .def_readwrite("fov", &PerspectiveCamera::fov)
@@ -114,12 +116,15 @@ namespace akari::python {
             .def_readwrite("transform", &Node::transform)
             .def_readwrite("instances", &Node::instances)
             .def_readwrite("children", &Node::children);
+        py::class_<Integrator, Object, P<Integrator>>(m, "Integrator");
+        py::class_<PathTracer, Integrator, P<PathTracer>>(m, "PathTracer").def_readwrite("spp", &PathTracer::spp);
         py::class_<SceneGraph, P<SceneGraph>>(m, "SceneGraph")
             .def(py::init<>())
             .def_readwrite("meshes", &SceneGraph::meshes)
             .def_readwrite("root", &SceneGraph::root)
             .def_readwrite("camera", &SceneGraph::camera)
             .def_readwrite("instances", &SceneGraph::instances)
+            .def_readwrite("integrator", &SceneGraph::integrator)
             .def("find", &SceneGraph::find);
         m.def("save_json_str", [](P<SceneGraph> scene) -> std::string {
             std::ostringstream os;

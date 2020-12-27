@@ -48,5 +48,9 @@ CEREAL_REGISTER_POLYMORPHIC_RELATION(akari::scene::Object, akari::scene::Camera)
 CEREAL_REGISTER_TYPE(akari::scene::PerspectiveCamera);
 CEREAL_REGISTER_POLYMORPHIC_RELATION(akari::scene::Camera, akari::scene::PerspectiveCamera);
 
+CEREAL_REGISTER_TYPE(akari::scene::Integrator);
+CEREAL_REGISTER_POLYMORPHIC_RELATION(akari::scene::Object, akari::scene::Integrator);
+CEREAL_REGISTER_TYPE(akari::scene::PathTracer);
+CEREAL_REGISTER_POLYMORPHIC_RELATION(akari::scene::Integrator, akari::scene::PathTracer);
 
 CEREAL_REGISTER_DYNAMIC_INIT(akari);
