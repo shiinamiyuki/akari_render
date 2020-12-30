@@ -27,7 +27,7 @@ namespace akari::render {
             const Light *light = nullptr;
         };
         astd::pmr::vector<VirtualPointLight> generate_vpls(IRConfig config, const Scene &scene, Sampler &sampler,
-                                                           Allocator<> alloc) {
+                                                           Allocator<> alloc, Float &max_radiance) {
             astd::pmr::vector<VirtualPointLight> vpls(alloc);
             Ray ray;
             Spectrum L(0.0);
@@ -47,6 +47,8 @@ namespace akari::render {
                 L = vpl0.radiance;
                 beta = Spectrum(1.0 / sample.pdfDir);
                 ray = sample.ray;
+                // max_radiance = hmax(vpl0.radiance);
+                max_radiance = 1.0 / (light_pdf * sample.pdfPos);
                 // vpls.emplace_back(vpl0);
             }
             for (int depth = 0; depth < config.max_depth; depth++) {
@@ -91,7 +93,8 @@ namespace akari::render {
         for (uint32_t pass = 0; pass < config.spp; pass++) {
             vpl_sampler.start_next_sample();
             Allocator<> vpl_alloc(&vpl_buf);
-            auto vpls = ir::generate_vpls(config, scene, vpl_sampler, vpl_alloc);
+            Float max_radiance = 0.0;
+            auto vpls = ir::generate_vpls(config, scene, vpl_sampler, vpl_alloc, max_radiance);
             auto kernel = [&](ivec2 id, uint32_t tid) {
                 Sampler &sampler = samplers[id.x + id.y * film.resolution().x];
                 Spectrum L(0.0);
@@ -100,11 +103,22 @@ namespace akari::render {
                 Ray ray = camera_sample.ray;
                 auto alloc = Allocator<>(buffers[tid]);
                 int depth = 0;
+                BSDFType prev_bsdf_type = BSDFType::Unset;
+                std::optional<SurfaceInteraction> prev_si = std::nullopt;
+                Float G_bound = 0;
                 while (depth < config.max_depth) {
-                    BSDFType prev_bsdf_type = BSDFType::Unset;
                     auto si = scene.intersect(ray);
                     if (!si)
                         break;
+                    if (prev_si) {
+                        auto w0 = prev_si->p - si->p;
+                        const auto dist_sqr = dot(w0, w0);
+                        const auto w = w0 / std::sqrt(dist_sqr);
+                        const auto G0 = std::abs(dot(w, prev_si->ng) * dot(w, si->ng)) / dist_sqr;
+                        if (G0 < G_bound) {
+                            break;
+                        }
+                    }
                     auto wo = -ray.d;
                     auto *material = si->material();
                     if (!material)
@@ -114,7 +128,7 @@ namespace akari::render {
                         auto light = si->triangle.light;
                         if (depth == 0 || BSDFType::Unset != (prev_bsdf_type & BSDFType::Specular)) {
                             Spectrum I = beta * light->Le(wo, si->sp());
-                            L += I * beta;
+                            L += I;
                         }
                     }
                     // Direct lighting
@@ -139,22 +153,52 @@ namespace akari::render {
                             }
                         }
                     }
+                    // struct NextDir {
+                    //     Float k =0.0;
+                    //     Vec3 wi;
+                    //     Spectrum beta;
+                    // };
+                    astd::pmr::vector<Float> ks(alloc), bs(alloc);
                     for (const auto &vpl : vpls) {
                         auto w0 = vpl.p - si->p;
                         const auto dist_sqr = dot(w0, w0);
-                        auto w = w0 / std::sqrt(dist_sqr);
-                        const auto G = std::abs(dot(w, vpl.ng) * dot(w, si->ng)) / dist_sqr;
+                        const auto w = w0 / std::sqrt(dist_sqr);
+                        const auto G0 = std::abs(dot(w, vpl.ng) * dot(w, si->ng)) / dist_sqr;
+                        const auto f = bsdf.evaluate(wo, w);
+                        const auto c = max_radiance; // * 2.0f;
+                        const auto b = c / std::fmax(0.1f, hmax(f));
+                        const auto G = std::min(G0, b);
+                        const auto k = std::max<Float>((G0 - b) / G0, 0.0f);
+                        ks.emplace_back(k);
+                        bs.emplace_back(b);
                         Spectrum contribution(0.0);
-
-                        contribution = vpl.radiance * beta * G * bsdf.evaluate(wo, w) * vpl.bsdf->evaluate(vpl.wo, -w);
-
-                        Ray shadow_ray(si->p, w0, 0.01, 1.0f - ShadowEps);
+                        contribution = vpl.radiance * G * f * vpl.bsdf->evaluate(vpl.wo, -w);
+                        const Ray shadow_ray(si->p, w0, 0.01, 1.0f - ShadowEps);
                         if (!is_black(contribution) && !scene.occlude(shadow_ray)) {
-                            L += contribution;
+                            L += contribution * beta;
                         }
                     }
+                    Distribution1D dist(ks.data(), ks.size(), alloc);
+                    if (dist.integral() == 0.0)
+                        break;
+                    const auto [idx, k_pdf] = dist.sample_discrete(sampler.next1d());
+                    const auto k = ks[idx];
+                    const auto b = bs[idx];
+                    G_bound = b;
+                    BSDFSampleContext sample_ctx{sampler.next1d(), sampler.next2d(), wo};
+                    auto sample = bsdf.sample(sample_ctx);
+                    if (!sample) {
+                        break;
+                    }
+                    AKR_ASSERT(sample->pdf >= 0.0f);
+                    if (sample->pdf == 0.0f) {
+                        break;
+                    }
+                    beta *= sample->f * std::abs(glm::dot(si->ns, sample->wi)) / sample->pdf * k / k_pdf;
+                    ray = Ray(si->p, sample->wi, Eps / std::abs(glm::dot(si->ng, sample->wi)));
+                    prev_bsdf_type = sample->type;
+                    prev_si = si;
                     depth++;
-                    break;
                 }
                 buffers[tid]->release();
                 film.add_sample(id, L, 1.0);
