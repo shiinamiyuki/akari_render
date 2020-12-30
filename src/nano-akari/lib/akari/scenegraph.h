@@ -156,7 +156,7 @@ namespace akari::scene {
 
     class Integrator : public Object {
       public:
-        enum class Type { Path };
+        enum class Type { Path, VPL };
         AKR_DECL_RTTI(Integrator)
         AKR_SER_POLY(Object)
     };
@@ -165,6 +165,13 @@ namespace akari::scene {
       public:
         uint32_t spp = 16;
         AKR_DECL_TYPEID(PathTracer, Path)
+        AKR_SER_POLY(Integrator, spp)
+    };
+
+    class VPL : public Integrator {
+      public:
+        uint32_t spp = 16;
+        AKR_DECL_TYPEID(VPL, VPL)
         AKR_SER_POLY(Integrator, spp)
     };
     class SceneGraph {

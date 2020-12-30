@@ -52,5 +52,6 @@ CEREAL_REGISTER_TYPE(akari::scene::Integrator);
 CEREAL_REGISTER_POLYMORPHIC_RELATION(akari::scene::Object, akari::scene::Integrator);
 CEREAL_REGISTER_TYPE(akari::scene::PathTracer);
 CEREAL_REGISTER_POLYMORPHIC_RELATION(akari::scene::Integrator, akari::scene::PathTracer);
-
+CEREAL_REGISTER_TYPE(akari::scene::VPL);
+CEREAL_REGISTER_POLYMORPHIC_RELATION(akari::scene::Integrator, akari::scene::VPL);
 CEREAL_REGISTER_DYNAMIC_INIT(akari);

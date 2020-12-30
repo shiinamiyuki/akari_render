@@ -20,17 +20,48 @@
 #include <akari/thread.h>
 #include <akari/serial.h>
 #include <cxxopts.hpp>
-
+using namespace akari;
+static void do_render(scene::P<scene::SceneGraph> graph) {
+    Allocator<> alloc;
+    auto scene = render::create_scene(alloc, graph);
+    if (auto pt = graph->integrator->as<scene::PathTracer>()) {
+        render::PTConfig config;
+        config.min_depth = 4;
+        config.max_depth = 7;
+        config.spp = pt->spp;
+        config.sampler = render::PCGSampler();
+        auto film = render::render_pt(config, *scene);
+        auto image = film.to_rgb_image();
+        write_ldr(image, "out.png");
+    } else if (auto vpl = graph->integrator->as<scene::VPL>()) {
+        render::IRConfig config;
+        config.min_depth = 4;
+        config.max_depth = 7;
+        config.spp = vpl->spp;
+        config.sampler = render::PCGSampler();
+        auto image = render::render_ir(config, *scene);
+        write_ldr(image, "out.png");
+    }
+}
 int main(int argc, char **argv) {
-    using namespace akari;
+
     thread::init(std::thread::hardware_concurrency());
     if (argc < 2) {
         fprintf(stderr, "usage: akari-cli scene\n");
         exit(-1);
     }
     try {
+        scene::P<scene::SceneGraph> scene_graph;
+        {
+            std::ifstream t(argv[1]);
+            std::stringstream buffer;
+            buffer << t.rdbuf();
+            cereal::JSONInputArchive ar(buffer);
+            ar(scene_graph);
+        }
+        do_render(scene_graph);
 
-        } catch (std::exception &e) {
+    } catch (std::exception &e) {
         std::cerr << "error: " << e.what() << std::endl;
     }
     thread::finalize();

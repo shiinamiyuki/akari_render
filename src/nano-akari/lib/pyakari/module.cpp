@@ -117,7 +117,10 @@ namespace akari::python {
             .def_readwrite("instances", &Node::instances)
             .def_readwrite("children", &Node::children);
         py::class_<Integrator, Object, P<Integrator>>(m, "Integrator");
-        py::class_<PathTracer, Integrator, P<PathTracer>>(m, "PathTracer").def_readwrite("spp", &PathTracer::spp);
+        py::class_<PathTracer, Integrator, P<PathTracer>>(m, "PathTracer")
+            .def(py::init<>())
+            .def_readwrite("spp", &PathTracer::spp);
+        py::class_<VPL, Integrator, P<VPL>>(m, "VPL").def(py::init<>()).def_readwrite("spp", &VPL::spp);
         py::class_<SceneGraph, P<SceneGraph>>(m, "SceneGraph")
             .def(py::init<>())
             .def_readwrite("meshes", &SceneGraph::meshes)

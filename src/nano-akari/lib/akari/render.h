@@ -1109,6 +1109,21 @@ namespace akari::render {
             Float SA = triangle.area() * (-glm::dot(wi, triangle.ng())) / (hit->first * hit->first);
             return 1.0f / SA;
         }
+        LightRaySample sample_emission(Sampler &sampler) const {
+            LightRaySample sample;
+            sample.uv = sampler.next2d();
+            auto coords = uniform_sample_triangle(sample.uv);
+            auto p = triangle.p(coords);
+
+            sample.ng = triangle.ng();
+            sample.pdfPos = 1.0 / triangle.area();
+            auto w = cosine_hemisphere_sampling(sampler.next2d());
+            Frame local(sample.ng);
+            sample.pdfDir = cosine_hemisphere_pdf(std::abs(w.y));
+            sample.ray = Ray(p, local.local_to_world(w));
+            sample.E = color.evaluate_s(ShadingPoint(triangle.texcoord(coords)));
+            return sample;
+        }
         LightSample sample_incidence(const LightSampleContext &ctx) const {
             auto coords = uniform_sample_triangle(ctx.u);
             auto p = triangle.p(coords);
@@ -1133,6 +1148,7 @@ namespace akari::render {
         Float pdf_incidence(const PointGeometry &ref, const vec3 &wi) const {
             AKR_VAR_DISPATCH(pdf_incidence, ref, wi);
         }
+        LightRaySample sample_emission(Sampler &sampler) const { AKR_VAR_DISPATCH(sample_emission, sampler); }
         LightSample sample_incidence(const LightSampleContext &ctx) const { AKR_VAR_DISPATCH(sample_incidence, ctx); }
     };
     struct Intersection {
@@ -1220,6 +1236,17 @@ namespace akari::render {
         auto [_, rest] = render_pt_pixel_separete_emitter_direct(config, allocator, scene, sampler, p_film);
         return rest;
     }
+
+    struct IRConfig {
+        Sampler sampler;
+        int min_depth = 3;
+        int max_depth = 5;
+        uint32_t spp = 16;
+    };
+
+    // instant radiosity
+    Image render_ir(IRConfig config, const Scene &scene);
+
     struct SMSConfig {
         Sampler sampler;
         int min_depth = 3;
