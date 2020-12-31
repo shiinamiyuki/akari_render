@@ -70,23 +70,46 @@ namespace akari::render {
             pdf_select = 1.0 - fraction;
             inner_sample = bsdf_A->sample(u_, wo);
         }
+        if (!inner_sample) {
+            return std::nullopt;
+        }
         sample = *inner_sample;
+        AKR_ASSERT(sample.pdf >= 0.0);
+        AKR_ASSERT(pdf_select >= 0.0);
         sample.pdf *= pdf_select;
+        AKR_ASSERT(sample.pdf >= 0.0);
         return sample;
     }
     BSDF Material::evaluate(Sampler &sampler, Allocator<> alloc, const SurfaceInteraction &si) const {
         auto sp = si.sp();
         BSDF bsdf(Frame(si.ns, si.dpdu));
         auto m = metallic.evaluate_f(sp);
+        auto r = roughness.evaluate_f(sp);
+
         auto tr = transmission.evaluate_f(sp);
         if (tr > 1 - 1e-5f) {
             bsdf.set_closure(FresnelSpecular(color.evaluate_s(sp), color.evaluate_s(sp), 1.0, 1.333));
-        } else if (m < 1e-5f) {
-            bsdf.set_closure(DiffuseBSDF(color.evaluate_s(sp)));
-        } else if (m > 1 - 1e-5f) {
-            bsdf.set_closure(SpecularReflection(color.evaluate_s(sp)));
         } else {
-            AKR_ASSERT(false);
+            auto base_color = color.evaluate_s(sp);
+            // AKR_ASSERT(false);
+            // MicrofacetReflection glossy(base_color, r);
+            BSDFClosure glossy = [&]() -> BSDFClosure {
+                if (r < 0.001) {
+                    return SpecularReflection(base_color);
+                } else {
+                    return MicrofacetReflection(base_color, r);
+                }
+            }();
+            auto diffuse = DiffuseBSDF(base_color);
+            AKR_ASSERT(m >= 0 && m <= 1);
+            if (m < 1e-5f) {
+                bsdf.set_closure(diffuse);
+            } else if (m > 1 - 1e-5f) {
+                bsdf.set_closure(glossy);
+            } else {
+                MixBSDF mix(m, alloc.new_object<BSDFClosure>(diffuse), alloc.new_object<BSDFClosure>(glossy));
+                bsdf.set_closure(mix);
+            }
         }
         return bsdf;
     }
@@ -147,6 +170,7 @@ namespace akari::render {
             mat->color = create_tex(mat_node->color);
             mat->metallic = create_tex(mat_node->metallic);
             mat->emission = create_tex(mat_node->emission);
+            mat->roughness = create_tex(mat_node->roughness);
             mat->transmission = create_tex(mat_node->transmission);
             mat_map.emplace(mat_node.get(), mat);
             scene->materials.emplace_back(mat);

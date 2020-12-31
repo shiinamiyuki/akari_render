@@ -792,6 +792,62 @@ namespace akari::render {
             return sample;
         }
     };
+
+    class MicrofacetReflection {
+      public:
+        Spectrum R;
+        MicrofacetModel model;
+        Float roughness;
+        MicrofacetReflection(const Spectrum &R, Float roughness)
+            : R(R), model(microfacet_new(MicrofacetGGX, roughness)), roughness(roughness) {}
+        [[nodiscard]] Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const {
+            if (same_hemisphere(wo, wi)) {
+                auto wh = normalize(wo + wi);
+                return microfacet_evaluate_pdf(model, wh) / (Float(4.0f) * dot(wo, wh));
+            }
+            return 0.0f;
+        }
+        [[nodiscard]] Spectrum evaluate(const Vec3 &wo, const Vec3 &wi) const {
+            if (same_hemisphere(wo, wi)) {
+                Float cosThetaO = abs_cos_theta(wo);
+                Float cosThetaI = abs_cos_theta(wi);
+                auto wh = (wo + wi);
+                if (cosThetaI == 0 || cosThetaO == 0)
+                    return Spectrum(0);
+                if (wh.x == 0 && wh.y == 0 && wh.z == 0)
+                    return Spectrum(0);
+                wh = normalize(wh);
+                if (wh.y < 0) {
+                    wh = -wh;
+                }
+                auto F = 1.0f; // fresnel->evaluate(dot(wi, wh));
+
+                return R * (microfacet_D(model, wh) * microfacet_G(model, wo, wi, wh) * F /
+                            (Float(4.0f) * cosThetaI * cosThetaO));
+            }
+            return Spectrum(0.0f);
+        }
+        [[nodiscard]] BSDFType type() const { return BSDFType::GlossyReflection; }
+        [[nodiscard]] std::optional<BSDFSample> sample(const vec2 &u, const Vec3 &wo) const {
+            BSDFSample sample;
+            sample.type = type();
+            auto wh = microfacet_sample_wh(model, wo, u);
+            sample.wi = glm::reflect(-wo, wh);
+            if (!same_hemisphere(wo, sample.wi)) {
+                sample.pdf = 0;
+                return std::nullopt;
+            } else {
+                if (wh.y < 0) {
+                    wh = -wh;
+                }
+                sample.pdf = microfacet_evaluate_pdf(model, wh) / (Float(4.0f) * abs(dot(wo, wh)));
+                AKR_ASSERT(sample.pdf >= 0.0);
+            }
+            sample.f = evaluate(wo, sample.wi);
+            return sample;
+        }
+    };
+
     class FresnelNoOp {
       public:
         [[nodiscard]] Spectrum evaluate(Float cosThetaI) const;
@@ -884,8 +940,8 @@ namespace akari::render {
         [[nodiscard]] BSDFType type() const;
         std::optional<BSDFSample> sample(const vec2 &u, const Vec3 &wo) const;
     };
-    class BSDFClosure
-        : public Variant<DiffuseBSDF, SpecularReflection, SpecularTransmission, FresnelSpecular, MixBSDF> {
+    class BSDFClosure : public Variant<DiffuseBSDF, MicrofacetReflection, SpecularReflection, SpecularTransmission,
+                                       FresnelSpecular, MixBSDF> {
       public:
         using Variant::Variant;
         [[nodiscard]] Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const {
