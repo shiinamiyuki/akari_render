@@ -13,16 +13,16 @@
 // limitations under the License.
 #include <OpenImageIO/imageio.h>
 #include <akari/image.h>
+#include <spdlog/spdlog.h>
 namespace akari {
     Image array2d_to_rgb(const Array2D<Color3f> &array) {
         Image img = rgb_image(array.dimension());
         thread::parallel_for(array.dimension().y, [&](uint32_t y, uint32_t) {
             for (int x = 0; x < array.dimension().x; x++) {
-                auto color = array(x,y);
+                auto color = array(x, y);
                 img(x, y, 0) = color[0];
                 img(x, y, 1) = color[1];
                 img(x, y, 2) = color[2];
-
             }
         });
         return img;
@@ -86,7 +86,31 @@ namespace akari {
         return true;
     }
 
-    // Image read_generic_image(const fs::path &path){
-
-    // }
+    Image read_generic_image(const fs::path &path) {
+        using namespace OIIO;
+        auto in = ImageInput::open(path.string());
+        spdlog::info("loading {}", path.string());
+        if (!in) {
+            spdlog::error("cannot open image");
+            return rgb_image(ivec2(1));
+        }
+        const ImageSpec &spec = in->spec();
+        int xres = spec.width;
+        int yres = spec.height;
+        auto format = spec.format;
+        int channels = spec.nchannels;
+        std::vector<std::string> channel_names(channels);
+        for (int i = 0; i < channels; i++) {
+            channel_names[i] = spec.channel_name(i).str();
+        }
+        Image image(std::move(channel_names), ivec2(xres, yres));
+        in->read_image(TypeDesc::FLOAT, image.data());
+        in->close();
+        if(format != TypeDesc::FLOAT){
+            image.array3d().map_inplace([](Float x)->Float{
+                return srgb_to_linear(x);
+            });
+        }
+        return image;
+    }
 } // namespace akari

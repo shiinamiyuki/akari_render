@@ -19,6 +19,7 @@
 #include <akari/util.h>
 #include <akari/scenegraph.h>
 #include <akari/serial.h>
+#include <iostream>
 using namespace akari::scene;
 using akari::Spectrum;
 P<SceneGraph> import(const std::string &file) {
@@ -34,12 +35,32 @@ P<SceneGraph> import(const std::string &file) {
     std::vector<P<Mesh>> meshes((size_t)ai_scene->mNumMeshes);
     for (uint32_t i = 0; i < ai_scene->mNumMaterials; i++) {
         const aiMaterial *ai_mat = ai_scene->mMaterials[i];
-        aiColor4D diffuse_color, emission_color;
+        aiString name, ai_diffuse_tex_path;
+        aiGetMaterialString(ai_mat, AI_MATKEY_NAME, &name);
+        aiColor4D diffuse_color, emission_color, specular_color;
+        float shininess = 1.0;
         aiGetMaterialColor(ai_mat, AI_MATKEY_COLOR_DIFFUSE, &diffuse_color);
         aiGetMaterialColor(ai_mat, AI_MATKEY_COLOR_EMISSIVE, &emission_color);
+        aiGetMaterialColor(ai_mat, AI_MATKEY_COLOR_SPECULAR, &specular_color);
+        aiGetMaterialFloat(ai_mat, AI_MATKEY_SHININESS, &shininess);
+        aiGetMaterialString(ai_mat, AI_MATKEY_TEXTURE_DIFFUSE(0), &ai_diffuse_tex_path);
+        std::string diffuse_tex_path = ai_diffuse_tex_path.C_Str();
+        // std::cout << diffuse_tex_path << std::endl;
+        // if(diffuse_tex_path)
+        auto diffuse = color4_to_spectrum(diffuse_color);
+        auto roughness = std::sqrt(2.0 / (shininess + 2.0));
         auto mat = P<Material>(new Material());
-        mat->color = P<Texture>(new RGBTexture(color4_to_spectrum(diffuse_color)));
+        mat->name = name.C_Str();
+        mat->color = P<Texture>(new RGBTexture(diffuse));
         mat->emission = P<Texture>(new RGBTexture(color4_to_spectrum(emission_color)));
+        mat->roughness = P<Texture>(new FloatTexture(roughness));
+        auto specular = color4_to_spectrum(specular_color);
+        auto metallic =
+            (hmax(specular) + hmax(diffuse)) == 0.0 ? 0.0 : (hmax(specular) / (hmax(specular) + hmax(diffuse)));
+        mat->metallic = P<Texture>(new FloatTexture(metallic));
+        if (!diffuse_tex_path.empty()) {
+            mat->color = P<Texture>(new ImageTexture(diffuse_tex_path));
+        }
         materials[i] = mat;
     }
     for (uint32_t i = 0; i < ai_scene->mNumMeshes; i++) {

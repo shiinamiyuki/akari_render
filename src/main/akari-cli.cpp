@@ -19,30 +19,9 @@
 #include <akari/render_ppg.h>
 #include <akari/thread.h>
 #include <akari/serial.h>
+#include <akari/api.h>
 #include <cxxopts.hpp>
 using namespace akari;
-static void do_render(scene::P<scene::SceneGraph> graph) {
-    Allocator<> alloc;
-    auto scene = render::create_scene(alloc, graph);
-    if (auto pt = graph->integrator->as<scene::PathTracer>()) {
-        render::PTConfig config;
-        config.min_depth = 4;
-        config.max_depth = 7;
-        config.spp = pt->spp;
-        config.sampler = render::PCGSampler();
-        auto film = render::render_pt(config, *scene);
-        auto image = film.to_rgb_image();
-        write_ldr(image, "out.png");
-    } else if (auto vpl = graph->integrator->as<scene::VPL>()) {
-        render::IRConfig config;
-        config.min_depth = 4;
-        config.max_depth = 7;
-        config.spp = vpl->spp;
-        config.sampler = render::PCGSampler();
-        auto image = render::render_ir(config, *scene);
-        write_ldr(image, "out.png");
-    }
-}
 int main(int argc, char **argv) {
 
     thread::init(std::thread::hardware_concurrency());
@@ -59,7 +38,7 @@ int main(int argc, char **argv) {
             cereal::JSONInputArchive ar(buffer);
             ar(scene_graph);
         }
-        do_render(scene_graph);
+        render_scenegraph(scene_graph);
 
     } catch (std::exception &e) {
         std::cerr << "error: " << e.what() << std::endl;

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <akari/util.h>
+#include <akari/api.h>
 #include <akari/render.h>
 #include <spdlog/spdlog.h>
 namespace akari::render {
@@ -61,6 +62,7 @@ namespace akari::render {
         BSDFSample sample;
         std::optional<BSDFSample> inner_sample;
         Float pdf_select = 0;
+        bool sel = true;
         if (u[0] < fraction) {
             vec2 u_(u[0] / fraction, u[1]);
             pdf_select = fraction;
@@ -69,23 +71,36 @@ namespace akari::render {
             vec2 u_((u[0] - fraction) / (1.0 - fraction), u[1]);
             pdf_select = 1.0 - fraction;
             inner_sample = bsdf_A->sample(u_, wo);
+            sel = false;
         }
         if (!inner_sample) {
             return std::nullopt;
         }
-        sample = *inner_sample;
-        AKR_ASSERT(sample.pdf >= 0.0);
-        AKR_ASSERT(pdf_select >= 0.0);
-        sample.pdf *= pdf_select;
-        AKR_ASSERT(sample.pdf >= 0.0);
-        return sample;
+        if ((inner_sample->type & BSDFType::Specular) != BSDFType::Unset) {
+            sample = *inner_sample;
+            // AKR_ASSERT(sample.pdf >= 0.0);
+            // AKR_ASSERT(pdf_select >= 0.0);
+            sample.pdf *= pdf_select;
+            // AKR_ASSERT(sample.pdf >= 0.0);
+            return sample;
+        } else {
+            sample = *inner_sample;
+            if (sel) {
+                sample.f = sample.f + fraction * bsdf_B->evaluate(wo, sample.wi);
+                sample.pdf = sample.pdf + fraction * bsdf_B->evaluate_pdf(wo, sample.wi);
+            } else {
+                sample.f = sample.f + (1.0 - fraction) * bsdf_A->evaluate(wo, sample.wi);
+                sample.pdf = sample.pdf + (1.0 - fraction) * bsdf_A->evaluate_pdf(wo, sample.wi);
+            }
+            return sample;
+        }
     }
     BSDF Material::evaluate(Sampler &sampler, Allocator<> alloc, const SurfaceInteraction &si) const {
         auto sp = si.sp();
         BSDF bsdf(Frame(si.ns, si.dpdu));
         auto m = metallic.evaluate_f(sp);
         auto r = roughness.evaluate_f(sp);
-
+        r *= r;
         auto tr = transmission.evaluate_f(sp);
         if (tr > 1 - 1e-5f) {
             bsdf.set_closure(FresnelSpecular(color.evaluate_s(sp), color.evaluate_s(sp), 1.0, 1.333));
@@ -159,6 +174,10 @@ namespace akari::render {
                 tex.emplace(ConstantTexture(ftex->value));
             } else if (auto rgb_tex = tex_node->as<scene::RGBTexture>()) {
                 tex.emplace(ConstantTexture(rgb_tex->value));
+            } else if (auto img_tex = tex_node->as<scene::ImageTexture>()) {
+                std::shared_ptr<Image> img;
+                img.reset(new Image(std::move(read_generic_image(img_tex->path))));
+                tex.emplace(ImageTexture(std::move(img)));
             }
             return tex.value();
         };
@@ -222,3 +241,39 @@ namespace akari::render {
         return scene;
     }
 } // namespace akari::render
+
+namespace akari {
+    void render_scenegraph(scene::P<scene::SceneGraph> graph) {
+        if (!graph->integrator) {
+            std::cerr << "no integrator!" << std::endl;
+            exit(1);
+        }
+        Allocator<> alloc;
+        auto scene = render::create_scene(alloc, graph);
+        if (auto pt = graph->integrator->as<scene::PathTracer>()) {
+            render::PTConfig config;
+            config.min_depth = pt->min_depth;
+            config.max_depth = pt->max_depth;
+            config.spp = pt->spp;
+            config.sampler = render::PCGSampler();
+            auto film = render::render_pt(config, *scene);
+            auto image = film.to_rgb_image();
+            write_ldr(image, "out.png");
+        } else if (auto vpl = graph->integrator->as<scene::VPL>()) {
+            render::IRConfig config;
+            config.min_depth = vpl->min_depth;
+            config.max_depth = vpl->max_depth;
+            config.spp = vpl->spp;
+            config.sampler = render::PCGSampler();
+            auto image = render::render_ir(config, *scene);
+            write_ldr(image, "out.png");
+        } else if (auto smcmc = graph->integrator->as<scene::SMCMC>()) {
+            render::MLTConfig config;
+            config.min_depth = smcmc->min_depth;
+            config.max_depth = smcmc->max_depth;
+            config.spp = smcmc->spp;
+            auto image = render::render_smcmc(config, *scene);
+            write_ldr(image, "out.png");
+        }
+    }
+} // namespace akari

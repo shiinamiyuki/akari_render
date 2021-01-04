@@ -725,10 +725,24 @@ namespace akari::render {
     struct DeviceImageImpl;
     using DeviceImage = DeviceImageImpl *;
     struct ImageTexture {
-        DeviceImage image;
+        std::shared_ptr<Image> image;
+        ImageTexture() = default;
+        ImageTexture(std::shared_ptr<Image> image) : image(std::move(image)) {}
+        Float evaluate_f(const ShadingPoint &sp) const {
+            vec2 texcoords = sp.texcoords;
+            vec2 tc = glm::mod(texcoords, vec2(1.0f));
+            tc.y = 1.0f - tc.y;
+            return (*image)(tc, 0);
+        }
+        Spectrum evaluate_s(const ShadingPoint &sp) const {
+            vec2 texcoords = sp.texcoords;
+            vec2 tc = glm::mod(texcoords, vec2(1.0f));
+            tc.y = 1.0f - tc.y;
+            return Spectrum((*image)(tc, 0), (*image)(tc, 1), (*image)(tc, 2));
+        }
     };
 
-    struct Texture : Variant<ConstantTexture> {
+    struct Texture : Variant<ConstantTexture, ImageTexture> {
         using Variant::Variant;
         Float evaluate_f(const ShadingPoint &sp) const { AKR_VAR_DISPATCH(evaluate_f, sp); }
         Spectrum evaluate_s(const ShadingPoint &sp) const { AKR_VAR_DISPATCH(evaluate_s, sp); }
@@ -1269,6 +1283,10 @@ namespace akari::render {
 
     std::shared_ptr<const Scene> create_scene(Allocator<>, const std::shared_ptr<scene::SceneGraph> &scene_graph);
 
+    // experimental path space denoising
+    struct PSDConfig {
+        size_t filter_radius = 8;
+    };
     struct PTConfig {
         Sampler sampler;
         int min_depth = 3;
@@ -1276,6 +1294,7 @@ namespace akari::render {
         int spp = 16;
     };
     Film render_pt(PTConfig config, const Scene &scene);
+    Image render_pt_psd(PTConfig config, PSDConfig psd_config, const Scene & scene);
 
     // separate emitter direct hit
     // useful for MLT

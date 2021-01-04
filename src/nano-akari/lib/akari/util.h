@@ -168,7 +168,11 @@ namespace akari {
     Vector<T, N> select(const Vector<bool, N> &c, const Vector<T, N> &a, const Vector<T, N> &b) {
         return glm::mix(b, a, c);
     }
-
+    template <typename T, int N>
+    inline auto l2norm(const Vector<T, N> &a, const Vector<T, N> &b) {
+        auto v = a - b;
+        return dot(v, v);
+    }
     template <typename T>
     struct vec_trait {
         using value_type = void;
@@ -238,7 +242,10 @@ namespace akari {
     AKR_XPU bool is_black(const Color<Scalar, N> &color) {
         return !foldl(color, false, [](bool acc, Scalar f) { return acc || (f > 0.0f); });
     }
-
+    inline Float linear_to_srgb(Float L) {
+        return (L < 0.0031308) ? (L * 12.92) : (1.055 * std::pow(L, 1.0 / 2.4) - 0.055);
+    }
+    inline Float srgb_to_linear(Float S) { return (S < 0.04045) ? (S / 12.92) : (std::pow(S + 0.055, 2.4) / 1.055); }
     template <typename Scalar>
     AKR_XPU Color<Scalar, 3> linear_to_srgb(const Color<Scalar, 3> &L) {
         using Color3f = Color<Scalar, 3>;
@@ -878,5 +885,32 @@ namespace akari {
         T *_data = nullptr;
         size_t _size = 0;
     };
-} // namespace akari
 
+    template <typename T>
+    struct ObjectCache {
+        template <class F>
+        T &get_cached_or(F &&f) {
+            if (!_storage) {
+                _storage = f();
+            }
+            return _storage.value();
+        }
+        void invalidate() { _storage.reset(); }
+
+      private:
+        std::optional<T> _storage;
+    };
+    namespace astd {
+        template <class Fn>
+        struct scope_exit {
+            explicit scope_exit(Fn &&fn) noexcept : fn(fn) {}
+            ~scope_exit() { fn(); }
+            scope_exit(const scope_exit &) = delete;
+
+          private:
+            Fn fn;
+        };
+        template <class Fn>
+        scope_exit(Fn &&) -> scope_exit<Fn>;
+    } // namespace astd
+} // namespace akari

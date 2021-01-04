@@ -17,6 +17,7 @@
 #include <spdlog/spdlog.h>
 #include <akari/render.h>
 #include <akari/render_mlt.h>
+#include <akari/profile.h>
 #include <numeric>
 namespace akari::render {
     struct IVec2Hash {
@@ -371,18 +372,18 @@ namespace akari::render {
             auto t_off = t.p_center - s.p_center;
             if (overlapped_pixel_indices.find(t_off) == overlapped_pixel_indices.end())
                 return;
-            for (auto &i : overlapped_pixel_indices.at(t_off)) {
+            for (auto &i : overlapped_pixel_indices[t_off]) {
                 F(s.p_center + offsets[i]);
             }
         };
         auto for_each_overlapped_tile_pixel = [&](const Tile &s, auto &&F) {
-            for (auto &off : overlapped_tile_offsets) {
+            for (const auto &off : overlapped_tile_offsets) {
                 auto id = off + s.p_center;
                 if (glm::any(glm::lessThan(id, ivec2(0))) || glm::any(glm::greaterThanEqual(id, tiles.dimension()))) {
                     continue;
                 }
                 auto &t = tiles(id);
-                for (auto &i : overlapped_pixel_indices.at(off)) {
+                for (const auto &i : overlapped_pixel_indices[off]) {
                     F(t, s.p_center + offsets[i]);
                 }
             }
@@ -442,6 +443,8 @@ namespace akari::render {
                     thread::blocked_range<2>(tiles.dimension(), ivec2(16, 16)),
                     [&](ivec2 id, uint32_t tid) { error(id) = e(tiles(id)); });
             }
+            Timer timer;
+            timer.start();
             thread::parallel_for( //
                 thread::blocked_range<2>(tiles.dimension(), ivec2(16, 16)), [&](ivec2 id, uint32_t tid) {
                     const auto w1 = [&](const Tile &s) {
@@ -470,6 +473,8 @@ namespace akari::render {
                     new_b(id) = std::max(new_b(id), 0.0);
                     inc_bs(id, 1) = inc_b_denom;
                 });
+            timer.stop();
+            spdlog::info("iter take {}s", timer.elapsed_seconds());
             if (n % 50 == 0)
                 spdlog::info("iter={}", n);
             thread::parallel_for( //

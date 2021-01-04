@@ -25,12 +25,12 @@ namespace akari {
         const T *data() const { return data_.data(); }
         Array2D() : Array2D(ivec2(1, 1)) {}
         Array2D(const ivec2 &size) : Array2D(size, Allocator()) {}
-        static Array2D ones(const ivec2 &size){
+        static Array2D ones(const ivec2 &size) {
             Array2D tmp(size);
             tmp.fill(T(1.0));
             return tmp;
         }
-        static Array2D zeros(const ivec2 &size){
+        static Array2D zeros(const ivec2 &size) {
             Array2D tmp(size);
             tmp.fill(T(0.0));
             return tmp;
@@ -228,13 +228,14 @@ namespace akari {
         }
         template <class F>
         void map_inplace(F &&f) {
-            thread::parallel_for_each(data_.begin(), data_.end(), [&](auto &item) { item = f(item); });
+            thread::parallel_for(thread::blocked_range<3>(dimension(), ivec3(64)),
+                                 [&](ivec3 id, uint32_t) { (*this)(id) = f((*this)(id)); });
         }
         template <class F>
         Array3D map(F &&f) const {
             Array3D out(dimension());
             thread::parallel_for(thread::blocked_range<3>(out.dimension(), ivec3(64)),
-                                 [&](ivec3 id) { out(id) = f((*this)(id)); });
+                                 [&](ivec3 id, uint32_t) { out(id) = f((*this)(id)); });
             return out;
         }
     };

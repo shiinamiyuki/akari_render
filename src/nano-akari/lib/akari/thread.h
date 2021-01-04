@@ -19,6 +19,10 @@
 #include <atomic>
 #include <functional>
 #include <future>
+#include <deque>
+#include <vector>
+#include <condition_variable>
+#include <mutex>
 
 namespace akari {
     struct SpinLock {
@@ -37,7 +41,7 @@ namespace akari {
 
         void unlock() { lock_.store(false, std::memory_order_release); }
     };
-    template<class Float>
+    template <class Float>
     class TAtomicFloat {
         std::atomic<Float> val;
 
@@ -61,6 +65,31 @@ namespace akari {
     using AtomicFloat = TAtomicFloat<float>;
     using AtomicDouble = TAtomicFloat<double>;
     namespace thread {
+        class ThreadPool {
+          public:
+            using TaskFunc = std::function<void(void)>;
+
+          private:
+            std::condition_variable has_work, one_work_completed;
+            std::deque<TaskFunc> works;
+            std::vector<std::thread> workers;
+            std::atomic_bool stopped;
+            std::mutex work_m;
+            std::atomic_uint32_t num_active_workers;
+
+          public:
+            // using TaskFunc = std::function<void(void)>;
+            void enqueue(TaskFunc f);
+            void wait();
+            ThreadPool(size_t num_threads);
+            ~ThreadPool() {
+                stopped = true;
+                for (auto &worker : workers) {
+                    worker.join();
+                }
+            }
+        };
+     
         template <int N>
         struct BlockedDim {
             static_assert(N <= 3 && N >= 1);
@@ -128,7 +157,7 @@ namespace akari {
             });
         }
         template <class ParIter, class F>
-        auto parallel_for_each(ParIter begin, ParIter end, F &&f) -> decltype(*std::declval<ParIter>()) {
+        void parallel_for_each(ParIter begin, ParIter end, F &&f) {
             size_t count = std::distance(begin, end);
             parallel_for(count, [&](size_t idx, uint32_t) { f(*(begin + idx)); });
         }
@@ -179,7 +208,7 @@ namespace akari {
     };
     template <class _Fty, class... _ArgTypes>
     Future<std::invoke_result_t<std::decay_t<_Fty>, std::decay_t<_ArgTypes>...>>
-    async_do(std::launch policy, _Fty &&_Fnarg, _ArgTypes &&..._Args) {
+    async_do(std::launch policy, _Fty &&_Fnarg, _ArgTypes &&... _Args) {
         return std::async(policy, std::forward<_Fty>(_Fnarg), std::forward<_ArgTypes>(_Args)...);
     }
 } // namespace akari

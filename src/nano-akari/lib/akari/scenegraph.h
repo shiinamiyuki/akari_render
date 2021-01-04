@@ -84,6 +84,8 @@ namespace akari::scene {
     class ImageTexture : public Texture {
       public:
         std::string path;
+        ImageTexture() = default;
+        ImageTexture(const std::string &path) : path(path) {}
         AKR_SER_POLY(Texture, path)
         AKR_DECL_TYPEID(ImageTexture, Image)
     };
@@ -156,7 +158,7 @@ namespace akari::scene {
 
     class Integrator : public Object {
       public:
-        enum class Type { Path, VPL };
+        enum class Type { Path, VPL, SMCMC };
         AKR_DECL_RTTI(Integrator)
         AKR_SER_POLY(Object)
     };
@@ -164,15 +166,27 @@ namespace akari::scene {
     class PathTracer : public Integrator {
       public:
         uint32_t spp = 16;
+        int32_t min_depth = 4;
+        int32_t max_depth = 7;
         AKR_DECL_TYPEID(PathTracer, Path)
-        AKR_SER_POLY(Integrator, spp)
+        AKR_SER_POLY(Integrator, spp, min_depth, max_depth)
+    };
+    class SMCMC : public Integrator {
+      public:
+        uint32_t spp = 16;
+        int32_t min_depth = 4;
+        int32_t max_depth = 7;
+        AKR_DECL_TYPEID(SMCMC, SMCMC)
+        AKR_SER_POLY(Integrator, spp, min_depth, max_depth)
     };
 
     class VPL : public Integrator {
       public:
         uint32_t spp = 16;
+        int32_t min_depth = 4;
+        int32_t max_depth = 7;
         AKR_DECL_TYPEID(VPL, VPL)
-        AKR_SER_POLY(Integrator, spp)
+        AKR_SER_POLY(Integrator, spp, min_depth, max_depth)
     };
     class SceneGraph {
       public:

@@ -14,9 +14,12 @@
 
 #include <fstream>
 #include <sstream>
+#include <csignal>
 #include <pyakari/module.h>
 #include <pybind11/stl_bind.h>
 #include <akari/serial.h>
+#include <akari/api.h>
+#include <akari/thread.h>
 
 PYBIND11_MAKE_OPAQUE(std::vector<akari::scene::P<akari::scene::Object>>);
 PYBIND11_MAKE_OPAQUE(std::vector<akari::scene::P<akari::scene::Mesh>>);
@@ -24,9 +27,9 @@ PYBIND11_MAKE_OPAQUE(std::vector<akari::scene::P<akari::scene::Instance>>);
 PYBIND11_MAKE_OPAQUE(std::vector<akari::scene::P<akari::scene::Node>>);
 namespace akari::python {
 
-    template <typename T, int N>
+    template <typename V, typename T, int N>
     void register_vec(py::module &m, const char *name1, const char *name2) {
-        using V = Vector<T, N>;
+        // using V = Vector<T, N>;
         auto c = py::class_<V>(m, name1);
         m.def(name2, []() -> V { return V(); });
         if constexpr (N >= 1) {
@@ -55,21 +58,25 @@ namespace akari::python {
     void init(py::module &m) {
         using namespace akari::scene;
         m.doc() = "nano-akari python interface";
-        register_vec<float, 2>(m, "_vec2", "vec2");
-        register_vec<float, 3>(m, "_vec3", "vec3");
-        register_vec<float, 4>(m, "_vec4", "vec4");
+        register_vec<vec2, float, 2>(m, "_vec2", "vec2");
+        register_vec<vec3, float, 3>(m, "_vec3", "vec3");
+        register_vec<vec4, float, 4>(m, "_vec4", "vec4");
 
-        register_vec<int, 2>(m, "_ivec2", "ivec2");
-        register_vec<int, 3>(m, "_ivec3", "ivec3");
-        register_vec<int, 4>(m, "_ivec4", "ivec4");
+        register_vec<ivec2, int, 2>(m, "_ivec2", "ivec2");
+        register_vec<ivec3, int, 3>(m, "_ivec3", "ivec3");
+        register_vec<ivec4, int, 4>(m, "_ivec4", "ivec4");
 
-        register_vec<double, 2>(m, "_dvec2", "dvec2");
-        register_vec<double, 3>(m, "_dvec3", "dvec3");
-        register_vec<double, 4>(m, "_dvec4", "dvec4");
+        register_vec<dvec2, double, 2>(m, "_dvec2", "dvec2");
+        register_vec<dvec3, double, 3>(m, "_dvec3", "dvec3");
+        register_vec<dvec4, double, 4>(m, "_dvec4", "dvec4");
 
-        register_vec<bool, 2>(m, "_bvec2", "bvec2");
-        register_vec<bool, 3>(m, "_bvec3", "bvec3");
-        register_vec<bool, 4>(m, "_bvec4", "bvec4");
+        register_vec<bvec2, bool, 2>(m, "_bvec2", "bvec2");
+        register_vec<bvec3, bool, 3>(m, "_bvec3", "bvec3");
+        register_vec<bvec4, bool, 4>(m, "_bvec4", "bvec4");
+
+        register_vec<Color<float, 2>, float, 2>(m, "Color2f", "color2");
+        register_vec<Color<float, 3>, float, 3>(m, "Color3f", "color3");
+        register_vec<Color<float, 4>, float, 4>(m, "Color4f", "color4");
 
         py::class_<TRSTransform>(m, "TRSTransform")
             .def(py::init<>())
@@ -88,9 +95,11 @@ namespace akari::python {
         py::class_<Texture, Object, P<Texture>>(m, "Texture");
         py::class_<FloatTexture, Texture, P<FloatTexture>>(m, "FloatTexture")
             .def(py::init<>())
+            .def(py::init<Float>())
             .def_readwrite("value", &FloatTexture::value);
         py::class_<RGBTexture, Texture, P<RGBTexture>>(m, "RGBTexture")
             .def(py::init<>())
+            .def(py::init<Color3f>())
             .def_readwrite("value", &RGBTexture::value);
         py::class_<ImageTexture, Texture, P<ImageTexture>>(m, "ImageTexture")
             .def(py::init<>())
@@ -119,8 +128,19 @@ namespace akari::python {
         py::class_<Integrator, Object, P<Integrator>>(m, "Integrator");
         py::class_<PathTracer, Integrator, P<PathTracer>>(m, "PathTracer")
             .def(py::init<>())
-            .def_readwrite("spp", &PathTracer::spp);
-        py::class_<VPL, Integrator, P<VPL>>(m, "VPL").def(py::init<>()).def_readwrite("spp", &VPL::spp);
+            .def_readwrite("spp", &PathTracer::spp)
+            .def_readwrite("min_depth", &PathTracer::min_depth)
+            .def_readwrite("max_depth", &PathTracer::max_depth);
+        py::class_<SMCMC, Integrator, P<SMCMC>>(m, "SMCMC")
+            .def(py::init<>())
+            .def_readwrite("spp", &SMCMC::spp)
+            .def_readwrite("min_depth", &SMCMC::min_depth)
+            .def_readwrite("max_depth", &SMCMC::max_depth);
+        py::class_<VPL, Integrator, P<VPL>>(m, "VPL")
+            .def(py::init<>())
+            .def_readwrite("spp", &VPL::spp)
+            .def_readwrite("min_depth", &VPL::min_depth)
+            .def_readwrite("max_depth", &VPL::max_depth);
         py::class_<SceneGraph, P<SceneGraph>>(m, "SceneGraph")
             .def(py::init<>())
             .def_readwrite("meshes", &SceneGraph::meshes)
@@ -193,6 +213,13 @@ namespace akari::python {
                 ar(scene);
             }
         });
+        m.def("render", [](P<SceneGraph> scenegraph) {
+            auto old_sig_handler = std::signal(SIGINT, SIG_DFL);
+            astd::scope_exit _([=] { std::signal(SIGINT, old_sig_handler); });
+            render_scenegraph(scenegraph);
+        });
+        m.def("thread_pool_init", thread::init);
+        m.def("thread_pool_finalize", thread::finalize);
         py::bind_vector<std::vector<P<Object>>>(m, "ObjectArray");
         py::bind_vector<std::vector<P<Mesh>>>(m, "MeshArray");
         py::bind_vector<std::vector<P<Instance>>>(m, "InstanceArray");

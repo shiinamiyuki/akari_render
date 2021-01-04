@@ -72,6 +72,14 @@ namespace akari::render {
                 }
                 beta *= sample->f * std::abs(glm::dot(si->ns, sample->wi)) / sample->pdf;
                 ray = Ray(si->p, sample->wi, Eps / std::abs(glm::dot(si->ng, sample->wi)));
+                if (depth > config.min_depth) {
+                    Float continue_prob = std::min<Float>(1.0, hmax(beta)) * 0.95;
+                    if (continue_prob > sampler.next1d()) {
+                        beta *= (Spectrum(1.0 / continue_prob));
+                    } else {
+                        break;
+                    }
+                }
             }
             // spdlog::info("{}", vpls.size());
             return vpls;
@@ -128,6 +136,14 @@ namespace akari::render {
                                     const Float prev_bsdf_pdf, const BSDFType prev_bsdf_type, auto &&self) -> void {
                     if (depth >= config.max_depth)
                         return;
+                    if (depth > config.min_depth) {
+                        Float continue_prob = std::min<Float>(1.0, hmax(beta)) * 0.95;
+                        if (continue_prob > sampler.next1d()) {
+                            beta *= (Spectrum(1.0 / continue_prob));
+                        } else {
+                            return;
+                        }
+                    }
                     auto si = scene.intersect(ray);
                     if (!si)
                         return;
@@ -376,7 +392,7 @@ namespace akari::render {
 #endif
                 buffers[tid]->release();
                 L = clamp_zero(L);
-                L = min(L, Spectrum(1.5));
+                L = min(L, Spectrum(5.0));
                 film.add_sample(id, L, 1.0);
             };
             thread::parallel_for(thread::blocked_range<2>(film.resolution(), ivec2(16, 16)), kernel);

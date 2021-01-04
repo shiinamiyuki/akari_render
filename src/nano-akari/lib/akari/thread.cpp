@@ -136,5 +136,36 @@ namespace akari::thread {
         using namespace thread_internal;
         pool.reset(nullptr);
     }
-
+    ThreadPool::ThreadPool(size_t num_threads) : stopped(false), num_active_workers(0) {
+        for (size_t i = 0; i < num_threads; i++) {
+            workers.emplace_back([=] {
+                while (!stopped) {
+                    std::unique_lock<std::mutex> lock(work_m);
+                    while (works.empty() && !stopped) {
+                        has_work.wait(lock);
+                    }
+                    if (stopped)
+                        return;
+                    auto work = std::move(works.front());
+                    works.pop_front();
+                    num_active_workers++;
+                    lock.unlock();
+                    work();
+                    lock.lock();
+                    num_active_workers--;
+                    one_work_completed.notify_one();
+                    lock.unlock();
+                }
+            });
+        }
+    }
+    void ThreadPool::enqueue(TaskFunc func) {
+        std::unique_lock<std::mutex> lock(work_m);
+        works.emplace_back(std::move(func));
+        has_work.notify_all();
+    }
+    void ThreadPool::wait() {
+        std::unique_lock<std::mutex> lock(work_m);
+        one_work_completed.wait(lock, [=] { return works.empty() && num_active_workers.load() == 0; });
+    }
 } // namespace akari::thread
