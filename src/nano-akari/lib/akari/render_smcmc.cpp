@@ -41,6 +41,8 @@ namespace akari::render {
             TileEstimator mcmc_estimate, mc_estimate;
             CoherentSamples current;
             uint32_t n_mc_estimates = 0, n_mcmc_estimates = 0;
+            double average_mc = -1;
+            double average_unscaled_mcmc = -1;
             double b = 0.0;
         };
     } // namespace smcmc
@@ -58,15 +60,24 @@ namespace akari::render {
             ivec2(0, 0), ivec2(0, 1), ivec2(0, -1), ivec2(1, 0), ivec2(-1, 0),
         };
         std::unordered_map<ivec2, int, IVec2Hash, IVec2Equal> offset2index;
+        std::vector<int> _offset2index_fast(9);
         for (int i = 0; i < 5; i++) {
             offset2index[offsets[i]] = i;
+            int x = offsets[i].x + 1;
+            int y = offsets[i].y + 1;
+            _offset2index_fast[x + y * 3] = i;
         }
+        auto offset2index_fast = [&](ivec2 off) {
+            int x = off.x + 1;
+            int y = off.y + 1;
+            return _offset2index_fast[x + y * 3];
+        };
         astd::pmr::monotonic_buffer_resource _buffer(astd::pmr::new_delete_resource());
         astd::pmr::vector<ivec2> overlapped_tile_offsets((Allocator<>(&_buffer)));
         std::unordered_map<ivec2, astd::pmr::vector<int>, IVec2Hash, IVec2Equal,
                            Allocator<std::pair<const ivec2, astd::pmr::vector<int>>>>
             overlapped_pixel_indices((Allocator<std::pair<const ivec2, astd::pmr::vector<int>>>(&_buffer)));
-
+        std::unordered_map<ivec2, astd::pmr::vector<ivec2>, IVec2Hash, IVec2Equal> _overlapped_tile_by_pixel;
         {
             for (int x = -2; x <= 2; x++) {
                 for (int y = -2; y <= 2; y++) {
@@ -87,6 +98,41 @@ namespace akari::render {
                 }
             }
         }
+
+        {
+            for (const auto &t_off : overlapped_tile_offsets) {
+                for (const auto &i : overlapped_pixel_indices[t_off]) {
+                    auto off = offsets[i];
+                    auto &vec = _overlapped_tile_by_pixel[off];
+                    auto found = false;
+                    for (auto &t : vec) {
+                        if (glm::all(glm::equal(t, t_off))) {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found)
+                        vec.push_back(t_off);
+                }
+            }
+        }
+        astd::pmr::vector<std::pair<ivec2, astd::pmr::vector<ivec2>>> overlapped_tile_by_pixel((Allocator<>(&_buffer)));
+        {
+            for (auto &[off, vec] : _overlapped_tile_by_pixel) {
+                astd::pmr::vector<ivec2> cp((Allocator<>(&_buffer)));
+                for (auto i : vec) {
+                    cp.push_back(i);
+                }
+                overlapped_tile_by_pixel.emplace_back(off, std::move(vec));
+            }
+        }
+        // {
+        //     for (auto &[off, vec] : overlapped_tile_by_pixel) {
+        //         for (auto &t_off : vec) {
+        //             spdlog::info("{} {} : {} {}", off.x, off.y, t_off.x, t_off.y);
+        //         }
+        //     }
+        // }
         auto run_uniform_global_mcmc = [&](PTConfig config, Allocator<> allocator, Sampler &sampler) {
             sampler.start_next_sample();
             ivec2 p_center =
@@ -172,7 +218,7 @@ namespace akari::render {
             // }
             // AKR_ASSERT(false);
             auto off = p - state.p_center;
-            int i = offset2index.at(off);
+            int i = offset2index_fast(off);
             return state.mcmc_estimate[i].radiance / state.n_mcmc_estimates;
         };
         auto mc_estimator = [&](const Tile &state, const ivec2 &p) -> Spectrum {
@@ -183,7 +229,7 @@ namespace akari::render {
             // }
             // AKR_ASSERT(false);
             auto off = p - state.p_center;
-            int i = offset2index.at(off);
+            int i = offset2index_fast(off);
             if (state.n_mc_estimates == 0) {
                 return Spectrum(0.0);
             }
@@ -377,18 +423,87 @@ namespace akari::render {
             }
         };
         auto for_each_overlapped_tile_pixel = [&](const Tile &s, auto &&F) {
-            for (const auto &off : overlapped_tile_offsets) {
-                auto id = off + s.p_center;
-                if (glm::any(glm::lessThan(id, ivec2(0))) || glm::any(glm::greaterThanEqual(id, tiles.dimension()))) {
-                    continue;
-                }
-                auto &t = tiles(id);
-                for (const auto &i : overlapped_pixel_indices[off]) {
-                    F(t, s.p_center + offsets[i]);
+            // for (const auto &off : overlapped_tile_offsets) {
+            //     auto id = off + s.p_center;
+            //     if (glm::any(glm::lessThan(id, ivec2(0))) || glm::any(glm::greaterThanEqual(id, tiles.dimension())))
+            //     {
+            //         continue;
+            //     }
+            //     auto &t = tiles(id);
+            //     for (const auto &i : overlapped_pixel_indices[off]) {
+            //         F(t, s.p_center + offsets[i]);
+            //     }
+            // }
+            // {
+            //     auto off = ivec2(0, 0);
+            // }
+            {
+                for (const auto &[off, vec] : overlapped_tile_by_pixel) {
+                    const auto id = off + s.p_center;
+                    if (glm::any(glm::lessThan(id, ivec2(0))) ||
+                        glm::any(glm::greaterThanEqual(id, tiles.dimension()))) {
+                        continue;
+                    }
+                    for (const auto &t_off : vec) {
+                        const auto tid = t_off + s.p_center;
+                        if (glm::any(glm::lessThan(tid, ivec2(0))) ||
+                            glm::any(glm::greaterThanEqual(tid, tiles.dimension()))) {
+                            continue;
+                        }
+                        F(tiles(tid), id);
+                    }
                 }
             }
+            // auto do_this = [&](ivec2 t_off, ivec2 off) {
+            //     auto id = off + s.p_center;
+            //     if (glm::any(glm::lessThan(id, ivec2(0))) || glm::any(glm::greaterThanEqual(id, tiles.dimension())))
+            //     {
+            //         return;
+            //     }
+            //     auto tid = t_off + s.p_center;
+            //     if (glm::any(glm::lessThan(tid, ivec2(0))) || glm::any(glm::greaterThanEqual(tid,
+            //     tiles.dimension()))) {
+            //         return;
+            //     }
+            //     F(tiles(tid), id);
+            // };
+            // {
+            //     auto off = ivec2(0, 0);
+            //     do_this(ivec2(0, 1), off);
+            //     do_this(ivec2(0, -1), off);
+            //     do_this(ivec2(1, 0), off);
+            //     do_this(ivec2(-1, 0), off);
+            // }
+            // {
+            //     auto off = ivec2(0, 1);
+            //     do_this(ivec2(-1, 1), off);
+            //     do_this(ivec2(1, 1), off);
+            //     do_this(ivec2(0, 1), off);
+            //     do_this(ivec2(0, 2), off);
+            // }
+            // {
+            //     auto off = ivec2(0, -1);
+            //     do_this(ivec2(-1, -1), off);
+            //     do_this(ivec2(1, -1), off);
+            //     do_this(ivec2(0, -1), off);
+            //     do_this(ivec2(0, -2), off);
+            // }
+            // {
+            //     auto off = ivec2(1, 0);
+            //     do_this(ivec2(1, -1), off);
+            //     do_this(ivec2(1, 1), off);
+            //     do_this(ivec2(1, 0), off);
+            //     do_this(ivec2(2, 0), off);
+            // }
+            // {
+            //     auto off = ivec2(-1, 0);
+            //     do_this(ivec2(-1, -1), off);
+            //     do_this(ivec2(-1, 1), off);
+            //     do_this(ivec2(-1, 0), off);
+            //     do_this(ivec2(-2, 0), off);
+            // }
         };
-        auto average_tile_unscaled_mcmc = [&](const Tile &s) {
+        auto _average_tile_unscaled_mcmc = [&](const Tile &s) {
             double avg = 0.0;
             for (auto &r : s.mcmc_estimate) {
                 avg += T(r.radiance);
@@ -398,8 +513,10 @@ namespace akari::render {
                 avg /= s.n_mcmc_estimates;
             return avg;
         };
-        auto average_tile_mcmc = [&](const Tile &s) { return average_tile_unscaled_mcmc(s) * s.b; };
-        auto average_tile_mc = [&](const Tile &s) {
+        auto average_tile_unscaled_mcmc = [&](const Tile &s) { return s.average_unscaled_mcmc; };
+        auto average_tile_mcmc = [&](const Tile &s) { return s.average_unscaled_mcmc * s.b; };
+        auto average_tile_mc = [&](const Tile &s) { return s.average_mc; };
+        auto _average_tile_mc = [&](const Tile &s) {
             double avg = 0.0;
             for (auto &r : s.mc_estimate) {
                 avg += T(r.radiance);
@@ -429,7 +546,9 @@ namespace akari::render {
         error.fill(0);
         thread::parallel_for(thread::blocked_range<2>(tiles.dimension(), ivec2(16, 16)), [&](ivec2 id, uint32_t tid) {
             auto &s = tiles(id);
-            s.b = average_tile_mc(s);
+            s.average_mc = _average_tile_mc(s);
+            s.b = s.average_mc;
+            s.average_unscaled_mcmc = _average_tile_unscaled_mcmc(s);
         });
         auto bs = rgb_image(tiles.dimension());
         auto mcmc = rgb_image(tiles.dimension());
@@ -440,16 +559,15 @@ namespace akari::render {
             if (n % 50 == 0) {
                 spdlog::info("updating error");
                 thread::parallel_for( //
-                    thread::blocked_range<2>(tiles.dimension(), ivec2(16, 16)),
+                    thread::blocked_range<2>(tiles.dimension(), ivec2(32)),
                     [&](ivec2 id, uint32_t tid) { error(id) = e(tiles(id)); });
             }
+            auto b1_b2n = beta1 * std::pow(beta2, n);
             Timer timer;
             timer.start();
             thread::parallel_for( //
-                thread::blocked_range<2>(tiles.dimension(), ivec2(16, 16)), [&](ivec2 id, uint32_t tid) {
-                    const auto w1 = [&](const Tile &s) {
-                        return 1.0 / (error(s.p_center) + beta1 * std::pow(beta2, n));
-                    };
+                thread::blocked_range<2>(tiles.dimension(), ivec2(32)), [&](ivec2 id, uint32_t tid) {
+                    const auto w1 = [&](const Tile &s) { return 1.0 / (error(s.p_center) + b1_b2n); };
                     const auto w2 = [&](const Tile &s, const Tile &t) { return std::min(w1(s), w1(t)); };
                     auto &s = tiles(id);
                     double inc_b = 0.0;
@@ -474,18 +592,18 @@ namespace akari::render {
                     inc_bs(id, 1) = inc_b_denom;
                 });
             timer.stop();
-            spdlog::info("iter take {}s", timer.elapsed_seconds());
+            // spdlog::info("iter take {}s", timer.elapsed_seconds());
             if (n % 50 == 0)
                 spdlog::info("iter={}", n);
-            thread::parallel_for( //
-                thread::blocked_range<2>(tiles.dimension(), ivec2(16, 16)), [&](ivec2 id, uint32_t tid) {
-                    auto &s = tiles(id);
-                    s.b = new_b(id);
-                    for (int i = 0; i < 3; i++) {
-                        bs(id, i) = s.b;
-                        mcmc(id, i) = average_tile_mcmc(s);
-                    }
-                });
+            // thread::parallel_for( //
+            //     thread::blocked_range<2>(tiles.dimension(), ivec2(16, 16)), [&](ivec2 id, uint32_t tid) {
+            //         auto &s = tiles(id);
+            //         s.b = new_b(id);
+            //         for (int i = 0; i < 3; i++) {
+            //             bs(id, i) = s.b;
+            //             mcmc(id, i) = average_tile_mcmc(s);
+            //         }
+            //     });
             // write_hdr(inc_bs, fmt::format("inc_b{}.exr", n));
             // write_hdr(bs, fmt::format("b{}.exr", n));
             // write_hdr(mcmc, fmt::format("mcmc{}.exr", n));
