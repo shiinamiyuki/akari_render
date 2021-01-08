@@ -15,6 +15,7 @@
 #include <akari/util.h>
 #include <akari/render_ppg.h>
 #include <spdlog/spdlog.h>
+#include <numeric>
 
 namespace akari::render {
     namespace ppg {
@@ -389,7 +390,23 @@ namespace akari::render {
                         variance(id) = var.variance().value();
                 });
             if (samples >= 2) {
-                Spectrum avg_var = variance.sum() / hprod(variance.dimension());
+                const size_t Q1 = hprod(variance.dimension()) / 8;
+                const size_t Q2 = hprod(variance.dimension()) - Q1;
+                const size_t Q = Q2 - Q1;
+                std::array<std::vector<Float>, Spectrum::size> V;
+                Spectrum avg_var;
+                for (int c = 0; c < Spectrum::size; c++) {
+                    V[c].resize(hprod(variance.dimension()));
+                    thread::parallel_for(thread::blocked_range<2>(film.resolution(), ivec2(16, 16)),
+                                         [&](ivec2 id, uint32_t tid) {
+                                             auto i = id.x + id.y * film.resolution().x;
+                                             V[c][i] = variance(id)[c];
+                                         });
+                    std::sort(V[c].begin(), V[c].end());
+                    avg_var[c] = std::accumulate(V[c].begin() + Q1, V[c].begin() + Q2, 0.0) / Q;
+                }
+
+                // Spectrum avg_var = variance.sum() / hprod(variance.dimension());
                 all_samples.emplace_back(std::move(film.to_array2d()), avg_var);
                 spdlog::info("variance: {}", average(avg_var));
             }
@@ -416,7 +433,7 @@ namespace akari::render {
         {
             int cnt = 0;
             for (auto it = all_samples.rbegin(); cnt < 4 && it != all_samples.rend(); it++) {
-                auto var = std::clamp<Float>(average(it->second), 1e-6, 1e5);
+                auto var = std::clamp<Float>(average(it->second), 1e-10, 1e5);
                 auto weight = 1.0 / var;
                 sum += it->first * Spectrum(weight);
                 sum_weights += weight;

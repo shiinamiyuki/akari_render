@@ -15,6 +15,7 @@
 #include <akari/util.h>
 #include <akari/api.h>
 #include <akari/render.h>
+#include <akari/render_ppg.h>
 #include <spdlog/spdlog.h>
 namespace akari::render {
     Spectrum FresnelNoOp::evaluate(Float cosThetaI) const { return Spectrum(1.0f); }
@@ -54,24 +55,21 @@ namespace akari::render {
     [[nodiscard]] Float MixBSDF::evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const {
         return (1.0 - fraction) * bsdf_A->evaluate_pdf(wo, wi) + fraction * bsdf_B->evaluate_pdf(wo, wi);
     }
-    [[nodiscard]] Spectrum MixBSDF::evaluate(const Vec3 &wo, const Vec3 &wi) const {
-        return (1.0 - fraction) * bsdf_A->evaluate(wo, wi) + fraction * bsdf_B->evaluate(wo, wi);
+    [[nodiscard]] BSDFValue MixBSDF::evaluate(const Vec3 &wo, const Vec3 &wi) const {
+        return BSDFValue::mix(fraction, bsdf_A->evaluate(wo, wi), bsdf_B->evaluate(wo, wi));
     }
     [[nodiscard]] BSDFType MixBSDF::type() const { return BSDFType(bsdf_A->type() | bsdf_B->type()); }
     std::optional<BSDFSample> MixBSDF::sample(const vec2 &u, const Vec3 &wo) const {
         BSDFSample sample;
         std::optional<BSDFSample> inner_sample;
-        Float pdf_select = 0;
-        bool sel = true;
+        bool selA = true;
         if (u[0] < fraction) {
             vec2 u_(u[0] / fraction, u[1]);
-            pdf_select = fraction;
             inner_sample = bsdf_B->sample(u_, wo);
+            selA = false;
         } else {
             vec2 u_((u[0] - fraction) / (1.0 - fraction), u[1]);
-            pdf_select = 1.0 - fraction;
             inner_sample = bsdf_A->sample(u_, wo);
-            sel = false;
         }
         if (!inner_sample) {
             return std::nullopt;
@@ -80,17 +78,16 @@ namespace akari::render {
             sample = *inner_sample;
             // AKR_ASSERT(sample.pdf >= 0.0);
             // AKR_ASSERT(pdf_select >= 0.0);
-            sample.pdf *= pdf_select;
             // AKR_ASSERT(sample.pdf >= 0.0);
             return sample;
         } else {
             sample = *inner_sample;
-            if (sel) {
-                sample.f = sample.f + fraction * bsdf_B->evaluate(wo, sample.wi);
-                sample.pdf = sample.pdf + fraction * bsdf_B->evaluate_pdf(wo, sample.wi);
+            if (selA) {
+                sample.f = BSDFValue::mix(fraction, sample.f, bsdf_B->evaluate(wo, sample.wi));
+                sample.pdf = (1.0 - fraction) * sample.pdf + fraction * bsdf_B->evaluate_pdf(wo, sample.wi);
             } else {
-                sample.f = sample.f + (1.0 - fraction) * bsdf_A->evaluate(wo, sample.wi);
-                sample.pdf = sample.pdf + (1.0 - fraction) * bsdf_A->evaluate_pdf(wo, sample.wi);
+                sample.f = BSDFValue::mix(fraction, bsdf_A->evaluate(wo, sample.wi), sample.f);
+                sample.pdf = fraction * sample.pdf + (1.0 - fraction) * bsdf_A->evaluate_pdf(wo, sample.wi);
             }
             return sample;
         }
@@ -258,6 +255,14 @@ namespace akari {
             config.sampler = render::PCGSampler();
             auto film = render::render_pt(config, *scene);
             auto image = film.to_rgb_image();
+            write_ldr(image, "out.png");
+        } else if (auto gpt = graph->integrator->as<scene::GuidedPathTracer>()) {
+            render::PPGConfig config;
+            config.min_depth = gpt->min_depth;
+            config.max_depth = gpt->max_depth;
+            config.spp = gpt->spp;
+            config.sampler = render::PCGSampler();
+            auto image = render::render_ppg(config, *scene);
             write_ldr(image, "out.png");
         } else if (auto vpl = graph->integrator->as<scene::VPL>()) {
             render::IRConfig config;

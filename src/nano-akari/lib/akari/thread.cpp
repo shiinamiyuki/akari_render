@@ -146,9 +146,10 @@ namespace akari::thread {
                     }
                     if (stopped)
                         return;
+                    num_active_workers++;
                     auto work = std::move(works.front());
                     works.pop_front();
-                    num_active_workers++;
+
                     lock.unlock();
                     work();
                     lock.lock();

@@ -767,9 +767,27 @@ namespace akari::render {
     AKR_XPU inline BSDFType operator&(BSDFType a, BSDFType b) { return BSDFType((int)a & (int)b); }
     AKR_XPU inline BSDFType operator|(BSDFType a, BSDFType b) { return BSDFType((int)a | (int)b); }
     AKR_XPU inline BSDFType operator~(BSDFType a) { return BSDFType(~(uint32_t)a); }
+
+    struct BSDFValue {
+        Spectrum diffuse;
+        Spectrum glossy;
+        Spectrum specular;
+        static BSDFValue zero() { return BSDFValue{Spectrum(0.0), Spectrum(0.0), Spectrum(0.0)}; }
+        static BSDFValue with_diffuse(Spectrum diffuse) { return BSDFValue{diffuse, Spectrum(0.0), Spectrum(0.0)}; }
+        static BSDFValue with_glossy(Spectrum glossy) { return BSDFValue{Spectrum(0.0), glossy, Spectrum(0.0)}; }
+        static BSDFValue with_specular(Spectrum specular) { return BSDFValue{Spectrum(0.0), Spectrum(0.0), specular}; }
+        // linear interpolation
+        static BSDFValue mix(Float alpha, const BSDFValue &x, BSDFValue &y) {
+            return BSDFValue{(1.0f - alpha) * x.diffuse + alpha * y.diffuse,
+                             (1.0f - alpha) * x.glossy + alpha * y.glossy,
+                             (1.0f - alpha) * x.specular + alpha * y.specular};
+        }
+        Spectrum operator()() const { return diffuse + glossy + specular; }
+    };
+
     struct BSDFSample {
         Vec3 wi;
-        Spectrum f;
+        BSDFValue f = BSDFValue::zero();
         Float pdf = 0.0;
         BSDFType type = BSDFType::Unset;
     };
@@ -786,12 +804,12 @@ namespace akari::render {
             }
             return 0.0f;
         }
-        [[nodiscard]] Spectrum evaluate(const Vec3 &wo, const Vec3 &wi) const {
+        [[nodiscard]] BSDFValue evaluate(const Vec3 &wo, const Vec3 &wi) const {
 
             if (same_hemisphere(wo, wi)) {
-                return R * InvPi;
+                return BSDFValue::with_diffuse(R * InvPi);
             }
-            return Spectrum(0.0f);
+            return BSDFValue::with_diffuse(Spectrum(0.0f));
         }
         [[nodiscard]] BSDFType type() const { return BSDFType::DiffuseReflection; }
         std::optional<BSDFSample> sample(const vec2 &u, const Vec3 &wo) const {
@@ -802,7 +820,7 @@ namespace akari::render {
             }
             sample.type = type();
             sample.pdf = cosine_hemisphere_pdf(std::abs(cos_theta(sample.wi)));
-            sample.f = R * InvPi;
+            sample.f = BSDFValue::with_diffuse(R * InvPi);
             return sample;
         }
     };
@@ -821,25 +839,25 @@ namespace akari::render {
             }
             return 0.0f;
         }
-        [[nodiscard]] Spectrum evaluate(const Vec3 &wo, const Vec3 &wi) const {
+        [[nodiscard]] BSDFValue evaluate(const Vec3 &wo, const Vec3 &wi) const {
             if (same_hemisphere(wo, wi)) {
                 Float cosThetaO = abs_cos_theta(wo);
                 Float cosThetaI = abs_cos_theta(wi);
                 auto wh = (wo + wi);
                 if (cosThetaI == 0 || cosThetaO == 0)
-                    return Spectrum(0);
+                    return BSDFValue::zero();
                 if (wh.x == 0 && wh.y == 0 && wh.z == 0)
-                    return Spectrum(0);
+                    return BSDFValue::zero();
                 wh = normalize(wh);
                 if (wh.y < 0) {
                     wh = -wh;
                 }
                 auto F = 1.0f; // fresnel->evaluate(dot(wi, wh));
 
-                return R * (microfacet_D(model, wh) * microfacet_G(model, wo, wi, wh) * F /
-                            (Float(4.0f) * cosThetaI * cosThetaO));
+                return BSDFValue::with_glossy(R * (microfacet_D(model, wh) * microfacet_G(model, wo, wi, wh) * F /
+                                                   (Float(4.0f) * cosThetaI * cosThetaO)));
             }
-            return Spectrum(0.0f);
+            return BSDFValue::zero();
         }
         [[nodiscard]] BSDFType type() const { return BSDFType::GlossyReflection; }
         [[nodiscard]] std::optional<BSDFSample> sample(const vec2 &u, const Vec3 &wo) const {
@@ -901,7 +919,7 @@ namespace akari::render {
             sample.wi = glm::reflect(-wo, vec3(0, 1, 0));
             sample.type = type();
             sample.pdf = 1.0;
-            sample.f = R / (std::abs(cos_theta(sample.wi)));
+            sample.f = BSDFValue::with_specular(R / (std::abs(cos_theta(sample.wi))));
             return sample;
         }
     };
@@ -924,7 +942,7 @@ namespace akari::render {
             sample.wi = *wt;
             sample.type = type();
             sample.pdf = 1.0;
-            sample.f = R / (std::abs(cos_theta(sample.wi)));
+            sample.f = BSDFValue::with_specular(R / (std::abs(cos_theta(sample.wi))));
             return sample;
         }
     };
@@ -950,10 +968,16 @@ namespace akari::render {
         MixBSDF(Float fraction, const BSDFClosure *bsdf_A, const BSDFClosure *bsdf_B)
             : fraction(fraction), bsdf_A(bsdf_A), bsdf_B(bsdf_B) {}
         [[nodiscard]] Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const;
-        [[nodiscard]] Spectrum evaluate(const Vec3 &wo, const Vec3 &wi) const;
+        [[nodiscard]] BSDFValue evaluate(const Vec3 &wo, const Vec3 &wi) const;
         [[nodiscard]] BSDFType type() const;
         std::optional<BSDFSample> sample(const vec2 &u, const Vec3 &wo) const;
     };
+
+    /*
+    All BSDFClosure except MixBSDF must have *only* one of Diffuse, Glossy, Specular
+
+
+    */
     class BSDFClosure : public Variant<DiffuseBSDF, MicrofacetReflection, SpecularReflection, SpecularTransmission,
                                        FresnelSpecular, MixBSDF> {
       public:
@@ -961,7 +985,7 @@ namespace akari::render {
         [[nodiscard]] Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const {
             AKR_VAR_DISPATCH(evaluate_pdf, wo, wi);
         }
-        [[nodiscard]] Spectrum evaluate(const Vec3 &wo, const Vec3 &wi) const { AKR_VAR_DISPATCH(evaluate, wo, wi); }
+        [[nodiscard]] BSDFValue evaluate(const Vec3 &wo, const Vec3 &wi) const { AKR_VAR_DISPATCH(evaluate, wo, wi); }
         [[nodiscard]] BSDFType type() const { AKR_VAR_DISPATCH(type); }
         [[nodiscard]] bool match_flags(BSDFType flag) const { return ((uint32_t)type() & (uint32_t)flag) != 0; }
         [[nodiscard]] std::optional<BSDFSample> sample(const vec2 &u, const Vec3 &wo) const {
@@ -988,7 +1012,7 @@ namespace akari::render {
             auto pdf = closure().evaluate_pdf(frame.world_to_local(wo), frame.world_to_local(wi));
             return pdf * choice_pdf;
         }
-        [[nodiscard]] Spectrum evaluate(const Vec3 &wo, const Vec3 &wi) const {
+        [[nodiscard]] BSDFValue evaluate(const Vec3 &wo, const Vec3 &wi) const {
             auto f = closure().evaluate(frame.world_to_local(wo), frame.world_to_local(wi));
             return f;
         }
@@ -1294,7 +1318,7 @@ namespace akari::render {
         int spp = 16;
     };
     Film render_pt(PTConfig config, const Scene &scene);
-    Image render_pt_psd(PTConfig config, PSDConfig psd_config, const Scene & scene);
+    Image render_pt_psd(PTConfig config, PSDConfig psd_config, const Scene &scene);
 
     // separate emitter direct hit
     // useful for MLT

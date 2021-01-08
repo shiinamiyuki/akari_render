@@ -131,6 +131,11 @@ namespace akari::python {
             .def_readwrite("spp", &PathTracer::spp)
             .def_readwrite("min_depth", &PathTracer::min_depth)
             .def_readwrite("max_depth", &PathTracer::max_depth);
+        py::class_<GuidedPathTracer, Integrator, P<GuidedPathTracer>>(m, "GuidedPathTracer")
+            .def(py::init<>())
+            .def_readwrite("spp", &GuidedPathTracer::spp)
+            .def_readwrite("min_depth", &GuidedPathTracer::min_depth)
+            .def_readwrite("max_depth", &GuidedPathTracer::max_depth);
         py::class_<SMCMC, Integrator, P<SMCMC>>(m, "SMCMC")
             .def(py::init<>())
             .def_readwrite("spp", &SMCMC::spp)

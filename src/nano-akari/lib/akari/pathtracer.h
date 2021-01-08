@@ -20,8 +20,16 @@
 namespace akari::render ::pt {
     struct DirectLighting {
         Ray shadow_ray;
-        Spectrum color;
-        Float pdf;
+        Vec3 wi = Vec3(0.0);
+        Spectrum radiance;
+        Spectrum throughput = Spectrum(0.0);
+        Float pdf = 0.0;
+    };
+
+    struct HitLight {
+        Vec3 wo;
+        const Light *light = nullptr;
+        Spectrum I = Spectrum(0.0);
     };
 
     struct SurfaceVertex {
@@ -67,20 +75,79 @@ namespace akari::render ::pt {
             });
         }
     };
-
-    // Basic Path Tracing
-    class GenericPathTracer {
-      public:
+    struct PathTracerBase {
         const Scene *scene = nullptr;
         Sampler *sampler = nullptr;
-        Spectrum L;
+        Spectrum L = Spectrum(0.0);
         Spectrum emitter_direct;
         Spectrum beta = Spectrum(1.0f);
         Allocator<> allocator;
         int depth = 0;
         int min_depth = 5;
         int max_depth = 5;
+        PathTracerBase(const Scene *scene, Sampler *sampler, Allocator<> alloc, int min_depth, int max_depth)
+            : scene(scene), sampler(sampler), allocator(alloc), min_depth(min_depth), max_depth(max_depth) {}
+    };
+    // Basic Path Tracing
+    /*
+    class PathVisitor {
+    public:
+        explicit PathVisitor(PathTracerBase *);
 
+        // return true for accepting the scattering
+        bool on_scatter(const PathVertex & cur, const std::optional<PathVertex> &prev);
+        bool on_hit_light(const std::optional<PathVertex> &prev, const HitLight & hit);
+        bool on_direct_lighting(const PathVertex & cur, const DirectLighting & direct);
+        bool on_miss(const std::optional<PathVertex> &prev, const Ray & ray);
+        bool on_advance_path(const PathVertex &cur, const Ray &ray);
+    };
+    */
+    class NullPathVisitor {
+      public:
+        explicit NullPathVisitor(PathTracerBase *) {}
+
+        // return true for accepting the scattering
+        bool on_scatter(const PathVertex &cur, const std::optional<PathVertex> &prev) { return true; }
+        bool on_direct_lighting(const PathVertex &cur, const DirectLighting &direct) { return true; }
+        bool on_miss(const std::optional<PathVertex> &prev, const Ray &ray) { return true; }
+        bool on_hit_light(const std::optional<PathVertex> &prev, const HitLight &hit) { return true; }
+        bool on_advance_path(const PathVertex &cur, const Ray &ray) { return true; }
+    };
+
+    class SeparateEmitPathVisitor {
+        PathTracerBase *pt;
+
+      public:
+        Spectrum emitter_direct;
+        explicit SeparateEmitPathVisitor(PathTracerBase *pt) : pt(pt) {}
+
+        // return true for accepting the scattering
+        bool on_scatter(const PathVertex &cur, const std::optional<PathVertex> &prev) { return true; }
+        bool on_direct_lighting(const PathVertex &cur, const DirectLighting &direct) { return true; }
+        bool on_miss(const std::optional<PathVertex> &prev, const Ray &ray) { return true; }
+        bool on_hit_light(const std::optional<PathVertex> &prev, const HitLight &hit) {
+            if (pt->depth == 0) {
+                emitter_direct = hit.I;
+            }
+        }
+        bool on_advance_path(const PathVertex &cur, const Ray &ray) { return true; }
+    };
+    enum class AOVKind {
+        Emission,
+        Normal,
+        DiffuseAlbedo,
+        DiffuseDirect,
+        DiffuseIndirect,
+        Specular,// Specular + Glossy
+        NAOVKind
+    };
+    struct AOVs : std::array<Spectrum, (int)AOVKind::NAOVKind> {};
+    template <class PathVisitor = NullPathVisitor>
+    class GenericPathTracer : public PathTracerBase {
+      public:
+        PathVisitor visitor;
+        GenericPathTracer(const Scene *scene, Sampler *sampler, Allocator<> alloc, int min_depth, int max_depth)
+            : PathTracerBase(scene, sampler, alloc, min_depth, max_depth), visitor(this) {}
         static Float mis_weight(Float pdf_A, Float pdf_B) {
             pdf_A *= pdf_A;
             pdf_B *= pdf_B;
@@ -107,13 +174,18 @@ namespace akari::render ::pt {
                 if (light_sample.pdf <= 0.0)
                     return std::nullopt;
                 light_pdf *= light_sample.pdf;
-                auto f = light_sample.I * vertex.bsdf->evaluate(vertex.wo, light_sample.wi) *
-                         std::abs(dot(si.ns, light_sample.wi));
+                auto f = vertex.bsdf->evaluate(vertex.wo, light_sample.wi);
                 Float bsdf_pdf = vertex.bsdf->evaluate_pdf(vertex.wo, light_sample.wi);
-                lighting.color = f / light_pdf * mis_weight(light_pdf, bsdf_pdf);
+                lighting.throughput = light_sample.I * std::abs(dot(si.ns, light_sample.wi)) / light_pdf *
+                                      mis_weight(light_pdf, bsdf_pdf);
+                lighting.radiance = f * lighting.throughput;
                 lighting.shadow_ray = light_sample.shadow_ray;
                 lighting.pdf = light_pdf;
-                return lighting;
+                lighting.wi = light_sample.wi;
+                if (visitor.on_direct_lighting(vertex, lighting)) {
+                    return lighting;
+                }
+                return std::nullopt;
             } else {
                 return std::nullopt;
             }
@@ -131,21 +203,20 @@ namespace akari::render ::pt {
                           const std::optional<PathVertex> &prev_vertex) {
             Spectrum I = beta * light->Le(wo, sp);
             if (depth == 0 || BSDFType::Unset != (prev_vertex->sampled_lobe() & BSDFType::Specular)) {
-                if (depth == 0) {
-                    emitter_direct = I;
-                }
-                accumulate_radiance(I);
+                ;
             } else {
                 PointGeometry ref;
                 ref.n = prev_vertex->ng();
                 ref.p = prev_vertex->p();
                 auto light_pdf = light->pdf_incidence(ref, -wo) * scene->light_sampler->pdf(light);
-                if ((prev_vertex->sampled_lobe() & BSDFType::Specular) != BSDFType::Unset) {
-                    accumulate_radiance(I);
-                } else {
+                if ((prev_vertex->sampled_lobe() & BSDFType::Specular) == BSDFType::Unset) {
                     Float weight_bsdf = mis_weight(prev_vertex->pdf(), light_pdf);
-                    accumulate_radiance(weight_bsdf * I);
+                    I *= weight_bsdf;
                 }
+            }
+            HitLight hit{wo, light, I};
+            if (visitor.on_hit_light(prev_vertex, hit)) {
+                accumulate_radiance(I);
             }
         }
         void accumulate_beta(const Spectrum &k) { beta *= k; }
@@ -187,7 +258,7 @@ namespace akari::render ::pt {
                 }
                 auto wo = -ray.d;
                 auto vertex = on_surface_scatter(wo, *si, prev_vertex);
-                if (!vertex) {
+                if (!vertex || !visitor.on_scatter(vertex, prev_vertex)) {
                     break;
                 }
                 if ((vertex->sampled_lobe & BSDFType::Specular) == BSDFType::Unset) {
@@ -210,6 +281,9 @@ namespace akari::render ::pt {
                     }
                 }
                 ray = vertex->ray;
+                if (!visitor.on_advance_path(*vertex, ray)) {
+                    break;
+                }
                 prev_vertex = PathVertex(*vertex);
             }
         }
@@ -225,14 +299,14 @@ namespace akari::render ::pt {
 namespace akari::render {
     Spectrum pt_estimator(PTConfig config, const Scene &scene, Allocator<> alloc, Sampler &sampler, Ray &ray,
                           std::optional<pt::PathVertex> prev_vertex) {
-        pt::GenericPathTracer pt;
-        pt.min_depth = config.min_depth;
-        pt.max_depth = config.max_depth;
-        pt.L = Spectrum(0.0);
-        pt.beta = Spectrum(1.0);
-        pt.sampler = &sampler;
-        pt.scene = &scene;
-        pt.allocator = alloc;
+        pt::GenericPathTracer<> pt(&scene, &sampler, alloc, config.min_depth, config.max_depth);
+        // pt.min_depth = config.min_depth;
+        // pt.max_depth = config.max_depth;
+        // pt.L = Spectrum(0.0);
+        // pt.beta = Spectrum(1.0);
+        // pt.sampler = &sampler;
+        // pt.scene = &scene;
+        // pt.allocator = alloc;
         pt.run_megakernel(ray, prev_vertex);
         return pt.L;
     }

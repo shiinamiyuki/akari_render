@@ -21,17 +21,11 @@ namespace akari::render {
     std::pair<Spectrum, Spectrum> render_pt_pixel_separete_emitter_direct(PTConfig config, Allocator<> allocator,
                                                                           const Scene &scene, Sampler &sampler,
                                                                           const vec2 &p_film) {
-        pt::GenericPathTracer pt;
-        pt.min_depth = config.min_depth;
-        pt.max_depth = config.max_depth;
-        pt.L = Spectrum(0.0);
-        pt.beta = Spectrum(1.0);
-        pt.sampler = &sampler;
-        pt.scene = &scene;
-        pt.allocator = allocator;
+        pt::GenericPathTracer<pt::SeparateEmitPathVisitor> pt(&scene, &sampler, allocator, config.min_depth,
+                                                              config.max_depth);
         pt.run_megakernel(&scene.camera.value(), p_film);
         AKR_ASSERT(hmax(pt.L) >= 0.0 && hmax(pt.emitter_direct) >= 0.0);
-        return std::make_pair(pt.emitter_direct, pt.L);
+        return std::make_pair(pt.visitor.emitter_direct, pt.L);
     }
     Film render_pt(PTConfig config, const Scene &scene) {
         Film film(scene.camera->resolution());
