@@ -129,6 +129,7 @@ namespace akari::render ::pt {
             if (pt->depth == 0) {
                 emitter_direct = hit.I;
             }
+            return true;
         }
         bool on_advance_path(const PathVertex &cur, const Ray &ray) { return true; }
     };
@@ -174,7 +175,7 @@ namespace akari::render ::pt {
                 if (light_sample.pdf <= 0.0)
                     return std::nullopt;
                 light_pdf *= light_sample.pdf;
-                auto f = vertex.bsdf->evaluate(vertex.wo, light_sample.wi);
+                auto f = vertex.bsdf->evaluate(vertex.wo, light_sample.wi)();
                 Float bsdf_pdf = vertex.bsdf->evaluate_pdf(vertex.wo, light_sample.wi);
                 lighting.throughput = light_sample.I * std::abs(dot(si.ns, light_sample.wi)) / light_pdf *
                                       mis_weight(light_pdf, bsdf_pdf);
@@ -241,7 +242,7 @@ namespace akari::render ::pt {
                 }
                 vertex.bsdf = bsdf;
                 vertex.ray = Ray(si.p, sample->wi, Eps / std::abs(glm::dot(si.ng, sample->wi)));
-                vertex.beta = sample->f * std::abs(glm::dot(si.ns, sample->wi)) / sample->pdf;
+                vertex.beta = sample->f() * std::abs(glm::dot(si.ns, sample->wi)) / sample->pdf;
                 vertex.pdf = sample->pdf;
                 vertex.sampled_lobe = sample->type;
                 return vertex;
@@ -258,15 +259,15 @@ namespace akari::render ::pt {
                 }
                 auto wo = -ray.d;
                 auto vertex = on_surface_scatter(wo, *si, prev_vertex);
-                if (!vertex || !visitor.on_scatter(vertex, prev_vertex)) {
+                if (!vertex || !visitor.on_scatter(*vertex, prev_vertex)) {
                     break;
                 }
                 if ((vertex->sampled_lobe & BSDFType::Specular) == BSDFType::Unset) {
                     std::optional<DirectLighting> has_direct = compute_direct_lighting(*vertex, select_light());
                     if (has_direct) {
                         auto &direct = *has_direct;
-                        if (!is_black(direct.color) && !scene->occlude(direct.shadow_ray)) {
-                            accumulate_radiance(beta * direct.color);
+                        if (!is_black(direct.radiance) && !scene->occlude(direct.shadow_ray)) {
+                            accumulate_radiance(beta * direct.radiance);
                         }
                     }
                 }

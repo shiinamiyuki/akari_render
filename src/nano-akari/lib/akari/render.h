@@ -777,7 +777,7 @@ namespace akari::render {
         static BSDFValue with_glossy(Spectrum glossy) { return BSDFValue{Spectrum(0.0), glossy, Spectrum(0.0)}; }
         static BSDFValue with_specular(Spectrum specular) { return BSDFValue{Spectrum(0.0), Spectrum(0.0), specular}; }
         // linear interpolation
-        static BSDFValue mix(Float alpha, const BSDFValue &x, BSDFValue &y) {
+        static BSDFValue mix(Float alpha, const BSDFValue &x, const BSDFValue &y) {
             return BSDFValue{(1.0f - alpha) * x.diffuse + alpha * y.diffuse,
                              (1.0f - alpha) * x.glossy + alpha * y.glossy,
                              (1.0f - alpha) * x.specular + alpha * y.specular};
@@ -912,7 +912,7 @@ namespace akari::render {
       public:
         SpecularReflection(const Spectrum &R) : R(R) {}
         [[nodiscard]] Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const { return 0.0f; }
-        [[nodiscard]] Spectrum evaluate(const Vec3 &wo, const Vec3 &wi) const { return Spectrum(0.0f); }
+        [[nodiscard]] BSDFValue evaluate(const Vec3 &wo, const Vec3 &wi) const { return BSDFValue::zero(); }
         [[nodiscard]] BSDFType type() const { return BSDFType::SpecularReflection; }
         std::optional<BSDFSample> sample(const vec2 &u, const Vec3 &wo) const {
             BSDFSample sample;
@@ -930,7 +930,7 @@ namespace akari::render {
       public:
         SpecularTransmission(const Spectrum &R, Float eta) : R(R), eta(eta) {}
         [[nodiscard]] Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const { return 0.0f; }
-        [[nodiscard]] Spectrum evaluate(const Vec3 &wo, const Vec3 &wi) const { return Spectrum(0.0f); }
+        [[nodiscard]] BSDFValue evaluate(const Vec3 &wo, const Vec3 &wi) const { return BSDFValue::zero(); }
         [[nodiscard]] BSDFType type() const { return BSDFType::SpecularTransmission; }
         std::optional<BSDFSample> sample(const vec2 &u, const Vec3 &wo) const {
             BSDFSample sample;
@@ -957,7 +957,7 @@ namespace akari::render {
             : R(R), T(T), etaA(etaA), etaB(etaB), fresnel(etaA, etaB) {}
         [[nodiscard]] BSDFType type() const { return BSDFType::SpecularTransmission | BSDFType::SpecularReflection; }
         [[nodiscard]] Float evaluate_pdf(const vec3 &wo, const vec3 &wi) const { return 0; }
-        [[nodiscard]] Spectrum evaluate(const vec3 &wo, const vec3 &wi) const { return Spectrum(0); }
+        [[nodiscard]] BSDFValue evaluate(const vec3 &wo, const vec3 &wi) const { return BSDFValue::zero(); }
         [[nodiscard]] std::optional<BSDFSample> sample(const vec2 &u, const Vec3 &wo) const;
     };
     class MixBSDF {

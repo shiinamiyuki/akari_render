@@ -70,7 +70,7 @@ namespace akari::render {
                 if (sample->pdf == 0.0f) {
                     break;
                 }
-                beta *= sample->f * std::abs(glm::dot(si->ns, sample->wi)) / sample->pdf;
+                beta *= sample->f() * std::abs(glm::dot(si->ns, sample->wi)) / sample->pdf;
                 ray = Ray(si->p, sample->wi, Eps / std::abs(glm::dot(si->ng, sample->wi)));
                 if (depth > config.min_depth) {
                     Float continue_prob = std::min<Float>(1.0, hmax(beta)) * 0.95;
@@ -188,7 +188,7 @@ namespace akari::render {
                             if (light_sample.pdf > 0.0) {
 
                                 light_pdf *= light_sample.pdf;
-                                auto f = light_sample.I * bsdf.evaluate(wo, light_sample.wi) *
+                                auto f = light_sample.I * bsdf.evaluate(wo, light_sample.wi)()*
                                          std::abs(dot(si->ns, light_sample.wi));
                                 Float bsdf_pdf = bsdf.evaluate_pdf(wo, light_sample.wi);
                                 Float weight = [&, light_pdf = light_pdf]() -> Float {
@@ -212,7 +212,7 @@ namespace akari::render {
                         const auto dist_sqr = dot(w0, w0);
                         const auto w = w0 / std::sqrt(dist_sqr);
                         const auto G0 = std::abs(dot(w, vpl.ng) * dot(w, si->ng)) / dist_sqr;
-                        const auto f = bsdf.evaluate(wo, w) * vpl.bsdf->evaluate(vpl.wo, -w);
+                        const auto f = bsdf.evaluate(wo, w)() * vpl.bsdf->evaluate(vpl.wo, -w)();
                         const auto c = max_radiance;
                         const auto b = c / hmax(f);
                         const auto G = std::min(G0, b);
@@ -263,7 +263,7 @@ namespace akari::render {
                         if (sample->pdf == 0.0f) {
                             return;
                         }
-                        beta *= sample->f * std::abs(glm::dot(si->ns, sample->wi)) / sample->pdf;
+                        beta *= sample->f() * std::abs(glm::dot(si->ns, sample->wi)) / sample->pdf;
                         auto next_ray = Ray(si->p, sample->wi, Eps / std::abs(glm::dot(si->ng, sample->wi)),
                                             std::sqrt(1.0 / b) * 1.01);
                         self(next_ray, beta, depth + 1, si, b, sample->pdf, sample->type, self);
@@ -280,7 +280,7 @@ namespace akari::render {
                             if (sample->pdf == 0.0f) {
                                 return;
                             }
-                            beta_bsdf *= sample->f * std::abs(glm::dot(si->ns, sample->wi)) / sample->pdf;
+                            beta_bsdf *= sample->f() * std::abs(glm::dot(si->ns, sample->wi)) / sample->pdf;
                             auto next_ray = Ray(si->p, sample->wi, Eps / std::abs(glm::dot(si->ng, sample->wi)));
                             self(next_ray, beta_bsdf, depth + 1, si, std::nullopt, sample->pdf, sample->type, self);
                         }

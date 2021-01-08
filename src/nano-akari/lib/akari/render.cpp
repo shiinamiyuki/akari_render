@@ -31,7 +31,7 @@ namespace akari::render {
             sample.wi = reflect(-wo, vec3(0, 1, 0));
             sample.pdf = F;
             sample.type = BSDFType::SpecularReflection;
-            sample.f = F * R / abs_cos_theta(sample.wi);
+            sample.f = BSDFValue::with_specular(F * R / abs_cos_theta(sample.wi));
         } else {
             bool entering = cos_theta(wo) > 0;
             Float etaI = entering ? etaA : etaB;
@@ -47,7 +47,7 @@ namespace akari::render {
             ft *= (etaI * etaI) / (etaT * etaT);
             sample.pdf = 1 - F;
             sample.wi = *wt;
-            sample.f = ft / abs_cos_theta(sample.wi);
+            sample.f = BSDFValue::with_specular(ft / abs_cos_theta(sample.wi));
         }
         return sample;
     }

@@ -338,7 +338,7 @@ namespace akari::render {
                     if (light_sample.pdf <= 0.0)
                         return std::nullopt;
                     light_pdf *= light_sample.pdf;
-                    auto f = light_sample.I * vertex.bsdf->evaluate(vertex.wo, light_sample.wi) *
+                    auto f = light_sample.I * vertex.bsdf->evaluate(vertex.wo, light_sample.wi)() *
                              std::abs(dot(si.ns, light_sample.wi));
                     Float bsdf_pdf = vertex.bsdf->evaluate_pdf(vertex.wo, light_sample.wi);
                     lighting.color = f / light_pdf * mis_weight(light_pdf, bsdf_pdf);
@@ -398,7 +398,7 @@ namespace akari::render {
                     }
                     vertex.bsdf = bsdf;
                     vertex.ray = Ray(si.p, sample->wi, Eps / std::abs(glm::dot(si.ng, sample->wi)));
-                    vertex.beta = sample->f * std::abs(glm::dot(si.ns, sample->wi)) / sample->pdf;
+                    vertex.beta = sample->f() * std::abs(glm::dot(si.ns, sample->wi)) / sample->pdf;
                     vertex.pdf = sample->pdf;
                     return vertex;
                 }

@@ -124,7 +124,7 @@ namespace akari::render {
                     if (light_sample.pdf <= 0.0)
                         return std::nullopt;
                     light_pdf *= light_sample.pdf;
-                    auto f = light_sample.I * vertex.bsdf->evaluate(vertex.wo, light_sample.wi) *
+                    auto f = light_sample.I * vertex.bsdf->evaluate(vertex.wo, light_sample.wi)() *
                              std::abs(dot(si.ns, light_sample.wi));
                     const Float bsdfSamplingFraction = 0.5; // dTree->selection_prob();
                     Float bsdf_pdf = vertex.bsdf->evaluate_pdf(vertex.wo, light_sample.wi);
@@ -221,15 +221,15 @@ namespace akari::render {
                     }
                     AKR_ASSERT(!std::isnan(sample->pdf));
                     AKR_ASSERT(sample->pdf >= 0.0);
-                    AKR_ASSERT(hmin(sample->f) >= 0.0f);
+                    AKR_ASSERT(hmin(sample->f()) >= 0.0f);
                     if (std::isnan(sample->pdf) || sample->pdf == 0.0f) {
                         return std::nullopt;
                     }
                     vertex.bsdf = bsdf;
-                    vertex.f = sample->f;
+                    vertex.f = sample->f();
                     vertex.bsdf_pdf = bsdf_pdf;
                     vertex.ray = Ray(si.p, sample->wi, Eps / std::abs(glm::dot(si.ng, sample->wi)));
-                    vertex.beta = sample->f * std::abs(glm::dot(si.ns, sample->wi)) / sample->pdf;
+                    vertex.beta = sample->f() * std::abs(glm::dot(si.ns, sample->wi)) / sample->pdf;
                     vertex.pdf = sample->pdf;
                     vertex.sampled_lobe = sample->type;
                     return vertex;
