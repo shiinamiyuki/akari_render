@@ -20,8 +20,23 @@ namespace akari::render::mlt {
         Spectrum radiance;
     };
     struct MarkovChain {
-        explicit MarkovChain(MLTSampler sampler):sampler(sampler){}
+        explicit MarkovChain(MLTSampler sampler) : sampler(sampler) {}
         Sampler sampler;
         RadianceRecord current;
     };
+    inline auto T(const Spectrum &s) { return hmax(s); };
+    struct MLTStats {
+        AtomicDouble acc_b;
+        std::atomic_uint64_t n_large;
+        std::atomic_uint64_t accepts, rejects;
+        MLTStats() : acc_b(0.0), n_large(0), accepts(0), rejects(0) {}
+    };
 } // namespace akari::render::mlt
+
+namespace akari::render {
+    void accept_markov_chain_and_splat(mlt::MLTStats &stats, Rng &rng, const mlt::RadianceRecord &proposal,
+                                       mlt::MarkovChain &chain, Film &film);
+    std::pair<std::vector<mlt::MarkovChain>, double>
+    init_markov_chains(MLTConfig config, const Scene &scene,
+                       const std::function<Spectrum(ivec2, Allocator<>, const Scene &, Sampler&)> &estimator);
+} // namespace akari::render

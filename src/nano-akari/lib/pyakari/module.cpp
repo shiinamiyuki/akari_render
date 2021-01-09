@@ -135,12 +135,18 @@ namespace akari::python {
             .def(py::init<>())
             .def_readwrite("spp", &GuidedPathTracer::spp)
             .def_readwrite("min_depth", &GuidedPathTracer::min_depth)
-            .def_readwrite("max_depth", &GuidedPathTracer::max_depth);
+            .def_readwrite("max_depth", &GuidedPathTracer::max_depth)
+            .def_readwrite("metropolized", &GuidedPathTracer::metropolized);
         py::class_<SMCMC, Integrator, P<SMCMC>>(m, "SMCMC")
             .def(py::init<>())
             .def_readwrite("spp", &SMCMC::spp)
             .def_readwrite("min_depth", &SMCMC::min_depth)
             .def_readwrite("max_depth", &SMCMC::max_depth);
+        py::class_<MCMC, Integrator, P<MCMC>>(m, "MCMC")
+            .def(py::init<>())
+            .def_readwrite("spp", &MCMC::spp)
+            .def_readwrite("min_depth", &MCMC::min_depth)
+            .def_readwrite("max_depth", &MCMC::max_depth);
         py::class_<VPL, Integrator, P<VPL>>(m, "VPL")
             .def(py::init<>())
             .def_readwrite("spp", &VPL::spp)
@@ -153,6 +159,7 @@ namespace akari::python {
             .def_readwrite("camera", &SceneGraph::camera)
             .def_readwrite("instances", &SceneGraph::instances)
             .def_readwrite("integrator", &SceneGraph::integrator)
+            .def_readwrite("output_path", &SceneGraph::output_path)
             .def("find", &SceneGraph::find);
         m.def("save_json_str", [](P<SceneGraph> scene) -> std::string {
             std::ostringstream os;

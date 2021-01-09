@@ -18,14 +18,49 @@
 #include <akari/render_mlt.h>
 #include <numeric>
 namespace akari::render {
-    Image render_mlt(MLTConfig config, const Scene &scene) {
+    void accept_markov_chain_and_splat(mlt::MLTStats &stats, Rng &rng, const mlt::RadianceRecord &proposal,
+                                       mlt::MarkovChain &chain, Film &film) {
+        using namespace mlt;
+        const Float accept =
+            T(chain.current.radiance) == 0.0
+                ? 1.0f
+                : std::max<Float>(0.0, std::min<Float>(1.0, T(proposal.radiance) / T(chain.current.radiance)));
+        auto &mlt_sampler = *chain.sampler.get<MLTSampler>();
+        if (mlt_sampler.large_step) {
+            stats.acc_b.add(T(proposal.radiance));
+            stats.n_large++;
+        }
+        // Float weight1 = (accept + (mlt_sampler.large_step ? 1.0 : 0.0)) /
+        // (T(proposal.radiance) / b + mlt_sampler.large_step_prob);
+        // Float weight2 = (1 - accept) / (T(chain.current.radiance) / b + mlt_sampler.large_step_prob);
+        const Float weight1 = accept / T(proposal.radiance);
+        const Float weight2 = (1 - accept) / T(chain.current.radiance);
+
+        // spdlog::info("{} {}", T(L), weight1);
+        if (weight1 > 0 && std::isfinite(weight1))
+            film.splat(proposal.p_film, proposal.radiance * weight1);
+        if (weight2 > 0 && std::isfinite(weight2))
+            film.splat(chain.current.p_film, chain.current.radiance * weight2);
+
+        if (accept == 1.0 || rng.uniform_float() < accept) {
+            mlt_sampler.accept();
+            stats.accepts++;
+            chain.current = proposal;
+
+        } else {
+            mlt_sampler.reject();
+            stats.rejects++;
+        }
+    }
+    std::pair<std::vector<mlt::MarkovChain>, double>
+    init_markov_chains(MLTConfig config, const Scene &scene,
+                       const std::function<Spectrum(ivec2, Allocator<>, const Scene &, Sampler &)> &estimator) {
         using namespace mlt;
         PTConfig pt_config;
         pt_config.max_depth = config.max_depth;
         pt_config.min_depth = config.min_depth;
-        auto T = [](const Spectrum &s) { return hmax(s); };
         std::vector<MarkovChain> chains;
-        Float b = 0.0;
+        double b = 0.0;
         {
             std::random_device rd;
 
@@ -48,8 +83,8 @@ namespace akari::render {
                     sampler.start_next_sample();
                     ivec2 p_film = glm::min(scene.camera->resolution() - 1,
                                             ivec2(sampler.next2d() * vec2(scene.camera->resolution())));
-                    auto L = render_pt_pixel_wo_emitter_direct(pt_config, Allocator<>(&resource), scene, sampler,
-                                                                     p_film);
+                    auto L = estimator(p_film, Allocator<>(&resource), scene, sampler);
+                    // render_pt_pixel_wo_emitter_direct(pt_config, Allocator<>(&resource), scene, sampler, p_film);
                     // spdlog::info("{} {}", p_film[0], p_film[1]);
                     // spdlog::info("{}", T(L));
                     Ts.push_back(T(L));
@@ -64,22 +99,32 @@ namespace akari::render {
                 chain.sampler.start_next_sample();
                 ivec2 p_film = glm::min(scene.camera->resolution() - 1,
                                         ivec2(chain.sampler.next2d() * vec2(scene.camera->resolution())));
-                auto L = render_pt_pixel_wo_emitter_direct(pt_config, Allocator<>(&resource), scene,
-                                                                 chain.sampler, p_film);
+                auto L = estimator(p_film, Allocator<>(&resource), scene, chain.sampler);
                 AKR_ASSERT(T(L) > 0.0);
                 chain.current = RadianceRecord{p_film, L};
                 chains.emplace_back(chain);
             }
             b = distribution.integral();
         }
+        return std::make_pair(chains, b);
+    }
+    Image render_mlt(MLTConfig config, const Scene &scene) {
+        using namespace mlt;
+        PTConfig pt_config;
+        pt_config.max_depth = config.max_depth;
+        pt_config.min_depth = config.min_depth;
+        std::vector<MarkovChain> chains;
+        double b = 0.0;
+        std::tie(chains, b) = init_markov_chains(
+            config, scene, [&](ivec2 p_film, Allocator<> alloc, const Scene &scene, Sampler &sampler) {
+                return render_pt_pixel_wo_emitter_direct(pt_config, alloc, scene, sampler, p_film);
+            });
         size_t mutations_per_chain =
             (size_t(config.spp) * size_t(hprod(scene.camera->resolution())) + config.num_chains - 1) /
             size_t(config.num_chains);
         Film film(scene.camera->resolution());
         spdlog::info("{} {}", b, mutations_per_chain);
-        std::atomic_uint64_t accepts(0), rejects(0);
-        AtomicDouble acc_b(0.0f);
-        std::atomic_uint64_t n_large(0);
+        MLTStats stats;
         thread::parallel_for(config.num_chains, [&](uint32_t id, uint32_t tid) {
             astd::pmr::monotonic_buffer_resource resource;
             auto &chain = chains[id];
@@ -90,46 +135,18 @@ namespace akari::render {
                 chain.sampler.start_next_sample();
                 const ivec2 p_film = glm::min(scene.camera->resolution() - 1,
                                               ivec2(chain.sampler.next2d() * vec2(scene.camera->resolution())));
-                const auto L = render_pt_pixel_wo_emitter_direct(pt_config, Allocator<>(&resource), scene,
-                                                                       chain.sampler, p_film);
+                const auto L =
+                    render_pt_pixel_wo_emitter_direct(pt_config, Allocator<>(&resource), scene, chain.sampler, p_film);
 
                 const RadianceRecord proposal{p_film, L};
-                const Float accept =
-                    T(chain.current.radiance) == 0.0
-                        ? 1.0f
-                        : std::max<Float>(0.0, std::min<Float>(1.0, T(proposal.radiance) / T(chain.current.radiance)));
-                if (mlt_sampler.large_step) {
-                    acc_b.add(T(L));
-                    n_large++;
-                }
-                // Float weight1 = (accept + (mlt_sampler.large_step ? 1.0 : 0.0)) /
-                // (T(proposal.radiance) / b + mlt_sampler.large_step_prob);
-                // Float weight2 = (1 - accept) / (T(chain.current.radiance) / b + mlt_sampler.large_step_prob);
-                const Float weight1 = accept / T(proposal.radiance);
-                const Float weight2 = (1 - accept) / T(chain.current.radiance);
-
-                // spdlog::info("{} {}", T(L), weight1);
-                if (weight1 > 0 && std::isfinite(weight1))
-                    film.splat(proposal.p_film, proposal.radiance * weight1 / config.spp);
-                if (weight2 > 0 && std::isfinite(weight2))
-                    film.splat(chain.current.p_film, chain.current.radiance * weight2 / config.spp);
-
-                if (accept == 1.0 || rng.uniform_float() < accept) {
-                    mlt_sampler.accept();
-                    accepts++;
-                    chain.current = proposal;
-
-                } else {
-                    mlt_sampler.reject();
-                    rejects++;
-                }
+                accept_markov_chain_and_splat(stats, rng, proposal, chain, film);
                 resource.release();
             }
         });
-        b = (b * config.num_bootstrap + acc_b.value()) / (config.num_bootstrap + n_large.load());
-        spdlog::info("acceptance rate:{}%", accepts * 100 / (accepts + rejects));
+        b = (b * config.num_bootstrap + stats.acc_b.value()) / (config.num_bootstrap + stats.n_large.load());
+        spdlog::info("acceptance rate:{}%", stats.accepts * 100 / (stats.accepts + stats.rejects));
         auto array = film.to_array2d();
-        array *= Spectrum(b);
+        array *= Spectrum(b / config.spp);
         return array2d_to_rgb(array);
     }
 } // namespace akari::render

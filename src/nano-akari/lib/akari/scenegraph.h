@@ -158,7 +158,7 @@ namespace akari::scene {
 
     class Integrator : public Object {
       public:
-        enum class Type { Path, VPL, SMCMC, GuidedPath };
+        enum class Type { Path, VPL, MCMC, SMCMC, GuidedPath };
         AKR_DECL_RTTI(Integrator)
         AKR_SER_POLY(Object)
     };
@@ -176,9 +176,19 @@ namespace akari::scene {
         uint32_t spp = 16;
         int32_t min_depth = 4;
         int32_t max_depth = 7;
+        bool metropolized = false;
         AKR_DECL_TYPEID(GuidedPathTracer, GuidedPath)
+        AKR_SER_POLY(Integrator, spp, min_depth, max_depth, metropolized)
+    };
+    class MCMC : public Integrator {
+      public:
+        uint32_t spp = 16;
+        int32_t min_depth = 4;
+        int32_t max_depth = 7;
+        AKR_DECL_TYPEID(MCMC, MCMC)
         AKR_SER_POLY(Integrator, spp, min_depth, max_depth)
     };
+
     class SMCMC : public Integrator {
       public:
         uint32_t spp = 16;
@@ -203,8 +213,9 @@ namespace akari::scene {
         P<Node> root;
         std::vector<P<Mesh>> meshes;
         std::vector<P<Instance>> instances;
+        std::string output_path = "out.png";
         void commit();
-        AKR_SER(camera, integrator, meshes, instances, root)
+        AKR_SER(camera, integrator, meshes, instances, root, output_path)
 
         std::vector<P<Object>> find(const std::string &name);
     };

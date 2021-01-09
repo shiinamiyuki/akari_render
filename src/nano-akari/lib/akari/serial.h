@@ -56,4 +56,6 @@ CEREAL_REGISTER_TYPE(akari::scene::VPL);
 CEREAL_REGISTER_POLYMORPHIC_RELATION(akari::scene::Integrator, akari::scene::VPL);
 CEREAL_REGISTER_TYPE(akari::scene::SMCMC);
 CEREAL_REGISTER_POLYMORPHIC_RELATION(akari::scene::Integrator, akari::scene::SMCMC);
+CEREAL_REGISTER_TYPE(akari::scene::MCMC);
+CEREAL_REGISTER_POLYMORPHIC_RELATION(akari::scene::Integrator, akari::scene::MCMC);
 CEREAL_REGISTER_DYNAMIC_INIT(akari);

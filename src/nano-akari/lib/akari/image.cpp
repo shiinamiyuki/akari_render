@@ -106,11 +106,16 @@ namespace akari {
         Image image(std::move(channel_names), ivec2(xres, yres));
         in->read_image(TypeDesc::FLOAT, image.data());
         in->close();
-        if(format != TypeDesc::FLOAT){
-            image.array3d().map_inplace([](Float x)->Float{
-                return srgb_to_linear(x);
-            });
+        if (format != TypeDesc::FLOAT) {
+            image.array3d().map_inplace([](Float x) -> Float { return srgb_to_linear(x); });
         }
         return image;
+    }
+    bool write_generic_image(const Image &image, const fs::path &path) {
+        if (path.extension() == ".exr") {
+            return write_hdr(image, path);
+        } else {
+            return write_ldr(image, path);
+        }
     }
 } // namespace akari

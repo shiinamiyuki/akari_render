@@ -28,13 +28,23 @@ namespace akari::render {
         double learning_rate = 0.01;
         double regularization = 0.01;
         double theta = 0.0;
+        uint32_t batch_size = 64;
+        uint32_t count = 0;
+        double grad_acc = 0.0;
         void step(double grad) {
-            // AKR_ASSERT(!std::isnan(grad));
             if (std::isnan(grad))
                 return;
             if (std::isinf(grad)) {
-                grad = grad > 0.0 ? 100.0 : -100.0;
+                return; // grad = grad > 0.0 ? 100.0 : -100.0;
             }
+            count++;
+            grad_acc += grad;
+            if (count < batch_size)
+                return;
+            grad_acc /= count;
+            count = 0;
+            // AKR_ASSERT(!std::isnan(grad));
+
             t++;
             double l = learning_rate * std::sqrt(1 - std::pow(beta1, t)) / std::pow(beta2, t);
             m = beta1 * m + (1.0 - beta1) * grad;
@@ -345,11 +355,14 @@ namespace akari::render {
         SpinLock lock;
         // std::mutex lock;
         DTreeWrapper() = default;
-        DTreeWrapper(const DTreeWrapper &rhs) : building(rhs.building), sampling(rhs.sampling), opt(rhs.opt) {}
+        DTreeWrapper(const DTreeWrapper &rhs) : building(rhs.building), sampling(rhs.sampling) {
+            opt.theta = rhs.opt.theta;
+        }
         DTreeWrapper &operator=(const DTreeWrapper &rhs) {
             building = rhs.building;
             sampling = rhs.sampling;
-            opt = rhs.opt;
+            opt = AdamOptimizer();
+            opt.theta = rhs.opt.theta;
             return *this;
         }
         double selection_prob() const { return 1.0 / (1.0 + std::exp(-opt.theta)); }
@@ -367,12 +380,12 @@ namespace akari::render {
             AKR_CHECK(!building.nodes.empty());
             auto p = dirToCanonical(record.wi);
             building.deposit(p, record.radiance);
-            return;
+            // return;
             // https://tom94.net/data/courses/vorba19guiding/vorba19guiding.pdf
             const auto product_estimate = record.radiance * record.bsdf * abs(dot(record.n, record.wi));
             const auto learned_pdf = record.is_delta ? 0.0 : pdf(record.wi);
 
-            {
+            if (product_estimate > 0) {
                 std::lock_guard<SpinLock> guard(lock);
                 const auto a = selection_prob();
                 const auto combined_pdf = a * record.bsdf_pdf + (1.0 - a) * learned_pdf;
@@ -394,6 +407,9 @@ namespace akari::render {
             sampling._build();
             AKR_CHECK(sampling.sum.value() >= 0.0f);
             building.refine(sampling, 0.01);
+            auto old = opt;
+            opt = AdamOptimizer();
+            opt.theta = old.theta;
         }
     };
 
@@ -569,5 +585,7 @@ namespace akari::render {
     Image render_ppg(PPGConfig config, const Scene &scene);
 
     std::shared_ptr<STree> bake_sdtree(PPGConfig config, const Scene &scene);
+
+    Image render_metropolized_ppg(PPGConfig config, const Scene &scene);
 
 } // namespace akari::render

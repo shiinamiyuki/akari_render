@@ -54,6 +54,7 @@ P<SceneGraph> import(const std::string &file) {
         mat->color = P<Texture>(new RGBTexture(diffuse));
         mat->emission = P<Texture>(new RGBTexture(color4_to_spectrum(emission_color)));
         mat->roughness = P<Texture>(new FloatTexture(roughness));
+        mat->transmission = P<Texture>(new FloatTexture(0.0));
         auto specular = color4_to_spectrum(specular_color);
         auto metallic =
             (hmax(specular) + hmax(diffuse)) == 0.0 ? 0.0 : (hmax(specular) / (hmax(specular) + hmax(diffuse)));

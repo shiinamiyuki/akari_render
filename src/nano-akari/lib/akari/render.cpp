@@ -255,15 +255,19 @@ namespace akari {
             config.sampler = render::PCGSampler();
             auto film = render::render_pt(config, *scene);
             auto image = film.to_rgb_image();
-            write_ldr(image, "out.png");
+            write_generic_image(image, graph->output_path);
         } else if (auto gpt = graph->integrator->as<scene::GuidedPathTracer>()) {
             render::PPGConfig config;
             config.min_depth = gpt->min_depth;
             config.max_depth = gpt->max_depth;
             config.spp = gpt->spp;
             config.sampler = render::PCGSampler();
-            auto image = render::render_ppg(config, *scene);
-            write_ldr(image, "out.png");
+            if (gpt->metropolized) {
+                (void)render::render_metropolized_ppg(config, *scene);
+            } else {
+                auto image = render::render_ppg(config, *scene);
+                write_generic_image(image, graph->output_path);
+            }
         } else if (auto vpl = graph->integrator->as<scene::VPL>()) {
             render::IRConfig config;
             config.min_depth = vpl->min_depth;
@@ -271,14 +275,21 @@ namespace akari {
             config.spp = vpl->spp;
             config.sampler = render::PCGSampler();
             auto image = render::render_ir(config, *scene);
-            write_ldr(image, "out.png");
+            write_generic_image(image, graph->output_path);
         } else if (auto smcmc = graph->integrator->as<scene::SMCMC>()) {
             render::MLTConfig config;
             config.min_depth = smcmc->min_depth;
             config.max_depth = smcmc->max_depth;
             config.spp = smcmc->spp;
             auto image = render::render_smcmc(config, *scene);
-            write_ldr(image, "out.png");
+            write_generic_image(image, graph->output_path);
+        } else if (auto mcmc = graph->integrator->as<scene::MCMC>()) {
+            render::MLTConfig config;
+            config.min_depth = mcmc->min_depth;
+            config.max_depth = mcmc->max_depth;
+            config.spp = mcmc->spp;
+            auto image = render::render_mlt(config, *scene);
+            write_generic_image(image, graph->output_path);
         }
     }
 } // namespace akari

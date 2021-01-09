@@ -14,6 +14,7 @@
 
 #include <akari/util.h>
 #include <akari/render_ppg.h>
+#include <akari/render_mlt.h>
 #include <spdlog/spdlog.h>
 #include <numeric>
 
@@ -77,11 +78,13 @@ namespace akari::render {
             Sampler *sampler = nullptr;
             Spectrum L;
             Spectrum beta = Spectrum(1.0f);
+            Spectrum emitter_direct = Spectrum(0.0);
             Allocator<> allocator;
             int depth = 0;
             int min_depth = 5;
             int max_depth = 5;
             bool useNEE = true;
+            bool metropolized = false;
             std::shared_ptr<STree> sTree;
             struct PPGVertex {
                 vec3 wi;
@@ -126,7 +129,7 @@ namespace akari::render {
                     light_pdf *= light_sample.pdf;
                     auto f = light_sample.I * vertex.bsdf->evaluate(vertex.wo, light_sample.wi)() *
                              std::abs(dot(si.ns, light_sample.wi));
-                    const Float bsdfSamplingFraction = 0.5; // dTree->selection_prob();
+                    const Float bsdfSamplingFraction = dTree->selection_prob();
                     Float bsdf_pdf = vertex.bsdf->evaluate_pdf(vertex.wo, light_sample.wi);
                     Float mix_psdf =
                         bsdf_pdf * bsdfSamplingFraction + (1.0 - bsdfSamplingFraction) * dTree->pdf(light_sample.wi);
@@ -166,6 +169,9 @@ namespace akari::render {
                 Spectrum I = light->Le(wo, sp);
                 if (!useNEE || depth == 0 || BSDFType::Unset != (prev_vertex->sampled_lobe() & BSDFType::Specular)) {
                     accumulate_radiance_wo_beta(I);
+                    if (depth == 0) {
+                        emitter_direct = I;
+                    }
                 } else {
                     PointGeometry ref;
                     ref.n = prev_vertex->ng();
@@ -197,7 +203,7 @@ namespace akari::render {
                     Float bsdf_pdf = 0.0;
                     auto sample = bsdf.sample(sample_ctx);
                     bool is_delta = BSDFType::Unset != (bsdf.type() & BSDFType::Specular);
-                    const Float bsdfSamplingFraction = is_delta ? 1.0 : 0.5; // dTree->selection_prob();
+                    const Float bsdfSamplingFraction = is_delta ? 1.0 : dTree->selection_prob();
                     if (is_delta || u0 < bsdfSamplingFraction) {
                         sample = bsdf.sample(sample_ctx);
                         if (!sample)
@@ -294,6 +300,9 @@ namespace akari::render {
                 if (training) {
                     for (int i = 0; i < n_vertices; i++) {
                         auto irradiance = average(clamp_zero(vertices[i].L));
+                        if (metropolized && irradiance > 0) {
+                            irradiance /= mlt::T(clamp_zero(vertices[i].L));
+                        }
                         AKR_CHECK(irradiance >= 0);
                         SDTreeDepositRecord record;
                         record.p = vertices[i].p;
@@ -440,6 +449,189 @@ namespace akari::render {
                 cnt++;
             }
         }
+        Film thetas(scene.camera->resolution());
+        thread::parallel_for(thread::blocked_range<2>(thetas.resolution(), ivec2(16, 16)), [&](ivec2 id, uint32_t tid) {
+            Sampler sampler = PCGSampler(id.x);
+            auto sample = scene.camera->generate_ray(sampler.next2d(), sampler.next2d(), id);
+            const auto si = scene.intersect(sample.ray);
+            if (si) {
+                auto *dtree = sTree->dTree(si->p).first;
+                thetas.add_sample(id, Spectrum(dtree->selection_prob()), 1.0);
+            } else {
+                thetas.add_sample(id, Spectrum(0.0), 1.0);
+            }
+        });
+        write_hdr(thetas.to_rgb_image(), "selection.exr");
         return array2d_to_rgb(sum / Spectrum(sum_weights));
+    }
+
+    Image render_metropolized_ppg(PPGConfig config, const Scene &scene) {
+        using namespace mlt;
+        spdlog::info("Experimental metropolized ppg, spp: {}", config.spp);
+        std::shared_ptr<STree> sTree(new STree(scene.accel->world_bounds()));
+        bool useNEE = true;
+        RatioStat non_zero_path;
+        std::vector<astd::pmr::monotonic_buffer_resource *> buffers;
+        for (size_t i = 0; i < thread::num_work_threads(); i++) {
+            buffers.emplace_back(new astd::pmr::monotonic_buffer_resource(astd::pmr::new_delete_resource()));
+        }
+        std::vector<Sampler> samplers(hprod(scene.camera->resolution()));
+        for (size_t i = 0; i < samplers.size(); i++) {
+            samplers[i] = config.sampler;
+            samplers[i].set_sample_index(i);
+        }
+        MLTStats stats;
+        auto mc_sample_sdtree = [&](int samples, bool training) {
+            non_zero_path.clear();
+            Film film(scene.camera->resolution());
+            Array2D<Spectrum> variance(scene.camera->resolution());
+            thread::parallel_for(
+                thread::blocked_range<2>(film.resolution(), ivec2(16, 16)), [&](ivec2 id, uint32_t tid) {
+                    auto Li = [&](const ivec2 p, Sampler &sampler) -> Spectrum {
+                        ppg::GuidedPathTracer pt;
+                        pt.min_depth = config.min_depth;
+                        pt.max_depth = config.max_depth;
+                        pt.n_vertices = 0;
+                        pt.vertices =
+                            BufferView(Allocator<>(buffers[tid])
+                                           .allocate_object<ppg::GuidedPathTracer::PPGVertex>(config.max_depth + 1),
+                                       config.max_depth + 1);
+                        pt.L = Spectrum(0.0);
+                        pt.beta = Spectrum(1.0);
+                        pt.sampler = &sampler;
+                        pt.scene = &scene;
+                        pt.useNEE = useNEE;
+                        pt.training = training;
+                        pt.sTree = sTree;
+                        pt.allocator = Allocator<>(buffers[tid]);
+                        pt.run_megakernel(&scene.camera.value(), p);
+                        non_zero_path.accumluate(!is_black(pt.L));
+                        buffers[tid]->release();
+                        return pt.L;
+                    };
+                    Sampler &sampler = samplers[id.x + id.y * film.resolution().x];
+                    VarianceTracker<Spectrum> var;
+                    for (int s = 0; s < samples; s++) {
+                        sampler.start_next_sample();
+                        auto L = Li(id, sampler);
+                        var.update(L);
+                        film.add_sample(id, L, 1.0);
+                    }
+                    if (samples >= 2)
+                        variance(id) = var.variance().value();
+                });
+            spdlog::info("Refining SDTre");
+            spdlog::info("nodes: {}", sTree->nodes.size());
+            spdlog::info("non zero path:{}%", non_zero_path.ratio() * 100);
+            sTree->refine(12000 * std::sqrt(samples));
+            return std::make_pair(film.to_rgb_image(), variance);
+        };
+        auto mcmc_sample_sdtree = [&](int n_chains, int spp, bool training) {
+            non_zero_path.clear();
+            size_t mutations_per_chain =
+                (size_t(spp) * size_t(hprod(scene.camera->resolution())) + n_chains - 1) / size_t(n_chains);
+            Film film(scene.camera->resolution());
+            MLTConfig m;
+            m.max_depth = config.max_depth;
+            m.min_depth = config.min_depth;
+            m.num_bootstrap = 100000;
+            m.num_chains = n_chains;
+            m.spp = spp;
+
+            std::vector<MarkovChain> chains;
+            double b = 0.0;
+            std::tie(chains, b) = init_markov_chains(
+                m, scene, [&](ivec2 p_film, Allocator<> alloc, const Scene &scene, Sampler &sampler) {
+                    ppg::GuidedPathTracer pt;
+                    pt.min_depth = config.min_depth;
+                    pt.max_depth = config.max_depth;
+                    pt.n_vertices = 0;
+                    pt.vertices =
+                        BufferView(alloc.allocate_object<ppg::GuidedPathTracer::PPGVertex>(config.max_depth + 1),
+                                   config.max_depth + 1);
+                    pt.L = Spectrum(0.0);
+                    pt.beta = Spectrum(1.0);
+                    pt.sampler = &sampler;
+                    pt.scene = &scene;
+                    pt.useNEE = useNEE;
+                    pt.training = false;
+                    pt.sTree = sTree;
+                    pt.allocator = alloc;
+                    pt.run_megakernel(&scene.camera.value(), p_film);
+                    return pt.L - pt.emitter_direct;
+                });
+
+            thread::parallel_for(n_chains, [&](uint32_t id, uint32_t tid) {
+                astd::pmr::monotonic_buffer_resource resource;
+                auto &chain = chains[id];
+                auto &mlt_sampler = *chain.sampler.get<MLTSampler>();
+                Rng rng(id);
+                mlt_sampler.rng = Rng(rng.uniform_u32());
+                auto Li = [&](const ivec2 p, Sampler &sampler) -> Spectrum {
+                    ppg::GuidedPathTracer pt;
+                    pt.min_depth = config.min_depth;
+                    pt.max_depth = config.max_depth;
+                    pt.n_vertices = 0;
+                    pt.vertices =
+                        BufferView(Allocator<>(buffers[tid])
+                                       .allocate_object<ppg::GuidedPathTracer::PPGVertex>(config.max_depth + 1),
+                                   config.max_depth + 1);
+                    pt.L = Spectrum(0.0);
+                    pt.beta = Spectrum(1.0);
+                    pt.sampler = &sampler;
+                    pt.scene = &scene;
+                    pt.useNEE = useNEE;
+                    pt.training = training;
+                    pt.sTree = sTree;
+                    pt.metropolized = true;
+                    pt.allocator = Allocator<>(buffers[tid]);
+                    pt.run_megakernel(&scene.camera.value(), p);
+                    non_zero_path.accumluate(!is_black(pt.L));
+                    buffers[tid]->release();
+                    return pt.L - pt.emitter_direct;
+                };
+                for (size_t s = 0; s < mutations_per_chain; s++) {
+                    chain.sampler.start_next_sample();
+                    const ivec2 p_film = glm::min(scene.camera->resolution() - 1,
+                                                  ivec2(chain.sampler.next2d() * vec2(scene.camera->resolution())));
+                    const auto L = Li(p_film, chain.sampler);
+                    const RadianceRecord proposal{p_film, L};
+                    accept_markov_chain_and_splat(stats, rng, proposal, chain, film);
+                }
+            });
+            spdlog::info("acceptance rate: {}%", double(stats.accepts) / (stats.accepts + stats.rejects) * 100.0);
+            spdlog::info("Refining SDTre");
+            spdlog::info("nodes: {}", sTree->nodes.size());
+            spdlog::info("non zero path:{}%", non_zero_path.ratio() * 100);
+            sTree->refine(12000 * std::sqrt(spp));
+            b = (b * m.num_bootstrap + stats.acc_b.value()) / (m.num_bootstrap + stats.n_large.load());
+            auto array = film.to_array2d();
+            array *= Spectrum(b / spp);
+            return array2d_to_rgb(array);
+        };
+        uint32_t pass = 0;
+        uint32_t accumulatedSamples = 0;
+        bool last_iter = false;
+        for (pass = 0; accumulatedSamples < config.spp; pass++) {
+            non_zero_path.clear();
+            size_t samples;
+            samples = 1ull << pass;
+            auto nextPassSamples = 2u << pass;
+            if (accumulatedSamples + samples + nextPassSamples > (uint32_t)config.spp) {
+                samples = (uint32_t)config.spp - accumulatedSamples;
+                last_iter = true;
+            }
+            accumulatedSamples += samples;
+            spdlog::info("Pass {}, spp:{}", pass + 1, samples);
+            std::optional<Image> image;
+            if (!last_iter) {
+                image = mcmc_sample_sdtree(1000, samples, !last_iter);
+            } else {
+                auto col_var = mc_sample_sdtree(samples, !last_iter);
+                image = std::move(col_var.first);
+            }
+            write_hdr(*image, fmt::format("mppg_pass{}.exr", pass + 1));
+        }
+        return rgb_image(ivec2(1));
     }
 } // namespace akari::render

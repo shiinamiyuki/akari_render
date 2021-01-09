@@ -86,7 +86,7 @@ namespace akari {
         RGBA() = default;
         RGBA(vec3 rgb, float alpha) : rgb(rgb), alpha(alpha) {}
     };
-
+    bool write_generic_image(const Image &image, const fs::path &);
     bool write_ldr(const Image &image, const fs::path &);
     bool write_hdr(const Image &image, const fs::path &);
     Image read_generic_image(const fs::path &);
