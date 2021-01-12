@@ -14,6 +14,8 @@
 
 #pragma once
 #include <akari/util.h>
+#include <akari/pmj02tables.h>
+#include <akari/bluenoise.h>
 #include <akari/image.h>
 #include <akari/scenegraph.h>
 #include <array>
@@ -180,10 +182,28 @@ namespace akari::render {
         return glm::vec3((r * glm::cos(phi)), (r * glm::sin(phi)), z);
     }
     AKR_XPU inline glm::vec2 uniform_sample_triangle(const glm::vec2 &u) {
-        float su0 = glm::sqrt(u[int32_t(0)]);
-        float b0 = (float(1.0) - su0);
-        float b1 = (u[int32_t(1)] * su0);
-        return glm::vec2(b0, b1);
+        // float su0 = glm::sqrt(u[int32_t(0)]);
+        // float b0 = (float(1.0) - su0);
+        // float b1 = (u[int32_t(1)] * su0);
+        // return glm::vec2(b0, b1);
+
+        uint32_t uf = u[0] * (1ull << 32); // Fixed point
+        Float cx = 0.0f, cy = 0.0f;
+        Float w = 0.5f;
+
+        for (int i = 0; i < 16; i++) {
+            uint32_t uu = uf >> 30;
+            bool flip = (uu & 3) == 0;
+
+            cy += ((uu & 1) == 0) * w;
+            cx += ((uu & 2) == 0) * w;
+
+            w *= flip ? -0.5f : 0.5f;
+            uf <<= 2;
+        }
+
+        Float b0 = cx + w / 3.0f, b1 = cy + w / 3.0f;
+        return vec2(b0, b1);
     }
 #pragma endregion
 #pragma region geometry
@@ -425,13 +445,118 @@ namespace akari::render {
             (void)pcg32();
         }
     };
+    // http://zimbry.blogspot.ch/2011/09/better-bit-mixing-improving-on.html
+    inline uint64_t mix_bits(uint64_t v) {
+        v ^= (v >> 31);
+        v *= 0x7fb5d329728ea185;
+        v ^= (v >> 27);
+        v *= 0x81dadef4bc2dd44d;
+        v ^= (v >> 33);
+        return v;
+    }
+    inline int permutation_element(uint32_t i, uint32_t l, uint32_t p) {
+        uint32_t w = l - 1;
+        w |= w >> 1;
+        w |= w >> 2;
+        w |= w >> 4;
+        w |= w >> 8;
+        w |= w >> 16;
+        do {
+            i ^= p;
+            i *= 0xe170893d;
+            i ^= p >> 16;
+            i ^= (i & w) >> 4;
+            i ^= p >> 8;
+            i *= 0x0929eb3f;
+            i ^= p >> 23;
+            i ^= (i & w) >> 1;
+            i *= 1 | p >> 27;
+            i *= 0x6935fa69;
+            i ^= (i & w) >> 11;
+            i *= 0x74dcb303;
+            i ^= (i & w) >> 2;
+            i *= 0x9e501cc3;
+            i ^= (i & w) >> 2;
+            i *= 0xc860a3df;
+            i &= w;
+            i ^= i >> 5;
+        } while (i >= l);
+        return (i + p) % l;
+    }
+    struct SamplerConfig {
+        enum Type {
+            PCG,
+            LCG,
+            PMJ02BN,
+        };
+        Type type = Type::PCG;
+        int pixel_tile_size = 16;
+        int spp = 16;
+    };
+    class PMJ02BNSampler {
+        int spp = 0;
+        int seed;
+        int dimension = 0, sample_index = 0;
+        ivec2 pixel;
+        std::shared_ptr<vec2[]> pixel_samples;
+        int pixel_tile_size = 16;
+
+      public:
+        void start_pixel_sample(ivec2 p, uint32_t idx, uint32_t dim) {
+            pixel = p;
+            sample_index = idx;
+            dimension = std::max(2u, dim);
+        }
+        Float next1d() {
+            uint64_t hash =
+                mix_bits(((uint64_t)pixel.x << 48) ^ ((uint64_t)pixel.y << 32) ^ ((uint64_t)dimension << 16) ^ seed);
+            int index = permutation_element(sample_index, spp, hash);
+            Float delta = blue_nosie(dimension, pixel);
+            ++dimension;
+            return std::min((index + delta) / spp, OneMinusEpsilon);
+        }
+        vec2 next2d() {
+            if (dimension == 0) {
+                // Return pmj02bn pixel sample
+                int px = pixel.x % pixel_tile_size, py = pixel.y % pixel_tile_size;
+                int offset = (px + py * pixel_tile_size) * spp;
+                dimension += 2;
+                return (pixel_samples.get())[offset + sample_index];
+
+            } else {
+                // Compute index for 2D pmj02bn sample
+                int index = sample_index;
+                int pmjInstance = dimension / 2;
+                if (pmjInstance >= N_PMJ02BN_SETS) {
+                    // Permute index to be used for pmj02bn sample array
+                    uint64_t hash = mix_bits(((uint64_t)pixel.x << 48) ^ ((uint64_t)pixel.y << 32) ^
+                                             ((uint64_t)dimension << 16) ^ seed);
+                    index = permutation_element(sample_index, spp, hash);
+                }
+
+                // Return randomized pmj02bn sample for current dimension
+                auto u = pmj02bn(pmjInstance, index);
+                // Apply Cranley-Patterson rotation to pmj02bn sample _u_
+                u += vec2(blue_nosie(dimension, pixel), blue_nosie(dimension + 1, pixel));
+                if (u.x >= 1)
+                    u.x -= 1;
+                if (u.y >= 1)
+                    u.y -= 1;
+
+                dimension += 2;
+                return {std::min(u.x, OneMinusEpsilon), std::min(u.y, OneMinusEpsilon)};
+            }
+        }
+        void start_next_sample() {}
+    };
+
     class PCGSampler {
         Rng rng;
 
       public:
         void set_sample_index(uint64_t idx) { rng = Rng(idx); }
         Float next1d() { return rng.uniform_float(); }
-
+        vec2 next2d() { return vec2(next1d(), next1d()); }
         void start_next_sample() {}
         PCGSampler(uint64_t seed = 0u) : rng(seed) {}
     };
@@ -444,6 +569,7 @@ namespace akari::render {
             seed = (1103515245 * seed + 12345);
             return (Float)seed / (Float)0xFFFFFFFF;
         }
+        vec2 next2d() { return vec2(next1d(), next1d()); }
         void start_next_sample() {}
         LCGSampler(uint64_t seed = 0u) : seed(seed) {}
     };
@@ -490,6 +616,7 @@ namespace akari::render {
             sample_index += 1;
             return Xi.value;
         }
+        vec2 next2d() { return vec2(next1d(), next1d()); }
         double mutate(double x, double s1, double s2) {
             double r = uniform();
             if (r < 0.5) {
@@ -563,6 +690,7 @@ namespace akari::render {
             idx++;
             return rng.uniform_float();
         }
+        vec2 next2d() { return vec2(next1d(), next1d()); }
         void start_next_sample() { idx = 0; }
         void set_sample_index(uint64_t) {}
 
@@ -575,7 +703,7 @@ namespace akari::render {
         using Variant::Variant;
         Sampler() : Sampler(PCGSampler()) {}
         Float next1d() { AKR_VAR_DISPATCH(next1d); }
-        vec2 next2d() { return vec2(next1d(), next1d()); }
+        vec2 next2d() { AKR_VAR_DISPATCH(next2d); }
         void start_next_sample() { AKR_VAR_DISPATCH(start_next_sample); }
         void set_sample_index(uint64_t idx) { AKR_VAR_DISPATCH(set_sample_index, idx); }
     };
@@ -782,6 +910,13 @@ namespace akari::render {
                              (1.0f - alpha) * x.glossy + alpha * y.glossy,
                              (1.0f - alpha) * x.specular + alpha * y.specular};
         }
+        BSDFValue operator*(Float k) const { return BSDFValue{diffuse * k, glossy * k, specular * k}; }
+        friend BSDFValue operator*(Float k, const BSDFValue &f) { return f * k; }
+        BSDFValue operator*(const Spectrum &k) const { return BSDFValue{diffuse * k, glossy * k, specular * k}; }
+        friend BSDFValue operator*(const Spectrum &k, const BSDFValue &f) { return f * k; }
+        BSDFValue operator+(const BSDFValue &rhs) const {
+            return BSDFValue{diffuse + rhs.diffuse, glossy + rhs.glossy, specular + rhs.specular};
+        }
         Spectrum operator()() const { return diffuse + glossy + specular; }
     };
 
@@ -823,6 +958,7 @@ namespace akari::render {
             sample.f = BSDFValue::with_diffuse(R * InvPi);
             return sample;
         }
+        [[nodiscard]] BSDFValue albedo() const { return BSDFValue::with_diffuse(R); }
     };
 
     class MicrofacetReflection {
@@ -878,6 +1014,7 @@ namespace akari::render {
             sample.f = evaluate(wo, sample.wi);
             return sample;
         }
+        [[nodiscard]] BSDFValue albedo() const { return BSDFValue::with_glossy(R); }
     };
 
     class FresnelNoOp {
@@ -922,6 +1059,7 @@ namespace akari::render {
             sample.f = BSDFValue::with_specular(R / (std::abs(cos_theta(sample.wi))));
             return sample;
         }
+        [[nodiscard]] BSDFValue albedo() const { return BSDFValue::with_specular(R); }
     };
     class SpecularTransmission {
         Spectrum R;
@@ -945,6 +1083,7 @@ namespace akari::render {
             sample.f = BSDFValue::with_specular(R / (std::abs(cos_theta(sample.wi))));
             return sample;
         }
+        [[nodiscard]] BSDFValue albedo() const { return BSDFValue::with_specular(R); }
     };
 
     class AKR_EXPORT FresnelSpecular {
@@ -959,6 +1098,7 @@ namespace akari::render {
         [[nodiscard]] Float evaluate_pdf(const vec3 &wo, const vec3 &wi) const { return 0; }
         [[nodiscard]] BSDFValue evaluate(const vec3 &wo, const vec3 &wi) const { return BSDFValue::zero(); }
         [[nodiscard]] std::optional<BSDFSample> sample(const vec2 &u, const Vec3 &wo) const;
+        [[nodiscard]] BSDFValue albedo() const { return BSDFValue::with_specular((R + T) * 0.5); }
     };
     class MixBSDF {
       public:
@@ -971,6 +1111,7 @@ namespace akari::render {
         [[nodiscard]] BSDFValue evaluate(const Vec3 &wo, const Vec3 &wi) const;
         [[nodiscard]] BSDFType type() const;
         std::optional<BSDFSample> sample(const vec2 &u, const Vec3 &wo) const;
+        BSDFValue albedo() const;
     };
 
     /*
@@ -991,6 +1132,7 @@ namespace akari::render {
         [[nodiscard]] std::optional<BSDFSample> sample(const vec2 &u, const Vec3 &wo) const {
             AKR_VAR_DISPATCH(sample, u, wo);
         }
+        [[nodiscard]] BSDFValue albedo() const { AKR_VAR_DISPATCH(albedo); }
     };
     struct BSDFSampleContext {
         Float u0;

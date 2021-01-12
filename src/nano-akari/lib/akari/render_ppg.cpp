@@ -15,10 +15,12 @@
 #include <akari/util.h>
 #include <akari/render_ppg.h>
 #include <akari/render_mlt.h>
+#include <akari/profile.h>
 #include <spdlog/spdlog.h>
 #include <numeric>
 
 namespace akari::render {
+    static inline constexpr size_t STREE_THRESHOLD = 4000;
     namespace ppg {
         struct DirectLighting {
             Ray shadow_ray;
@@ -113,7 +115,18 @@ namespace akari::render {
             std::pair<const Light *, Float> select_light() noexcept {
                 return scene->light_sampler->sample(sampler->next2d());
             }
+            std::pair<DTreeWrapper *, vec3> get_dtree_and_jittered_position(vec3 p) {
+                vec3 dtree_voxel_size;
+                auto [_dTree, tree_depth] = sTree->dTree(p, dtree_voxel_size);
+                const vec3 u = vec3(sampler->next1d(), sampler->next1d(), sampler->next1d());
+                if (tree_depth < 3) {
+                    return std::make_pair(_dTree, p);
+                }
 
+                p = sTree->box.clip(p + dtree_voxel_size * (u - vec3(0.5)));
+                vec3 _;
+                return std::make_pair(sTree->dTree(p, _).first, p);
+            }
             std::optional<DirectLighting>
             compute_direct_lighting(SurfaceVertex &vertex, const std::pair<const Light *, Float> &selected) noexcept {
                 auto [light, light_pdf] = selected;
@@ -186,7 +199,6 @@ namespace akari::render {
                 }
             }
 
-            // @param mat_pdf: supplied if material is already chosen
             std::optional<SurfaceVertex> on_surface_scatter(const Vec3 &wo, SurfaceInteraction &si,
                                                             const std::optional<PathVertex> &prev_vertex) noexcept {
                 auto *material = si.material();
@@ -200,29 +212,38 @@ namespace akari::render {
                     SurfaceVertex vertex(wo, si);
                     auto bsdf = material->evaluate(*sampler, allocator, si);
                     BSDFSampleContext sample_ctx{sampler->next1d(), sampler->next2d(), wo};
-                    Float bsdf_pdf = 0.0;
+                    Float bsdf_pdf = 0.0, dtree_pdf = 0.0;
                     auto sample = bsdf.sample(sample_ctx);
                     bool is_delta = BSDFType::Unset != (bsdf.type() & BSDFType::Specular);
                     const Float bsdfSamplingFraction = is_delta ? 1.0 : dTree->selection_prob();
                     if (is_delta || u0 < bsdfSamplingFraction) {
                         sample = bsdf.sample(sample_ctx);
-                        if (!sample)
+                        if (!sample || sample->pdf == 0.0)
                             return std::nullopt;
                         bsdf_pdf = sample->pdf;
                         sample->pdf *= bsdfSamplingFraction;
+
                         if (BSDFType::Unset == (sample->type & BSDFType::Specular)) {
-                            sample->pdf = sample->pdf + (1.0f - bsdfSamplingFraction) * dTree->pdf(sample->wi);
+                            dtree_pdf = dTree->pdf(sample->wi);
+                            sample->pdf = sample->pdf + (1.0f - bsdfSamplingFraction) * dtree_pdf;
+                            // sample->f = sample->f * (mis_weight(bsdf_pdf, dtree_pdf) * 2.0);
                         }
+
                     } else {
                         sample = BSDFSample{};
                         auto w = dTree->sample(u1, u2);
                         sample->wi = w;
                         sample->pdf = dTree->pdf(w);
+                        dtree_pdf = sample->pdf;
                         AKR_CHECK(sample->pdf >= 0);
+                        if (sample->pdf == 0.0) {
+                            return std::nullopt;
+                        }
                         sample->f = bsdf.evaluate(wo, sample->wi);
                         sample->type = (BSDFType::All & ~BSDFType::Specular);
                         sample->pdf *= 1.0f - bsdfSamplingFraction;
                         bsdf_pdf = bsdf.evaluate_pdf(wo, sample->wi);
+                        // sample->f = sample->f * (mis_weight(dtree_pdf, bsdf_pdf) * 2.0);
                         sample->pdf = sample->pdf + bsdfSamplingFraction * bsdf_pdf;
                     }
                     AKR_ASSERT(!std::isnan(sample->pdf));
@@ -252,9 +273,8 @@ namespace akari::render {
                         on_miss(ray, prev_vertex);
                         break;
                     }
-                    auto [_dTree, tree_depth] = sTree->dTree(si->p);
-                    dTree = _dTree;
-                    // const auto dtree_voxel_size = sTree->box.size() * glm::pow(vec3(0.5), vec3(tree_depth));
+                    vec3 jittered_p;
+                    std::tie(dTree, jittered_p) = get_dtree_and_jittered_position(si->p);
                     const auto wo = -ray.d;
                     auto vertex = on_surface_scatter(wo, *si, prev_vertex);
                     if (!vertex) {
@@ -270,12 +290,9 @@ namespace akari::render {
                         }
                     }
                     vertices[n_vertices].L = Spectrum(0);
-                    {
-                        // const vec3 u = vec3(sampler->next1d(), sampler->next1d(), sampler->next1d());
-                        auto p = si->p;
-                        // p = sTree->box.clip(p + dtree_voxel_size * (u - vec3(0.5)));
-                        vertices[n_vertices].p = p;
-                    }
+                    // {
+                    vertices[n_vertices].p = jittered_p;
+                    // }
                     vertices[n_vertices].bsdf_pdf = vertex->bsdf_pdf;
                     vertices[n_vertices].sample_pdf = vertex->pdf;
                     vertices[n_vertices].bsdf = vertex->f;
@@ -352,9 +369,8 @@ namespace akari::render {
         bool last_iter = false;
         for (pass = 0; accumulatedSamples < config.spp; pass++) {
             non_zero_path.clear();
-            size_t samples;
-            samples = 1ull << pass;
-            auto nextPassSamples = 2u << pass;
+            size_t samples = (1ull << pass) * config.spp_per_pass;
+            auto nextPassSamples = (2u << pass) * config.spp_per_pass;
             if (accumulatedSamples + samples + nextPassSamples > (uint32_t)config.spp) {
                 samples = (uint32_t)config.spp - accumulatedSamples;
                 last_iter = true;
@@ -363,6 +379,7 @@ namespace akari::render {
             accumulatedSamples += samples;
             Film film(scene.camera->resolution());
             Array2D<Spectrum> variance(scene.camera->resolution());
+            ProgressReporter reporter(hprod(film.resolution()));
             thread::parallel_for(
                 thread::blocked_range<2>(film.resolution(), ivec2(16, 16)), [&](ivec2 id, uint32_t tid) {
                     auto Li = [&](const ivec2 p, Sampler &sampler) -> Spectrum {
@@ -397,10 +414,13 @@ namespace akari::render {
                     }
                     if (samples >= 2)
                         variance(id) = var.variance().value();
+                    reporter.update();
                 });
+            putchar('\n');
             if (samples >= 2) {
-                const size_t Q1 = hprod(variance.dimension()) / 8;
-                const size_t Q2 = hprod(variance.dimension()) - Q1;
+                const size_t one_eighth = hprod(variance.dimension()) / 8;
+                const size_t Q1 = 0; // hprod(variance.dimension()) / 8;
+                const size_t Q2 = hprod(variance.dimension()) - one_eighth;
                 const size_t Q = Q2 - Q1;
                 std::array<std::vector<Float>, Spectrum::size> V;
                 Spectrum avg_var;
@@ -422,7 +442,7 @@ namespace akari::render {
             spdlog::info("Refining SDTree; pass: {}", pass + 1);
             spdlog::info("nodes: {}", sTree->nodes.size());
             spdlog::info("non zero path:{}%", non_zero_path.ratio() * 100);
-            sTree->refine(12000 * std::sqrt(samples));
+            sTree->refine(STREE_THRESHOLD * std::sqrt(double(samples) / config.spp_per_pass));
         }
         for (auto buf : buffers) {
             delete buf;
@@ -437,6 +457,14 @@ namespace akari::render {
     Image render_ppg(PPGConfig config, const Scene &scene) {
         std::vector<std::pair<Array2D<Spectrum>, Spectrum>> all_samples;
         auto sTree = render_ppg(all_samples, config, scene);
+        {
+            size_t cnt = 0;
+            for (auto &samples : all_samples) {
+                auto image = array2d_to_rgb(samples.first);
+                write_generic_image(image, fmt::format("ppg{}.exr", cnt + 1));
+                cnt++;
+            }
+        }
         Array2D<Spectrum> sum(scene.camera->resolution());
         double sum_weights = 0.0;
         {
@@ -455,7 +483,8 @@ namespace akari::render {
             auto sample = scene.camera->generate_ray(sampler.next2d(), sampler.next2d(), id);
             const auto si = scene.intersect(sample.ray);
             if (si) {
-                auto *dtree = sTree->dTree(si->p).first;
+                vec3 _;
+                auto *dtree = sTree->dTree(si->p, _).first;
                 thetas.add_sample(id, Spectrum(dtree->selection_prob()), 1.0);
             } else {
                 thetas.add_sample(id, Spectrum(0.0), 1.0);
@@ -523,7 +552,7 @@ namespace akari::render {
             spdlog::info("Refining SDTre");
             spdlog::info("nodes: {}", sTree->nodes.size());
             spdlog::info("non zero path:{}%", non_zero_path.ratio() * 100);
-            sTree->refine(12000 * std::sqrt(samples));
+            sTree->refine(STREE_THRESHOLD * std::sqrt(samples));
             return std::make_pair(film.to_rgb_image(), variance);
         };
         auto mcmc_sample_sdtree = [&](int n_chains, int spp, bool training) {
@@ -603,7 +632,7 @@ namespace akari::render {
             spdlog::info("Refining SDTre");
             spdlog::info("nodes: {}", sTree->nodes.size());
             spdlog::info("non zero path:{}%", non_zero_path.ratio() * 100);
-            sTree->refine(12000 * std::sqrt(spp));
+            sTree->refine(STREE_THRESHOLD * std::sqrt(spp));
             b = (b * m.num_bootstrap + stats.acc_b.value()) / (m.num_bootstrap + stats.n_large.load());
             auto array = film.to_array2d();
             array *= Spectrum(b / spp);

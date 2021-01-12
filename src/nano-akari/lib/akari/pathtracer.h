@@ -21,7 +21,7 @@ namespace akari::render ::pt {
     struct DirectLighting {
         Ray shadow_ray;
         Vec3 wi = Vec3(0.0);
-        Spectrum radiance;
+        BSDFValue radiance = BSDFValue::zero();
         Spectrum throughput = Spectrum(0.0);
         Float pdf = 0.0;
     };
@@ -36,7 +36,7 @@ namespace akari::render ::pt {
         SurfaceInteraction si;
         Vec3 wo;
         Ray ray;
-        Spectrum beta;
+        BSDFValue beta;
         std::optional<BSDF> bsdf;
         Float pdf = 0.0;
         BSDFType sampled_lobe = BSDFType::Unset;
@@ -139,13 +139,24 @@ namespace akari::render ::pt {
         DiffuseAlbedo,
         DiffuseDirect,
         DiffuseIndirect,
-        Specular,// Specular + Glossy
+        Specular, // Specular + Glossy
         NAOVKind
     };
-    struct AOVs : std::array<Spectrum, (int)AOVKind::NAOVKind> {};
-    template <class PathVisitor = NullPathVisitor>
+    struct AOVs : std::array<Spectrum, (int)AOVKind::NAOVKind> {
+        using Base = std::array<Spectrum, (int)AOVKind::NAOVKind>;
+        AOVs() {
+            for (auto &s : *this) {
+                s = Spectrum(0.0);
+            }
+        }
+        Spectrum &operator[](AOVKind kind) { return static_cast<Base &>(*this)[(int)kind]; }
+    };
+
+    template <class PathVisitor = NullPathVisitor, bool ComputeAOV = false>
     class GenericPathTracer : public PathTracerBase {
       public:
+        AOVs aovs;
+        Spectrum beta_diffuse = Spectrum(0.0);
         PathVisitor visitor;
         GenericPathTracer(const Scene *scene, Sampler *sampler, Allocator<> alloc, int min_depth, int max_depth)
             : PathTracerBase(scene, sampler, alloc, min_depth, max_depth), visitor(this) {}
@@ -175,7 +186,7 @@ namespace akari::render ::pt {
                 if (light_sample.pdf <= 0.0)
                     return std::nullopt;
                 light_pdf *= light_sample.pdf;
-                auto f = vertex.bsdf->evaluate(vertex.wo, light_sample.wi)();
+                auto f = vertex.bsdf->evaluate(vertex.wo, light_sample.wi);
                 Float bsdf_pdf = vertex.bsdf->evaluate_pdf(vertex.wo, light_sample.wi);
                 lighting.throughput = light_sample.I * std::abs(dot(si.ns, light_sample.wi)) / light_pdf *
                                       mis_weight(light_pdf, bsdf_pdf);
@@ -218,10 +229,18 @@ namespace akari::render ::pt {
             HitLight hit{wo, light, I};
             if (visitor.on_hit_light(prev_vertex, hit)) {
                 accumulate_radiance(I);
+                if (depth == 0) {
+                    aovs[AOVKind::DiffuseDirect] += I;
+                }
             }
         }
-        void accumulate_beta(const Spectrum &k) { beta *= k; }
-        // @param mat_pdf: supplied if material is already chosen
+        void accumulate_beta(const Spectrum &k) {
+            beta *= k;
+            if constexpr (ComputeAOV) {
+                beta_diffuse *= k;
+            }
+        }
+        
         std::optional<SurfaceVertex> on_surface_scatter(const Vec3 &wo, SurfaceInteraction &si,
                                                         const std::optional<PathVertex> &prev_vertex) noexcept {
             auto *material = si.material();
@@ -242,7 +261,7 @@ namespace akari::render ::pt {
                 }
                 vertex.bsdf = bsdf;
                 vertex.ray = Ray(si.p, sample->wi, Eps / std::abs(glm::dot(si.ng, sample->wi)));
-                vertex.beta = sample->f() * std::abs(glm::dot(si.ns, sample->wi)) / sample->pdf;
+                vertex.beta = sample->f * (std::abs(glm::dot(si.ns, sample->wi)) / sample->pdf);
                 vertex.pdf = sample->pdf;
                 vertex.sampled_lobe = sample->type;
                 return vertex;
@@ -257,21 +276,40 @@ namespace akari::render ::pt {
                     on_miss(ray, prev_vertex);
                     break;
                 }
+
                 auto wo = -ray.d;
                 auto vertex = on_surface_scatter(wo, *si, prev_vertex);
                 if (!vertex || !visitor.on_scatter(*vertex, prev_vertex)) {
                     break;
                 }
+                if constexpr (ComputeAOV) {
+                    if (depth == 0) {
+                        aovs[AOVKind::Normal] = si->ns;
+                        aovs[AOVKind::DiffuseAlbedo] = vertex->bsdf->closure().albedo().diffuse;
+                    }
+                }
                 if ((vertex->sampled_lobe & BSDFType::Specular) == BSDFType::Unset) {
                     std::optional<DirectLighting> has_direct = compute_direct_lighting(*vertex, select_light());
                     if (has_direct) {
                         auto &direct = *has_direct;
-                        if (!is_black(direct.radiance) && !scene->occlude(direct.shadow_ray)) {
-                            accumulate_radiance(beta * direct.radiance);
+                        if (!is_black(direct.radiance()) && !scene->occlude(direct.shadow_ray)) {
+                            accumulate_radiance(beta * direct.radiance());
+                            if constexpr (ComputeAOV) {
+                                if (depth == 0)
+                                    aovs[AOVKind::DiffuseDirect] += beta * direct.radiance.diffuse;
+                                else {
+                                    aovs[AOVKind::DiffuseIndirect] += beta_diffuse * direct.radiance();
+                                }
+                            }
                         }
                     }
                 }
-                accumulate_beta(vertex->beta);
+                accumulate_beta(vertex->beta());
+                if constexpr (ComputeAOV) {
+                    if (depth == 0) {
+                        beta_diffuse = vertex->beta.diffuse;
+                    }
+                }
                 depth++;
                 if (depth > min_depth) {
                     Float continue_prob = std::min<Float>(1.0, hmax(beta)) * 0.95;
@@ -286,6 +324,9 @@ namespace akari::render ::pt {
                     break;
                 }
                 prev_vertex = PathVertex(*vertex);
+            }
+            if constexpr (ComputeAOV) {
+                aovs[AOVKind::Specular] = pt.L - (aovs[AOVKind::DiffuseDirect] + aovs[AOVKind::DiffuseIndirect]);
             }
         }
         void run_megakernel(const Camera *camera, const ivec2 &p) noexcept {

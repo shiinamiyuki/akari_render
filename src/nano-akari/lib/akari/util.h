@@ -103,6 +103,13 @@ namespace akari {
     static constexpr Float Inv4Pi = Float(1.0) / (4.0 * Pi);
     static constexpr Float Eps = Float(0.001f);
     static constexpr Float ShadowEps = Float(0.0001f);
+
+    static constexpr Float MachineEpsilon = std::numeric_limits<Float>::epsilon() * 0.5;
+
+    static constexpr double DoubleOneMinusEpsilon = 0x1.fffffffffffffp-1;
+    static constexpr float FloatOneMinusEpsilon = 0x1.fffffep-1;
+
+    static constexpr float OneMinusEpsilon = FloatOneMinusEpsilon;
 #endif
     template <typename T, typename Float>
     T lerp(T a, T b, Float t) {

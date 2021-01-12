@@ -16,6 +16,7 @@
 #include <akari/pathtracer.h>
 #include <spdlog/spdlog.h>
 #include <akari/kdtree.h>
+#include <akari/profile.h>
 namespace akari::render {
 
     std::pair<Spectrum, Spectrum> render_pt_pixel_separete_emitter_direct(PTConfig config, Allocator<> allocator,
@@ -33,6 +34,7 @@ namespace akari::render {
         for (size_t i = 0; i < thread::num_work_threads(); i++) {
             buffers.emplace_back(new astd::pmr::monotonic_buffer_resource(astd::pmr::new_delete_resource()));
         }
+        ProgressReporter reporter(hprod(film.resolution()));
         thread::parallel_for(thread::blocked_range<2>(film.resolution(), ivec2(16, 16)), [&](ivec2 id, uint32_t tid) {
             Sampler sampler = config.sampler;
             sampler.set_sample_index(id.y * film.resolution().x + id.x);
@@ -42,6 +44,7 @@ namespace akari::render {
                 buffers[tid]->release();
                 film.add_sample(id, L, 1.0);
             }
+            reporter.update();
         });
         for (auto buf : buffers) {
             delete buf;

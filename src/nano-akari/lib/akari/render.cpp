@@ -59,6 +59,7 @@ namespace akari::render {
         return BSDFValue::mix(fraction, bsdf_A->evaluate(wo, wi), bsdf_B->evaluate(wo, wi));
     }
     [[nodiscard]] BSDFType MixBSDF::type() const { return BSDFType(bsdf_A->type() | bsdf_B->type()); }
+    BSDFValue MixBSDF::albedo() const { return BSDFValue::mix(fraction, bsdf_A->albedo(), bsdf_B->albedo()); }
     std::optional<BSDFSample> MixBSDF::sample(const vec2 &u, const Vec3 &wo) const {
         BSDFSample sample;
         std::optional<BSDFSample> inner_sample;
@@ -76,6 +77,7 @@ namespace akari::render {
         }
         if ((inner_sample->type & BSDFType::Specular) != BSDFType::Unset) {
             sample = *inner_sample;
+            sample.pdf *= selA ? fraction : (1.0f - fraction);
             // AKR_ASSERT(sample.pdf >= 0.0);
             // AKR_ASSERT(pdf_select >= 0.0);
             // AKR_ASSERT(sample.pdf >= 0.0);

@@ -28,7 +28,7 @@ namespace akari::render {
         double learning_rate = 0.01;
         double regularization = 0.01;
         double theta = 0.0;
-        uint32_t batch_size = 64;
+        uint32_t batch_size = 128;
         uint32_t count = 0;
         double grad_acc = 0.0;
         void step(double grad) {
@@ -318,7 +318,7 @@ namespace akari::render {
                     auto &otherNode = node.tree->nodes.at(node.otherNode);
                     auto fraction = total == 0.0f ? std::pow(0.25, node.depth) : otherNode._sum[i].value() / total;
                     // log::log("{} {}\n", otherNode._sum[i].value(), fraction);
-                    if (fraction >= threshold && node.depth < 10) {
+                    if (fraction >= threshold && node.depth < 20) {
                         if (otherNode.isLeaf(i)) {
                             stack.push({nodes.size(), nodes.size(), this, node.depth + 1});
                         } else {
@@ -361,8 +361,9 @@ namespace akari::render {
         DTreeWrapper &operator=(const DTreeWrapper &rhs) {
             building = rhs.building;
             sampling = rhs.sampling;
-            opt = AdamOptimizer();
-            opt.theta = rhs.opt.theta;
+            // opt = AdamOptimizer();
+            // opt.theta = rhs.opt.theta;
+            opt = rhs.opt;
             return *this;
         }
         double selection_prob() const { return 1.0 / (1.0 + std::exp(-opt.theta)); }
@@ -407,9 +408,9 @@ namespace akari::render {
             sampling._build();
             AKR_CHECK(sampling.sum.value() >= 0.0f);
             building.refine(sampling, 0.01);
-            auto old = opt;
-            opt = AdamOptimizer();
-            opt.theta = old.theta;
+            // auto old = opt;
+            // opt = AdamOptimizer();
+            // opt.theta = old.theta;
         }
     };
 
@@ -457,19 +458,20 @@ namespace akari::render {
             }
         }
 
-        std::pair<DTreeWrapper *, int> getDTree(vec3 p, std::vector<STreeNode> &nodes) {
+        std::pair<DTreeWrapper *, int> getDTree(vec3 p, vec3 &size, std::vector<STreeNode> &nodes) {
             //            AKR_CHECK(0.0f - 1e-6f <= p[axis] && p[axis] <= 1.0f + 1e-6f);
             //            log::log("{} {}\n",axis,p[axis]);
             if (isLeaf()) {
                 return {&dTree, 0};
             } else {
+                size[axis] *= 0.5;
                 if (p[axis] < 0.5f) {
                     p[axis] *= 2.0f;
-                    auto [tree, depth] = nodes.at(_children[0]).getDTree(p, nodes);
+                    auto [tree, depth] = nodes.at(_children[0]).getDTree(p, size, nodes);
                     return {tree, depth + 1};
                 } else {
                     p[axis] = (p[axis] - 0.5f) * 2.0f;
-                    auto [tree, depth] = nodes.at(_children[1]).getDTree(p, nodes);
+                    auto [tree, depth] = nodes.at(_children[1]).getDTree(p, size, nodes);
                     return {tree, depth + 1};
                 }
             }
@@ -524,7 +526,10 @@ namespace akari::render {
 
         Float pdf(const vec3 &p, const vec3 &w) { return nodes.at(0).pdf(box.offset(p), w, nodes); }
 
-        auto dTree(const vec3 &p) { return nodes[0].getDTree(box.offset(p), nodes); }
+        auto dTree(const vec3 &p, vec3 &size) {
+            auto sz = box.size();
+            return nodes[0].getDTree(box.offset(p), sz, nodes);
+        }
 
         Float eval(const vec3 &p, const vec3 &w) { return nodes.at(0).eval(box.offset(p), w, nodes); }
 
@@ -579,6 +584,7 @@ namespace akari::render {
         int min_depth = 3;
         int max_depth = 5;
         uint32_t spp = 16;
+        uint32_t spp_per_pass = 1;
     };
     std::shared_ptr<STree> render_ppg(std::vector<std::pair<Array2D<Spectrum>, Spectrum>> &all_samples,
                                       PPGConfig config, const Scene &scene);
