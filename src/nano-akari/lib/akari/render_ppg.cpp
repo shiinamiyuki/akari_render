@@ -78,7 +78,7 @@ namespace akari::render {
           public:
             const Scene *scene = nullptr;
             Sampler *sampler = nullptr;
-            Spectrum L;
+            Spectrum L = Spectrum(0.0);
             Spectrum beta = Spectrum(1.0f);
             Spectrum emitter_direct = Spectrum(0.0);
             Allocator<> allocator;

@@ -437,7 +437,7 @@ namespace akari::render {
                             independent_mcmc(alloc, tiles(i, 0));
                             buffers[tid]->release();
                         }
-                        for (; j + 1 < tiles.dimension()[0]; j += 2) {
+                        for (; j + 1 < tiles.dimension()[1]; j += 2) {
                             replica_exchange(alloc, tiles(i, j), tiles(i, j + 1));
                             buffers[tid]->release();
                         }
