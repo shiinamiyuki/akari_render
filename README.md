@@ -9,9 +9,11 @@ AkariRender is a highly modular CPU/GPU physically based renderer written in C++
 [![Build Status](https://travis-ci.org/shiinamiyuki/AkariRender.svg?branch=master)](https://travis-ci.org/shiinamiyuki/AkariRender)
 
 ## Features
+- Modified Instant Radiosity (supports all kinds of BSDFs)
 - Unidirectional Path Tracing
-- Practical Path Guiding
+- Practical Path Guiding with improvments
 - Stratified MCMC
+- [WIP] Specular Manifold Sampling
 - [WIP] Python binding
 ## TODO
 - Realtime Rendering
