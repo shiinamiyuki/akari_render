@@ -5,8 +5,8 @@
 
 AkariRender is a highly modular CPU/GPU physically based renderer written in C++17.
 
-### Status
-[![Build Status](https://travis-ci.org/shiinamiyuki/AkariRender.svg?branch=master)](https://travis-ci.org/shiinamiyuki/AkariRender)
+<!---### Status
+[![Build Status](https://travis-ci.org/shiinamiyuki/AkariRender.svg?branch=master)](https://travis-ci.org/shiinamiyuki/AkariRender)-->
 
 ## Features
 - Modified Instant Radiosity (supports all kinds of BSDFs)
