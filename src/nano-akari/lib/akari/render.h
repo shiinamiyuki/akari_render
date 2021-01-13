@@ -1160,6 +1160,16 @@ namespace akari::render {
         }
 
         [[nodiscard]] BSDFType type() const { return closure().type(); }
+        [[nodiscard]] bool is_pure_delta() const {
+            auto ty = type();
+            if (BSDFType::Unset == (ty & BSDFType::Specular))
+                return false;
+            if (BSDFType::Unset != (ty & BSDFType::Diffuse))
+                return false;
+            if (BSDFType::Unset != (ty & BSDFType::Glossy))
+                return false;
+            return true;
+        }
         [[nodiscard]] bool match_flags(BSDFType flag) const { return closure().match_flags(flag); }
         std::optional<BSDFSample> sample(const BSDFSampleContext &ctx) const {
             auto wo = frame.world_to_local(ctx.wo);

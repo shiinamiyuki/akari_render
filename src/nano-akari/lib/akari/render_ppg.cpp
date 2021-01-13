@@ -118,6 +118,7 @@ namespace akari::render {
             std::pair<DTreeWrapper *, vec3> get_dtree_and_jittered_position(vec3 p) {
                 vec3 dtree_voxel_size;
                 auto [_dTree, tree_depth] = sTree->dTree(p, dtree_voxel_size);
+                return std::make_pair(_dTree, p);
                 const vec3 u = vec3(sampler->next1d(), sampler->next1d(), sampler->next1d());
                 if (tree_depth < 3) {
                     return std::make_pair(_dTree, p);
@@ -142,11 +143,12 @@ namespace akari::render {
                     light_pdf *= light_sample.pdf;
                     auto f = light_sample.I * vertex.bsdf->evaluate(vertex.wo, light_sample.wi)() *
                              std::abs(dot(si.ns, light_sample.wi));
-                    const Float bsdfSamplingFraction = dTree->selection_prob();
+                    bool is_delta_bsdf = vertex.bsdf->is_pure_delta();
+                    const Float bsdfSamplingFraction = is_delta_bsdf ? 1.0 : dTree->selection_prob();
                     Float bsdf_pdf = vertex.bsdf->evaluate_pdf(vertex.wo, light_sample.wi);
-                    Float mix_psdf =
+                    Float mix_pdf =
                         bsdf_pdf * bsdfSamplingFraction + (1.0 - bsdfSamplingFraction) * dTree->pdf(light_sample.wi);
-                    lighting.color = f / light_pdf * mis_weight(light_pdf, mix_psdf);
+                    lighting.color = f / light_pdf * mis_weight(light_pdf, mix_pdf);
                     lighting.shadow_ray = light_sample.shadow_ray;
                     lighting.pdf = light_pdf;
                     return lighting;
@@ -214,10 +216,10 @@ namespace akari::render {
                     BSDFSampleContext sample_ctx{sampler->next1d(), sampler->next2d(), wo};
                     Float bsdf_pdf = 0.0, dtree_pdf = 0.0;
                     auto sample = bsdf.sample(sample_ctx);
-                    bool is_delta = BSDFType::Unset != (bsdf.type() & BSDFType::Specular);
-                    const Float bsdfSamplingFraction = is_delta ? 1.0 : dTree->selection_prob();
-                    if (is_delta || u0 < bsdfSamplingFraction) {
-                        sample = bsdf.sample(sample_ctx);
+                    bool is_delta_bsdf = bsdf.is_pure_delta();
+                    const Float bsdfSamplingFraction = is_delta_bsdf ? 1.0 : dTree->selection_prob();
+
+                    if (is_delta_bsdf || u0 < bsdfSamplingFraction) {
                         if (!sample || sample->pdf == 0.0)
                             return std::nullopt;
                         bsdf_pdf = sample->pdf;

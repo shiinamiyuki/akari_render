@@ -28,7 +28,7 @@ namespace akari::render {
         double learning_rate = 0.01;
         double regularization = 0.01;
         double theta = 0.0;
-        uint32_t batch_size = 128;
+        uint32_t batch_size = 256;
         uint32_t count = 0;
         double grad_acc = 0.0;
         void step(double grad) {
@@ -49,8 +49,8 @@ namespace akari::render {
             double l = learning_rate * std::sqrt(1 - std::pow(beta1, t)) / std::pow(beta2, t);
             m = beta1 * m + (1.0 - beta1) * grad;
             v = beta2 * v + (1.0 - beta2) * grad * grad;
-            theta = theta - l * m / (std::sqrt(v) + eps);
-            theta = std::clamp<double>(theta, -20.0, 20.0);
+            auto new_theta = theta - l * m / (std::sqrt(v) + eps);
+            theta = std::clamp<double>(new_theta, -20.0, 20.0);
             AKR_ASSERT(!std::isnan(m));
             AKR_ASSERT(!std::isnan(v));
             AKR_ASSERT(!std::isnan(theta));
@@ -355,9 +355,7 @@ namespace akari::render {
         SpinLock lock;
         // std::mutex lock;
         DTreeWrapper() = default;
-        DTreeWrapper(const DTreeWrapper &rhs) : building(rhs.building), sampling(rhs.sampling) {
-            opt.theta = rhs.opt.theta;
-        }
+        DTreeWrapper(const DTreeWrapper &rhs) : building(rhs.building), sampling(rhs.sampling) { opt = rhs.opt; }
         DTreeWrapper &operator=(const DTreeWrapper &rhs) {
             building = rhs.building;
             sampling = rhs.sampling;
@@ -366,7 +364,10 @@ namespace akari::render {
             opt = rhs.opt;
             return *this;
         }
-        double selection_prob() const { return 1.0 / (1.0 + std::exp(-opt.theta)); }
+        double selection_prob() const {
+            // return 0.5;
+            return 1.0 / (1.0 + std::exp(-opt.theta));
+        }
         //        DTreeWrapper(){
         //            sampling.nodes[0].setSum(0.25);
         //        }
@@ -417,7 +418,7 @@ namespace akari::render {
     class STreeNode {
       public:
         DTreeWrapper dTree;
-        std::atomic<int> nSample = 0;
+        std::atomic_uint64_t nSample = 0;
         std::array<int, 2> _children = {-1, -1};
         int axis = 0;
         bool _isLeaf = true;
@@ -566,6 +567,7 @@ namespace akari::render {
         }
 
         void refine(size_t maxSample) {
+            // spdlog::info("refine({})", maxSample);
             AKR_CHECK(maxSample > 0);
             for (auto &i : nodes) {
                 if (i.isLeaf()) {
@@ -584,7 +586,7 @@ namespace akari::render {
         int min_depth = 3;
         int max_depth = 5;
         uint32_t spp = 16;
-        uint32_t spp_per_pass = 1;
+        uint32_t spp_per_pass = 4;
     };
     std::shared_ptr<STree> render_ppg(std::vector<std::pair<Array2D<Spectrum>, Spectrum>> &all_samples,
                                       PPGConfig config, const Scene &scene);
