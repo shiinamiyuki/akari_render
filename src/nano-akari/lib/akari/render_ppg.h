@@ -28,7 +28,7 @@ namespace akari::render {
         double learning_rate = 0.01;
         double regularization = 0.01;
         double theta = 0.0;
-        uint32_t batch_size = 256;
+        uint32_t batch_size = 1;
         uint32_t count = 0;
         double grad_acc = 0.0;
         void step(double grad) {
@@ -41,12 +41,13 @@ namespace akari::render {
             grad_acc += grad;
             if (count < batch_size)
                 return;
-            grad_acc /= count;
+            grad = grad_acc / batch_size;
+            grad_acc = 0;
             count = 0;
             // AKR_ASSERT(!std::isnan(grad));
 
             t++;
-            double l = learning_rate * std::sqrt(1 - std::pow(beta1, t)) / std::pow(beta2, t);
+            double l = learning_rate * std::sqrt(1 - std::pow(beta1, t)) / (1.0 - std::pow(beta2, t));
             m = beta1 * m + (1.0 - beta1) * grad;
             v = beta2 * v + (1.0 - beta2) * grad * grad;
             auto new_theta = theta - l * m / (std::sqrt(v) + eps);
@@ -97,7 +98,10 @@ namespace akari::render {
             }
         }
 
-        QTreeNode *child(int i, std::vector<QTreeNode> &nodes) const {
+        QTreeNode *child(int i, std::vector<QTreeNode> &nodes) {
+            return _children[i] > 0 ? &nodes[_children[i]] : nullptr;
+        }
+        const QTreeNode *child(int i, const std::vector<QTreeNode> &nodes) const {
             return _children[i] > 0 ? &nodes[_children[i]] : nullptr;
         }
 
@@ -128,7 +132,7 @@ namespace akari::render {
             return v;
         }
 
-        float eval(const vec2 &p, std::vector<QTreeNode> &nodes) const {
+        float eval(const vec2 &p, const std::vector<QTreeNode> &nodes) const {
             auto idx = childIndex(p);
             if (child(idx, nodes)) {
                 return 4.0f * child(idx, nodes)->eval((p - offset(idx)) * 2.0f, nodes);
@@ -138,7 +142,7 @@ namespace akari::render {
             }
         }
 
-        float pdf(const vec2 &p, std::vector<QTreeNode> &nodes) const {
+        float pdf(const vec2 &p, const std::vector<QTreeNode> &nodes) const {
             auto idx = childIndex(p);
             //            if (!(_sum[idx].value() > 0)) {
             //                return 0.0f;
@@ -159,7 +163,7 @@ namespace akari::render {
             }
         }
 
-        vec2 sample(vec2 u, vec2 u2, std::vector<QTreeNode> &nodes) const {
+        vec2 sample(vec2 u, vec2 u2, const std::vector<QTreeNode> &nodes) const {
             std::array<float, 4> m = {float(_sum[0]), float(_sum[1]), float(_sum[2]), float(_sum[3])};
             auto left = m[0] + m[2];
             auto right = m[1] + m[3];
@@ -265,11 +269,11 @@ namespace akari::render {
             return *this;
         }
 
-        vec2 sample(const vec2 &u, const vec2 &u2) { return nodes[0].sample(u, u2, nodes); }
+        vec2 sample(const vec2 &u, const vec2 &u2) const { return nodes[0].sample(u, u2, nodes); }
 
-        Float pdf(const vec2 &p) { return nodes[0].pdf(p, nodes); }
+        Float pdf(const vec2 &p) const { return nodes[0].pdf(p, nodes); }
 
-        Float eval(const vec2 &u) {
+        Float eval(const vec2 &u) const {
             return nodes[0].eval(u, nodes); /// weight.value();
         }
 
@@ -392,7 +396,7 @@ namespace akari::render {
                 const auto a = selection_prob();
                 const auto combined_pdf = a * record.bsdf_pdf + (1.0 - a) * learned_pdf;
                 const auto grad_a =
-                    product_estimate * (record.bsdf_pdf - learned_pdf) / (record.sample_pdf * combined_pdf);
+                    -product_estimate * (record.bsdf_pdf - learned_pdf) / (record.sample_pdf * combined_pdf);
                 const auto grad_theta = grad_a * a * (1.0 - a);
                 const auto reg_grad = opt.regularization * opt.theta;
                 opt.step(grad_theta + reg_grad);
@@ -403,12 +407,15 @@ namespace akari::render {
 
         void refine() {
             // spdlog::info("a = {}", selection_prob());
+
             AKR_CHECK(building.sum.value() >= 0.0f);
             //            building._build();
             sampling = building;
             sampling._build();
             AKR_CHECK(sampling.sum.value() >= 0.0f);
             building.refine(sampling, 0.01);
+            // if(sampling.sum.value() > 0.0)
+            // spdlog::info("{}", sampling.sum.value());
             // auto old = opt;
             // opt = AdamOptimizer();
             // opt.theta = old.theta;

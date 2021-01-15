@@ -21,6 +21,19 @@
 
 namespace akari::render {
     static inline constexpr size_t STREE_THRESHOLD = 4000;
+    Image dump_dtree(const DTree &tree, int resolution) {
+        Image img = rgb_image(ivec2(resolution));
+        for (int x = 0; x < resolution; x++) {
+            for (int y = 0; y < resolution; y++) {
+                auto p = vec2(x, y) / vec2(resolution);
+                auto c = tree.pdf(p);
+                img(ivec2(x, y), 0) = c;
+                img(ivec2(x, y), 1) = c;
+                img(ivec2(x, y), 2) = c;
+            }
+        }
+        return img;
+    }
     namespace ppg {
         struct DirectLighting {
             Ray shadow_ray;
@@ -87,6 +100,8 @@ namespace akari::render {
             int max_depth = 5;
             bool useNEE = true;
             bool metropolized = false;
+            enum Filter { NEAREST, SPATIAL };
+            Filter filter = Filter::NEAREST;
             std::shared_ptr<STree> sTree;
             struct PPGVertex {
                 vec3 wi;
@@ -118,9 +133,8 @@ namespace akari::render {
             std::pair<DTreeWrapper *, vec3> get_dtree_and_jittered_position(vec3 p) {
                 vec3 dtree_voxel_size;
                 auto [_dTree, tree_depth] = sTree->dTree(p, dtree_voxel_size);
-                return std::make_pair(_dTree, p);
                 const vec3 u = vec3(sampler->next1d(), sampler->next1d(), sampler->next1d());
-                if (tree_depth < 3) {
+                if (filter == Filter::NEAREST) {
                     return std::make_pair(_dTree, p);
                 }
 
@@ -381,9 +395,11 @@ namespace akari::render {
             accumulatedSamples += samples;
             Film film(scene.camera->resolution());
             Array2D<Spectrum> variance(scene.camera->resolution());
-            ProgressReporter reporter(hprod(film.resolution()));
-            thread::parallel_for(
-                thread::blocked_range<2>(film.resolution(), ivec2(16, 16)), [&](ivec2 id, uint32_t tid) {
+            Array2D<VarianceTracker<Spectrum>> var_trackers(scene.camera->resolution());
+            ProgressReporter reporter(samples);
+            for (int s = 0; s < samples; s++) {
+                thread::parallel_for(thread::blocked_range<2>(film.resolution(), ivec2(16, 16)), [&](ivec2 id,
+                                                                                                     uint32_t tid) {
                     auto Li = [&](const ivec2 p, Sampler &sampler) -> Spectrum {
                         ppg::GuidedPathTracer pt;
                         pt.min_depth = config.min_depth;
@@ -400,6 +416,9 @@ namespace akari::render {
                         pt.useNEE = useNEE;
                         pt.training = !last_iter;
                         pt.sTree = sTree;
+                        pt.filter = ppg::GuidedPathTracer::Filter::NEAREST; // pass >= 3 ?
+                                                                            // ppg::GuidedPathTracer::Filter::SPATIAL
+                                                                            // : ppg::GuidedPathTracer::Filter::BOX;
                         pt.allocator = Allocator<>(buffers[tid]);
                         pt.run_megakernel(&scene.camera.value(), p);
                         non_zero_path.accumluate(!is_black(pt.L));
@@ -407,17 +426,20 @@ namespace akari::render {
                         return pt.L;
                     };
                     Sampler &sampler = samplers[id.x + id.y * film.resolution().x];
-                    VarianceTracker<Spectrum> var;
-                    for (int s = 0; s < samples; s++) {
-                        sampler.start_next_sample();
-                        auto L = Li(id, sampler);
-                        var.update(L);
-                        film.add_sample(id, L, 1.0);
-                    }
-                    if (samples >= 2)
-                        variance(id) = var.variance().value();
-                    reporter.update();
+                    // VarianceTracker<Spectrum> var;
+
+                    sampler.start_next_sample();
+                    auto L = Li(id, sampler);
+                    var_trackers(id).update(L);
+                    film.add_sample(id, L, 1.0);
                 });
+                reporter.update();
+            }
+            thread::parallel_for(thread::blocked_range<2>(film.resolution(), ivec2(16, 16)),
+                                 [&](ivec2 id, uint32_t tid) {
+                                     if (samples >= 2)
+                                         variance(id) = var_trackers(id).variance().value();
+                                 });
             putchar('\n');
             if (samples >= 2) {
                 const size_t one_eighth = hprod(variance.dimension()) / 8;
@@ -441,10 +463,12 @@ namespace akari::render {
                 all_samples.emplace_back(std::move(film.to_array2d()), avg_var);
                 spdlog::info("variance: {}", average(avg_var));
             }
-            spdlog::info("Refining SDTree; pass: {}", pass + 1);
-            spdlog::info("nodes: {}", sTree->nodes.size());
             spdlog::info("non zero path:{}%", non_zero_path.ratio() * 100);
-            sTree->refine(STREE_THRESHOLD * std::sqrt(double(samples) / config.spp_per_pass));
+            if (!last_iter) {
+                spdlog::info("Refining SDTree; pass: {}", pass + 1);
+                spdlog::info("nodes: {}", sTree->nodes.size());
+                sTree->refine(STREE_THRESHOLD * std::sqrt(double(samples) / 4));
+            }
         }
         for (auto buf : buffers) {
             delete buf;
@@ -479,20 +503,38 @@ namespace akari::render {
                 cnt++;
             }
         }
-        Film thetas(scene.camera->resolution());
-        thread::parallel_for(thread::blocked_range<2>(thetas.resolution(), ivec2(16, 16)), [&](ivec2 id, uint32_t tid) {
-            Sampler sampler = PCGSampler(id.x);
-            auto sample = scene.camera->generate_ray(sampler.next2d(), sampler.next2d(), id);
-            const auto si = scene.intersect(sample.ray);
-            if (si) {
-                vec3 _;
-                auto *dtree = sTree->dTree(si->p, _).first;
-                thetas.add_sample(id, Spectrum(dtree->selection_prob()), 1.0);
-            } else {
-                thetas.add_sample(id, Spectrum(0.0), 1.0);
-            }
-        });
-        write_hdr(thetas.to_rgb_image(), "selection.exr");
+        // Film thetas(scene.camera->resolution());
+        // thread::parallel_for(thread::blocked_range<2>(thetas.resolution(), ivec2(16, 16)), [&](ivec2 id, uint32_t
+        // tid) {
+        //     Sampler sampler = PCGSampler(id.x);
+        //     auto sample = scene.camera->generate_ray(sampler.next2d(), sampler.next2d(), id);
+        //     const auto si = scene.intersect(sample.ray);
+        //     if (si) {
+        //         vec3 _;
+        //         auto *dtree = sTree->dTree(si->p, _).first;
+        //         thetas.add_sample(id, Spectrum(dtree->selection_prob()), 1.0);
+        //     } else {
+        //         thetas.add_sample(id, Spectrum(0.0), 1.0);
+        //     }
+        // });
+        // {
+        //     auto range = thread::blocked_range<2>(thetas.resolution(), ivec2(16, 16));
+        //     thread::parallel_for(range, [&](ivec2 id, uint32_t tid) {
+        //         if (id.x % 16 != 0 || id.y % 16 != 0)
+        //             return;
+        //         Sampler sampler = PCGSampler(id.x);
+        //         auto sample = scene.camera->generate_ray(sampler.next2d(), sampler.next2d(), id);
+        //         const auto si = scene.intersect(sample.ray);
+        //         if (si) {
+        //             vec3 _;
+        //             auto *dtree = sTree->dTree(si->p, _).first;
+        //             // printf("%f %f\n", dtree->sampling.sum.value(), dtree->building.sum.value());
+        //             auto img = dump_dtree(dtree->sampling, 128);
+        //             write_generic_image(img, fmt::format("radiance_{}_{}.exr", id.x, id.y));
+        //         }
+        //     });
+        // }
+        // write_hdr(thetas.to_rgb_image(), "selection.exr");
         return array2d_to_rgb(sum / Spectrum(sum_weights));
     }
 
