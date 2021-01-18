@@ -621,12 +621,12 @@ namespace akari::render {
             double r = uniform();
             if (r < 0.5) {
                 r = r * 2.0;
-                x = x + s2 * exp(-log(s2 / s1) * r);
+                x = x + s2 * std::exp(-std::log(s2 / s1) * r);
                 if (x > 1.0)
                     x -= 1.0;
             } else {
                 r = (r - 0.5) * 2.0;
-                x = x - s2 * exp(-log(s2 / s1) * r);
+                x = x - s2 * std::exp(-std::log(s2 / s1) * r);
                 if (x < 0.0)
                     x += 1.0;
             }
@@ -1184,6 +1184,7 @@ namespace akari::render {
 
     struct Light;
     struct Material;
+    struct Medium;
     struct Triangle {
         std::array<Vec3, 3> vertices;
         std::array<Vec3, 3> normals;
@@ -1288,6 +1289,7 @@ namespace akari::render {
         std::vector<const Light *> lights;
         const scene::Mesh *mesh = nullptr;
         const Material *material = nullptr;
+        const Medium *medium = nullptr;
 
         Triangle get_triangle(int prim_id) const {
             Triangle trig;
@@ -1306,6 +1308,24 @@ namespace akari::render {
             }
             return trig;
         }
+    };
+    inline Float phase_hg(Float cosTheta, Float g) {
+        Float denom = 1 + g * g + 2 * g * cosTheta;
+        return Inv4Pi * (1 - g * g) / (denom * std::sqrt(denom));
+    }
+    struct HomogeneousMedium {
+        const Spectrum sigma_a, sigma_s;
+        const Spectrum sigma_t;
+        const Float g;
+        HomogeneousMedium(Spectrum sigma_a, Spectrum sigma_s, Float g)
+            : sigma_a(sigma_a), sigma_s(sigma_s), sigma_t(sigma_a + sigma_s), g(g) {}
+        Spectrum tr(const Ray &ray, Sampler &sampler) const {
+            return exp(-sigma_t * std::min<Float>(ray.tmax * length(ray.d), MaxFloat));
+        }
+    };
+    struct Medium : Variant<HomogeneousMedium> {
+        using Variant::Variant;
+        Spectrum tr(const Ray &ray, Sampler &sampler) const { AKR_VAR_DISPATCH(tr, ray, sampler); }
     };
     struct PointGeometry {
         Vec3 p;
@@ -1514,7 +1534,7 @@ namespace akari::render {
         int spp = 16;
     };
 
-    Film render_bdpt(PTConfig config, const Scene &scene);
+    Image render_bdpt(PTConfig config, const Scene &scene);
 
     struct MLTConfig {
         int num_bootstrap = 100000;

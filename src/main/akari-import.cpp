@@ -22,7 +22,7 @@
 #include <iostream>
 using namespace akari::scene;
 using akari::Spectrum;
-P<SceneGraph> import(const std::string &file) {
+void import(P<SceneGraph> scene, const std::string &file) {
     auto create_vec = [&](aiVector3D v) -> glm::vec3 { return glm::vec3(v[0], v[1], v[2]); };
     auto color4_to_spectrum = [&](aiColor4D v) -> Spectrum { return Spectrum(v[0], v[1], v[2]); };
     Assimp::Importer importer;
@@ -30,7 +30,6 @@ P<SceneGraph> import(const std::string &file) {
     const aiScene *ai_scene =
         importer.ReadFile(file, aiProcess_CalcTangentSpace | aiProcess_Triangulate | aiProcess_GenSmoothNormals |
                                     aiProcess_JoinIdenticalVertices | aiProcess_SortByPType);
-    P<SceneGraph> scene(new SceneGraph());
     std::vector<P<Material>> materials((size_t)ai_scene->mNumMaterials);
     std::vector<P<Mesh>> meshes((size_t)ai_scene->mNumMeshes);
     for (uint32_t i = 0; i < ai_scene->mNumMaterials; i++) {
@@ -127,7 +126,6 @@ P<SceneGraph> import(const std::string &file) {
     scene->meshes = meshes;
     scene->root = create_node(ai_scene->mRootNode, create_node);
     printf("imported %zd meshes\n", scene->meshes.size());
-    return scene;
 }
 void save(const P<SceneGraph> &scene, std::string dir) {
     using namespace akari;
@@ -154,7 +152,18 @@ int main(int argc, char **argv) {
     if (!fs::exists(out_dir)) {
         fs::create_directory(out_dir);
     }
-    auto scene = import(file);
+    P<SceneGraph> scene;
+    if (fs::exists(scene_file)) {
+
+        std::ifstream t(scene_file);
+        std::stringstream buffer;
+        buffer << t.rdbuf();
+        cereal::JSONInputArchive ar(buffer);
+        ar(scene);
+    } else {
+        scene.reset(new SceneGraph());
+    }
+    import(scene, file);
     save(scene, out_dir);
     {
         std::ofstream os(scene_file);

@@ -158,7 +158,7 @@ namespace akari::scene {
 
     class Integrator : public Object {
       public:
-        enum class Type { Path, VPL, MCMC, SMCMC, GuidedPath };
+        enum class Type { Path, VPL, MCMC, SMCMC, GuidedPath, BDPT };
         AKR_DECL_RTTI(Integrator)
         AKR_SER_POLY(Object)
     };
@@ -204,6 +204,14 @@ namespace akari::scene {
         int32_t min_depth = 4;
         int32_t max_depth = 7;
         AKR_DECL_TYPEID(VPL, VPL)
+        AKR_SER_POLY(Integrator, spp, min_depth, max_depth)
+    };
+    class BDPT : public Integrator {
+      public:
+        uint32_t spp = 16;
+        int32_t min_depth = 4;
+        int32_t max_depth = 7;
+        AKR_DECL_TYPEID(BDPT, BDPT)
         AKR_SER_POLY(Integrator, spp, min_depth, max_depth)
     };
     class SceneGraph {

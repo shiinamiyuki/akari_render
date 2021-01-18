@@ -41,7 +41,7 @@ namespace akari {
     template <class T = astd::byte>
     using Allocator = astd::pmr::polymorphic_allocator<T>;
     template <typename T, typename... Ts>
-    std::shared_ptr<T> make_pmr_shared(Allocator<> alloc, Ts &&... args) {
+    std::shared_ptr<T> make_pmr_shared(Allocator<> alloc, Ts &&...args) {
         return std::shared_ptr<T>(alloc.new_object<T>(std::forward<Ts>(args)...), [=](T *p) mutable {
             alloc.destroy(p);
             alloc.deallocate_object(const_cast<std::remove_const_t<T> *>(p), 1);
@@ -95,6 +95,7 @@ namespace akari {
 #    define ShadowEps (Float(0.0001f))
 #else
     static constexpr Float Inf = std::numeric_limits<Float>::infinity();
+    static constexpr Float MaxFloat = std::numeric_limits<Float>::max();
     static constexpr Float Pi = Float(3.1415926535897932384f);
     static constexpr Float PiOver2 = Pi / Float(2.0f);
     static constexpr Float PiOver4 = Pi / Float(4.0f);
@@ -126,6 +127,14 @@ namespace akari {
     template <typename V, typename V2>
     inline V dlerp3dv(const V &v0, const V &v1, const V &v2, V2 v) {
         return -v0 + v2;
+    }
+    template <typename T, int N, class F>
+    T map(const Vector<T, N> &vec, F &&f) {
+        Vector<T, N> out;
+        for (int i = 0; i < N; i++) {
+            out[i] = f(vec[i]);
+        }
+        return out;
     }
     template <typename T, int N, class F>
     T reduce(const Vector<T, N> &vec, F &&f) {
@@ -236,6 +245,10 @@ namespace akari {
             c[i] = x;
         }
         return c;
+    }
+    template <typename Scalar, int N>
+    AKR_XPU Color<Scalar, N> exp(const Color<Scalar, N> &in) {
+        return map(in, [](Scalar x) -> Scalar { return exp(x); });
     }
     template <typename Scalar, int N>
     AKR_XPU Color<Scalar, N> min(const Color<Scalar, N> &in, const Color<Scalar, N> &v) {
@@ -552,7 +565,7 @@ namespace akari {
                 return *this;
             }
             template <typename... Ts>
-            AKR_CPU void emplace(Ts &&... args) {
+            AKR_CPU void emplace(Ts &&...args) {
                 reset();
                 new (ptr()) T(std::forward<Ts>(args)...);
                 set = true;
@@ -920,4 +933,31 @@ namespace akari {
         template <class Fn>
         scope_exit(Fn &&) -> scope_exit<Fn>;
     } // namespace astd
+
+    template <typename T, int N = (64 + sizeof(T) - 1) / sizeof(T)>
+    class SmallVector {
+        T *_data = nullptr;
+        std::array<T, N> arr;
+        // bool on_heap = false;
+        uint32_t _size = 0;
+        void ensure_size(size_t x) { AKR_ASSERT(x <= N); }
+
+      public:
+        SmallVector() { _data = &arr[0]; }
+        size_t size() const { return _size; }
+        const T *data() const { return _data; }
+        T *data() { return _data; }
+        const T &operator[](uint32_t i) const { return data()[i]; }
+        T &operator[](uint32_t i) const { return data()[i]; }
+        void push_back(const T &v) {
+            ensure_size(size() + 1);
+            new &data()[size()] T(v);
+            _size++;
+        }
+        void pop_back() {
+            AKR_ASSERT(size() > 0);
+            _size--;
+            data()[_size].~T();
+        }
+    };
 } // namespace akari

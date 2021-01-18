@@ -258,6 +258,14 @@ namespace akari {
             auto film = render::render_pt(config, *scene);
             auto image = film.to_rgb_image();
             write_generic_image(image, graph->output_path);
+        } else if (auto bdpt = graph->integrator->as<scene::BDPT>()) {
+            render::PTConfig config;
+            config.min_depth = bdpt->min_depth;
+            config.max_depth = bdpt->max_depth;
+            config.spp = bdpt->spp;
+            config.sampler = render::PCGSampler();
+            auto image = render::render_bdpt(config, *scene);
+            write_generic_image(image, graph->output_path);
         } else if (auto gpt = graph->integrator->as<scene::GuidedPathTracer>()) {
             render::PPGConfig config;
             config.min_depth = gpt->min_depth;

@@ -39,15 +39,16 @@ namespace akari::render {
             using Variant::Variant;
         };
 
-        using Path = BufferView<Vertex>;
+        using Path = astd::pmr::vector<Vertex>;
+
     } // namespace bidir
     
-    Film render_bdpt(PTConfig config, const Scene &scene) {
+    Image render_bdpt(PTConfig config, const Scene &scene) {
         Film film(scene.camera->resolution());
         thread::parallel_for(thread::blocked_range<2>(film.resolution(), ivec2(16, 16)), [&](ivec2 id, uint32_t tid) {
             //  film.add_sample(id, Spectrum(1.0), 1.0);
         });
         spdlog::info("render bdpt done");
-        return film;
+        return film.to_rgb_image();
     }
 } // namespace akari::render

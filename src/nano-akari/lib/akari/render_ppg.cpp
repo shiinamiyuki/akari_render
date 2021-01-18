@@ -503,38 +503,38 @@ namespace akari::render {
                 cnt++;
             }
         }
-        // Film thetas(scene.camera->resolution());
-        // thread::parallel_for(thread::blocked_range<2>(thetas.resolution(), ivec2(16, 16)), [&](ivec2 id, uint32_t
-        // tid) {
-        //     Sampler sampler = PCGSampler(id.x);
-        //     auto sample = scene.camera->generate_ray(sampler.next2d(), sampler.next2d(), id);
-        //     const auto si = scene.intersect(sample.ray);
-        //     if (si) {
-        //         vec3 _;
-        //         auto *dtree = sTree->dTree(si->p, _).first;
-        //         thetas.add_sample(id, Spectrum(dtree->selection_prob()), 1.0);
-        //     } else {
-        //         thetas.add_sample(id, Spectrum(0.0), 1.0);
-        //     }
-        // });
-        // {
-        //     auto range = thread::blocked_range<2>(thetas.resolution(), ivec2(16, 16));
-        //     thread::parallel_for(range, [&](ivec2 id, uint32_t tid) {
-        //         if (id.x % 16 != 0 || id.y % 16 != 0)
-        //             return;
-        //         Sampler sampler = PCGSampler(id.x);
-        //         auto sample = scene.camera->generate_ray(sampler.next2d(), sampler.next2d(), id);
-        //         const auto si = scene.intersect(sample.ray);
-        //         if (si) {
-        //             vec3 _;
-        //             auto *dtree = sTree->dTree(si->p, _).first;
-        //             // printf("%f %f\n", dtree->sampling.sum.value(), dtree->building.sum.value());
-        //             auto img = dump_dtree(dtree->sampling, 128);
-        //             write_generic_image(img, fmt::format("radiance_{}_{}.exr", id.x, id.y));
-        //         }
-        //     });
-        // }
-        // write_hdr(thetas.to_rgb_image(), "selection.exr");
+        Film thetas(scene.camera->resolution());
+        thread::parallel_for(thread::blocked_range<2>(thetas.resolution(), ivec2(16, 16)), [&](ivec2 id, uint32_t
+        tid) {
+            Sampler sampler = PCGSampler(id.x);
+            auto sample = scene.camera->generate_ray(sampler.next2d(), sampler.next2d(), id);
+            const auto si = scene.intersect(sample.ray);
+            if (si) {
+                vec3 _;
+                auto *dtree = sTree->dTree(si->p, _).first;
+                thetas.add_sample(id, Spectrum(dtree->selection_prob()), 1.0);
+            } else {
+                thetas.add_sample(id, Spectrum(0.0), 1.0);
+            }
+        });
+        {
+            auto range = thread::blocked_range<2>(thetas.resolution(), ivec2(16, 16));
+            thread::parallel_for(range, [&](ivec2 id, uint32_t tid) {
+                if (id.x % 16 != 0 || id.y % 16 != 0)
+                    return;
+                Sampler sampler = PCGSampler(id.x);
+                auto sample = scene.camera->generate_ray(sampler.next2d(), sampler.next2d(), id);
+                const auto si = scene.intersect(sample.ray);
+                if (si) {
+                    vec3 _;
+                    auto *dtree = sTree->dTree(si->p, _).first;
+                    // printf("%f %f\n", dtree->sampling.sum.value(), dtree->building.sum.value());
+                    auto img = dump_dtree(dtree->sampling, 128);
+                    write_generic_image(img, fmt::format("radiance_{}_{}.exr", id.x, id.y));
+                }
+            });
+        }
+        write_hdr(thetas.to_rgb_image(), "selection.exr");
         return array2d_to_rgb(sum / Spectrum(sum_weights));
     }
 

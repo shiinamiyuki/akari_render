@@ -152,7 +152,12 @@ namespace akari::render ::pt {
         Spectrum &operator[](AOVKind kind) { return static_cast<Base &>(*this)[(int)kind]; }
     };
 
-    template <class PathVisitor = NullPathVisitor, bool ComputeAOV = false>
+    template <int N>
+    struct MediumStack {
+        SmallVector<const Medium, N> st;
+    };
+
+    template <class PathVisitor = NullPathVisitor, bool ComputeAOV = false, bool VolPath = false>
     class GenericPathTracer : public PathTracerBase {
       public:
         AOVs aovs;
@@ -240,7 +245,7 @@ namespace akari::render ::pt {
                 beta_diffuse *= k;
             }
         }
-        
+
         std::optional<SurfaceVertex> on_surface_scatter(const Vec3 &wo, SurfaceInteraction &si,
                                                         const std::optional<PathVertex> &prev_vertex) noexcept {
             auto *material = si.material();

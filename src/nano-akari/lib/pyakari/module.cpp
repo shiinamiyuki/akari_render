@@ -152,6 +152,11 @@ namespace akari::python {
             .def_readwrite("spp", &VPL::spp)
             .def_readwrite("min_depth", &VPL::min_depth)
             .def_readwrite("max_depth", &VPL::max_depth);
+        py::class_<BDPT, Integrator, P<BDPT>>(m, "BDPT")
+            .def(py::init<>())
+            .def_readwrite("spp", &BDPT::spp)
+            .def_readwrite("min_depth", &BDPT::min_depth)
+            .def_readwrite("max_depth", &BDPT::max_depth);
         py::class_<SceneGraph, P<SceneGraph>>(m, "SceneGraph")
             .def(py::init<>())
             .def_readwrite("meshes", &SceneGraph::meshes)
