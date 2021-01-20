@@ -330,7 +330,8 @@ namespace akari {
         // Float time = 0.0f;
         vec3 o;
         vec3 d;
-        Float tmin = -1, tmax = -1;
+        Float tmin = -1;
+        mutable Float tmax = -1;
         Ray() = default;
         Ray(const vec3 &o, const vec3 &d, Float tmin = Eps, Float tmax = std::numeric_limits<Float>::infinity())
             : o(o), d(d), tmin(tmin), tmax(tmax) {}
@@ -741,7 +742,7 @@ namespace akari {
             auto that = this;
             v.dispatch([&](const auto &item) {
                 using U = std::decay_t<decltype(item)>;
-                *that->template get<U>() = item;
+                new (&data) U(item);
             });
             return *this;
         }
@@ -935,7 +936,7 @@ namespace akari {
     } // namespace astd
 
     template <typename T, int N = (64 + sizeof(T) - 1) / sizeof(T)>
-    class SmallVector {
+    class FixedVector {
         T *_data = nullptr;
         std::array<T, N> arr;
         // bool on_heap = false;
@@ -943,15 +944,15 @@ namespace akari {
         void ensure_size(size_t x) { AKR_ASSERT(x <= N); }
 
       public:
-        SmallVector() { _data = &arr[0]; }
+        FixedVector() { _data = &arr[0]; }
         size_t size() const { return _size; }
         const T *data() const { return _data; }
         T *data() { return _data; }
         const T &operator[](uint32_t i) const { return data()[i]; }
-        T &operator[](uint32_t i) const { return data()[i]; }
+        T &operator[](uint32_t i) { return data()[i]; }
         void push_back(const T &v) {
             ensure_size(size() + 1);
-            new &data()[size()] T(v);
+            new (data() + size()) T(v);
             _size++;
         }
         void pop_back() {
@@ -959,5 +960,8 @@ namespace akari {
             _size--;
             data()[_size].~T();
         }
+        bool empty() const { return size() == 0; }
+        T &back() { return data()[size() - 1]; }
+        const T &back() const { return data()[size() - 1]; }
     };
 } // namespace akari

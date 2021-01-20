@@ -136,6 +136,7 @@ namespace akari::render {
         Triangle triangle = instances[isct->geom_id].get_triangle(isct->prim_id);
         SurfaceInteraction si(isct->uv, triangle);
         si.shape = &instances[isct->geom_id];
+        ray.tmax = isct->t;
         return si;
     }
     Scene::~Scene() {
@@ -197,6 +198,8 @@ namespace akari::render {
         auto create_instance = [&](Transform parent_transform, scene::P<scene::Node> node, auto &&self) -> void {
             Transform node_T = parent_transform * node->transform();
             for (auto &instance : node->instances) {
+                if (!instance)
+                    continue;
                 Transform T = node_T * instance->transform();
                 MeshInstance inst;
                 inst.transform = T;
@@ -257,6 +260,14 @@ namespace akari {
             config.sampler = render::PCGSampler();
             auto film = render::render_pt(config, *scene);
             auto image = film.to_rgb_image();
+            write_generic_image(image, graph->output_path);
+        } else if (auto upt = graph->integrator->as<scene::UnifiedPathTracer>()) {
+            render::UPTConfig config;
+            config.min_depth = upt->min_depth;
+            config.max_depth = upt->max_depth;
+            config.spp = upt->spp;
+            config.sampler = render::PCGSampler();
+            auto image = render::render_unified(config, *scene);
             write_generic_image(image, graph->output_path);
         } else if (auto bdpt = graph->integrator->as<scene::BDPT>()) {
             render::PTConfig config;

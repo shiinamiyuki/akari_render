@@ -36,6 +36,12 @@ CEREAL_REGISTER_POLYMORPHIC_RELATION(akari::scene::Object, akari::scene::Mesh);
 CEREAL_REGISTER_TYPE(akari::scene::Material);
 CEREAL_REGISTER_POLYMORPHIC_RELATION(akari::scene::Object, akari::scene::Material);
 
+CEREAL_REGISTER_TYPE(akari::scene::Volume);
+CEREAL_REGISTER_POLYMORPHIC_RELATION(akari::scene::Object, akari::scene::Volume);
+
+CEREAL_REGISTER_TYPE(akari::scene::HomogeneousVolume);
+CEREAL_REGISTER_POLYMORPHIC_RELATION(akari::scene::Volume, akari::scene::HomogeneousVolume);
+
 CEREAL_REGISTER_TYPE(akari::scene::FloatTexture);
 CEREAL_REGISTER_POLYMORPHIC_RELATION(akari::scene::Texture, akari::scene::FloatTexture);
 CEREAL_REGISTER_TYPE(akari::scene::RGBTexture);
@@ -52,6 +58,8 @@ CEREAL_REGISTER_TYPE(akari::scene::Integrator);
 CEREAL_REGISTER_POLYMORPHIC_RELATION(akari::scene::Object, akari::scene::Integrator);
 CEREAL_REGISTER_TYPE(akari::scene::PathTracer);
 CEREAL_REGISTER_POLYMORPHIC_RELATION(akari::scene::Integrator, akari::scene::PathTracer);
+CEREAL_REGISTER_TYPE(akari::scene::UnifiedPathTracer);
+CEREAL_REGISTER_POLYMORPHIC_RELATION(akari::scene::Integrator, akari::scene::UnifiedPathTracer);
 CEREAL_REGISTER_TYPE(akari::scene::VPL);
 CEREAL_REGISTER_POLYMORPHIC_RELATION(akari::scene::Integrator, akari::scene::VPL);
 CEREAL_REGISTER_TYPE(akari::scene::SMCMC);

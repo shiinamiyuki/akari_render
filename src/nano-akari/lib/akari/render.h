@@ -1240,35 +1240,7 @@ namespace akari::render {
     };
     struct Material;
     struct MeshInstance;
-    struct SurfaceInteraction {
-        Triangle triangle;
-        Vec3 p;
-        Vec3 ng, ns;
-        vec2 texcoords;
-        Vec3 dndu, dndv;
-        Vec3 dpdu, dpdv;
-        const MeshInstance *shape = nullptr;
-        SurfaceInteraction(const vec2 &uv, const Triangle &triangle)
-            : triangle(triangle), p(triangle.p(uv)), ng(triangle.ng()), ns(triangle.ns(uv)),
-              texcoords(triangle.texcoord(uv)) {
-            dpdu = triangle.dpdu(uv[0]);
-            dpdv = triangle.dpdu(uv[1]);
-            std::tie(dndu, dndv) = triangle.dnduv(uv);
-        }
-        const Light *light() const { return triangle.light; }
-        const Material *material() const { return triangle.material; }
-        ShadingPoint sp() const {
-            ShadingPoint sp_;
-            sp_.n = ns;
-            sp_.texcoords = texcoords;
-            sp_.dndu = dndu;
-            sp_.dndv = dndv;
-            sp_.dpdu = dpdu;
-            sp_.dpdv = dpdv;
-            return sp_;
-        }
-    };
-
+    struct SurfaceInteraction;
     struct Material {
         Texture color;
         Texture metallic;
@@ -1313,20 +1285,101 @@ namespace akari::render {
         Float denom = 1 + g * g + 2 * g * cosTheta;
         return Inv4Pi * (1 - g * g) / (denom * std::sqrt(denom));
     }
+
+    struct PhaseHG {
+        const Float g;
+        inline Float evaluate(const Float cos_theta) const { return phase_hg(cos_theta, g); }
+        std::pair<Vec3, Float> sample(const Vec3 &wo, const Vec2 &u) const {
+            Float cos_theta = 0.0;
+            if (std::abs(g) < 1e-3)
+                cos_theta = 1 - 2 * u[0];
+            else {
+                Float sqr = (1 - g * g) / (1 + g - 2 * g * u[0]);
+                cos_theta = -(1 + g * g - sqr * sqr) / (2 * g);
+            }
+            auto sin_theta = std::sqrt(std::max<Float>(0, 1.0 - cos_theta * cos_theta));
+            auto phi = 2.0 * Pi * u[1];
+            Frame frame(wo);
+            auto wi = spherical_to_xyz(sin_theta, cos_theta, phi);
+            return std::make_pair(frame.local_to_world(wi), evaluate(cos_theta));
+        }
+    };
+    struct PhaseFunction : Variant<PhaseHG> {
+        using Variant::Variant;
+        Float evaluate(Float cos_theta) const { AKR_VAR_DISPATCH(evaluate, cos_theta); }
+        std::pair<Vec3, Float> sample(const Vec3 &wo, const Vec2 &u) const { AKR_VAR_DISPATCH(sample, wo, u); }
+    };
+    struct MediumInteraction {
+        Vec3 p;
+        PhaseFunction phase;
+    };
     struct HomogeneousMedium {
         const Spectrum sigma_a, sigma_s;
         const Spectrum sigma_t;
         const Float g;
         HomogeneousMedium(Spectrum sigma_a, Spectrum sigma_s, Float g)
             : sigma_a(sigma_a), sigma_s(sigma_s), sigma_t(sigma_a + sigma_s), g(g) {}
-        Spectrum tr(const Ray &ray, Sampler &sampler) const {
+        Spectrum transmittance(const Ray &ray, Sampler &sampler) const {
             return exp(-sigma_t * std::min<Float>(ray.tmax * length(ray.d), MaxFloat));
+        }
+        std::pair<std::optional<MediumInteraction>, Spectrum> sample(const Ray &ray, Sampler &sampler,
+                                                                     Allocator<> alloc) const {
+            int channel = std::min<int>(sampler.next1d() * Spectrum::size, Spectrum::size - 1);
+            auto dist = -std::log(1.0 - sampler.next1d()) / sigma_t[channel];
+            auto t = std::min<double>(dist * length(ray.d), ray.tmax);
+            bool sample_medium = t < ray.tmax;
+            std::optional<MediumInteraction> mi;
+            if (sample_medium) {
+                mi.emplace(MediumInteraction{ray(t), PhaseHG{g}});
+            }
+            auto tr = transmittance(ray, sampler);
+            Spectrum density = sample_medium ? sigma_t * tr : tr;
+            Float pdf = hsum(density);
+            pdf /= Spectrum::size;
+            return std::make_pair(mi, Spectrum(sample_medium ? (tr * sigma_s / pdf) : (tr / pdf)));
         }
     };
     struct Medium : Variant<HomogeneousMedium> {
         using Variant::Variant;
-        Spectrum tr(const Ray &ray, Sampler &sampler) const { AKR_VAR_DISPATCH(tr, ray, sampler); }
+        Spectrum transmittance(const Ray &ray, Sampler &sampler) const {
+            AKR_VAR_DISPATCH(transmittance, ray, sampler);
+        }
+        std::pair<std::optional<MediumInteraction>, Spectrum> sample(const Ray &ray, Sampler &sampler,
+                                                                     Allocator<> alloc) const {
+            AKR_VAR_DISPATCH(sample, ray, sampler, alloc);
+        }
     };
+
+    struct SurfaceInteraction {
+        Triangle triangle;
+        Vec3 p;
+        Vec3 ng, ns;
+        vec2 texcoords;
+        Vec3 dndu, dndv;
+        Vec3 dpdu, dpdv;
+        const MeshInstance *shape = nullptr;
+        SurfaceInteraction(const vec2 &uv, const Triangle &triangle)
+            : triangle(triangle), p(triangle.p(uv)), ng(triangle.ng()), ns(triangle.ns(uv)),
+              texcoords(triangle.texcoord(uv)) {
+            dpdu = triangle.dpdu(uv[0]);
+            dpdv = triangle.dpdu(uv[1]);
+            std::tie(dndu, dndv) = triangle.dnduv(uv);
+        }
+        const Light *light() const { return triangle.light; }
+        const Material *material() const { return triangle.material; }
+        const Medium *medium() const { return shape->medium; }
+        ShadingPoint sp() const {
+            ShadingPoint sp_;
+            sp_.n = ns;
+            sp_.texcoords = texcoords;
+            sp_.dndu = dndu;
+            sp_.dndv = dndv;
+            sp_.dpdu = dpdu;
+            sp_.dpdv = dpdv;
+            return sp_;
+        }
+    };
+
     struct PointGeometry {
         Vec3 p;
         Vec3 n;
@@ -1490,6 +1543,13 @@ namespace akari::render {
         int spp = 16;
     };
     Film render_pt(PTConfig config, const Scene &scene);
+    struct UPTConfig {
+        Sampler sampler;
+        int min_depth = 3;
+        int max_depth = 5;
+        int spp = 16;
+    };
+    Image render_unified(UPTConfig config, const Scene &scene);
     Image render_pt_psd(PTConfig config, PSDConfig psd_config, const Scene &scene);
 
     // separate emitter direct hit

@@ -22,8 +22,8 @@ namespace akari::render {
     std::pair<Spectrum, Spectrum> render_pt_pixel_separete_emitter_direct(PTConfig config, Allocator<> allocator,
                                                                           const Scene &scene, Sampler &sampler,
                                                                           const vec2 &p_film) {
-        pt::GenericPathTracer<pt::SeparateEmitPathVisitor> pt(&scene, &sampler, allocator, config.min_depth,
-                                                              config.max_depth);
+        pt::SimplePathTracer<pt::SeparateEmitPathVisitor> pt(&scene, &sampler, allocator, config.min_depth,
+                                                             config.max_depth);
         pt.run_megakernel(&scene.camera.value(), p_film);
         AKR_ASSERT(hmax(pt.L) >= 0.0 && hmax(pt.emitter_direct) >= 0.0);
         return std::make_pair(pt.visitor.emitter_direct, pt.L);
@@ -51,6 +51,32 @@ namespace akari::render {
         }
         spdlog::info("render pt done");
         return film;
+    }
+    Image render_unified(UPTConfig config, const Scene &scene) {
+        Film film(scene.camera->resolution());
+        std::vector<astd::pmr::monotonic_buffer_resource *> buffers;
+        for (size_t i = 0; i < thread::num_work_threads(); i++) {
+            buffers.emplace_back(new astd::pmr::monotonic_buffer_resource(astd::pmr::new_delete_resource()));
+        }
+        ProgressReporter reporter(hprod(film.resolution()));
+        thread::parallel_for(thread::blocked_range<2>(film.resolution(), ivec2(16, 16)), [&](ivec2 id, uint32_t tid) {
+            Sampler sampler = config.sampler;
+            sampler.set_sample_index(id.y * film.resolution().x + id.x);
+            for (int s = 0; s < config.spp; s++) {
+                sampler.start_next_sample();
+                pt::UnifiedPathTracer<pt::NullPathVisitor> pt(&scene, &sampler, Allocator<>(buffers[tid]),
+                                                              config.min_depth, config.max_depth);
+                pt.run_megakernel(&scene.camera.value(), id);
+                buffers[tid]->release();
+                film.add_sample(id, pt.L, 1.0);
+            }
+            reporter.update();
+        });
+        for (auto buf : buffers) {
+            delete buf;
+        }
+        spdlog::info("render pt done");
+        return film.to_rgb_image();
     }
     namespace psd {
         struct IrradianceRecord {

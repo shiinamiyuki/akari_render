@@ -111,10 +111,17 @@ namespace akari::python {
             .def_readwrite("metallic", &Material::metallic)
             .def_readwrite("emission", &Material::emission)
             .def_readwrite("roughness", &Material::roughness);
+        py::class_<Volume, Object, P<Volume>>(m, "Volume");
+        py::class_<HomogeneousVolume, Object, P<HomogeneousVolume>>(m, "HomogeneousVolume")
+            .def_readwrite("color", &HomogeneousVolume::color)
+            .def_readwrite("absorption", &HomogeneousVolume::absorption)
+            .def_readwrite("density", &HomogeneousVolume::density)
+            .def_readwrite("anisotropy", &HomogeneousVolume::anisotropy);
         py::class_<Instance, Object, P<Instance>>(m, "Instance")
             .def(py::init<>())
             .def_readwrite("transform", &Instance::transform)
             .def_readwrite("material", &Instance::material)
+            .def_readwrite("volume", &Instance::volume)
             .def_readwrite("mesh", &Instance::mesh);
         py::class_<Mesh, Object, P<Mesh>>(m, "Mesh")
             .def(py::init<>())
@@ -131,6 +138,11 @@ namespace akari::python {
             .def_readwrite("spp", &PathTracer::spp)
             .def_readwrite("min_depth", &PathTracer::min_depth)
             .def_readwrite("max_depth", &PathTracer::max_depth);
+        py::class_<UnifiedPathTracer, Integrator, P<UnifiedPathTracer>>(m, "UnifiedPathTracer")
+            .def(py::init<>())
+            .def_readwrite("spp", &UnifiedPathTracer::spp)
+            .def_readwrite("min_depth", &UnifiedPathTracer::min_depth)
+            .def_readwrite("max_depth", &UnifiedPathTracer::max_depth);
         py::class_<GuidedPathTracer, Integrator, P<GuidedPathTracer>>(m, "GuidedPathTracer")
             .def(py::init<>())
             .def_readwrite("spp", &GuidedPathTracer::spp)

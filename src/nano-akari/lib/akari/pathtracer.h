@@ -18,10 +18,35 @@
 #include <akari/render.h>
 
 namespace akari::render ::pt {
+    template <int N = 16>
+    struct MediumStack : FixedVector<const Medium *, N> {
+        auto top() const { return back(); }
+        void update(const SurfaceInteraction &si, const Ray &ray) {
+            if (!si.medium()) {
+                return;
+            }
+            bool going_in = dot(si.ng, ray.d) < 0.0;
+            if (going_in) {
+                if (size() < N - 1)
+                    push_back(si.medium());
+            } else {
+                if (!empty())
+                    pop_back();
+            }
+        }
+    };
     struct DirectLighting {
         Ray shadow_ray;
         Vec3 wi = Vec3(0.0);
         BSDFValue radiance = BSDFValue::zero();
+        Spectrum throughput = Spectrum(0.0);
+        Float pdf = 0.0;
+    };
+
+    struct VolumeDirectLighting {
+        Ray shadow_ray;
+        MediumStack<> st;
+        Vec3 wi = Vec3(0.0);
         Spectrum throughput = Spectrum(0.0);
         Float pdf = 0.0;
     };
@@ -41,11 +66,21 @@ namespace akari::render ::pt {
         Float pdf = 0.0;
         BSDFType sampled_lobe = BSDFType::Unset;
         // SurfaceVertex() = default;
-        SurfaceVertex(const Vec3 &wo, const SurfaceInteraction si) : wo(wo), si(si) {}
+        SurfaceVertex(const Vec3 &wo, const SurfaceInteraction &si) : wo(wo), si(si) {}
         Vec3 p() const { return si.p; }
         Vec3 ng() const { return si.ng; }
     };
-    struct PathVertex : Variant<SurfaceVertex> {
+    struct MediumVertex {
+        MediumInteraction mi;
+        Vec3 wo;
+        Ray ray;
+        Spectrum beta = Spectrum(1.0);
+        Float pdf = 0.0;
+        explicit MediumVertex(const Vec3 &wo, const MediumInteraction &mi) : wo(wo), mi(mi) {}
+        Vec3 p() const { return mi.p; }
+        Vec3 ng() const { return Vec3(0); }
+    };
+    struct PathVertex : Variant<SurfaceVertex, MediumVertex> {
         using Variant::Variant;
         Vec3 p() const {
             return dispatch([](auto &&arg) { return arg.p(); });
@@ -151,25 +186,18 @@ namespace akari::render ::pt {
         }
         Spectrum &operator[](AOVKind kind) { return static_cast<Base &>(*this)[(int)kind]; }
     };
-
-    template <int N>
-    struct MediumStack {
-        SmallVector<const Medium, N> st;
-    };
-
-    template <class PathVisitor = NullPathVisitor, bool ComputeAOV = false, bool VolPath = false>
-    class GenericPathTracer : public PathTracerBase {
+    static Float mis_weight(Float pdf_A, Float pdf_B) {
+        pdf_A *= pdf_A;
+        pdf_B *= pdf_B;
+        return pdf_A / (pdf_A + pdf_B);
+    }
+    template <class PathVisitor = NullPathVisitor>
+    class SimplePathTracer : public PathTracerBase {
       public:
-        AOVs aovs;
-        Spectrum beta_diffuse = Spectrum(0.0);
         PathVisitor visitor;
-        GenericPathTracer(const Scene *scene, Sampler *sampler, Allocator<> alloc, int min_depth, int max_depth)
+        SimplePathTracer(const Scene *scene, Sampler *sampler, Allocator<> alloc, int min_depth, int max_depth)
             : PathTracerBase(scene, sampler, alloc, min_depth, max_depth), visitor(this) {}
-        static Float mis_weight(Float pdf_A, Float pdf_B) {
-            pdf_A *= pdf_A;
-            pdf_B *= pdf_B;
-            return pdf_A / (pdf_A + pdf_B);
-        }
+
         CameraSample camera_ray(const Camera *camera, const ivec2 &p) noexcept {
             CameraSample sample = camera->generate_ray(sampler->next2d(), sampler->next2d(), p);
             return sample;
@@ -234,17 +262,9 @@ namespace akari::render ::pt {
             HitLight hit{wo, light, I};
             if (visitor.on_hit_light(prev_vertex, hit)) {
                 accumulate_radiance(I);
-                if (depth == 0) {
-                    aovs[AOVKind::DiffuseDirect] += I;
-                }
             }
         }
-        void accumulate_beta(const Spectrum &k) {
-            beta *= k;
-            if constexpr (ComputeAOV) {
-                beta_diffuse *= k;
-            }
-        }
+        void accumulate_beta(const Spectrum &k) { beta *= k; }
 
         std::optional<SurfaceVertex> on_surface_scatter(const Vec3 &wo, SurfaceInteraction &si,
                                                         const std::optional<PathVertex> &prev_vertex) noexcept {
@@ -287,34 +307,17 @@ namespace akari::render ::pt {
                 if (!vertex || !visitor.on_scatter(*vertex, prev_vertex)) {
                     break;
                 }
-                if constexpr (ComputeAOV) {
-                    if (depth == 0) {
-                        aovs[AOVKind::Normal] = si->ns;
-                        aovs[AOVKind::DiffuseAlbedo] = vertex->bsdf->closure().albedo().diffuse;
-                    }
-                }
                 if ((vertex->sampled_lobe & BSDFType::Specular) == BSDFType::Unset) {
                     std::optional<DirectLighting> has_direct = compute_direct_lighting(*vertex, select_light());
                     if (has_direct) {
                         auto &direct = *has_direct;
                         if (!is_black(direct.radiance()) && !scene->occlude(direct.shadow_ray)) {
                             accumulate_radiance(beta * direct.radiance());
-                            if constexpr (ComputeAOV) {
-                                if (depth == 0)
-                                    aovs[AOVKind::DiffuseDirect] += beta * direct.radiance.diffuse;
-                                else {
-                                    aovs[AOVKind::DiffuseIndirect] += beta_diffuse * direct.radiance();
-                                }
-                            }
                         }
                     }
                 }
                 accumulate_beta(vertex->beta());
-                if constexpr (ComputeAOV) {
-                    if (depth == 0) {
-                        beta_diffuse = vertex->beta.diffuse;
-                    }
-                }
+
                 depth++;
                 if (depth > min_depth) {
                     Float continue_prob = std::min<Float>(1.0, hmax(beta)) * 0.95;
@@ -330,9 +333,6 @@ namespace akari::render ::pt {
                 }
                 prev_vertex = PathVertex(*vertex);
             }
-            if constexpr (ComputeAOV) {
-                aovs[AOVKind::Specular] = pt.L - (aovs[AOVKind::DiffuseDirect] + aovs[AOVKind::DiffuseIndirect]);
-            }
         }
         void run_megakernel(const Camera *camera, const ivec2 &p) noexcept {
             auto camera_sample = camera_ray(camera, p);
@@ -341,12 +341,257 @@ namespace akari::render ::pt {
         }
     };
 
+    template <class PathVisitor = NullPathVisitor>
+    class UnifiedPathTracer : public PathTracerBase {
+      public:
+        struct Config {
+            bool compute_aov = false;
+            bool use_guiding = false;
+            bool volumetric = true;
+            bool use_nee = true;
+        };
+        Config config;
+        PathVisitor visitor;
+        UnifiedPathTracer(const Scene *scene, Sampler *sampler, Allocator<> alloc, int min_depth, int max_depth)
+            : PathTracerBase(scene, sampler, alloc, min_depth, max_depth), visitor(this) {}
+        CameraSample camera_ray(const Camera *camera, const ivec2 &p) noexcept {
+            CameraSample sample = camera->generate_ray(sampler->next2d(), sampler->next2d(), p);
+            return sample;
+        }
+        std::pair<const Light *, Float> select_light() noexcept {
+            return scene->light_sampler->sample(sampler->next2d());
+        }
+        std::optional<DirectLighting>
+        compute_direct_lighting(const MediumVertex &vertex, const std::pair<const Light *, Float> &selected) noexcept {
+            auto [light, light_pdf] = selected;
+            if (light) {
+                auto &mi = vertex.mi;
+                DirectLighting lighting;
+                LightSampleContext light_ctx;
+                light_ctx.u = sampler->next2d();
+                light_ctx.p = mi.p;
+                LightSample light_sample = light->sample_incidence(light_ctx);
+                if (light_sample.pdf <= 0.0)
+                    return std::nullopt;
+                lighting.throughput =
+                    light_sample.I * mi.phase.evaluate(std::abs(dot(vertex.wo, light_sample.wi))) / light_pdf;
+                light_pdf *= light_sample.pdf;
+                lighting.shadow_ray = light_sample.shadow_ray;
+                lighting.pdf = light_pdf;
+                lighting.wi = light_sample.wi;
+                return lighting;
+            }
+            return std::nullopt;
+        }
+        std::optional<DirectLighting>
+        compute_direct_lighting(const SurfaceVertex &vertex, const std::pair<const Light *, Float> &selected) noexcept {
+            auto [light, light_pdf] = selected;
+            if (light) {
+                auto &si = vertex.si;
+                DirectLighting lighting;
+                LightSampleContext light_ctx;
+                light_ctx.u = sampler->next2d();
+                light_ctx.p = si.p;
+                LightSample light_sample = light->sample_incidence(light_ctx);
+                if (light_sample.pdf <= 0.0)
+                    return std::nullopt;
+                light_pdf *= light_sample.pdf;
+                auto f = vertex.bsdf->evaluate(vertex.wo, light_sample.wi);
+                Float bsdf_pdf = vertex.bsdf->evaluate_pdf(vertex.wo, light_sample.wi);
+                lighting.throughput = light_sample.I * std::abs(dot(si.ns, light_sample.wi)) / light_pdf *
+                                      mis_weight(light_pdf, bsdf_pdf);
+                lighting.radiance = f * lighting.throughput;
+                lighting.shadow_ray = light_sample.shadow_ray;
+                lighting.pdf = light_pdf;
+                lighting.wi = light_sample.wi;
+                if (visitor.on_direct_lighting(vertex, lighting)) {
+                    return lighting;
+                }
+                return std::nullopt;
+            } else {
+                return std::nullopt;
+            }
+        }
+
+        void on_miss(const Ray &ray, const std::optional<PathVertex> &prev_vertex) noexcept {
+            // if (scene->envmap) {
+            //     on_hit_light(scene->envmap.get(), -ray.d, ShadingPoint(), prev_vertex);
+            // }
+        }
+
+        void accumulate_radiance(const Spectrum &r) { L += r; }
+
+        void on_hit_light(const Light *light, const Vec3 &wo, const ShadingPoint &sp,
+                          const std::optional<PathVertex> &prev_vertex) {
+            Spectrum I = beta * light->Le(wo, sp);
+            if (!config.use_nee || depth == 0 ||
+                BSDFType::Unset != (prev_vertex->sampled_lobe() & BSDFType::Specular)) {
+                ;
+            } else {
+                PointGeometry ref;
+                ref.n = prev_vertex->ng();
+                ref.p = prev_vertex->p();
+                auto light_pdf = light->pdf_incidence(ref, -wo) * scene->light_sampler->pdf(light);
+                if ((prev_vertex->sampled_lobe() & BSDFType::Specular) == BSDFType::Unset) {
+                    Float weight_bsdf = mis_weight(prev_vertex->pdf(), light_pdf);
+                    I *= weight_bsdf;
+                }
+            }
+            HitLight hit{wo, light, I};
+            if (visitor.on_hit_light(prev_vertex, hit)) {
+                accumulate_radiance(I);
+            }
+        }
+        void accumulate_beta(const Spectrum &k) { beta *= k; }
+        std::optional<MediumVertex> on_volume_scatter(const Vec3 &wo, const MediumInteraction &mi) noexcept {
+            if (depth < max_depth) {
+                MediumVertex vertex(wo, mi);
+                auto [wi, phase] = mi.phase.sample(wo, sampler->next2d());
+                vertex.ray = Ray(mi.p, wi, Eps);
+                vertex.pdf = phase;
+                vertex.beta = Spectrum(1.0);
+                return vertex;
+            }
+            return std::nullopt;
+        }
+        std::optional<SurfaceVertex> on_surface_scatter(const Vec3 &wo, SurfaceInteraction &si) noexcept {
+            auto *material = si.material();
+            if (depth < max_depth) {
+                SurfaceVertex vertex(wo, si);
+                auto bsdf = material->evaluate(*sampler, allocator, si);
+                BSDFSampleContext sample_ctx{sampler->next1d(), sampler->next2d(), wo};
+                auto sample = bsdf.sample(sample_ctx);
+                if (!sample) {
+                    return std::nullopt;
+                }
+                AKR_ASSERT(sample->pdf >= 0.0f);
+                if (sample->pdf == 0.0f) {
+                    return std::nullopt;
+                }
+                vertex.bsdf = bsdf;
+                vertex.ray = Ray(si.p, sample->wi, Eps / std::abs(glm::dot(si.ng, sample->wi)));
+                vertex.beta = sample->f * (std::abs(glm::dot(si.ns, sample->wi)) / sample->pdf);
+                vertex.pdf = sample->pdf;
+                vertex.sampled_lobe = sample->type;
+                return vertex;
+            }
+            return std::nullopt;
+        }
+        Spectrum transmittance(Ray shadow_ray, MediumStack<> st) {
+            Spectrum tr(1.0);
+            vec3 dst = shadow_ray(shadow_ray.tmax);
+            while (true) {
+                Ray ray = shadow_ray;
+                auto si = scene->intersect(ray);
+                if (!st.empty())
+                    tr *= st.top()->transmittance(ray, *sampler);
+                if (is_black(tr) || hmax(tr) < 1e-10)
+                    return Spectrum(0);
+                if (si) {
+                    if (si->material() != nullptr)
+                        return Spectrum(0);
+                    st.update(*si, ray);
+                } else {
+                    break;
+                }
+                shadow_ray.o = si->p;
+                shadow_ray.tmax = length(dst - si->p) / length(shadow_ray.d);
+            }
+            return tr;
+        }
+        void run_megakernel(Ray ray, MediumStack<> st, std::optional<PathVertex> prev_vertex) noexcept {
+            std::optional<PathVertex> this_vertex;
+            while (true) {
+                auto si = scene->intersect(ray);
+                auto wo = -ray.d;
+                // if (!si) {
+                //     on_miss(ray, prev_vertex);
+                //     break;
+                // }
+                std::optional<MediumInteraction> mi;
+                if (config.volumetric && !st.empty()) {
+                    Spectrum tr(0);
+                    std::tie(mi, tr) = st.top()->sample(ray, *sampler, allocator);
+                    accumulate_beta(tr);
+                    st.update(*si, ray);
+                }
+                if (si && si->triangle.light) {
+                    on_hit_light(si->triangle.light, wo, si->sp(), prev_vertex);
+                    break;
+                }
+                if (!mi) {
+                    if (!si) {
+                        on_miss(ray, prev_vertex);
+                        break;
+                    }
+                    auto vertex = on_surface_scatter(wo, *si);
+                    if (!vertex || !visitor.on_scatter(*vertex, prev_vertex)) {
+                        break;
+                    }
+                    if (config.use_nee && (vertex->sampled_lobe & BSDFType::Specular) == BSDFType::Unset) {
+                        std::optional<DirectLighting> has_direct = compute_direct_lighting(*vertex, select_light());
+                        if (has_direct) {
+                            auto &direct = *has_direct;
+                            if (!is_black(direct.radiance())) {
+                                if (!config.volumetric) {
+                                    if (!scene->occlude(direct.shadow_ray))
+                                        accumulate_radiance(beta * direct.radiance());
+                                } else {
+                                    accumulate_radiance(beta * direct.radiance() *
+                                                        transmittance(direct.shadow_ray, st));
+                                }
+                            }
+                        }
+                    }
+                    accumulate_beta(vertex->beta());
+                    ray = vertex->ray;
+                    this_vertex = PathVertex(*vertex);
+                } else {
+                    auto vertex = on_volume_scatter(wo, *mi);
+                    if (!vertex) {
+                        break;
+                    }
+                    if (config.use_nee) {
+                        std::optional<DirectLighting> has_direct = compute_direct_lighting(*vertex, select_light());
+                        if (has_direct) {
+                            auto &direct = *has_direct;
+                            if (!is_black(direct.radiance())) {
+                                accumulate_radiance(beta * direct.radiance() * transmittance(direct.shadow_ray, st));
+                            }
+                        }
+                    }
+                    accumulate_beta(vertex->beta);
+                    ray = vertex->ray;
+                    this_vertex = PathVertex(*vertex);
+                }
+
+                depth++;
+                if (depth > min_depth) {
+                    Float continue_prob = std::min<Float>(1.0, hmax(beta)) * 0.95;
+                    if (continue_prob > sampler->next1d()) {
+                        accumulate_beta(Spectrum(1.0 / continue_prob));
+                    } else {
+                        break;
+                    }
+                }
+
+                prev_vertex = this_vertex;
+            }
+        }
+        void run_megakernel(const Camera *camera, const ivec2 &p) noexcept {
+            auto camera_sample = camera_ray(camera, p);
+            Ray ray = camera_sample.ray;
+            MediumStack<> st;
+            run_megakernel(ray, st, std::nullopt);
+        }
+    };
+
 } // namespace akari::render::pt
 
 namespace akari::render {
     Spectrum pt_estimator(PTConfig config, const Scene &scene, Allocator<> alloc, Sampler &sampler, Ray &ray,
                           std::optional<pt::PathVertex> prev_vertex) {
-        pt::GenericPathTracer<> pt(&scene, &sampler, alloc, config.min_depth, config.max_depth);
+        pt::SimplePathTracer<> pt(&scene, &sampler, alloc, config.min_depth, config.max_depth);
         // pt.min_depth = config.min_depth;
         // pt.max_depth = config.max_depth;
         // pt.L = Spectrum(0.0);

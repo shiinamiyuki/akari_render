@@ -98,8 +98,24 @@ namespace akari::scene {
         P<Texture> emission;
         P<Texture> transmission;
         Material();
-        void commit() {}
+        virtual void commit() {}
         AKR_SER_POLY(Object, color, specular, metallic, roughness, emission, transmission)
+    };
+    class Volume : public Object {
+      public:
+        enum class Type { Homogeneous };
+        AKR_DECL_RTTI(Volume)
+        AKR_SER_POLY(Object)
+        virtual void commit() {}
+    };
+    class HomogeneousVolume : public Volume {
+      public:
+        AKR_DECL_TYPEID(HomogeneousVolume, Homogeneous)
+        Color3f color = Color3f(1.0);
+        Color3f absorption = Color3f(0.0);
+        Float density = 1.0;
+        Float anisotropy = 0.0;
+        AKR_SER_POLY(Volume, color, absorption, density, anisotropy)
     };
     class Mesh : public Object {
         bool loaded = false;
@@ -122,8 +138,14 @@ namespace akari::scene {
         TRSTransform transform;
         P<Mesh> mesh;
         P<Material> material;
-        void commit() { material->commit(); }
-        AKR_SER_POLY(Object, transform, mesh, material)
+        P<Volume> volume;
+        void commit() {
+            if (material)
+                material->commit();
+            if (volume)
+                volume->commit();
+        }
+        AKR_SER_POLY(Object, transform, mesh, material, volume)
     };
     class Node : public Object {
       public:
@@ -158,7 +180,7 @@ namespace akari::scene {
 
     class Integrator : public Object {
       public:
-        enum class Type { Path, VPL, MCMC, SMCMC, GuidedPath, BDPT };
+        enum class Type { Path, VPL, MCMC, SMCMC, GuidedPath, UnifiedPath, BDPT };
         AKR_DECL_RTTI(Integrator)
         AKR_SER_POLY(Object)
     };
@@ -169,6 +191,14 @@ namespace akari::scene {
         int32_t min_depth = 4;
         int32_t max_depth = 7;
         AKR_DECL_TYPEID(PathTracer, Path)
+        AKR_SER_POLY(Integrator, spp, min_depth, max_depth)
+    };
+    class UnifiedPathTracer : public Integrator {
+      public:
+        uint32_t spp = 16;
+        int32_t min_depth = 4;
+        int32_t max_depth = 7;
+        AKR_DECL_TYPEID(UnifiedPathTracer, UnifiedPath)
         AKR_SER_POLY(Integrator, spp, min_depth, max_depth)
     };
     class GuidedPathTracer : public Integrator {
