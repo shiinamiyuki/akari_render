@@ -2,3 +2,6 @@
 [submodule "external/vcpkg"]
 	path = external/vcpkg
 	url = https://github.com/microsoft/vcpkg
+[submodule "external/useless"]
+	path = external/useless
+	url = https://github.com/shiinamiyuki/useless
