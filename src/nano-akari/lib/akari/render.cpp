@@ -181,7 +181,19 @@ namespace akari::render {
             }
             return tex.value();
         };
+        auto create_volume = [&](const scene::P<scene::Volume> &vol_node) -> const Medium * {
+            if (!vol_node)
+                return nullptr;
+            if (auto homo = vol_node->as<scene::HomogeneousVolume>()) {
+                auto vol =
+                    HomogeneousMedium(homo->density * homo->absorption, homo->density * homo->color, homo->anisotropy);
+                return scene->allocator.new_object<Medium>(vol);
+            }
+            return nullptr;
+        };
         auto create_mat = [&](const scene::P<scene::Material> &mat_node) -> const Material * {
+            if (!mat_node)
+                return nullptr;
             auto it = mat_map.find(mat_node.get());
             if (it != mat_map.end())
                 return it->second;
@@ -204,24 +216,27 @@ namespace akari::render {
                 MeshInstance inst;
                 inst.transform = T;
                 inst.material = create_mat(instance->material);
+                inst.medium = create_volume(instance->volume);
                 inst.indices = instance->mesh->indices;
                 inst.normals = instance->mesh->normals;
                 inst.texcoords = instance->mesh->texcoords;
                 inst.vertices = instance->mesh->vertices;
                 inst.mesh = instance->mesh.get();
-                if (inst.material->emission.isa<ConstantTexture>() &&
-                    luminance(inst.material->emission.get<ConstantTexture>()->evaluate_s(ShadingPoint())) <= 0.0) {
-                    // not emissive
-                } else {
-                    // emissived
-                    std::vector<const Light *> lights;
-                    for (int i = 0; i < (int)inst.indices.size(); i++) {
-                        AreaLight area_light(inst.get_triangle(i), inst.material->emission, false);
-                        auto light = alloc.new_object<Light>(area_light);
-                        scene->lights.emplace_back(light);
-                        lights.emplace_back(light);
+                if (inst.material) {
+                    if (inst.material->emission.isa<ConstantTexture>() &&
+                        luminance(inst.material->emission.get<ConstantTexture>()->evaluate_s(ShadingPoint())) <= 0.0) {
+                        // not emissive
+                    } else {
+                        // emissived
+                        std::vector<const Light *> lights;
+                        for (int i = 0; i < (int)inst.indices.size(); i++) {
+                            AreaLight area_light(inst.get_triangle(i), inst.material->emission, false);
+                            auto light = alloc.new_object<Light>(area_light);
+                            scene->lights.emplace_back(light);
+                            lights.emplace_back(light);
+                        }
+                        inst.lights = std::move(lights);
                     }
-                    inst.lights = std::move(lights);
                 }
                 scene->instances.emplace_back(std::move(inst));
             }

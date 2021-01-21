@@ -18,11 +18,15 @@
 #include <akari/render.h>
 
 namespace akari::render ::pt {
+
     template <int N = 16>
     struct MediumStack : FixedVector<const Medium *, N> {
         auto top() const { return back(); }
+        // void update(const SurfaceInteraction & si, const std::optional<MediumInteraction> & mi, const Ray & ray){
+        //     if(empty() &&)
+        // }
         void update(const SurfaceInteraction &si, const Ray &ray) {
-            if (!si.medium()) {
+            if (!si.medium() || si.material()) {
                 return;
             }
             bool going_in = dot(si.ng, ray.d) < 0.0;
@@ -45,9 +49,8 @@ namespace akari::render ::pt {
 
     struct VolumeDirectLighting {
         Ray shadow_ray;
-        MediumStack<> st;
         Vec3 wi = Vec3(0.0);
-        Spectrum throughput = Spectrum(0.0);
+        Spectrum radiance = Spectrum(0.0);
         Float pdf = 0.0;
     };
 
@@ -361,21 +364,25 @@ namespace akari::render ::pt {
         std::pair<const Light *, Float> select_light() noexcept {
             return scene->light_sampler->sample(sampler->next2d());
         }
-        std::optional<DirectLighting>
+        std::optional<VolumeDirectLighting>
         compute_direct_lighting(const MediumVertex &vertex, const std::pair<const Light *, Float> &selected) noexcept {
             auto [light, light_pdf] = selected;
             if (light) {
                 auto &mi = vertex.mi;
-                DirectLighting lighting;
+                VolumeDirectLighting lighting;
                 LightSampleContext light_ctx;
                 light_ctx.u = sampler->next2d();
                 light_ctx.p = mi.p;
                 LightSample light_sample = light->sample_incidence(light_ctx);
                 if (light_sample.pdf <= 0.0)
                     return std::nullopt;
-                lighting.throughput =
-                    light_sample.I * mi.phase.evaluate(std::abs(dot(vertex.wo, light_sample.wi))) / light_pdf;
                 light_pdf *= light_sample.pdf;
+                auto phase = mi.phase.evaluate(std::abs(dot(vertex.wo, light_sample.wi)));
+                AKR_CHECK(std::isfinite(phase));
+                AKR_CHECK(std::isfinite(light_sample.pdf));
+                AKR_CHECK(std::isfinite(light_pdf));
+                AKR_CHECK(std::isfinite(hsum(light_sample.I)));
+                lighting.radiance = light_sample.I * phase / light_pdf * mis_weight(light_pdf, phase);
                 lighting.shadow_ray = light_sample.shadow_ray;
                 lighting.pdf = light_pdf;
                 lighting.wi = light_sample.wi;
@@ -424,7 +431,7 @@ namespace akari::render ::pt {
         void on_hit_light(const Light *light, const Vec3 &wo, const ShadingPoint &sp,
                           const std::optional<PathVertex> &prev_vertex) {
             Spectrum I = beta * light->Le(wo, sp);
-            if (!config.use_nee || depth == 0 ||
+            if (!config.use_nee || !prev_vertex || depth == 0 ||
                 BSDFType::Unset != (prev_vertex->sampled_lobe() & BSDFType::Specular)) {
                 ;
             } else {
@@ -469,7 +476,8 @@ namespace akari::render ::pt {
                     return std::nullopt;
                 }
                 vertex.bsdf = bsdf;
-                vertex.ray = Ray(si.p, sample->wi, Eps / std::abs(glm::dot(si.ng, sample->wi)));
+                vertex.ray = spawn_ray(si.p, sample->wi, si.ng);
+                // vertex.ray = Ray(si.p, sample->wi, Eps / std::abs(glm::dot(si.ng, sample->wi)));
                 vertex.beta = sample->f * (std::abs(glm::dot(si.ns, sample->wi)) / sample->pdf);
                 vertex.pdf = sample->pdf;
                 vertex.sampled_lobe = sample->type;
@@ -480,11 +488,18 @@ namespace akari::render ::pt {
         Spectrum transmittance(Ray shadow_ray, MediumStack<> st) {
             Spectrum tr(1.0);
             vec3 dst = shadow_ray(shadow_ray.tmax);
+            int iter = 0;
             while (true) {
                 Ray ray = shadow_ray;
                 auto si = scene->intersect(ray);
-                if (!st.empty())
+                if (!st.empty()) {
                     tr *= st.top()->transmittance(ray, *sampler);
+                }
+                iter++;
+                if (iter > 1024) {
+                    fprintf(stderr, "Max iteration in transmittance() reached\n");
+                    break;
+                }
                 if (is_black(tr) || hmax(tr) < 1e-10)
                     return Spectrum(0);
                 if (si) {
@@ -494,9 +509,10 @@ namespace akari::render ::pt {
                 } else {
                     break;
                 }
-                shadow_ray.o = si->p;
+                shadow_ray.o = offset_ray(si->p, dot(shadow_ray.d, si->ng) > 0 ? si->ng : -si->ng);
                 shadow_ray.tmax = length(dst - si->p) / length(shadow_ray.d);
             }
+            AKR_CHECK(!std::isnan(hsum(tr)));
             return tr;
         }
         void run_megakernel(Ray ray, MediumStack<> st, std::optional<PathVertex> prev_vertex) noexcept {
@@ -509,20 +525,31 @@ namespace akari::render ::pt {
                 //     break;
                 // }
                 std::optional<MediumInteraction> mi;
-                if (config.volumetric && !st.empty()) {
-                    Spectrum tr(0);
-                    std::tie(mi, tr) = st.top()->sample(ray, *sampler, allocator);
-                    accumulate_beta(tr);
-                    st.update(*si, ray);
-                }
-                if (si && si->triangle.light) {
-                    on_hit_light(si->triangle.light, wo, si->sp(), prev_vertex);
-                    break;
+                if (si) {
+                    if (config.volumetric && !st.empty()) {
+                        Spectrum tr(0);
+                        std::tie(mi, tr) = st.top()->sample(ray, *sampler, allocator);
+                        AKR_CHECK(!std::isnan(hsum(tr)));
+                        accumulate_beta(tr);
+                    }
+                    if (!mi)
+                        st.update(*si, ray);
+
+                    if (si->triangle.light) {
+                        on_hit_light(si->triangle.light, wo, si->sp(), prev_vertex);
+                        break;
+                    }
                 }
                 if (!mi) {
                     if (!si) {
                         on_miss(ray, prev_vertex);
                         break;
+                    }
+                    if (!si->material() && si->medium()) {
+                        // skip volume boundary
+                        // ray = Ray(si->p, ray.d, Eps);
+                        ray = spawn_ray(si->p, ray.d, si->ng);
+                        continue;
                     }
                     auto vertex = on_surface_scatter(wo, *si);
                     if (!vertex || !visitor.on_scatter(*vertex, prev_vertex)) {
@@ -552,14 +579,17 @@ namespace akari::render ::pt {
                         break;
                     }
                     if (config.use_nee) {
-                        std::optional<DirectLighting> has_direct = compute_direct_lighting(*vertex, select_light());
+                        std::optional<VolumeDirectLighting> has_direct =
+                            compute_direct_lighting(*vertex, select_light());
                         if (has_direct) {
                             auto &direct = *has_direct;
-                            if (!is_black(direct.radiance())) {
-                                accumulate_radiance(beta * direct.radiance() * transmittance(direct.shadow_ray, st));
+                            AKR_CHECK(!std::isnan(hsum(direct.radiance)));
+                            if (!is_black(direct.radiance)) {
+                                accumulate_radiance(beta * direct.radiance * transmittance(direct.shadow_ray, st));
                             }
                         }
                     }
+                    AKR_CHECK(!std::isnan(hsum(vertex->beta)));
                     accumulate_beta(vertex->beta);
                     ray = vertex->ray;
                     this_vertex = PathVertex(*vertex);

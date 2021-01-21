@@ -112,7 +112,8 @@ namespace akari::python {
             .def_readwrite("emission", &Material::emission)
             .def_readwrite("roughness", &Material::roughness);
         py::class_<Volume, Object, P<Volume>>(m, "Volume");
-        py::class_<HomogeneousVolume, Object, P<HomogeneousVolume>>(m, "HomogeneousVolume")
+        py::class_<HomogeneousVolume, Volume, P<HomogeneousVolume>>(m, "HomogeneousVolume")
+            .def(py::init<>())
             .def_readwrite("color", &HomogeneousVolume::color)
             .def_readwrite("absorption", &HomogeneousVolume::absorption)
             .def_readwrite("density", &HomogeneousVolume::density)

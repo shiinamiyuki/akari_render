@@ -102,7 +102,7 @@ namespace akari {
     static constexpr Float InvPi = Float(1.0f) / Pi;
     static constexpr Float Inv2Pi = Float(1.0) / (2.0 * Pi);
     static constexpr Float Inv4Pi = Float(1.0) / (4.0 * Pi);
-    static constexpr Float Eps = Float(0.001f);
+    static constexpr Float Eps = Float(1e-5f);
     static constexpr Float ShadowEps = Float(0.0001f);
 
     static constexpr Float MachineEpsilon = std::numeric_limits<Float>::epsilon() * 0.5;
@@ -335,14 +335,44 @@ namespace akari {
         Ray() = default;
         Ray(const vec3 &o, const vec3 &d, Float tmin = Eps, Float tmax = std::numeric_limits<Float>::infinity())
             : o(o), d(d), tmin(tmin), tmax(tmax) {}
-        static Ray spawn_to(const vec3 &p0, const vec3 &p1) {
-            vec3 dir = p1 - p0;
-            return Ray(p0, dir, Eps, Float(1.0f) - ShadowEps);
-        }
         vec3 operator()(Float t) const { return o + t * d; }
         AKR_SER(o, d, tmin, tmax)
     };
 
+    namespace robust_rt {
+        constexpr inline float origin() { return 1.0f / 32.0f; }
+        constexpr inline float float_scale() { return 1.0f / 65536.0f; }
+        constexpr inline float int_scale() { return 256.0f; }
+
+    } // namespace robust_rt
+    // Normal points outward for rays exiting the surface, else is flipped.
+    inline vec3 offset_ray(const vec3 p, const vec3 n) {
+        using namespace robust_rt;
+        ivec3 of_i(int_scale() * n.x, int_scale() * n.y, int_scale() * n.z);
+
+        vec3 p_i(glm::intBitsToFloat(glm::floatBitsToInt(p.x) + ((p.x < 0) ? -of_i.x : of_i.x)),
+                 glm::intBitsToFloat(glm::floatBitsToInt(p.y) + ((p.y < 0) ? -of_i.y : of_i.y)),
+                 glm::intBitsToFloat(glm::floatBitsToInt(p.z) + ((p.z < 0) ? -of_i.z : of_i.z)));
+
+        return vec3(fabsf(p.x) < origin() ? p.x + float_scale() * n.x : p_i.x,
+                    fabsf(p.y) < origin() ? p.y + float_scale() * n.y : p_i.y,
+                    fabsf(p.z) < origin() ? p.z + float_scale() * n.z : p_i.z);
+    }
+
+    inline glm::dvec3 offset_ray(const glm::dvec3 p, const glm::dvec3 n) { return p; }
+    inline Ray spawn_ray(const Vec3 &o, const Vec3 &d, const Vec3 &n) {
+        auto ray = Ray(o, d, Eps);
+        ray.o = offset_ray(ray.o, dot(d, n) > 0 ? n : -n);
+        return ray;
+    }
+    inline Ray spawn_to(const Vec3 &p1, const Vec3 &p2, const Vec3 &n) {
+        auto w = p2 - p1;
+        auto dist = length(w);
+        w /= dist;
+        auto ray = spawn_ray(p1, w, n);
+        ray.tmax = dist * (1.0 - 1e-7f);
+        return ray;
+    }
     struct Frame {
         Frame() = default;
         static inline void compute_local_frame(const vec3 &v1, vec3 *v2, vec3 *v3) {

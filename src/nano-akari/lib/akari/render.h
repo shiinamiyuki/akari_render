@@ -1388,6 +1388,7 @@ namespace akari::render {
     struct LightSampleContext {
         vec2 u;
         Vec3 p;
+        Vec3 n = Vec3(0);
     };
     struct LightSample {
         Vec3 ng = Vec3(0.0f);
@@ -1452,9 +1453,14 @@ namespace akari::render {
             auto dist_sqr = dot(sample.wi, sample.wi);
             sample.wi /= sqrt(dist_sqr);
             sample.I = color.evaluate_s(ShadingPoint(triangle.texcoord(coords)));
-            sample.pdf = dist_sqr / max(Float(0.0), -dot(sample.wi, sample.ng)) / triangle.area();
-            sample.shadow_ray = Ray(p, -sample.wi, Eps / std::abs(dot(sample.wi, sample.ng)),
-                                    sqrt(dist_sqr) * (Float(1.0f) - ShadowEps));
+            auto cos_theta = dot(sample.wi, sample.ng);
+            if (-cos_theta < 0.0)
+                sample.pdf = 0.0;
+            else
+                sample.pdf = dist_sqr / max(Float(0.0), -cos_theta) / triangle.area();
+            // sample.shadow_ray = Ray(p, -sample.wi, Eps / std::abs(dot(sample.wi, sample.ng)),
+            // sqrt(dist_sqr) * (Float(1.0f) - ShadowEps));
+            sample.shadow_ray = Ray(ctx.p, sample.wi, Eps, sqrt(dist_sqr) * (Float(1.0f) - ShadowEps));
             return sample;
         }
 
