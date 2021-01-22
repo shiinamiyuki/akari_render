@@ -217,10 +217,12 @@ namespace akari::render {
                 inst.transform = T;
                 inst.material = create_mat(instance->material);
                 inst.medium = create_volume(instance->volume);
-                inst.indices = instance->mesh->indices;
-                inst.normals = instance->mesh->normals;
-                inst.texcoords = instance->mesh->texcoords;
-                inst.vertices = instance->mesh->vertices;
+                inst.indices = BufferView<const ivec3>(instance->mesh->indices.data(), instance->mesh->indices.size());
+                inst.normals = BufferView<const vec3>(instance->mesh->normals.data(), instance->mesh->normals.size());
+                inst.texcoords =
+                    BufferView<const vec2>(instance->mesh->texcoords.data(), instance->mesh->texcoords.size());
+                inst.vertices =
+                    BufferView<const vec3>(instance->mesh->vertices.data(), instance->mesh->vertices.size());
                 inst.mesh = instance->mesh.get();
                 if (inst.material) {
                     if (inst.material->emission.isa<ConstantTexture>() &&

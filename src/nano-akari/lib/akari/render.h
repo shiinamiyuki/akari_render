@@ -710,8 +710,8 @@ namespace akari::render {
 
     struct Film {
         Array2D<Spectrum> radiance;
-        Array2D<std::array<AtomicFloat, Spectrum::size>> splats;
         Array2D<Float> weight;
+        Array2D<std::array<AtomicFloat, Spectrum::size>> splats;
         explicit Film(const ivec2 &dimension) : radiance(dimension), weight(dimension), splats(dimension) {}
         void add_sample(const ivec2 &p, const Spectrum &sample, Float weight_) {
             weight(p) += weight_;

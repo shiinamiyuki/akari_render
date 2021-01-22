@@ -42,8 +42,8 @@ namespace akari::render {
         };
 
         struct SurfaceVertex {
-            SurfaceInteraction si;
             Vec3 wo;
+            SurfaceInteraction si;
             Ray ray;
             Spectrum beta;
             std::optional<BSDF> bsdf;
@@ -397,7 +397,7 @@ namespace akari::render {
             Array2D<Spectrum> variance(scene.camera->resolution());
             Array2D<VarianceTracker<Spectrum>> var_trackers(scene.camera->resolution());
             ProgressReporter reporter(samples);
-            for (int s = 0; s < samples; s++) {
+            for (uint32_t s = 0; s < samples; s++) {
                 thread::parallel_for(thread::blocked_range<2>(film.resolution(), ivec2(16, 16)), [&](ivec2 id,
                                                                                                      uint32_t tid) {
                     auto Li = [&](const ivec2 p, Sampler &sampler) -> Spectrum {
@@ -448,7 +448,7 @@ namespace akari::render {
                 const size_t Q = Q2 - Q1;
                 std::array<std::vector<Float>, Spectrum::size> V;
                 Spectrum avg_var;
-                for (int c = 0; c < Spectrum::size; c++) {
+                for (uint32_t c = 0; c < Spectrum::size; c++) {
                     V[c].resize(hprod(variance.dimension()));
                     thread::parallel_for(thread::blocked_range<2>(film.resolution(), ivec2(16, 16)),
                                          [&](ivec2 id, uint32_t tid) {
@@ -504,8 +504,7 @@ namespace akari::render {
             }
         }
         Film thetas(scene.camera->resolution());
-        thread::parallel_for(thread::blocked_range<2>(thetas.resolution(), ivec2(16, 16)), [&](ivec2 id, uint32_t
-        tid) {
+        thread::parallel_for(thread::blocked_range<2>(thetas.resolution(), ivec2(16, 16)), [&](ivec2 id, uint32_t tid) {
             Sampler sampler = PCGSampler(id.x);
             auto sample = scene.camera->generate_ray(sampler.next2d(), sampler.next2d(), id);
             const auto si = scene.intersect(sample.ray);

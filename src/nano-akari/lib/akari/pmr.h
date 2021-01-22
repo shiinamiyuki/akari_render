@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #pragma once
+#include <cstddef>
+#include <list>
 #include <akari/common.h>
 // enabling C++20 pmr
 

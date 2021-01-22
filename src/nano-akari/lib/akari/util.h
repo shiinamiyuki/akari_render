@@ -16,6 +16,7 @@
 #include <vector>
 #include <optional>
 #include <memory>
+#include <cstring>
 #include <akari/common.h>
 #include <akari/pmr.h>
 #if defined(AKR_GPU_BACKEND_CUDA) || defined(__CUDACC__) || defined(__NVCC__)
@@ -237,7 +238,7 @@ namespace akari {
         Color<Scalar, N> c;
         for (int i = 0; i < N; i++) {
             auto x = in[i];
-            if (isnan(x)) {
+            if (std::isnan(x)) {
                 x = 0;
             } else {
                 x = max(Scalar(0.0f), x);
@@ -915,12 +916,11 @@ namespace akari {
     template <typename T>
     struct BufferView {
         BufferView() = default;
-        template <typename Allocator>
-        BufferView(const std::vector<T, Allocator> &vec) : _data(vec.data()), _size(vec.size()) {}
-        template <typename Allocator, typename = std::enable_if_t<std::is_const_v<T>>>
-        BufferView(const std::vector<std::remove_const_t<T>, Allocator> &vec) : _data(vec.data()), _size(vec.size()) {}
-        template <typename Allocator, typename = std::enable_if_t<std::is_const_v<T>>>
-        BufferView(const T *data, size_t size) : _data(data), _size(size) {}
+        // template <typename Allocator>
+        // BufferView(std::vector<T, Allocator> &vec) : _data(vec.data()), _size(vec.size()) {}
+        // template <typename Allocator>
+        // BufferView(std::enable_if_t<std::is_const_v<T>, const std::vector<std::remove_const_t<T>, Allocator>> &vec)
+        //     : _data(vec.data()), _size(vec.size()) {}
         BufferView(T *data, size_t size) : _data(data), _size(size) {}
         T &operator[](uint32_t i) const { return _data[i]; }
         size_t size() const { return _size; }
@@ -935,7 +935,9 @@ namespace akari {
         T *_data = nullptr;
         size_t _size = 0;
     };
-
+    template <typename T>
+    BufferView(T *, size_t) -> BufferView<T>;
+    
     template <typename T>
     struct ObjectCache {
         template <class F>

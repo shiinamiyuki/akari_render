@@ -76,7 +76,7 @@ namespace akari::render {
                 return dot(d1, d1) < dot(d2, d2);
             };
             using Compare = decltype(cmp);
-            auto cmp_node = [&](const KDTreeNode *a, const query *b) {
+            auto cmp_node = [&](const KDTreeNode *a, const KDTreeNode *b) {
                 auto d1 = a->point->p() - query.p();
                 auto d2 = b->point->p() - query.p();
                 return dot(d1, d1) < dot(d2, d2);
@@ -103,6 +103,7 @@ namespace akari::render {
                 if (!container.empty()) {
                     max_dist = std::min<double>(max_dist, l2norm(container.front().p() - query));
                 }
+                auto axis = node->axis;
                 if (node->left) {
                     auto d = (node->left->point->p()[axis] - query[axis]);
                     d *= d;

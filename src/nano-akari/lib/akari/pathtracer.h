@@ -21,7 +21,7 @@ namespace akari::render ::pt {
 
     template <int N = 16>
     struct MediumStack : FixedVector<const Medium *, N> {
-        auto top() const { return back(); }
+        auto top() const { return this->back(); }
         // void update(const SurfaceInteraction & si, const std::optional<MediumInteraction> & mi, const Ray & ray){
         //     if(empty() &&)
         // }
@@ -31,11 +31,11 @@ namespace akari::render ::pt {
             }
             bool going_in = dot(si.ng, ray.d) < 0.0;
             if (going_in) {
-                if (size() < N - 1)
-                    push_back(si.medium());
+                if (this->size() < N - 1)
+                    this->push_back(si.medium());
             } else {
-                if (!empty())
-                    pop_back();
+                if (!this->empty())
+                    this->pop_back();
             }
         }
     };
@@ -61,8 +61,8 @@ namespace akari::render ::pt {
     };
 
     struct SurfaceVertex {
-        SurfaceInteraction si;
         Vec3 wo;
+        SurfaceInteraction si;
         Ray ray;
         BSDFValue beta;
         std::optional<BSDF> bsdf;
@@ -74,8 +74,8 @@ namespace akari::render ::pt {
         Vec3 ng() const { return si.ng; }
     };
     struct MediumVertex {
-        MediumInteraction mi;
         Vec3 wo;
+        MediumInteraction mi;
         Ray ray;
         Spectrum beta = Spectrum(1.0);
         Float pdf = 0.0;

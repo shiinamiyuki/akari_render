@@ -455,28 +455,29 @@ namespace akari::render {
 
         const auto alpha = 0.05;
         const auto beta1 = 0.05, beta2 = 0.5;
-        auto in_tile = [&](const Tile &s, ivec2 p) -> bool {
-            auto off = p - s.p_center;
-            return offset2index.find(off) != offset2index.end();
-        };
-        auto for_each_overlapped_tile = [&](const Tile &s, auto &&F) {
-            for (auto &off : overlapped_tile_offsets) {
-                auto id = off + s.p_center;
-                if (glm::any(glm::lessThan(id, ivec2(0))) || glm::any(glm::greaterThanEqual(id, tiles.dimension()))) {
-                    continue;
-                }
-                F(tiles(id));
-            }
-        };
+        // auto in_tile = [&](const Tile &s, ivec2 p) -> bool {
+        //     auto off = p - s.p_center;
+        //     return offset2index.find(off) != offset2index.end();
+        // };
+        // auto for_each_overlapped_tile = [&](const Tile &s, auto &&F) {
+        //     for (auto &off : overlapped_tile_offsets) {
+        //         auto id = off + s.p_center;
+        //         if (glm::any(glm::lessThan(id, ivec2(0))) || glm::any(glm::greaterThanEqual(id, tiles.dimension())))
+        //         {
+        //             continue;
+        //         }
+        //         F(tiles(id));
+        //     }
+        // };
 
-        auto for_each_overlapped_pixel = [&](const Tile &s, const Tile &t, auto &&F) {
-            auto t_off = t.p_center - s.p_center;
-            if (overlapped_pixel_indices.find(t_off) == overlapped_pixel_indices.end())
-                return;
-            for (auto &i : overlapped_pixel_indices[t_off]) {
-                F(s.p_center + offsets[i]);
-            }
-        };
+        // auto for_each_overlapped_pixel = [&](const Tile &s, const Tile &t, auto &&F) {
+        //     auto t_off = t.p_center - s.p_center;
+        //     if (overlapped_pixel_indices.find(t_off) == overlapped_pixel_indices.end())
+        //         return;
+        //     for (auto &i : overlapped_pixel_indices[t_off]) {
+        //         F(s.p_center + offsets[i]);
+        //     }
+        // };
         auto for_each_overlapped_tile_pixel = [&](const Tile &s, auto &&F) {
             {
                 for (const auto &[off, vec] : overlapped_tile_by_pixel) {

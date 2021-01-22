@@ -81,11 +81,11 @@ namespace akari {
         }
 
       private:
+        std::atomic<size_t> total;
         double min_report_interval;
         double last_report_time = 0;
         Timer timer;
         std::mutex m;
         std::atomic<size_t> count = 0;
-        std::atomic<size_t> total;
     };
 } // namespace akari

@@ -18,9 +18,9 @@
 
 namespace akari::render {
     namespace bidir {
-        struct SurfaceVertex {
+        struct SurfaceVertex {Vec3 wo;
             SurfaceInteraction si;
-            Vec3 wo;
+            
             Ray ray;
             Spectrum beta;
             std::optional<BSDF> bsdf;

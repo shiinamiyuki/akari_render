@@ -74,8 +74,8 @@ namespace akari::render {
         };
 
         struct SurfaceVertex {
-            SurfaceInteraction si;
             Vec3 wo;
+            SurfaceInteraction si;
             Ray ray;
             Spectrum beta;
             std::optional<BSDF> bsdf;
