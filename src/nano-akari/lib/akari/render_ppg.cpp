@@ -442,9 +442,9 @@ namespace akari::render {
                                  });
             putchar('\n');
             if (samples >= 2) {
-                const size_t one_eighth = hprod(variance.dimension()) / 8;
-                const size_t Q1 = 0; // hprod(variance.dimension()) / 8;
-                const size_t Q2 = hprod(variance.dimension()) - one_eighth;
+                const size_t outliers = 8; // hprod(variance.dimension()) / 8;
+                const size_t Q1 = 0;       // hprod(variance.dimension()) / 8;
+                const size_t Q2 = hprod(variance.dimension()) - outliers;
                 const size_t Q = Q2 - Q1;
                 std::array<std::vector<Float>, Spectrum::size> V;
                 Spectrum avg_var;
