@@ -769,7 +769,6 @@ namespace akari {
             if (index != -1)
                 _drop();
             index = v.index;
-            auto that = this;
             v.dispatch([&](const auto &item) {
                 using U = std::decay_t<decltype(item)>;
                 new (&data) U(item);

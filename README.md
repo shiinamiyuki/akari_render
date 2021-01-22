@@ -19,24 +19,18 @@ AkariRender is a highly modular CPU/GPU physically based renderer written in C++
 - Realtime Rendering
 
 ## Build
-### If you don't have / don't know vcpkg
+AkariRender uses a custom package manager called [useless](https://github.com/shiinamiyuki/useless). It's completely useless but still more useful than vcpkg/system package manager.
+
+
 ```bash
 git clone --recursive https://github.com/shiinamiyuki/AkariRender
+cd useless
+python main.py install embree assimp cereal glm cxxopts pybind11
+cd ..
 mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release # vcpkg will download and install dependencies
+cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j 8
 ```
 
-### If you have vcpkg installed
-Pass CMAKE_TOOLCHAIN_FILE to cmake to force using your own vcpkg
-
-Dependencies:
-- OpenImageIO
-- Embree3
-- glm
-- cereal
-- assimp
-- pybind11
-- cxxopts
 
 

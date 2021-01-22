@@ -14,18 +14,18 @@ option(AKR_BACKEND_EMBREE "Enable cpu backend with embree" ON)
 option(AKR_BACKEND_CUDA "Enable CUDA + Optix7 backend" OFF)
 option(AKR_BUILD_GUI "Build GUI" OFF)
 
-find_package(glm CONFIG REQUIRED)
-find_package(cereal CONFIG REQUIRED)
-find_package(assimp CONFIG REQUIRED)
+find_package(glm REQUIRED)
+find_package(cereal REQUIRED)
+find_package(assimp REQUIRED)
 # find_package(Eigen3 CONFIG REQUIRED)
 find_package(Python COMPONENTS Interpreter Development)
-find_package(pybind11 CONFIG REQUIRED)
-find_package(IlmBase CONFIG REQUIRED)
-find_package(OpenEXR CONFIG REQUIRED)
-find_package(OpenImageIO CONFIG REQUIRED)
-find_package(spdlog CONFIG REQUIRED)
-set(AKR_EXT_LIBS ${AKR_EXT_LIBS} glm cereal OpenImageIO::OpenImageIO  OpenImageIO::OpenImageIO_Util embree
-    spdlog::spdlog spdlog::spdlog_header_only)
+find_package(pybind11 REQUIRED)
+# find_package(IlmBase REQUIRED)
+find_package(OpenEXR REQUIRED)
+find_package(spdlog REQUIRED)
+find_package(stb REQUIRED)
+set(AKR_EXT_LIBS ${AKR_EXT_LIBS} glm cereal::cereal  embree
+    spdlog::spdlog spdlog::spdlog_header_only OpenEXR::OpenEXR stb_image stb_image_write)
 
 message(STATUS "python:  " ${Python_EXECUTABLE})
 

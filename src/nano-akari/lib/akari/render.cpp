@@ -249,6 +249,7 @@ namespace akari::render {
             BufferView<const Light *> lights(scene->lights.data(), scene->lights.size());
             std::vector<Float> power;
             for (auto light : lights) {
+                (void)light;
                 power.emplace_back(1.0);
             }
             scene->light_sampler = std::make_shared<PowerLightSampler>(alloc, lights, power);
