@@ -44,7 +44,7 @@ if(MSVC)
 else()
     set(CMAKE_CXX_FLAGS -fPIC ${CMAKE_CXX_FLAGS})
     set(AKR_CXX_FLAGS -mavx2)
-    set(AKR_CORE_EXT_LIBS ${AKR_CORE_EXT_LIBS} stdc++fs)
+    set(AKR_EXT_LIBS ${AKR_EXT_LIBS} stdc++fs)
 endif()
 
 function(set_output_dir target)
