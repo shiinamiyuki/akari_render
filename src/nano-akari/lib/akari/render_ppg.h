@@ -52,9 +52,9 @@ namespace akari::render {
             v = beta2 * v + (1.0 - beta2) * grad * grad;
             auto new_theta = theta - l * m / (std::sqrt(v) + eps);
             theta = std::clamp<double>(new_theta, -20.0, 20.0);
-            AKR_ASSERT(!std::isnan(m));
-            AKR_ASSERT(!std::isnan(v));
-            AKR_ASSERT(!std::isnan(theta));
+            AKR_CHECK(!std::isnan(m));
+            AKR_CHECK(!std::isnan(v));
+            AKR_CHECK(!std::isnan(theta));
         }
     };
     struct SDTreeDepositRecord {
@@ -154,8 +154,8 @@ namespace akari::render {
             if (factor < 0 || std::isnan(factor)) {
                 spdlog::info("{} {} {}\n", factor, _sum[idx].value(), s);
             }
-            AKR_ASSERT(!std::isnan(factor));
-            AKR_ASSERT(factor >= 0);
+            AKR_CHECK(!std::isnan(factor));
+            AKR_CHECK(factor >= 0);
             if (child(idx, nodes)) {
                 return 4.0f * factor * child(idx, nodes)->pdf((p - offset(idx)) * 2.0f, nodes);
             } else {
@@ -543,7 +543,7 @@ namespace akari::render {
 
         void deposit(SDTreeDepositRecord record) {
             auto &irradiance = record.radiance;
-            AKR_ASSERT(irradiance >= 0 && !std::isnan(irradiance) && !std::isinf(irradiance));
+            AKR_CHECK(irradiance >= 0 && !std::isnan(irradiance) && !std::isinf(irradiance));
             if (irradiance >= 0 && !std::isnan(irradiance)) {
                 record.p = box.offset(record.p);
                 nodes.at(0).deposit(record, nodes);

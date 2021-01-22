@@ -262,9 +262,9 @@ namespace akari::render {
                         // sample->f = sample->f * (mis_weight(dtree_pdf, bsdf_pdf) * 2.0);
                         sample->pdf = sample->pdf + bsdfSamplingFraction * bsdf_pdf;
                     }
-                    AKR_ASSERT(!std::isnan(sample->pdf));
-                    AKR_ASSERT(sample->pdf >= 0.0);
-                    AKR_ASSERT(hmin(sample->f()) >= 0.0f);
+                    AKR_CHECK(!std::isnan(sample->pdf));
+                    AKR_CHECK(sample->pdf >= 0.0);
+                    AKR_CHECK(hmin(sample->f()) >= 0.0f);
                     if (std::isnan(sample->pdf) || sample->pdf == 0.0f) {
                         return std::nullopt;
                     }
@@ -330,6 +330,7 @@ namespace akari::render {
                     ray = vertex->ray;
                     prev_vertex = PathVertex(*vertex);
                 }
+                L = clamp_zero(L);
                 if (training) {
                     for (int i = 0; i < n_vertices; i++) {
                         auto irradiance = average(clamp_zero(vertices[i].L));
@@ -460,7 +461,7 @@ namespace akari::render {
                 }
 
                 // Spectrum avg_var = variance.sum() / hprod(variance.dimension());
-                all_samples.emplace_back(std::move(film.to_array2d()), avg_var);
+                all_samples.emplace_back(film.to_array2d(), avg_var);
                 spdlog::info("variance: {}", average(avg_var));
             }
             spdlog::info("non zero path:{}%", non_zero_path.ratio() * 100);

@@ -336,6 +336,7 @@ namespace akari::render ::pt {
                 }
                 prev_vertex = PathVertex(*vertex);
             }
+            L = clamp_zero(L);
         }
         void run_megakernel(const Camera *camera, const ivec2 &p) noexcept {
             auto camera_sample = camera_ray(camera, p);

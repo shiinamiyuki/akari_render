@@ -176,7 +176,7 @@ namespace akari::render {
                 tex.emplace(ConstantTexture(rgb_tex->value));
             } else if (auto img_tex = tex_node->as<scene::ImageTexture>()) {
                 std::shared_ptr<Image> img;
-                img.reset(new Image(std::move(read_generic_image(img_tex->path))));
+                img.reset(new Image(read_generic_image(img_tex->path)));
                 tex.emplace(ImageTexture(std::move(img)));
             }
             return tex.value();
