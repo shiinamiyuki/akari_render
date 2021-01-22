@@ -16,7 +16,7 @@
 #include <akari/util.h>
 #include <akari/pmr.h>
 #include <algorithm>
-#include <execution>
+
 namespace akari::render {
 
     /*
@@ -49,7 +49,7 @@ namespace akari::render {
                 return node;
             }
             int axis = depth % 3;
-            std::sort(std::execution::par, indices.begin() + range.first, indices.begin() + range.second,
+            std::sort(indices.begin() + range.first, indices.begin() + range.second,
                       [=](int a, int b) { return points[a].p()[axis] < points[b].p()[axis]; });
             size_t mid = (range.first + range.second) / 2;
             auto node = alloc.new_object<KDTreeNode>();
