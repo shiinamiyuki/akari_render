@@ -5,8 +5,8 @@
 
 AkariRender is a highly modular CPU/GPU physically based renderer written in C++17.
 
-<!---### Status
-[![Build Status](https://travis-ci.org/shiinamiyuki/AkariRender.svg?branch=master)](https://travis-ci.org/shiinamiyuki/AkariRender)-->
+-### Status
+[![Build Status](https://travis-ci.org/shiinamiyuki/AkariRender.svg?branch=master)](https://travis-ci.org/shiinamiyuki/AkariRender)
 
 ## Features
 - Modified Instant Radiosity (supports all kinds of BSDFs)
@@ -25,7 +25,7 @@ AkariRender uses a custom package manager called [useless](https://github.com/sh
 ```bash
 git clone --recursive https://github.com/shiinamiyuki/AkariRender
 cd useless
-python main.py install embree assimp cereal glm cxxopts pybind11
+python main.py install embree assimp cereal glm cxxopts pybind11 openexr spdlog stb
 cd ..
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
