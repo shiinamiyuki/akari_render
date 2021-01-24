@@ -26,7 +26,7 @@ endif()
 if(AKR_USE_OPENVDB)
     set(RECIPE_OPENVDB_ARG "openvdb")
 endif()
-execute_process(COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/recipe.py ${RECIPE_EMBREE_ARG}
+execute_process(COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/recipe.py ${RECIPE_EMBREE_ARG} ${RECIPE_OPENVDB_ARG}
                WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 add_subdirectory(src)
 
