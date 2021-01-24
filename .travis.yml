@@ -41,7 +41,7 @@ matrix:
         apt:
           sources: ['ubuntu-toolchain-r-test']
           packages: ['clang-10','ninja-build','libc++-10-dev', 'libc++abi-10-dev', 'zip', 'unzip', 'curl','pkg-config', 
-                    'libgl1-mesa-dev','libxxf86vm-dev']
+                    'libgl1-mesa-dev','libxxf86vm-dev','libboost-dev','libboost-system-dev','libboost-iostreams-dev']
       env: CC=clang-10 CXX=clang++-10
       script: bash ./scripts/build-linux-cpu.sh
 
