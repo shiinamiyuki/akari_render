@@ -9,14 +9,22 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_SHARED_LIBRARY_PREFIX_CXX "")
 set(CMAKE_STATIC_LIBRARY_PREFIX_CXX "")
 
+option(AKR_BACKEND_EMBREE "Enable cpu backend with embree" ON)
+option(AKR_BACKEND_CUDA "Enable CUDA + Optix7 backend" OFF)
+option(AKR_BUILD_GUI "Build GUI" OFF)
+option(AKR_USE_OPENVDB "Use OpenVDB" ON)
+
 
 set(CMAKE_PREFIX_PATH ${CMAKE_SOURCE_DIR}/.useless/install)
-
 find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
 
 set(RECIPE_EMBREE_ARG "embree")
+set(RECIPE_OPENVDB_ARG "openvdb")
 if(embree_DIR)
     set(RECIPE_EMBREE_ARG "")
+endif()
+if(AKR_USE_OPENVDB)
+    set(RECIPE_OPENVDB_ARG "")
 endif()
 execute_process(COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/recipe.py ${RECIPE_EMBREE_ARG}
                WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

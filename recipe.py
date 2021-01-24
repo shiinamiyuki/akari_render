@@ -14,6 +14,7 @@ if __name__ == '__main__':
         r.require('cxxopts')
         r.require('assimp')
         r.require('pybind11')
-        r.require('openvdb')
+        if 'openvdb' in sys.argv[1:]:
+            r.require('openvdb')
         if 'embree' in sys.argv[1:]:
             r.require('embree')

@@ -10,9 +10,7 @@ set(AKR_EXT_LIBS "")
 set(AKR_EXT_INCLUDES "")
 set(AKR_COMPILE_DEFINITIONS "")
 
-option(AKR_BACKEND_EMBREE "Enable cpu backend with embree" ON)
-option(AKR_BACKEND_CUDA "Enable CUDA + Optix7 backend" OFF)
-option(AKR_BUILD_GUI "Build GUI" OFF)
+
 
 find_package(glm REQUIRED)
 find_package(cereal REQUIRED)
@@ -24,6 +22,14 @@ find_package(pybind11 REQUIRED)
 find_package(OpenEXR REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(stb REQUIRED)
+
+if(AKR_USE_OPENVDB)
+    set(Boost_ROOT ${CMAKE_SOURCE_DIR}/.useless/source/boost)
+    find_package(Boost REQUIRED)
+    set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/.useless/install ${CMAKE_SOURCE_DIR}/.useless/install/lib/cmake/OpenVDB)
+    find_package(OpenVDB REQUIRED)
+    set(AKR_EXT_LIBS ${AKR_EXT_LIBS} OpenVDB::openvdb )
+endif()
 set(AKR_EXT_LIBS ${AKR_EXT_LIBS} glm cereal::cereal  embree
     spdlog::spdlog spdlog::spdlog_header_only OpenEXR::IlmImf OpenEXR::IlmImfUtil stb_image stb_image_write)
 
