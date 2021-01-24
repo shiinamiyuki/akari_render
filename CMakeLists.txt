@@ -10,8 +10,22 @@ set(CMAKE_SHARED_LIBRARY_PREFIX_CXX "")
 set(CMAKE_STATIC_LIBRARY_PREFIX_CXX "")
 
 
-set(CMAKE_PREFIX_PATH ${CMAKE_SOURCE_DIR}/useless/.useless/install)
+set(CMAKE_PREFIX_PATH ${CMAKE_SOURCE_DIR}/.useless/install)
 
+find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+
+set(RECIPE_EMBREE_ARG "embree")
+if(embree_DIR)
+    set(RECIPE_EMBREE_ARG "")
+endif()
+execute_process(COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/recipe.py ${RECIPE_EMBREE_ARG}
+               WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 add_subdirectory(src)
+
+if(NOT COPIED_DLL)
+execute_process(COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/useless/copy_dll.py ${CMAKE_SOURCE_DIR}/.useless/install/bin ${CMAKE_BINARY_DIR}/dist
+                WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    set(COPIED_DLL TRUE CACHE BOOL "DLL COPIED" FORCE)
+endif()
 
 

@@ -25,7 +25,7 @@ find_package(OpenEXR REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(stb REQUIRED)
 set(AKR_EXT_LIBS ${AKR_EXT_LIBS} glm cereal::cereal  embree
-    spdlog::spdlog spdlog::spdlog_header_only OpenEXR::OpenEXR stb_image stb_image_write)
+    spdlog::spdlog spdlog::spdlog_header_only OpenEXR::IlmImf OpenEXR::IlmImfUtil stb_image stb_image_write)
 
 message(STATUS "python:  " ${Python_EXECUTABLE})
 
