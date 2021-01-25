@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 #pragma once
-#include <vulkan/vulkan.hpp>
+#define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+#include <vulkan/vulkan.hpp>
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_vulkan.h>
@@ -21,6 +22,7 @@
 #include <akari-engine/util.h>
 
 namespace akari::engine {
+#if 0
     class AKR_EXPORT AppWindow {
         const std::string title;
         ivec2 size;
@@ -49,5 +51,20 @@ namespace akari::engine {
       public:
         AppWindow(const char *title, ivec2 size) : title(title), size(size) {}
         void show();
+    };
+#endif
+    class AKR_EXPORT AppWindow {
+        const std::string title;
+        ivec2 size;
+        GLFWwindow *window = nullptr;
+        vk::UniqueInstance instance;
+        vk::PhysicalDevice physical_device;
+        void init_window();
+        void init_vulkan();
+        void cleanup();
+      public:
+        AppWindow(const char *title, ivec2 size) : title(title), size(size) {init_window();init_vulkan();}
+        void show();
+        ~AppWindow(){cleanup();}
     };
 } // namespace akari::engine

@@ -13,8 +13,12 @@
 // limitations under the License.
 #include <akari-engine/app.h>
 int main() {
-    using namespace akari;
-    using akari::engine::AppWindow;
-    AppWindow app("Test", ivec2(1280, 720));
-    app.show();
+    try {
+        using namespace akari;
+        using akari::engine::AppWindow;
+        AppWindow app("Test", ivec2(1280, 720));
+        app.show();
+    } catch (std::exception &e) {
+        std::cerr << "Exception: " << e.what() << std::endl;
+    }
 }

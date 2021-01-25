@@ -14,25 +14,26 @@ option(AKR_BACKEND_CUDA "Enable CUDA + Optix7 backend" OFF)
 option(AKR_BUILD_GUI "Build GUI" OFF)
 option(AKR_ENABLE_ENGINE "Build AkariEngine" OFF)
 option(AKR_USE_OPENVDB "Use OpenVDB" ON)
-
+option(AKR_BUILD_DIFF "Build diff-akari" OFF)
 
 set(CMAKE_PREFIX_PATH ${CMAKE_SOURCE_DIR}/.useless/install)
 find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
 
-set(RECIPE_EMBREE_ARG "embree")
-set(RECIPE_OPENVDB_ARG "")
-set(RECIPE_GUI_ARG "")
-if(embree_DIR)
-    set(RECIPE_EMBREE_ARG "")
+set(RECIPE_ARGS "")
+if(NOT embree_DIR)
+    set(RECIPE_ARGS ${RECIPE_ARGS} embree)
 endif()
 if(AKR_USE_OPENVDB)
-    set(RECIPE_OPENVDB_ARG "openvdb")
+    set(RECIPE_ARGS ${RECIPE_ARGS} openvdb)
 endif()
 if(AKR_BUILD_GUI)
-    set(RECIPE_GUI_ARG "gui")
+    set(RECIPE_ARGS ${RECIPE_ARGS} gui)
+endif()
+if(AKR_BUILD_DIFF)
+    set(RECIPE_ARGS ${RECIPE_ARGS} diff)
 endif()
 execute_process(
-    COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/recipe.py ${RECIPE_EMBREE_ARG} ${RECIPE_OPENVDB_ARG} ${RECIPE_GUI_ARG}
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/recipe.py ${RECIPE_ARGS}
                WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 add_subdirectory(src)
 

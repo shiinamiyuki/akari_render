@@ -15,16 +15,17 @@
 #include <algorithm>
 #include <GLFW/glfw3.h>
 #include <spdlog/spdlog.h>
-static void glfw_error_callback(int error, const char *description) {
-    fprintf(stderr, "Glfw Error %d: %s\n", error, description);
-}
-static void check_vk_result(VkResult err) {
-    if (err == 0)
-        return;
-    spdlog::error("[vulkan] Error: VkResult = {}", (int)err);
-    if (err < 0)
-        abort();
-}
+// static void glfw_error_callback(int error, const char *description) {
+//     fprintf(stderr, "Glfw Error %d: %s\n", error, description);
+// }
+// static void check_vk_result(VkResult err) {
+//     if (err == 0)
+//         return;
+//     spdlog::error("[vulkan] Error: VkResult = {}", (int)err);
+//     if (err < 0)
+//         abort();
+// }
+#if 0
 namespace akari::engine {
     void AppWindow::setup_vulkan(const char **extensions, uint32_t extensions_count) {
 
@@ -134,12 +135,12 @@ namespace akari::engine {
             requestSurfaceColorSpace);
 
         // Select Present Mode
-#ifdef IMGUI_UNLIMITED_FRAME_RATE
+#    ifdef IMGUI_UNLIMITED_FRAME_RATE
         VkPresentModeKHR present_modes[] = {VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_IMMEDIATE_KHR,
                                             VK_PRESENT_MODE_FIFO_KHR};
-#else
+#    else
         VkPresentModeKHR present_modes[] = {VK_PRESENT_MODE_FIFO_KHR};
-#endif
+#    endif
         wd->PresentMode = ImGui_ImplVulkanH_SelectPresentMode(g_PhysicalDevice, wd->Surface, &present_modes[0],
                                                               IM_ARRAYSIZE(present_modes));
         // printf("[vulkan] Selected PresentMode = %d\n", wd->PresentMode);
@@ -434,5 +435,53 @@ namespace akari::engine {
             err = vkQueueSubmit(g_Queue, 1, &info, fd->Fence);
             check_vk_result(err);
         }
+    }
+} // namespace akari::engine
+#endif
+
+namespace akari::engine {
+    void AppWindow::init_vulkan() {
+        vk::ApplicationInfo app_info("akari-engine", 1, "akari-engine", 1, VK_API_VERSION_1_1);
+        vk::InstanceCreateInfo instance_create_info({}, &app_info);
+        uint32_t glfwExtensionCount = 0;
+        const char **glfwExtensions;
+
+        glfwExtensions                               = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+        instance_create_info.enabledExtensionCount   = glfwExtensionCount;
+        instance_create_info.ppEnabledExtensionNames = glfwExtensions;
+        instance_create_info.enabledLayerCount       = 0;
+        instance                                     = vk::createInstanceUnique(instance_create_info);
+        uint32_t extensionCount                      = 0;
+        CHECK_VK(vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr));
+        std::vector<VkExtensionProperties> extensions(extensionCount);
+        CHECK_VK(vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data()));
+
+        std::cout << "available extensions:\n";
+
+        for (const auto &extension : extensions) {
+            std::cout << '\t' << extension.extensionName << '\n';
+        }
+
+        auto devices = instance->enumeratePhysicalDevices();
+        AKR_ASSERT(!devices.empty());
+        physical_device = devices.front();
+
+        
+    }
+    void AppWindow::show() {
+        while (!glfwWindowShouldClose(window)) {
+            glfwPollEvents();
+        }
+    }
+    void AppWindow::init_window() {
+        glfwInit();
+        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+        glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+        window = glfwCreateWindow(size.x, size.y, title.c_str(), nullptr, nullptr);
+    }
+    void AppWindow::cleanup() {
+        glfwDestroyWindow(window);
+
+        glfwTerminate();
     }
 } // namespace akari::engine
