@@ -11,7 +11,10 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-int main(){
-
+#include <akari-engine/app.h>
+int main() {
+    using namespace akari;
+    using akari::engine::AppWindow;
+    AppWindow app("Test", ivec2(1280, 720));
+    app.show();
 }
