@@ -12,6 +12,7 @@ set(CMAKE_STATIC_LIBRARY_PREFIX_CXX "")
 option(AKR_BACKEND_EMBREE "Enable cpu backend with embree" ON)
 option(AKR_BACKEND_CUDA "Enable CUDA + Optix7 backend" OFF)
 option(AKR_BUILD_GUI "Build GUI" OFF)
+option(AKR_ENABLE_ENGINE "Build AkariEngine" OFF)
 option(AKR_USE_OPENVDB "Use OpenVDB" ON)
 
 
@@ -20,13 +21,18 @@ find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
 
 set(RECIPE_EMBREE_ARG "embree")
 set(RECIPE_OPENVDB_ARG "")
+set(RECIPE_GUI_ARG "")
 if(embree_DIR)
     set(RECIPE_EMBREE_ARG "")
 endif()
 if(AKR_USE_OPENVDB)
     set(RECIPE_OPENVDB_ARG "openvdb")
 endif()
-execute_process(COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/recipe.py ${RECIPE_EMBREE_ARG} ${RECIPE_OPENVDB_ARG}
+if(AKR_BUILD_GUI)
+    set(RECIPE_GUI_ARG "gui")
+endif()
+execute_process(
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/recipe.py ${RECIPE_EMBREE_ARG} ${RECIPE_OPENVDB_ARG} ${RECIPE_GUI_ARG}
                WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 add_subdirectory(src)
 
