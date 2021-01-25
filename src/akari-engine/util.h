@@ -18,8 +18,8 @@
 namespace akari::engine {
 #define CHECK_VK(expr)                                                                                                 \
     ([&] {                                                                                                             \
-        auto err = expr;                                                                                               \
-        if (err != 0) {                                                                                                \
+        const auto err = expr;                                                                                               \
+        if (int(err) != 0) {                                                                                                \
             fprintf(stderr, "[vulkan] Error: VkResult = %d not satisfied at %s:%d\n; call:%s", err, __FILE__,          \
                     __LINE__, #expr);                                                                                  \
         }                                                                                                              \
