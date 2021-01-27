@@ -122,7 +122,7 @@ namespace akari::scene {
 
       public:
         std::vector<vec3> vertices;
-        std::vector<ivec3> indices;
+        std::vector<uvec3> indices;
         std::vector<vec3> normals;
         std::vector<vec2> texcoords;
         std::string path;
@@ -253,8 +253,9 @@ namespace akari::scene {
         std::vector<P<Instance>> instances;
         std::string output_path = "out.png";
         void commit();
+        void normalize();
         AKR_SER(camera, integrator, meshes, instances, root, output_path)
-
+    
         std::vector<P<Object>> find(const std::string &name);
     };
 } // namespace akari::scene

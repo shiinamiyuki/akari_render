@@ -24,17 +24,19 @@ namespace akari::gpu {
           public:
             virtual RawBuffer allocate_buffer(size_t bytes) = 0;
             virtual Dispatcher new_dispatcher()             = 0;
+            virtual ~Impl()                                 = default;
         };
         template <typename T>
         Buffer<T> allocate_buffer(size_t n_elements) {
             return Buffer<T>(impl->allocate_buffer(n_elements * sizeof(T)));
         }
         Dispatcher new_dispatcher() { return impl->new_dispatcher(); }
+        Device(std::unique_ptr<Impl> impl) : impl(std::move(impl)) {}
 
       protected:
         std::unique_ptr<Impl> impl;
     };
-    std::shared_ptr<Device> create_cuda_device();
+
     // template <class T>
     // class BufferView {
     //     BufferView(Buffer<T> & buf){

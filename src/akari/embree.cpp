@@ -66,7 +66,7 @@ namespace akari::render {
                                                             mesh->vertices.size()));
                     AKR_ASSERT_THROW(rtcGetDeviceError(device) == RTC_ERROR_NONE);
                     EMBREE_CHECK(rtcSetSharedGeometryBuffer(geometry, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3,
-                                                            &mesh->indices[0], 0, sizeof(int) * 3,
+                                                            &mesh->indices[0], 0, sizeof(uint32_t) * 3,
                                                             mesh->indices.size()));
                     AKR_ASSERT_THROW(rtcGetDeviceError(device) == RTC_ERROR_NONE);
                     EMBREE_CHECK(rtcCommitGeometry(geometry));

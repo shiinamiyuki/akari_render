@@ -19,6 +19,7 @@
 #include <pybind11/stl_bind.h>
 #include <akari/serial.h>
 #include <akari/api.h>
+#include <akari/gpu/api.h>
 #include <akari/thread.h>
 
 PYBIND11_MAKE_OPAQUE(std::vector<akari::scene::P<akari::scene::Object>>);
@@ -248,6 +249,12 @@ namespace akari::python {
             astd::scope_exit _([=] { std::signal(SIGINT, old_sig_handler); });
             render_scenegraph(scenegraph);
         });
+        m.def("render_gpu", [](P<SceneGraph> scenegraph, const std::string &backend) {
+            auto old_sig_handler = std::signal(SIGINT, SIG_DFL);
+            astd::scope_exit _([=] { std::signal(SIGINT, old_sig_handler); });
+            gpu::render_scenegraph(scenegraph, backend);
+        });
+
         m.def("thread_pool_init", thread::init);
         m.def("thread_pool_finalize", thread::finalize);
         py::bind_vector<std::vector<P<Object>>>(m, "ObjectArray");

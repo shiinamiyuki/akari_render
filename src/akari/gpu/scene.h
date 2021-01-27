@@ -22,8 +22,8 @@ namespace akari::gpu {
         Buffer<float> vertices;
         Buffer<float> normals;
         Buffer<float> texcoords;
-        Buffer<int> indices;
-        Mesh(Buffer<float> vertices, Buffer<float> normals, Buffer<float> texcoords, Buffer<int> indices)
+        Buffer<uint32_t> indices;
+        Mesh(Buffer<float> vertices, Buffer<float> normals, Buffer<float> texcoords, Buffer<uint32_t> indices)
             : vertices(std::move(vertices)), normals(std::move(normals)), texcoords(std::move(texcoords)),
               indices(std::move(indices)) {}
     };

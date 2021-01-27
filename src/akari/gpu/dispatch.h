@@ -15,18 +15,21 @@
 #include <akari/util.h>
 #include <akari/gpu/buffer.h>
 namespace akari::gpu {
-    class Dispatcher {
+    class Dispatcher : NonCopyable {
       public:
         class Impl {
           public:
-            virtual ~Impl()                                       = default;
-            virtual void then(const std::function<void(void)> &F) = 0;
+            virtual ~Impl()                                = default;
+            virtual void then(std::function<void(void)> F) = 0;
+            virtual void wait()                            = 0;
         };
-        Dispatcher &then(const std::function<void(void)> &F) {
-            impl->then(F);
+        void wait() { impl->wait(); }
+        Dispatcher &then(std::function<void(void)> F) {
+            impl->then(std::move(F));
             return *this;
         }
         Dispatcher(std::unique_ptr<Impl> impl) : impl(std::move(impl)) {}
+        Impl *impl_mut() const { return impl.get(); }
 
       protected:
         std::unique_ptr<Impl> impl;

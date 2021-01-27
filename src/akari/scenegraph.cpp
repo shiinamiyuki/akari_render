@@ -72,13 +72,16 @@ namespace akari::scene {
         vertices = std::vector<vec3>();
         normals = std::vector<vec3>();
         texcoords = std::vector<vec2>();
-        indices = std::vector<ivec3>();
+        indices = std::vector<uvec3>();
         loaded = false;
     }
     void SceneGraph::commit() {
         for (auto &mesh : meshes) {
             mesh->load();
         }
+    }
+    void SceneGraph::normalize(){
+
     }
     std::vector<P<Object>> SceneGraph::find(const std::string &name) {
         std::vector<P<Object>> v;

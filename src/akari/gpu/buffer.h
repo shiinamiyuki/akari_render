@@ -26,6 +26,7 @@ namespace akari::gpu {
             virtual ~Impl()                                                                                = default;
         };
         RawBuffer(std::unique_ptr<Impl> impl) : impl(std::move(impl)) {}
+        Impl *impl_mut() const { return impl.get(); }
 
       protected:
         std::unique_ptr<Impl> impl;
@@ -37,9 +38,11 @@ namespace akari::gpu {
         Buffer(RawBuffer buf) : RawBuffer(std::move(buf)) {}
         size_t size() const { return impl->size() / sizeof(T); }
         void download(Dispatcher &dispatcher, size_t offset, size_t size, T *host_data) {
+            AKR_ASSERT(offset * sizeof(T) + size * sizeof(T) <= impl->size());
             impl->download(dispatcher, offset * sizeof(T), size * sizeof(T), host_data);
         }
         void upload(Dispatcher &dispatcher, size_t offset, size_t size, const T *host_data) {
+            AKR_ASSERT(offset * sizeof(T) + size * sizeof(T) <= impl->size());
             impl->upload(dispatcher, offset * sizeof(T), size * sizeof(T), host_data);
         }
     };

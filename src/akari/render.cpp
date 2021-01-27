@@ -217,7 +217,7 @@ namespace akari::render {
                 inst.transform = T;
                 inst.material = create_mat(instance->material);
                 inst.medium = create_volume(instance->volume);
-                inst.indices = BufferView<const ivec3>(instance->mesh->indices.data(), instance->mesh->indices.size());
+                inst.indices = BufferView<const uvec3>(instance->mesh->indices.data(), instance->mesh->indices.size());
                 inst.normals = BufferView<const vec3>(instance->mesh->normals.data(), instance->mesh->normals.size());
                 inst.texcoords =
                     BufferView<const vec2>(instance->mesh->texcoords.data(), instance->mesh->texcoords.size());

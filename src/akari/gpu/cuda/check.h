@@ -16,14 +16,18 @@
 #define OPTIX_CHECK(EXPR)                                                                                              \
     [&] {                                                                                                              \
         OptixResult res = EXPR;                                                                                        \
-        if (res != OPTIX_SUCCESS)                                                                                      \
-            spdlog::error("OptiX call " #EXPR " failed with code {}: \"{}\"", int(res), optixGetErrorString(res));     \
+        if (res != OPTIX_SUCCESS) {                                                                                    \
+            spdlog::error("OptiX call " #EXPR " failed with code {}: \"{}\" at {}:{}", int(res),                       \
+                          optixGetErrorString(res), __FILE__, __LINE__);                                               \
+            std::abort();                                                                                              \
+        }                                                                                                              \
     }()
 #define CUDA_CHECK(EXPR)                                                                                               \
     [&] {                                                                                                              \
         if (EXPR != cudaSuccess) {                                                                                     \
             cudaError_t error = cudaGetLastError();                                                                    \
-            spdlog::error("CUDA error: {}", cudaGetErrorString(error));                                                \
+            spdlog::error("CUDA error: {} at {}:{}", cudaGetErrorString(error), __FILE__, __LINE__);                   \
+            std::abort();                                                                                              \
         }                                                                                                              \
     }()
 
@@ -32,7 +36,8 @@
         CUresult result = EXPR;                                                                                        \
         if (result != CUDA_SUCCESS) {                                                                                  \
             const char *str;                                                                                           \
-            AKR_ASSERT(CUDA_SUCCESS == cuGetErrorString(result, &str));                                                  \
-            spdlog::error("CUDA error: {}", str);                                                                      \
+            AKR_ASSERT(CUDA_SUCCESS == cuGetErrorString(result, &str));                                                \
+            spdlog::error("CUDA error: {} at {}:{}", str, __FILE__, __LINE__);                                         \
+            std::abort();                                                                                              \
         }                                                                                                              \
     }()

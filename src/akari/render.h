@@ -1255,7 +1255,7 @@ namespace akari::render {
     struct MeshInstance {
         Transform transform;
         BufferView<const vec3> vertices;
-        BufferView<const ivec3> indices;
+        BufferView<const uvec3> indices;
         BufferView<const vec3> normals;
         BufferView<const vec2> texcoords;
         std::vector<const Light *> lights;
