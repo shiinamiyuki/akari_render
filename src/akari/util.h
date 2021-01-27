@@ -39,6 +39,13 @@
 #include <akari/macro.h>
 
 namespace akari {
+    class NonCopyable {
+      public:
+        NonCopyable()                    = default;
+        NonCopyable(const NonCopyable &) = delete;
+        NonCopyable &operator=(const NonCopyable &) = delete;
+        NonCopyable(NonCopyable &&)                 = default;
+    };
     template <class T = astd::byte>
     using Allocator = astd::pmr::polymorphic_allocator<T>;
     template <typename T, typename... Ts>
@@ -50,7 +57,7 @@ namespace akari {
     }
     template <typename T, int N>
     struct Color;
-    using Float = float;
+    using Float    = float;
     using Spectrum = Color<Float, 3>;
 #define USE_GLM_TVEC(prefix, i) using glm::prefix##vec##i;
 #define USE_GLM_VEC_PREFIX(prefix)                                                                                     \
@@ -75,7 +82,7 @@ namespace akari {
     template <typename T, int N>
     using Vector = glm::vec<N, T, glm::defaultp>;
     template <typename T, int N>
-    using Mat = glm::mat<N, N, T, glm::defaultp>;
+    using Mat  = glm::mat<N, N, T, glm::defaultp>;
     using Vec1 = Vector<Float, 1>;
     using Vec2 = Vector<Float, 2>;
     using Vec3 = Vector<Float, 3>;
@@ -95,21 +102,21 @@ namespace akari {
 #    define Eps       (Float(0.001f))
 #    define ShadowEps (Float(0.0001f))
 #else
-    static constexpr Float Inf = std::numeric_limits<Float>::infinity();
-    static constexpr Float MaxFloat = std::numeric_limits<Float>::max();
-    static constexpr Float Pi = Float(3.1415926535897932384f);
-    static constexpr Float PiOver2 = Pi / Float(2.0f);
-    static constexpr Float PiOver4 = Pi / Float(4.0f);
-    static constexpr Float InvPi = Float(1.0f) / Pi;
-    static constexpr Float Inv2Pi = Float(1.0) / (2.0 * Pi);
-    static constexpr Float Inv4Pi = Float(1.0) / (4.0 * Pi);
-    static constexpr Float Eps = Float(1e-5f);
+    static constexpr Float Inf       = std::numeric_limits<Float>::infinity();
+    static constexpr Float MaxFloat  = std::numeric_limits<Float>::max();
+    static constexpr Float Pi        = Float(3.1415926535897932384f);
+    static constexpr Float PiOver2   = Pi / Float(2.0f);
+    static constexpr Float PiOver4   = Pi / Float(4.0f);
+    static constexpr Float InvPi     = Float(1.0f) / Pi;
+    static constexpr Float Inv2Pi    = Float(1.0) / (2.0 * Pi);
+    static constexpr Float Inv4Pi    = Float(1.0) / (4.0 * Pi);
+    static constexpr Float Eps       = Float(1e-5f);
     static constexpr Float ShadowEps = Float(0.0001f);
 
     static constexpr Float MachineEpsilon = std::numeric_limits<Float>::epsilon() * 0.5;
 
     static constexpr double DoubleOneMinusEpsilon = 0x1.fffffffffffffp-1;
-    static constexpr float FloatOneMinusEpsilon = 0x1.fffffep-1;
+    static constexpr float FloatOneMinusEpsilon   = 0x1.fffffep-1;
 
     static constexpr float OneMinusEpsilon = FloatOneMinusEpsilon;
 #endif
@@ -192,14 +199,14 @@ namespace akari {
     }
     template <typename T>
     struct vec_trait {
-        using value_type = void;
+        using value_type                = void;
         static constexpr bool is_vector = false;
     };
 
     template <typename T, int N>
     struct vec_trait<Vector<T, N>> {
-        using value_type = T;
-        static constexpr int size = N;
+        using value_type                = T;
+        static constexpr int size       = N;
         static constexpr bool is_vector = true;
     };
 
@@ -215,7 +222,7 @@ namespace akari {
     struct Color : Vector<Scalar, N> {
         using Base = Vector<Scalar, N>;
         using Base::Base;
-        using value_t = Scalar;
+        using value_t                = Scalar;
         static constexpr size_t size = N;
         AKR_XPU Color(const Base &v) : Base(v) {}
 #define AKR_COLOR_OP(op)                                                                                               \
@@ -285,8 +292,8 @@ namespace akari {
     AKR_XPU inline Float average(const Color3f &rgb) { return hsum(rgb) / 3.0f; }
     template <typename T, int N>
     struct vec_trait<Color<T, N>> {
-        using value_type = T;
-        static constexpr int size = N;
+        using value_type                = T;
+        static constexpr int size       = N;
         static constexpr bool is_vector = true;
     };
 } // namespace akari
@@ -331,9 +338,9 @@ namespace akari {
         // Float time = 0.0f;
         vec3 o;
         vec3 d;
-        Float tmin = -1;
+        Float tmin         = -1;
         mutable Float tmax = -1;
-        Ray() = default;
+        Ray()              = default;
         Ray(const vec3 &o, const vec3 &d, Float tmin = Eps, Float tmax = std::numeric_limits<Float>::infinity())
             : o(o), d(d), tmin(tmin), tmax(tmax) {}
         vec3 operator()(Float t) const { return o + t * d; }
@@ -363,11 +370,11 @@ namespace akari {
     inline glm::dvec3 offset_ray(const glm::dvec3 p, const glm::dvec3 n) { return p; }
     inline Ray spawn_ray(const Vec3 &o, const Vec3 &d, const Vec3 &n) {
         auto ray = Ray(o, d, Eps);
-        ray.o = offset_ray(ray.o, dot(d, n) > 0 ? n : -n);
+        ray.o    = offset_ray(ray.o, dot(d, n) > 0 ? n : -n);
         return ray;
     }
     inline Ray spawn_to(const Vec3 &p1, const Vec3 &p2, const Vec3 &n) {
-        auto w = p2 - p1;
+        auto w    = p2 - p1;
         auto dist = length(w);
         w /= dist;
         auto ray = spawn_ray(p1, w, n);
@@ -403,7 +410,7 @@ namespace akari {
         Transform() : Transform(glm::mat4(1.0)) {}
         Transform(const Mat4 &m) : Transform(m, glm::inverse(m)) {}
         Transform(const Mat4 &m, const Mat4 &minv) : m(m), minv(minv) {
-            m3 = glm::mat3(m);
+            m3    = glm::mat3(m);
             m3inv = glm::inverse(m3);
         }
         Transform inverse() const { return Transform(minv, m); }
@@ -476,7 +483,7 @@ namespace akari {
                 auto ext = extents();
                 return hsum(akari::shuffle<1, 2, 0>(ext) * ext) * Float(2);
             } else {
-                auto ext = extents();
+                auto ext     = extents();
                 Float result = Float(0);
                 for (size_t i = 0; i < N; ++i) {
                     Float term = Float(1);
@@ -501,7 +508,7 @@ namespace akari {
     struct TRSTransform {
         Vec3 translation;
         Vec3 rotation;
-        Vec3 scale = Vec3(1.0, 1.0, 1.0);
+        Vec3 scale     = Vec3(1.0, 1.0, 1.0);
         TRSTransform() = default;
         TRSTransform(Vec3 t, Vec3 r, Vec3 s) : translation(t), rotation(r), scale(s) {}
         Transform operator()() const {
@@ -682,8 +689,8 @@ namespace akari {
         template <typename T>
         AKR_XPU inline void swap(T &a, T &b) {
             T tmp = std::move(a);
-            a = std::move(b);
-            b = std::move(tmp);
+            a     = std::move(b);
+            b     = std::move(tmp);
         }
     } // namespace astd
 
@@ -737,13 +744,13 @@ namespace akari {
     template <typename... T>
     struct Variant {
       private:
-        static constexpr int nTypes = sizeof...(T);
+        static constexpr int nTypes                  = sizeof...(T);
         static constexpr std::size_t alignment_value = std::max({alignof(T)...});
         typename std::aligned_storage<SizeOf<T...>::value, alignment_value>::type data;
         int index = -1;
 
       public:
-        using Index = TypeIndex<T...>;
+        using Index                       = TypeIndex<T...>;
         static constexpr size_t num_types = nTypes;
 
         template <typename U>
@@ -778,7 +785,7 @@ namespace akari {
         }
 
         AKR_XPU Variant(Variant &&v) noexcept : index(v.index) {
-            index = v.index;
+            index   = v.index;
             v.index = -1;
             std::memcpy(&data, &v.data, sizeof(data));
         }
@@ -786,7 +793,7 @@ namespace akari {
         AKR_XPU Variant &operator=(Variant &&v) noexcept {
             if (index != -1)
                 _drop();
-            index = v.index;
+            index   = v.index;
             v.index = -1;
             std::memcpy(&data, &v.data, sizeof(data));
             return *this;
@@ -932,12 +939,12 @@ namespace akari {
         bool empty() const { return size() == 0; }
 
       private:
-        T *_data = nullptr;
+        T *_data     = nullptr;
         size_t _size = 0;
     };
     template <typename T>
     BufferView(T *, size_t) -> BufferView<T>;
-    
+
     template <typename T>
     struct ObjectCache {
         template <class F>

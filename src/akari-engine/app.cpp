@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#include <app.h>
+#include "app.h"
 #include <algorithm>
 #include <GLFW/glfw3.h>
 #include <spdlog/spdlog.h>
@@ -440,33 +440,106 @@ namespace akari::engine {
 #endif
 
 namespace akari::engine {
+    static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+                                                         VkDebugUtilsMessageTypeFlagsEXT messageType,
+                                                         const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
+                                                         void *pUserData) {
+        if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
+            std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
+
+        return VK_FALSE;
+    }
+    static VkResult CreateDebugUtilsMessengerEXT(VkInstance instance,
+                                                 const VkDebugUtilsMessengerCreateInfoEXT *pCreateInfo,
+                                                 const VkAllocationCallbacks *pAllocator,
+                                                 VkDebugUtilsMessengerEXT *pDebugMessenger) {
+        auto func =
+            (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
+        if (func != nullptr) {
+            return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
+        } else {
+            return VK_ERROR_EXTENSION_NOT_PRESENT;
+        }
+    }
+    static void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger,
+                                              const VkAllocationCallbacks *pAllocator) {
+        auto func =
+            (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+        if (func != nullptr) {
+            func(instance, debugMessenger, pAllocator);
+        }
+    }
     void AppWindow::init_vulkan() {
         vk::ApplicationInfo app_info("akari-engine", 1, "akari-engine", 1, VK_API_VERSION_1_1);
-        vk::InstanceCreateInfo instance_create_info({}, &app_info);
-        uint32_t glfwExtensionCount = 0;
-        const char **glfwExtensions;
 
-        glfwExtensions                               = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-        instance_create_info.enabledExtensionCount   = glfwExtensionCount;
-        instance_create_info.ppEnabledExtensionNames = glfwExtensions;
-        instance_create_info.enabledLayerCount       = 0;
-        instance                                     = vk::createInstanceUnique(instance_create_info);
-        uint32_t extensionCount                      = 0;
-        CHECK_VK(vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr));
-        std::vector<VkExtensionProperties> extensions(extensionCount);
-        CHECK_VK(vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data()));
+        {
+            uint32_t glfwExtensionCount = 0;
+            const char **glfwExtensions;
 
-        std::cout << "available extensions:\n";
+            glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+            std::vector<const char *> extension_names;
+            for (uint32_t i = 0; i < glfwExtensionCount; i++) {
+                extension_names.push_back(glfwExtensions[i]);
+            }
+            if (enable_validation_layer) {
+                extension_names.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+            }
+            vk::InstanceCreateInfo instance_create_info({}, &app_info);
+            instance_create_info.enabledExtensionCount   = extension_names.size();
+            instance_create_info.ppEnabledExtensionNames = extension_names.data();
+            instance_create_info.enabledLayerCount       = 0;
+            instance                                     = vk::createInstanceUnique(instance_create_info);
+            // CHECK_VK(vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr));
+            auto extensions = vk::enumerateInstanceExtensionProperties();
+            // CHECK_VK(vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data()));
 
-        for (const auto &extension : extensions) {
-            std::cout << '\t' << extension.extensionName << '\n';
+            std::cout << "available extensions:\n";
+
+            for (const auto &extension : extensions) {
+                std::cout << '\t' << extension.extensionName << '\n';
+            }
         }
+        if (enable_validation_layer) {
+            vk::DebugUtilsMessengerCreateInfoEXT info;
+            info.messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose |
+                                   vk::DebugUtilsMessageSeverityFlagBitsEXT::eError |
+                                   vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning;
+            info.messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
+                               vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance |
+                               vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation;
+            info.pfnUserCallback = debug_callback;
+            info.pUserData       = nullptr;
+            CHECK_VK(CreateDebugUtilsMessengerEXT(
+                instance.get(), reinterpret_cast<const VkDebugUtilsMessengerCreateInfoEXT *>(&info), nullptr,
+                reinterpret_cast<VkDebugUtilsMessengerEXT *>(&debug_messenger)));
+        }
+        {
+            auto devices = instance->enumeratePhysicalDevices();
+            AKR_ASSERT(!devices.empty());
+            physical_device         = devices.front();
+            auto queue_family_props = physical_device.getQueueFamilyProperties();
+            queue_family =
+                std::distance(queue_family_props.begin(),
+                              std::find_if(queue_family_props.begin(), queue_family_props.end(),
+                                           [&](auto &qfp) { return qfp.queueFlags & vk::QueueFlagBits::eGraphics; }));
+            AKR_ASSERT(queue_family < queue_family_props.size());
+        }
+        {
+            vk::PhysicalDeviceFeatures features;
+            vk::DeviceQueueCreateInfo queue_info;
+            queue_info.queueCount       = 1;
+            queue_info.queueFamilyIndex = queue_family;
+            const float priority        = 1.0f;
+            queue_info.pQueuePriorities = &priority;
+            vk::DeviceCreateInfo device_info;
+            device_info.pEnabledFeatures      = &features;
+            device_info.queueCreateInfoCount  = 1;
+            device_info.pQueueCreateInfos     = &queue_info;
+            device_info.enabledExtensionCount = 0;
 
-        auto devices = instance->enumeratePhysicalDevices();
-        AKR_ASSERT(!devices.empty());
-        physical_device = devices.front();
-
-        
+            device         = physical_device.createDeviceUnique(device_info, nullptr);
+            graphic_queues = device->getQueue(queue_family, 0);
+        }
     }
     void AppWindow::show() {
         while (!glfwWindowShouldClose(window)) {
@@ -480,6 +553,9 @@ namespace akari::engine {
         window = glfwCreateWindow(size.x, size.y, title.c_str(), nullptr, nullptr);
     }
     void AppWindow::cleanup() {
+        if (enable_validation_layer) {
+            DestroyDebugUtilsMessengerEXT(instance.get(), debug_messenger, nullptr);
+        }
         glfwDestroyWindow(window);
 
         glfwTerminate();

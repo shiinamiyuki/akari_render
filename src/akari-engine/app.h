@@ -15,11 +15,12 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <vulkan/vulkan.hpp>
-#include <imgui.h>
-#include <imgui_impl_glfw.h>
-#include <imgui_impl_vulkan.h>
 #include <akari/util.h>
 #include <akari-engine/util.h>
+#include <akari-engine/ext/imgui/imgui.h>
+#include <akari-engine/ext/imgui/imgui_impl_glfw.h>
+#include <akari-engine/ext/imgui/imgui_impl_vulkan.h>
+// #include <akari-engine/ext/vulkan-hpp/utils.hpp>
 
 namespace akari::engine {
 #if 0
@@ -56,15 +57,24 @@ namespace akari::engine {
     class AKR_EXPORT AppWindow {
         const std::string title;
         ivec2 size;
-        GLFWwindow *window = nullptr;
+        bool enable_validation_layer = true;
+        GLFWwindow *window           = nullptr;
         vk::UniqueInstance instance;
+        vk::DebugUtilsMessengerEXT debug_messenger;
         vk::PhysicalDevice physical_device;
+        uint32_t queue_family = (uint32_t)-1;
+        vk::UniqueDevice device;
+        vk::Queue graphic_queues;
         void init_window();
         void init_vulkan();
         void cleanup();
+
       public:
-        AppWindow(const char *title, ivec2 size) : title(title), size(size) {init_window();init_vulkan();}
+        AppWindow(const char *title, ivec2 size) : title(title), size(size) {
+            init_window();
+            init_vulkan();
+        }
         void show();
-        ~AppWindow(){cleanup();}
+        ~AppWindow() { cleanup(); }
     };
 } // namespace akari::engine
