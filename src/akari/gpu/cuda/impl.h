@@ -24,7 +24,9 @@
 #include <akari/gpu/cuda/check.h>
 
 namespace akari::gpu {
-
+    class CUDAKernel : public Kernel::Impl {
+    public:
+    };
     class CUDADispatcher : public Dispatcher::Impl {
       public:
         cudaStream_t stream;

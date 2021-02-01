@@ -1,8 +1,0 @@
-option(AKR_ENABLE_GPU "" OFF)
-if(AKR_ENABLE_GPU)
-    find_package(Vulkan)
-    include_directories(${Vulkan_INCLUDE_DIRS})
-    file(GLOB AKR_GPU_SRC include/akari/gpu/*.* src/gpu/*.*)
-    add_library(AkariCoreGPU ${AKR_GPU_SRC})
-    target_link_libraries(AkariCoreGPU AkariCore ${Vulkan_LIBRARIES})
-endif()

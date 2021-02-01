@@ -21,12 +21,25 @@ function(set_output_dir target)
     )
 endfunction()
 
+function(file2c)
+    set(options "")
+    set(oneValueArgs TARGET NAMESPACE)
+    set(multiValueArgs FILES )
+    cmake_parse_arguments(FILE2C "${options}" "${oneValueArgs}"
+                          "${multiValueArgs}" ${ARGN} )
+    add_custom_command(COMMAND ${Python3_EXECUTABLE}
+             ${CMAKE_SOURCE_DIR}/tools/file2c.py ${FILE2C_FILES} --ns ${FILE2C_NAMESPACE} --source ${CMAKE_CURRENT_BINARY_DIR}/${FILE2C_TARGET}.cpp --header ${CMAKE_CURRENT_BINARY_DIR}/${FILE2C_TARGET}.h
+        DEPENDS ${CMAKE_SOURCE_DIR}/tools/file2c.py ${FILE2C_FILES}
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${FILE2C_TARGET}.cpp ${CMAKE_CURRENT_BINARY_DIR}/${FILE2C_TARGET}.h
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        )
+    add_library(${FILE2C_TARGET} STATIC ${CMAKE_CURRENT_BINARY_DIR}/${FILE2C_TARGET}.cpp)
+    target_include_directories(${FILE2C_TARGET} INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
+endfunction()
 
 set(AKR_EXT_LIBS "")
 set(AKR_EXT_INCLUDES "")
 set(AKR_COMPILE_DEFINITIONS "")
-
-
 
 find_package(glm REQUIRED)
 find_package(cereal REQUIRED)
@@ -72,9 +85,33 @@ endif()
 
 file(GLOB AKR_LIB_SRC akari/*.*)
 set(AKR_GPU_LIBS "")
+set(AKR_GPU_SRC "")
 if(AKR_BACKEND_CUDA)
-    file(GLOB AKR_GPU_SRC akari/gpu/cuda/*.cpp akari/gpu/*.cpp)
-    set(AKR_GPU_LIBS ${AKR_GPU_LIBS} CUDA::nvrtc CUDA::cudart_static CUDA::cuda_driver)
+    include(${CMAKE_SOURCE_DIR}/cmake/bin2c.cmake)
+    function(cuda_pp)
+        set(options "")
+        set(oneValueArgs FILE)
+        set(multiValueArgs INCLUDE_DIRS )
+        cmake_parse_arguments(CUDA_PP "${options}" "${oneValueArgs}"
+                          "${multiValueArgs}" ${ARGN} )
+        list(TRANSFORM CUDA_PP_INCLUDE_DIRS PREPEND -I)
+        add_custom_command(COMMAND ${CUDAToolkit_NVCC_EXECUTABLE} --preprocess ${CUDA_PP_FILE} -o ${CUDA_PP_FILE}.pp ${CUDA_PP_INCLUDE_DIRS}
+                       DEPENDS ${CUDA_PP_FILE}
+                       OUTPUT ${CUDA_PP_FILE}.pp
+                       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        )
+    endfunction()
+    file(GLOB AKR_GPU_SRC0 akari/gpu/cuda/*.cpp akari/gpu/*.cpp)
+    set(CUDA_COMPILE_DEFNS "-O3;--use_fast_math")
+    add_ptx_embed_library(optix_kernels akari/gpu/cuda/optix.cu
+        INCLUDE_DIRECTORIES ${AKR_OPTIX7_PATH}/include ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/.useless/install/include
+        COMPILE_DEFINITIONS
+        ${CUDA_COMPILE_DEFNS}
+        # These options don't seem to do print any warnings?
+        -Xptxas --warn-on-double-precision-use
+        -Xptxas -Werror)
+    set(AKR_GPU_SRC ${AKR_GPU_SRC} ${AKR_GPU_SRC0})
+    set(AKR_GPU_LIBS ${AKR_GPU_LIBS} CUDA::nvrtc CUDA::cudart_static CUDA::cuda_driver optix_kernels)
     set(AKR_DEFS ${AKR_DEFS} AKR_BACKEND_CUDA)
 endif()
 add_library(nano-akari STATIC ${AKR_LIB_SRC} ${AKR_GPU_SRC})
@@ -106,5 +143,8 @@ add_library(akari::python ALIAS pyakari)
 
 if(AKR_ENABLE_ENGINE)
     add_subdirectory(akari-engine)
+endif()
+if(AKR_BUILD_DIFF)
+    add_subdirectory(diff-akari)
 endif()
 add_subdirectory(main)

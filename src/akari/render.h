@@ -30,7 +30,7 @@ namespace akari::render {
         void update(T value) {
             if (count == 0) {
                 mean = value;
-                m2 = T(0.0);
+                m2   = T(0.0);
             } else {
                 auto delta = value - *mean;
                 *mean += delta / T(count + 1);
@@ -141,7 +141,7 @@ namespace akari::render {
             Float pdfs[2];
             auto d1 = pMarginal->sample_continuous(u[0], &pdfs[0], &v);
             auto d0 = pConditionalV[v].sample_continuous(u[1], &pdfs[1]);
-            *pdf = pdfs[0] * pdfs[1];
+            *pdf    = pdfs[0] * pdfs[1];
             return Vec2(d0, d1);
         }
         Float pdf_continuous(const Vec2 &p) const {
@@ -151,276 +151,6 @@ namespace akari::render {
         }
     };
 #pragma endregion
-#pragma region sampling
-    AKR_XPU inline glm::vec2 concentric_disk_sampling(const glm::vec2 &u) {
-        glm::vec2 uOffset = ((float(2.0) * u) - glm::vec2(int32_t(1), int32_t(1)));
-        if (((uOffset.x == float(0.0)) && (uOffset.y == float(0.0))))
-            return glm::vec2(int32_t(0), int32_t(0));
-        float theta = float();
-        float r = float();
-        if ((glm::abs(uOffset.x) > glm::abs(uOffset.y))) {
-            r = uOffset.x;
-            theta = (PiOver4 * (uOffset.y / uOffset.x));
-        } else {
-            r = uOffset.y;
-            theta = (PiOver2 - (PiOver4 * (uOffset.x / uOffset.y)));
-        }
-        return (r * glm::vec2(glm::cos(theta), glm::sin(theta)));
-    }
-    AKR_XPU inline glm::vec3 cosine_hemisphere_sampling(const glm::vec2 &u) {
-        glm::vec2 uv = concentric_disk_sampling(u);
-        float r = glm::dot(uv, uv);
-        float h = glm::sqrt(glm::max(float(float(0.0)), float((float(1.0) - r))));
-        return glm::vec3(uv.x, h, uv.y);
-    }
-    AKR_XPU inline float cosine_hemisphere_pdf(float cosTheta) { return (cosTheta * InvPi); }
-    AKR_XPU inline float uniform_sphere_pdf() { return (float(1.0) / (float(4.0) * Pi)); }
-    AKR_XPU inline glm::vec3 uniform_sphere_sampling(const glm::vec2 &u) {
-        float z = (float(1.0) - (float(2.0) * u[int32_t(0)]));
-        float r = glm::sqrt(glm::max(float(0.0), (float(1.0) - (z * z))));
-        float phi = ((float(2.0) * Pi) * u[int32_t(1)]);
-        return glm::vec3((r * glm::cos(phi)), (r * glm::sin(phi)), z);
-    }
-    AKR_XPU inline glm::vec2 uniform_sample_triangle(const glm::vec2 &u) {
-        // float su0 = glm::sqrt(u[int32_t(0)]);
-        // float b0 = (float(1.0) - su0);
-        // float b1 = (u[int32_t(1)] * su0);
-        // return glm::vec2(b0, b1);
-
-        uint32_t uf = u[0] * (1ull << 32); // Fixed point
-        Float cx = 0.0f, cy = 0.0f;
-        Float w = 0.5f;
-
-        for (int i = 0; i < 16; i++) {
-            uint32_t uu = uf >> 30;
-            bool flip = (uu & 3) == 0;
-
-            cy += ((uu & 1) == 0) * w;
-            cx += ((uu & 2) == 0) * w;
-
-            w *= flip ? -0.5f : 0.5f;
-            uf <<= 2;
-        }
-
-        Float b0 = cx + w / 3.0f, b1 = cy + w / 3.0f;
-        return vec2(b0, b1);
-    }
-#pragma endregion
-#pragma region geometry
-    AKR_XPU inline float cos_theta(const glm::vec3 &w) { return w.y; }
-    AKR_XPU inline float abs_cos_theta(const glm::vec3 &w) { return glm::abs(cos_theta(w)); }
-    AKR_XPU inline float cos2_theta(const glm::vec3 &w) { return (w.y * w.y); }
-    AKR_XPU inline float sin2_theta(const glm::vec3 &w) { return (float(1.0) - cos2_theta(w)); }
-    AKR_XPU inline float sin_theta(const glm::vec3 &w) { return glm::sqrt(glm::max(float(0.0), sin2_theta(w))); }
-    AKR_XPU inline float tan2_theta(const glm::vec3 &w) { return (sin2_theta(w) / cos2_theta(w)); }
-    AKR_XPU inline float tan_theta(const glm::vec3 &w) { return glm::sqrt(glm::max(float(0.0), tan2_theta(w))); }
-    AKR_XPU inline float cos_phi(const glm::vec3 &w) {
-        float sinTheta = sin_theta(w);
-        return (sinTheta == float(0.0)) ? float(1.0) : glm::clamp((w.x / sinTheta), -float(1.0), float(1.0));
-    }
-    AKR_XPU inline float sin_phi(const glm::vec3 &w) {
-        float sinTheta = sin_theta(w);
-        return (sinTheta == float(0.0)) ? float(0.0) : glm::clamp((w.z / sinTheta), -float(1.0), float(1.0));
-    }
-    AKR_XPU inline float cos2_phi(const glm::vec3 &w) { return (cos_phi(w) * cos_phi(w)); }
-    AKR_XPU inline float sin2_phi(const glm::vec3 &w) { return (sin_phi(w) * sin_phi(w)); }
-    AKR_XPU inline bool same_hemisphere(const glm::vec3 &wo, const glm::vec3 &wi) {
-        return ((wo.y * wi.y) >= float(0.0));
-    }
-    AKR_XPU inline std::optional<glm::vec3> refract(const glm::vec3 &wi, const glm::vec3 &n, float eta) {
-        float cosThetaI = glm::dot(n, wi);
-        float sin2ThetaI = glm::max(float(0.0), (float(1.0) - (cosThetaI * cosThetaI)));
-        float sin2ThetaT = ((eta * eta) * sin2ThetaI);
-        if ((sin2ThetaT >= float(1.0)))
-            return std::nullopt;
-        float cosThetaT = glm::sqrt((float(1.0) - sin2ThetaT));
-        auto wt = ((eta * -wi) + (((eta * cosThetaI) - cosThetaT) * n));
-        return wt;
-    }
-    AKR_XPU inline vec3 faceforward(const vec3 &w, const vec3 &n) { return dot(w, n) < 0.0 ? -n : n; }
-    AKR_XPU inline float fr_dielectric(float cosThetaI, float etaI, float etaT) {
-        bool entering = (cosThetaI > float(0.0));
-        if (!entering) {
-            std::swap(etaI, etaT);
-            cosThetaI = glm::abs(cosThetaI);
-        }
-        float sinThetaI = glm::sqrt(glm::max(float(0.0), (float(1.0) - (cosThetaI * cosThetaI))));
-        float sinThetaT = ((etaI / etaT) * sinThetaI);
-        if ((sinThetaT >= float(1.0)))
-            return float(1.0);
-        float cosThetaT = glm::sqrt(glm::max(float(0.0), (float(1.0) - (sinThetaT * sinThetaT))));
-        float Rpar = (((etaT * cosThetaI) - (etaI * cosThetaT)) / ((etaT * cosThetaI) + (etaI * cosThetaT)));
-        float Rper = (((etaI * cosThetaI) - (etaT * cosThetaT)) / ((etaI * cosThetaI) + (etaT * cosThetaT)));
-        return (float(0.5) * ((Rpar * Rpar) + (Rper * Rper)));
-    }
-    AKR_XPU inline glm::vec3 fr_conductor(float cosThetaI, const glm::vec3 &etaI, const glm::vec3 &etaT,
-                                          const glm::vec3 &k) {
-        float CosTheta2 = (cosThetaI * cosThetaI);
-        float SinTheta2 = (float(1.0) - CosTheta2);
-        glm::vec3 Eta = (etaT / etaI);
-        glm::vec3 Etak = (k / etaI);
-        glm::vec3 Eta2 = (Eta * Eta);
-        glm::vec3 Etak2 = (Etak * Etak);
-        glm::vec3 t0 = ((Eta2 - Etak2) - SinTheta2);
-        glm::vec3 a2plusb2 = glm::sqrt(((t0 * t0) + ((float(4.0) * Eta2) * Etak2)));
-        glm::vec3 t1 = (a2plusb2 + CosTheta2);
-        glm::vec3 a = glm::sqrt((float(0.5) * (a2plusb2 + t0)));
-        glm::vec3 t2 = ((float(2.0) * a) * cosThetaI);
-        glm::vec3 Rs = ((t1 - t2) / (t1 + t2));
-        glm::vec3 t3 = ((CosTheta2 * a2plusb2) + (SinTheta2 * SinTheta2));
-        glm::vec3 t4 = (t2 * SinTheta2);
-        glm::vec3 Rp = ((Rs * (t3 - t4)) / (t3 + t4));
-        return (float(0.5) * (Rp + Rs));
-    }
-
-    AKR_XPU inline vec3 spherical_to_xyz(float sinTheta, float cosTheta, float phi) {
-        return glm::vec3(sinTheta * glm::cos(phi), cosTheta, sinTheta * glm::sin(phi));
-    }
-
-    AKR_XPU inline float spherical_theta(const vec3 &v) { return glm::acos(glm::clamp(v.y, -1.0f, 1.0f)); }
-
-    AKR_XPU inline float spherical_phi(const glm::vec3 v) {
-        float p = glm::atan(v.z, v.x);
-        return p < 0.0 ? (p + 2.0 * Pi) : p;
-    }
-#pragma endregion
-#pragma region
-
-    static const int32_t MicrofacetGGX = int32_t(0);
-    static const int32_t MicrofacetBeckmann = int32_t(1);
-    static const int32_t MicrofacetPhong = int32_t(2);
-    AKR_XPU inline float BeckmannD(float alpha, const glm::vec3 &m) {
-        if ((m.y <= float(0.0)))
-            return float(0.0);
-        float c = cos2_theta(m);
-        float t = tan2_theta(m);
-        float a2 = (alpha * alpha);
-        return (glm::exp((-t / a2)) / (((Pi * a2) * c) * c));
-    }
-    AKR_XPU inline float BeckmannG1(float alpha, const glm::vec3 &v, const glm::vec3 &m) {
-        if (((glm::dot(v, m) * v.y) <= float(0.0))) {
-            return float(0.0);
-        }
-        float a = (float(1.0) / (alpha * tan_theta(v)));
-        if ((a < float(1.6))) {
-            return (((float(3.535) * a) + ((float(2.181) * a) * a)) /
-                    ((float(1.0) + (float(2.276) * a)) + ((float(2.577) * a) * a)));
-        } else {
-            return float(1.0);
-        }
-    }
-    AKR_XPU inline float PhongG1(float alpha, const glm::vec3 &v, const glm::vec3 &m) {
-        if (((glm::dot(v, m) * v.y) <= float(0.0))) {
-            return float(0.0);
-        }
-        float a = (glm::sqrt(((float(0.5) * alpha) + float(1.0))) / tan_theta(v));
-        if ((a < float(1.6))) {
-            return (((float(3.535) * a) + ((float(2.181) * a) * a)) /
-                    ((float(1.0) + (float(2.276) * a)) + ((float(2.577) * a) * a)));
-        } else {
-            return float(1.0);
-        }
-    }
-    AKR_XPU inline float PhongD(float alpha, const glm::vec3 &m) {
-        if ((m.y <= float(0.0)))
-            return float(0.0);
-        return (((alpha + float(2.0)) / (float(2.0) * Pi)) * glm::pow(m.y, alpha));
-    }
-    AKR_XPU inline float GGX_D(float alpha, const glm::vec3 &m) {
-        if ((m.y <= float(0.0)))
-            return float(0.0);
-        float a2 = (alpha * alpha);
-        float c2 = cos2_theta(m);
-        float t2 = tan2_theta(m);
-        float at = (a2 + t2);
-        return (a2 / ((((Pi * c2) * c2) * at) * at));
-    }
-    AKR_XPU inline float GGX_G1(float alpha, const glm::vec3 &v, const glm::vec3 &m) {
-        if (((glm::dot(v, m) * v.y) <= float(0.0))) {
-            return float(0.0);
-        }
-        return (float(2.0) / (float(1.0) + glm::sqrt((float(1.0) + ((alpha * alpha) * tan2_theta(m))))));
-    }
-    struct MicrofacetModel {
-        int32_t type;
-        float alpha;
-    };
-    AKR_XPU inline MicrofacetModel microfacet_new(int32_t type, float roughness) {
-        float alpha = float();
-        if ((type == MicrofacetPhong)) {
-            alpha = ((float(2.0) / (roughness * roughness)) - float(2.0));
-        } else {
-            alpha = roughness;
-        }
-        return MicrofacetModel{type, alpha};
-    }
-    AKR_XPU inline float microfacet_D(const MicrofacetModel &model, const glm::vec3 &m) {
-        int32_t type = model.type;
-        float alpha = model.alpha;
-        switch (type) {
-        case MicrofacetBeckmann: {
-            return BeckmannD(alpha, m);
-        }
-        case MicrofacetPhong: {
-            return PhongD(alpha, m);
-        }
-        case MicrofacetGGX: {
-            return GGX_D(alpha, m);
-        }
-        }
-        return float(0.0);
-    }
-    AKR_XPU inline float microfacet_G1(const MicrofacetModel &model, const glm::vec3 &v, const glm::vec3 &m) {
-        int32_t type = model.type;
-        float alpha = model.alpha;
-        switch (type) {
-        case MicrofacetBeckmann: {
-            return BeckmannG1(alpha, v, m);
-        }
-        case MicrofacetPhong: {
-            return PhongG1(alpha, v, m);
-        }
-        case MicrofacetGGX: {
-            return GGX_G1(alpha, v, m);
-        }
-        }
-        return float(0.0);
-    }
-    AKR_XPU inline float microfacet_G(const MicrofacetModel &model, const glm::vec3 &i, const glm::vec3 &o,
-                                      const glm::vec3 &m) {
-        return (microfacet_G1(model, i, m) * microfacet_G1(model, o, m));
-    }
-    AKR_XPU inline glm::vec3 microfacet_sample_wh(const MicrofacetModel &model, const glm::vec3 &wo,
-                                                  const glm::vec2 &u) {
-        int32_t type = model.type;
-        float alpha = model.alpha;
-        float phi = ((float(2.0) * Pi) * u.y);
-        float cosTheta = float(0.0);
-        switch (type) {
-        case MicrofacetBeckmann: {
-            float t2 = ((-alpha * alpha) * glm::log((float(1.0) - u.x)));
-            cosTheta = (float(1.0) / glm::sqrt((float(1.0) + t2)));
-            break;
-        }
-        case MicrofacetPhong: {
-            cosTheta = glm::pow(u.x, float((float(1.0) / (alpha + float(2.0)))));
-            break;
-        }
-        case MicrofacetGGX: {
-            float t2 = (((alpha * alpha) * u.x) / (float(1.0) - u.x));
-            cosTheta = (float(1.0) / glm::sqrt((float(1.0) + t2)));
-            break;
-        }
-        }
-        float sinTheta = glm::sqrt(glm::max(float(0.0), (float(1.0) - (cosTheta * cosTheta))));
-        glm::vec3 wh = glm::vec3((glm::cos(phi) * sinTheta), cosTheta, (glm::sin(phi) * sinTheta));
-        if (!same_hemisphere(wo, wh))
-            wh = -wh;
-        return wh;
-    }
-    AKR_XPU inline float microfacet_evaluate_pdf(const MicrofacetModel &m, const glm::vec3 &wh) {
-        return (microfacet_D(m, wh) * abs_cos_theta(wh));
-    }
 #pragma endregion
     struct Rng {
         Rng(uint64_t sequence = 0) { pcg32_init(sequence); }
@@ -428,12 +158,12 @@ namespace akari::render {
         double uniform_float() { return pcg32() / double(0xffffffff); }
 
       private:
-        uint64_t state = 0x4d595df4d0f33173; // Or something seed-dependent
+        uint64_t state                   = 0x4d595df4d0f33173; // Or something seed-dependent
         static uint64_t const multiplier = 6364136223846793005u;
-        static uint64_t const increment = 1442695040888963407u; // Or an arbitrary odd constant
+        static uint64_t const increment  = 1442695040888963407u; // Or an arbitrary odd constant
         static uint32_t rotr32(uint32_t x, unsigned r) { return x >> r | x << (-r & 31); }
         uint32_t pcg32(void) {
-            uint64_t x = state;
+            uint64_t x     = state;
             unsigned count = (unsigned)(x >> 59); // 59 = 64 - 5
 
             state = x * multiplier + increment;
@@ -489,9 +219,9 @@ namespace akari::render {
             LCG,
             PMJ02BN,
         };
-        Type type = Type::PCG;
+        Type type           = Type::PCG;
         int pixel_tile_size = 16;
-        int spp = 16;
+        int spp             = 16;
     };
     class PMJ02BNSampler {
         int spp = 0;
@@ -503,14 +233,14 @@ namespace akari::render {
 
       public:
         void start_pixel_sample(ivec2 p, uint32_t idx, uint32_t dim) {
-            pixel = p;
+            pixel        = p;
             sample_index = idx;
-            dimension = std::max(2u, dim);
+            dimension    = std::max(2u, dim);
         }
         Float next1d() {
             uint64_t hash =
                 mix_bits(((uint64_t)pixel.x << 48) ^ ((uint64_t)pixel.y << 32) ^ ((uint64_t)dimension << 16) ^ seed);
-            int index = permutation_element(sample_index, spp, hash);
+            int index   = permutation_element(sample_index, spp, hash);
             Float delta = blue_nosie(dimension, pixel);
             ++dimension;
             return std::min((index + delta) / spp, OneMinusEpsilon);
@@ -525,13 +255,13 @@ namespace akari::render {
 
             } else {
                 // Compute index for 2D pmj02bn sample
-                int index = sample_index;
+                int index       = sample_index;
                 int pmjInstance = dimension / 2;
                 if (pmjInstance >= N_PMJ02BN_SETS) {
                     // Permute index to be used for pmj02bn sample array
                     uint64_t hash = mix_bits(((uint64_t)pixel.x << 48) ^ ((uint64_t)pixel.y << 32) ^
                                              ((uint64_t)dimension << 16) ^ seed);
-                    index = permutation_element(sample_index, spp, hash);
+                    index         = permutation_element(sample_index, spp, hash);
                 }
 
                 // Return randomized pmj02bn sample for current dimension
@@ -582,12 +312,12 @@ namespace akari::render {
             uint64_t last_modified_backup;
 
             void backup() {
-                _backup = value;
+                _backup              = value;
                 last_modified_backup = last_modification_iteration;
             }
 
             void restore() {
-                value = _backup;
+                value                       = _backup;
                 last_modification_iteration = last_modified_backup;
             }
         };
@@ -595,10 +325,10 @@ namespace akari::render {
         Rng rng;
         std::vector<PrimarySample> X;
         uint64_t current_iteration = 0;
-        bool large_step = true;
-        uint64_t last_large_step = 0;
-        Float large_step_prob = 0.25;
-        uint32_t sample_index = 0;
+        bool large_step            = true;
+        uint64_t last_large_step   = 0;
+        Float large_step_prob      = 0.25;
+        uint32_t sample_index      = 0;
         uint64_t accepts = 0, rejects = 0;
         Float uniform() { return rng.uniform_float(); }
         void start_next_sample() {
@@ -637,7 +367,7 @@ namespace akari::render {
             s1 = 1.0 / 1024.0, s2 = 1.0 / 64.0;
 
             if (Xi.last_modification_iteration < last_large_step) {
-                Xi.value = uniform();
+                Xi.value                       = uniform();
                 Xi.last_modification_iteration = last_large_step;
             }
 
@@ -654,7 +384,7 @@ namespace akari::render {
                         nSmallMinus--;
                         x = mutate(x, s1, s2);
                     }
-                    Xi.value = x;
+                    Xi.value                       = x;
                     Xi.last_modification_iteration = current_iteration - 1;
                 }
                 Xi.backup();
@@ -732,10 +462,10 @@ namespace akari::render {
                         splat_s[i] = splats(x, y)[i].value();
                     }
                     if (weight(x, y) != 0) {
-                        auto color = (radiance(x, y)) / weight(x, y);
+                        auto color  = (radiance(x, y)) / weight(x, y);
                         array(x, y) = color + splat_s;
                     } else {
-                        auto color = radiance(x, y);
+                        auto color  = radiance(x, y);
                         array(x, y) = color + splat_s;
                     }
                 }
@@ -752,12 +482,12 @@ namespace akari::render {
                         splat_s[i] = splats(x, y)[i].value();
                     }
                     if (weight(x, y) != 0) {
-                        auto color = (radiance(x, y)) / weight(x, y) + splat_s;
+                        auto color     = (radiance(x, y)) / weight(x, y) + splat_s;
                         image(x, y, 0) = color[0];
                         image(x, y, 1) = color[1];
                         image(x, y, 2) = color[2];
                     } else {
-                        auto color = radiance(x, y) + splat_s;
+                        auto color     = radiance(x, y) + splat_s;
                         image(x, y, 0) = color[0];
                         image(x, y, 1) = color[1];
                         image(x, y, 2) = color[2];
@@ -778,7 +508,7 @@ namespace akari::render {
         Transform c2w, w2c, r2c, c2r;
         ivec2 _resolution;
         Float fov;
-        Float lens_radius = 0.0f;
+        Float lens_radius    = 0.0f;
         Float focal_distance = 0.0f;
         PerspectiveCamera(const ivec2 &_resolution, const Transform &c2w, Float fov)
             : c2w(c2w), w2c(c2w.inverse()), _resolution(_resolution), fov(fov) {
@@ -794,15 +524,15 @@ namespace akari::render {
             vec2 p = shuffle<0, 1>(r2c.apply_point(Vec3(sample.p_film.x, sample.p_film.y, 0.0f)));
             Ray ray(Vec3(0), Vec3(normalize(Vec3(p.x, p.y, 0) - Vec3(0, 0, 1))));
             if (lens_radius > 0 && focal_distance > 0) {
-                Float ft = focal_distance / std::abs(ray.d.z);
+                Float ft    = focal_distance / std::abs(ray.d.z);
                 Vec3 pFocus = ray(ft);
-                ray.o = Vec3(sample.p_lens.x, sample.p_lens.y, 0);
-                ray.d = Vec3(normalize(pFocus - ray.o));
+                ray.o       = Vec3(sample.p_lens.x, sample.p_lens.y, 0);
+                ray.d       = Vec3(normalize(pFocus - ray.o));
             }
-            ray.o = c2w.apply_point(ray.o);
-            ray.d = c2w.apply_vector(ray.d);
+            ray.o         = c2w.apply_point(ray.o);
+            ray.d         = c2w.apply_vector(ray.d);
             sample.normal = c2w.apply_normal(Vec3(0, 0, -1.0f));
-            sample.ray = ray;
+            sample.ray    = ray;
 
             return sample;
         }
@@ -810,10 +540,10 @@ namespace akari::render {
       private:
         void preprocess() {
             Transform m;
-            m = Transform::scale(Vec3(1.0f / _resolution.x, 1.0f / _resolution.y, 1)) * m;
-            m = Transform::scale(Vec3(2, 2, 1)) * m;
-            m = Transform::translate(Vec3(-1, -1, 0)) * m;
-            m = Transform::scale(Vec3(1, -1, 1)) * m;
+            m      = Transform::scale(Vec3(1.0f / _resolution.x, 1.0f / _resolution.y, 1)) * m;
+            m      = Transform::scale(Vec3(2, 2, 1)) * m;
+            m      = Transform::translate(Vec3(-1, -1, 0)) * m;
+            m      = Transform::scale(Vec3(1, -1, 1)) * m;
             auto s = atan(fov / 2);
             if (_resolution.x > _resolution.y) {
                 m = Transform::scale(Vec3(s, s * Float(_resolution.y) / _resolution.x, 1)) * m;
@@ -858,14 +588,14 @@ namespace akari::render {
         ImageTexture(std::shared_ptr<Image> image) : image(std::move(image)) {}
         Float evaluate_f(const ShadingPoint &sp) const {
             vec2 texcoords = sp.texcoords;
-            vec2 tc = glm::mod(texcoords, vec2(1.0f));
-            tc.y = 1.0f - tc.y;
+            vec2 tc        = glm::mod(texcoords, vec2(1.0f));
+            tc.y           = 1.0f - tc.y;
             return (*image)(tc, 0);
         }
         Spectrum evaluate_s(const ShadingPoint &sp) const {
             vec2 texcoords = sp.texcoords;
-            vec2 tc = glm::mod(texcoords, vec2(1.0f));
-            tc.y = 1.0f - tc.y;
+            vec2 tc        = glm::mod(texcoords, vec2(1.0f));
+            tc.y           = 1.0f - tc.y;
             return Spectrum((*image)(tc, 0), (*image)(tc, 1), (*image)(tc, 2));
         }
     };
@@ -878,19 +608,19 @@ namespace akari::render {
     };
 
     enum class BSDFType : int {
-        Unset = 0u,
-        Reflection = 1u << 0,
-        Transmission = 1u << 1,
-        Diffuse = 1u << 2,
-        Glossy = 1u << 3,
-        Specular = 1u << 4,
-        DiffuseReflection = Diffuse | Reflection,
-        DiffuseTransmission = Diffuse | Transmission,
-        GlossyReflection = Glossy | Reflection,
-        GlossyTransmission = Glossy | Transmission,
-        SpecularReflection = Specular | Reflection,
+        Unset                = 0u,
+        Reflection           = 1u << 0,
+        Transmission         = 1u << 1,
+        Diffuse              = 1u << 2,
+        Glossy               = 1u << 3,
+        Specular             = 1u << 4,
+        DiffuseReflection    = Diffuse | Reflection,
+        DiffuseTransmission  = Diffuse | Transmission,
+        GlossyReflection     = Glossy | Reflection,
+        GlossyTransmission   = Glossy | Transmission,
+        SpecularReflection   = Specular | Reflection,
         SpecularTransmission = Specular | Transmission,
-        All = Diffuse | Glossy | Specular | Reflection | Transmission
+        All                  = Diffuse | Glossy | Specular | Reflection | Transmission
     };
     AKR_XPU inline BSDFType operator&(BSDFType a, BSDFType b) { return BSDFType((int)a & (int)b); }
     AKR_XPU inline BSDFType operator|(BSDFType a, BSDFType b) { return BSDFType((int)a | (int)b); }
@@ -922,8 +652,8 @@ namespace akari::render {
 
     struct BSDFSample {
         Vec3 wi;
-        BSDFValue f = BSDFValue::zero();
-        Float pdf = 0.0;
+        BSDFValue f   = BSDFValue::zero();
+        Float pdf     = 0.0;
         BSDFType type = BSDFType::Unset;
     };
     class BSDFClosure;
@@ -954,8 +684,8 @@ namespace akari::render {
                 sample.wi.y = -sample.wi.y;
             }
             sample.type = type();
-            sample.pdf = cosine_hemisphere_pdf(std::abs(cos_theta(sample.wi)));
-            sample.f = BSDFValue::with_diffuse(R * InvPi);
+            sample.pdf  = cosine_hemisphere_pdf(std::abs(cos_theta(sample.wi)));
+            sample.f    = BSDFValue::with_diffuse(R * InvPi);
             return sample;
         }
         [[nodiscard]] BSDFValue albedo() const { return BSDFValue::with_diffuse(R); }
@@ -979,7 +709,7 @@ namespace akari::render {
             if (same_hemisphere(wo, wi)) {
                 Float cosThetaO = abs_cos_theta(wo);
                 Float cosThetaI = abs_cos_theta(wi);
-                auto wh = (wo + wi);
+                auto wh         = (wo + wi);
                 if (cosThetaI == 0 || cosThetaO == 0)
                     return BSDFValue::zero();
                 if (wh.x == 0 && wh.y == 0 && wh.z == 0)
@@ -999,8 +729,8 @@ namespace akari::render {
         [[nodiscard]] std::optional<BSDFSample> sample(const vec2 &u, const Vec3 &wo) const {
             BSDFSample sample;
             sample.type = type();
-            auto wh = microfacet_sample_wh(model, wo, u);
-            sample.wi = glm::reflect(-wo, wh);
+            auto wh     = microfacet_sample_wh(model, wo, u);
+            sample.wi   = glm::reflect(-wo, wh);
             if (!same_hemisphere(wo, sample.wi)) {
                 sample.pdf = 0;
                 return std::nullopt;
@@ -1053,10 +783,10 @@ namespace akari::render {
         [[nodiscard]] BSDFType type() const { return BSDFType::SpecularReflection; }
         std::optional<BSDFSample> sample(const vec2 &u, const Vec3 &wo) const {
             BSDFSample sample;
-            sample.wi = glm::reflect(-wo, vec3(0, 1, 0));
+            sample.wi   = glm::reflect(-wo, vec3(0, 1, 0));
             sample.type = type();
-            sample.pdf = 1.0;
-            sample.f = BSDFValue::with_specular(R / (std::abs(cos_theta(sample.wi))));
+            sample.pdf  = 1.0;
+            sample.f    = BSDFValue::with_specular(R / (std::abs(cos_theta(sample.wi))));
             return sample;
         }
         [[nodiscard]] BSDFValue albedo() const { return BSDFValue::with_specular(R); }
@@ -1073,14 +803,14 @@ namespace akari::render {
         std::optional<BSDFSample> sample(const vec2 &u, const Vec3 &wo) const {
             BSDFSample sample;
             Float etaIO = same_hemisphere(wo, vec3(0, 1, 0)) ? eta : 1.0f / eta;
-            auto wt = refract(wo, faceforward(wo, vec3(0, 1, 0)), etaIO);
-            if (!wt) {
+            auto wt     = refract(wo, faceforward(wo, vec3(0, 1, 0)), etaIO);
+            if (glm::all(glm::equal(wt, vec3(0)))) {
                 return std::nullopt;
             }
-            sample.wi = *wt;
+            sample.wi   = wt;
             sample.type = type();
-            sample.pdf = 1.0;
-            sample.f = BSDFValue::with_specular(R / (std::abs(cos_theta(sample.wi))));
+            sample.pdf  = 1.0;
+            sample.f    = BSDFValue::with_specular(R / (std::abs(cos_theta(sample.wi))));
             return sample;
         }
         [[nodiscard]] BSDFValue albedo() const { return BSDFValue::with_specular(R); }
@@ -1190,7 +920,7 @@ namespace akari::render {
         std::array<Vec3, 3> normals;
         std::array<vec2, 3> texcoords;
         const Material *material = nullptr;
-        const Light *light = nullptr;
+        const Light *light       = nullptr;
         Vec3 p(const vec2 &uv) const { return lerp3(vertices[0], vertices[1], vertices[2], uv); }
         Float area() const { return length(cross(vertices[1] - vertices[0], vertices[2] - vertices[0])) * 0.5f; }
         Vec3 ng() const { return normalize(cross(vertices[1] - vertices[0], vertices[2] - vertices[0])); }
@@ -1200,13 +930,13 @@ namespace akari::render {
         Vec3 dpdv(Float v) const { return dlerp3du(vertices[0], vertices[1], vertices[2], v); }
 
         std::pair<Vec3, Vec3> dnduv(const vec2 &uv) const {
-            auto n = ns(uv);
+            auto n   = ns(uv);
             Float il = 1.0 / length(n);
             n *= il;
             auto dn_du = (normals[1] - normals[0]) * il;
             auto dn_dv = (normals[2] - normals[0]) * il;
-            dn_du = -n * dot(n, dn_du) + dn_du;
-            dn_dv = -n * dot(n, dn_dv) + dn_dv;
+            dn_du      = -n * dot(n, dn_du) + dn_du;
+            dn_dv      = -n * dot(n, dn_dv) + dn_dv;
             return std::make_pair(dn_du, dn_dv);
         }
 
@@ -1214,20 +944,20 @@ namespace akari::render {
             auto &v0 = vertices[0];
             auto &v1 = vertices[1];
             auto &v2 = vertices[2];
-            Vec3 e1 = (v1 - v0);
-            Vec3 e2 = (v2 - v0);
+            Vec3 e1  = (v1 - v0);
+            Vec3 e2  = (v2 - v0);
             Float a, f, u, v;
             auto h = cross(ray.d, e2);
-            a = dot(e1, h);
+            a      = dot(e1, h);
             if (a > Float(-1e-6f) && a < Float(1e-6f))
                 return std::nullopt;
-            f = 1.0f / a;
+            f      = 1.0f / a;
             auto s = ray.o - v0;
-            u = f * dot(s, h);
+            u      = f * dot(s, h);
             if (u < 0.0 || u > 1.0)
                 return std::nullopt;
             auto q = cross(s, e1);
-            v = f * dot(ray.d, q);
+            v      = f * dot(ray.d, q);
             if (v < 0.0 || u + v > 1.0)
                 return std::nullopt;
             Float t = f * dot(e2, q);
@@ -1259,15 +989,15 @@ namespace akari::render {
         BufferView<const vec3> normals;
         BufferView<const vec2> texcoords;
         std::vector<const Light *> lights;
-        const scene::Mesh *mesh = nullptr;
+        const scene::Mesh *mesh  = nullptr;
         const Material *material = nullptr;
-        const Medium *medium = nullptr;
+        const Medium *medium     = nullptr;
 
         Triangle get_triangle(int prim_id) const {
             Triangle trig;
             for (int i = 0; i < 3; i++) {
                 trig.vertices[i] = transform.apply_vector(vertices[indices[prim_id][i]]);
-                trig.normals[i] = transform.apply_normal(normals[indices[prim_id][i]]);
+                trig.normals[i]  = transform.apply_normal(normals[indices[prim_id][i]]);
                 if (!texcoords.empty())
                     trig.texcoords[i] = texcoords[indices[prim_id][i]];
                 else {
@@ -1298,7 +1028,7 @@ namespace akari::render {
                 cos_theta = -(1 + g * g - sqr * sqr) / (2 * g);
             }
             auto sin_theta = std::sqrt(std::max<Float>(0, 1.0 - cos_theta * cos_theta));
-            auto phi = 2.0 * Pi * u[1];
+            auto phi       = 2.0 * Pi * u[1];
             Frame frame(wo);
             auto wi = spherical_to_xyz(sin_theta, cos_theta, phi);
             return std::make_pair(frame.local_to_world(wi), evaluate(cos_theta));
@@ -1324,17 +1054,17 @@ namespace akari::render {
         }
         std::pair<std::optional<MediumInteraction>, Spectrum> sample(const Ray &ray, Sampler &sampler,
                                                                      Allocator<> alloc) const {
-            int channel = std::min<int>(sampler.next1d() * Spectrum::size, Spectrum::size - 1);
-            auto dist = -std::log(1.0 - sampler.next1d()) / sigma_t[channel];
-            auto t = std::min<double>(dist * length(ray.d), ray.tmax);
+            int channel        = std::min<int>(sampler.next1d() * Spectrum::size, Spectrum::size - 1);
+            auto dist          = -std::log(1.0 - sampler.next1d()) / sigma_t[channel];
+            auto t             = std::min<double>(dist * length(ray.d), ray.tmax);
             bool sample_medium = t < ray.tmax;
             std::optional<MediumInteraction> mi;
             if (sample_medium) {
                 mi.emplace(MediumInteraction{ray(t), PhaseHG{g}});
             }
-            auto tr = transmittance(ray, sampler);
+            auto tr          = transmittance(ray, sampler);
             Spectrum density = sample_medium ? sigma_t * tr : tr;
-            Float pdf = hsum(density);
+            Float pdf        = hsum(density);
             pdf /= Spectrum::size;
             return std::make_pair(mi, Spectrum(sample_medium ? (tr * sigma_s / pdf) : (tr / pdf)));
         }
@@ -1361,8 +1091,8 @@ namespace akari::render {
         SurfaceInteraction(const vec2 &uv, const Triangle &triangle)
             : triangle(triangle), p(triangle.p(uv)), ng(triangle.ng()), ns(triangle.ns(uv)),
               texcoords(triangle.texcoord(uv)) {
-            dpdu = triangle.dpdu(uv[0]);
-            dpdv = triangle.dpdu(uv[1]);
+            dpdu                 = triangle.dpdu(uv[0]);
+            dpdv                 = triangle.dpdu(uv[1]);
             std::tie(dndu, dndv) = triangle.dnduv(uv);
         }
         const Light *light() const { return triangle.light; }
@@ -1370,12 +1100,12 @@ namespace akari::render {
         const Medium *medium() const { return shape->medium; }
         ShadingPoint sp() const {
             ShadingPoint sp_;
-            sp_.n = ns;
+            sp_.n         = ns;
             sp_.texcoords = texcoords;
-            sp_.dndu = dndu;
-            sp_.dndv = dndv;
-            sp_.dpdu = dpdu;
-            sp_.dpdv = dpdv;
+            sp_.dndu      = dndu;
+            sp_.dndv      = dndv;
+            sp_.dpdu      = dpdu;
+            sp_.dpdv      = dpdv;
             return sp_;
         }
     };
@@ -1431,28 +1161,28 @@ namespace akari::render {
         }
         LightRaySample sample_emission(Sampler &sampler) const {
             LightRaySample sample;
-            sample.uv = sampler.next2d();
+            sample.uv   = sampler.next2d();
             auto coords = uniform_sample_triangle(sample.uv);
-            auto p = triangle.p(coords);
+            auto p      = triangle.p(coords);
 
-            sample.ng = triangle.ng();
+            sample.ng     = triangle.ng();
             sample.pdfPos = 1.0 / triangle.area();
-            auto w = cosine_hemisphere_sampling(sampler.next2d());
+            auto w        = cosine_hemisphere_sampling(sampler.next2d());
             Frame local(sample.ng);
             sample.pdfDir = cosine_hemisphere_pdf(std::abs(w.y));
-            sample.ray = Ray(p, local.local_to_world(w));
-            sample.E = color.evaluate_s(ShadingPoint(triangle.texcoord(coords)));
+            sample.ray    = Ray(p, local.local_to_world(w));
+            sample.E      = color.evaluate_s(ShadingPoint(triangle.texcoord(coords)));
             return sample;
         }
         LightSample sample_incidence(const LightSampleContext &ctx) const {
             auto coords = uniform_sample_triangle(ctx.u);
-            auto p = triangle.p(coords);
+            auto p      = triangle.p(coords);
             LightSample sample;
-            sample.ng = triangle.ng();
-            sample.wi = p - ctx.p;
+            sample.ng     = triangle.ng();
+            sample.wi     = p - ctx.p;
             auto dist_sqr = dot(sample.wi, sample.wi);
             sample.wi /= sqrt(dist_sqr);
-            sample.I = color.evaluate_s(ShadingPoint(triangle.texcoord(coords)));
+            sample.I       = color.evaluate_s(ShadingPoint(triangle.texcoord(coords)));
             auto cos_theta = dot(sample.wi, sample.ng);
             if (-cos_theta < 0.0)
                 sample.pdf = 0.0;
@@ -1487,9 +1217,9 @@ namespace akari::render {
     class EmbreeAccel {
       public:
         virtual void build(const Scene &scene, const std::shared_ptr<scene::SceneGraph> &scene_graph) = 0;
-        virtual std::optional<Intersection> intersect1(const Ray &ray) const = 0;
-        virtual bool occlude1(const Ray &ray) const = 0;
-        virtual Bounds3f world_bounds() const = 0;
+        virtual std::optional<Intersection> intersect1(const Ray &ray) const                          = 0;
+        virtual bool occlude1(const Ray &ray) const                                                   = 0;
+        virtual Bounds3f world_bounds() const                                                         = 0;
     };
     std::shared_ptr<EmbreeAccel> create_embree_accel();
 
@@ -1531,7 +1261,7 @@ namespace akari::render {
         astd::pmr::monotonic_buffer_resource *rsrc;
         std::optional<SurfaceInteraction> intersect(const Ray &ray) const;
         bool occlude(const Ray &ray) const;
-        Scene() = default;
+        Scene()              = default;
         Scene(const Scene &) = delete;
         ~Scene();
     };
@@ -1546,14 +1276,14 @@ namespace akari::render {
         Sampler sampler;
         int min_depth = 3;
         int max_depth = 5;
-        int spp = 16;
+        int spp       = 16;
     };
     Film render_pt(PTConfig config, const Scene &scene);
     struct UPTConfig {
         Sampler sampler;
         int min_depth = 3;
         int max_depth = 5;
-        int spp = 16;
+        int spp       = 16;
     };
     Image render_unified(UPTConfig config, const Scene &scene);
     Image render_pt_psd(PTConfig config, PSDConfig psd_config, const Scene &scene);
@@ -1578,7 +1308,7 @@ namespace akari::render {
         Sampler sampler;
         int min_depth = 3;
         int max_depth = 5;
-        uint32_t spp = 16;
+        uint32_t spp  = 16;
     };
 
     // instant radiosity
@@ -1588,7 +1318,7 @@ namespace akari::render {
         Sampler sampler;
         int min_depth = 3;
         int max_depth = 5;
-        int spp = 16;
+        int spp       = 16;
     };
 
     // sms single scatter
@@ -1597,17 +1327,17 @@ namespace akari::render {
         Sampler sampler;
         int min_depth = 3;
         int max_depth = 5;
-        int spp = 16;
+        int spp       = 16;
     };
 
     Image render_bdpt(PTConfig config, const Scene &scene);
 
     struct MLTConfig {
         int num_bootstrap = 100000;
-        int num_chains = 1024;
-        int min_depth = 3;
-        int max_depth = 5;
-        int spp = 16;
+        int num_chains    = 1024;
+        int min_depth     = 3;
+        int max_depth     = 5;
+        int spp           = 16;
     };
     Image render_mlt(MLTConfig config, const Scene &scene);
     Image render_smcmc(MLTConfig config, const Scene &scene);

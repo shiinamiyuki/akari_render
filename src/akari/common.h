@@ -44,7 +44,7 @@
 #endif
 
 #ifdef _MSC_VER
-#define __restrict__ __restrict 
+#    define __restrict__ __restrict
 #endif
 
 #ifdef __GNUC__
@@ -68,15 +68,14 @@ namespace akari {
 #endif
 #define AKR_CPU
 #define AKR_GPU
-#if defined(AKR_GPU_BACKEND_CUDA)
+#if defined(AKR_BACKEND_CUDA)
 #    define AKR_ENABLE_GPU
 #endif
 #if defined(__CUDA_ARCH__)
 #    define AKR_GPU_CODE
 #endif
 
-#ifdef AKR_GPU_BACKEND_CUDA
-#    include <cuda_runtime.h>
+#ifdef __CUDACC__
 #    undef AKR_CPU
 #    undef AKR_GPU
 #    define AKR_CPU __host__
@@ -121,5 +120,4 @@ namespace akari {
         }                                                                                                              \
     } while (0)
 
-   
 } // namespace akari

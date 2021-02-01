@@ -14,18 +14,7 @@
 #pragma once
 #include "map.h"
 namespace akari {
-    template <class Archive, class T>
-    void safe_apply(Archive &ar, const char *name, T &val) {
-        try {
-            ar(CEREAL_NVP_(name, val));
-        } catch (cereal::Exception &e) {
-            std::string_view msg(e.what());
-            if (msg.find("provided NVP") == std::string_view::npos) {
-                // not a name not found error
-                throw e;
-            }
-        }
-    }
+    
 #define AKR_SER_ONE(value) safe_apply(ar, #value, value);
 #define AKR_SER_MULT(...)  ENOKI_MAP(AKR_SER_ONE, __VA_ARGS__)
 #define AKR_SER(...)                                                                                                   \

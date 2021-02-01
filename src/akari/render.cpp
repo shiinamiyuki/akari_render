@@ -37,7 +37,7 @@ namespace akari::render {
             Float etaI = entering ? etaA : etaB;
             Float etaT = entering ? etaB : etaA;
             auto wt = refract(wo, faceforward(wo, vec3(0, 1, 0)), etaI / etaT);
-            if (!wt) {
+            if (glm::all(glm::equal(wt, vec3(0)))) {
                 AKR_ASSERT(etaI > etaT);
                 return std::nullopt;
             }
@@ -46,7 +46,7 @@ namespace akari::render {
 
             ft *= (etaI * etaI) / (etaT * etaT);
             sample.pdf = 1 - F;
-            sample.wi = *wt;
+            sample.wi = wt;
             sample.f = BSDFValue::with_specular(ft / abs_cos_theta(sample.wi));
         }
         return sample;

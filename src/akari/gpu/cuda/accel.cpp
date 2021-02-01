@@ -17,6 +17,8 @@
 #include <optix_stubs.h>
 #include <akari/gpu/cuda/check.h>
 #include <akari/gpu/cuda/impl.h>
+#include <akari/gpu/kernel/camera.h>
+#include <akari/gpu/cuda/optix_ptx.h>
 
 static void logCallback(unsigned int level, const char *tag, const char *message, void *cbdata) {
     if (level <= 2)
@@ -26,6 +28,13 @@ static void logCallback(unsigned int level, const char *tag, const char *message
 }
 
 namespace akari::gpu {
+    struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) RaygenRecord {
+        __align__(OPTIX_SBT_RECORD_ALIGNMENT) char header[OPTIX_SBT_RECORD_HEADER_SIZE];
+    };
+
+    struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) MissRecord {
+        __align__(OPTIX_SBT_RECORD_ALIGNMENT) char header[OPTIX_SBT_RECORD_HEADER_SIZE];
+    };
     OptixAccel::OptixAccel(std::shared_ptr<Device> device) : device(device), dispatcher(device->new_dispatcher()) {
         CUDA_CHECK(cudaFree(nullptr));
         stream = dynamic_cast<CUDADispatcher *>(dispatcher.impl_mut())->stream;
@@ -37,13 +46,52 @@ namespace akari::gpu {
 #ifndef NDEBUG
         ctxOptions.logCallbackLevel = 4; // status/progress
 #else
-        ctxOptions.logCallbackLevel = 2; // error
+        ctxOptions.logCallbackLevel     = 2; // error
 #endif
         ctxOptions.logCallbackFunction = logCallback;
 #if (OPTIX_VERSION >= 70200)
         ctxOptions.validationMode = OPTIX_DEVICE_CONTEXT_VALIDATION_MODE_ALL;
 #endif
         OPTIX_CHECK(optixDeviceContextCreate(cudaContext, &ctxOptions, &optix_context));
+        create_module();
+    }
+    void OptixAccel::create_module() {
+        // OptiX module
+        OptixModuleCompileOptions moduleCompileOptions = {};
+        // TODO: REVIEW THIS
+        moduleCompileOptions.maxRegisterCount = OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT;
+#ifndef NDEBUG
+        moduleCompileOptions.optLevel   = OPTIX_COMPILE_OPTIMIZATION_LEVEL_0;
+        moduleCompileOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO;
+#else
+        moduleCompileOptions.optLevel   = OPTIX_COMPILE_OPTIMIZATION_LEVEL_3;
+        moduleCompileOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_NONE;
+#endif
+        OptixPipelineCompileOptions pipelineCompileOptions = {};
+        pipelineCompileOptions.traversableGraphFlags       = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_ANY;
+        pipelineCompileOptions.usesMotionBlur              = false;
+        pipelineCompileOptions.numPayloadValues            = 3;
+        pipelineCompileOptions.numAttributeValues          = 4;
+        // OPTIX_EXCEPTION_FLAG_NONE;
+        pipelineCompileOptions.exceptionFlags =
+            (OPTIX_EXCEPTION_FLAG_STACK_OVERFLOW | OPTIX_EXCEPTION_FLAG_TRACE_DEPTH | OPTIX_EXCEPTION_FLAG_DEBUG);
+        pipelineCompileOptions.pipelineLaunchParamsVariableName = "params";
+
+        OptixPipelineLinkOptions pipelineLinkOptions = {};
+        pipelineLinkOptions.maxTraceDepth            = 2;
+#ifndef NDEBUG
+        pipelineLinkOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_FULL;
+#else
+        pipelineLinkOptions.debugLevel  = OPTIX_COMPILE_DEBUG_LEVEL_NONE;
+#endif
+
+        char log[4096];
+        size_t logSize = sizeof(log);
+        OPTIX_CHECK_WITH_LOG(optixModuleCreateFromPTX(optix_context, &moduleCompileOptions, &pipelineCompileOptions,
+                                                      (const char *)optix_ptx, optix_ptx_size, log, &logSize,
+                                                      &optix_module),
+                             log);
+        spdlog::info("{}", log);
     }
     OptixBuildInput OptixAccel::get_mesh_build_input(const Mesh &mesh) {
         OptixBuildInput input = {};
@@ -144,10 +192,6 @@ namespace akari::gpu {
             normals.upload(dispatcher, 0, normals.size(), (const float *)mesh_node->normals.data());
             texcoords.upload(dispatcher, 0, texcoords.size(), (const float *)mesh_node->texcoords.data());
             indices.upload(dispatcher, 0, indices.size(), (const uint32_t *)mesh_node->indices.data());
-            // std::vector<ivec3> tmp = mesh_node->indices;
-            // indices.download(dispatcher, 0, indices.size(), (int *)tmp.data());
-            // dispatcher.wait();
-            // AKR_ASSERT(std::memcmp(tmp.data(), mesh_node->indices.data(), sizeof(ivec3) * tmp.size()) == 0);
             auto mesh = std::make_shared<Mesh>(std::move(vertices), std::move(normals), std::move(texcoords),
                                                std::move(indices));
             auto id   = scene.meshes.size();

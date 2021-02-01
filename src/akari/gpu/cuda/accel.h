@@ -38,6 +38,7 @@ namespace akari::gpu {
         size_t gpu_bvh_bytes = 0;
         std::optional<Buffer<OptixInstance>> ias_instances_buf;
         std::list<CUdeviceptr> vertx_buf_ptrs;
+        void create_module();
       public:
         OptixAccel(std::shared_ptr<Device> device);
         void build(scene::P<scene::SceneGraph> graph);

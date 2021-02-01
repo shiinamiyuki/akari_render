@@ -16,15 +16,17 @@
 #include <akari/util.h>
 #include <akari/gpu/buffer.h>
 #include <akari/gpu/dispatch.h>
+#include <akari/gpu/kernel.h>
 #include <memory>
 namespace akari::gpu {
     class Device {
       public:
         class Impl {
           public:
-            virtual RawBuffer allocate_buffer(size_t bytes) = 0;
-            virtual Dispatcher new_dispatcher()             = 0;
-            virtual ~Impl()                                 = default;
+            virtual RawBuffer allocate_buffer(size_t bytes)                                  = 0;
+            virtual Dispatcher new_dispatcher()                                              = 0;
+            // virtual Kernel compile_kernel(std::string_view source, std::string_view options) = 0;
+            virtual ~Impl()                                                                  = default;
         };
         template <typename T>
         Buffer<T> allocate_buffer(size_t n_elements) {
@@ -32,6 +34,9 @@ namespace akari::gpu {
         }
         Dispatcher new_dispatcher() { return impl->new_dispatcher(); }
         Device(std::unique_ptr<Impl> impl) : impl(std::move(impl)) {}
+        // Kernel compile_kernel(std::string_view source, std::string_view options) {
+        //     return impl->compile_kernel(source, options);
+        // }
 
       protected:
         std::unique_ptr<Impl> impl;
