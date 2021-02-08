@@ -34,7 +34,7 @@
 #include <akari/mathutil.h>
 #include <cereal/cereal.hpp>
 #include <akari/common.h>
-
+#include <akari/macro.h>
 namespace akari {
     class NonCopyable {
       public:

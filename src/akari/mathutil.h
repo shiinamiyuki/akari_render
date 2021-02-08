@@ -19,12 +19,6 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
 
-#ifndef __CUDACC__
-#    include <akari/macro.h>
-#else
-#    define AKR_SER(...)
-#endif
-
 namespace akari {
     template <class T>
     AKR_XPU void swap(T &a, T &b) {
@@ -306,7 +300,6 @@ namespace akari {
         AKR_XPU Ray(const vec3 &o, const vec3 &d, Float tmin = Eps, Float tmax = std::numeric_limits<Float>::infinity())
             : o(o), d(d), tmin(tmin), tmax(tmax) {}
         AKR_XPU vec3 operator()(Float t) const { return o + t * d; }
-        AKR_SER(o, d, tmin, tmax)
     };
 
     namespace robust_rt {
@@ -370,7 +363,6 @@ namespace akari {
     struct Transform {
         Mat4 m, minv;
         Mat3 m3, m3inv;
-        AKR_SER(m, minv, m3, m3inv)
         AKR_XPU Transform() : Transform(glm::mat4(1.0)) {}
         AKR_XPU Transform(const Mat4 &m) : Transform(m, glm::inverse(m)) {}
         AKR_XPU Transform(const Mat4 &m, const Mat4 &minv) : m(m), minv(minv) {

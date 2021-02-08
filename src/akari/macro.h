@@ -14,9 +14,10 @@
 #pragma once
 #include "map.h"
 namespace akari {
-    
-#define AKR_SER_ONE(value) safe_apply(ar, #value, value);
-#define AKR_SER_MULT(...)  ENOKI_MAP(AKR_SER_ONE, __VA_ARGS__)
+
+#define AKR_SER_ONE_EXT(member) safe_apply(ar, #member, st.member);
+#define AKR_SER_ONE(value)      safe_apply(ar, #value, value);
+#define AKR_SER_MULT(...)       ENOKI_MAP(AKR_SER_ONE, __VA_ARGS__)
 #define AKR_SER(...)                                                                                                   \
     template <class Archive>                                                                                           \
     void save(Archive &ar) const {                                                                                     \
@@ -36,5 +37,10 @@ namespace akari {
     void load(Archive &ar) {                                                                                           \
         ar(CEREAL_NVP_(#Base, cereal::base_class<Base>(this)));                                                        \
         AKR_SER_MULT(__VA_ARGS__)                                                                                      \
+    }
+#define AKR_SER_STRUCT(Struct, ...)                                                                                    \
+    template <class Archive>                                                                                           \
+    void serialize(Archive &ar, Struct &st) {                                                                          \
+        ENOKI_MAP(AKR_SER_ONE_EXT, __VA_ARGS__)                                                                        \
     }
 } // namespace akari
