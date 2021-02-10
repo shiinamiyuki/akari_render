@@ -19,7 +19,7 @@
 namespace akari::render {
     namespace ir {
         struct VirtualPointLight {
-            std::optional<BSDF> bsdf;
+            astd::optional<BSDF> bsdf;
             vec3 wo;
             vec3 ng;
             vec3 p;
@@ -43,7 +43,7 @@ namespace akari::render {
                 vpl0.radiance = sample.E / (light_pdf * sample.pdfPos);
                 vpl0.ng = sample.ng;
                 vpl0.p = sample.ray.o;
-                vpl0.bsdf = std::nullopt;
+                vpl0.bsdf = astd::nullopt;
                 L = vpl0.radiance;
                 beta = Spectrum(1.0 / sample.pdfDir);
                 ray = sample.ray;
@@ -132,7 +132,7 @@ namespace akari::render {
                 // auto rec_sampler = sampler;
 #if 1
                 auto estimate = [&](const Ray ray, Spectrum beta, const int depth,
-                                    const std::optional<SurfaceInteraction> prev, const std::optional<Float> prev_b,
+                                    const astd::optional<SurfaceInteraction> prev, const astd::optional<Float> prev_b,
                                     const Float prev_bsdf_pdf, const BSDFType prev_bsdf_type, auto &&self) -> void {
                     if (depth >= config.max_depth)
                         return;
@@ -282,18 +282,18 @@ namespace akari::render {
                             }
                             beta_bsdf *= sample->f() * std::abs(glm::dot(si->ns, sample->wi)) / sample->pdf;
                             auto next_ray = Ray(si->p, sample->wi, Eps / std::abs(glm::dot(si->ng, sample->wi)));
-                            self(next_ray, beta_bsdf, depth + 1, si, std::nullopt, sample->pdf, sample->type, self);
+                            self(next_ray, beta_bsdf, depth + 1, si, astd::nullopt, sample->pdf, sample->type, self);
                         }
                     };
                     F();
                 };
-                estimate(ray, Spectrum(1.0), 0, std::nullopt, std::nullopt, 0.0, BSDFType::Unset, estimate);
+                estimate(ray, Spectrum(1.0), 0, astd::nullopt, astd::nullopt, 0.0, BSDFType::Unset, estimate);
 #endif
 #if 0
                 Spectrum beta(1.0);
                 int depth = 0;
                 BSDFType prev_bsdf_type = BSDFType::Unset;
-                std::optional<SurfaceInteraction> prev_si = std::nullopt;
+                astd::optional<SurfaceInteraction> prev_si = astd::nullopt;
                 Float G_bound = 0;
                 while (depth < config.max_depth) {
                     auto si = scene.intersect(ray);

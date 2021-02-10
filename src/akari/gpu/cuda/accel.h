@@ -36,7 +36,7 @@ namespace akari::gpu {
         OptixTraversableHandle build_bvh(const std::vector<OptixBuildInput> &build_inputs);
         std::vector<OptixTraversableHandle> mesh_handles;
         size_t gpu_bvh_bytes = 0;
-        std::optional<Buffer<OptixInstance>> ias_instances_buf;
+        astd::optional<Buffer<OptixInstance>> ias_instances_buf;
         std::list<CUdeviceptr> vertx_buf_ptrs;
         void create_module();
       public:

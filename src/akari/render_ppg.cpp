@@ -46,7 +46,7 @@ namespace akari::render {
             SurfaceInteraction si;
             Ray ray;
             Spectrum beta;
-            std::optional<BSDF> bsdf;
+            astd::optional<BSDF> bsdf;
             Spectrum f;
             Float bsdf_pdf        = 0.0;
             Float pdf             = 0.0;
@@ -142,7 +142,7 @@ namespace akari::render {
                 vec3 _;
                 return std::make_pair(sTree->dTree(p, _).first, p);
             }
-            std::optional<DirectLighting>
+            astd::optional<DirectLighting>
             compute_direct_lighting(SurfaceVertex &vertex, const std::pair<const Light *, Float> &selected) noexcept {
                 auto [light, light_pdf] = selected;
                 if (light) {
@@ -153,7 +153,7 @@ namespace akari::render {
                     light_ctx.p              = si.p;
                     LightSample light_sample = light->sample_incidence(light_ctx);
                     if (light_sample.pdf <= 0.0)
-                        return std::nullopt;
+                        return astd::nullopt;
                     light_pdf *= light_sample.pdf;
                     auto f = light_sample.I * vertex.bsdf->evaluate(vertex.wo, light_sample.wi)() *
                              std::abs(dot(si.ns, light_sample.wi));
@@ -167,11 +167,11 @@ namespace akari::render {
                     lighting.pdf        = light_pdf;
                     return lighting;
                 } else {
-                    return std::nullopt;
+                    return astd::nullopt;
                 }
             }
 
-            void on_miss(const Ray &ray, const std::optional<PathVertex> &prev_vertex) noexcept {
+            void on_miss(const Ray &ray, const astd::optional<PathVertex> &prev_vertex) noexcept {
                 // if (scene->envmap) {
                 //     on_hit_light(scene->envmap.get(), -ray.d, ShadingPoint(), prev_vertex);
                 // }
@@ -194,7 +194,7 @@ namespace akari::render {
             }
 
             void on_hit_light(const Light *light, const Vec3 &wo, const ShadingPoint &sp,
-                              const std::optional<PathVertex> &prev_vertex) {
+                              const astd::optional<PathVertex> &prev_vertex) {
                 Spectrum I = light->Le(wo, sp);
                 if (!useNEE || depth == 0 || BSDFType::Unset != (prev_vertex->sampled_lobe() & BSDFType::Specular)) {
                     accumulate_radiance_wo_beta(I);
@@ -215,12 +215,12 @@ namespace akari::render {
                 }
             }
 
-            std::optional<SurfaceVertex> on_surface_scatter(const Vec3 &wo, SurfaceInteraction &si,
-                                                            const std::optional<PathVertex> &prev_vertex) noexcept {
+            astd::optional<SurfaceVertex> on_surface_scatter(const Vec3 &wo, SurfaceInteraction &si,
+                                                            const astd::optional<PathVertex> &prev_vertex) noexcept {
                 auto *material = si.material();
                 if (si.triangle.light) {
                     on_hit_light(si.triangle.light, wo, si.sp(), prev_vertex);
-                    return std::nullopt;
+                    return astd::nullopt;
                 } else if (depth < max_depth) {
                     auto u0 = sampler->next1d();
                     auto u1 = sampler->next2d();
@@ -235,7 +235,7 @@ namespace akari::render {
 
                     if (is_delta_bsdf || u0 < bsdfSamplingFraction) {
                         if (!sample || sample->pdf == 0.0)
-                            return std::nullopt;
+                            return astd::nullopt;
                         bsdf_pdf = sample->pdf;
                         sample->pdf *= bsdfSamplingFraction;
 
@@ -253,7 +253,7 @@ namespace akari::render {
                         dtree_pdf   = sample->pdf;
                         AKR_CHECK(sample->pdf >= 0);
                         if (sample->pdf == 0.0) {
-                            return std::nullopt;
+                            return astd::nullopt;
                         }
                         sample->f    = bsdf.evaluate(wo, sample->wi);
                         sample->type = (BSDFType::All & ~BSDFType::Specular);
@@ -266,7 +266,7 @@ namespace akari::render {
                     AKR_CHECK(sample->pdf >= 0.0);
                     AKR_CHECK(hmin(sample->f()) >= 0.0f);
                     if (std::isnan(sample->pdf) || sample->pdf == 0.0f) {
-                        return std::nullopt;
+                        return astd::nullopt;
                     }
                     vertex.bsdf         = bsdf;
                     vertex.f            = sample->f();
@@ -277,12 +277,12 @@ namespace akari::render {
                     vertex.sampled_lobe = sample->type;
                     return vertex;
                 }
-                return std::nullopt;
+                return astd::nullopt;
             }
             void run_megakernel(const Camera *camera, const ivec2 &raster) noexcept {
                 auto camera_sample = camera_ray(camera, raster);
                 Ray ray            = camera_sample.ray;
-                std::optional<PathVertex> prev_vertex;
+                astd::optional<PathVertex> prev_vertex;
                 while (true) {
                     auto si = scene->intersect(ray);
                     if (!si) {
@@ -297,7 +297,7 @@ namespace akari::render {
                         break;
                     }
                     if ((vertex->sampled_lobe & BSDFType::Specular) == BSDFType::Unset && useNEE) {
-                        std::optional<DirectLighting> has_direct = compute_direct_lighting(*vertex, select_light());
+                        astd::optional<DirectLighting> has_direct = compute_direct_lighting(*vertex, select_light());
                         if (has_direct) {
                             auto &direct = *has_direct;
                             if (!is_black(direct.color) && !scene->occlude(direct.shadow_ray)) {
@@ -447,7 +447,7 @@ namespace akari::render {
                 const size_t Q1       = 0; // hprod(variance.dimension()) / 8;
                 const size_t Q2       = hprod(variance.dimension()) - outliers;
                 const size_t Q        = Q2 - Q1;
-                std::array<std::vector<Float>, Spectrum::size> V;
+                astd::array<std::vector<Float>, Spectrum::size> V;
                 Spectrum avg_var;
                 for (uint32_t c = 0; c < Spectrum::size; c++) {
                     V[c].resize(hprod(variance.dimension()));
@@ -696,7 +696,7 @@ namespace akari::render {
             }
             accumulatedSamples += samples;
             spdlog::info("Pass {}, spp:{}", pass + 1, samples);
-            std::optional<Image> image;
+            astd::optional<Image> image;
             if (!last_iter) {
                 image = mcmc_sample_sdtree(1000, samples, !last_iter);
             } else {

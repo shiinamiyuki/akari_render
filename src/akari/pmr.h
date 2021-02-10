@@ -257,58 +257,6 @@ namespace akari::astd {
             bool do_is_equal(const memory_resource &other) const noexcept override { return this == &other; }
         };
     } // namespace pmr
-
-    template <typename T, int N>
-    class array {
-      public:
-        using value_type = T;
-        using iterator = value_type *;
-        using const_iterator = const value_type *;
-        using size_t = std::size_t;
-
-        array() = default;
-
-        array(std::initializer_list<T> v) {
-            size_t i = 0;
-            for (const T &val : v)
-                values[i++] = val;
-        }
-
-        void fill(const T &v) {
-            for (int i = 0; i < N; ++i)
-                values[i] = v;
-        }
-
-        bool operator==(const array<T, N> &a) const {
-            for (int i = 0; i < N; ++i)
-                if (values[i] != a.values[i])
-                    return false;
-            return true;
-        }
-
-        bool operator!=(const array<T, N> &a) const { return !(*this == a); }
-
-        iterator begin() { return values; }
-
-        iterator end() { return values + N; }
-
-        const_iterator begin() const { return values; }
-
-        const_iterator end() const { return values + N; }
-
-        size_t size() const { return N; }
-
-        T &operator[](size_t i) { return values[i]; }
-
-        const T &operator[](size_t i) const { return values[i]; }
-
-        T *data() { return values; }
-
-        const T *data() const { return values; }
-
-      private:
-        T values[N] = {};
-    };
     namespace pmr {
         template <typename T>
         using vector = std::vector<T, polymorphic_allocator<T>>;

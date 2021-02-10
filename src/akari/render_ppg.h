@@ -70,8 +70,8 @@ namespace akari::render {
 
     class QTreeNode {
       public:
-        std::array<AtomicFloat, 4> _sum;
-        std::array<int, 4> _children = {-1, -1, -1, -1};
+        astd::array<AtomicFloat, 4> _sum;
+        astd::array<int, 4> _children = {-1, -1, -1, -1};
 
         QTreeNode() { setSum(0); }
 
@@ -164,7 +164,7 @@ namespace akari::render {
         }
 
         vec2 sample(vec2 u, vec2 u2, const std::vector<QTreeNode> &nodes) const {
-            std::array<float, 4> m = {float(_sum[0]), float(_sum[1]), float(_sum[2]), float(_sum[3])};
+            astd::array<float, 4> m = {float(_sum[0]), float(_sum[1]), float(_sum[2]), float(_sum[3])};
             auto left = m[0] + m[2];
             auto right = m[1] + m[3];
             auto total = left + right;
@@ -426,7 +426,7 @@ namespace akari::render {
       public:
         DTreeWrapper dTree;
         std::atomic_uint64_t nSample = 0;
-        std::array<int, 2> _children = {-1, -1};
+        astd::array<int, 2> _children = {-1, -1};
         int axis = 0;
         bool _isLeaf = true;
 

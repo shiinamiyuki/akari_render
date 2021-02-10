@@ -33,11 +33,11 @@ namespace akari::render {
     };
     namespace smcmc {
         using namespace mlt;
-        struct TileEstimator : std::array<RadianceRecord, 5> {};
-        struct CoherentSamples : std::array<RadianceRecord, 5> {};
+        struct TileEstimator : astd::array<RadianceRecord, 5> {};
+        struct CoherentSamples : astd::array<RadianceRecord, 5> {};
         struct Tile {
             ivec2 p_center;
-            std::optional<Sampler> sampler;
+            astd::optional<Sampler> sampler;
             TileEstimator mcmc_estimate, mc_estimate;
             CoherentSamples current;
             uint32_t n_mc_estimates = 0, n_mcmc_estimates = 0;
@@ -56,7 +56,7 @@ namespace akari::render {
             AKR_ASSERT(hmax(s) >= 0.0);
             return hmax(s);
         };
-        const std::array<ivec2, 5> offsets = {
+        const astd::array<ivec2, 5> offsets = {
             ivec2(0, 0), ivec2(0, 1), ivec2(0, -1), ivec2(1, 0), ivec2(-1, 0),
         };
         std::unordered_map<ivec2, int, IVec2Hash, IVec2Equal> offset2index;
@@ -164,7 +164,7 @@ namespace akari::render {
             auto L = render_pt_pixel_wo_emitter_direct(pt_config, allocator, scene, sampler, p_film);
             return L;
         };
-        std::optional<MarkovChain> global_chain;
+        astd::optional<MarkovChain> global_chain;
         std::random_device rd;
         {
             std::vector<uint64_t> seeds;

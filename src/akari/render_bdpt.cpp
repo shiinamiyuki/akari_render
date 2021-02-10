@@ -23,7 +23,7 @@ namespace akari::render {
             
             Ray ray;
             Spectrum beta;
-            std::optional<BSDF> bsdf;
+            astd::optional<BSDF> bsdf;
             Float pdf_fwd = 0.0;
             Float pdf_rev = 0.0;
             BSDFType sampled_lobe = BSDFType::Unset;

@@ -78,7 +78,7 @@ namespace akari::render {
             SurfaceInteraction si;
             Ray ray;
             Spectrum beta;
-            std::optional<BSDF> bsdf;
+            astd::optional<BSDF> bsdf;
             Float pdf = 0.0;
             BSDFType sampled_lobe = BSDFType::Unset;
             // SurfaceVertex() = default;
@@ -120,19 +120,19 @@ namespace akari::render {
             const Scene *scene = nullptr;
             Sampler *sampler = nullptr;
 
-            static std::optional<std::pair<Vec2, Vec2>> compute_step(const Vec3 &v0, const ManifoldVertex &v1,
+            static astd::optional<std::pair<Vec2, Vec2>> compute_step(const Vec3 &v0, const ManifoldVertex &v1,
                                                                      const Vec3 &v2, const Vec3 &n_offset) {
                 Vec3 wo = v2 - v1.p;
                 Float ilo = length(wo);
                 if (ilo < 1e-3) {
-                    return std::nullopt;
+                    return astd::nullopt;
                 }
                 ilo = 1.0 / ilo;
                 wo /= ilo;
                 Vec3 wi = v0 - v1.p;
                 Float ili = length(wi);
                 if (ili < 1e-3) {
-                    return std::nullopt;
+                    return astd::nullopt;
                 }
                 wi /= ili;
                 Float eta = v1.eta;
@@ -165,7 +165,7 @@ namespace akari::render {
                 dH_dX(1, 1) = dot(v1.dtdv, h) + dot(v1.t, dh_dv);
                 Float det = dH_dX.determinant();
                 if (abs(det) < 1e-6) {
-                    return std::nullopt;
+                    return astd::nullopt;
                 }
                 Matrix2f dX_dH = dH_dX.inverse();
                 Vec2 H(dot(v1.s, h), dot(v1.t, h));
@@ -251,10 +251,10 @@ namespace akari::render {
                 Float G = dw0_dx1 * dx1_dx2;
                 return G;
             }
-            std::optional<SurfaceInteraction> newton_solver(const SurfaceInteraction &si,
+            astd::optional<SurfaceInteraction> newton_solver(const SurfaceInteraction &si,
                                                             const ManifoldVertex &vtx_init, const Vec3 &light_p) {
                 ManifoldVertex vtx = vtx_init;
-                std::optional<SurfaceInteraction> solution;
+                astd::optional<SurfaceInteraction> solution;
                 size_t iter = 0;
                 const size_t max_iter = 20;
                 const Float threshold = 1e-5;
@@ -288,14 +288,14 @@ namespace akari::render {
                     iter++;
                 }
                 if (!success) {
-                    return std::nullopt;
+                    return astd::nullopt;
                 }
                 Vec3 wx = normalize(si.p - vtx.p);
                 Vec3 wy = normalize(light_p - vtx.p);
                 bool refraction = dot(vtx.ng, wx) * dot(vtx.ng, wy) < 0;
                 bool reflection = !refraction;
                 if ((vtx.eta == 1.0 && !reflection) || (vtx.eta != 1.0 && !refraction)) {
-                    return std::nullopt;
+                    return astd::nullopt;
                 }
                 return solution;
             }
@@ -325,7 +325,7 @@ namespace akari::render {
                 return scene->light_sampler->sample(sampler->next2d());
             }
 
-            std::optional<DirectLighting>
+            astd::optional<DirectLighting>
             compute_direct_lighting(SurfaceVertex &vertex, const std::pair<const Light *, Float> &selected) noexcept {
                 auto [light, light_pdf] = selected;
                 if (light) {
@@ -336,7 +336,7 @@ namespace akari::render {
                     light_ctx.p = si.p;
                     LightSample light_sample = light->sample_incidence(light_ctx);
                     if (light_sample.pdf <= 0.0)
-                        return std::nullopt;
+                        return astd::nullopt;
                     light_pdf *= light_sample.pdf;
                     auto f = light_sample.I * vertex.bsdf->evaluate(vertex.wo, light_sample.wi)() *
                              std::abs(dot(si.ns, light_sample.wi));
@@ -346,11 +346,11 @@ namespace akari::render {
                     lighting.pdf = light_pdf;
                     return lighting;
                 } else {
-                    return std::nullopt;
+                    return astd::nullopt;
                 }
             }
 
-            void on_miss(const Ray &ray, const std::optional<PathVertex> &prev_vertex) noexcept {
+            void on_miss(const Ray &ray, const astd::optional<PathVertex> &prev_vertex) noexcept {
                 // if (scene->envmap) {
                 //     on_hit_light(scene->envmap.get(), -ray.d, ShadingPoint(), prev_vertex);
                 // }
@@ -359,7 +359,7 @@ namespace akari::render {
             void accumulate_radiance(const Spectrum &r) { L += r; }
 
             void on_hit_light(const Light *light, const Vec3 &wo, const ShadingPoint &sp,
-                              const std::optional<PathVertex> &prev_vertex) {
+                              const astd::optional<PathVertex> &prev_vertex) {
                 Spectrum I = beta * light->Le(wo, sp);
                 if (depth == 0 || BSDFType::Unset != (prev_vertex->sampled_lobe() & BSDFType::Specular)) {
                     accumulate_radiance(I);
@@ -378,23 +378,23 @@ namespace akari::render {
             }
             void accumulate_beta(const Spectrum &k) { beta *= k; }
             // @param mat_pdf: supplied if material is already chosen
-            std::optional<SurfaceVertex> on_surface_scatter(const Vec3 &wo, SurfaceInteraction &si,
-                                                            const std::optional<PathVertex> &prev_vertex) noexcept {
+            astd::optional<SurfaceVertex> on_surface_scatter(const Vec3 &wo, SurfaceInteraction &si,
+                                                            const astd::optional<PathVertex> &prev_vertex) noexcept {
                 auto *material = si.material();
                 if (si.triangle.light) {
                     on_hit_light(si.triangle.light, wo, si.sp(), prev_vertex);
-                    return std::nullopt;
+                    return astd::nullopt;
                 } else if (depth < max_depth) {
                     SurfaceVertex vertex(wo, si);
                     auto bsdf = material->evaluate(*sampler, allocator, si);
                     BSDFSampleContext sample_ctx{sampler->next1d(), sampler->next2d(), wo};
                     auto sample = bsdf.sample(sample_ctx);
                     if (!sample) {
-                        return std::nullopt;
+                        return astd::nullopt;
                     }
                     AKR_ASSERT(sample->pdf >= 0.0f);
                     if (sample->pdf == 0.0f) {
-                        return std::nullopt;
+                        return astd::nullopt;
                     }
                     vertex.bsdf = bsdf;
                     vertex.ray = Ray(si.p, sample->wi, Eps / std::abs(glm::dot(si.ng, sample->wi)));
@@ -402,12 +402,12 @@ namespace akari::render {
                     vertex.pdf = sample->pdf;
                     return vertex;
                 }
-                return std::nullopt;
+                return astd::nullopt;
             }
             void run_megakernel(const Camera *camera, const ivec2 &p) noexcept {
                 auto camera_sample = camera_ray(camera, p);
                 Ray ray = camera_sample.ray;
-                std::optional<PathVertex> prev_vertex;
+                astd::optional<PathVertex> prev_vertex;
                 while (true) {
                     auto si = scene->intersect(ray);
                     if (!si) {
@@ -420,7 +420,7 @@ namespace akari::render {
                         break;
                     }
                     if ((vertex->sampled_lobe & BSDFType::Specular) == BSDFType::Unset) {
-                        std::optional<DirectLighting> has_direct = compute_direct_lighting(*vertex, select_light());
+                        astd::optional<DirectLighting> has_direct = compute_direct_lighting(*vertex, select_light());
                         if (has_direct) {
                             auto &direct = *has_direct;
                             if (!is_black(direct.color) && !scene->occlude(direct.shadow_ray)) {

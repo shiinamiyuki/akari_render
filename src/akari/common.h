@@ -119,5 +119,18 @@ namespace akari {
             throw std::runtime_error(#expr " not satisfied");                                                          \
         }                                                                                                              \
     } while (0)
+#ifdef AKR_GPU_CODE
+#    define __AKR_GPU_CODE__ 1
+#else
+#    define __AKR_GPU_CODE__ 0
+#endif
 
+#define AKR_GPU_ONLY                                                                                                   \
+    if constexpr (!__AKR_GPU_CODE__) {                                                                                 \
+        AKR_PANIC("this is gpu only");                                                                                 \
+    } else
+#define AKR_CPU_ONLY                                                                                                   \
+    if constexpr (__AKR_GPU_CODE__) {                                                                                  \
+        AKR_PANIC("this is cpu only");                                                                                 \
+    } else
 } // namespace akari

@@ -95,7 +95,7 @@ namespace akari {
         return false;
     }
     Image read_hdr(const fs::path &path) {
-        std::optional<Image> image;
+        astd::optional<Image> image;
         int x, y, channel;
         auto ext = path.extension().string();
         if (ext == ".hdr") {
@@ -125,7 +125,7 @@ namespace akari {
         return *image;
     }
     Image read_ldr(const fs::path &path) {
-        std::optional<Image> image;
+        astd::optional<Image> image;
         int x, y, channel;
         auto ext = path.extension().string();
 

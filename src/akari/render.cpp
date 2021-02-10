@@ -23,7 +23,7 @@ namespace akari::render {
     Spectrum FresnelDielectric::evaluate(Float cosThetaI) const {
         return Spectrum(fr_dielectric(cosThetaI, etaI, etaT));
     }
-    [[nodiscard]] std::optional<BSDFSample> FresnelSpecular::sample(const vec2 &u, const Vec3 &wo) const {
+    [[nodiscard]] astd::optional<BSDFSample> FresnelSpecular::sample(const vec2 &u, const Vec3 &wo) const {
         Float F = fr_dielectric(cos_theta(wo), etaA, etaB);
         AKR_ASSERT(F >= 0.0);
         BSDFSample sample;
@@ -39,7 +39,7 @@ namespace akari::render {
             auto wt = refract(wo, faceforward(wo, vec3(0, 1, 0)), etaI / etaT);
             if (glm::all(glm::equal(wt, vec3(0)))) {
                 AKR_ASSERT(etaI > etaT);
-                return std::nullopt;
+                return astd::nullopt;
             }
             Spectrum ft = T * (1 - F);
             sample.type = BSDFType::SpecularTransmission;
@@ -60,9 +60,9 @@ namespace akari::render {
     }
     [[nodiscard]] BSDFType MixBSDF::type() const { return BSDFType(bsdf_A->type() | bsdf_B->type()); }
     BSDFValue MixBSDF::albedo() const { return BSDFValue::mix(fraction, bsdf_A->albedo(), bsdf_B->albedo()); }
-    std::optional<BSDFSample> MixBSDF::sample(const vec2 &u, const Vec3 &wo) const {
+    astd::optional<BSDFSample> MixBSDF::sample(const vec2 &u, const Vec3 &wo) const {
         BSDFSample sample;
-        std::optional<BSDFSample> inner_sample;
+        astd::optional<BSDFSample> inner_sample;
         bool selA = true;
         if (u[0] < fraction) {
             vec2 u_(u[0] / fraction, u[1]);
@@ -73,7 +73,7 @@ namespace akari::render {
             inner_sample = bsdf_A->sample(u_, wo);
         }
         if (!inner_sample) {
-            return std::nullopt;
+            return astd::nullopt;
         }
         if ((inner_sample->type & BSDFType::Specular) != BSDFType::Unset) {
             sample = *inner_sample;
@@ -128,10 +128,10 @@ namespace akari::render {
         return bsdf;
     }
     bool Scene::occlude(const Ray &ray) const { return accel->occlude1(ray); }
-    std::optional<SurfaceInteraction> Scene::intersect(const Ray &ray) const {
-        std::optional<Intersection> isct = accel->intersect1(ray);
+    astd::optional<SurfaceInteraction> Scene::intersect(const Ray &ray) const {
+        astd::optional<Intersection> isct = accel->intersect1(ray);
         if (!isct) {
-            return std::nullopt;
+            return astd::nullopt;
         }
         Triangle triangle = instances[isct->geom_id].get_triangle(isct->prim_id);
         SurfaceInteraction si(isct->uv, triangle);
@@ -156,7 +156,7 @@ namespace akari::render {
             scene->allocator = Allocator<>(scene->rsrc);
         }
         scene->camera = [&] {
-            std::optional<Camera> camera;
+            astd::optional<Camera> camera;
             if (auto perspective = scene_graph->camera->as<scene::PerspectiveCamera>()) {
                 TRSTransform TRS{perspective->transform.translation, perspective->transform.rotation, Vec3(1.0)};
                 auto c2w = TRS();
@@ -169,7 +169,7 @@ namespace akari::render {
             if (!tex_node) {
                 return Texture(ConstantTexture(0.0));
             }
-            std::optional<Texture> tex;
+            astd::optional<Texture> tex;
             if (auto ftex = tex_node->as<scene::FloatTexture>()) {
                 tex.emplace(ConstantTexture(ftex->value));
             } else if (auto rgb_tex = tex_node->as<scene::RGBTexture>()) {
