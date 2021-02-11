@@ -16,7 +16,7 @@
 
 #include <math_constants.h>
 #include <optix.h>
-#include <akari/gpu/kernel/camera.h>
+// #include <akari/render_xpu.h>
 
 struct LaunchParams {
     

@@ -14,6 +14,14 @@
 #pragma once
 #include <akari/mathutil.h>
 #include <akari/util_xpu.h>
+#include <akari/pmj02tables.h>
+#include <akari/bluenoise.h>
+#include <cmath>
+#include <vector>
+namespace akari::scene {
+    class Mesh;
+
+}
 namespace akari::render {
 
     struct Rng {
@@ -25,7 +33,7 @@ namespace akari::render {
         uint64_t state                   = 0x4d595df4d0f33173; // Or something seed-dependent
         static uint64_t const multiplier = 6364136223846793005u;
         static uint64_t const increment  = 1442695040888963407u; // Or an arbitrary odd constant
-        static uint32_t rotr32(uint32_t x, unsigned r) { return x >> r | x << (-r & 31); }
+        AKR_XPU static uint32_t rotr32(uint32_t x, unsigned r) { return x >> r | x << (-r & 31); }
         AKR_XPU uint32_t pcg32(void) {
             uint64_t x     = state;
             unsigned count = (unsigned)(x >> 59); // 59 = 64 - 5
@@ -96,12 +104,12 @@ namespace akari::render {
         int pixel_tile_size = 16;
 
       public:
-        AKR_XPU void start_pixel_sample(ivec2 p, uint32_t idx, uint32_t dim) {
+        void start_pixel_sample(ivec2 p, uint32_t idx, uint32_t dim) {
             pixel        = p;
             sample_index = idx;
             dimension    = std::max(2u, dim);
         }
-        AKR_XPU Float next1d() {
+        Float next1d() {
             uint64_t hash =
                 mix_bits(((uint64_t)pixel.x << 48) ^ ((uint64_t)pixel.y << 32) ^ ((uint64_t)dimension << 16) ^ seed);
             int index   = permutation_element(sample_index, spp, hash);
@@ -109,7 +117,7 @@ namespace akari::render {
             ++dimension;
             return std::min((index + delta) / spp, OneMinusEpsilon);
         }
-        AKR_XPU vec2 next2d() {
+        vec2 next2d() {
             if (dimension == 0) {
                 // Return pmj02bn pixel sample
                 int px = pixel.x % pixel_tile_size, py = pixel.y % pixel_tile_size;
@@ -483,7 +491,7 @@ namespace akari::render {
             sample.f    = BSDFValue::with_specular(R / (std::abs(cos_theta(sample.wi))));
             return sample;
         }
-        [[nodiscard]] BSDFValue albedo() const { return BSDFValue::with_specular(R); }
+        [[nodiscard]] AKR_XPU BSDFValue albedo() const { return BSDFValue::with_specular(R); }
     };
 
     class FresnelSpecular {
@@ -508,9 +516,7 @@ namespace akari::render {
         Vec2 u1;
         const Vec3 wo;
     };
-    /*
-     All BSDFClosure except MixBSDF must have *only* one of Diffuse, Glossy, Specular
-   */
+
     class GPUBSDFClosure
         : public Variant<DiffuseBSDF, MicrofacetReflection, SpecularReflection, SpecularTransmission, FresnelSpecular> {
       public:
@@ -531,16 +537,16 @@ namespace akari::render {
 
     template <class TBSDFClosure>
     class TBSDF {
-        astd::optional<BSDFClosure> closure_;
+        astd::optional<TBSDFClosure> closure_;
         Frame frame;
         Float choice_pdf = 1.0f;
 
       public:
-        AKR_XPU BSDF(const Frame &frame) : frame(frame) {}
+        AKR_XPU TBSDF(const Frame &frame) : frame(frame) {}
         AKR_XPU bool null() const { return !closure_.has_value(); }
         AKR_XPU void set_closure(const BSDFClosure &closure) { closure_ = closure; }
         AKR_XPU void set_choice_pdf(Float pdf) { choice_pdf = pdf; }
-        AKR_XPU const BSDFClosure &closure() const { return *closure_; }
+        AKR_XPU const TBSDFClosure &closure() const { return *closure_; }
         [[nodiscard]] AKR_XPU Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const {
             auto pdf = closure().evaluate_pdf(frame.world_to_local(wo), frame.world_to_local(wi));
             return pdf * choice_pdf;
@@ -594,7 +600,7 @@ namespace akari::render {
         AKR_XPU Vec3 dpdu(Float u) const { return dlerp3du(vertices[0], vertices[1], vertices[2], u); }
         AKR_XPU Vec3 dpdv(Float v) const { return dlerp3du(vertices[0], vertices[1], vertices[2], v); }
 
-        AKR_XPU std::pair<Vec3, Vec3> dnduv(const vec2 &uv) const {
+        AKR_XPU astd::pair<Vec3, Vec3> dnduv(const vec2 &uv) const {
             auto n   = ns(uv);
             Float il = 1.0 / length(n);
             n *= il;
@@ -602,10 +608,10 @@ namespace akari::render {
             auto dn_dv = (normals[2] - normals[0]) * il;
             dn_du      = -n * dot(n, dn_du) + dn_du;
             dn_dv      = -n * dot(n, dn_dv) + dn_dv;
-            return std::make_pair(dn_du, dn_dv);
+            return astd::make_pair(dn_du, dn_dv);
         }
 
-        AKR_XPU astd::optional<std::pair<Float, Vec2>> intersect(const Ray &ray) const {
+        AKR_XPU astd::optional<astd::pair<Float, Vec2>> intersect(const Ray &ray) const {
             auto &v0 = vertices[0];
             auto &v1 = vertices[1];
             auto &v2 = vertices[2];
@@ -627,7 +633,7 @@ namespace akari::render {
                 return astd::nullopt;
             Float t = f * dot(e2, q);
             if (t > ray.tmin && t < ray.tmax) {
-                return std::make_pair(t, Vec2(u, v));
+                return astd::make_pair(t, Vec2(u, v));
             } else {
                 return astd::nullopt;
             }
@@ -642,7 +648,7 @@ namespace akari::render {
     struct PhaseHG {
         const Float g;
         AKR_XPU inline Float evaluate(const Float cos_theta) const { return phase_hg(cos_theta, g); }
-        AKR_XPU std::pair<Vec3, Float> sample(const Vec3 &wo, const Vec2 &u) const {
+        AKR_XPU astd::pair<Vec3, Float> sample(const Vec3 &wo, const Vec2 &u) const {
             Float cos_theta = 0.0;
             if (std::abs(g) < 1e-3)
                 cos_theta = 1 - 2 * u[0];
@@ -654,13 +660,13 @@ namespace akari::render {
             auto phi       = 2.0 * Pi * u[1];
             Frame frame(wo);
             auto wi = spherical_to_xyz(sin_theta, cos_theta, phi);
-            return std::make_pair(frame.local_to_world(wi), evaluate(cos_theta));
+            return astd::make_pair(frame.local_to_world(wi), evaluate(cos_theta));
         }
     };
     struct PhaseFunction : Variant<PhaseHG> {
         using Variant::Variant;
         AKR_XPU Float evaluate(Float cos_theta) const { AKR_VAR_DISPATCH(evaluate, cos_theta); }
-        AKR_XPU std::pair<Vec3, Float> sample(const Vec3 &wo, const Vec2 &u) const { AKR_VAR_DISPATCH(sample, wo, u); }
+        AKR_XPU astd::pair<Vec3, Float> sample(const Vec3 &wo, const Vec2 &u) const { AKR_VAR_DISPATCH(sample, wo, u); }
     };
     struct MediumInteraction {
         Vec3 p;
@@ -677,8 +683,8 @@ namespace akari::render {
             return exp(-sigma_t * std::min<Float>(ray.tmax * length(ray.d), MaxFloat));
         }
         template <class TSampler>
-        AKR_XPU std::pair<astd::optional<MediumInteraction>, Spectrum> sample(const Ray &ray, TSampler &sampler,
-                                                                              Allocator<> alloc) const {
+        AKR_XPU astd::pair<astd::optional<MediumInteraction>, Spectrum> sample(const Ray &ray, TSampler &sampler,
+                                                                               Allocator<> alloc) const {
             int channel        = std::min<int>(sampler.next1d() * Spectrum::size, Spectrum::size - 1);
             auto dist          = -std::log(1.0 - sampler.next1d()) / sigma_t[channel];
             auto t             = std::min<double>(dist * length(ray.d), ray.tmax);
@@ -691,7 +697,7 @@ namespace akari::render {
             Spectrum density = sample_medium ? sigma_t * tr : tr;
             Float pdf        = hsum(density);
             pdf /= Spectrum::size;
-            return std::make_pair(mi, Spectrum(sample_medium ? (tr * sigma_s / pdf) : (tr / pdf)));
+            return astd::make_pair(mi, Spectrum(sample_medium ? (tr * sigma_s / pdf) : (tr / pdf)));
         }
     };
     struct Medium : Variant<HomogeneousMedium> {
@@ -701,13 +707,14 @@ namespace akari::render {
             AKR_VAR_DISPATCH(transmittance, ray, sampler);
         }
         template <class TSampler>
-        AKR_XPU std::pair<astd::optional<MediumInteraction>, Spectrum> sample(const Ray &ray, TSampler &sampler,
-                                                                              Allocator<> alloc) const {
+        AKR_XPU astd::pair<astd::optional<MediumInteraction>, Spectrum> sample(const Ray &ray, TSampler &sampler,
+                                                                               Allocator<> alloc) const {
             AKR_VAR_DISPATCH(sample, ray, sampler, alloc);
         }
     };
     struct Material;
     struct GPUMaterial;
+
     struct MeshInstance {
         Transform transform;
         BufferView<const vec3> vertices;
@@ -749,9 +756,11 @@ namespace akari::render {
         AKR_XPU SurfaceInteraction(const vec2 &uv, const Triangle &triangle)
             : triangle(triangle), p(triangle.p(uv)), ng(triangle.ng()), ns(triangle.ns(uv)),
               texcoords(triangle.texcoord(uv)) {
-            dpdu                 = triangle.dpdu(uv[0]);
-            dpdv                 = triangle.dpdu(uv[1]);
-            std::tie(dndu, dndv) = triangle.dnduv(uv);
+            dpdu             = triangle.dpdu(uv[0]);
+            dpdv             = triangle.dpdu(uv[1]);
+            const auto dnduv = triangle.dnduv(uv);
+            dndu             = dnduv.first;
+            dndv             = dnduv.second;
         }
         AKR_XPU const Light *light() const { return triangle.light; }
         AKR_XPU const Material *material() const { return triangle.material; }

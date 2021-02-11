@@ -19,9 +19,15 @@ namespace akari::gpu {
     class Kernel {
       public:
         class Impl {
-            void launch(vec3 global_size, vec3 local_size);
+          public:
+            virtual void launch(Dispatcher &dispatcher, uvec3 global_size, uvec3 local_size,
+                                std::vector<void *> args) = 0;
+            virtual ~Impl()                               = default;
         };
-        void launch(vec3 global_size, vec3 local_size);
+        void launch(Dispatcher &dispatcher, uvec3 global_size, uvec3 local_size, std::vector<void *> args) {
+            impl->launch(dispatcher, global_size, local_size, std::move(args));
+        }
+        explicit Kernel(std::unique_ptr<Impl> impl) : impl(std::move(impl)) {}
 
       private:
         std::unique_ptr<Impl> impl;

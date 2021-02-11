@@ -17,8 +17,7 @@
 #include <optix_stubs.h>
 #include <akari/gpu/cuda/check.h>
 #include <akari/gpu/cuda/impl.h>
-#include <akari/gpu/kernel/camera.h>
-#include <akari/gpu/cuda/optix_ptx.h>
+#include <akari/gpu/cuda/ptx/optix_ptx.h>
 
 static void logCallback(unsigned int level, const char *tag, const char *message, void *cbdata) {
     if (level <= 2)
@@ -91,7 +90,8 @@ namespace akari::gpu {
                                                       (const char *)optix_ptx, optix_ptx_size, log, &logSize,
                                                       &optix_module),
                              log);
-        spdlog::info("{}", log);
+
+        spdlog::info("Optix: {}", log);
     }
     OptixBuildInput OptixAccel::get_mesh_build_input(const Mesh &mesh) {
         OptixBuildInput input = {};

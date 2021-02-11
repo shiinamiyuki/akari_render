@@ -102,7 +102,7 @@ if(AKR_BACKEND_CUDA)
         )
     endfunction()
     file(GLOB AKR_GPU_SRC0 akari/gpu/cuda/*.cpp akari/gpu/*.cpp)
-    set(CUDA_COMPILE_DEFNS "-O3;--use_fast_math")
+    set(CUDA_COMPILE_DEFNS "-O3;--use_fast_math;--expt-relaxed-constexpr")
     add_ptx_embed_library(optix_kernels akari/gpu/cuda/optix.cu
         INCLUDE_DIRECTORIES ${AKR_OPTIX7_PATH}/include ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/.useless/install/include
         COMPILE_DEFINITIONS
@@ -110,8 +110,18 @@ if(AKR_BACKEND_CUDA)
         # These options don't seem to do print any warnings?
         -Xptxas --warn-on-double-precision-use
         -Xptxas -Werror)
+    add_ptx_embed_library(cuda_volpath_kernel akari/gpu/cuda/volpath.cu
+        INCLUDE_DIRECTORIES ${AKR_OPTIX7_PATH}/include ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/.useless/install/include
+        COMPILE_DEFINITIONS
+        ${CUDA_COMPILE_DEFNS}
+        # These options don't seem to do print any warnings?
+        -Xptxas --warn-on-double-precision-use
+        -Xptxas -Werror)
+    file(GLOB AKR_PTX_SRC akari/gpu/cuda/ptx/*)
+    add_library(cuda_ptx_libs STATIC ${AKR_PTX_SRC})
+    target_link_libraries(cuda_ptx_libs PUBLIC optix_kernels cuda_volpath_kernel)
     set(AKR_GPU_SRC ${AKR_GPU_SRC} ${AKR_GPU_SRC0})
-    set(AKR_GPU_LIBS ${AKR_GPU_LIBS} CUDA::nvrtc CUDA::cudart_static CUDA::cuda_driver optix_kernels)
+    set(AKR_GPU_LIBS ${AKR_GPU_LIBS} CUDA::nvrtc CUDA::cudart_static CUDA::cuda_driver cuda_ptx_libs)
     set(AKR_DEFS ${AKR_DEFS} AKR_BACKEND_CUDA)
 endif()
 add_library(nano-akari STATIC ${AKR_LIB_SRC} ${AKR_GPU_SRC})

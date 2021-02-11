@@ -14,9 +14,17 @@
 
 #pragma once
 
-#include "compat.h"
-#include <akari/mathutil.h>
-
-namespace akari::gpu::kernel {
-
-} // namespace akari::gpu::kernel
+#include <akari/gpu/cuda/accel.h>
+#include <akari/gpu/volpath.h>
+#include <akari/gpu/cuda/impl.h>
+#include <akari/gpu/cuda/ptx/volpath_ptx.h>
+namespace akari::gpu {
+    VolPathKernels load_kernels() {
+        spdlog::info("loading kernels");
+        CUmodule module;
+        CU_CHECK(cuModuleLoadData(&module, volpath_ptx));
+        CUfunction func;
+        CU_CHECK(cuModuleGetFunction(&func, module, "volpath_advance"));
+        return VolPathKernels{Kernel(std::make_unique<CUDAKernel>(func))};
+    }
+} // namespace akari::gpu

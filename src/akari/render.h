@@ -20,6 +20,7 @@
 #include <akari/scenegraph.h>
 #include <akari/render_xpu.h>
 #include <array>
+#include <memory>
 namespace akari::scene {
     class SceneGraph;
 }

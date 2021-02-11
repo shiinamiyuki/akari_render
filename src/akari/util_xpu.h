@@ -24,13 +24,13 @@ namespace akari {
             T1 first;
             T2 second;
         };
-        // template <typename T1, typename T2>
-        // pair(T1 &&, T2 &&) -> pair<T1, T2>;
+        template <typename T1, typename T2>
+        pair(T1 &&, T2 &&) -> pair<T1, T2>;
 
-        // template <typename T1, typename T2>
-        // AKR_XPU pair<T1, T2> make_pair(T1 a, T2 b) {
-        //     return pair<T1, T2>{a, b};
-        // }
+        template <typename T1, typename T2>
+        AKR_XPU pair<T1, T2> make_pair(T1 a, T2 b) {
+            return pair<T1, T2>{a, b};
+        }
         template <typename T, int N>
         class array {
           public:
@@ -360,17 +360,16 @@ namespace akari {
             static_assert(Index::template GetIndex<U>::value != -1, "U is not in T...");
             return Index::template GetIndex<U>::value != index ? nullptr : reinterpret_cast<const U *>(&data);
         }
-
+#define _GEN_CASE_INNER(N)                                                                                             \
+    using ty = typename Index::template GetType<N>::type;                                                              \
+    if constexpr (std::is_const_v<std::remove_pointer_t<decltype(this)>>)                                              \
+        return visitor(*reinterpret_cast<const ty *>(&data));                                                          \
+    else                                                                                                               \
+        return visitor(*reinterpret_cast<ty *>(&data));
 #define _GEN_CASE_N(N)                                                                                                 \
     case N:                                                                                                            \
         if constexpr (N < nTypes) {                                                                                    \
-            using ty = typename Index::template GetType<N>::type;                                                      \
-            if constexpr (!std::is_same_v<ty, std::monostate>) {                                                       \
-                if constexpr (std::is_const_v<std::remove_pointer_t<decltype(this)>>)                                  \
-                    return visitor(*reinterpret_cast<const ty *>(&data));                                              \
-                else                                                                                                   \
-                    return visitor(*reinterpret_cast<ty *>(&data));                                                    \
-            }                                                                                                          \
+            _GEN_CASE_INNER(N)                                                                                         \
         };                                                                                                             \
         break;
 #define _GEN_CASES_2()                                                                                                 \
@@ -408,10 +407,11 @@ namespace akari {
     } else if constexpr (nTypes <= 16) {                                                                               \
         switch (index) { _GEN_CASES_16(); }                                                                            \
     }                                                                                                                  \
+    AKR_PANIC("No matching case");                                                                                     \
     if constexpr (std::is_same_v<void, Ret>) {                                                                         \
         return;                                                                                                        \
     } else {                                                                                                           \
-        AKR_PANIC("No matching case");                                                                                 \
+        { _GEN_CASE_INNER(0) }                                                                                         \
     }
         template <class Visitor>
         AKR_XPU auto dispatch(Visitor &&visitor) {

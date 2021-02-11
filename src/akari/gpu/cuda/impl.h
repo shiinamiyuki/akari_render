@@ -24,9 +24,6 @@
 #include <akari/gpu/cuda/check.h>
 
 namespace akari::gpu {
-    class CUDAKernel : public Kernel::Impl {
-    public:
-    };
     class CUDADispatcher : public Dispatcher::Impl {
       public:
         cudaStream_t stream;
@@ -62,6 +59,18 @@ namespace akari::gpu {
             CUDA_CHECK(cudaMemcpyAsync((uint8_t *)ptr + offset, host_data, size, cudaMemcpyHostToDevice, stream));
         }
     };
+    class CUDAKernel : public Kernel::Impl {
+        CUfunction func;
+
+      public:
+        CUDAKernel(CUfunction func) : func(func) {}
+        void launch(Dispatcher &dispatcher, uvec3 global_size, uvec3 local_size, std::vector<void *> args) override {
+            auto stream    = dynamic_cast<CUDADispatcher *>(dispatcher.impl_mut())->stream;
+            vec3 grid_size = (global_size + local_size - uvec3(1)) / local_size;
+            CU_CHECK(cuLaunchKernel(func, grid_size.x, grid_size.y, grid_size.z, local_size.x, local_size.y,
+                                    local_size.z, 1024, stream, args.data(), nullptr));
+        }
+    };
     class CUDADevice : public Device::Impl {
       public:
         RawBuffer allocate_buffer(size_t bytes) override {
@@ -76,6 +85,6 @@ namespace akari::gpu {
         }
     };
     inline std::shared_ptr<Device> create_cuda_device() {
-         return std::make_shared<Device>(std::make_unique<CUDADevice>());
+        return std::make_shared<Device>(std::make_unique<CUDADevice>());
     }
 } // namespace akari::gpu

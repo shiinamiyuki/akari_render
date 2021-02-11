@@ -41,23 +41,23 @@ namespace akari::render ::pt {
     };
     struct DirectLighting {
         Ray shadow_ray;
-        Vec3 wi = Vec3(0.0);
-        BSDFValue radiance = BSDFValue::zero();
+        Vec3 wi             = Vec3(0.0);
+        BSDFValue radiance  = BSDFValue::zero();
         Spectrum throughput = Spectrum(0.0);
-        Float pdf = 0.0;
+        Float pdf           = 0.0;
     };
 
     struct VolumeDirectLighting {
         Ray shadow_ray;
-        Vec3 wi = Vec3(0.0);
+        Vec3 wi           = Vec3(0.0);
         Spectrum radiance = Spectrum(0.0);
-        Float pdf = 0.0;
+        Float pdf         = 0.0;
     };
 
     struct HitLight {
         Vec3 wo;
         const Light *light = nullptr;
-        Spectrum I = Spectrum(0.0);
+        Spectrum I         = Spectrum(0.0);
     };
 
     struct SurfaceVertex {
@@ -66,7 +66,7 @@ namespace akari::render ::pt {
         Ray ray;
         BSDFValue beta;
         astd::optional<BSDF> bsdf;
-        Float pdf = 0.0;
+        Float pdf             = 0.0;
         BSDFType sampled_lobe = BSDFType::Unset;
         // SurfaceVertex() = default;
         SurfaceVertex(const Vec3 &wo, const SurfaceInteraction &si) : wo(wo), si(si) {}
@@ -78,7 +78,7 @@ namespace akari::render ::pt {
         MediumInteraction mi;
         Ray ray;
         Spectrum beta = Spectrum(1.0);
-        Float pdf = 0.0;
+        Float pdf     = 0.0;
         explicit MediumVertex(const Vec3 &wo, const MediumInteraction &mi) : wo(wo), mi(mi) {}
         Vec3 p() const { return mi.p; }
         Vec3 ng() const { return Vec3(0); }
@@ -115,12 +115,12 @@ namespace akari::render ::pt {
     };
     struct PathTracerBase {
         const Scene *scene = nullptr;
-        Sampler *sampler = nullptr;
-        Spectrum L = Spectrum(0.0);
+        Sampler *sampler   = nullptr;
+        Spectrum L         = Spectrum(0.0);
         Spectrum emitter_direct;
         Spectrum beta = Spectrum(1.0f);
         Allocator<> allocator;
-        int depth = 0;
+        int depth     = 0;
         int min_depth = 5;
         int max_depth = 5;
         PathTracerBase(const Scene *scene, Sampler *sampler, Allocator<> alloc, int min_depth, int max_depth)
@@ -216,20 +216,20 @@ namespace akari::render ::pt {
                 auto &si = vertex.si;
                 DirectLighting lighting;
                 LightSampleContext light_ctx;
-                light_ctx.u = sampler->next2d();
-                light_ctx.p = si.p;
+                light_ctx.u              = sampler->next2d();
+                light_ctx.p              = si.p;
                 LightSample light_sample = light->sample_incidence(light_ctx);
                 if (light_sample.pdf <= 0.0)
                     return astd::nullopt;
                 light_pdf *= light_sample.pdf;
-                auto f = vertex.bsdf->evaluate(vertex.wo, light_sample.wi);
-                Float bsdf_pdf = vertex.bsdf->evaluate_pdf(vertex.wo, light_sample.wi);
+                auto f              = vertex.bsdf->evaluate(vertex.wo, light_sample.wi);
+                Float bsdf_pdf      = vertex.bsdf->evaluate_pdf(vertex.wo, light_sample.wi);
                 lighting.throughput = light_sample.I * std::abs(dot(si.ns, light_sample.wi)) / light_pdf *
                                       mis_weight(light_pdf, bsdf_pdf);
-                lighting.radiance = f * lighting.throughput;
+                lighting.radiance   = f * lighting.throughput;
                 lighting.shadow_ray = light_sample.shadow_ray;
-                lighting.pdf = light_pdf;
-                lighting.wi = light_sample.wi;
+                lighting.pdf        = light_pdf;
+                lighting.wi         = light_sample.wi;
                 if (visitor.on_direct_lighting(vertex, lighting)) {
                     return lighting;
                 }
@@ -254,8 +254,8 @@ namespace akari::render ::pt {
                 ;
             } else {
                 PointGeometry ref;
-                ref.n = prev_vertex->ng();
-                ref.p = prev_vertex->p();
+                ref.n          = prev_vertex->ng();
+                ref.p          = prev_vertex->p();
                 auto light_pdf = light->pdf_incidence(ref, -wo) * scene->light_sampler->pdf(light);
                 if ((prev_vertex->sampled_lobe() & BSDFType::Specular) == BSDFType::Unset) {
                     Float weight_bsdf = mis_weight(prev_vertex->pdf(), light_pdf);
@@ -270,7 +270,7 @@ namespace akari::render ::pt {
         void accumulate_beta(const Spectrum &k) { beta *= k; }
 
         astd::optional<SurfaceVertex> on_surface_scatter(const Vec3 &wo, SurfaceInteraction &si,
-                                                        const astd::optional<PathVertex> &prev_vertex) noexcept {
+                                                         const astd::optional<PathVertex> &prev_vertex) noexcept {
             auto *material = si.material();
             if (si.triangle.light) {
                 on_hit_light(si.triangle.light, wo, si.sp(), prev_vertex);
@@ -287,10 +287,10 @@ namespace akari::render ::pt {
                 if (sample->pdf == 0.0f) {
                     return astd::nullopt;
                 }
-                vertex.bsdf = bsdf;
-                vertex.ray = Ray(si.p, sample->wi, Eps / std::abs(glm::dot(si.ng, sample->wi)));
-                vertex.beta = sample->f * (std::abs(glm::dot(si.ns, sample->wi)) / sample->pdf);
-                vertex.pdf = sample->pdf;
+                vertex.bsdf         = bsdf;
+                vertex.ray          = Ray(si.p, sample->wi, Eps / std::abs(glm::dot(si.ng, sample->wi)));
+                vertex.beta         = sample->f * (std::abs(glm::dot(si.ns, sample->wi)) / sample->pdf);
+                vertex.pdf          = sample->pdf;
                 vertex.sampled_lobe = sample->type;
                 return vertex;
             }
@@ -305,7 +305,7 @@ namespace akari::render ::pt {
                     break;
                 }
 
-                auto wo = -ray.d;
+                auto wo     = -ray.d;
                 auto vertex = on_surface_scatter(wo, *si, prev_vertex);
                 if (!vertex || !visitor.on_scatter(*vertex, prev_vertex)) {
                     break;
@@ -340,7 +340,7 @@ namespace akari::render ::pt {
         }
         void run_megakernel(const Camera *camera, const ivec2 &p) noexcept {
             auto camera_sample = camera_ray(camera, p);
-            Ray ray = camera_sample.ray;
+            Ray ray            = camera_sample.ray;
             run_megakernel(ray, astd::nullopt);
         }
     };
@@ -351,8 +351,8 @@ namespace akari::render ::pt {
         struct Config {
             bool compute_aov = false;
             bool use_guiding = false;
-            bool volumetric = true;
-            bool use_nee = true;
+            bool volumetric  = true;
+            bool use_nee     = true;
         };
         Config config;
         PathVisitor visitor;
@@ -372,8 +372,8 @@ namespace akari::render ::pt {
                 auto &mi = vertex.mi;
                 VolumeDirectLighting lighting;
                 LightSampleContext light_ctx;
-                light_ctx.u = sampler->next2d();
-                light_ctx.p = mi.p;
+                light_ctx.u              = sampler->next2d();
+                light_ctx.p              = mi.p;
                 LightSample light_sample = light->sample_incidence(light_ctx);
                 if (light_sample.pdf <= 0.0)
                     return astd::nullopt;
@@ -383,10 +383,10 @@ namespace akari::render ::pt {
                 AKR_CHECK(std::isfinite(light_sample.pdf));
                 AKR_CHECK(std::isfinite(light_pdf));
                 AKR_CHECK(std::isfinite(hsum(light_sample.I)));
-                lighting.radiance = light_sample.I * phase / light_pdf * mis_weight(light_pdf, phase);
+                lighting.radiance   = light_sample.I * phase / light_pdf * mis_weight(light_pdf, phase);
                 lighting.shadow_ray = light_sample.shadow_ray;
-                lighting.pdf = light_pdf;
-                lighting.wi = light_sample.wi;
+                lighting.pdf        = light_pdf;
+                lighting.wi         = light_sample.wi;
                 return lighting;
             }
             return astd::nullopt;
@@ -398,20 +398,20 @@ namespace akari::render ::pt {
                 auto &si = vertex.si;
                 DirectLighting lighting;
                 LightSampleContext light_ctx;
-                light_ctx.u = sampler->next2d();
-                light_ctx.p = si.p;
+                light_ctx.u              = sampler->next2d();
+                light_ctx.p              = si.p;
                 LightSample light_sample = light->sample_incidence(light_ctx);
                 if (light_sample.pdf <= 0.0)
                     return astd::nullopt;
                 light_pdf *= light_sample.pdf;
-                auto f = vertex.bsdf->evaluate(vertex.wo, light_sample.wi);
-                Float bsdf_pdf = vertex.bsdf->evaluate_pdf(vertex.wo, light_sample.wi);
+                auto f              = vertex.bsdf->evaluate(vertex.wo, light_sample.wi);
+                Float bsdf_pdf      = vertex.bsdf->evaluate_pdf(vertex.wo, light_sample.wi);
                 lighting.throughput = light_sample.I * std::abs(dot(si.ns, light_sample.wi)) / light_pdf *
                                       mis_weight(light_pdf, bsdf_pdf);
-                lighting.radiance = f * lighting.throughput;
+                lighting.radiance   = f * lighting.throughput;
                 lighting.shadow_ray = light_sample.shadow_ray;
-                lighting.pdf = light_pdf;
-                lighting.wi = light_sample.wi;
+                lighting.pdf        = light_pdf;
+                lighting.wi         = light_sample.wi;
                 if (visitor.on_direct_lighting(vertex, lighting)) {
                     return lighting;
                 }
@@ -437,8 +437,8 @@ namespace akari::render ::pt {
                 ;
             } else {
                 PointGeometry ref;
-                ref.n = prev_vertex->ng();
-                ref.p = prev_vertex->p();
+                ref.n          = prev_vertex->ng();
+                ref.p          = prev_vertex->p();
                 auto light_pdf = light->pdf_incidence(ref, -wo) * scene->light_sampler->pdf(light);
                 if ((prev_vertex->sampled_lobe() & BSDFType::Specular) == BSDFType::Unset) {
                     Float weight_bsdf = mis_weight(prev_vertex->pdf(), light_pdf);
@@ -455,9 +455,9 @@ namespace akari::render ::pt {
             if (depth < max_depth) {
                 MediumVertex vertex(wo, mi);
                 auto [wi, phase] = mi.phase.sample(wo, sampler->next2d());
-                vertex.ray = Ray(mi.p, wi, Eps);
-                vertex.pdf = phase;
-                vertex.beta = Spectrum(1.0);
+                vertex.ray       = Ray(mi.p, wi, Eps);
+                vertex.pdf       = phase;
+                vertex.beta      = Spectrum(1.0);
                 return vertex;
             }
             return astd::nullopt;
@@ -477,10 +477,10 @@ namespace akari::render ::pt {
                     return astd::nullopt;
                 }
                 vertex.bsdf = bsdf;
-                vertex.ray = spawn_ray(si.p, sample->wi, si.ng);
+                vertex.ray  = spawn_ray(si.p, sample->wi, si.ng);
                 // vertex.ray = Ray(si.p, sample->wi, Eps / std::abs(glm::dot(si.ng, sample->wi)));
-                vertex.beta = sample->f * (std::abs(glm::dot(si.ns, sample->wi)) / sample->pdf);
-                vertex.pdf = sample->pdf;
+                vertex.beta         = sample->f * (std::abs(glm::dot(si.ns, sample->wi)) / sample->pdf);
+                vertex.pdf          = sample->pdf;
                 vertex.sampled_lobe = sample->type;
                 return vertex;
             }
@@ -510,7 +510,7 @@ namespace akari::render ::pt {
                 } else {
                     break;
                 }
-                shadow_ray.o = offset_ray(si->p, dot(shadow_ray.d, si->ng) > 0 ? si->ng : -si->ng);
+                shadow_ray.o    = offset_ray(si->p, dot(shadow_ray.d, si->ng) > 0 ? si->ng : -si->ng);
                 shadow_ray.tmax = length(dst - si->p) / length(shadow_ray.d);
             }
             AKR_CHECK(!std::isnan(hsum(tr)));
@@ -529,7 +529,9 @@ namespace akari::render ::pt {
                 if (si) {
                     if (config.volumetric && !st.empty()) {
                         Spectrum tr(0);
-                        std::tie(mi, tr) = st.top()->sample(ray, *sampler, allocator);
+                        auto _ = st.top()->sample(ray, *sampler, allocator);
+                        mi     = _.first;
+                        tr     = _.second;
                         AKR_CHECK(!std::isnan(hsum(tr)));
                         accumulate_beta(tr);
                     }
@@ -572,7 +574,7 @@ namespace akari::render ::pt {
                         }
                     }
                     accumulate_beta(vertex->beta());
-                    ray = vertex->ray;
+                    ray         = vertex->ray;
                     this_vertex = PathVertex(*vertex);
                 } else {
                     auto vertex = on_volume_scatter(wo, *mi);
@@ -592,7 +594,7 @@ namespace akari::render ::pt {
                     }
                     AKR_CHECK(!std::isnan(hsum(vertex->beta)));
                     accumulate_beta(vertex->beta);
-                    ray = vertex->ray;
+                    ray         = vertex->ray;
                     this_vertex = PathVertex(*vertex);
                 }
 
@@ -611,7 +613,7 @@ namespace akari::render ::pt {
         }
         void run_megakernel(const Camera *camera, const ivec2 &p) noexcept {
             auto camera_sample = camera_ray(camera, p);
-            Ray ray = camera_sample.ray;
+            Ray ray            = camera_sample.ray;
             MediumStack<> st;
             run_megakernel(ray, st, astd::nullopt);
         }

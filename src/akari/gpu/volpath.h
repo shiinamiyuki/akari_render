@@ -13,18 +13,11 @@
 // limitations under the License.
 
 #pragma once
-
-#include "common.h"
-
-namespace akari::gpu::kernel {
-
-knl_device_inline float3 transform_apply_normal(const AffineTransform &T, const float3 &n) {
-
-}
-knl_device_inline float3 transform_apply_vector(const AffineTransform &T, const float3 &v) {
-
-}
-knl_device_inline float3 transform_apply_point(const AffineTransform &T, const float3 &p) {
-    
-}
+#include <akari/util.h>
+#include <akari/gpu/kernel.h>
+namespace akari::gpu {
+    struct VolPathKernels {
+        Kernel advance;
+    };
+    VolPathKernels load_kernels();
 }

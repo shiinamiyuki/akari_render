@@ -15,15 +15,21 @@
 #include <akari/gpu/api.h>
 #include <akari/gpu/cuda/accel.h>
 #include <akari/gpu/cuda/impl.h>
+#include <akari/gpu/cuda/impl.h>
+#include <akari/gpu/volpath.h>
 #include <spdlog/spdlog.h>
 namespace akari::gpu {
     void render_scenegraph(scene::P<scene::SceneGraph> graph, const std::string &backend) {
         graph->commit();
 #ifdef AKR_BACKEND_CUDA
         if (backend == "cuda") {
-            auto device = create_cuda_device();
+            auto device     = create_cuda_device();
+            auto dispatcher = device->new_dispatcher();
             OptixAccel accel(device);
             accel.build(graph);
+            auto kernels = load_kernels();
+            kernels.advance.launch(dispatcher, uvec3(1024, 1, 1), uvec3(64, 1, 1), {});
+            dispatcher.wait();
             return;
         }
 #endif
