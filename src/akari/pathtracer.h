@@ -19,13 +19,13 @@
 
 namespace akari::render ::pt {
 
-    template <int N = 16>
-    struct MediumStack : FixedVector<const Medium *, N> {
+    template <class C, int N = 16>
+    struct MediumStack : FixedVector<const Medium<CPU> *, N> {
         auto top() const { return this->back(); }
         // void update(const SurfaceInteraction & si, const astd::optional<MediumInteraction> & mi, const Ray & ray){
         //     if(empty() &&)
         // }
-        void update(const SurfaceInteraction &si, const Ray &ray) {
+        void update(const SurfaceInteraction<CPU> &si, const Ray &ray) {
             if (!si.medium() || si.material()) {
                 return;
             }
@@ -56,20 +56,20 @@ namespace akari::render ::pt {
 
     struct HitLight {
         Vec3 wo;
-        const Light *light = nullptr;
-        Spectrum I         = Spectrum(0.0);
+        const Light<CPU> *light = nullptr;
+        Spectrum I              = Spectrum(0.0);
     };
 
     struct SurfaceVertex {
         Vec3 wo;
-        SurfaceInteraction si;
+        SurfaceInteraction<CPU> si;
         Ray ray;
         BSDFValue beta;
-        astd::optional<BSDF> bsdf;
+        astd::optional<BSDF<CPU>> bsdf;
         Float pdf             = 0.0;
         BSDFType sampled_lobe = BSDFType::Unset;
         // SurfaceVertex() = default;
-        SurfaceVertex(const Vec3 &wo, const SurfaceInteraction &si) : wo(wo), si(si) {}
+        SurfaceVertex(const Vec3 &wo, const SurfaceInteraction<CPU> &si) : wo(wo), si(si) {}
         Vec3 p() const { return si.p; }
         Vec3 ng() const { return si.ng; }
     };
@@ -103,8 +103,8 @@ namespace akari::render ::pt {
                 return BSDFType::Unset;
             });
         }
-        const Light *light(const Scene *scene) const {
-            return dispatch([=](auto &&arg) -> const Light * {
+        const Light<CPU> *light(const Scene<CPU> *scene) const {
+            return dispatch([=](auto &&arg) -> const Light<CPU> * {
                 using T = std::decay_t<decltype(arg)>;
                 if constexpr (std::is_same_v<T, SurfaceVertex>) {
                     return arg.si.light();
@@ -114,16 +114,16 @@ namespace akari::render ::pt {
         }
     };
     struct PathTracerBase {
-        const Scene *scene = nullptr;
-        Sampler *sampler   = nullptr;
-        Spectrum L         = Spectrum(0.0);
+        const Scene<CPU> *scene = nullptr;
+        Sampler<CPU> *sampler   = nullptr;
+        Spectrum L              = Spectrum(0.0);
         Spectrum emitter_direct;
         Spectrum beta = Spectrum(1.0f);
         Allocator<> allocator;
         int depth     = 0;
         int min_depth = 5;
         int max_depth = 5;
-        PathTracerBase(const Scene *scene, Sampler *sampler, Allocator<> alloc, int min_depth, int max_depth)
+        PathTracerBase(const Scene<CPU> *scene, Sampler<CPU> *sampler, Allocator<> alloc, int min_depth, int max_depth)
             : scene(scene), sampler(sampler), allocator(alloc), min_depth(min_depth), max_depth(max_depth) {}
     };
     // Basic Path Tracing
@@ -198,19 +198,20 @@ namespace akari::render ::pt {
     class SimplePathTracer : public PathTracerBase {
       public:
         PathVisitor visitor;
-        SimplePathTracer(const Scene *scene, Sampler *sampler, Allocator<> alloc, int min_depth, int max_depth)
+        SimplePathTracer(const Scene<CPU> *scene, Sampler<CPU> *sampler, Allocator<> alloc, int min_depth,
+                         int max_depth)
             : PathTracerBase(scene, sampler, alloc, min_depth, max_depth), visitor(this) {}
 
-        CameraSample camera_ray(const Camera *camera, const ivec2 &p) noexcept {
+        CameraSample camera_ray(const Camera<CPU> *camera, const ivec2 &p) noexcept {
             CameraSample sample = camera->generate_ray(sampler->next2d(), sampler->next2d(), p);
             return sample;
         }
-        std::pair<const Light *, Float> select_light() noexcept {
+        std::pair<const Light<CPU> *, Float> select_light() noexcept {
             return scene->light_sampler->sample(sampler->next2d());
         }
 
         astd::optional<DirectLighting>
-        compute_direct_lighting(SurfaceVertex &vertex, const std::pair<const Light *, Float> &selected) noexcept {
+        compute_direct_lighting(SurfaceVertex &vertex, const std::pair<const Light<CPU> *, Float> &selected) noexcept {
             auto [light, light_pdf] = selected;
             if (light) {
                 auto &si = vertex.si;
@@ -247,7 +248,7 @@ namespace akari::render ::pt {
 
         void accumulate_radiance(const Spectrum &r) { L += r; }
 
-        void on_hit_light(const Light *light, const Vec3 &wo, const ShadingPoint &sp,
+        void on_hit_light(const Light<CPU> *light, const Vec3 &wo, const ShadingPoint &sp,
                           const astd::optional<PathVertex> &prev_vertex) {
             Spectrum I = beta * light->Le(wo, sp);
             if (depth == 0 || BSDFType::Unset != (prev_vertex->sampled_lobe() & BSDFType::Specular)) {
@@ -269,7 +270,7 @@ namespace akari::render ::pt {
         }
         void accumulate_beta(const Spectrum &k) { beta *= k; }
 
-        astd::optional<SurfaceVertex> on_surface_scatter(const Vec3 &wo, SurfaceInteraction &si,
+        astd::optional<SurfaceVertex> on_surface_scatter(const Vec3 &wo, SurfaceInteraction<CPU> &si,
                                                          const astd::optional<PathVertex> &prev_vertex) noexcept {
             auto *material = si.material();
             if (si.triangle.light) {
@@ -338,7 +339,7 @@ namespace akari::render ::pt {
             }
             L = clamp_zero(L);
         }
-        void run_megakernel(const Camera *camera, const ivec2 &p) noexcept {
+        void run_megakernel(const Camera<CPU> *camera, const ivec2 &p) noexcept {
             auto camera_sample = camera_ray(camera, p);
             Ray ray            = camera_sample.ray;
             run_megakernel(ray, astd::nullopt);
@@ -356,17 +357,19 @@ namespace akari::render ::pt {
         };
         Config config;
         PathVisitor visitor;
-        UnifiedPathTracer(const Scene *scene, Sampler *sampler, Allocator<> alloc, int min_depth, int max_depth)
+        UnifiedPathTracer(const Scene<CPU> *scene, Sampler<CPU> *sampler, Allocator<> alloc, int min_depth,
+                          int max_depth)
             : PathTracerBase(scene, sampler, alloc, min_depth, max_depth), visitor(this) {}
-        CameraSample camera_ray(const Camera *camera, const ivec2 &p) noexcept {
+        CameraSample camera_ray(const Camera<CPU> *camera, const ivec2 &p) noexcept {
             CameraSample sample = camera->generate_ray(sampler->next2d(), sampler->next2d(), p);
             return sample;
         }
-        std::pair<const Light *, Float> select_light() noexcept {
+        std::pair<const Light<CPU> *, Float> select_light() noexcept {
             return scene->light_sampler->sample(sampler->next2d());
         }
         astd::optional<VolumeDirectLighting>
-        compute_direct_lighting(const MediumVertex &vertex, const std::pair<const Light *, Float> &selected) noexcept {
+        compute_direct_lighting(const MediumVertex &vertex,
+                                const std::pair<const Light<CPU> *, Float> &selected) noexcept {
             auto [light, light_pdf] = selected;
             if (light) {
                 auto &mi = vertex.mi;
@@ -392,7 +395,8 @@ namespace akari::render ::pt {
             return astd::nullopt;
         }
         astd::optional<DirectLighting>
-        compute_direct_lighting(const SurfaceVertex &vertex, const std::pair<const Light *, Float> &selected) noexcept {
+        compute_direct_lighting(const SurfaceVertex &vertex,
+                                const std::pair<const Light<CPU> *, Float> &selected) noexcept {
             auto [light, light_pdf] = selected;
             if (light) {
                 auto &si = vertex.si;
@@ -429,7 +433,7 @@ namespace akari::render ::pt {
 
         void accumulate_radiance(const Spectrum &r) { L += r; }
 
-        void on_hit_light(const Light *light, const Vec3 &wo, const ShadingPoint &sp,
+        void on_hit_light(const Light<CPU> *light, const Vec3 &wo, const ShadingPoint &sp,
                           const astd::optional<PathVertex> &prev_vertex) {
             Spectrum I = beta * light->Le(wo, sp);
             if (!config.use_nee || !prev_vertex || depth == 0 ||
@@ -462,7 +466,7 @@ namespace akari::render ::pt {
             }
             return astd::nullopt;
         }
-        astd::optional<SurfaceVertex> on_surface_scatter(const Vec3 &wo, SurfaceInteraction &si) noexcept {
+        astd::optional<SurfaceVertex> on_surface_scatter(const Vec3 &wo, SurfaceInteraction<CPU> &si) noexcept {
             auto *material = si.material();
             if (depth < max_depth) {
                 SurfaceVertex vertex(wo, si);
@@ -486,7 +490,7 @@ namespace akari::render ::pt {
             }
             return astd::nullopt;
         }
-        Spectrum transmittance(Ray shadow_ray, MediumStack<> st) {
+        Spectrum transmittance(Ray shadow_ray, MediumStack<CPU> st) {
             Spectrum tr(1.0);
             vec3 dst = shadow_ray(shadow_ray.tmax);
             int iter = 0;
@@ -516,7 +520,7 @@ namespace akari::render ::pt {
             AKR_CHECK(!std::isnan(hsum(tr)));
             return tr;
         }
-        void run_megakernel(Ray ray, MediumStack<> st, astd::optional<PathVertex> prev_vertex) noexcept {
+        void run_megakernel(Ray ray, MediumStack<CPU> st, astd::optional<PathVertex> prev_vertex) noexcept {
             astd::optional<PathVertex> this_vertex;
             while (true) {
                 auto si = scene->intersect(ray);
@@ -611,10 +615,10 @@ namespace akari::render ::pt {
                 prev_vertex = this_vertex;
             }
         }
-        void run_megakernel(const Camera *camera, const ivec2 &p) noexcept {
+        void run_megakernel(const Camera<CPU> *camera, const ivec2 &p) noexcept {
             auto camera_sample = camera_ray(camera, p);
             Ray ray            = camera_sample.ray;
-            MediumStack<> st;
+            MediumStack<CPU> st;
             run_megakernel(ray, st, astd::nullopt);
         }
     };
@@ -622,7 +626,7 @@ namespace akari::render ::pt {
 } // namespace akari::render::pt
 
 namespace akari::render {
-    Spectrum pt_estimator(PTConfig config, const Scene &scene, Allocator<> alloc, Sampler &sampler, Ray &ray,
+    Spectrum pt_estimator(PTConfig config, const Scene<CPU> &scene, Allocator<> alloc, Sampler<CPU> &sampler, Ray &ray,
                           astd::optional<pt::PathVertex> prev_vertex) {
         pt::SimplePathTracer<> pt(&scene, &sampler, alloc, config.min_depth, config.max_depth);
         // pt.min_depth = config.min_depth;

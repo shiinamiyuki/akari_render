@@ -21,7 +21,7 @@ namespace akari::render::mlt {
     };
     struct MarkovChain {
         explicit MarkovChain(MLTSampler sampler) : sampler(sampler) {}
-        Sampler sampler;
+        Sampler<CPU>  sampler;
         RadianceRecord current;
     };
     inline auto T(const Spectrum &s) { return hmax(s); };
@@ -37,6 +37,6 @@ namespace akari::render {
     void accept_markov_chain_and_splat(mlt::MLTStats &stats, Rng &rng, const mlt::RadianceRecord &proposal,
                                        mlt::MarkovChain &chain, Film &film);
     std::pair<std::vector<mlt::MarkovChain>, double>
-    init_markov_chains(MLTConfig config, const Scene &scene,
-                       const std::function<Spectrum(ivec2, Allocator<>, const Scene &, Sampler&)> &estimator);
+    init_markov_chains(MLTConfig config, const Scene<CPU>  &scene,
+                       const std::function<Spectrum(ivec2, Allocator<>, const Scene<CPU>  &, Sampler<CPU> &)> &estimator);
 } // namespace akari::render

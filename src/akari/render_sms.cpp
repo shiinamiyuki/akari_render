@@ -47,8 +47,8 @@ namespace akari::render {
             Float eta;
             Vec3 ng;
             Matrix2f A, B, C;
-            const MeshInstance *shape = nullptr;
-            ManifoldVertex(const SurfaceInteraction &si) {
+            const MeshInstance<CPU> *shape = nullptr;
+            ManifoldVertex(const SurfaceInteraction<CPU> &si) {
                 p = si.p;
                 dpdu = si.dpdu;
                 dpdv = si.dpdv;
@@ -75,14 +75,14 @@ namespace akari::render {
 
         struct SurfaceVertex {
             Vec3 wo;
-            SurfaceInteraction si;
+            SurfaceInteraction<CPU> si;
             Ray ray;
             Spectrum beta;
-            astd::optional<BSDF> bsdf;
+            astd::optional<BSDF<CPU>> bsdf;
             Float pdf = 0.0;
             BSDFType sampled_lobe = BSDFType::Unset;
             // SurfaceVertex() = default;
-            SurfaceVertex(const Vec3 &wo, const SurfaceInteraction si) : wo(wo), si(si) {}
+            SurfaceVertex(const Vec3 &wo, const SurfaceInteraction<CPU> si) : wo(wo), si(si) {}
             Vec3 p() const { return si.p; }
             Vec3 ng() const { return si.ng; }
         };
@@ -106,8 +106,8 @@ namespace akari::render {
                     return BSDFType::Unset;
                 });
             }
-            const Light *light(const Scene *scene) const {
-                return dispatch([=](auto &&arg) -> const Light * {
+            const Light<CPU> *light(const Scene<CPU> *scene) const {
+                return dispatch([=](auto &&arg) -> const Light<CPU> * {
                     using T = std::decay_t<decltype(arg)>;
                     if constexpr (std::is_same_v<T, SurfaceVertex>) {
                         return arg.si.light();
@@ -117,8 +117,8 @@ namespace akari::render {
             }
         };
         struct ManifoldPathSampler {
-            const Scene *scene = nullptr;
-            Sampler *sampler = nullptr;
+            const Scene<CPU> *scene = nullptr;
+            Sampler<CPU> *sampler = nullptr;
 
             static astd::optional<std::pair<Vec2, Vec2>> compute_step(const Vec3 &v0, const ManifoldVertex &v1,
                                                                      const Vec3 &v2, const Vec3 &n_offset) {
@@ -251,10 +251,10 @@ namespace akari::render {
                 Float G = dw0_dx1 * dx1_dx2;
                 return G;
             }
-            astd::optional<SurfaceInteraction> newton_solver(const SurfaceInteraction &si,
+            astd::optional<SurfaceInteraction<CPU>> newton_solver(const SurfaceInteraction<CPU> &si,
                                                             const ManifoldVertex &vtx_init, const Vec3 &light_p) {
                 ManifoldVertex vtx = vtx_init;
-                astd::optional<SurfaceInteraction> solution;
+                astd::optional<SurfaceInteraction<CPU>> solution;
                 size_t iter = 0;
                 const size_t max_iter = 20;
                 const Float threshold = 1e-5;
@@ -303,8 +303,8 @@ namespace akari::render {
         // Basic Path Tracing
         class SMSPathTracer {
           public:
-            const Scene *scene = nullptr;
-            Sampler *sampler = nullptr;
+            const Scene<CPU> *scene = nullptr;
+            Sampler<CPU> *sampler = nullptr;
             Spectrum L;
             Spectrum beta = Spectrum(1.0f);
             Allocator<> allocator;
@@ -317,16 +317,16 @@ namespace akari::render {
                 pdf_B *= pdf_B;
                 return pdf_A / (pdf_A + pdf_B);
             }
-            CameraSample camera_ray(const Camera *camera, const ivec2 &p) noexcept {
+            CameraSample camera_ray(const Camera<CPU> *camera, const ivec2 &p) noexcept {
                 CameraSample sample = camera->generate_ray(sampler->next2d(), sampler->next2d(), p);
                 return sample;
             }
-            std::pair<const Light *, Float> select_light() noexcept {
+            std::pair<const Light<CPU> *, Float> select_light() noexcept {
                 return scene->light_sampler->sample(sampler->next2d());
             }
 
             astd::optional<DirectLighting>
-            compute_direct_lighting(SurfaceVertex &vertex, const std::pair<const Light *, Float> &selected) noexcept {
+            compute_direct_lighting(SurfaceVertex &vertex, const std::pair<const Light<CPU> *, Float> &selected) noexcept {
                 auto [light, light_pdf] = selected;
                 if (light) {
                     auto &si = vertex.si;
@@ -358,7 +358,7 @@ namespace akari::render {
 
             void accumulate_radiance(const Spectrum &r) { L += r; }
 
-            void on_hit_light(const Light *light, const Vec3 &wo, const ShadingPoint &sp,
+            void on_hit_light(const Light<CPU> *light, const Vec3 &wo, const ShadingPoint &sp,
                               const astd::optional<PathVertex> &prev_vertex) {
                 Spectrum I = beta * light->Le(wo, sp);
                 if (depth == 0 || BSDFType::Unset != (prev_vertex->sampled_lobe() & BSDFType::Specular)) {
@@ -378,7 +378,7 @@ namespace akari::render {
             }
             void accumulate_beta(const Spectrum &k) { beta *= k; }
             // @param mat_pdf: supplied if material is already chosen
-            astd::optional<SurfaceVertex> on_surface_scatter(const Vec3 &wo, SurfaceInteraction &si,
+            astd::optional<SurfaceVertex> on_surface_scatter(const Vec3 &wo, SurfaceInteraction<CPU> &si,
                                                             const astd::optional<PathVertex> &prev_vertex) noexcept {
                 auto *material = si.material();
                 if (si.triangle.light) {
@@ -404,7 +404,7 @@ namespace akari::render {
                 }
                 return astd::nullopt;
             }
-            void run_megakernel(const Camera *camera, const ivec2 &p) noexcept {
+            void run_megakernel(const Camera<CPU> *camera, const ivec2 &p) noexcept {
                 auto camera_sample = camera_ray(camera, p);
                 Ray ray = camera_sample.ray;
                 astd::optional<PathVertex> prev_vertex;
@@ -444,14 +444,14 @@ namespace akari::render {
             }
         };
     } // namespace sms
-    Film render_sms(SMSConfig config, const Scene &scene) {
+    Film render_sms(SMSConfig config, const Scene<CPU> &scene) {
         Film film(scene.camera->resolution());
         std::vector<astd::pmr::monotonic_buffer_resource *> buffers;
         for (size_t i = 0; i < thread::num_work_threads(); i++) {
             buffers.emplace_back(new astd::pmr::monotonic_buffer_resource(astd::pmr::new_delete_resource()));
         }
         thread::parallel_for(thread::blocked_range<2>(film.resolution(), ivec2(16, 16)), [&](ivec2 id, uint32_t tid) {
-            auto Li = [&](const ivec2 p, Sampler &sampler) -> Spectrum {
+            auto Li = [&](const ivec2 p, Sampler<CPU> &sampler) -> Spectrum {
                 sms::SMSPathTracer pt;
                 pt.min_depth = config.min_depth;
                 pt.max_depth = config.max_depth;
@@ -464,7 +464,7 @@ namespace akari::render {
                 buffers[tid]->release();
                 return pt.L;
             };
-            Sampler sampler = config.sampler;
+            Sampler<CPU> sampler = config.sampler;
             sampler.set_sample_index(id.y * film.resolution().x + id.x);
             for (int s = 0; s < config.spp; s++) {
                 auto L = Li(id, sampler);

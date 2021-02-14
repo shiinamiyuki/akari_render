@@ -27,6 +27,7 @@ static void logCallback(unsigned int level, const char *tag, const char *message
 }
 
 namespace akari::gpu {
+    using namespace accel;
     struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) RaygenRecord {
         __align__(OPTIX_SBT_RECORD_ALIGNMENT) char header[OPTIX_SBT_RECORD_HEADER_SIZE];
     };

@@ -14,10 +14,29 @@
 
 #pragma once
 #include <akari/util.h>
+#include <akari/render_xpu.h>
 #include <akari/gpu/kernel.h>
-namespace akari::gpu {
+#include <akari/gpu/soa.h>
+namespace akari::gpu::kernel {
+    using namespace akari::render;
+    struct PathState {
+        enum KernelState {
+            KERNEL_RAYGEN,
+            
+        };
+        KernelState state;
+        ivec2 pixel;
+        Ray ray;
+        Sampler<GPU> sampler;
+    };
+
+    struct KernelGlobals {
+        const Camera<GPU> *camera = nullptr;
+        SOA<PathState> path_states;
+    };
     struct VolPathKernels {
         Kernel advance;
     };
+
     VolPathKernels load_kernels();
-}
+} // namespace akari::gpu

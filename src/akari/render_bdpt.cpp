@@ -19,16 +19,16 @@
 namespace akari::render {
     namespace bidir {
         struct SurfaceVertex {Vec3 wo;
-            SurfaceInteraction si;
+            SurfaceInteraction<CPU> si;
             
             Ray ray;
             Spectrum beta;
-            astd::optional<BSDF> bsdf;
+            astd::optional<BSDF<CPU>> bsdf;
             Float pdf_fwd = 0.0;
             Float pdf_rev = 0.0;
             BSDFType sampled_lobe = BSDFType::Unset;
             // SurfaceVertex() = default;
-            SurfaceVertex(const Vec3 &wo, const SurfaceInteraction si) : wo(wo), si(si) {}
+            SurfaceVertex(const Vec3 &wo, const SurfaceInteraction<CPU> si) : wo(wo), si(si) {}
             Vec3 p() const { return si.p; }
             Vec3 ng() const { return si.ng; }
         };
@@ -43,7 +43,7 @@ namespace akari::render {
 
     } // namespace bidir
     
-    Image render_bdpt(PTConfig config, const Scene &scene) {
+    Image render_bdpt(PTConfig config, const Scene<CPU> &scene) {
         Film film(scene.camera->resolution());
         thread::parallel_for(thread::blocked_range<2>(film.resolution(), ivec2(16, 16)), [&](ivec2 id, uint32_t tid) {
             //  film.add_sample(id, Spectrum(1.0), 1.0);

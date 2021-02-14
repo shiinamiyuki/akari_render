@@ -48,7 +48,7 @@ namespace akari::render {
     }()
       public:
         EmbreeAccelImpl() { device = rtcNewDevice(nullptr); }
-        void build(const Scene &scene, const std::shared_ptr<scene::SceneGraph> &scene_graph) override {
+        void build(const Scene<CPU> &scene, const std::shared_ptr<scene::SceneGraph> &scene_graph) override {
             spdlog::info("building acceleration structure for {} meshes, {} instances", scene_graph->meshes.size(),
                          scene.instances.size());
             if (rtcScene) {

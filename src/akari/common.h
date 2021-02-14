@@ -15,34 +15,55 @@
 #pragma once
 #include <akari/diagnostic.h>
 
-#ifdef _MSC_VER
-#    define AKR_EXPORT __declspec(dllexport)
-#    pragma warning(disable : 4275)
-#    pragma warning(disable : 4267)
-#    pragma warning(                                                                                                   \
-        disable : 4251) // 'field' : class 'A' needs to have dll-interface to be used by clients of class 'B'
-#    pragma warning(disable : 4800) // 'type' : forcing value to bool 'true' or 'false' (performance warning)
-#    pragma warning(disable : 4996) // Secure SCL warnings
-#    pragma warning(disable : 5030)
-#    pragma warning(disable : 4324)
-#    pragma warning(disable : 4201)
-#    define AKR_FORCEINLINE __forceinline
-#else
-#    if defined _WIN32 || defined __CYGWIN__
-#        ifdef __GNUC__
-#            define AKR_EXPORT __attribute__((dllexport))
-
-#        else
-#            define AKR_EXPORT __declspec(dllexport) // Note: actually gcc seems to also supports this syntax.
-#        endif
-#    else
-
-#        define AKR_EXPORT __attribute__((visibility("default")))
-
-#    endif
-#    define AKR_FORCEINLINE inline __attribute__((always_inline))
+#define AKR_CPU
+#define AKR_GPU
+#if defined(AKR_BACKEND_CUDA)
+#    define AKR_ENABLE_GPU
+#endif
+#if defined(__CUDA_ARCH__)
+#    define AKR_GPU_CODE
 #endif
 
+#ifdef __CUDACC__
+#    undef AKR_CPU
+#    undef AKR_GPU
+#    define AKR_CPU __host__
+#    define AKR_GPU __device__
+#endif
+
+#define AKR_XPU AKR_GPU AKR_CPU
+
+#ifdef AKR_GPU_CODE
+#    define AKR_EXPORT
+#else
+#    ifdef _MSC_VER
+#        define AKR_EXPORT __declspec(dllexport)
+#        pragma warning(disable : 4275)
+#        pragma warning(disable : 4267)
+#        pragma warning(                                                                                               \
+            disable : 4251) // 'field' : class 'A' needs to have dll-interface to be used by clients of class 'B'
+#        pragma warning(disable : 4800) // 'type' : forcing value to bool 'true' or 'false' (performance warning)
+#        pragma warning(disable : 4996) // Secure SCL warnings
+#        pragma warning(disable : 5030)
+#        pragma warning(disable : 4324)
+#        pragma warning(disable : 4201)
+#        define AKR_FORCEINLINE __forceinline
+#    else
+#        if defined _WIN32 || defined __CYGWIN__
+#            ifdef __GNUC__
+#                define AKR_EXPORT __attribute__((dllexport))
+
+#            else
+#                define AKR_EXPORT __declspec(dllexport) // Note: actually gcc seems to also supports this syntax.
+#            endif
+#        else
+
+#            define AKR_EXPORT __attribute__((visibility("default")))
+
+#        endif
+#        define AKR_FORCEINLINE inline __attribute__((always_inline))
+#    endif
+#endif
 #ifdef _MSC_VER
 #    define __restrict__ __restrict
 #endif
@@ -66,23 +87,6 @@ namespace akari {
     namespace fs = std::filesystem;
 }
 #endif
-#define AKR_CPU
-#define AKR_GPU
-#if defined(AKR_BACKEND_CUDA)
-#    define AKR_ENABLE_GPU
-#endif
-#if defined(__CUDA_ARCH__)
-#    define AKR_GPU_CODE
-#endif
-
-#ifdef __CUDACC__
-#    undef AKR_CPU
-#    undef AKR_GPU
-#    define AKR_CPU __host__
-#    define AKR_GPU __device__
-#endif
-
-#define AKR_XPU AKR_GPU AKR_CPU
 
 namespace akari {
     [[noreturn]] AKR_XPU inline void panic(const char *file, int line, const char *msg) {

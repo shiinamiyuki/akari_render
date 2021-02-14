@@ -42,21 +42,22 @@ namespace akari::gpu {
         ~CUDADispatcher() { CUDA_CHECK(cudaStreamDestroy(stream)); }
     };
     class CUDABuffer : public RawBuffer::Impl {
-        void *ptr;
+        void *_ptr;
         size_t bytes;
 
       public:
-        void *device_ptr() { return ptr; }
-        CUDABuffer(void *ptr, size_t bytes) : ptr(ptr), bytes(bytes) {}
-        ~CUDABuffer() { CUDA_CHECK(cudaFree(ptr)); }
+        void *device_ptr() { return _ptr; }
+        void *ptr() override { return _ptr; }
+        CUDABuffer(void *ptr, size_t bytes) : _ptr(ptr), bytes(bytes) {}
+        ~CUDABuffer() { CUDA_CHECK(cudaFree(_ptr)); }
         size_t size() const override { return bytes; }
         void download(Dispatcher &dispatcher, size_t offset, size_t size, void *host_data) {
             auto stream = dynamic_cast<CUDADispatcher *>(dispatcher.impl_mut())->stream;
-            CUDA_CHECK(cudaMemcpyAsync(host_data, (const uint8_t *)ptr + offset, size, cudaMemcpyDeviceToHost, stream));
+            CUDA_CHECK(cudaMemcpyAsync(host_data, (const uint8_t *)_ptr + offset, size, cudaMemcpyDeviceToHost, stream));
         }
         void upload(Dispatcher &dispatcher, size_t offset, size_t size, const void *host_data) {
             auto stream = dynamic_cast<CUDADispatcher *>(dispatcher.impl_mut())->stream;
-            CUDA_CHECK(cudaMemcpyAsync((uint8_t *)ptr + offset, host_data, size, cudaMemcpyHostToDevice, stream));
+            CUDA_CHECK(cudaMemcpyAsync((uint8_t *)_ptr + offset, host_data, size, cudaMemcpyHostToDevice, stream));
         }
     };
     class CUDAKernel : public Kernel::Impl {

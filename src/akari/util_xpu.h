@@ -293,6 +293,12 @@ namespace akari {
             new (&data) U(u);
             index = Index::template GetIndex<U>::value;
         }
+        template <typename U, class = typename std::enable_if_t<!std::is_lvalue_reference_v<U>>>
+        AKR_XPU Variant(U &&u) {
+            static_assert(Index::template GetIndex<U>::value != -1, "U is not in T...");
+            new (&data) U(std::move(u));
+            index = Index::template GetIndex<U>::value;
+        }
 
         AKR_XPU Variant(const Variant &v) : index(v.index) {
             v.dispatch([&](const auto &item) {
@@ -319,17 +325,20 @@ namespace akari {
         }
 
         AKR_XPU Variant(Variant &&v) noexcept : index(v.index) {
-            index   = v.index;
-            v.index = -1;
-            std::memcpy(&data, &v.data, sizeof(data));
+            v.dispatch([&](auto &item) {
+                using U = std::decay_t<decltype(item)>;
+                new (&data) U(std::move(item));
+            });
         }
 
         AKR_XPU Variant &operator=(Variant &&v) noexcept {
             if (index != -1)
                 _drop();
-            index   = v.index;
-            v.index = -1;
-            std::memcpy(&data, &v.data, sizeof(data));
+            index = v.index;
+            v.dispatch([&](auto &item) {
+                using U = std::decay_t<decltype(item)>;
+                new (&data) U(std::move(item));
+            });
             return *this;
         }
 
@@ -508,4 +517,10 @@ namespace akari {
         AKR_XPU T &back() { return data()[size() - 1]; }
         AKR_XPU const T &back() const { return data()[size() - 1]; }
     };
+
+    struct CPU{};
+    struct GPU{};
+
+#define AKR_XPU_CLASS template<class C> 
+
 } // namespace akari

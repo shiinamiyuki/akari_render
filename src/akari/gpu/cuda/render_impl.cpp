@@ -18,7 +18,7 @@
 #include <akari/gpu/volpath.h>
 #include <akari/gpu/cuda/impl.h>
 #include <akari/gpu/cuda/ptx/volpath_ptx.h>
-namespace akari::gpu {
+namespace akari::gpu::kernel {
     VolPathKernels load_kernels() {
         spdlog::info("loading kernels");
         CUmodule module;

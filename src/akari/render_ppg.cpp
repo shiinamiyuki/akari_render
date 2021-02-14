@@ -43,16 +43,16 @@ namespace akari::render {
 
         struct SurfaceVertex {
             Vec3 wo;
-            SurfaceInteraction si;
+            SurfaceInteraction<CPU> si;
             Ray ray;
             Spectrum beta;
-            astd::optional<BSDF> bsdf;
+            astd::optional<BSDF<CPU>> bsdf;
             Spectrum f;
             Float bsdf_pdf        = 0.0;
             Float pdf             = 0.0;
             BSDFType sampled_lobe = BSDFType::Unset;
             // SurfaceVertex() = default;
-            SurfaceVertex(const Vec3 &wo, const SurfaceInteraction si) : wo(wo), si(si) {}
+            SurfaceVertex(const Vec3 &wo, const SurfaceInteraction<CPU> si) : wo(wo), si(si) {}
             Vec3 p() const { return si.p; }
             Vec3 ng() const { return si.ng; }
         };
@@ -76,8 +76,8 @@ namespace akari::render {
                     return BSDFType::Unset;
                 });
             }
-            const Light *light(const Scene *scene) const {
-                return dispatch([=](auto &&arg) -> const Light * {
+            const Light<CPU> *light(const Scene<CPU> *scene) const {
+                return dispatch([=](auto &&arg) -> const Light<CPU> * {
                     using T = std::decay_t<decltype(arg)>;
                     if constexpr (std::is_same_v<T, SurfaceVertex>) {
                         return arg.si.light();
@@ -89,8 +89,8 @@ namespace akari::render {
 
         class GuidedPathTracer {
           public:
-            const Scene *scene      = nullptr;
-            Sampler *sampler        = nullptr;
+            const Scene<CPU> *scene      = nullptr;
+            Sampler<CPU> *sampler        = nullptr;
             Spectrum L              = Spectrum(0.0);
             Spectrum beta           = Spectrum(1.0f);
             Spectrum emitter_direct = Spectrum(0.0);
@@ -123,11 +123,11 @@ namespace akari::render {
                 pdf_B *= pdf_B;
                 return pdf_A / (pdf_A + pdf_B);
             }
-            CameraSample camera_ray(const Camera *camera, const ivec2 &p) noexcept {
+            CameraSample camera_ray(const Camera<CPU> *camera, const ivec2 &p) noexcept {
                 CameraSample sample = camera->generate_ray(sampler->next2d(), sampler->next2d(), p);
                 return sample;
             }
-            std::pair<const Light *, Float> select_light() noexcept {
+            std::pair<const Light<CPU> *, Float> select_light() noexcept {
                 return scene->light_sampler->sample(sampler->next2d());
             }
             std::pair<DTreeWrapper *, vec3> get_dtree_and_jittered_position(vec3 p) {
@@ -143,7 +143,7 @@ namespace akari::render {
                 return std::make_pair(sTree->dTree(p, _).first, p);
             }
             astd::optional<DirectLighting>
-            compute_direct_lighting(SurfaceVertex &vertex, const std::pair<const Light *, Float> &selected) noexcept {
+            compute_direct_lighting(SurfaceVertex &vertex, const std::pair<const Light<CPU> *, Float> &selected) noexcept {
                 auto [light, light_pdf] = selected;
                 if (light) {
                     auto &si = vertex.si;
@@ -193,7 +193,7 @@ namespace akari::render {
                 }
             }
 
-            void on_hit_light(const Light *light, const Vec3 &wo, const ShadingPoint &sp,
+            void on_hit_light(const Light<CPU> *light, const Vec3 &wo, const ShadingPoint &sp,
                               const astd::optional<PathVertex> &prev_vertex) {
                 Spectrum I = light->Le(wo, sp);
                 if (!useNEE || depth == 0 || BSDFType::Unset != (prev_vertex->sampled_lobe() & BSDFType::Specular)) {
@@ -215,7 +215,7 @@ namespace akari::render {
                 }
             }
 
-            astd::optional<SurfaceVertex> on_surface_scatter(const Vec3 &wo, SurfaceInteraction &si,
+            astd::optional<SurfaceVertex> on_surface_scatter(const Vec3 &wo, SurfaceInteraction<CPU> &si,
                                                             const astd::optional<PathVertex> &prev_vertex) noexcept {
                 auto *material = si.material();
                 if (si.triangle.light) {
@@ -279,7 +279,7 @@ namespace akari::render {
                 }
                 return astd::nullopt;
             }
-            void run_megakernel(const Camera *camera, const ivec2 &raster) noexcept {
+            void run_megakernel(const Camera<CPU> *camera, const ivec2 &raster) noexcept {
                 auto camera_sample = camera_ray(camera, raster);
                 Ray ray            = camera_sample.ray;
                 astd::optional<PathVertex> prev_vertex;
@@ -368,7 +368,7 @@ namespace akari::render {
         double ratio() const { return double(good.load()) / double(total.load()); }
     };
     std::shared_ptr<STree> render_ppg(std::vector<std::pair<Array2D<Spectrum>, Spectrum>> &all_samples,
-                                      PPGConfig config, const Scene &scene) {
+                                      PPGConfig config, const Scene<CPU> &scene) {
         std::shared_ptr<STree> sTree(new STree(scene.accel->world_bounds()));
         bool useNEE = true;
         RatioStat non_zero_path;
@@ -376,7 +376,7 @@ namespace akari::render {
         for (size_t i = 0; i < thread::num_work_threads(); i++) {
             buffers.emplace_back(new astd::pmr::monotonic_buffer_resource(astd::pmr::new_delete_resource()));
         }
-        std::vector<Sampler> samplers(hprod(scene.camera->resolution()));
+        std::vector<Sampler<CPU>> samplers(hprod(scene.camera->resolution()));
         for (size_t i = 0; i < samplers.size(); i++) {
             samplers[i] = config.sampler;
             samplers[i].set_sample_index(i);
@@ -401,7 +401,7 @@ namespace akari::render {
             for (uint32_t s = 0; s < samples; s++) {
                 thread::parallel_for(thread::blocked_range<2>(film.resolution(), ivec2(16, 16)), [&](ivec2 id,
                                                                                                      uint32_t tid) {
-                    auto Li = [&](const ivec2 p, Sampler &sampler) -> Spectrum {
+                    auto Li = [&](const ivec2 p, Sampler<CPU> &sampler) -> Spectrum {
                         ppg::GuidedPathTracer pt;
                         pt.min_depth  = config.min_depth;
                         pt.max_depth  = config.max_depth;
@@ -426,7 +426,7 @@ namespace akari::render {
                         buffers[tid]->release();
                         return pt.L;
                     };
-                    Sampler &sampler = samplers[id.x + id.y * film.resolution().x];
+                    Sampler<CPU> &sampler = samplers[id.x + id.y * film.resolution().x];
                     // VarianceTracker<Spectrum> var;
 
                     sampler.start_next_sample();
@@ -477,11 +477,11 @@ namespace akari::render {
         spdlog::info("render ppg done");
         return sTree;
     }
-    std::shared_ptr<STree> bake_sdtree(PPGConfig config, const Scene &scene) {
+    std::shared_ptr<STree> bake_sdtree(PPGConfig config, const Scene<CPU> &scene) {
         std::vector<std::pair<Array2D<Spectrum>, Spectrum>> all_samples;
         return render_ppg(all_samples, config, scene);
     }
-    Image render_ppg(PPGConfig config, const Scene &scene) {
+    Image render_ppg(PPGConfig config, const Scene<CPU> &scene) {
         std::vector<std::pair<Array2D<Spectrum>, Spectrum>> all_samples;
         auto sTree = render_ppg(all_samples, config, scene);
         {
@@ -506,7 +506,7 @@ namespace akari::render {
         }
         Film thetas(scene.camera->resolution());
         thread::parallel_for(thread::blocked_range<2>(thetas.resolution(), ivec2(16, 16)), [&](ivec2 id, uint32_t tid) {
-            Sampler sampler = PCGSampler(id.x);
+            Sampler<CPU> sampler = PCGSampler(id.x);
             auto sample     = scene.camera->generate_ray(sampler.next2d(), sampler.next2d(), id);
             const auto si   = scene.intersect(sample.ray);
             if (si) {
@@ -522,7 +522,7 @@ namespace akari::render {
             thread::parallel_for(range, [&](ivec2 id, uint32_t tid) {
                 if (id.x % 16 != 0 || id.y % 16 != 0)
                     return;
-                Sampler sampler = PCGSampler(id.x);
+                Sampler<CPU> sampler = PCGSampler(id.x);
                 auto sample     = scene.camera->generate_ray(sampler.next2d(), sampler.next2d(), id);
                 const auto si   = scene.intersect(sample.ray);
                 if (si) {
@@ -538,7 +538,7 @@ namespace akari::render {
         return array2d_to_rgb(sum / Spectrum(sum_weights));
     }
 
-    Image render_metropolized_ppg(PPGConfig config, const Scene &scene) {
+    Image render_metropolized_ppg(PPGConfig config, const Scene<CPU> &scene) {
         using namespace mlt;
         spdlog::info("Experimental metropolized ppg, spp: {}", config.spp);
         std::shared_ptr<STree> sTree(new STree(scene.accel->world_bounds()));
@@ -548,7 +548,7 @@ namespace akari::render {
         for (size_t i = 0; i < thread::num_work_threads(); i++) {
             buffers.emplace_back(new astd::pmr::monotonic_buffer_resource(astd::pmr::new_delete_resource()));
         }
-        std::vector<Sampler> samplers(hprod(scene.camera->resolution()));
+        std::vector<Sampler<CPU>> samplers(hprod(scene.camera->resolution()));
         for (size_t i = 0; i < samplers.size(); i++) {
             samplers[i] = config.sampler;
             samplers[i].set_sample_index(i);
@@ -560,7 +560,7 @@ namespace akari::render {
             Array2D<Spectrum> variance(scene.camera->resolution());
             thread::parallel_for(
                 thread::blocked_range<2>(film.resolution(), ivec2(16, 16)), [&](ivec2 id, uint32_t tid) {
-                    auto Li = [&](const ivec2 p, Sampler &sampler) -> Spectrum {
+                    auto Li = [&](const ivec2 p, Sampler<CPU> &sampler) -> Spectrum {
                         ppg::GuidedPathTracer pt;
                         pt.min_depth  = config.min_depth;
                         pt.max_depth  = config.max_depth;
@@ -582,7 +582,7 @@ namespace akari::render {
                         buffers[tid]->release();
                         return pt.L;
                     };
-                    Sampler &sampler = samplers[id.x + id.y * film.resolution().x];
+                    Sampler<CPU> &sampler = samplers[id.x + id.y * film.resolution().x];
                     VarianceTracker<Spectrum> var;
                     for (int s = 0; s < samples; s++) {
                         sampler.start_next_sample();
@@ -614,7 +614,7 @@ namespace akari::render {
             std::vector<MarkovChain> chains;
             double b            = 0.0;
             std::tie(chains, b) = init_markov_chains(
-                m, scene, [&](ivec2 p_film, Allocator<> alloc, const Scene &scene, Sampler &sampler) {
+                m, scene, [&](ivec2 p_film, Allocator<> alloc, const Scene<CPU> &scene, Sampler<CPU> &sampler) {
                     ppg::GuidedPathTracer pt;
                     pt.min_depth  = config.min_depth;
                     pt.max_depth  = config.max_depth;
@@ -640,7 +640,7 @@ namespace akari::render {
                 auto &mlt_sampler = *chain.sampler.get<MLTSampler>();
                 Rng rng(id);
                 mlt_sampler.rng = Rng(rng.uniform_u32());
-                auto Li         = [&](const ivec2 p, Sampler &sampler) -> Spectrum {
+                auto Li         = [&](const ivec2 p, Sampler<CPU> &sampler) -> Spectrum {
                     ppg::GuidedPathTracer pt;
                     pt.min_depth  = config.min_depth;
                     pt.max_depth  = config.max_depth;

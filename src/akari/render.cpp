@@ -28,15 +28,15 @@ namespace akari::render {
         AKR_ASSERT(F >= 0.0);
         BSDFSample sample;
         if (u[0] < F) {
-            sample.wi = reflect(-wo, vec3(0, 1, 0));
-            sample.pdf = F;
+            sample.wi   = reflect(-wo, vec3(0, 1, 0));
+            sample.pdf  = F;
             sample.type = BSDFType::SpecularReflection;
-            sample.f = BSDFValue::with_specular(F * R / abs_cos_theta(sample.wi));
+            sample.f    = BSDFValue::with_specular(F * R / abs_cos_theta(sample.wi));
         } else {
             bool entering = cos_theta(wo) > 0;
-            Float etaI = entering ? etaA : etaB;
-            Float etaT = entering ? etaB : etaA;
-            auto wt = refract(wo, faceforward(wo, vec3(0, 1, 0)), etaI / etaT);
+            Float etaI    = entering ? etaA : etaB;
+            Float etaT    = entering ? etaB : etaA;
+            auto wt       = refract(wo, faceforward(wo, vec3(0, 1, 0)), etaI / etaT);
             if (glm::all(glm::equal(wt, vec3(0)))) {
                 AKR_ASSERT(etaI > etaT);
                 return astd::nullopt;
@@ -46,8 +46,8 @@ namespace akari::render {
 
             ft *= (etaI * etaI) / (etaT * etaT);
             sample.pdf = 1 - F;
-            sample.wi = wt;
-            sample.f = BSDFValue::with_specular(ft / abs_cos_theta(sample.wi));
+            sample.wi  = wt;
+            sample.f   = BSDFValue::with_specular(ft / abs_cos_theta(sample.wi));
         }
         return sample;
     }
@@ -67,7 +67,7 @@ namespace akari::render {
         if (u[0] < fraction) {
             vec2 u_(u[0] / fraction, u[1]);
             inner_sample = bsdf_B->sample(u_, wo);
-            selA = false;
+            selA         = false;
         } else {
             vec2 u_((u[0] - fraction) / (1.0 - fraction), u[1]);
             inner_sample = bsdf_A->sample(u_, wo);
@@ -85,18 +85,20 @@ namespace akari::render {
         } else {
             sample = *inner_sample;
             if (selA) {
-                sample.f = BSDFValue::mix(fraction, sample.f, bsdf_B->evaluate(wo, sample.wi));
+                sample.f   = BSDFValue::mix(fraction, sample.f, bsdf_B->evaluate(wo, sample.wi));
                 sample.pdf = (1.0 - fraction) * sample.pdf + fraction * bsdf_B->evaluate_pdf(wo, sample.wi);
             } else {
-                sample.f = BSDFValue::mix(fraction, bsdf_A->evaluate(wo, sample.wi), sample.f);
+                sample.f   = BSDFValue::mix(fraction, bsdf_A->evaluate(wo, sample.wi), sample.f);
                 sample.pdf = fraction * sample.pdf + (1.0 - fraction) * bsdf_A->evaluate_pdf(wo, sample.wi);
             }
             return sample;
         }
     }
-    BSDF Material::evaluate(Sampler &sampler, Allocator<> alloc, const SurfaceInteraction &si) const {
+    template <>
+    BSDF<CPU> Material<CPU>::evaluate(Sampler<CPU> &sampler, Allocator<> alloc,
+                                      const SurfaceInteraction<CPU> &si) const {
         auto sp = si.sp();
-        BSDF bsdf(Frame(si.ns, si.dpdu));
+        BSDF<CPU> bsdf(Frame(si.ns, si.dpdu));
         auto m = metallic.evaluate_f(sp);
         auto r = roughness.evaluate_f(sp);
         r *= r;
@@ -107,7 +109,7 @@ namespace akari::render {
             auto base_color = color.evaluate_s(sp);
             // AKR_ASSERT(false);
             // MicrofacetReflection glossy(base_color, r);
-            BSDFClosure glossy = [&]() -> BSDFClosure {
+            BSDFClosure<CPU> glossy = [&]() -> BSDFClosure<CPU> {
                 if (r < 0.001) {
                     return SpecularReflection(base_color);
                 } else {
@@ -121,14 +123,16 @@ namespace akari::render {
             } else if (m > 1 - 1e-5f) {
                 bsdf.set_closure(glossy);
             } else {
-                MixBSDF mix(m, alloc.new_object<BSDFClosure>(diffuse), alloc.new_object<BSDFClosure>(glossy));
+                MixBSDF mix(m, alloc.new_object<BSDFClosure<CPU>>(diffuse), alloc.new_object<BSDFClosure<CPU>>(glossy));
                 bsdf.set_closure(mix);
             }
         }
         return bsdf;
     }
-    bool Scene::occlude(const Ray &ray) const { return accel->occlude1(ray); }
-    astd::optional<SurfaceInteraction> Scene::intersect(const Ray &ray) const {
+
+    bool Scene<CPU>::occlude(const Ray &ray) const { return accel->occlude1(ray); }
+
+    astd::optional<SurfaceInteraction<CPU>> Scene<CPU>::intersect(const Ray &ray) const {
         astd::optional<Intersection> isct = accel->intersect1(ray);
         if (!isct) {
             return astd::nullopt;
@@ -139,24 +143,25 @@ namespace akari::render {
         ray.tmax = isct->t;
         return si;
     }
-    Scene::~Scene() {
+
+    Scene<CPU>::~Scene() {
         camera.reset();
         light_sampler.reset();
         materials.clear();
         lights.clear();
         delete rsrc;
     }
-    std::shared_ptr<const Scene> create_scene(Allocator<> alloc,
-                                              const std::shared_ptr<scene::SceneGraph> &scene_graph) {
+    std::shared_ptr<const Scene<CPU>> create_scene(Allocator<> alloc,
+                                                   const std::shared_ptr<scene::SceneGraph> &scene_graph) {
         scene_graph->commit();
-        auto scene = make_pmr_shared<Scene>(alloc);
+        auto scene = make_pmr_shared<Scene<CPU>>(alloc);
         {
-            auto rsrc = alloc.resource();
-            scene->rsrc = new astd::pmr::monotonic_buffer_resource(rsrc);
+            auto rsrc        = alloc.resource();
+            scene->rsrc      = new astd::pmr::monotonic_buffer_resource(rsrc);
             scene->allocator = Allocator<>(scene->rsrc);
         }
         scene->camera = [&] {
-            astd::optional<Camera> camera;
+            astd::optional<Camera<CPU>> camera;
             if (auto perspective = scene_graph->camera->as<scene::PerspectiveCamera>()) {
                 TRSTransform TRS{perspective->transform.translation, perspective->transform.rotation, Vec3(1.0)};
                 auto c2w = TRS();
@@ -164,12 +169,12 @@ namespace akari::render {
             }
             return camera;
         }();
-        std::unordered_map<const scene::Material *, const Material *> mat_map;
-        auto create_tex = [&](const scene::P<scene::Texture> &tex_node) -> Texture {
+        std::unordered_map<const scene::Material *, const Material<CPU> *> mat_map;
+        auto create_tex = [&](const scene::P<scene::Texture> &tex_node) -> Texture<CPU> {
             if (!tex_node) {
-                return Texture(ConstantTexture(0.0));
+                return Texture<CPU>(ConstantTexture(0.0));
             }
-            astd::optional<Texture> tex;
+            astd::optional<Texture<CPU>> tex;
             if (auto ftex = tex_node->as<scene::FloatTexture>()) {
                 tex.emplace(ConstantTexture(ftex->value));
             } else if (auto rgb_tex = tex_node->as<scene::RGBTexture>()) {
@@ -181,27 +186,27 @@ namespace akari::render {
             }
             return tex.value();
         };
-        auto create_volume = [&](const scene::P<scene::Volume> &vol_node) -> const Medium * {
+        auto create_volume = [&](const scene::P<scene::Volume> &vol_node) -> const Medium<CPU> * {
             if (!vol_node)
                 return nullptr;
             if (auto homo = vol_node->as<scene::HomogeneousVolume>()) {
                 auto vol =
                     HomogeneousMedium(homo->density * homo->absorption, homo->density * homo->color, homo->anisotropy);
-                return scene->allocator.new_object<Medium>(vol);
+                return scene->allocator.new_object<Medium<CPU>>(vol);
             }
             return nullptr;
         };
-        auto create_mat = [&](const scene::P<scene::Material> &mat_node) -> const Material * {
+        auto create_mat = [&](const scene::P<scene::Material> &mat_node) -> const Material<CPU> * {
             if (!mat_node)
                 return nullptr;
             auto it = mat_map.find(mat_node.get());
             if (it != mat_map.end())
                 return it->second;
-            auto mat = scene->allocator.new_object<Material>();
-            mat->color = create_tex(mat_node->color);
-            mat->metallic = create_tex(mat_node->metallic);
-            mat->emission = create_tex(mat_node->emission);
-            mat->roughness = create_tex(mat_node->roughness);
+            auto mat          = scene->allocator.new_object<Material<CPU>>();
+            mat->color        = create_tex(mat_node->color);
+            mat->metallic     = create_tex(mat_node->metallic);
+            mat->emission     = create_tex(mat_node->emission);
+            mat->roughness    = create_tex(mat_node->roughness);
             mat->transmission = create_tex(mat_node->transmission);
             mat_map.emplace(mat_node.get(), mat);
             scene->materials.emplace_back(mat);
@@ -213,10 +218,10 @@ namespace akari::render {
                 if (!instance)
                     continue;
                 Transform T = node_T * instance->transform();
-                MeshInstance inst;
+                MeshInstance<CPU> inst;
                 inst.transform = T;
-                inst.material = create_mat(instance->material);
-                inst.medium = create_volume(instance->volume);
+                inst.material  = create_mat(instance->material);
+                inst.medium    = create_volume(instance->volume);
                 inst.indices = BufferView<const uvec3>(instance->mesh->indices.data(), instance->mesh->indices.size());
                 inst.normals = BufferView<const vec3>(instance->mesh->normals.data(), instance->mesh->normals.size());
                 inst.texcoords =
@@ -230,10 +235,10 @@ namespace akari::render {
                         // not emissive
                     } else {
                         // emissived
-                        std::vector<const Light *> lights;
+                        std::vector<const Light<CPU> *> lights;
                         for (int i = 0; i < (int)inst.indices.size(); i++) {
-                            AreaLight area_light(inst.get_triangle(i), inst.material->emission, false);
-                            auto light = alloc.new_object<Light>(area_light);
+                            AreaLight<CPU> area_light(inst.get_triangle(i), inst.material->emission, false);
+                            auto light = alloc.new_object<Light<CPU>>(area_light);
                             scene->lights.emplace_back(light);
                             lights.emplace_back(light);
                         }
@@ -248,13 +253,13 @@ namespace akari::render {
         };
         create_instance(Transform(), scene_graph->root, create_instance);
         {
-            BufferView<const Light *> lights(scene->lights.data(), scene->lights.size());
+            BufferView<const Light<CPU> *> lights(scene->lights.data(), scene->lights.size());
             std::vector<Float> power;
             for (auto light : lights) {
                 (void)light;
                 power.emplace_back(1.0);
             }
-            scene->light_sampler = std::make_shared<PowerLightSampler>(alloc, lights, power);
+            scene->light_sampler = std::make_shared<PowerLightSampler<CPU>>(alloc, lights, power);
         }
         scene->accel = create_embree_accel();
         scene->accel->build(*scene, scene_graph);
@@ -274,33 +279,33 @@ namespace akari {
             render::PTConfig config;
             config.min_depth = pt->min_depth;
             config.max_depth = pt->max_depth;
-            config.spp = pt->spp;
-            config.sampler = render::PCGSampler();
-            auto film = render::render_pt(config, *scene);
-            auto image = film.to_rgb_image();
+            config.spp       = pt->spp;
+            config.sampler   = render::PCGSampler();
+            auto film        = render::render_pt(config, *scene);
+            auto image       = film.to_rgb_image();
             write_generic_image(image, graph->output_path);
         } else if (auto upt = graph->integrator->as<scene::UnifiedPathTracer>()) {
             render::UPTConfig config;
             config.min_depth = upt->min_depth;
             config.max_depth = upt->max_depth;
-            config.spp = upt->spp;
-            config.sampler = render::PCGSampler();
-            auto image = render::render_unified(config, *scene);
+            config.spp       = upt->spp;
+            config.sampler   = render::PCGSampler();
+            auto image       = render::render_unified(config, *scene);
             write_generic_image(image, graph->output_path);
         } else if (auto bdpt = graph->integrator->as<scene::BDPT>()) {
             render::PTConfig config;
             config.min_depth = bdpt->min_depth;
             config.max_depth = bdpt->max_depth;
-            config.spp = bdpt->spp;
-            config.sampler = render::PCGSampler();
-            auto image = render::render_bdpt(config, *scene);
+            config.spp       = bdpt->spp;
+            config.sampler   = render::PCGSampler();
+            auto image       = render::render_bdpt(config, *scene);
             write_generic_image(image, graph->output_path);
         } else if (auto gpt = graph->integrator->as<scene::GuidedPathTracer>()) {
             render::PPGConfig config;
             config.min_depth = gpt->min_depth;
             config.max_depth = gpt->max_depth;
-            config.spp = gpt->spp;
-            config.sampler = render::PCGSampler();
+            config.spp       = gpt->spp;
+            config.sampler   = render::PCGSampler();
             if (gpt->metropolized) {
                 (void)render::render_metropolized_ppg(config, *scene);
             } else {
@@ -311,23 +316,23 @@ namespace akari {
             render::IRConfig config;
             config.min_depth = vpl->min_depth;
             config.max_depth = vpl->max_depth;
-            config.spp = vpl->spp;
-            config.sampler = render::PCGSampler();
-            auto image = render::render_ir(config, *scene);
+            config.spp       = vpl->spp;
+            config.sampler   = render::PCGSampler();
+            auto image       = render::render_ir(config, *scene);
             write_generic_image(image, graph->output_path);
         } else if (auto smcmc = graph->integrator->as<scene::SMCMC>()) {
             render::MLTConfig config;
             config.min_depth = smcmc->min_depth;
             config.max_depth = smcmc->max_depth;
-            config.spp = smcmc->spp;
-            auto image = render::render_smcmc(config, *scene);
+            config.spp       = smcmc->spp;
+            auto image       = render::render_smcmc(config, *scene);
             write_generic_image(image, graph->output_path);
         } else if (auto mcmc = graph->integrator->as<scene::MCMC>()) {
             render::MLTConfig config;
             config.min_depth = mcmc->min_depth;
             config.max_depth = mcmc->max_depth;
-            config.spp = mcmc->spp;
-            auto image = render::render_mlt(config, *scene);
+            config.spp       = mcmc->spp;
+            auto image       = render::render_mlt(config, *scene);
             write_generic_image(image, graph->output_path);
         }
     }

@@ -19,14 +19,14 @@
 namespace akari::render {
     namespace ir {
         struct VirtualPointLight {
-            astd::optional<BSDF> bsdf;
+            astd::optional<BSDF<CPU>> bsdf;
             vec3 wo;
             vec3 ng;
             vec3 p;
             Spectrum radiance = Spectrum(0.0);
-            const Light *light = nullptr;
+            const Light<CPU> *light = nullptr;
         };
-        astd::pmr::vector<VirtualPointLight> generate_vpls(IRConfig config, const Scene &scene, Sampler &sampler,
+        astd::pmr::vector<VirtualPointLight> generate_vpls(IRConfig config, const Scene<CPU> &scene, Sampler<CPU> &sampler,
                                                            Allocator<> alloc, Float &max_radiance) {
             astd::pmr::vector<VirtualPointLight> vpls(alloc);
             Ray ray;
@@ -84,7 +84,7 @@ namespace akari::render {
             // spdlog::info("{}", vpls.size());
             return vpls;
         }
-        static Float ir_sample_fraction(const BSDFClosure &closure) {
+        static Float ir_sample_fraction(const BSDFClosure<CPU> &closure) {
             if (closure.isa<SpecularReflection>() || closure.isa<SpecularTransmission>() ||
                 closure.isa<FresnelSpecular>()) {
                 return 0.0;
@@ -104,14 +104,14 @@ namespace akari::render {
             return pdf_A / (pdf_A + pdf_B);
         }
     } // namespace ir
-    Image render_ir(IRConfig config, const Scene &scene) {
+    Image render_ir(IRConfig config, const Scene<CPU> &scene) {
         Film film(scene.camera->resolution());
         std::vector<astd::pmr::monotonic_buffer_resource *> buffers;
         for (size_t i = 0; i < thread::num_work_threads(); i++) {
             buffers.emplace_back(new astd::pmr::monotonic_buffer_resource(astd::pmr::new_delete_resource()));
         }
         auto vpl_sampler = config.sampler;
-        std::vector<Sampler> samplers(hprod(scene.camera->resolution()));
+        std::vector<Sampler<CPU>> samplers(hprod(scene.camera->resolution()));
         for (size_t i = 0; i < samplers.size(); i++) {
             samplers[i] = config.sampler;
             samplers[i].set_sample_index(i);
@@ -123,7 +123,7 @@ namespace akari::render {
             Float max_radiance = 0.0;
             auto vpls = ir::generate_vpls(config, scene, vpl_sampler, vpl_alloc, max_radiance);
             auto kernel = [&](ivec2 id, uint32_t tid) {
-                Sampler &sampler = samplers[id.x + id.y * film.resolution().x];
+                Sampler<CPU> &sampler = samplers[id.x + id.y * film.resolution().x];
                 Spectrum L(0.0);
                 // Spectrum beta(1.0);
                 auto camera_sample = scene.camera->generate_ray(sampler.next2d(), sampler.next2d(), id);
@@ -132,7 +132,7 @@ namespace akari::render {
                 // auto rec_sampler = sampler;
 #if 1
                 auto estimate = [&](const Ray ray, Spectrum beta, const int depth,
-                                    const astd::optional<SurfaceInteraction> prev, const astd::optional<Float> prev_b,
+                                    const astd::optional<SurfaceInteraction<CPU>> prev, const astd::optional<Float> prev_b,
                                     const Float prev_bsdf_pdf, const BSDFType prev_bsdf_type, auto &&self) -> void {
                     if (depth >= config.max_depth)
                         return;

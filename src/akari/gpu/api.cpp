@@ -27,7 +27,7 @@ namespace akari::gpu {
             auto dispatcher = device->new_dispatcher();
             OptixAccel accel(device);
             accel.build(graph);
-            auto kernels = load_kernels();
+            auto kernels = kernel::load_kernels();
             kernels.advance.launch(dispatcher, uvec3(1024, 1, 1), uvec3(64, 1, 1), {});
             dispatcher.wait();
             return;

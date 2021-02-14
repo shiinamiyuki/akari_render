@@ -58,13 +58,13 @@ namespace akari::scene {
     //     void set_float(Float v) { value = v; }
     // };
 
-    class Texture : public Object {
+    class AKR_EXPORT Texture : public Object {
       public:
         enum class Type { Float, RGB, Image };
         AKR_DECL_RTTI(Texture)
         AKR_SER_POLY(Object)
     };
-    class FloatTexture : public Texture {
+    class AKR_EXPORT FloatTexture : public Texture {
       public:
         Float value = 0.0;
         FloatTexture() = default;
@@ -73,7 +73,7 @@ namespace akari::scene {
         AKR_DECL_TYPEID(FloatTexture, Float)
     };
 
-    class RGBTexture : public Texture {
+    class AKR_EXPORT RGBTexture : public Texture {
       public:
         Color3f value;
         RGBTexture() = default;
@@ -89,7 +89,7 @@ namespace akari::scene {
         AKR_SER_POLY(Texture, path)
         AKR_DECL_TYPEID(ImageTexture, Image)
     };
-    class Material : public Object {
+    class AKR_EXPORT Material : public Object {
       public:
         P<Texture> color;
         P<Texture> specular;
@@ -101,14 +101,14 @@ namespace akari::scene {
         virtual void commit() {}
         AKR_SER_POLY(Object, color, specular, metallic, roughness, emission, transmission)
     };
-    class Volume : public Object {
+    class AKR_EXPORT Volume : public Object {
       public:
         enum class Type { Homogeneous };
         AKR_DECL_RTTI(Volume)
         AKR_SER_POLY(Object)
         virtual void commit() {}
     };
-    class HomogeneousVolume : public Volume {
+    class AKR_EXPORT HomogeneousVolume : public Volume {
       public:
         AKR_DECL_TYPEID(HomogeneousVolume, Homogeneous)
         Color3f color = Color3f(1.0);
@@ -117,7 +117,7 @@ namespace akari::scene {
         Float anisotropy = 0.0;
         AKR_SER_POLY(Volume, color, absorption, density, anisotropy)
     };
-    class Mesh : public Object {
+    class AKR_EXPORT Mesh : public Object {
         bool loaded = false;
 
       public:
@@ -133,7 +133,7 @@ namespace akari::scene {
         void unload();
     };
 
-    class Instance : public Object {
+    class AKR_EXPORT Instance : public Object {
       public:
         TRSTransform transform;
         P<Mesh> mesh;
@@ -147,7 +147,7 @@ namespace akari::scene {
         }
         AKR_SER_POLY(Object, transform, mesh, material, volume)
     };
-    class Node : public Object {
+    class AKR_EXPORT Node : public Object {
       public:
         TRSTransform transform;
         std::vector<P<Instance>> instances;
@@ -160,7 +160,7 @@ namespace akari::scene {
         AKR_SER_POLY(Object, transform, instances, children)
     };
 
-    class Camera : public Object {
+    class AKR_EXPORT Camera : public Object {
       public:
         enum class Type { Perspective };
         AKR_DECL_RTTI(Camera)
@@ -169,7 +169,7 @@ namespace akari::scene {
         ivec2 resolution = ivec2(512, 512);
         AKR_SER_POLY(Object, transform, resolution)
     };
-    class PerspectiveCamera final : public Camera {
+    class AKR_EXPORT PerspectiveCamera final : public Camera {
       public:
         AKR_DECL_TYPEID(PerspectiveCamera, Perspective)
         Float fov = glm::radians(80.0);
@@ -178,14 +178,14 @@ namespace akari::scene {
         AKR_SER_POLY(Camera, fov, lens_radius, focal_distance)
     };
 
-    class Integrator : public Object {
+    class AKR_EXPORT Integrator : public Object {
       public:
         enum class Type { Path, VPL, MCMC, SMCMC, GuidedPath, UnifiedPath, BDPT };
         AKR_DECL_RTTI(Integrator)
         AKR_SER_POLY(Object)
     };
 
-    class PathTracer : public Integrator {
+    class AKR_EXPORT PathTracer : public Integrator {
       public:
         uint32_t spp = 16;
         int32_t min_depth = 4;
@@ -193,7 +193,7 @@ namespace akari::scene {
         AKR_DECL_TYPEID(PathTracer, Path)
         AKR_SER_POLY(Integrator, spp, min_depth, max_depth)
     };
-    class UnifiedPathTracer : public Integrator {
+    class AKR_EXPORT UnifiedPathTracer : public Integrator {
       public:
         uint32_t spp = 16;
         int32_t min_depth = 4;
@@ -201,7 +201,7 @@ namespace akari::scene {
         AKR_DECL_TYPEID(UnifiedPathTracer, UnifiedPath)
         AKR_SER_POLY(Integrator, spp, min_depth, max_depth)
     };
-    class GuidedPathTracer : public Integrator {
+    class AKR_EXPORT GuidedPathTracer : public Integrator {
       public:
         uint32_t spp = 16;
         int32_t min_depth = 4;
@@ -210,7 +210,7 @@ namespace akari::scene {
         AKR_DECL_TYPEID(GuidedPathTracer, GuidedPath)
         AKR_SER_POLY(Integrator, spp, min_depth, max_depth, metropolized)
     };
-    class MCMC : public Integrator {
+    class AKR_EXPORT MCMC : public Integrator {
       public:
         uint32_t spp = 16;
         int32_t min_depth = 4;
@@ -219,7 +219,7 @@ namespace akari::scene {
         AKR_SER_POLY(Integrator, spp, min_depth, max_depth)
     };
 
-    class SMCMC : public Integrator {
+    class AKR_EXPORT SMCMC : public Integrator {
       public:
         uint32_t spp = 16;
         int32_t min_depth = 4;
@@ -228,7 +228,7 @@ namespace akari::scene {
         AKR_SER_POLY(Integrator, spp, min_depth, max_depth)
     };
 
-    class VPL : public Integrator {
+    class AKR_EXPORT VPL : public Integrator {
       public:
         uint32_t spp = 16;
         int32_t min_depth = 4;
@@ -236,7 +236,7 @@ namespace akari::scene {
         AKR_DECL_TYPEID(VPL, VPL)
         AKR_SER_POLY(Integrator, spp, min_depth, max_depth)
     };
-    class BDPT : public Integrator {
+    class AKR_EXPORT BDPT : public Integrator {
       public:
         uint32_t spp = 16;
         int32_t min_depth = 4;
@@ -244,7 +244,7 @@ namespace akari::scene {
         AKR_DECL_TYPEID(BDPT, BDPT)
         AKR_SER_POLY(Integrator, spp, min_depth, max_depth)
     };
-    class SceneGraph {
+    class AKR_EXPORT SceneGraph {
       public:
         P<Camera> camera;
         P<Integrator> integrator;

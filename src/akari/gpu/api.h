@@ -15,5 +15,5 @@
 #pragma once
 #include <akari/scenegraph.h>
 namespace akari::gpu {
-    void render_scenegraph(scene::P<scene::SceneGraph> graph, const std::string & backend);
+    AKR_EXPORT void render_scenegraph(scene::P<scene::SceneGraph> graph, const std::string &backend);
 }

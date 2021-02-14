@@ -53,8 +53,8 @@ namespace akari::render {
         }
     }
     std::pair<std::vector<mlt::MarkovChain>, double>
-    init_markov_chains(MLTConfig config, const Scene &scene,
-                       const std::function<Spectrum(ivec2, Allocator<>, const Scene &, Sampler &)> &estimator) {
+    init_markov_chains(MLTConfig config, const Scene<CPU> &scene,
+                       const std::function<Spectrum(ivec2, Allocator<>, const Scene<CPU> &, Sampler<CPU> &)> &estimator) {
         using namespace mlt;
         PTConfig pt_config;
         pt_config.max_depth = config.max_depth;
@@ -79,7 +79,7 @@ namespace akari::render {
 
                 astd::pmr::monotonic_buffer_resource resource;
                 for (auto seed : seeds) {
-                    Sampler sampler = MLTSampler(seed);
+                    Sampler<CPU> sampler = MLTSampler(seed);
                     sampler.start_next_sample();
                     ivec2 p_film = glm::min(scene.camera->resolution() - 1,
                                             ivec2(sampler.next2d() * vec2(scene.camera->resolution())));
@@ -108,7 +108,7 @@ namespace akari::render {
         }
         return std::make_pair(chains, b);
     }
-    Image render_mlt(MLTConfig config, const Scene &scene) {
+    Image render_mlt(MLTConfig config, const Scene<CPU>  &scene) {
         using namespace mlt;
         PTConfig pt_config;
         pt_config.max_depth = config.max_depth;
@@ -116,7 +116,7 @@ namespace akari::render {
         std::vector<MarkovChain> chains;
         double b = 0.0;
         std::tie(chains, b) = init_markov_chains(
-            config, scene, [&](ivec2 p_film, Allocator<> alloc, const Scene &scene, Sampler &sampler) {
+            config, scene, [&](ivec2 p_film, Allocator<> alloc, const Scene<CPU> &scene, Sampler<CPU> &sampler) {
                 return render_pt_pixel_wo_emitter_direct(pt_config, alloc, scene, sampler, p_film);
             });
         size_t mutations_per_chain =

@@ -20,15 +20,15 @@
 namespace akari::render {
 
     std::pair<Spectrum, Spectrum> render_pt_pixel_separete_emitter_direct(PTConfig config, Allocator<> allocator,
-                                                                          const Scene &scene, Sampler &sampler,
-                                                                          const vec2 &p_film) {
+                                                                          const Scene<CPU> &scene,
+                                                                          Sampler<CPU> &sampler, const vec2 &p_film) {
         pt::SimplePathTracer<pt::SeparateEmitPathVisitor> pt(&scene, &sampler, allocator, config.min_depth,
                                                              config.max_depth);
         pt.run_megakernel(&scene.camera.value(), p_film);
         AKR_ASSERT(hmax(pt.L) >= 0.0 && hmax(pt.emitter_direct) >= 0.0);
         return std::make_pair(pt.visitor.emitter_direct, pt.L);
     }
-    Film render_pt(PTConfig config, const Scene &scene) {
+    Film render_pt(PTConfig config, const Scene<CPU> &scene) {
         Film film(scene.camera->resolution());
         std::vector<astd::pmr::monotonic_buffer_resource *> buffers;
         for (size_t i = 0; i < thread::num_work_threads(); i++) {
@@ -36,7 +36,7 @@ namespace akari::render {
         }
         ProgressReporter reporter(hprod(film.resolution()));
         thread::parallel_for(thread::blocked_range<2>(film.resolution(), ivec2(16, 16)), [&](ivec2 id, uint32_t tid) {
-            Sampler sampler = config.sampler;
+            Sampler<CPU> sampler = config.sampler;
             sampler.set_sample_index(id.y * film.resolution().x + id.x);
             for (int s = 0; s < config.spp; s++) {
                 sampler.start_next_sample();
@@ -52,7 +52,7 @@ namespace akari::render {
         spdlog::info("render pt done");
         return film;
     }
-    Image render_unified(UPTConfig config, const Scene &scene) {
+    Image render_unified(UPTConfig config, const Scene<CPU> &scene) {
         Film film(scene.camera->resolution());
         std::vector<astd::pmr::monotonic_buffer_resource *> buffers;
         for (size_t i = 0; i < thread::num_work_threads(); i++) {
@@ -60,7 +60,7 @@ namespace akari::render {
         }
         ProgressReporter reporter(hprod(film.resolution()));
         thread::parallel_for(thread::blocked_range<2>(film.resolution(), ivec2(16, 16)), [&](ivec2 id, uint32_t tid) {
-            Sampler sampler = config.sampler;
+            Sampler<CPU> sampler = config.sampler;
             sampler.set_sample_index(id.y * film.resolution().x + id.x);
             for (int s = 0; s < config.spp; s++) {
                 sampler.start_next_sample();

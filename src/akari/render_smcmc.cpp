@@ -37,7 +37,7 @@ namespace akari::render {
         struct CoherentSamples : astd::array<RadianceRecord, 5> {};
         struct Tile {
             ivec2 p_center;
-            astd::optional<Sampler> sampler;
+            astd::optional<Sampler<CPU>> sampler;
             TileEstimator mcmc_estimate, mc_estimate;
             CoherentSamples current;
             uint32_t n_mc_estimates = 0, n_mcmc_estimates = 0;
@@ -46,7 +46,7 @@ namespace akari::render {
             double b = 0.0;
         };
     } // namespace smcmc
-    Image render_smcmc(MLTConfig config, const Scene &scene) {
+    Image render_smcmc(MLTConfig config, const Scene<CPU> &scene) {
         using namespace mlt;
         using namespace smcmc;
         PTConfig pt_config;
@@ -133,7 +133,7 @@ namespace akari::render {
         //         }
         //     }
         // }
-        auto run_uniform_global_mcmc = [&](PTConfig config, Allocator<> allocator, Sampler &sampler) {
+        auto run_uniform_global_mcmc = [&](PTConfig config, Allocator<> allocator, Sampler<CPU> &sampler) {
             sampler.start_next_sample();
             ivec2 p_center =
                 glm::min(scene.camera->resolution() - 1, ivec2(sampler.next2d() * vec2(scene.camera->resolution())));
@@ -142,7 +142,7 @@ namespace akari::render {
             auto L = render_pt_pixel_wo_emitter_direct(pt_config, allocator, scene, sampler, p_film);
             return std::make_pair(p_center, L);
         };
-        auto run_mcmc = [&](PTConfig config, Allocator<> allocator, const ivec2 &p_center, Sampler &sampler) {
+        auto run_mcmc = [&](PTConfig config, Allocator<> allocator, const ivec2 &p_center, Sampler<CPU> &sampler) {
             sampler.start_next_sample();
             (void)sampler.next2d();
             auto idx = std::min<int>(sampler.next1d() * 5, 4);
@@ -156,7 +156,7 @@ namespace akari::render {
             for (auto &X : base.X) {
                 Xs.push_back(X.value);
             }
-            Sampler sampler = ReplaySampler(std::move(Xs), base.rng);
+            Sampler<CPU> sampler = ReplaySampler(std::move(Xs), base.rng);
             sampler.start_next_sample();
             (void)sampler.next2d();
             (void)sampler.next1d();
@@ -179,7 +179,7 @@ namespace akari::render {
             {
                 astd::pmr::monotonic_buffer_resource resource;
                 for (auto seed : seeds) {
-                    Sampler sampler = MLTSampler(seed);
+                    Sampler<CPU> sampler = MLTSampler(seed);
                     auto [p_film, L] = run_uniform_global_mcmc(pt_config, Allocator<>(&resource), sampler);
                     Ts.push_back(T(L));
                 }
@@ -275,7 +275,7 @@ namespace akari::render {
             if (!tiles(id).sampler.has_value()) {
                 const int num_tries = 16;
                 for (int i = 0; i < num_tries; i++) {
-                    Sampler sampler = MLTSampler(dist(rd));
+                    Sampler<CPU> sampler = MLTSampler(dist(rd));
                     auto [idx, L] = run_mcmc(pt_config, Allocator<>(&resource), id, sampler);
                     if (T(L) > 0.0 || i == num_tries - 1) {
                         tiles(id).sampler = sampler;

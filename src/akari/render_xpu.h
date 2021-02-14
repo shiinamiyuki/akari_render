@@ -175,11 +175,20 @@ namespace akari::render {
         AKR_XPU void start_next_sample() {}
         AKR_XPU LCGSampler(uint64_t seed = 0u) : seed(seed) {}
     };
-
-    class GPUSampler : public Variant<LCGSampler, PCGSampler> {
+    AKR_XPU_CLASS struct Triangle;
+    AKR_XPU_CLASS class Sampler;
+    AKR_XPU_CLASS class Texture;
+    AKR_XPU_CLASS class Material;
+    AKR_XPU_CLASS class Light;
+    AKR_XPU_CLASS class Medium;
+    AKR_XPU_CLASS class Camera;
+    AKR_XPU_CLASS class BSDFClosure;
+    AKR_XPU_CLASS class BSDF;
+    template <>
+    class Sampler<GPU> : public Variant<LCGSampler, PCGSampler> {
       public:
-        using Variant::Variant;
-        GPUSampler() : GPUSampler(PCGSampler()) {}
+        using Variant<LCGSampler, PCGSampler>::Variant;
+        Sampler() : Sampler(PCGSampler()) {}
         AKR_XPU Float next1d() { AKR_VAR_DISPATCH(next1d); }
         AKR_XPU vec2 next2d() { AKR_VAR_DISPATCH(next2d); }
         AKR_XPU void start_next_sample() { AKR_VAR_DISPATCH(start_next_sample); }
@@ -192,7 +201,8 @@ namespace akari::render {
         Vec3 normal;
         Ray ray;
     };
-    struct PerspectiveCamera {
+    class PerspectiveCamera {
+      public:
         Transform c2w, w2c, r2c, c2r;
         ivec2 _resolution;
         Float fov;
@@ -242,8 +252,10 @@ namespace akari::render {
             c2r = r2c.inverse();
         }
     };
-    struct Camera : Variant<PerspectiveCamera> {
-        using Variant::Variant;
+    AKR_XPU_CLASS
+    class Camera : public Variant<PerspectiveCamera> {
+      public:
+        using Variant<PerspectiveCamera>::Variant;
         AKR_XPU ivec2 resolution() const { AKR_VAR_DISPATCH(resolution); }
         AKR_XPU CameraSample generate_ray(const vec2 &u1, const vec2 &u2, const ivec2 &raster) const {
             AKR_VAR_DISPATCH(generate_ray, u1, u2, raster);
@@ -260,7 +272,8 @@ namespace akari::render {
         AKR_XPU ShadingPoint(Vec2 tc) : texcoords(tc) {}
     };
 
-    struct ConstantTexture {
+    class ConstantTexture {
+      public:
         Spectrum value;
         AKR_XPU ConstantTexture(Float v) : value(v) {}
         AKR_XPU ConstantTexture(Spectrum v) : value(v) {}
@@ -268,13 +281,17 @@ namespace akari::render {
         AKR_XPU Spectrum evaluate_s(const ShadingPoint &sp) const { return value; }
     };
 
-    struct GPUImageTexture {};
+    class GPUImageTexture {
+      public:
+    };
 
-    struct GPUTexture : Variant<ConstantTexture> {
-        using Variant::Variant;
+    template <>
+    class Texture<GPU> : public Variant<ConstantTexture> {
+      public:
+        using Variant<ConstantTexture>::Variant;
         AKR_XPU Float evaluate_f(const ShadingPoint &sp) const { AKR_VAR_DISPATCH(evaluate_f, sp); }
         AKR_XPU Spectrum evaluate_s(const ShadingPoint &sp) const { AKR_VAR_DISPATCH(evaluate_s, sp); }
-        AKR_XPU GPUTexture() : GPUTexture(ConstantTexture(0.0)) {}
+        AKR_XPU Texture() : Texture(ConstantTexture(0.0)) {}
     };
 
     enum class BSDFType : int {
@@ -334,7 +351,7 @@ namespace akari::render {
         Float pdf     = 0.0;
         BSDFType type = BSDFType::Unset;
     };
-    class BSDFClosure;
+
     class DiffuseBSDF {
         Spectrum R;
 
@@ -517,10 +534,12 @@ namespace akari::render {
         const Vec3 wo;
     };
 
-    class GPUBSDFClosure
+    template <>
+    class BSDFClosure<GPU>
         : public Variant<DiffuseBSDF, MicrofacetReflection, SpecularReflection, SpecularTransmission, FresnelSpecular> {
       public:
-        using Variant::Variant;
+        using Variant<DiffuseBSDF, MicrofacetReflection, SpecularReflection, SpecularTransmission,
+                      FresnelSpecular>::Variant;
         [[nodiscard]] AKR_XPU Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const {
             AKR_VAR_DISPATCH(evaluate_pdf, wo, wi);
         }
@@ -535,18 +554,18 @@ namespace akari::render {
         [[nodiscard]] AKR_XPU BSDFValue albedo() const { AKR_VAR_DISPATCH(albedo); }
     };
 
-    template <class TBSDFClosure>
-    class TBSDF {
-        astd::optional<TBSDFClosure> closure_;
+    AKR_XPU_CLASS
+    class BSDF {
+        astd::optional<BSDFClosure<C>> closure_;
         Frame frame;
         Float choice_pdf = 1.0f;
 
       public:
-        AKR_XPU TBSDF(const Frame &frame) : frame(frame) {}
+        AKR_XPU BSDF(const Frame &frame) : frame(frame) {}
         AKR_XPU bool null() const { return !closure_.has_value(); }
-        AKR_XPU void set_closure(const BSDFClosure &closure) { closure_ = closure; }
+        AKR_XPU void set_closure(const BSDFClosure<C> &closure) { closure_ = closure; }
         AKR_XPU void set_choice_pdf(Float pdf) { choice_pdf = pdf; }
-        AKR_XPU const TBSDFClosure &closure() const { return *closure_; }
+        AKR_XPU const BSDFClosure<C> &closure() const { return *closure_; }
         [[nodiscard]] AKR_XPU Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const {
             auto pdf = closure().evaluate_pdf(frame.world_to_local(wo), frame.world_to_local(wi));
             return pdf * choice_pdf;
@@ -578,18 +597,14 @@ namespace akari::render {
             return astd::nullopt;
         }
     };
-    using GPUBSDF = TBSDF<GPUBSDFClosure>;
-    struct Light;
-    struct Material;
-    struct GPUMaterial;
-    struct Medium;
+
+    AKR_XPU_CLASS
     struct Triangle {
         astd::array<Vec3, 3> vertices;
         astd::array<Vec3, 3> normals;
         astd::array<vec2, 3> texcoords;
-        const Material *material        = nullptr;
-        const GPUMaterial *gpu_material = nullptr;
-        const Light *light              = nullptr;
+        const Material<C> *material = nullptr;
+        const Light<C> *light       = nullptr;
         AKR_XPU Vec3 p(const vec2 &uv) const { return lerp3(vertices[0], vertices[1], vertices[2], uv); }
         AKR_XPU Float area() const {
             return length(cross(vertices[1] - vertices[0], vertices[2] - vertices[0])) * 0.5f;
@@ -700,8 +715,9 @@ namespace akari::render {
             return astd::make_pair(mi, Spectrum(sample_medium ? (tr * sigma_s / pdf) : (tr / pdf)));
         }
     };
-    struct Medium : Variant<HomogeneousMedium> {
-        using Variant::Variant;
+    AKR_XPU_CLASS class Medium : public Variant<HomogeneousMedium> {
+      public:
+        using Variant<HomogeneousMedium>::Variant;
         template <class TSampler>
         AKR_XPU Spectrum transmittance(const Ray &ray, TSampler &sampler) const {
             AKR_VAR_DISPATCH(transmittance, ray, sampler);
@@ -712,23 +728,21 @@ namespace akari::render {
             AKR_VAR_DISPATCH(sample, ray, sampler, alloc);
         }
     };
-    struct Material;
-    struct GPUMaterial;
 
+    AKR_XPU_CLASS
     struct MeshInstance {
         Transform transform;
         BufferView<const vec3> vertices;
         BufferView<const uvec3> indices;
         BufferView<const vec3> normals;
         BufferView<const vec2> texcoords;
-        std::vector<const Light *> lights;
-        const scene::Mesh *mesh         = nullptr;
-        const Material *material        = nullptr;
-        const GPUMaterial *gpu_material = nullptr;
-        const Medium *medium            = nullptr;
+        std::vector<const Light<C> *> lights;
+        const scene::Mesh *mesh     = nullptr;
+        const Material<C> *material = nullptr;
+        const Medium<C> *medium     = nullptr;
 
-        AKR_XPU Triangle get_triangle(int prim_id) const {
-            Triangle trig;
+        AKR_XPU Triangle<C> get_triangle(int prim_id) const {
+            Triangle<C> trig;
             for (int i = 0; i < 3; i++) {
                 trig.vertices[i] = transform.apply_vector(vertices[indices[prim_id][i]]);
                 trig.normals[i]  = transform.apply_normal(normals[indices[prim_id][i]]);
@@ -745,15 +759,17 @@ namespace akari::render {
             return trig;
         }
     };
+
+    AKR_XPU_CLASS
     struct SurfaceInteraction {
-        Triangle triangle;
+        Triangle<C> triangle;
         Vec3 p;
         Vec3 ng, ns;
         vec2 texcoords;
         Vec3 dndu, dndv;
         Vec3 dpdu, dpdv;
-        const MeshInstance *shape = nullptr;
-        AKR_XPU SurfaceInteraction(const vec2 &uv, const Triangle &triangle)
+        const MeshInstance<C> *shape = nullptr;
+        AKR_XPU SurfaceInteraction(const vec2 &uv, const Triangle<C> &triangle)
             : triangle(triangle), p(triangle.p(uv)), ng(triangle.ng()), ns(triangle.ns(uv)),
               texcoords(triangle.texcoord(uv)) {
             dpdu             = triangle.dpdu(uv[0]);
@@ -762,9 +778,9 @@ namespace akari::render {
             dndu             = dnduv.first;
             dndv             = dnduv.second;
         }
-        AKR_XPU const Light *light() const { return triangle.light; }
-        AKR_XPU const Material *material() const { return triangle.material; }
-        AKR_XPU const Medium *medium() const { return shape->medium; }
+        AKR_XPU const Light<C> *light() const { return triangle.light; }
+        AKR_XPU const Material<C> *material() const { return triangle.material; }
+        AKR_XPU const Medium<C> *medium() const { return shape->medium; }
         AKR_XPU ShadingPoint sp() const {
             ShadingPoint sp_;
             sp_.n         = ns;
@@ -801,12 +817,12 @@ namespace akari::render {
         vec2 uv; // 2D parameterized position
         Float pdfPos = 0.0, pdfDir = 0.0;
     };
-    template <class TTexture>
+    AKR_XPU_CLASS
     struct AreaLight {
-        Triangle triangle;
-        TTexture color;
+        Triangle<C> triangle;
+        Texture<C> color;
         bool double_sided = false;
-        AKR_XPU AreaLight(Triangle triangle, TTexture color, bool double_sided)
+        AKR_XPU AreaLight(Triangle<C> triangle, Texture<C> color, bool double_sided)
             : triangle(triangle), color(color), double_sided(double_sided) {
             ng = triangle.ng();
         }

@@ -11,38 +11,11 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
+#pragma once
 #include <akari/util.h>
 #include <akari/gpu/buffer.h>
 // #define AKR_KNL_CPU
 // #include <akari/gpu/kernel/scene.h>
 namespace akari::gpu {
-    class Mesh {
-      public:
-        Buffer<float> vertices;
-        Buffer<float> normals;
-        Buffer<float> texcoords;
-        Buffer<uint32_t> indices;
-        Mesh(Buffer<float> vertices, Buffer<float> normals, Buffer<float> texcoords, Buffer<uint32_t> indices)
-            : vertices(std::move(vertices)), normals(std::move(normals)), texcoords(std::move(texcoords)),
-              indices(std::move(indices)) {}
-    };
-    class MeshInstance {
-      public:
-        Transform transform;
-        uint32_t mesh_id     = uint32_t(-1);
-        uint32_t material_id = uint32_t(-1);
-        uint32_t volume_id   = uint32_t(-1);
-    };
-
-    // struct Material {
-
-    // };
-    class Scene {
-      public:
-        std::vector<std::shared_ptr<Mesh>> meshes;
-        std::vector<MeshInstance> instances;
-
-        // std::vector<
-    };
+   
 } // namespace akari::gpu

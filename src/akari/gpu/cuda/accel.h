@@ -19,9 +19,38 @@
 
 #include <akari/scenegraph.h>
 #include <akari/gpu/device.h>
-#include <akari/gpu/scene.h>
+// #include <akari/gpu/scene.h>
 namespace akari::gpu {
+    namespace accel {
+        class Mesh {
+          public:
+            Buffer<float> vertices;
+            Buffer<float> normals;
+            Buffer<float> texcoords;
+            Buffer<uint32_t> indices;
+            Mesh(Buffer<float> vertices, Buffer<float> normals, Buffer<float> texcoords, Buffer<uint32_t> indices)
+                : vertices(std::move(vertices)), normals(std::move(normals)), texcoords(std::move(texcoords)),
+                  indices(std::move(indices)) {}
+        };
+        class MeshInstance {
+          public:
+            Transform transform;
+            uint32_t mesh_id     = uint32_t(-1);
+            uint32_t material_id = uint32_t(-1);
+            uint32_t volume_id   = uint32_t(-1);
+        };
 
+        // struct Material {
+
+        // };
+        class Scene {
+          public:
+            std::vector<std::shared_ptr<Mesh>> meshes;
+            std::vector<MeshInstance> instances;
+
+            // std::vector<
+        };
+    } // namespace accel
     class OptixAccel {
         std::shared_ptr<Device> device;
         Dispatcher dispatcher;
@@ -30,15 +59,16 @@ namespace akari::gpu {
         OptixModule optix_module;
         OptixTraversableHandle root_traversable;
         OptixDeviceContext context;
-        Scene scene;
+        accel::Scene scene;
         uint32_t geom_flags = OPTIX_BUILD_FLAG_ALLOW_COMPACTION;
-        OptixBuildInput get_mesh_build_input(const Mesh &mesh);
+        OptixBuildInput get_mesh_build_input(const accel::Mesh &mesh);
         OptixTraversableHandle build_bvh(const std::vector<OptixBuildInput> &build_inputs);
         std::vector<OptixTraversableHandle> mesh_handles;
         size_t gpu_bvh_bytes = 0;
         astd::optional<Buffer<OptixInstance>> ias_instances_buf;
         std::list<CUdeviceptr> vertx_buf_ptrs;
         void create_module();
+
       public:
         OptixAccel(std::shared_ptr<Device> device);
         void build(scene::P<scene::SceneGraph> graph);

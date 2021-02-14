@@ -589,18 +589,18 @@ namespace akari::render {
     };
 
     struct PPGConfig {
-        Sampler sampler;
+        Sampler<CPU> sampler;
         int min_depth = 3;
         int max_depth = 5;
         uint32_t spp = 16;
         uint32_t spp_per_pass = 4;
     };
     std::shared_ptr<STree> render_ppg(std::vector<std::pair<Array2D<Spectrum>, Spectrum>> &all_samples,
-                                      PPGConfig config, const Scene &scene);
-    Image render_ppg(PPGConfig config, const Scene &scene);
+                                      PPGConfig config, const Scene<CPU> &scene);
+    Image render_ppg(PPGConfig config, const Scene<CPU> &scene);
 
-    std::shared_ptr<STree> bake_sdtree(PPGConfig config, const Scene &scene);
+    std::shared_ptr<STree> bake_sdtree(PPGConfig config, const Scene<CPU> &scene);
 
-    Image render_metropolized_ppg(PPGConfig config, const Scene &scene);
+    Image render_metropolized_ppg(PPGConfig config, const Scene<CPU> &scene);
 
 } // namespace akari::render

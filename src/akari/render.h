@@ -139,18 +139,20 @@ namespace akari::render {
             return Spectrum((*image)(tc, 0), (*image)(tc, 1), (*image)(tc, 2));
         }
     };
-    struct Texture : Variant<ConstantTexture, ImageTexture> {
-        using Variant::Variant;
+    template <>
+    struct Texture<CPU> : Variant<ConstantTexture, ImageTexture> {
+        using Variant<ConstantTexture, ImageTexture>::Variant;
         Float evaluate_f(const ShadingPoint &sp) const { AKR_VAR_DISPATCH(evaluate_f, sp); }
         Spectrum evaluate_s(const ShadingPoint &sp) const { AKR_VAR_DISPATCH(evaluate_s, sp); }
         Texture() : Texture(ConstantTexture(0.0)) {}
     };
+
     class MixBSDF {
       public:
         Float fraction;
-        const BSDFClosure *bsdf_A = nullptr;
-        const BSDFClosure *bsdf_B = nullptr;
-        AKR_XPU MixBSDF(Float fraction, const BSDFClosure *bsdf_A, const BSDFClosure *bsdf_B)
+        const BSDFClosure<CPU> *bsdf_A = nullptr;
+        const BSDFClosure<CPU> *bsdf_B = nullptr;
+        AKR_XPU MixBSDF(Float fraction, const BSDFClosure<CPU> *bsdf_A, const BSDFClosure<CPU> *bsdf_B)
             : fraction(fraction), bsdf_A(bsdf_A), bsdf_B(bsdf_B) {}
         [[nodiscard]] AKR_XPU Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const;
         [[nodiscard]] AKR_XPU BSDFValue evaluate(const Vec3 &wo, const Vec3 &wi) const;
@@ -162,8 +164,9 @@ namespace akari::render {
     /*
     All BSDFClosure except MixBSDF must have *only* one of Diffuse, Glossy, Specular
     */
-    class BSDFClosure : public Variant<DiffuseBSDF, MicrofacetReflection, SpecularReflection, SpecularTransmission,
-                                       FresnelSpecular, MixBSDF> {
+    template <>
+    class BSDFClosure<CPU> : public Variant<DiffuseBSDF, MicrofacetReflection, SpecularReflection, SpecularTransmission,
+                                            FresnelSpecular, MixBSDF> {
       public:
         using Variant::Variant;
         [[nodiscard]] AKR_XPU Float evaluate_pdf(const Vec3 &wo, const Vec3 &wi) const {
@@ -179,20 +182,17 @@ namespace akari::render {
         }
         [[nodiscard]] AKR_XPU BSDFValue albedo() const { AKR_VAR_DISPATCH(albedo); }
     };
-    using BSDF = TBSDF<BSDFClosure>;
-    struct Material;
-    struct MeshInstance;
-    struct SurfaceInteraction;
-    struct Sampler;
-    struct Material {
-        Texture color;
-        Texture metallic;
-        Texture roughness;
-        Texture specular;
-        Texture emission;
-        Texture transmission;
+
+    AKR_XPU_CLASS class Material {
+      public:
+        Texture<C> color;
+        Texture<C> metallic;
+        Texture<C> roughness;
+        Texture<C> specular;
+        Texture<C> emission;
+        Texture<C> transmission;
         AKR_XPU Material() {}
-        BSDF evaluate(Sampler &sampler, Allocator<> alloc, const SurfaceInteraction &si) const;
+        BSDF<C> evaluate(Sampler<C> &sampler, Allocator<> alloc, const SurfaceInteraction<C> &si) const;
     };
 
     struct Distribution2D {
@@ -297,31 +297,34 @@ namespace akari::render {
         int prim_id = -1;
         bool hit() const { return geom_id != -1; }
     };
-    struct Scene;
+    AKR_XPU_CLASS
+    class Scene;
     class EmbreeAccel {
       public:
-        virtual void build(const Scene &scene, const std::shared_ptr<scene::SceneGraph> &scene_graph) = 0;
-        virtual astd::optional<Intersection> intersect1(const Ray &ray) const                         = 0;
-        virtual bool occlude1(const Ray &ray) const                                                   = 0;
-        virtual Bounds3f world_bounds() const                                                         = 0;
+        virtual void build(const Scene<CPU> &scene, const std::shared_ptr<scene::SceneGraph> &scene_graph) = 0;
+        virtual astd::optional<Intersection> intersect1(const Ray &ray) const                              = 0;
+        virtual bool occlude1(const Ray &ray) const                                                        = 0;
+        virtual Bounds3f world_bounds() const                                                              = 0;
     };
     std::shared_ptr<EmbreeAccel> create_embree_accel();
 
-    struct PowerLightSampler {
-        PowerLightSampler(Allocator<> alloc, BufferView<const Light *> lights_, const std::vector<Float> &power)
+    AKR_XPU_CLASS
+    class PowerLightSampler {
+      public:
+        PowerLightSampler(Allocator<> alloc, BufferView<const Light<C> *> lights_, const std::vector<Float> &power)
             : light_distribution(power.data(), power.size(), alloc), lights(lights_) {
             for (uint32_t i = 0; i < power.size(); i++) {
                 light_pdf[lights[i]] = light_distribution.pdf_discrete(i);
             }
         }
         Distribution1D light_distribution;
-        BufferView<const Light *> lights;
-        std::unordered_map<const Light *, Float> light_pdf;
-        std::pair<const Light *, Float> sample(Vec2 u) const {
+        BufferView<const Light<C> *> lights;
+        std::unordered_map<const Light<C> *, Float> light_pdf;
+        std::pair<const Light<C> *, Float> sample(Vec2 u) const {
             auto [light_idx, pdf] = light_distribution.sample_discrete(u[0]);
             return std::make_pair(lights[light_idx], pdf);
         }
-        Float pdf(const Light *light) const {
+        Float pdf(const Light<C> *light) const {
             auto it = light_pdf.find(light);
             if (it == light_pdf.end()) {
                 return 0.0;
@@ -462,7 +465,9 @@ namespace akari::render {
         Rng rng;
         astd::pmr::vector<Float> Xs;
     };
-    struct Sampler : Variant<LCGSampler, PCGSampler, MLTSampler, ReplaySampler> {
+    template <>
+    class Sampler<CPU> : public Variant<LCGSampler, PCGSampler, MLTSampler, ReplaySampler> {
+      public:
         using Variant::Variant;
         Sampler() : Sampler(PCGSampler()) {}
         Float next1d() { AKR_VAR_DISPATCH(next1d); }
@@ -470,9 +475,10 @@ namespace akari::render {
         void start_next_sample() { AKR_VAR_DISPATCH(start_next_sample); }
         void set_sample_index(uint64_t idx) { AKR_VAR_DISPATCH(set_sample_index, idx); }
     };
-
-    struct Light : Variant<AreaLight<Texture>> {
-        using Variant::Variant;
+    AKR_XPU_CLASS
+    class Light : public Variant<AreaLight<C>> {
+      public:
+        using Variant<AreaLight<C>>::Variant;
         Spectrum Le(const Vec3 &wo, const ShadingPoint &sp) const { AKR_VAR_DISPATCH(Le, wo, sp); }
         Float pdf_incidence(const PointGeometry &ref, const vec3 &wi) const {
             AKR_VAR_DISPATCH(pdf_incidence, ref, wi);
@@ -483,92 +489,99 @@ namespace akari::render {
         }
         LightSample sample_incidence(const LightSampleContext &ctx) const { AKR_VAR_DISPATCH(sample_incidence, ctx); }
     };
-    struct LightSampler : Variant<std::shared_ptr<PowerLightSampler>> {
+    AKR_XPU_CLASS
+    class LightSampler;
+    template <>
+    class LightSampler<CPU> : public Variant<std::shared_ptr<PowerLightSampler<CPU>>> {
+      public:
         using Variant::Variant;
-        std::pair<const Light *, Float> sample(Vec2 u) const { AKR_VAR_PTR_DISPATCH(sample, u); }
-        Float pdf(const Light *light) const { AKR_VAR_PTR_DISPATCH(pdf, light); }
+        std::pair<const Light<CPU> *, Float> sample(Vec2 u) const { AKR_VAR_PTR_DISPATCH(sample, u); }
+        Float pdf(const Light<CPU> *light) const { AKR_VAR_PTR_DISPATCH(pdf, light); }
     };
-    struct Scene {
-        astd::optional<Camera> camera;
-        std::vector<MeshInstance> instances;
-        std::vector<const Material *> materials;
-        std::vector<const Light *> lights;
+    AKR_XPU_CLASS class Scene;
+    template <>
+    class Scene<CPU> {
+      public:
+        astd::optional<Camera<CPU>> camera;
+        std::vector<MeshInstance<CPU>> instances;
+        std::vector<const Material<CPU> *> materials;
+        std::vector<const Light<CPU> *> lights;
         std::shared_ptr<EmbreeAccel> accel;
         Allocator<> allocator;
-        astd::optional<LightSampler> light_sampler;
+        astd::optional<LightSampler<CPU>> light_sampler;
         astd::pmr::monotonic_buffer_resource *rsrc;
-        astd::optional<SurfaceInteraction> intersect(const Ray &ray) const;
+        astd::optional<SurfaceInteraction<CPU>> intersect(const Ray &ray) const;
         bool occlude(const Ray &ray) const;
         Scene()              = default;
         Scene(const Scene &) = delete;
         ~Scene();
     };
 
-    std::shared_ptr<const Scene> create_scene(Allocator<>, const std::shared_ptr<scene::SceneGraph> &scene_graph);
+    std::shared_ptr<const Scene<CPU>> create_scene(Allocator<>, const std::shared_ptr<scene::SceneGraph> &scene_graph);
 
     // experimental path space denoising
     struct PSDConfig {
         size_t filter_radius = 8;
     };
     struct PTConfig {
-        Sampler sampler;
+        Sampler<CPU> sampler;
         int min_depth = 3;
         int max_depth = 5;
         int spp       = 16;
     };
-    Film render_pt(PTConfig config, const Scene &scene);
+    Film render_pt(PTConfig config, const Scene<CPU> &scene);
     struct UPTConfig {
-        Sampler sampler;
+        Sampler<CPU> sampler;
         int min_depth = 3;
         int max_depth = 5;
         int spp       = 16;
     };
-    Image render_unified(UPTConfig config, const Scene &scene);
-    Image render_pt_psd(PTConfig config, PSDConfig psd_config, const Scene &scene);
+    Image render_unified(UPTConfig config, const Scene<CPU> &scene);
+    Image render_pt_psd(PTConfig config, PSDConfig psd_config, const Scene<CPU> &scene);
 
     // separate emitter direct hit
     // useful for MLT
     std::pair<Spectrum, Spectrum> render_pt_pixel_separete_emitter_direct(PTConfig config, Allocator<>,
-                                                                          const Scene &scene, Sampler &sampler,
-                                                                          const vec2 &p_film);
-    inline Spectrum render_pt_pixel_wo_emitter_direct(PTConfig config, Allocator<> allocator, const Scene &scene,
-                                                      Sampler &sampler, const vec2 &p_film) {
+                                                                          const Scene<CPU> &scene,
+                                                                          Sampler<CPU> &sampler, const vec2 &p_film);
+    inline Spectrum render_pt_pixel_wo_emitter_direct(PTConfig config, Allocator<> allocator, const Scene<CPU> &scene,
+                                                      Sampler<CPU> &sampler, const vec2 &p_film) {
         auto [_, rest] = render_pt_pixel_separete_emitter_direct(config, allocator, scene, sampler, p_film);
         return rest - _;
     }
-    inline Spectrum render_pt_pixel(PTConfig config, Allocator<> allocator, const Scene &scene, Sampler &sampler,
-                                    const vec2 &p_film) {
+    inline Spectrum render_pt_pixel(PTConfig config, Allocator<> allocator, const Scene<CPU> &scene,
+                                    Sampler<CPU> &sampler, const vec2 &p_film) {
         auto [_, rest] = render_pt_pixel_separete_emitter_direct(config, allocator, scene, sampler, p_film);
         return rest;
     }
 
     struct IRConfig {
-        Sampler sampler;
+        Sampler<CPU> sampler;
         int min_depth = 3;
         int max_depth = 5;
         uint32_t spp  = 16;
     };
 
     // instant radiosity
-    Image render_ir(IRConfig config, const Scene &scene);
+    Image render_ir(IRConfig config, const Scene<CPU> &scene);
 
     struct SMSConfig {
-        Sampler sampler;
+        Sampler<CPU>  sampler;
         int min_depth = 3;
         int max_depth = 5;
         int spp       = 16;
     };
 
     // sms single scatter
-    Film render_sms_ss(SMSConfig config, const Scene &scene);
+    Film render_sms_ss(SMSConfig config, const Scene<CPU> &scene);
     struct BDPTConfig {
-        Sampler sampler;
+        Sampler<CPU> sampler;
         int min_depth = 3;
         int max_depth = 5;
         int spp       = 16;
     };
 
-    Image render_bdpt(PTConfig config, const Scene &scene);
+    Image render_bdpt(PTConfig config, const Scene<CPU> &scene);
 
     struct MLTConfig {
         int num_bootstrap = 100000;
@@ -577,6 +590,6 @@ namespace akari::render {
         int max_depth     = 5;
         int spp           = 16;
     };
-    Image render_mlt(MLTConfig config, const Scene &scene);
-    Image render_smcmc(MLTConfig config, const Scene &scene);
+    Image render_mlt(MLTConfig config, const Scene<CPU> &scene);
+    Image render_smcmc(MLTConfig config, const Scene<CPU> &scene);
 } // namespace akari::render
