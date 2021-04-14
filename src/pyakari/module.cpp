@@ -249,12 +249,13 @@ namespace akari::python {
             astd::scope_exit _([=] { std::signal(SIGINT, old_sig_handler); });
             render_scenegraph(scenegraph);
         });
+#ifdef AKR_BACKEND_CUDA
         m.def("render_gpu", [](P<SceneGraph> scenegraph, const std::string &backend) {
             auto old_sig_handler = std::signal(SIGINT, SIG_DFL);
             astd::scope_exit _([=] { std::signal(SIGINT, old_sig_handler); });
             gpu::render_scenegraph(scenegraph, backend);
         });
-
+#endif
         m.def("thread_pool_init", thread::init);
         m.def("thread_pool_finalize", thread::finalize);
         py::bind_vector<std::vector<P<Object>>>(m, "ObjectArray");
