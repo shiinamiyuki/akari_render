@@ -3,7 +3,7 @@
 // use akari::camera::*;
 // use akari::integrator::*;
 // use akari::light::*;
-use akari::{scene::Scene};
+use akari::scene::Scene;
 use vkc::Context;
 // use akari::shape::*;
 // use akari::*;
@@ -11,9 +11,9 @@ use std::path::Path;
 use std::process::exit;
 // use std::sync::Arc;
 extern crate clap;
+use akari::api;
 use akari::film::Film;
 use akari::profile;
-use akari::{api};
 use clap::{App, Arg};
 
 use log::{Level, Metadata, Record};
@@ -40,14 +40,18 @@ static LOGGER: SimpleLogger = SimpleLogger;
 pub fn init() -> Result<(), SetLoggerError> {
     log::set_logger(&LOGGER).map(|()| log::set_max_level(LevelFilter::Info))
 }
-use akari::{gpu::{pt::WavefrontPathTracer, scene::GPUScene}};
+use akari::gpu::{pt::WavefrontPathTracer, scene::GPUScene};
 #[cfg(feature = "gpu")]
-fn render_gpu(scene: &Scene, output: &String, validation: bool, integrator:&mut WavefrontPathTracer) {
-
+fn render_gpu(
+    scene: &Scene,
+    output: &String,
+    validation: bool,
+    integrator: &mut WavefrontPathTracer,
+) {
     log::info!("initializing vulkan context");
-    let ctx = Context::new(vkc::ContextCreateInfo {
-        enabled_extensions:&[vkc::Extension::ExternalMemory],
-        enable_validation:validation,
+    let ctx = Context::new_compute_only(vkc::ContextCreateInfo {
+        enabled_extensions: &[vkc::Extension::RayTracing, vkc::Extension::ExternalMemory],
+        enable_validation: validation,
     });
     log::info!("building GPUAccel");
     let gpu_scene = GPUScene::new(&ctx, scene);
@@ -156,7 +160,12 @@ fn main() {
             println!("no filed provided");
             exit(1);
         };
-        render_gpu(&scene, &output, matches.is_present("debug"), &mut integrator);
+        render_gpu(
+            &scene,
+            &output,
+            matches.is_present("debug"),
+            &mut integrator,
+        );
     }
 }
 // fn main() {

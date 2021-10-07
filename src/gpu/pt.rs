@@ -316,7 +316,7 @@ impl<'a> WavefrontImpl<'a> {
                 ),
             ];
             let ray_queue = &rchit_wq[0];
-            let sampler = vkc::resource::Sampler::new(ctx);
+            let sampler = vkc::resource::Sampler::default_sampler(ctx);
             let scene_set = vkc::Set::Bindings(vec![
                 vkc::Binding::StorageBuffer(gpu_scene.instances.handle),
                 vkc::Binding::StorageBuffer(gpu_scene.bsdfs.handle),
