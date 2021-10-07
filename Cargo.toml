@@ -1,0 +1,56 @@
+[package]
+name = "akari"
+version = "0.1.0"
+authors = ["shiinamiyuki <xiaochun.tong@mail.utoronto.ca>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[build-dependencies]
+shaderc = {version = "0.7.2", optional = true}
+cmake = {version = "0.1", optional = true}
+bindgen = {version ="0.59.1", optional = true}
+
+[dependencies]
+nalgebra = {version ="0.26.2", features = ["serde-serialize"] }
+nalgebra-glm = "0.12.0"
+rayon = "1.5.0"
+image = "0.23.14"
+rand = "0.8.3"
+serde = { version = "1.*", features = ["derive"] }
+serde_json = "1.0"
+bytemuck = {version = "1.7.*", features=["derive"]}
+futures = "*"
+
+mimalloc = { version = "*", default-features = false, optional = true }
+ordered-float = "2.1.1"
+bitflags = "1.2.1"
+statrs = "0.14.0"
+clap = "2.33.3"
+tobj = "2.0.4"
+bson = {version = "1.2.2", features = ["u2i"] }
+lazy_static = "1.*"
+ash = { version = "*", optional = true }
+vkc = {git = "https://github.com/shiinamiyuki/vkc", optional = true }
+shaderc = {version = "0.7.2", optional = true}
+libloading = {version = "0.7.*", optional = true}
+log = "*"
+indicatif = "0.16.2"
+
+[features]
+default = ["gpu"]
+global_mimalloc = ["mimalloc"]
+gpu_nrc = ["cmake", "bindgen", "gpu"]
+gpu = ["ash", "shaderc", "vkc"]
+float_f64 = []
+
+[[bin]]
+name="akr-cli"
+path="src/bin/akr-cli.rs"
+
+[[bin]]
+name="akr-import"
+path="src/bin/akr-import.rs"
+
+[[bin]]
+name="bench"
+path="src/bin/bench.rs"
