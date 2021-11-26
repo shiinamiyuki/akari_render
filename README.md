@@ -4,12 +4,13 @@
 ![](gallery/beauty4k.png)
 
 AkariRender is a CPU/GPU physically based renderer written in Rust and Vulkan RTX.
-Previous version with PPG and SMCMC are in [legacy-cpp](https://github.com/shiinamiyuki/akari_render/tree/legacy-cpp) branch.
+Previous version with PPG and SMCMC is in [legacy-cpp](https://github.com/shiinamiyuki/akari_render/tree/legacy-cpp) branch.
 
 
 
 ## Features
 - Unidirectional Path Tracing
+- Wavefront Path Tracing
 - SPPM
 - BDPT
 - [Neural Radiance Cache](https://arxiv.org/pdf/2106.12372.pdf)
