@@ -341,6 +341,9 @@ pub fn generate_light_path<'a>(
         * glm::dot(&sample.ray.d, &sample.n).abs();
     let vertex = Vertex::create_light_vertex(light, sample.ray.o, le, light_pdf * sample.pdf_pos);
     path.push(vertex);
+    if sample.pdf_dir == 0.0{
+        return;
+    }
     random_walk(
         scene,
         sample.ray,

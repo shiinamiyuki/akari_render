@@ -21,6 +21,8 @@ impl Integrator for PathTracer {
     fn render(&mut self, scene: &Scene) -> Film {
         let npixels = (scene.camera.resolution().x * scene.camera.resolution().y) as usize;
         let film = Film::new(&scene.camera.resolution());
+        let chunks = (npixels + 255) / 256;
+        let progress = crate::util::create_progess_bar(chunks, "chunks");
         parallel_for(npixels, 256, |id| {
             let mut sampler = SobolSampler::new(id as u32);
             let x = (id as u32) % scene.camera.resolution().x;
@@ -132,7 +134,11 @@ impl Integrator for PathTracer {
             }
             acc_li = acc_li / (self.spp as Float);
             film.add_sample(&uvec2(x, y), &acc_li, 1.0);
+            if (id + 1) % 256 == 0 {
+                progress.inc(1);
+            }
         });
+        progress.finish();
         film
     }
 }

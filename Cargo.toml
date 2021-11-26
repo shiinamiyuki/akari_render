@@ -11,9 +11,9 @@ cmake = {version = "0.1", optional = true}
 bindgen = {version ="0.59.1", optional = true}
 
 [dependencies]
-nalgebra = {version ="0.26.2", features = ["serde-serialize"] }
-nalgebra-glm = "0.12.0"
-rayon = "1.5.0"
+nalgebra = {version ="*", features = ["serde-serialize"] }
+nalgebra-glm = "*"
+rayon = "*"
 image = "0.23.14"
 rand = "0.8.3"
 serde = { version = "1.*", features = ["derive"] }
@@ -31,15 +31,17 @@ bson = {version = "1.2.2", features = ["u2i"] }
 lazy_static = "1.*"
 ash = { version = "*", optional = true }
 vkc = {git = "https://github.com/shiinamiyuki/vkc", optional = true }
+embree-sys = {git = "https://github.com/shiinamiyuki/embree-sys", optional = true}
 shaderc = {version = "0.7.2", optional = true}
-libloading = {version = "0.7.*", optional = true}
+parking_lot = "*"
 log = "*"
 indicatif = "0.16.2"
 
 [features]
-default = ["gpu"]
+default = ["gpu", "embree"]
 global_mimalloc = ["mimalloc"]
 gpu_nrc = ["cmake", "bindgen", "gpu"]
+embree = ["embree-sys"]
 gpu = ["ash", "shaderc", "vkc"]
 float_f64 = []
 
@@ -54,3 +56,6 @@ path="src/bin/akr-import.rs"
 [[bin]]
 name="bench"
 path="src/bin/bench.rs"
+
+[profile.dev]
+opt-level=1 

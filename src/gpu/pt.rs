@@ -33,7 +33,7 @@ impl WavefrontPathTracer {
         imp.render();
         {
             let mapped = imp.film.map_range(.., vk::MemoryMapFlags::empty());
-            let mut pixels = film.pixels.write().unwrap();
+            let mut pixels = film.pixels.write();
             assert!(pixels.len() == mapped.slice.len());
             for i in 0..mapped.slice.len() {
                 pixels[i].intensity[0] = mapped.slice[i][0];

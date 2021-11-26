@@ -1,7 +1,8 @@
 #![allow(dead_code)]
 use nalgebra as na;
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc};
+use parking_lot::RwLock;
 #[derive(Clone)]
 pub struct Dual<T> {
     pub val: T,
@@ -150,7 +151,7 @@ impl Optimizer for SGD {
 }
 impl OptimizerImpl for SGDImpl {
     fn step(&mut self, val: &mut [f32], grad: &[f32]) {
-        let lr = self.params.read().unwrap().learning_rate;
+        let lr = self.params.read().learning_rate;
         assert!(val.len() == grad.len());
         for i in 0..val.len() {
             val[i] -= lr * grad[i].min(1000.0).max(-1000.0);
@@ -201,7 +202,7 @@ struct AdamImpl {
 }
 impl OptimizerImpl for AdamImpl {
     fn step(&mut self, val: &mut [f32], grad: &[f32]) {
-        let params = self.params.read().unwrap();
+        let params = self.params.read();
         let lr = params.learning_rate;
         let beta1 = params.beta1;
         let beta2 = params.beta2;

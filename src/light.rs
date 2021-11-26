@@ -32,7 +32,7 @@ bitflags! {
         const DELTA = Self::DELTA_POSITION.bits | Self::DELTA_DIRECTION.bits;
     }
 }
-pub trait Light: Sync + Send +AsAny {
+pub trait Light: Sync + Send + AsAny {
     fn sample_le(&self, u: &[Vec2; 2]) -> LightRaySample;
     fn sample_li(&self, u: &Vec3, p: &ReferencePoint) -> LightSample;
     // (pdf_pos,pdf_dir)
@@ -54,7 +54,7 @@ pub struct PowerLightDistribution {
     pdf_map: HashMap<usize, Float>,
 }
 impl PowerLightDistribution {
-    pub fn pdf(&self)->&[f32]{
+    pub fn pdf(&self) -> &[f32] {
         &self.dist.pmf
     }
     pub fn new(lights: Vec<Arc<dyn Light>>) -> Self {
@@ -123,8 +123,19 @@ pub struct AreaLight {
 }
 impl_as_any!(AreaLight);
 impl Light for AreaLight {
-    fn sample_le(&self, _u: &[Vec2; 2]) -> LightRaySample {
-        todo!()
+    fn sample_le(&self, u: &[Vec2; 2]) -> LightRaySample {
+        let p = self.shape.sample_surface(&vec3(u[0].x, u[0].y, 0.0));
+        let dir = consine_hemisphere_sampling(&u[1]);
+        let frame = Frame::from_normal(&p.ng);
+        LightRaySample {
+            le: self.emission.evaluate_s(&ShadingPoint {
+                texcoord: p.texcoords,
+            }),
+            pdf_dir: (dir.y.abs()) * FRAC_1_PI,
+            pdf_pos: p.pdf,
+            n: p.ng,
+            ray: Ray::spawn(&p.p, &frame.to_world(&dir)),
+        }
     }
 
     fn sample_li(&self, u: &Vec3, ref_: &ReferencePoint) -> LightSample {
@@ -147,8 +158,18 @@ impl Light for AreaLight {
         }
     }
 
-    fn pdf_le(&self, _ray: &Ray) -> (Float, Float) {
-        todo!()
+    fn pdf_le(&self, ray: &Ray) -> (Float, Float) {
+        let ray = Ray {
+            tmin: 0.0 - 0.0001,
+            ..*ray
+        };
+        (
+            1.0 / self.shape.area(),
+            match self.shape.intersect(&ray) {
+                Some(isct) => isct.ng.dot(&ray.d).abs() * FRAC_1_PI,
+                None => 0.0,
+            },
+        )
     }
 
     fn pdf_li(&self, wi: &Vec3, ref_: &ReferencePoint) -> (Float, Float) {

@@ -392,15 +392,15 @@ impl Bsdf for GPUBsdfProxy {
         Some(self.emission.clone())
     }
     fn evaluate(&self, _sp: &ShadingPoint, _wo: &Vec3, _wi: &Vec3) -> Spectrum {
-        panic!("should be called on cpu")
+        panic!("shouldn't be called on cpu")
     }
     fn evaluate_pdf(&self, _sp: &ShadingPoint, _wo: &Vec3, _wi: &Vec3) -> Float {
-        panic!("should be called on cpu")
+        panic!("shouldn't be called on cpu")
     }
     fn sample(&self, _sp: &ShadingPoint, _u: &Vec2, _wo: &Vec3) -> Option<BsdfSample> {
-        panic!("should be called on cpu")
+        panic!("shouldn't be called on cpu")
     }
     fn info(&self, _sp: &ShadingPoint) -> BsdfInfo {
-        panic!("should be called on cpu")
+        panic!("shouldn't be called on cpu")
     }
 }

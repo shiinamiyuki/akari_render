@@ -1,5 +1,5 @@
 use crate::accel::bvh::BVHAccelerator;
-use crate::accel::bvh::BinnedSAHBuilder;
+use crate::accel::bvh::SweepSAHBuilder;
 use crate::distribution::Distribution1D;
 use crate::*;
 use crate::{accel::bvh, bsdf::Bsdf};
@@ -166,26 +166,12 @@ impl Triangle {
         if t >= ray.tmin && t < ray.tmax
         // ray intersection
         {
-            // let n = glm::normalize(&glm::cross(&edge1, &edge2));
-            // let tc = lerp3(
-            //     &self.texcoords[0],
-            //     &self.texcoords[1],
-            //     &self.texcoords[2],
-            //     &vec2(u, v),
-            // );
-            // Some(Intersection {
-            //     shape: self,
-            //     t,
-            //     uv: vec2(u, v),
-            //     texcoords: tc,
-            //     ng: n,
-            //     ns: n,
-            // })
             Some((t, vec2(u, v)))
         } else {
             None
         }
     }
+
     fn occlude(&self, ray: &Ray) -> bool {
         if let Some(_) = self.intersect(ray) {
             true
@@ -241,14 +227,14 @@ impl bvh::BVHData for TriangleMeshAccelData {
         };
         let t_uv = trig.intersect(ray);
         if let Some(t_uv) = t_uv {
-            let (tc0, tc1, tc2) = self.get_tc(&face);
-            let ng = trig.ng();
+            //let (tc0, tc1, tc2) = self.get_tc(&face);
+            // let ng = trig.ng();
             Some(Intersection {
                 shape: None,
                 uv: t_uv.1,
-                texcoords: lerp3(&tc0, &tc1, &tc2, &t_uv.1),
-                ng,
-                ns: ng,
+                texcoords: vec2(0.0, 0.0), //lerp3(&tc0, &tc1, &tc2, &t_uv.1),
+                ng: vec3(0.0, 0.0, 0.0),
+                ns: vec3(0.0, 0.0, 0.0),
                 t: t_uv.0,
                 prim_id: idx,
             })
@@ -344,8 +330,23 @@ impl Shape for TriangleMeshInstance {
     }
     fn intersect<'a>(&'a self, ray: &Ray) -> Option<Intersection<'a>> {
         if let Some(isct) = self.accel.intersect(ray) {
+            let idx = isct.prim_id as usize;
+            let mesh = &*self.accel.data.mesh;
+            let face = mesh.indices[idx as usize];
+            let v0 = mesh.vertices[face[0] as usize].cast::<Float>();
+            let v1 = mesh.vertices[face[1] as usize].cast::<Float>();
+            let v2 = mesh.vertices[face[2] as usize].cast::<Float>();
+            let trig = Triangle {
+                vertices: [v0, v1, v2],
+            };
+            let ng = trig.ng();
+            let (tc0, tc1, tc2) = self.accel.data.get_tc(&face);
+
             Some(Intersection {
                 shape: Some(self),
+                texcoords: lerp3(&tc0, &tc1, &tc2, &isct.uv),
+                ng,
+                ns: ng,
                 ..isct
             })
         } else {
@@ -421,10 +422,11 @@ impl TriangleMesh {
 
 impl TriangleMesh {
     pub fn build_accel(self: &Arc<TriangleMesh>) -> BVHAccelerator<TriangleMeshAccelData> {
-        let accel = BinnedSAHBuilder::build(
+        let accel = SweepSAHBuilder::build(
             TriangleMeshAccelData { mesh: self.clone() },
             (0..self.indices.len() as u32).collect(),
-        );
+        )
+        .optimize_layout();
         accel
     }
     pub fn create_instance(

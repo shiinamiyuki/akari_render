@@ -19,8 +19,6 @@ pub mod film;
 #[cfg(feature = "gpu")]
 #[macro_use]
 pub mod gpu;
-#[cfg(feature = "gpu_nn")]
-pub mod gpu_nn;
 pub mod integrator;
 pub mod light;
 pub mod ltc;
@@ -40,11 +38,11 @@ use std::{
     ops::{Index, IndexMut, Mul},
     sync::{
         atomic::{AtomicPtr, AtomicU32, Ordering},
-        Arc, RwLock,
+        Arc,
     },
     usize,
 };
-
+use parking_lot::RwLock;
 #[cfg(feature = "float_f64")]
 pub type Float = f64;
 

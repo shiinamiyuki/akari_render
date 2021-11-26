@@ -183,7 +183,7 @@ impl RadianceCache {
             return None;
         }
         let v = Self::get_input_vec(r);
-        let mut queue = self.query_queue.write().unwrap();
+        let mut queue = self.query_queue.write();
         let idx = queue.len() / INPUT_SIZE;
         queue.extend(v.iter());
         // let s: Spectrum = self.model.infer(&nrc_encoding(&v)).into();
@@ -212,7 +212,7 @@ impl RadianceCache {
             return;
         }
         let v = Self::get_input_vec(r);
-        let mut train = self.train.write().unwrap();
+        let mut train = self.train.write();
         assert_eq!(
             train.queue.len() / INPUT_SIZE,
             train.target.len() / Spectrum::N_SAMPLES,
@@ -230,7 +230,7 @@ impl RadianceCache {
     }
     fn infer(&self) {
         {
-            let queue = self.query_queue.write().unwrap();
+            let queue = self.query_queue.write();
             assert!(queue.len() % INPUT_SIZE == 0);
             let mut inputs = na::DMatrix::<f32>::from_column_slice(
                 INPUT_SIZE,
@@ -238,7 +238,7 @@ impl RadianceCache {
                 &queue[..],
             );
             inputs = nrc_encoding(&inputs);
-            let mut result = self.query_result.write().unwrap();
+            let mut result = self.query_result.write();
             *result = {
                 let mut r = self.model.infer(inputs);
                 r.iter_mut().for_each(|x| *x = inv_tone_mapping(*x));
@@ -251,12 +251,12 @@ impl RadianceCache {
             };
         }
         {
-            let mut queue = self.query_queue.write().unwrap();
+            let mut queue = self.query_queue.write();
             queue.clear();
         }
     }
     fn train(&mut self) -> f32 {
-        let mut train = self.train.write().unwrap();
+        let mut train = self.train.write();
         assert!(train.queue.len() % INPUT_SIZE == 0);
         assert!(train.target.len() % Spectrum::N_SAMPLES == 0);
         let queue = &train.queue;
@@ -676,7 +676,7 @@ impl Integrator for CachedPathTracer {
             {
                 // println!(
                 //     "batch size:{} {}",
-                //     cache.train.read().unwrap().queue.len() / INPUT_SIZE,
+                //     cache.train.read().queue.len() / INPUT_SIZE,
                 //     npixels as f64 * 1.0 / training_freq
                 // );
                 let loss = cache.train();
@@ -769,7 +769,7 @@ impl Integrator for CachedPathTracer {
                     let cache = &trained_caches[state.thread_index];
                     let li = {
                         if let Some(idx) = state.query_index {
-                            let results = cache.query_result.read().unwrap();
+                            let results = cache.query_result.read();
                             let result = Spectrum {
                                 samples: na::SVector::from_iterator(
                                     results.column(idx).iter().map(|x| *x as Float),
@@ -803,7 +803,7 @@ impl Integrator for CachedPathTracer {
         //     let y = (id as u32) / scene.camera.resolution().x;
         //     let pixel = uvec2(x, y);
         //     let (ray, _ray_weight) = scene.camera.generate_ray(&pixel, &mut sampler);
-        //     let lk = cache.read().unwrap();
+        //     let lk = cache.read();
         //     let cache = &*lk;
         //     // let li = cache.infer(&ray.o, &dir_to_spherical(&ray.d));
         //     let mut li = Spectrum::zero();

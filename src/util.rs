@@ -1,5 +1,7 @@
 use std::{io::Read, path::PathBuf};
 
+use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
+
 use crate::*;
 
 pub struct CurrentDirGuard {
@@ -38,4 +40,19 @@ pub fn deserialize_pods<T: bytemuck::Pod, In: Read>(pods: &mut Vec<T>, s: &mut I
         let slice = unsafe { std::slice::from_raw_parts_mut(pods.as_mut_ptr(), len) };
         s.read(bytemuck::cast_slice_mut::<T, u8>(slice)).unwrap();
     }
+}
+
+pub fn create_progess_bar(count: usize, what: &str) -> ProgressBar {
+    let template = String::from(
+        "[{elapsed_precise} - {eta_precise}] [{bar:40.cyan/blue}] {pos:>7}/{len:7}WHAT {msg}",
+    );
+    let template = template.replace("WHAT", what);
+    let progress = ProgressBar::new(count as u64);
+    progress.set_draw_target(ProgressDrawTarget::stdout_with_hz(2));
+    progress.set_style(
+        ProgressStyle::default_bar()
+            .template(&template)
+            .progress_chars("=>-"),
+    );
+    progress
 }

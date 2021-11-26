@@ -22,13 +22,13 @@ impl Film {
         }
     }
     pub fn add_sample(&self, pixel: &glm::UVec2, value: &Spectrum, weight: Float) {
-        let mut pixels = self.pixels.write().unwrap();
+        let mut pixels = self.pixels.write();
         let pixel = &mut (*pixels)[(pixel.x + pixel.y * self.resolution.x) as usize];
         pixel.intensity = pixel.intensity + *value;
         pixel.weight += weight;
     }
     pub fn get_pixel(&self, pixel: &glm::UVec2) -> Pixel {
-        let pixels = self.pixels.read().unwrap();
+        let pixels = self.pixels.read();
         (*pixels)[(pixel.x + pixel.y * self.resolution.x) as usize]
     }
     pub fn to_rgb_image(&self) -> image::RgbImage {

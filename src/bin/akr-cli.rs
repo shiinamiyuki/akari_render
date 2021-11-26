@@ -127,11 +127,11 @@ fn main() {
         let path = Path::new(scene);
         api::load_scene(path, gpu_mode)
     } else {
-        println!("no filed provided");
+        log::error!("no filed provided");
         exit(1);
     };
     if scene.lights.is_empty() {
-        println!("scene has no light!");
+        log::error!("scene has no light!");
         exit(1);
     }
     let output = if let Some(output) = matches.value_of("output") {
@@ -144,12 +144,12 @@ fn main() {
             let path = Path::new(algorithm);
             api::load_integrator(path)
         } else {
-            println!("no filed provided");
+            log::error!("no filed provided");
             exit(1);
         };
-        println!("rendering...");
+        log::info!("rendering with {} threads", rayon::current_num_threads());
         let (film, time) = profile(|| -> Film { integrator.as_mut().render(&scene) });
-        println!("took {}s", time);
+        log::info!("took {}s", time);
         let image = film.to_rgb_image();
         image.save(output).unwrap();
     } else {
@@ -157,7 +157,7 @@ fn main() {
             let path = Path::new(algorithm);
             api::load_gpu_integrator(path)
         } else {
-            println!("no filed provided");
+            log::error!("no filed provided");
             exit(1);
         };
         render_gpu(
