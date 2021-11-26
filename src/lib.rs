@@ -1,3 +1,4 @@
+
 pub use glm::vec2;
 pub use glm::vec3;
 #[cfg(feature = "global_mimalloc")]
@@ -32,6 +33,7 @@ pub mod util;
 
 #[macro_use]
 extern crate bitflags;
+use parking_lot::RwLock;
 use std::any::Any;
 use std::{
     collections::HashMap,
@@ -42,7 +44,6 @@ use std::{
     },
     usize,
 };
-use parking_lot::RwLock;
 #[cfg(feature = "float_f64")]
 pub type Float = f64;
 
@@ -772,27 +773,31 @@ impl<T> UnsafeConstPointer<T> {
 #[macro_use]
 mod nn_v2;
 
-pub trait AsAny {
+pub trait Base: Any {
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
+    fn type_name(&self) -> &'static str;
 }
 
-pub fn downcast_ref<U: 'static, T: AsAny + ?Sized>(obj: &T) -> Option<&U> {
+pub fn downcast_ref<U: 'static, T: Base + ?Sized>(obj: &T) -> Option<&U> {
     obj.as_any().downcast_ref::<U>()
 }
 
-pub fn downcast_mut<U: 'static, T: AsAny + ?Sized>(obj: &mut T) -> Option<&mut U> {
+pub fn downcast_mut<U: 'static, T: Base + ?Sized>(obj: &mut T) -> Option<&mut U> {
     obj.as_any_mut().downcast_mut::<U>()
 }
 #[macro_export]
-macro_rules! impl_as_any {
+macro_rules! impl_base {
     ($t:ty) => {
-        impl AsAny for $t {
+        impl Base for $t {
             fn as_any(&self) -> &dyn Any {
                 self
             }
             fn as_any_mut(&mut self) -> &mut dyn Any {
                 self
+            }
+            fn type_name(&self) -> &'static str {
+                std::any::type_name::<Self>()
             }
         }
     };

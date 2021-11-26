@@ -32,7 +32,7 @@ bitflags! {
         const DELTA = Self::DELTA_POSITION.bits | Self::DELTA_DIRECTION.bits;
     }
 }
-pub trait Light: Sync + Send + AsAny {
+pub trait Light: Sync + Send + Base {
     fn sample_le(&self, u: &[Vec2; 2]) -> LightRaySample;
     fn sample_li(&self, u: &Vec3, p: &ReferencePoint) -> LightSample;
     // (pdf_pos,pdf_dir)
@@ -44,7 +44,7 @@ pub trait Light: Sync + Send + AsAny {
     fn power(&self) -> Float;
     fn address(&self) -> usize; // ????
 }
-pub trait LightDistribution: Sync + Send + AsAny {
+pub trait LightDistribution: Sync + Send + Base {
     fn sample<'a>(&'a self, u: Float) -> (&'a dyn Light, Float);
     fn pdf<'a>(&self, light: &'a dyn Light) -> Float;
 }
@@ -86,12 +86,12 @@ impl LightDistribution for PowerLightDistribution {
         }
     }
 }
-impl_as_any!(PowerLightDistribution);
+impl_base!(PowerLightDistribution);
 pub struct UniformLightDistribution {
     lights: Vec<Arc<dyn Light>>,
     pdf_map: HashMap<usize, Float>,
 }
-impl_as_any!(UniformLightDistribution);
+impl_base!(UniformLightDistribution);
 impl UniformLightDistribution {
     pub fn new(lights: Vec<Arc<dyn Light>>) -> Self {
         let mut pdf_map = HashMap::new();
@@ -121,7 +121,7 @@ pub struct AreaLight {
     pub shape: Arc<dyn Shape>,
     pub emission: Arc<dyn Texture>,
 }
-impl_as_any!(AreaLight);
+impl_base!(AreaLight);
 impl Light for AreaLight {
     fn sample_le(&self, u: &[Vec2; 2]) -> LightRaySample {
         let p = self.shape.sample_surface(&vec3(u[0].x, u[0].y, 0.0));
@@ -208,7 +208,7 @@ pub struct PointLight {
     pub position: Vec3,
     pub emission: Arc<dyn Texture>,
 }
-impl_as_any!(PointLight);
+impl_base!(PointLight);
 impl PointLight {
     fn evaluate(&self, w: &Vec3) -> Spectrum {
         let uv = spherical_to_uv(&dir_to_spherical(w));

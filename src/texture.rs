@@ -12,7 +12,7 @@ impl ShadingPoint {
         }
     }
 }
-pub trait Texture: Sync + Send + AsAny {
+pub trait Texture: Sync + Send + Base {
     fn evaluate_s(&self, sp: &ShadingPoint) -> Spectrum;
     fn evaluate_f(&self, sp: &ShadingPoint) -> Float;
     fn power(&self) -> Float;
@@ -34,7 +34,7 @@ impl Texture for ConstantTexture<f32> {
         self.value as Float
     }
 }
-impl_as_any!(ConstantTexture<f32>);
+impl_base!(ConstantTexture<f32>);
 
 impl Texture for ConstantTexture<f64> {
     fn evaluate_s(&self, _sp: &ShadingPoint) -> Spectrum {
@@ -49,7 +49,7 @@ impl Texture for ConstantTexture<f64> {
         self.value as Float
     }
 }
-impl_as_any!(ConstantTexture<f64>);
+impl_base!(ConstantTexture<f64>);
 impl Texture for ConstantTexture<Spectrum> {
     fn evaluate_s(&self, _sp: &ShadingPoint) -> Spectrum {
         self.value
@@ -61,7 +61,7 @@ impl Texture for ConstantTexture<Spectrum> {
         self.value.samples.max() as Float
     }
 }
-impl_as_any!(ConstantTexture<Spectrum>);
+impl_base!(ConstantTexture<Spectrum>);
 pub struct ImageTexture<T: Copy + Clone> {
     data: Vec<T>,
     size: (u32, u32),
@@ -116,7 +116,7 @@ impl Texture for ImageTexture<f32> {
         self.data.iter().sum::<f32>() as Float / self.data.len() as Float
     }
 }
-impl_as_any!(ImageTexture<f32>);
+impl_base!(ImageTexture<f32>);
 impl Texture for ImageTexture<f64> {
     fn evaluate_s(&self, sp: &ShadingPoint) -> Spectrum {
         Spectrum {
@@ -130,7 +130,7 @@ impl Texture for ImageTexture<f64> {
         self.data.iter().sum::<f64>() as Float / self.data.len() as Float
     }
 }
-impl_as_any!(ImageTexture<f64>);
+impl_base!(ImageTexture<f64>);
 impl Texture for ImageTexture<Spectrum> {
     fn evaluate_s(&self, sp: &ShadingPoint) -> Spectrum {
         *self.get_pixel(&sp.texcoord)
@@ -142,4 +142,4 @@ impl Texture for ImageTexture<Spectrum> {
         self.data.iter().map(|s| s.samples.max()).sum::<Float>() / self.data.len() as Float
     }
 }
-impl_as_any!(ImageTexture<Spectrum>);
+impl_base!(ImageTexture<Spectrum>);

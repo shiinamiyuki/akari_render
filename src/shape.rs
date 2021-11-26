@@ -16,13 +16,16 @@ pub struct SurfaceSample {
     pub ng: Vec3,
     pub ns: Vec3,
 }
-pub trait Shape: Sync + Send + AsAny {
+pub trait Shape: Sync + Send + Base {
     fn intersect<'a>(&'a self, ray: &Ray) -> Option<Intersection<'a>>;
     fn occlude(&self, ray: &Ray) -> bool;
     fn bsdf<'a>(&'a self) -> Option<&'a dyn Bsdf>;
     fn aabb(&self) -> Bounds3f;
     fn sample_surface(&self, u: &Vec3) -> SurfaceSample;
     fn area(&self) -> Float;
+    fn children(&self) -> Option<Vec<Arc<dyn Shape>>> {
+        None
+    }
 }
 
 #[derive(Clone)]
@@ -31,7 +34,7 @@ pub struct Sphere {
     pub radius: Float,
     pub bsdf: Arc<dyn Bsdf>,
 }
-impl_as_any!(Sphere);
+impl_base!(Sphere);
 impl Shape for Sphere {
     fn intersect<'a>(&'a self, ray: &Ray) -> Option<Intersection<'a>> {
         let oc = ray.o - self.center;
@@ -192,17 +195,7 @@ pub struct TriangleMeshAccelData {
 
 impl TriangleMeshAccelData {
     fn get_tc(&self, face: &glm::UVec3) -> (Vec2, Vec2, Vec2) {
-        if self.mesh.texcoords.is_empty() {
-            let tc0 = vec2(0.0, 0.0);
-            let tc1 = vec2(0.0, 1.0);
-            let tc2 = vec2(1.0, 1.0);
-            (tc0, tc1, tc2)
-        } else {
-            let tc0 = self.mesh.texcoords[face[0] as usize].cast::<Float>();
-            let tc1 = self.mesh.texcoords[face[1] as usize].cast::<Float>();
-            let tc2 = self.mesh.texcoords[face[2] as usize].cast::<Float>();
-            (tc0, tc1, tc2)
-        }
+        self.mesh.get_tc(face)
     }
 }
 impl bvh::BVHData for TriangleMeshAccelData {
@@ -263,17 +256,17 @@ pub struct TriangleMeshInstance {
     pub area: Float,
     pub dist: Distribution1D,
 }
-impl_as_any!(TriangleMeshInstance);
-pub struct GPUTriangleMeshInstanceProxy {
+impl_base!(TriangleMeshInstance);
+pub struct MeshInstanceProxy {
     pub mesh: Arc<TriangleMesh>,
     pub bsdf: Arc<dyn Bsdf>,
 }
-impl_as_any!(GPUTriangleMeshInstanceProxy);
-pub struct GPUAggregate {
+impl_base!(MeshInstanceProxy);
+pub struct AggregateProxy {
     pub shapes: Vec<Arc<dyn Shape>>,
 }
-impl_as_any!(GPUAggregate);
-impl Shape for GPUAggregate {
+impl_base!(AggregateProxy);
+impl Shape for AggregateProxy {
     fn intersect<'a>(&'a self, _ray: &Ray) -> Option<Intersection<'a>> {
         panic!("shouldn't be called on cpu")
     }
@@ -298,7 +291,7 @@ impl Shape for GPUAggregate {
         panic!("shouldn't be called on cpu")
     }
 }
-impl Shape for GPUTriangleMeshInstanceProxy {
+impl Shape for MeshInstanceProxy {
     fn intersect<'a>(&'a self, _ray: &Ray) -> Option<Intersection<'a>> {
         panic!("shouldn't be called on cpu")
     }
@@ -363,24 +356,7 @@ impl Shape for TriangleMeshInstance {
         self.area
     }
     fn sample_surface(&self, u: &Vec3) -> SurfaceSample {
-        let (idx, pdf_idx) = self.dist.sample_discrete(u[2]);
-        let face = self.accel.data.mesh.indices[idx as usize];
-        let v0 = self.accel.data.mesh.vertices[face[0] as usize].cast::<Float>();
-        let v1 = self.accel.data.mesh.vertices[face[1] as usize].cast::<Float>();
-        let v2 = self.accel.data.mesh.vertices[face[2] as usize].cast::<Float>();
-        let trig = Triangle {
-            vertices: [v0, v1, v2],
-        };
-        let uv = uniform_sample_triangle(&vec2(u.x, u.y));
-        let p = lerp3(&v0, &v1, &v2, &uv);
-        let (tc0, tc1, tc2) = self.accel.data.get_tc(&face);
-        SurfaceSample {
-            p,
-            ng: trig.ng(),
-            ns: trig.ng(),
-            texcoords: lerp3(&tc0, &tc1, &tc2, &uv),
-            pdf: 1.0 / self.accel.data.mesh.get_triangle(idx).area() * pdf_idx,
-        }
+        self.accel.data.mesh.sample_surface(u, &self.dist)
     }
 }
 
@@ -393,6 +369,26 @@ pub struct TriangleMesh {
     pub indices: Vec<glm::UVec3>,
 }
 impl TriangleMesh {
+    pub fn sample_surface(&self, u: &Vec3, dist: &Distribution1D) -> SurfaceSample {
+        let (idx, pdf_idx) = dist.sample_discrete(u[2]);
+        let face = self.indices[idx as usize];
+        let v0 = self.vertices[face[0] as usize].cast::<Float>();
+        let v1 = self.vertices[face[1] as usize].cast::<Float>();
+        let v2 = self.vertices[face[2] as usize].cast::<Float>();
+        let trig = Triangle {
+            vertices: [v0, v1, v2],
+        };
+        let uv = uniform_sample_triangle(&vec2(u.x, u.y));
+        let p = lerp3(&v0, &v1, &v2, &uv);
+        let (tc0, tc1, tc2) = self.get_tc(&face);
+        SurfaceSample {
+            p,
+            ng: trig.ng(),
+            ns: trig.ng(),
+            texcoords: lerp3(&tc0, &tc1, &tc2, &uv),
+            pdf: 1.0 / self.get_triangle(idx).area() * pdf_idx,
+        }
+    }
     pub fn get_triangle(&self, i: usize) -> Triangle {
         let face = self.indices[i];
         let v0 = self.vertices[face[0] as usize].cast::<Float>();
@@ -417,6 +413,19 @@ impl TriangleMesh {
             .map(|(i, _face)| self.get_triangle(i).area())
             .collect();
         Distribution1D::new(f.as_slice()).unwrap()
+    }
+    pub fn get_tc(&self, face: &glm::UVec3) -> (Vec2, Vec2, Vec2) {
+        if self.texcoords.is_empty() {
+            let tc0 = vec2(0.0, 0.0);
+            let tc1 = vec2(0.0, 1.0);
+            let tc2 = vec2(1.0, 1.0);
+            (tc0, tc1, tc2)
+        } else {
+            let tc0 = self.texcoords[face[0] as usize].cast::<Float>();
+            let tc1 = self.texcoords[face[1] as usize].cast::<Float>();
+            let tc2 = self.texcoords[face[2] as usize].cast::<Float>();
+            (tc0, tc1, tc2)
+        }
     }
 }
 

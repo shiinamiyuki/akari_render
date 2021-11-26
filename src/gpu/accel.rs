@@ -3,8 +3,8 @@ use std::rc::Rc;
 use super::mesh::GPUMesh;
 use super::mesh::GPUMeshInstance;
 use crate::scene::Scene;
-use crate::shape::GPUAggregate;
-use crate::shape::GPUTriangleMeshInstanceProxy;
+use crate::shape::AggregateProxy;
+use crate::shape::MeshInstanceProxy;
 use crate::shape::TriangleMesh;
 use crate::*;
 use ash::extensions::nv;
@@ -397,7 +397,7 @@ impl GPUAccel {
                 ray_tracing: Rc::new(nv::RayTracing::new(&ctx.instance, &ctx.device)),
                 ctx: ctx.clone(),
             };
-            let aggregate: Option<&GPUAggregate> = downcast_ref(scene.shape.as_ref());
+            let aggregate: Option<&AggregateProxy> = downcast_ref(scene.shape.as_ref());
             let aggragate = aggregate.unwrap();
             let mut shape_to_geometry = HashMap::new();
             let geometries: Vec<_> = scene
@@ -419,7 +419,7 @@ impl GPUAccel {
                 .iter()
                 .enumerate()
                 .map(|(instane_id, shape)| {
-                    let proxy: Option<&GPUTriangleMeshInstanceProxy> = downcast_ref(shape.as_ref());
+                    let proxy: Option<&MeshInstanceProxy> = downcast_ref(shape.as_ref());
                     if let Some(proxy) = proxy {
                         let addr = Arc::into_raw(proxy.mesh.clone()).cast::<()>() as u64;
                         let geometry_id = shape_to_geometry.get(&addr).unwrap();

@@ -88,6 +88,12 @@ fn main() {
                 .required(true),
         )
         .arg(
+            Arg::with_name("accel")
+                .long("as")
+                .value_name("ACCEL")
+                .help("Acceleration structure (possible values: 'bvh', 'embree')")
+        )
+        .arg(
             Arg::with_name("output")
                 .short("o")
                 .long("output")
@@ -121,11 +127,20 @@ fn main() {
             .build_global()
             .unwrap();
     }
+    let accel = if let Some(accel) = matches.value_of("accel") {
+        String::from(accel)
+    } else {
+        if cfg!(feature = "embree") {
+            String::from("embree")
+        } else {
+            String::from("bvh")
+        }
+    };
     let gpu_mode = matches.is_present("gpu");
     log::info!("rendering mode {}", if gpu_mode { "gpu" } else { "cpu" });
     let scene = if let Some(scene) = matches.value_of("scene") {
         let path = Path::new(scene);
-        api::load_scene(path, gpu_mode)
+        api::load_scene(path, gpu_mode, accel.as_str())
     } else {
         log::error!("no filed provided");
         exit(1);
@@ -147,9 +162,10 @@ fn main() {
             log::error!("no filed provided");
             exit(1);
         };
-        log::info!("rendering with {} threads", rayon::current_num_threads());
+        log::info!("Acceleration Structure: {}", accel);
+        log::info!("Rendering with {} threads", rayon::current_num_threads());
         let (film, time) = profile(|| -> Film { integrator.as_mut().render(&scene) });
-        log::info!("took {}s", time);
+        log::info!("Took {}s", time);
         let image = film.to_rgb_image();
         image.save(output).unwrap();
     } else {

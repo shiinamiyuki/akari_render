@@ -468,7 +468,7 @@ checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
 [[package]]
 name = "embree-sys"
 version = "0.1.0"
-source = "git+https://github.com/shiinamiyuki/embree-sys#aef30f6d88168751723a761e972f93a1a57f4a9b"
+source = "git+https://github.com/shiinamiyuki/embree-sys#d0be2ed181875d9c4fcde199cbef50dcd8c72882"
 dependencies = [
  "bindgen",
  "reqwest",

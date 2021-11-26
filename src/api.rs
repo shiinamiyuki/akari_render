@@ -1,5 +1,3 @@
-use crate::accel::bvh::BVHAccelerator;
-use crate::accel::Aggregate;
 use crate::bsdf::*;
 use crate::camera::*;
 use crate::gpu::pt::WavefrontPathTracer;
@@ -26,10 +24,6 @@ use std::sync::atomic::AtomicU64;
 
 use serde_json::Value;
 
-struct MeshAccelCache {
-    mesh: Arc<TriangleMesh>,
-    accel: Option<Arc<BVHAccelerator<TriangleMeshAccelData>>>,
-}
 struct SceneLoaderContext<'a> {
     parent_path: &'a Path,
     graph: &'a node::Scene,
@@ -38,7 +32,7 @@ struct SceneLoaderContext<'a> {
     lights: Vec<Arc<dyn Light>>,
     named_bsdfs: HashMap<String, Arc<dyn Bsdf>>,
     texture_power: HashMap<usize, Float>,
-    mesh_accel_cache: HashMap<String, MeshAccelCache>,
+    mesh_cache: HashMap<String, Arc<TriangleMesh>>,
     gpu: bool,
 }
 impl<'a> SceneLoaderContext<'a> {
@@ -163,37 +157,22 @@ impl<'a> SceneLoaderContext<'a> {
     fn load_shape(&mut self, node: &node::Shape) -> Arc<dyn Shape> {
         match node {
             node::Shape::Mesh(path, bsdf_node) => {
-                let (mesh, accel) = {
-                    if let Some(cache) = self.mesh_accel_cache.get(path) {
-                        (cache.mesh.clone(), cache.accel.clone())
+                let mesh = {
+                    if let Some(cache) = self.mesh_cache.get(path) {
+                        cache.clone()
                     } else {
                         let mut file = self.resolve_file(path);
                         let model = Arc::new({
                             let bson_data = bson::Document::from_reader(&mut file).unwrap();
                             bson::from_document::<TriangleMesh>(bson_data).unwrap()
                         });
-                        let accel = if self.gpu {
-                            None
-                        } else {
-                            Some(Arc::new(model.build_accel()))
-                        };
-                        self.mesh_accel_cache.insert(
-                            path.clone(),
-                            MeshAccelCache {
-                                mesh: model.clone(),
-                                accel: accel.clone(),
-                            },
-                        );
-                        (model, accel)
+                        self.mesh_cache.insert(path.clone(), model.clone());
+                        model
                     }
                 };
 
                 let bsdf = self.load_bsdf(bsdf_node);
-                if self.gpu {
-                    Arc::new(GPUTriangleMeshInstanceProxy { mesh, bsdf })
-                } else {
-                    TriangleMesh::create_instance(bsdf, accel.unwrap(), mesh)
-                }
+                Arc::new(MeshInstanceProxy { mesh, bsdf })
             }
         }
     }
@@ -260,7 +239,7 @@ impl<'a> SceneLoaderContext<'a> {
     }
 }
 
-pub fn load_scene(path: &Path, gpu_mode: bool) -> Scene {
+pub fn load_scene(path: &Path, gpu_mode: bool, accel: &str) -> Scene {
     let serialized = std::fs::read_to_string(path).unwrap();
     let canonical = std::fs::canonicalize(path).unwrap();
     let graph: node::Scene = serde_json::from_str(&serialized).unwrap();
@@ -272,48 +251,41 @@ pub fn load_scene(path: &Path, gpu_mode: bool) -> Scene {
         camera: None,
         named_bsdfs: HashMap::new(),
         texture_power: HashMap::new(),
-        mesh_accel_cache: HashMap::new(),
+        mesh_cache: HashMap::new(),
         gpu: gpu_mode,
     };
     ctx.load();
 
-    let mut shape_to_light = HashMap::new();
-    for shape in &ctx.shapes {
-        if let Some(bsdf) = shape.bsdf() {
-            if let Some(emission) = bsdf.emission() {
-                if emission.power() > 0.001 {
-                    let light: Arc<dyn Light> = Arc::new(AreaLight {
-                        emission,
-                        shape: shape.clone(),
-                    });
-                    ctx.lights.push(light.clone());
-                    shape_to_light
-                        .insert(Arc::into_raw(shape.clone()).cast::<()>() as usize, light);
-                }
-            }
-        }
-    }
-    println!("{} lights", ctx.lights.len());
-
-    Scene {
-        ray_counter: AtomicU64::new(0),
-        shape: if gpu_mode {
-            Arc::new(GPUAggregate {
-                shapes: ctx.shapes.clone(),
-            })
-        } else {
-            Arc::new(Aggregate::new(ctx.shapes.clone()))
-        },
-        camera: ctx.camera.unwrap(),
-        lights: ctx.lights.clone(),
-        shape_to_light,
-        light_distr: Arc::new(PowerLightDistribution::new(ctx.lights)),
-        meshes: ctx
-            .mesh_accel_cache
+    // let mut shape_to_light = HashMap::new();
+    // for shape in &ctx.shapes {
+    //     if let Some(bsdf) = shape.bsdf() {
+    //         if let Some(emission) = bsdf.emission() {
+    //             if emission.power() > 0.001 {
+    //                 let light: Arc<dyn Light> = Arc::new(AreaLight {
+    //                     emission,
+    //                     shape: shape.clone(),
+    //                 });
+    //                 ctx.lights.push(light.clone());
+    //                 shape_to_light
+    //                     .insert(Arc::into_raw(shape.clone()).cast::<()>() as usize, light);
+    //             }
+    //         }
+    //     }
+    // }
+    let scene = Scene::new(
+        ctx.camera.unwrap(),
+        ctx.shapes.clone(),
+        ctx.mesh_cache
             .iter()
-            .map(|(_, cache)| cache.mesh.clone())
+            .map(|(_, cache)| cache.clone())
             .collect(),
-    }
+        ctx.lights.clone(),
+        accel,
+    );
+
+    println!("{} lights", scene.lights.len());
+
+    scene
 }
 #[cfg(feature = "gpu")]
 pub fn load_gpu_integrator(path: &Path) -> WavefrontPathTracer {

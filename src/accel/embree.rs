@@ -1,0 +1,356 @@
+use crate::glm;
+use crate::Base;
+use embree_sys as sys;
+use lazy_static::lazy_static;
+use nalgebra_glm::{vec2, vec3, UVec3};
+use parking_lot::Mutex;
+use rayon::prelude::*;
+use std::{any::Any, collections::HashMap, convert::TryInto, mem::MaybeUninit, sync::Arc};
+use sys::RTCIntersectContext;
+
+use crate::{
+    accel::Aggregate,
+    bsdf::{self, Bsdf},
+    distribution::Distribution1D,
+    impl_base, lerp3,
+    shape::{AggregateProxy, MeshInstanceProxy, Shape, SurfaceSample, Triangle, TriangleMesh},
+    Bounds3f, Float, Intersection, Ray, Vec3,
+};
+struct Device(sys::RTCDevice);
+unsafe impl Send for Device {}
+unsafe impl Sync for Device {}
+
+lazy_static! {
+    static ref DEVICE: Mutex<Device> = Mutex::new(Device(std::ptr::null_mut()));
+}
+fn init_device() {
+    let mut device = DEVICE.lock();
+    if device.0.is_null() {
+        device.0 = unsafe { sys::rtcNewDevice(std::ptr::null()) }
+    }
+}
+struct EmbreeMeshAccel {
+    scene: sys::RTCScene,
+}
+unsafe impl Send for EmbreeMeshAccel {}
+unsafe impl Sync for EmbreeMeshAccel {}
+impl EmbreeMeshAccel {
+    unsafe fn new(mesh: &TriangleMesh) -> Self {
+        init_device();
+        let device = DEVICE.lock();
+        let device = device.0;
+        let scene = sys::rtcNewScene(device);
+        let geometry = sys::rtcNewGeometry(device, sys::RTCGeometryType_RTC_GEOMETRY_TYPE_TRIANGLE);
+        let vb = sys::rtcSetNewGeometryBuffer(
+            geometry,
+            sys::RTCBufferType_RTC_BUFFER_TYPE_VERTEX,
+            0,
+            sys::RTCFormat_RTC_FORMAT_FLOAT3,
+            (3 * std::mem::size_of::<f32>()).try_into().unwrap(),
+            mesh.vertices.len().try_into().unwrap(),
+        );
+        assert!(std::mem::size_of::<Vec3>() == std::mem::size_of::<[f32; 3]>());
+        assert!(std::mem::align_of::<Vec3>() == std::mem::align_of::<[f32; 3]>());
+        assert!(std::mem::size_of::<UVec3>() == std::mem::size_of::<[u32; 3]>());
+        assert!(std::mem::align_of::<UVec3>() == std::mem::align_of::<[u32; 3]>());
+        let vb = std::slice::from_raw_parts_mut(vb as *mut [f32; 3], mesh.vertices.len());
+        vb.par_iter_mut()
+            .enumerate()
+            .for_each(|(i, v)| *v = mesh.vertices[i].into());
+        let ib = sys::rtcSetNewGeometryBuffer(
+            geometry,
+            sys::RTCBufferType_RTC_BUFFER_TYPE_INDEX,
+            0,
+            sys::RTCFormat_RTC_FORMAT_UINT3,
+            (3 * std::mem::size_of::<u32>()).try_into().unwrap(),
+            mesh.indices.len().try_into().unwrap(),
+        );
+        let ib = std::slice::from_raw_parts_mut(ib as *mut [u32; 3], mesh.indices.len());
+        ib.par_iter_mut()
+            .enumerate()
+            .for_each(|(i, v)| *v = mesh.indices[i].into());
+        sys::rtcCommitGeometry(geometry);
+        sys::rtcAttachGeometry(scene, geometry);
+        sys::rtcReleaseGeometry(geometry);
+        sys::rtcCommitScene(scene);
+        Self { scene }
+    }
+}
+pub struct EmbreeInstance {
+    base: sys::RTCScene,
+    instance_scene: sys::RTCScene,
+    instance: sys::RTCGeometry,
+    mesh: Arc<dyn Shape>,
+    mesh_ref: &'static MeshInstanceProxy,
+    area: Float,
+    dist: Distribution1D,
+}
+unsafe impl Send for EmbreeInstance {}
+unsafe impl Sync for EmbreeInstance {}
+impl EmbreeInstance {
+    unsafe fn new(base: sys::RTCScene, mesh: Arc<dyn Shape>) -> Self {
+        init_device();
+        let device = DEVICE.lock();
+        let device = device.0;
+        let geometry = sys::rtcNewGeometry(device, sys::RTCGeometryType_RTC_GEOMETRY_TYPE_INSTANCE);
+        sys::rtcSetGeometryInstancedScene(geometry, base);
+        sys::rtcCommitGeometry(geometry);
+        let scene = sys::rtcNewScene(device);
+        sys::rtcAttachGeometry(scene, geometry);
+        sys::rtcCommitScene(scene);
+        let mesh_ref = mesh
+            .as_ref()
+            .as_any()
+            .downcast_ref::<MeshInstanceProxy>()
+            .unwrap();
+        sys::rtcRetainScene(base);
+        Self {
+            base,
+            instance_scene: scene,
+            mesh: mesh.clone(),
+            mesh_ref: std::mem::transmute(mesh_ref),
+            instance: geometry,
+            area: mesh_ref.mesh.area(),
+            dist: mesh_ref.mesh.area_distribution(),
+        }
+    }
+}
+impl Drop for EmbreeInstance {
+    fn drop(&mut self) {
+        unsafe {
+            sys::rtcReleaseGeometry(self.instance);
+            sys::rtcReleaseScene(self.instance_scene);
+            sys::rtcReleaseScene(self.base);
+        }
+    }
+}
+impl_base!(EmbreeInstance);
+impl Shape for EmbreeInstance {
+    fn intersect<'a>(&'a self, ray: &Ray) -> Option<Intersection<'a>> {
+        unsafe {
+            let mut rayhit = sys::RTCRayHit {
+                ray: to_rtc_ray(ray),
+                hit: sys::RTCHit {
+                    Ng_x: 0.0,
+                    Ng_y: 0.0,
+                    Ng_z: 0.0,
+                    u: 0.0,
+                    v: 0.0,
+                    primID: u32::MAX,
+                    geomID: u32::MAX,
+                    instID: [u32::MAX],
+                },
+            };
+            let mut ctx = RTCIntersectContext {
+                flags: sys::RTCIntersectContextFlags_RTC_INTERSECT_CONTEXT_FLAG_INCOHERENT,
+                filter: None,
+                instID: [u32::MAX],
+            };
+            sys::rtcIntersect1(
+                self.instance_scene,
+                &mut ctx as *mut _,
+                &mut rayhit as *mut _,
+            );
+            if rayhit.hit.geomID != u32::MAX {
+                let face = self.mesh_ref.mesh.indices[rayhit.hit.primID as usize];
+                let (tc0, tc1, tc2) = self.mesh_ref.mesh.get_tc(&face);
+                let uv = vec2(rayhit.hit.u, rayhit.hit.v);
+                let ng = glm::normalize(&vec3(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z));
+                Some(Intersection {
+                    shape: Some(self),
+                    uv,
+                    texcoords: lerp3(&tc0, &tc1, &tc2, &uv),
+                    t: rayhit.ray.tfar,
+                    ng,
+                    ns: ng,
+                    prim_id: rayhit.hit.primID,
+                })
+            } else {
+                None
+            }
+        }
+    }
+    fn occlude(&self, ray: &Ray) -> bool {
+        unsafe {
+            let mut ray = to_rtc_ray(ray);
+            let mut ctx = RTCIntersectContext {
+                flags: sys::RTCIntersectContextFlags_RTC_INTERSECT_CONTEXT_FLAG_INCOHERENT,
+                filter: None,
+                instID: [u32::MAX],
+            };
+            sys::rtcOccluded1(self.instance_scene, &mut ctx as *mut _, &mut ray as *mut _);
+            ray.tfar < 0.0
+        }
+    }
+    fn bsdf<'a>(&'a self) -> Option<&'a dyn Bsdf> {
+        self.mesh.bsdf()
+    }
+    fn aabb(&self) -> Bounds3f {
+        todo!()
+    }
+    fn sample_surface(&self, u: &Vec3) -> SurfaceSample {
+        self.mesh_ref.mesh.sample_surface(u, &self.dist)
+    }
+    fn area(&self) -> Float {
+        self.area
+    }
+}
+pub struct EmbreeTopLevelAccel {
+    scene: sys::RTCScene,
+    instances: Vec<Arc<EmbreeInstance>>,
+}
+unsafe impl Send for EmbreeTopLevelAccel {}
+unsafe impl Sync for EmbreeTopLevelAccel {}
+impl Drop for EmbreeTopLevelAccel {
+    fn drop(&mut self) {
+        unsafe {
+            sys::rtcReleaseScene(self.scene);
+        }
+    }
+}
+
+impl EmbreeTopLevelAccel {
+    pub(crate) unsafe fn new(shape: Arc<dyn Shape>) -> Self {
+        init_device();
+        let aggregate = shape
+            .as_ref()
+            .as_any()
+            .downcast_ref::<AggregateProxy>()
+            .unwrap_or_else(|| {
+                panic!("expected AggregateProxy but found {:?}", shape.type_name());
+            });
+        let mut cache: HashMap<*const dyn Any, EmbreeMeshAccel> = HashMap::new();
+        let shapes: Vec<_> = aggregate
+            .shapes
+            .iter()
+            .map(|shape_| {
+                let shape = shape_.as_ref().as_any();
+                assert!(!shape.is::<AggregateProxy>());
+                assert!(!shape.is::<Aggregate>());
+                if let Some(mesh) = shape.downcast_ref::<MeshInstanceProxy>() {
+                    let base = mesh.mesh.clone();
+                    if !cache.contains_key(&Arc::as_ptr(&(base.clone() as Arc<dyn Any>))) {
+                        let accel = EmbreeMeshAccel::new(&base);
+                        cache.insert(Arc::as_ptr(&(base.clone() as Arc<dyn Any>)), accel);
+                    }
+                    let accel = cache
+                        .get(&Arc::as_ptr(&(base.clone() as Arc<dyn Any>)))
+                        .unwrap()
+                        .clone();
+                    Arc::new(EmbreeInstance::new(accel.scene, shape_.clone()))
+                } else {
+                    unimplemented!()
+                }
+            })
+            .collect();
+        let device = DEVICE.lock();
+        let device = device.0;
+        let scene = sys::rtcNewScene(device);
+        for (id, shape) in shapes.iter().enumerate() {
+            sys::rtcAttachGeometryByID(scene, shape.instance, id as u32);
+        }
+        sys::rtcCommitScene(scene);
+        Self {
+            scene,
+            instances: shapes,
+        }
+    }
+}
+
+impl_base!(EmbreeTopLevelAccel);
+impl Shape for EmbreeTopLevelAccel {
+    fn intersect<'a>(&'a self, ray: &Ray) -> Option<Intersection<'a>> {
+        unsafe {
+            let mut rayhit = sys::RTCRayHit {
+                ray: to_rtc_ray(ray),
+                hit: sys::RTCHit {
+                    Ng_x: 0.0,
+                    Ng_y: 0.0,
+                    Ng_z: 0.0,
+                    u: 0.0,
+                    v: 0.0,
+                    primID: u32::MAX,
+                    geomID: u32::MAX,
+                    instID: [u32::MAX],
+                },
+            };
+            let mut ctx = RTCIntersectContext {
+                flags: sys::RTCIntersectContextFlags_RTC_INTERSECT_CONTEXT_FLAG_INCOHERENT,
+                filter: None,
+                instID: [u32::MAX],
+            };
+            sys::rtcIntersect1(self.scene, &mut ctx as *mut _, &mut rayhit as *mut _);
+            if rayhit.hit.geomID != u32::MAX {
+                let instance = &self.instances[rayhit.hit.instID[0] as usize];
+                let face = instance.mesh_ref.mesh.indices[rayhit.hit.primID as usize];
+                let (tc0, tc1, tc2) = self.instances[rayhit.hit.instID[0] as usize]
+                    .mesh_ref
+                    .mesh
+                    .get_tc(&face);
+                let uv = vec2(rayhit.hit.u, rayhit.hit.v);
+                let ng = glm::normalize(&vec3(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z));
+                Some(Intersection {
+                    shape: Some(self.instances[rayhit.hit.instID[0] as usize].as_ref()),
+                    uv,
+                    texcoords: lerp3(&tc0, &tc1, &tc2, &uv),
+                    t: rayhit.ray.tfar,
+                    ng,
+                    ns: ng,
+                    prim_id: rayhit.hit.primID,
+                })
+            } else {
+                None
+            }
+        }
+    }
+    fn occlude(&self, ray: &Ray) -> bool {
+        unsafe {
+            let mut ray = to_rtc_ray(ray);
+            let mut ctx = RTCIntersectContext {
+                flags: sys::RTCIntersectContextFlags_RTC_INTERSECT_CONTEXT_FLAG_INCOHERENT,
+                filter: None,
+                instID: [u32::MAX],
+            };
+            sys::rtcOccluded1(self.scene, &mut ctx as *mut _, &mut ray as *mut _);
+            ray.tfar < 0.0
+        }
+    }
+    fn bsdf<'a>(&'a self) -> Option<&'a dyn Bsdf> {
+        unimplemented!()
+    }
+    fn aabb(&self) -> Bounds3f {
+        unimplemented!()
+    }
+    fn sample_surface(&self, u: &Vec3) -> SurfaceSample {
+        unimplemented!()
+    }
+    fn area(&self) -> Float {
+        unimplemented!()
+    }
+    fn children(&self) -> Option<Vec<Arc<dyn Shape>>> {
+        Some(
+            self.instances
+                .iter()
+                .map(|i| i.clone() as Arc<dyn Shape>)
+                .collect(),
+        )
+    }
+}
+
+fn to_rtc_ray(ray: &Ray) -> sys::RTCRay {
+    let rtc_ray = sys::RTCRay {
+        org_x: ray.o.x,
+        org_y: ray.o.y,
+        org_z: ray.o.z,
+        dir_x: ray.d.x,
+        dir_y: ray.d.y,
+        dir_z: ray.d.z,
+        tnear: ray.tmin,
+        tfar: ray.tmax,
+        time: 0.0,
+        mask: 0,
+        id: 0,
+        flags: 0,
+    };
+    rtc_ray
+}

@@ -78,7 +78,7 @@ fn frame_from_wo(wo: &Vec3) -> Frame {
     // println!("{:?} {:?} {:?}",T, N, B);
     Frame { T, B, N }
 }
-impl_as_any!(GgxLtcBsdf);
+impl_base!(GgxLtcBsdf);
 impl Bsdf for GgxLtcBsdf {
     fn evaluate(&self, sp: &texture::ShadingPoint, wo: &Vec3, wi: &Vec3) -> Spectrum {
         if !Frame::same_hemisphere(wo, wi) {

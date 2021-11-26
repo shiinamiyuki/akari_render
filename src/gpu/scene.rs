@@ -5,7 +5,7 @@ use std::sync::Arc;
 use crate::bsdf::{Bsdf, GPUBsdfProxy};
 use crate::light::{AreaLight, PointLight, PowerLightDistribution};
 use crate::scene::Scene;
-use crate::shape::{GPUAggregate, GPUTriangleMeshInstanceProxy};
+use crate::shape::{AggregateProxy, MeshInstanceProxy};
 use crate::sobolmat::{SOBOL_BITS, SOBOL_MATRIX, SOBOL_MAX_DIMENSION};
 use crate::texture::{ConstantTexture, ImageTexture, Texture};
 use crate::{downcast_ref, Spectrum};
@@ -317,11 +317,11 @@ impl GPUScene {
             }
         };
         {
-            let aggregate: Option<&GPUAggregate> = downcast_ref(scene.shape.as_ref());
+            let aggregate: Option<&AggregateProxy> = downcast_ref(scene.shape.as_ref());
             let aggragate = aggregate.unwrap();
             let instances = &mut accel.instances;
             for (i, instance) in instances.iter_mut().enumerate() {
-                let proxy: Option<&GPUTriangleMeshInstanceProxy> =
+                let proxy: Option<&MeshInstanceProxy> =
                     downcast_ref(aggragate.shapes[i].as_ref());
                 let proxy = proxy.unwrap();
                 let id = get_bsdf_id(&mut builder, &proxy.bsdf);
@@ -391,7 +391,7 @@ impl GPUScene {
                     let proxy = area
                         .shape
                         .as_any()
-                        .downcast_ref::<GPUTriangleMeshInstanceProxy>()
+                        .downcast_ref::<MeshInstanceProxy>()
                         .unwrap();
                     let dist = proxy.mesh.area_distribution();
                     let alias_table = create_alias_table(&dist.pmf);

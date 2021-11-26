@@ -30,7 +30,7 @@ pub struct BsdfInfo {
     pub metallic: Float,
 }
 
-pub trait Bsdf: Sync + Send + AsAny {
+pub trait Bsdf: Sync + Send + Base {
     fn evaluate(&self, sp: &ShadingPoint, wo: &Vec3, wi: &Vec3) -> Spectrum;
     fn evaluate_pdf(&self, sp: &ShadingPoint, wo: &Vec3, wi: &Vec3) -> Float;
     fn sample(&self, sp: &ShadingPoint, u: &Vec2, wo: &Vec3) -> Option<BsdfSample>;
@@ -87,7 +87,7 @@ impl Bsdf for NullBsdf {
         }
     }
 }
-impl_as_any!(NullBsdf);
+impl_base!(NullBsdf);
 pub struct EmissiveBsdf {
     pub base: Arc<dyn Bsdf>,
     pub emission: Arc<dyn Texture>,
@@ -109,13 +109,13 @@ impl Bsdf for EmissiveBsdf {
         Some(self.emission.clone())
     }
 }
-impl_as_any!(EmissiveBsdf);
+impl_base!(EmissiveBsdf);
 pub struct MixBsdf<A: Bsdf, B: Bsdf> {
     pub bsdf_a: A,
     pub bsdf_b: B,
     pub frac: Arc<dyn Texture>,
 }
-impl<A, B> AsAny for MixBsdf<A, B>
+impl<A, B> Base for MixBsdf<A, B>
 where
     A: Bsdf + 'static,
     B: Bsdf + 'static,
@@ -125,6 +125,9 @@ where
     }
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
+    }
+    fn type_name(&self) -> &'static str {
+        std::any::type_name::<Self>()
     }
 }
 impl<A, B> Bsdf for MixBsdf<A, B>
@@ -305,7 +308,7 @@ impl DisneyBsdfClosure {
 pub struct DiffuseBsdf {
     pub color: Arc<dyn Texture>,
 }
-impl_as_any!(DiffuseBsdf);
+impl_base!(DiffuseBsdf);
 impl Bsdf for DiffuseBsdf {
     fn info(&self, sp: &ShadingPoint) -> BsdfInfo {
         BsdfInfo {
@@ -352,7 +355,7 @@ impl Bsdf for DiffuseBsdf {
 pub struct SpecularBsdf {
     pub color: Arc<dyn Texture>,
 }
-impl_as_any!(SpecularBsdf);
+impl_base!(SpecularBsdf);
 impl Bsdf for SpecularBsdf {
     fn info(&self, sp: &ShadingPoint) -> BsdfInfo {
         BsdfInfo {
@@ -386,7 +389,7 @@ pub struct GPUBsdfProxy {
     pub roughness: Arc<dyn Texture>,
     pub emission: Arc<dyn Texture>,
 }
-impl_as_any!(GPUBsdfProxy);
+impl_base!(GPUBsdfProxy);
 impl Bsdf for GPUBsdfProxy {
     fn emission(&self) -> Option<Arc<dyn Texture>> {
         Some(self.emission.clone())

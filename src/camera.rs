@@ -1,6 +1,6 @@
 use crate::*;
 use sampler::*;
-pub trait Camera: Sync + Send + AsAny {
+pub trait Camera: Sync + Send + Base {
     fn generate_ray(&self, pixel: &glm::UVec2, sampler: &mut dyn Sampler) -> (Ray, Spectrum);
     fn resolution(&self) -> glm::UVec2;
     fn we(&self, ray: &Ray) -> (Option<glm::UVec2>, Spectrum);
@@ -17,7 +17,7 @@ pub struct PerspectiveCamera {
     pub c2r: Transform,
     pub a: Float,
 }
-impl_as_any!(PerspectiveCamera);
+impl_base!(PerspectiveCamera);
 impl PerspectiveCamera {
     pub fn new(resolution: &glm::UVec2, transform: &Transform, fov: Float) -> Self {
         let mut m = glm::identity();
