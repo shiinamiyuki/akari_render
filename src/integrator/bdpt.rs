@@ -432,9 +432,9 @@ pub fn mis_weight<'a>(
         // );
     }
     if s == 1 {
-        light_path.push(sampled.unwrap());
+        light_path[0] = sampled.unwrap();
     } else if t == 1 {
-        eye_path.push(sampled.unwrap());
+        eye_path[0] = sampled.unwrap();
     }
     // update vertices
     {
@@ -585,8 +585,10 @@ pub fn connect_paths<'a>(
                 if pt.on_surface() {
                     l *= glm::dot(&light_sample.wi, &p_ref.n).abs();
                 }
-                if scene.shape.occlude(&light_sample.shadow_ray) {
-                    l *= 0.0;
+                if !l.is_black() {
+                    if scene.shape.occlude(&light_sample.shadow_ray) {
+                        l *= 0.0;
+                    }
                 }
                 // li += beta
                 //     * bsdf.evaluate(&wo, &light_sample.wi)
@@ -739,9 +741,7 @@ impl Integrator for Bdpt {
                     }
                     let idx = get_index(s, t);
                     let film = &pyramid[idx];
-                    let img = film.to_rgb_image();
-                    img.save(format!("bdpt-d{}-s{}-t{}.png", depth, s, t))
-                        .unwrap();
+                    film.write_exr(&format!("bdpt-d{}-s{}-t{}.exr", depth, s, t));
                 }
             }
         }

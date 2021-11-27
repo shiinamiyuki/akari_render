@@ -32,14 +32,33 @@ impl Film {
         (*pixels)[(pixel.x + pixel.y * self.resolution.x) as usize]
     }
     pub fn to_rgb_image(&self) -> image::RgbImage {
-        let image =
-            image::ImageBuffer::from_fn(self.resolution.x, self.resolution.y, |x, y| {
-                let pixel = self.get_pixel(&uvec2(x, y));
-                let value = pixel.intensity * (1.0 / pixel.weight);
-                let srgb = value.to_srgb() * 255.0;
-                image::Rgb([srgb.x as u8, srgb.y as u8, srgb.z as u8])
-            });
+        let image = image::ImageBuffer::from_fn(self.resolution.x, self.resolution.y, |x, y| {
+            let pixel = self.get_pixel(&uvec2(x, y));
+            let value = pixel.intensity * (1.0 / pixel.weight);
+            let srgb = value.to_srgb() * 255.0;
+            image::Rgb([srgb.x as u8, srgb.y as u8, srgb.z as u8])
+        });
 
         image
+    }
+    pub fn write_exr(&self, path: &str) {
+        let pixels = self.pixels.read();
+        exr::prelude::write_rgba_file(
+            path,
+            self.resolution.x as usize,
+            self.resolution.y as usize, // write an image with 2048x2048 pixels
+            |x, y| {
+                let pixel = (*pixels)[x + y * self.resolution.x as usize];
+                let value = pixel.intensity * (1.0 / pixel.weight);
+                (
+                    // generate (or lookup in your own image) an f32 rgb color for each of the 2048x2048 pixels
+                    value.samples.x,
+                    value.samples.y,
+                    value.samples.z,
+                    1.0,
+                )
+            },
+        )
+        .unwrap();
     }
 }
