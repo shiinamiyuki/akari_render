@@ -6,8 +6,8 @@ use crate::light::*;
 use crate::sampler::*;
 use crate::scene::*;
 use crate::shape::*;
-use crate::*;
 use crate::texture::ShadingPoint;
+use crate::*;
 #[derive(Clone, Copy)]
 pub struct VertexBase {
     pdf_fwd: Float,
@@ -61,7 +61,13 @@ impl<'a> Vertex<'a> {
             },
         })
     }
-    fn create_light_vertex(light: &'a dyn Light, p: Vec3, beta: Spectrum, pdf_fwd: Float) -> Self {
+    fn create_light_vertex(
+        light: &'a dyn Light,
+        p: Vec3,
+        n: Vec3,
+        beta: Spectrum,
+        pdf_fwd: Float,
+    ) -> Self {
         Self::Light(LightVertex {
             light,
             base: VertexBase {
@@ -71,7 +77,7 @@ impl<'a> Vertex<'a> {
                 delta: false,
                 beta,
                 p,
-                n: vec3(0.0, 0.0, 0.0), // ?????
+                n,
             },
         })
     }
@@ -150,14 +156,9 @@ impl<'a> Vertex<'a> {
         match self {
             Vertex::Light(v) => {
                 let light_pdf = scene.light_distr.pdf(v.light);
-                let wi = glm::normalize(&(next.p() - self.p()));
-                let (pdf_pos, _) = v.light.pdf_li(
-                    &wi,
-                    &ReferencePoint {
-                        p: self.p(),
-                        n: self.n(),
-                    },
-                );
+                let (pdf_pos, _) = v
+                    .light
+                    .pdf_le(&Ray::spawn_to(&self.p(), &next.p()), &self.n());
                 light_pdf * pdf_pos
             }
             _ => unreachable!(),
@@ -167,7 +168,7 @@ impl<'a> Vertex<'a> {
         match self {
             Vertex::Light(v) => {
                 let ray = Ray::spawn_to(&self.p(), &next.p());
-                let (_pdf_pos, pdf_dir) = v.light.pdf_le(&ray);
+                let (_pdf_pos, pdf_dir) = v.light.pdf_le(&ray, &self.n());
                 self.convert_pdf_to_area(pdf_dir, next)
             }
             _ => unreachable!(),
@@ -176,17 +177,16 @@ impl<'a> Vertex<'a> {
     pub fn pdf(&self, scene: &Scene, prev: Option<&Vertex<'a>>, next: &Vertex<'a>) -> Float {
         let p2 = next.p();
         let p = self.p();
-        let pdf = match self {
+        match self {
             Vertex::Surface(v) => {
                 let p1 = prev.unwrap().p();
                 let wo = glm::normalize(&(p1 - p));
                 let wi = glm::normalize(&(p2 - p));
-                v.bsdf.evaluate_pdf(&wo, &wi)
+                self.convert_pdf_to_area(v.bsdf.evaluate_pdf(&wo, &wi), next)
             }
             Vertex::Light(_) => self.pdf_light(scene, next),
             _ => unreachable!(),
-        };
-        self.convert_pdf_to_area(pdf, next)
+        }
     }
     pub fn f(&self, next: &Vertex<'a>, _mode: TransportMode) -> Spectrum {
         let v1 = self.as_surface().unwrap();
@@ -207,8 +207,8 @@ impl<'a> Vertex<'a> {
         self.base().n
     }
     pub fn le(&self, _scene: &'a Scene, prev: &Vertex<'a>) -> Spectrum {
-        if let Some(v) = prev.as_light() {
-            v.light.le(&Ray::spawn_to(&self.p(), &prev.p()))
+        if let Some(v) = self.as_light() {
+            v.light.le(&Ray::spawn_to(&prev.p(), &self.p()))
         } else {
             Spectrum::zero()
         }
@@ -232,6 +232,7 @@ impl<'a> Vertex<'a> {
         }
     }
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TransportMode {
     IMPORTANCE,
     RADIANCE,
@@ -243,7 +244,7 @@ pub fn random_walk<'a>(
     mut beta: Spectrum,
     pdf: Float,
     max_depth: usize,
-    _mode: TransportMode,
+    mode: TransportMode,
     path: &mut Path<'a>,
 ) {
     assert!(pdf > 0.0, "pdf is {}", pdf);
@@ -260,13 +261,21 @@ pub fn random_walk<'a>(
             let ng = isct.ng;
             let frame = Frame::from_normal(&ng);
             let shape = isct.shape.unwrap();
+            if mode == TransportMode::RADIANCE {
+                if let Some(light) = scene.get_light_of_shape(shape) {
+                    let vertex =
+                        Vertex::create_light_vertex(light, ray.at(isct.t), isct.ng, beta, pdf_fwd);
+                    path.push(vertex);
+                    break;
+                }
+            }
             let opt_bsdf = shape.bsdf();
             if opt_bsdf.is_none() {
                 break;
             }
             let p = ray.at(isct.t);
             let bsdf = BsdfClosure {
-                sp:ShadingPoint::from_intersection(&isct),
+                sp: ShadingPoint::from_intersection(&isct),
                 frame,
                 bsdf: opt_bsdf.unwrap(),
             };
@@ -313,7 +322,7 @@ pub fn generate_camera_path<'a>(
     let vertex = Vertex::create_camera_vertex(camera, &ray, beta, 1.0);
     path.push(vertex);
     let (_pdf_pos, pdf_dir) = camera.pdf_we(&ray);
-    if pdf_dir == 0.0 {
+    if !(pdf_dir > 0.0) {
         return;
     }
     random_walk(
@@ -339,9 +348,15 @@ pub fn generate_light_path<'a>(
     let le = sample.le;
     let beta = le / (sample.pdf_dir * sample.pdf_pos * light_pdf)
         * glm::dot(&sample.ray.d, &sample.n).abs();
-    let vertex = Vertex::create_light_vertex(light, sample.ray.o, le, light_pdf * sample.pdf_pos);
+    let vertex = Vertex::create_light_vertex(
+        light,
+        sample.ray.o,
+        sample.n,
+        le,
+        light_pdf * sample.pdf_pos,
+    );
     path.push(vertex);
-    if sample.pdf_dir == 0.0{
+    if !(sample.pdf_dir > 0.0) {
         return;
     }
     random_walk(
@@ -360,7 +375,8 @@ pub fn geometry_term(scene: &Scene, v1: &Vertex, v2: &Vertex) -> Float {
     let mut wi = v1.p() - v2.p();
     let dist2: Float = glm::dot(&wi, &wi);
     wi /= dist2.sqrt();
-    let ray = Ray::spawn_to(&v1.p(), &v2.p()).offset_along_normal(&v1.n());
+    let mut ray = Ray::spawn_to(&v1.p(), &v2.p()).offset_along_normal(&v1.n());
+    ray.tmax *= 0.997;
     if scene.shape.occlude(&ray) {
         0.0
     } else {
@@ -372,6 +388,7 @@ pub struct ConnectionStrategy {
     pub s: usize,
     pub t: usize,
 }
+#[derive(Clone)]
 pub struct Scratch<'a> {
     new_light_path: Path<'a>,
     new_eye_path: Path<'a>,
@@ -457,11 +474,11 @@ pub fn mis_weight<'a>(
         }
 
         if !pt_minus.is_null() {
-            let pt = unsafe { pt.as_mut().unwrap() };
+            let pt = unsafe { pt.as_ref().unwrap() };
             let qs = unsafe { qs.as_ref() };
-            let pt_minus = unsafe { pt_minus.as_ref().unwrap() };
+            let pt_minus = unsafe { pt_minus.as_mut().unwrap() };
             // pt-1 <- pt qs qs-1
-            pt.base_mut().pdf_rev = if s > 0 {
+            pt_minus.base_mut().pdf_rev = if s > 0 {
                 pt.pdf(scene, qs, pt_minus)
             } else {
                 // pt-1 <- pt
@@ -490,10 +507,10 @@ pub fn mis_weight<'a>(
         if x == 0.0 {
             1.0
         } else {
-            x
+            x * x
         }
     };
-    {
+    if t > 0 {
         // camera path
         let mut ri = 1.0;
         for i in (2..=t - 1).rev() {
@@ -503,7 +520,7 @@ pub fn mis_weight<'a>(
             }
         }
     }
-    {
+    if s > 0 {
         let mut ri = 1.0;
         for i in (0..=s - 1).rev() {
             ri *= remap(light_path[i].base().pdf_rev) / remap(light_path[i].base().pdf_fwd);
@@ -541,7 +558,7 @@ pub fn connect_paths<'a>(
         unreachable!();
     } else if s == 1 {
         let pt = &eye_path[t - 1];
-        if pt.connectible() {
+        if pt.connectible() && !pt.as_light().is_some() {
             let (light, light_pdf) = scene.light_distr.sample(sampler.next1d());
             let p_ref = ReferencePoint {
                 p: pt.p(),
@@ -553,6 +570,7 @@ pub fn connect_paths<'a>(
                     let mut v = Vertex::create_light_vertex(
                         light,
                         light_sample.p,
+                        light_sample.n,
                         light_sample.li / (light_sample.pdf * light_pdf),
                         0.0,
                     );
@@ -580,7 +598,7 @@ pub fn connect_paths<'a>(
     } else {
         let pt = &eye_path[t - 1];
         let qs = &light_path[s - 1];
-        if pt.connectible() && qs.connectible() {
+        if pt.connectible() && qs.connectible() && !pt.as_light().is_some() {
             l = qs.beta()
                 * pt.beta()
                 * pt.f(qs, TransportMode::RADIANCE)
@@ -603,7 +621,20 @@ pub struct Bdpt {
     pub max_depth: usize,
     pub debug: bool,
 }
-
+#[derive(Clone)]
+struct BdptPerThreadData<'a> {
+    scratch: Scratch<'a>,
+    camera_path: Vec<Vertex<'a>>,
+    light_path: Vec<Vertex<'a>>,
+}
+impl<'a> BdptPerThreadData<'a> {
+    fn reset(&mut self) {
+        self.scratch.new_eye_path.clear();
+        self.scratch.new_light_path.clear();
+        self.camera_path.clear();
+        self.light_path.clear();
+    }
+}
 impl Integrator for Bdpt {
     fn render(&mut self, scene: &Scene) -> Film {
         let npixels = (scene.camera.resolution().x * scene.camera.resolution().y) as usize;
@@ -615,14 +646,24 @@ impl Integrator for Bdpt {
             }
         }
         let get_index = |s, t| (t - 2) as usize * (3 + self.max_depth) + s as usize;
+        let chunks = (npixels + 255) / 256;
+        let progress = crate::util::create_progess_bar(chunks, "chunks");
+        let per_thread_data = util::PerThread::<BdptPerThreadData>::new(BdptPerThreadData {
+            scratch: Scratch::new(),
+            camera_path: vec![],
+            light_path: vec![],
+        });
         parallel_for(npixels, 256, |id| {
             let mut sampler = PCGSampler { rng: PCG::new(id) };
             let x = (id as u32) % scene.camera.resolution().x;
             let y = (id as u32) / scene.camera.resolution().x;
             let pixel = uvec2(x, y);
             let mut acc_li = Spectrum::zero();
-            let mut camera_path = vec![];
-            let mut light_path = vec![];
+            let data = per_thread_data.get_mut();
+            data.reset();
+            let camera_path = &mut data.camera_path;
+            let light_path = &mut data.light_path;
+            let scratch = &mut data.scratch;
             let mut debug_acc = vec![];
             if self.debug {
                 for _t in 2..=self.max_depth + 2 {
@@ -631,16 +672,15 @@ impl Integrator for Bdpt {
                     }
                 }
             }
-            let mut scratch = bdpt::Scratch::new();
             for _ in 0..self.spp {
                 bdpt::generate_camera_path(
                     scene,
                     &pixel,
                     &mut sampler,
                     self.max_depth + 2,
-                    &mut camera_path,
+                    camera_path,
                 );
-                bdpt::generate_light_path(scene, &mut sampler, self.max_depth + 1, &mut light_path);
+                bdpt::generate_light_path(scene, &mut sampler, self.max_depth + 1, light_path);
                 for t in 2..=camera_path.len() as isize {
                     for s in 0..=light_path.len() as isize {
                         let depth = s + t - 2;
@@ -653,10 +693,10 @@ impl Integrator for Bdpt {
                                 s: s as usize,
                                 t: t as usize,
                             },
-                            &mut light_path,
-                            &mut camera_path,
+                            light_path,
+                            camera_path,
                             &mut sampler,
-                            &mut scratch,
+                            scratch,
                         );
                         if self.debug {
                             debug_acc[get_index(s, t)] += li;
@@ -685,7 +725,11 @@ impl Integrator for Bdpt {
                     }
                 }
             }
+            if (id + 1) % 256 == 0 {
+                progress.inc(1);
+            }
         });
+        progress.finish();
         if self.debug {
             for t in 2..=(self.max_depth + 2) as isize {
                 for s in 0..=(self.max_depth + 2) as isize {

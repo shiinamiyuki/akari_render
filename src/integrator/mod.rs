@@ -3,8 +3,14 @@ pub mod bdpt;
 pub mod nrc;
 pub mod path;
 pub mod sppm;
-use crate::{film::Film, scene::Scene};
+use crate::{film::Film, scene::Scene, Bound2};
 
 pub trait Integrator {
     fn render(&mut self, scene: &Scene) -> Film;
+    fn support_block_rendering(&self) -> bool {
+        false
+    }
+    fn render_block(&mut self, scene: &Scene, bound: Bound2<u32>, film: &Film) {
+        unimplemented!()
+    }
 }

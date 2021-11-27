@@ -340,10 +340,11 @@ pub fn load_integrator(path: &Path) -> Box<dyn Integrator> {
         "bdpt" => {
             let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
             let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as usize;
+            let debug = (|| json.get("bdpt_debug")?.as_bool())().unwrap_or(false);
             Box::new(bdpt::Bdpt {
                 spp,
                 max_depth,
-                debug: false,
+                debug,
             })
         }
         "sppm" => {

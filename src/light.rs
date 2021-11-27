@@ -18,6 +18,7 @@ pub struct LightSample {
     pub shadow_ray: Ray,
     pub wi: Vec3,
     pub p: Vec3,
+    pub n: Vec3,
 }
 #[derive(Clone, Copy)]
 pub struct ReferencePoint {
@@ -36,7 +37,7 @@ pub trait Light: Sync + Send + Base {
     fn sample_le(&self, u: &[Vec2; 2]) -> LightRaySample;
     fn sample_li(&self, u: &Vec3, p: &ReferencePoint) -> LightSample;
     // (pdf_pos,pdf_dir)
-    fn pdf_le(&self, ray: &Ray) -> (Float, Float);
+    fn pdf_le(&self, ray: &Ray, n: &Vec3) -> (Float, Float);
     // (pdf_pos,pdf_dir)
     fn pdf_li(&self, wi: &Vec3, p: &ReferencePoint) -> (Float, Float);
     fn le(&self, ray: &Ray) -> Spectrum;
@@ -155,21 +156,12 @@ impl Light for AreaLight {
             wi,
             p: surface_sample.p,
             shadow_ray: ray.offset_along_normal(&surface_sample.ng),
+            n: surface_sample.ng,
         }
     }
 
-    fn pdf_le(&self, ray: &Ray) -> (Float, Float) {
-        let ray = Ray {
-            tmin: 0.0 - 0.0001,
-            ..*ray
-        };
-        (
-            1.0 / self.shape.area(),
-            match self.shape.intersect(&ray) {
-                Some(isct) => isct.ng.dot(&ray.d).abs() * FRAC_1_PI,
-                None => 0.0,
-            },
-        )
+    fn pdf_le(&self, ray: &Ray, n: &Vec3) -> (Float, Float) {
+        (1.0 / self.shape.area(), n.dot(&ray.d).abs() * FRAC_1_PI)
     }
 
     fn pdf_li(&self, wi: &Vec3, ref_: &ReferencePoint) -> (Float, Float) {
@@ -241,9 +233,10 @@ impl Light for PointLight {
             shadow_ray: ray,
             wi,
             p: self.position,
+            n: glm::normalize(&ray.d),
         }
     }
-    fn pdf_le(&self, _ray: &Ray) -> (Float, Float) {
+    fn pdf_le(&self, _ray: &Ray, n: &Vec3) -> (Float, Float) {
         (0.0, uniform_sphere_pdf())
     }
     fn pdf_li(&self, _wi: &Vec3, _p: &ReferencePoint) -> (Float, Float) {

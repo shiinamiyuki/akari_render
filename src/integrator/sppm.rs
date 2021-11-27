@@ -257,11 +257,11 @@ impl Integrator for Sppm {
                         .unwrap()
                         .as_mut()
                 };
-                let light = &scene.lights[0];
+                let (light, light_pdf) = scene.light_distr.sample(sampler.next1d());
                 let sample = light.sample_le(&[sampler.next2d(), sampler.next2d()]);
                 let mut depth = 0;
                 let mut ray = sample.ray;
-                let mut beta = sample.le / (sample.pdf_dir * sample.pdf_pos)
+                let mut beta = sample.le / (sample.pdf_dir * sample.pdf_pos * light_pdf)
                     * glm::dot(&sample.n, &ray.d).abs();
                 loop {
                     if let Some(isct) = scene.shape.intersect(&ray) {

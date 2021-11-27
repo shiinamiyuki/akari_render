@@ -1,4 +1,4 @@
-use std::{io::Read, path::PathBuf};
+use std::{cell::UnsafeCell, io::Read, path::PathBuf};
 
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 
@@ -55,4 +55,24 @@ pub fn create_progess_bar(count: usize, what: &str) -> ProgressBar {
             .progress_chars("=>-"),
     );
     progress
+}
+
+pub struct PerThread<T> {
+    data: UnsafeCell<Vec<T>>,
+}
+unsafe impl<T: Sync + Send + Clone> Sync for PerThread<T> {}
+unsafe impl<T: Sync + Send + Clone> Send for PerThread<T> {}
+impl<T: Sync + Send + Clone> PerThread<T> {
+    pub fn new(v: T) -> Self {
+        let num_threads = rayon::current_num_threads();
+        Self {
+            data: UnsafeCell::new(vec![v; num_threads]),
+        }
+    }
+    pub fn get(&self) -> &T {
+        unsafe { &self.data.get().as_ref().unwrap()[rayon::current_thread_index().unwrap()] }
+    }
+    pub fn get_mut(&self) -> &mut T {
+        unsafe { &mut self.data.get().as_mut().unwrap()[rayon::current_thread_index().unwrap()] }
+    }
 }
