@@ -58,7 +58,7 @@ pub struct MLTSampler {
     dimension: usize,
     last_large_iteration: usize,
 }
-const SIGMA: Float = 1.0;
+const SIGMA: Float = 0.01;
 impl MLTSampler {
     pub fn new(seed: usize) -> Self {
         Self {
