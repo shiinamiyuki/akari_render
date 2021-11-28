@@ -31,7 +31,7 @@ impl PCG {
     }
     pub fn new(seed: usize) -> Self {
         let mut r = Self {
-            state: seed + Self::INC,
+            state: seed.wrapping_add(Self::INC),
         };
         let _ = r.pcg32();
         r
@@ -55,9 +55,11 @@ pub struct SobolSampler {
 }
 fn cmj_hash_simple(mut i: u32, p: u32) -> u32 {
     i = (i ^ 61) ^ p;
-    i += i << 3;
+    // i += i << 3;
+    i = i.wrapping_add(i << 3);
     i ^= i >> 4;
-    i *= 0x27d4eb2d;
+    // i *= 0x27d4eb2d;
+    i = i.wrapping_mul(0x27d4eb2d);
     i
 }
 fn sobol(dim: u32, mut i: u32, rng: u32) -> f32 {

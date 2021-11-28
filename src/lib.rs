@@ -20,6 +20,7 @@ pub mod film;
 #[cfg(feature = "gpu")]
 #[macro_use]
 pub mod gpu;
+pub mod bidir;
 pub mod integrator;
 pub mod light;
 pub mod ltc;

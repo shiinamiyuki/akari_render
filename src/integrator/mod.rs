@@ -3,6 +3,7 @@ pub mod bdpt;
 pub mod nrc;
 pub mod path;
 pub mod sppm;
+pub mod mmlt;
 use crate::{film::Film, scene::Scene, Bound2};
 
 pub trait Integrator {

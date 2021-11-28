@@ -347,6 +347,18 @@ pub fn load_integrator(path: &Path) -> Box<dyn Integrator> {
                 debug,
             })
         }
+        "mmlt" => {
+            let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
+            let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as usize;
+            let n_bootstrap = (|| json.get("n_bootstrap")?.as_u64())().unwrap_or(100000) as usize;
+            let n_chains = (|| json.get("n_chains")?.as_u64())().unwrap_or(1024) as usize;
+            Box::new(mmlt::MMLT {
+                spp,
+                max_depth: max_depth as u32,
+                n_bootstrap,
+                n_chains,
+            })
+        }
         "sppm" => {
             let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as usize;
             let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as usize;

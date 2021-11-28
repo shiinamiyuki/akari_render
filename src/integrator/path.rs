@@ -78,10 +78,11 @@ impl Integrator for PathTracer {
                             }
 
                             let wo = -ray.d;
+                            depth += 1;
                             if depth >= self.max_depth {
                                 break;
                             }
-                            depth += 1;
+
                             {
                                 let (light, light_pdf) = scene.light_distr.sample(sampler.next1d());
                                 let sample_self =

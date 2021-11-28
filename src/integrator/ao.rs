@@ -4,7 +4,6 @@ use crate::film::*;
 use crate::integrator::*;
 use crate::sampler::*;
 use crate::scene::*;
-use crate::shape::*;
 use crate::*;
 pub struct RTAO {
     pub spp: u32,
