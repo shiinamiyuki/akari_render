@@ -307,7 +307,7 @@
                     "Float": 0.0
                 },
                 "emission": {
-                    "Float": 6.0
+                    "Float": 0.0
                 },
                 "hint": "ltc"
             }
@@ -615,7 +615,7 @@
                     "Float": 0.0
                 },
                 "emission": {
-                    "Float": 2.0
+                    "Float": 0.0
                 },
                 "hint": "ltc"
             }
@@ -739,7 +739,7 @@
                     "Float": 0.0
                 },
                 "emission": {
-                    "Float": 6.0
+                    "Float": 0.0
                 },
                 "hint": "ltc"
             }
@@ -1055,7 +1055,7 @@
                     "Float": 0.0
                 },
                 "emission": {
-                    "Float": 6.0
+                    "Float": 0.0
                 },
                 "hint": "ltc"
             }
@@ -1747,8 +1747,10 @@
         "Walls": {
             "Principled": {
                 "color": {
-                    "SrgbU8": [
-                        232, 190, 172
+                    "Srgb": [
+                        0.797737717628479,
+                        0.797737717628479,
+                        0.797737717628479
                     ]
                 },
                 "subsurface": {
@@ -2651,7 +2653,24 @@
             }
         }
     },
-    "lights": [],
+    "lights": [
+        {
+            "Point": {
+                "pos": [
+                    0.4,
+                    2.2000000476837158,
+                    2.8
+                ],
+                "emission": {
+                    "Srgb": [
+                        4.0,
+                        4.0,
+                        4.0
+                    ]
+                }
+            }
+        }
+    ],
     "shapes": [
         {
             "Mesh": [
