@@ -1,4 +1,3 @@
-
 pub use glm::vec2;
 pub use glm::vec3;
 #[cfg(feature = "global_mimalloc")]
@@ -238,9 +237,9 @@ impl Spectrum {
             samples: vec3(1.0, 1.0, 1.0),
         }
     }
-
     pub fn is_black(&self) -> bool {
-        !glm::all(&glm::greater_than(&self.samples, &glm::zero()))
+        self.samples.iter().any(|x| !x.is_finite())
+            || !glm::all(&glm::greater_than(&self.samples, &glm::zero()))
             || glm::any(&glm::less_than(&self.samples, &glm::zero()))
     }
     pub fn lerp(x: &Spectrum, y: &Spectrum, a: Float) -> Spectrum {

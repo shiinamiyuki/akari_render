@@ -31,6 +31,7 @@ impl Integrator for PathTracer {
             let mut acc_li = Spectrum::zero();
             let mut prev_n: Option<Vec3> = None;
             let mut prev_bsdf_pdf: Option<Float> = None;
+            let mut is_delta = false;
             for _ in 0..self.spp {
                 let (mut ray, _ray_weight) = scene.camera.generate_ray(&pixel, &mut sampler);
                 let mut li = Spectrum::zero();
@@ -71,18 +72,22 @@ impl Integrator for PathTracer {
                                     let bsdf_pdf = prev_bsdf_pdf.unwrap();
                                     assert!(light_pdf.is_finite());
                                     assert!(light_pdf >= 0.0);
-                                    let weight = mis_weight(bsdf_pdf, light_pdf);
+                                    let weight = if is_delta {
+                                        1.0
+                                    } else {
+                                        mis_weight(bsdf_pdf, light_pdf)
+                                    };
                                     li += beta * light.le(&ray) * weight;
                                     // println!("{} {} {}", light_pdf, bsdf_pdf, weight);
                                 }
                             }
 
                             let wo = -ray.d;
-                            depth += 1;
+
                             if depth >= self.max_depth {
                                 break;
                             }
-
+                            depth += 1;
                             {
                                 let (light, light_pdf) = scene.light_distr.sample(sampler.next1d());
                                 let sample_self =
@@ -103,7 +108,11 @@ impl Integrator for PathTracer {
                                         && !scene.shape.occlude(&light_sample.shadow_ray)
                                     {
                                         let bsdf_pdf = bsdf.evaluate_pdf(&wo, &light_sample.wi);
-                                        let weight = mis_weight(light_pdf, bsdf_pdf);
+                                        let weight = if light.is_delta() {
+                                            1.0
+                                        } else {
+                                            mis_weight(light_pdf, bsdf_pdf)
+                                        };
                                         // println!("{} {} {}", light_pdf, bsdf_pdf, weight);
                                         // assert!(light_pdf.is_finite());
                                         assert!(light_pdf >= 0.0);
@@ -118,6 +127,7 @@ impl Integrator for PathTracer {
                             }
 
                             if let Some(bsdf_sample) = bsdf.sample(&sampler.next2d(), &wo) {
+                                is_delta = bsdf_sample.flag.contains(BsdfFlags::SPECULAR);
                                 let wi = &bsdf_sample.wi;
                                 ray = Ray::spawn(&p, wi).offset_along_normal(&ng);
                                 beta *= bsdf_sample.f * glm::dot(wi, &ng).abs() / bsdf_sample.pdf;

@@ -281,6 +281,7 @@ pub fn load_scene(path: &Path, gpu_mode: bool, accel: &str) -> Scene {
             .collect(),
         ctx.lights.clone(),
         accel,
+        gpu_mode,
     );
 
     println!("{} lights", scene.lights.len());
@@ -352,11 +353,13 @@ pub fn load_integrator(path: &Path) -> Box<dyn Integrator> {
             let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as usize;
             let n_bootstrap = (|| json.get("n_bootstrap")?.as_u64())().unwrap_or(100000) as usize;
             let n_chains = (|| json.get("n_chains")?.as_u64())().unwrap_or(1024) as usize;
+            let direct_spp = (|| json.get("direct_spp")?.as_u64())().unwrap_or(16) as u32;
             Box::new(mmlt::MMLT {
                 spp,
                 max_depth: max_depth as u32,
                 n_bootstrap,
                 n_chains,
+                direct_spp,
             })
         }
         "sppm" => {

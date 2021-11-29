@@ -26,9 +26,13 @@ impl Scene {
         meshes: Vec<Arc<TriangleMesh>>,
         mut lights: Vec<Arc<dyn Light>>,
         accel: &str,
+        is_gpu: bool,
     ) -> Self {
-        let toplevel =
-            accel::build_accel(Arc::new(AggregateProxy { shapes }), accel);
+        let toplevel = if is_gpu {
+            Arc::new(AggregateProxy { shapes })
+        } else {
+            accel::build_accel(Arc::new(AggregateProxy { shapes }), accel)
+        };
         let shapes = toplevel.children().unwrap();
         let mut shape_to_light = HashMap::new();
         for shape in &shapes {

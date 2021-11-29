@@ -280,10 +280,11 @@ impl Integrator for Sppm {
                         };
                         let wo = -ray.d;
                         // println!("{} {} {}", p, depth, self.max_depth);
+                        depth += 1;
                         if depth >= self.max_depth {
                             break;
                         }
-                        depth += 1;
+                        
                         {
                             // splat to grid
                             let grid = grid.as_ref().unwrap();
@@ -303,7 +304,7 @@ impl Integrator for Sppm {
                                     for i in 0..Spectrum::N_SAMPLES {
                                         pixel.phi[i].fetch_add(phi[i] as f32, Ordering::SeqCst);
                                     }
-                                    pixel.M.fetch_add(1, Ordering::SeqCst);
+                                    pixel.M.fetch_add(1, Ordering::Relaxed);
                                 }
                                 ap = node.next.load(Ordering::Relaxed);
                             }

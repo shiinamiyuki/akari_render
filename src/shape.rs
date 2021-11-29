@@ -290,6 +290,9 @@ impl Shape for AggregateProxy {
     fn area(&self) -> Float {
         panic!("shouldn't be called on cpu")
     }
+    fn children(&self) -> Option<Vec<Arc<dyn Shape>>> {
+        Some(self.shapes.clone())
+    }
 }
 impl Shape for MeshInstanceProxy {
     fn intersect<'a>(&'a self, _ray: &Ray) -> Option<Intersection<'a>> {

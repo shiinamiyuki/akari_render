@@ -44,6 +44,9 @@ pub trait Light: Sync + Send + Base {
     fn flags(&self) -> LightFlags;
     fn power(&self) -> Float;
     fn address(&self) -> usize; // ????
+    fn is_delta(&self) -> bool {
+        self.flags().intersects(LightFlags::DELTA)
+    }
 }
 pub trait LightDistribution: Sync + Send + Base {
     fn sample<'a>(&'a self, u: Float) -> (&'a dyn Light, Float);

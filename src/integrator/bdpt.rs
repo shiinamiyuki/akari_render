@@ -1,9 +1,9 @@
-use crate::*;
 use crate::bidir::*;
 use crate::film::*;
 use crate::integrator::*;
-use crate::sampler::PCG;
 use crate::sampler::PCGSampler;
+use crate::sampler::PCG;
+use crate::*;
 pub struct Bdpt {
     pub spp: u32,
     pub max_depth: usize,

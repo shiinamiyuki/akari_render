@@ -133,6 +133,7 @@ pub struct MMLT {
     pub(crate) n_chains: usize,
     pub(crate) n_bootstrap: usize,
     pub(crate) spp: u32,
+    pub(crate) direct_spp: u32,
 }
 pub struct FRecord {
     pixel: UVec2,
@@ -201,9 +202,10 @@ impl<'a> Chain<'a> {
             &mut self.sampler,
             &mut self.scratch,
         ) * n_strategies as Float;
+        let l = if l.is_black() { Spectrum::zero() } else { l };
         FRecord {
             pixel,
-            f: glm::comp_max(&l.samples),
+            f: glm::comp_max(&l.samples).clamp(0.0, 100.0),
             l,
         }
     }
@@ -258,6 +260,9 @@ impl MMLT {
                         scratch: Scratch::new(),
                     };
                     chain.cur = chain.run(scene);
+                    chain.sampler.rng = PCGSampler {
+                        rng: PCG::new(rng.gen()),
+                    };
                     chain
                 })
                 .collect(),
@@ -269,13 +274,13 @@ impl Integrator for MMLT {
     fn render(&mut self, scene: &scene::Scene) -> Film {
         log::info!("rendering direct lighting...");
         let mut depth0_pt = PathTracer {
-            spp: 4,
-            max_depth: 0,
+            spp: self.direct_spp,
+            max_depth: 1,
         };
         let film_direct = depth0_pt.render(scene);
         let npixels = (scene.camera.resolution().x * scene.camera.resolution().y) as usize;
         log::info!("bootstrapping...");
-        let per_depth_chains: Vec<_> = (1..=self.max_depth)
+        let per_depth_chains: Vec<_> = (2..=self.max_depth)
             .into_par_iter()
             .map(|depth| Self::init_chain(self.n_bootstrap, self.n_chains, depth, scene))
             .collect();
