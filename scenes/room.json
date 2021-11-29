@@ -3,7 +3,7 @@
         "Magazine": {
             "Principled": {
                 "color": {
-                    "Image": "textures\\magazine.jpg"
+                    "Image": "textures/magazine.jpg"
                 },
                 "subsurface": {
                     "Float": 0.0
@@ -191,7 +191,7 @@
         "Picture1": {
             "Principled": {
                 "color": {
-                    "Image": "textures\\photo1.jpg"
+                    "Image": "textures/photo1.jpg"
                 },
                 "subsurface": {
                     "Float": 0.0
@@ -379,7 +379,7 @@
         "Picture5": {
             "Principled": {
                 "color": {
-                    "Image": "textures\\photo4.jpg"
+                    "Image": "textures/photo4.jpg"
                 },
                 "subsurface": {
                     "Float": 0.0
@@ -439,7 +439,7 @@
         "Books": {
             "Principled": {
                 "color": {
-                    "Image": "textures\\book-spines.jpg"
+                    "Image": "textures/book-spines.jpg"
                 },
                 "subsurface": {
                     "Float": 0.0
@@ -499,7 +499,7 @@
         "Cushion": {
             "Principled": {
                 "color": {
-                    "Image": "textures\\cushion-green-circles.jpg"
+                    "Image": "textures/cushion-green-circles.jpg"
                 },
                 "subsurface": {
                     "Float": 0.0
@@ -623,7 +623,7 @@
         "Apple": {
             "Principled": {
                 "color": {
-                    "Image": "textures\\apple.jpg"
+                    "Image": "textures/apple.jpg"
                 },
                 "subsurface": {
                     "Float": 0.0
@@ -939,7 +939,7 @@
         "CeilingLampshade": {
             "Principled": {
                 "color": {
-                    "Image": "textures\\Shade-paper.jpg"
+                    "Image": "textures/Shade-paper.jpg"
                 },
                 "subsurface": {
                     "Float": 0.0
@@ -1191,7 +1191,7 @@
         "Floor": {
             "Principled": {
                 "color": {
-                    "Image": "textures\\wood4.jpg"
+                    "Image": "textures/wood4.jpg"
                 },
                 "subsurface": {
                     "Float": 0.0
@@ -1251,7 +1251,7 @@
         "LargePicture": {
             "Principled": {
                 "color": {
-                    "Image": "textures\\pic5wide.jpg"
+                    "Image": "textures/pic5wide.jpg"
                 },
                 "subsurface": {
                     "Float": 0.0
@@ -1439,7 +1439,7 @@
         "Picture4": {
             "Principled": {
                 "color": {
-                    "Image": "textures\\photo2.jpg"
+                    "Image": "textures/photo2.jpg"
                 },
                 "subsurface": {
                     "Float": 0.0
@@ -1499,7 +1499,7 @@
         "Picture": {
             "Principled": {
                 "color": {
-                    "Image": "textures\\picture11-vert.jpg"
+                    "Image": "textures/picture11-vert.jpg"
                 },
                 "subsurface": {
                     "Float": 0.0
@@ -1687,7 +1687,7 @@
         "Carpet": {
             "Principled": {
                 "color": {
-                    "Image": "textures\\carpet-text3b.jpg"
+                    "Image": "textures/carpet-text3b.jpg"
                 },
                 "subsurface": {
                     "Float": 0.0
@@ -1937,7 +1937,7 @@
         "Cushion1": {
             "Principled": {
                 "color": {
-                    "Image": "textures\\cushion-stripe-purple.jpg"
+                    "Image": "textures/cushion-stripe-purple.jpg"
                 },
                 "subsurface": {
                     "Float": 0.0
@@ -1997,7 +1997,7 @@
         "Picture2": {
             "Principled": {
                 "color": {
-                    "Image": "textures\\photo3.jpg"
+                    "Image": "textures/photo3.jpg"
                 },
                 "subsurface": {
                     "Float": 0.0
@@ -2121,7 +2121,7 @@
         "Cushion3": {
             "Principled": {
                 "color": {
-                    "Image": "textures\\cushion-purple-yellow-stripe.jpg"
+                    "Image": "textures/cushion-purple-yellow-stripe.jpg"
                 },
                 "subsurface": {
                     "Float": 0.0
@@ -2565,7 +2565,7 @@
         "LampshaderOuter": {
             "Principled": {
                 "color": {
-                    "Image": "textures\\shade-stripes.jpg"
+                    "Image": "textures/shade-stripes.jpg"
                 },
                 "subsurface": {
                     "Float": 0.0
