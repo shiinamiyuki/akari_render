@@ -1,9 +1,6 @@
 use std::collections::HashSet;
 use std::pin::Pin;
 
-use futures::future;
-use futures::Future;
-
 use crate::bsdf::*;
 use crate::shape::*;
 use crate::*;
@@ -69,16 +66,6 @@ impl Aggregate {
         let data = GenericBVHData { shapes };
         Self {
             bvh: bvh::SweepSAHBuilder::build(data, v).optimize_layout(),
-            area,
-        }
-    }
-    pub async fn new_async(shapes: Vec<Pin<Box<dyn Future<Output = Arc<dyn Shape>>>>>) -> Self {
-        let v: Vec<u32> = (0..shapes.len() as u32).collect();
-        let shapes = future::join_all(shapes.into_iter()).await;
-        let area: Float = shapes.iter().map(|s| s.area()).sum();
-        let data = GenericBVHData { shapes };
-        Self {
-            bvh: bvh::SweepSAHBuilder::build(data, v),
             area,
         }
     }

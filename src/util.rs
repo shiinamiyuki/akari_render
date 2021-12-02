@@ -137,3 +137,24 @@ pub fn erf(x: Float) -> Float {
         1.0 as Float - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * (-x * x).exp();
     sign * y
 }
+
+pub trait FileResolver {
+    fn resolve(&self, path: &str) -> Option<std::fs::File>;
+}
+
+pub struct LocalFileResolver {
+    paths: Vec<PathBuf>,
+}
+impl FileResolver for LocalFileResolver {
+    fn resolve(&self, path: &str) -> Option<std::fs::File> {
+        if let Ok(f) = std::fs::File::open(path) {
+            return Some(f);
+        }
+        for p in &self.paths {
+            if let Ok(f) = std::fs::File::open(p.join(path)) {
+                return Some(f);
+            }
+        }
+        None
+    }
+}

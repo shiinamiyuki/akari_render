@@ -23,6 +23,8 @@ pub mod bidir;
 pub mod integrator;
 pub mod light;
 pub mod ltc;
+#[cfg(feature = "network")]
+pub mod net;
 pub mod sampler;
 pub mod scene;
 pub mod scenegraph;
@@ -35,6 +37,7 @@ pub mod util;
 extern crate bitflags;
 use parking_lot::RwLock;
 use std::any::Any;
+use std::sync::atomic::AtomicUsize;
 use std::{
     collections::HashMap,
     ops::{Index, IndexMut, Mul},
@@ -662,11 +665,20 @@ pub fn dir_to_uv(v: &Vec3) -> Vec2 {
     spherical_to_uv(&dir_to_spherical(v))
 }
 pub fn parallel_for<F: Fn(usize) -> () + Sync>(count: usize, chunk_size: usize, f: F) {
-    let chunks = (count + chunk_size - 1) / chunk_size;
-    (0..chunks).into_par_iter().for_each(|chunk_id| {
-        (chunk_id * chunk_size..(chunk_id * chunk_size + chunk_size).min(count)).for_each(|id| {
-            f(id);
-        });
+    let nthreads = rayon::current_num_threads();
+    let work_counter = AtomicUsize::new(0);
+    rayon::scope(|s| {
+        for _ in 0..nthreads {
+            s.spawn(|_| loop {
+                let work = work_counter.fetch_add(chunk_size, Ordering::Relaxed);
+                if work >= count {
+                    return;
+                }
+                for i in work..(work + chunk_size).min(count) {
+                    f(i);
+                }
+            });
+        }
     });
 }
 impl Frame {

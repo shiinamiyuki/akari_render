@@ -23,8 +23,13 @@ impl Film {
         }
     }
     pub fn add_sample(&self, pixel: &glm::UVec2, value: &Spectrum, weight: Float) {
+        let value = if value.is_black() {
+            Spectrum::zero()
+        } else {
+            *value
+        };
         let mut pixel = self.pixels[(pixel.x + pixel.y * self.resolution.x) as usize].write();
-        pixel.intensity = pixel.intensity + *value;
+        pixel.intensity = pixel.intensity + value;
         pixel.weight += weight;
     }
     pub fn get_pixel(&self, pixel: &glm::UVec2) -> Pixel {
