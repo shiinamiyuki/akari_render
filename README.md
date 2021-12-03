@@ -19,5 +19,5 @@ Previous version with PPG and SMCMC is in [legacy-cpp](https://github.com/shiina
 ```
 cargo build --relase
 cargo run --release --bin akr-cli -- -s ./scenes/cbox.json -a ./scenes/integrator.json
-cargo run --release --bin akr-cli -- -s ./scenes/cbox.json -a ./scenes/integrator.json --gpu
+cargo run --release --features gpu --bin akr-cli -- -s ./scenes/cbox.json -a ./scenes/integrator.json --gpu
 ```
