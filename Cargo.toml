@@ -40,8 +40,7 @@ exr = "1.3.0"
 tokio = {version="1.*", optional=true, features=["full"]}
 
 [features]
-default = ["gpu", "embree", "global_mimalloc", "network"]
-network = ["tokio"]
+default = ["embree", "global_mimalloc"]
 global_mimalloc = ["mimalloc"]
 gpu_nrc = ["cmake", "bindgen", "gpu"]
 embree = ["embree-sys"]
