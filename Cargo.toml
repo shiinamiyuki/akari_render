@@ -39,7 +39,7 @@ indicatif = "0.16.2"
 exr = "1.3.0"
 
 [features]
-default = ["embree", "global_mimalloc"]
+default = ["embree"]
 global_mimalloc = ["mimalloc"]
 gpu_nrc = ["cmake", "bindgen", "gpu"]
 embree = ["embree-sys"]
