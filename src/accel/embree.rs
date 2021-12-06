@@ -5,15 +5,15 @@ use lazy_static::lazy_static;
 use nalgebra_glm::{vec2, vec3, UVec3};
 use parking_lot::Mutex;
 use rayon::prelude::*;
-use std::{any::Any, collections::HashMap, convert::TryInto, mem::MaybeUninit, sync::Arc};
+use std::{any::Any, collections::HashMap, convert::TryInto,  sync::Arc};
 use sys::RTCIntersectContext;
 
 use crate::{
     accel::Aggregate,
-    bsdf::{self, Bsdf},
+    bsdf::Bsdf,
     distribution::Distribution1D,
     impl_base, lerp3,
-    shape::{AggregateProxy, MeshInstanceProxy, Shape, SurfaceSample, Triangle, TriangleMesh},
+    shape::{AggregateProxy, MeshInstanceProxy, Shape, SurfaceSample,TriangleMesh},
     Bounds3f, Float, Intersection, Ray, Vec3,
 };
 struct Device(sys::RTCDevice);

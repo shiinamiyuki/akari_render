@@ -1,6 +1,4 @@
 use std::collections::HashSet;
-use std::pin::Pin;
-
 use crate::bsdf::*;
 use crate::shape::*;
 use crate::*;

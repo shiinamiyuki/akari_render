@@ -78,6 +78,7 @@ fn write_ltc_fit() {
     out += "]};\n";
     std::fs::write("src/ltc/fit.rs", out).unwrap();
 }
+#[cfg(feature = "gpu")]
 use shaderc::{
     CompileOptions, Compiler, IncludeCallbackResult, ResolvedInclude,
     ShaderKind,
@@ -122,15 +123,9 @@ fn compile_shader_imp(path: &String, shader_kind: ShaderKind, output: &String, o
     file.write_all(spirv.as_binary_u8()).unwrap();
 }
 
-#[cfg(not(feature = "gpu"))]
-fn compile_shader_imp(
-    _path: &String,
-    _shader_kind: ShaderKind,
-    _output: &String,
-    options: Options,
-) {
-}
 
+
+#[cfg(feature = "gpu")]
 fn compile_shader(path: &str, shader_kind: ShaderKind, output: &str, options: Options) {
     if !Path::new("src/gpu/spv").exists() {
         std::fs::create_dir("src/gpu/spv").unwrap();
@@ -152,6 +147,8 @@ fn main() {
 
     let nrc_opt = Options { nrc: true };
     let pt_opt = Options { nrc: false };
+
+#   [cfg(feature = "gpu")]
     {
         compile_shader(
             "closest.rgen.glsl",
