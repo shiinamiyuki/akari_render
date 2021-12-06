@@ -1,8 +1,9 @@
-use std::{cell::UnsafeCell, io::Read, path::PathBuf};
+use std::{cell::UnsafeCell, io::Read, path::PathBuf, ffi::OsString};
 
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 
 use crate::*;
+use lazy_static::lazy_static;
 
 pub struct CurrentDirGuard {
     current_dir: PathBuf,
@@ -139,14 +140,15 @@ pub fn erf(x: Float) -> Float {
 }
 
 pub trait FileResolver {
-    fn resolve(&self, path: &str) -> Option<std::fs::File>;
+    fn resolve(&self, path: &std::path::Path) -> Option<std::fs::File>;
 }
 
 pub struct LocalFileResolver {
-    paths: Vec<PathBuf>,
+    pub(crate) paths: Vec<PathBuf>,
 }
+
 impl FileResolver for LocalFileResolver {
-    fn resolve(&self, path: &str) -> Option<std::fs::File> {
+    fn resolve(&self, path: &std::path::Path) -> Option<std::fs::File> {
         if let Ok(f) = std::fs::File::open(path) {
             return Some(f);
         }

@@ -1,5 +1,6 @@
 use crate::bsdf::*;
 use crate::camera::*;
+#[cfg(feature = "gpu")]
 use crate::gpu::pt::WavefrontPathTracer;
 // use crate::film::*;
 use crate::integrator::ao::RTAO;
@@ -15,11 +16,14 @@ use crate::shape::*;
 use crate::texture::ConstantTexture;
 use crate::texture::ImageTexture;
 use crate::texture::Texture;
+use crate::util::FileResolver;
+use crate::util::LocalFileResolver;
 use crate::*;
 use core::panic;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
+use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 
 use serde_json::Value;
@@ -33,6 +37,7 @@ struct SceneLoaderContext<'a> {
     named_bsdfs: HashMap<String, Arc<dyn Bsdf>>,
     texture_power: HashMap<usize, Float>,
     mesh_cache: HashMap<String, Arc<TriangleMesh>>,
+    file_resolver: Box<dyn FileResolver>,
     gpu: bool,
 }
 impl<'a> SceneLoaderContext<'a> {
@@ -224,31 +229,33 @@ impl<'a> SceneLoaderContext<'a> {
             self.lights.push(light);
         }
     }
-    fn resolve_file<P: AsRef<Path>>(&self, path: P) -> File {
-        if let Ok(file) = File::open(&path) {
+    fn resolve_file(&self, path: &String) -> File {
+        let path = if cfg!(target_os = "windows") {
+            path.replace("/", "\\")
+        } else {
+            path.replace("\\", "/")
+        };
+        if let Some(file) = self.file_resolver.resolve(path.as_ref()) {
             return file;
         }
-        {
-            let _guard = util::CurrentDirGuard::new();
-            std::env::set_current_dir(self.parent_path).unwrap();
-            if let Ok(file) = File::open(&path) {
-                return file;
-            }
-        }
-        panic!("cannot resolve path {}", path.as_ref().display());
+        panic!("cannot resolve path {}", path);
     }
 }
 
-pub fn load_scene(path: &Path, gpu_mode: bool, accel: &str) -> Scene {
+pub fn load_scene<R: FileResolver>(path: &Path, gpu_mode: bool, accel: &str) -> Scene {
     let serialized = std::fs::read_to_string(path).unwrap();
     let canonical = std::fs::canonicalize(path).unwrap();
     let graph: node::Scene = serde_json::from_str(&serialized).unwrap();
+    let parent_path = canonical.parent().unwrap();
     let mut ctx = SceneLoaderContext {
-        parent_path: &canonical.parent().unwrap(),
+        parent_path,
         graph: &graph,
         shapes: vec![],
         lights: vec![],
         camera: None,
+        file_resolver: Box::new(LocalFileResolver {
+            paths: vec![PathBuf::from(parent_path)],
+        }),
         named_bsdfs: HashMap::new(),
         texture_power: HashMap::new(),
         mesh_cache: HashMap::new(),
@@ -256,22 +263,6 @@ pub fn load_scene(path: &Path, gpu_mode: bool, accel: &str) -> Scene {
     };
     ctx.load();
 
-    // let mut shape_to_light = HashMap::new();
-    // for shape in &ctx.shapes {
-    //     if let Some(bsdf) = shape.bsdf() {
-    //         if let Some(emission) = bsdf.emission() {
-    //             if emission.power() > 0.001 {
-    //                 let light: Arc<dyn Light> = Arc::new(AreaLight {
-    //                     emission,
-    //                     shape: shape.clone(),
-    //                 });
-    //                 ctx.lights.push(light.clone());
-    //                 shape_to_light
-    //                     .insert(Arc::into_raw(shape.clone()).cast::<()>() as usize, light);
-    //             }
-    //         }
-    //     }
-    // }
     let scene = Scene::new(
         ctx.camera.unwrap(),
         ctx.shapes.clone(),
