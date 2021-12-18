@@ -245,9 +245,10 @@ impl Spectrum {
             samples: vec3(1.0, 1.0, 1.0),
         }
     }
+    // not necessarily black, but any value that is either black or invalid
     pub fn is_black(&self) -> bool {
         self.samples.iter().any(|x| !x.is_finite())
-            || !glm::all(&glm::greater_than(&self.samples, &glm::zero()))
+            || glm::all(&glm::equal(&self.samples, &glm::zero()))
             || glm::any(&glm::less_than(&self.samples, &glm::zero()))
     }
     pub fn lerp(x: &Spectrum, y: &Spectrum, a: Float) -> Spectrum {

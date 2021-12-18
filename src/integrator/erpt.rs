@@ -1,6 +1,6 @@
 use crate::distribution::Distribution1D;
 use crate::integrator::path::PathTracer;
-use crate::sampler::{PCGSampler, ReplaySampler, Sampler, PCG};
+use crate::sampler::{PCGSampler, ReplaySampler, Sampler, Pcg};
 use crate::scene::Scene;
 use crate::*;
 use bidir::*;
@@ -27,7 +27,7 @@ pub struct Erpt {
 //         log::info!("bootstrapping...");
 //         let per_depth_e_avg: Vec<_> = (2..=self.max_depth)
 //             .into_par_iter()
-//             .map(|depth| MMLT::init_chain(self.n_bootstrap, 0, depth, scene).1)
+//             .map(|depth| Mmlt::init_chain(self.n_bootstrap, 0, depth, scene).1)
 //             .collect();
 //         log::info!("average energy: {:?}", per_depth_e_avg);
 

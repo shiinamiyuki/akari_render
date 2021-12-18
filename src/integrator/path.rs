@@ -18,7 +18,13 @@ fn mis_weight(mut pdf_a: Float, mut pdf_b: Float) -> Float {
     pdf_a / (pdf_a + pdf_b)
 }
 impl PathTracer {
-    fn li(mut ray: Ray, sampler: &mut dyn Sampler, scene: &Scene, max_depth: usize) -> Spectrum {
+    pub fn li(
+        mut ray: Ray,
+        sampler: &mut dyn Sampler,
+        scene: &Scene,
+        max_depth: usize,
+        indirect_only: bool,
+    ) -> Spectrum {
         let mut li = Spectrum::zero();
         let mut beta = Spectrum::one();
         let mut prev_n: Option<Vec3> = None;
@@ -45,27 +51,32 @@ impl PathTracer {
                     if let Some(light) = scene.get_light_of_shape(shape) {
                         // li += beta * light.le(&ray);
                         if depth == 0 {
-                            li += beta * light.le(&ray);
+                            if !indirect_only {
+                                li += beta * light.le(&ray);
+                            }
                         } else {
-                            let light_pdf = scene.light_distr.pdf(light)
-                                * light
-                                    .pdf_li(
-                                        &ray.d,
-                                        &ReferencePoint {
-                                            p: ray.o,
-                                            n: prev_n.unwrap(),
-                                        },
-                                    )
-                                    .1;
-                            let bsdf_pdf = prev_bsdf_pdf.unwrap();
-                            assert!(light_pdf.is_finite());
-                            assert!(light_pdf >= 0.0);
-                            let weight = if is_delta {
-                                1.0
-                            } else {
-                                mis_weight(bsdf_pdf, light_pdf)
-                            };
-                            li += beta * light.le(&ray) * weight;
+                            if !indirect_only || depth > 1 {
+                                let light_pdf = scene.light_distr.pdf(light)
+                                    * light
+                                        .pdf_li(
+                                            &ray.d,
+                                            &ReferencePoint {
+                                                p: ray.o,
+                                                n: prev_n.unwrap(),
+                                            },
+                                        )
+                                        .1;
+                                let bsdf_pdf = prev_bsdf_pdf.unwrap();
+                                assert!(light_pdf.is_finite());
+                                assert!(light_pdf >= 0.0);
+                                let weight = if is_delta {
+                                    1.0
+                                } else {
+                                    mis_weight(bsdf_pdf, light_pdf)
+                                };
+
+                                li += beta * light.le(&ray) * weight;
+                            }
                             // println!("{} {} {}", light_pdf, bsdf_pdf, weight);
                         }
                     }
@@ -91,24 +102,26 @@ impl PathTracer {
                             let p_ref = ReferencePoint { p, n: ng };
                             let light_sample = light.sample_li(&sampler.next3d(), &p_ref);
                             let light_pdf = light_sample.pdf * light_pdf;
-                            if !light_sample.li.is_black()
-                                && !scene.shape.occlude(&light_sample.shadow_ray)
-                            {
-                                let bsdf_pdf = bsdf.evaluate_pdf(&wo, &light_sample.wi);
-                                let weight = if light.is_delta() {
-                                    1.0
-                                } else {
-                                    mis_weight(light_pdf, bsdf_pdf)
-                                };
-                                // println!("{} {} {}", light_pdf, bsdf_pdf, weight);
-                                // assert!(light_pdf.is_finite());
-                                assert!(light_pdf >= 0.0);
-                                li += beta
-                                    * bsdf.evaluate(&wo, &light_sample.wi)
-                                    * glm::dot(&ng, &light_sample.wi).abs()
-                                    * light_sample.li
-                                    / light_pdf
-                                    * weight;
+                            if !indirect_only || depth > 1 {
+                                if !light_sample.li.is_black()
+                                    && !scene.shape.occlude(&light_sample.shadow_ray)
+                                {
+                                    let bsdf_pdf = bsdf.evaluate_pdf(&wo, &light_sample.wi);
+                                    let weight = if light.is_delta() {
+                                        1.0
+                                    } else {
+                                        mis_weight(light_pdf, bsdf_pdf)
+                                    };
+                                    // println!("{} {} {}", light_pdf, bsdf_pdf, weight);
+                                    // assert!(light_pdf.is_finite());
+                                    assert!(light_pdf >= 0.0);
+                                    li += beta
+                                        * bsdf.evaluate(&wo, &light_sample.wi)
+                                        * glm::dot(&ng, &light_sample.wi).abs()
+                                        * light_sample.li
+                                        / light_pdf
+                                        * weight;
+                                }
                             }
                         }
                     }
@@ -128,7 +141,11 @@ impl PathTracer {
                 }
             }
         }
-        li
+        if li.is_black() {
+            Spectrum::zero()
+        } else {
+            li
+        }
     }
 }
 impl Integrator for PathTracer {
@@ -145,7 +162,7 @@ impl Integrator for PathTracer {
             let mut acc_li = Spectrum::zero();
             for _ in 0..self.spp {
                 let (mut ray, _ray_weight) = scene.camera.generate_ray(&pixel, &mut sampler);
-                let li = Self::li(ray, &mut sampler, scene, self.max_depth as usize);
+                let li = Self::li(ray, &mut sampler, scene, self.max_depth as usize, false);
                 acc_li += li;
             }
             acc_li = acc_li / (self.spp as Float);

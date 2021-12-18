@@ -633,7 +633,7 @@ impl Integrator for CachedPathTracer {
                     };
                     let sampler = &mut samplers[id];
                     sampler.start_next_sample();
-                    // let mut sampler = PCGSampler { rng: PCG::new(id) };
+                    // let mut sampler = PCGSampler { rng: Pcg::new(id) };
                     let x = (id as u32) % scene.camera.resolution().x;
                     let y = (id as u32) / scene.camera.resolution().x;
                     let pixel = uvec2(x, y);
@@ -717,7 +717,7 @@ impl Integrator for CachedPathTracer {
                         let state = &mut states[id];
                         let sampler = &mut samplers[id];
                         sampler.start_next_sample();
-                        // let mut sampler = PCGSampler { rng: PCG::new(id) };
+                        // let mut sampler = PCGSampler { rng: Pcg::new(id) };
                         let x = (id as u32) % scene.camera.resolution().x;
                         let y = (id as u32) / scene.camera.resolution().x;
                         let pixel = uvec2(x, y);
@@ -798,7 +798,7 @@ impl Integrator for CachedPathTracer {
         }
         // println!("visiualizing");
         // parallel_for(npixels, 256, |id| {
-        //     let mut sampler = PCGSampler { rng: PCG::new(id) };
+        //     let mut sampler = PCGSampler { rng: Pcg::new(id) };
         //     let x = (id as u32) % scene.camera.resolution().x;
         //     let y = (id as u32) / scene.camera.resolution().x;
         //     let pixel = uvec2(x, y);

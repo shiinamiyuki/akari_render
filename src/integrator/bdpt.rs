@@ -2,7 +2,7 @@ use crate::bidir::*;
 use crate::film::*;
 use crate::integrator::*;
 use crate::sampler::PCGSampler;
-use crate::sampler::PCG;
+use crate::sampler::Pcg;
 use crate::*;
 pub struct Bdpt {
     pub spp: u32,
@@ -42,7 +42,7 @@ impl Integrator for Bdpt {
             light_path: vec![],
         });
         parallel_for(npixels, 256, |id| {
-            let mut sampler = PCGSampler { rng: PCG::new(id as u64) };
+            let mut sampler = PCGSampler { rng: Pcg::new(id as u64) };
             let x = (id as u32) % scene.camera.resolution().x;
             let y = (id as u32) / scene.camera.resolution().x;
             let pixel = uvec2(x, y);

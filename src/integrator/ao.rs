@@ -13,7 +13,7 @@ impl Integrator for RTAO {
         let npixels = (scene.camera.resolution().x * scene.camera.resolution().y) as usize;
         let film = RwLock::new(Film::new(&scene.camera.resolution()));
         parallel_for(npixels, 256, |id| {
-            let mut sampler = PCGSampler { rng: PCG::new(id as u64) };
+            let mut sampler = PCGSampler { rng: Pcg::new(id as u64) };
             let x = (id as u32) % scene.camera.resolution().x;
             let y = (id as u32) / scene.camera.resolution().x;
             let pixel = uvec2(x, y);

@@ -19,10 +19,31 @@ pub trait Sampler: Sync + Send {
     }
 }
 
-pub struct PCG {
+pub struct Lcg {
+    state: u32,
+}
+impl Lcg {
+    const INC: u32 = 12345;
+    const MULTIPILER: u32 = 1103515245;
+    pub fn new(seed: u32) -> Self {
+        let mut r = Self {
+            state: seed + Self::INC,
+        };
+        let _ = r.lcg32();
+        r
+    }
+    pub fn lcg32(&mut self) -> u32 {
+        self.state = self
+            .state
+            .wrapping_mul(Self::MULTIPILER)
+            .wrapping_add(Self::INC);
+        self.state
+    }
+}
+pub struct Pcg {
     state: u64,
 }
-impl PCG {
+impl Pcg {
     const MULTIPILER: u64 = 6364136223846793005;
     const INC: u64 = 1442695040888963407;
 
@@ -45,12 +66,12 @@ impl PCG {
     }
 }
 pub struct PCGSampler {
-    pub rng: PCG,
+    pub rng: Pcg,
 }
 impl PCGSampler {
     pub fn new(seed: u64) -> Self {
         Self {
-            rng: PCG::new(seed),
+            rng: Pcg::new(seed),
         }
     }
 }
@@ -177,7 +198,7 @@ impl PrimarySample {
     pub fn new(x: Float) -> Self {
         Self {
             value: x,
-            backup: 0.0,
+            backup: x,
             last_modified: 0,
             modified_backup: 0,
         }
@@ -192,7 +213,7 @@ impl PrimarySample {
     }
 }
 
-pub struct MLTSampler {
+pub struct MltSampler {
     pub samples: Vec<PrimarySample>,
     pub rng: PCGSampler,
     pub large_step: bool,
@@ -201,12 +222,19 @@ pub struct MLTSampler {
     pub last_large_iteration: usize,
 }
 const SIGMA: Float = 0.01;
-impl MLTSampler {
+impl MltSampler {
+    pub fn from_replay<S>(replay: &ReplaySampler<S>, seed: u64) -> Self {
+        let mut s = MltSampler::new(seed);
+        for x in &replay.x {
+            s.samples.push(PrimarySample::new(*x))
+        }
+        s
+    }
     pub fn new(seed: u64) -> Self {
         Self {
             samples: vec![],
             rng: PCGSampler {
-                rng: PCG::new(seed),
+                rng: Pcg::new(seed),
             },
             large_step: false,
             last_large_iteration: 0,
@@ -251,8 +279,11 @@ impl MLTSampler {
         self.large_step = is_large_step;
         self.dimension = 0;
     }
+    pub fn reseed(&mut self, seed: u64) {
+        self.rng = PCGSampler::new(seed);
+    }
 }
-impl Sampler for MLTSampler {
+impl Sampler for MltSampler {
     fn start_next_sample(&mut self) {
         panic!("call start_new_iteration instead for mlt sampler");
     }

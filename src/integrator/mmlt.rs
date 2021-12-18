@@ -2,7 +2,7 @@ use std::convert::TryInto;
 use std::sync::atomic::AtomicUsize;
 
 use crate::distribution::Distribution1D;
-use crate::sampler::{MLTSampler, PCGSampler, Sampler, PCG};
+use crate::sampler::{MltSampler, PCGSampler, Sampler, Pcg};
 use crate::scene::Scene;
 use crate::util::erf_inv;
 use crate::*;
@@ -24,7 +24,7 @@ pub enum Stream {
     TotalStreams = 3,
 }
 
-pub struct MMLT {
+pub struct Mmlt {
     pub max_depth: u32,
     pub n_chains: usize,
     pub n_bootstrap: usize,
@@ -37,23 +37,23 @@ pub struct FRecord {
     pub l: Spectrum,
 }
 
-pub struct MMLTSampler {
-    streams: [MLTSampler; 3],
+pub struct MmltSampler {
+    streams: [MltSampler; 3],
     stream: Stream,
     large_step_prob: f32,
-    large_step:bool,
-    pcg: PCGSampler,
+    large_step: bool,
+    pub pcg: PCGSampler,
 }
-impl MMLTSampler {
+impl MmltSampler {
     fn new(seed: u64) -> Self {
         let mut pcg = PCGSampler::new(seed);
         Self {
             streams: [
-                MLTSampler::new(pcg.rng.pcg64()),
-                MLTSampler::new(pcg.rng.pcg64()),
-                MLTSampler::new(pcg.rng.pcg64()),
+                MltSampler::new(pcg.rng.pcg64()), // can the path be correlated?
+                MltSampler::new(pcg.rng.pcg64()),
+                MltSampler::new(pcg.rng.pcg64()),
             ],
-            large_step:true,
+            large_step: true,
             pcg,
             stream: Stream::Camera,
             large_step_prob: 0.3,
@@ -69,6 +69,9 @@ impl MMLTSampler {
     }
     fn reseed(&mut self, seed: u64) {
         self.pcg = PCGSampler::new(seed);
+        for s in &mut self.streams {
+            s.reseed(self.pcg.rng.pcg64())
+        }
     }
     fn reject(&mut self) {
         for s in &mut self.streams {
@@ -76,7 +79,7 @@ impl MMLTSampler {
         }
     }
 }
-impl Sampler for MMLTSampler {
+impl Sampler for MmltSampler {
     fn start_next_sample(&mut self) {
         self.large_step = self.pcg.next1d() < self.large_step_prob;
         for s in &mut self.streams {
@@ -89,7 +92,7 @@ impl Sampler for MMLTSampler {
 }
 
 pub struct Chain<'a> {
-    pub sampler: MMLTSampler,
+    pub sampler: MmltSampler,
     pub cur: FRecord,
     pub depth: u32,
     pub light_path: Vec<Vertex<'a>>,
@@ -135,7 +138,7 @@ impl<'a> Chain<'a> {
         ) * n_strategies as Float;
         let l = if l.is_black() { Spectrum::zero() } else { l };
         FRecord {
-            pixel:*pixel,
+            pixel: *pixel,
             f: glm::comp_max(&l.samples).clamp(0.0, 100.0),
             l,
         }
@@ -160,7 +163,7 @@ impl<'a> Chain<'a> {
         self.run_at_pixel(&pixel, scene)
     }
 }
-impl MMLT {
+impl Mmlt {
     pub fn init_chain<'a>(
         n_bootstrap: usize,
         n_chains: usize,
@@ -172,7 +175,7 @@ impl MMLT {
         let fs: Vec<_> = (0..n_bootstrap)
             .map(|i| {
                 Chain {
-                    sampler: MMLTSampler::new(seeds[i]),
+                    sampler: MmltSampler::new(seeds[i]),
                     cur: FRecord {
                         pixel: glm::zero(),
                         f: 0.0,
@@ -198,7 +201,7 @@ impl MMLT {
                 .map(|_| {
                     let (i, _) = dist.sample_discrete(rng.gen::<Float>());
                     let mut chain = Chain {
-                        sampler: MMLTSampler::new(seeds[i]),
+                        sampler: MmltSampler::new(seeds[i]),
                         cur: FRecord {
                             pixel: glm::zero(),
                             f: 0.0,
@@ -218,7 +221,7 @@ impl MMLT {
         )
     }
 }
-impl Integrator for MMLT {
+impl Integrator for Mmlt {
     fn render(&mut self, scene: &scene::Scene) -> Film {
         log::info!("rendering direct lighting...");
         let mut depth0_pt = PathTracer {
