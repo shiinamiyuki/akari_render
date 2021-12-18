@@ -37,7 +37,7 @@ struct SceneLoaderContext<'a> {
     named_bsdfs: HashMap<String, Arc<dyn Bsdf>>,
     texture_power: HashMap<usize, Float>,
     mesh_cache: HashMap<String, Arc<TriangleMesh>>,
-    file_resolver: Box<dyn FileResolver>,
+    file_resolver: Arc<dyn FileResolver + Send + Sync>,
     gpu: bool,
 }
 impl<'a> SceneLoaderContext<'a> {
@@ -242,7 +242,7 @@ impl<'a> SceneLoaderContext<'a> {
     }
 }
 
-pub fn load_scene<R: FileResolver>(path: &Path, gpu_mode: bool, accel: &str) -> Scene {
+pub fn load_scene<R: FileResolver+ Send + Sync>(path: &Path, gpu_mode: bool, accel: &str) -> Scene {
     let serialized = std::fs::read_to_string(path).unwrap();
     let canonical = std::fs::canonicalize(path).unwrap();
     let graph: node::Scene = serde_json::from_str(&serialized).unwrap();
@@ -253,7 +253,7 @@ pub fn load_scene<R: FileResolver>(path: &Path, gpu_mode: bool, accel: &str) -> 
         shapes: vec![],
         lights: vec![],
         camera: None,
-        file_resolver: Box::new(LocalFileResolver {
+        file_resolver: Arc::new(LocalFileResolver {
             paths: vec![PathBuf::from(parent_path)],
         }),
         named_bsdfs: HashMap::new(),

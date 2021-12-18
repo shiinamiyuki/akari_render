@@ -33,7 +33,7 @@ impl Film {
         pixel.weight += weight;
     }
     pub fn get_pixel(&self, pixel: &glm::UVec2) -> Pixel {
-        let mut pixel = self.pixels[(pixel.x + pixel.y * self.resolution.x) as usize].read();
+        let pixel = self.pixels[(pixel.x + pixel.y * self.resolution.x) as usize].read();
         *pixel
     }
     pub fn to_rgb_image(&self) -> image::RgbImage {

@@ -23,7 +23,7 @@ pub mod bidir;
 pub mod integrator;
 pub mod light;
 pub mod ltc;
-#[cfg(feature = "network")]
+#[cfg(feature = "net")]
 pub mod net;
 pub mod sampler;
 pub mod scene;
@@ -36,7 +36,10 @@ pub mod util;
 #[macro_use]
 extern crate bitflags;
 use parking_lot::RwLock;
+use serde::Deserialize;
+use serde::Serialize;
 use std::any::Any;
+use std::fmt;
 use std::sync::atomic::AtomicUsize;
 use std::{
     collections::HashMap,
@@ -74,6 +77,7 @@ pub fn profile_ms<F: FnOnce() -> T, T>(f: F) -> (T, f64) {
     let ret = f();
     (ret, now.elapsed().as_secs_f64() * 1000.0)
 }
+#[derive(Serialize, Deserialize)]
 pub struct AtomicFloat {
     bits: AtomicU32,
 }
@@ -82,6 +86,7 @@ impl Default for AtomicFloat {
         Self::new(0.0)
     }
 }
+
 impl AtomicFloat {
     pub fn new(v: f32) -> Self {
         Self {

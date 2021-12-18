@@ -1,9 +1,12 @@
 pub mod ao;
 pub mod bdpt;
+pub mod pssmlt;
+pub mod erpt;
+pub mod mmlt;
 pub mod nrc;
 pub mod path;
+pub mod ppg;
 pub mod sppm;
-pub mod mmlt;
 use crate::{film::Film, scene::Scene, Bound2};
 
 pub trait Integrator {

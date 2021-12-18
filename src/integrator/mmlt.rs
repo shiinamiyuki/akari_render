@@ -2,7 +2,7 @@ use std::convert::TryInto;
 use std::sync::atomic::AtomicUsize;
 
 use crate::distribution::Distribution1D;
-use crate::sampler::{PCGSampler, Sampler, PCG};
+use crate::sampler::{MLTSampler, PCGSampler, Sampler, PCG};
 use crate::scene::Scene;
 use crate::util::erf_inv;
 use crate::*;
@@ -24,140 +24,80 @@ pub enum Stream {
     TotalStreams = 3,
 }
 
-pub struct PrimarySample {
-    value: Float,
-    backup: Float,
-    last_modified: usize,
-    modified_backup: usize,
+pub struct MMLT {
+    pub max_depth: u32,
+    pub n_chains: usize,
+    pub n_bootstrap: usize,
+    pub spp: u32,
+    pub direct_spp: u32,
 }
-impl PrimarySample {
-    pub fn new(x: Float) -> Self {
-        Self {
-            value: x,
-            backup: 0.0,
-            last_modified: 0,
-            modified_backup: 0,
-        }
-    }
-    pub fn backup(&mut self) {
-        self.backup = self.value;
-        self.modified_backup = self.last_modified;
-    }
-    pub fn restore(&mut self) {
-        self.value = self.backup;
-        self.last_modified = self.modified_backup;
-    }
+pub struct FRecord {
+    pub pixel: UVec2,
+    pub f: Float,
+    pub l: Spectrum,
 }
-pub struct MLTSampler {
+
+pub struct MMLTSampler {
+    streams: [MLTSampler; 3],
     stream: Stream,
-    samples: Vec<PrimarySample>,
-    rng: PCGSampler,
-    large_step: bool,
-    cur_iteration: isize,
-    large_step_prob: Float,
-    dimension: usize,
-    last_large_iteration: usize,
+    large_step_prob: f32,
+    large_step:bool,
+    pcg: PCGSampler,
 }
-const SIGMA: Float = 0.01;
-impl MLTSampler {
-    pub fn new(seed: usize) -> Self {
+impl MMLTSampler {
+    fn new(seed: u64) -> Self {
+        let mut pcg = PCGSampler::new(seed);
         Self {
+            streams: [
+                MLTSampler::new(pcg.rng.pcg64()),
+                MLTSampler::new(pcg.rng.pcg64()),
+                MLTSampler::new(pcg.rng.pcg64()),
+            ],
+            large_step:true,
+            pcg,
             stream: Stream::Camera,
-            samples: vec![],
-            rng: PCGSampler {
-                rng: PCG::new(seed),
-            },
-            large_step: false,
             large_step_prob: 0.3,
-            last_large_iteration: 0,
-            cur_iteration: 0,
-            dimension: 0,
         }
     }
     fn use_stream(&mut self, stream: Stream) {
         self.stream = stream;
-        self.dimension = 0;
-    }
-    fn update(&mut self, i: usize) {
-        let x = &mut self.samples[i];
-        if x.last_modified < self.last_large_iteration {
-            x.value = self.rng.next1d();
-            x.last_modified = self.last_large_iteration;
-        }
-        x.backup();
-        if self.large_step {
-            x.value = self.rng.next1d();
-        } else {
-            let n_small: usize = self.cur_iteration as usize - x.last_modified;
-            let normal_sample = (2.0 as Float).sqrt() * erf_inv(2.0 * self.rng.next1d() - 1.0);
-            let err_sigma = SIGMA * (n_small as Float).sqrt();
-            x.value += normal_sample * err_sigma;
-            x.value -= x.value.floor();
-        }
-        x.last_modified = self.cur_iteration.try_into().unwrap();
     }
     fn accept(&mut self) {
-        if self.large_step {
-            self.last_large_iteration = self.cur_iteration as usize;
+        for s in &mut self.streams {
+            s.accept();
         }
+    }
+    fn reseed(&mut self, seed: u64) {
+        self.pcg = PCGSampler::new(seed);
     }
     fn reject(&mut self) {
-        for x in &mut self.samples {
-            if x.last_modified == self.cur_iteration as usize {
-                x.restore();
-            }
+        for s in &mut self.streams {
+            s.reject();
         }
-        self.cur_iteration -= 1;
     }
 }
-impl Sampler for MLTSampler {
+impl Sampler for MMLTSampler {
     fn start_next_sample(&mut self) {
-        self.cur_iteration += 1;
-        self.large_step = self.rng.next1d() < self.large_step_prob;
-        self.dimension = 0;
-    }
-
-    fn next1d(&mut self) -> Float {
-        let idx = self.dimension * Stream::TotalStreams as usize + self.stream as usize;
-        self.dimension += 1;
-        while idx >= self.samples.len() {
-            self.samples.push(PrimarySample::new(self.rng.next1d()));
+        self.large_step = self.pcg.next1d() < self.large_step_prob;
+        for s in &mut self.streams {
+            s.start_new_iteration(self.large_step);
         }
-        self.update(idx);
-        self.samples[idx].value
+    }
+    fn next1d(&mut self) -> Float {
+        self.streams[self.stream as usize].next1d()
     }
 }
 
-pub struct MMLT {
-    pub(crate) max_depth: u32,
-    pub(crate) n_chains: usize,
-    pub(crate) n_bootstrap: usize,
-    pub(crate) spp: u32,
-    pub(crate) direct_spp: u32,
-}
-pub struct FRecord {
-    pixel: UVec2,
-    f: Float,
-    l: Spectrum,
-}
-
-struct Chain<'a> {
-    sampler: MLTSampler,
-    cur: FRecord,
-    depth: u32,
-    light_path: Vec<Vertex<'a>>,
-    camera_path: Vec<Vertex<'a>>,
-    scratch: Scratch<'a>,
+pub struct Chain<'a> {
+    pub sampler: MMLTSampler,
+    pub cur: FRecord,
+    pub depth: u32,
+    pub light_path: Vec<Vertex<'a>>,
+    pub camera_path: Vec<Vertex<'a>>,
+    pub scratch: Scratch<'a>,
 }
 impl<'a> Chain<'a> {
-    fn run(&mut self, scene: &'a Scene) -> FRecord {
-        self.sampler.start_next_sample();
-        self.sampler.use_stream(Stream::Camera);
-        self.light_path.clear();
-        self.camera_path.clear();
-        self.scratch.new_light_path.clear();
-        self.scratch.new_eye_path.clear();
-
+    pub fn run_at_pixel(&mut self, pixel: &UVec2, scene: &'a Scene) -> FRecord {
         let (n_strategies, s, t) = if self.depth == 0 {
             (1, 0, 2)
         } else {
@@ -167,19 +107,10 @@ impl<'a> Chain<'a> {
             let t = self.depth as usize + 2 - s;
             (n_strategies, s, t)
         };
-        let pixel = self
-            .sampler
-            .next2d()
-            .component_mul(&scene.camera.resolution().cast::<Float>());
-        let pixel = uvec2(pixel.x as u32, pixel.y as u32);
-        let pixel = uvec2(
-            pixel.x.min(scene.camera.resolution().x - 1),
-            pixel.y.min(scene.camera.resolution().y - 1),
-        );
         bidir::generate_camera_path(scene, &pixel, &mut self.sampler, t, &mut self.camera_path);
         if self.camera_path.len() != t {
             return FRecord {
-                pixel,
+                pixel: *pixel,
                 f: 0.0,
                 l: Spectrum::zero(),
             };
@@ -188,7 +119,7 @@ impl<'a> Chain<'a> {
         bidir::generate_light_path(scene, &mut self.sampler, s, &mut self.light_path);
         if self.light_path.len() != s {
             return FRecord {
-                pixel,
+                pixel: *pixel,
                 f: 0.0,
                 l: Spectrum::zero(),
             };
@@ -204,25 +135,44 @@ impl<'a> Chain<'a> {
         ) * n_strategies as Float;
         let l = if l.is_black() { Spectrum::zero() } else { l };
         FRecord {
-            pixel,
+            pixel:*pixel,
             f: glm::comp_max(&l.samples).clamp(0.0, 100.0),
             l,
         }
     }
+    pub fn run(&mut self, scene: &'a Scene) -> FRecord {
+        self.sampler.start_next_sample();
+        self.sampler.use_stream(Stream::Camera);
+        self.light_path.clear();
+        self.camera_path.clear();
+        self.scratch.new_light_path.clear();
+        self.scratch.new_eye_path.clear();
+
+        let pixel = self
+            .sampler
+            .next2d()
+            .component_mul(&scene.camera.resolution().cast::<Float>());
+        let pixel = uvec2(pixel.x as u32, pixel.y as u32);
+        let pixel = uvec2(
+            pixel.x.min(scene.camera.resolution().x - 1),
+            pixel.y.min(scene.camera.resolution().y - 1),
+        );
+        self.run_at_pixel(&pixel, scene)
+    }
 }
 impl MMLT {
-    fn init_chain<'a>(
+    pub fn init_chain<'a>(
         n_bootstrap: usize,
         n_chains: usize,
         depth: u32,
         scene: &'a Scene,
     ) -> (Vec<Chain<'a>>, Float) {
         let mut rng = thread_rng();
-        let seeds: Vec<_> = { (0..n_bootstrap).map(|_| rng.gen::<usize>()).collect() };
+        let seeds: Vec<_> = { (0..n_bootstrap).map(|_| rng.gen::<u64>()).collect() };
         let fs: Vec<_> = (0..n_bootstrap)
             .map(|i| {
                 Chain {
-                    sampler: MLTSampler::new(seeds[i]),
+                    sampler: MMLTSampler::new(seeds[i]),
                     cur: FRecord {
                         pixel: glm::zero(),
                         f: 0.0,
@@ -248,7 +198,7 @@ impl MMLT {
                 .map(|_| {
                     let (i, _) = dist.sample_discrete(rng.gen::<Float>());
                     let mut chain = Chain {
-                        sampler: MLTSampler::new(seeds[i]),
+                        sampler: MMLTSampler::new(seeds[i]),
                         cur: FRecord {
                             pixel: glm::zero(),
                             f: 0.0,
@@ -260,9 +210,7 @@ impl MMLT {
                         scratch: Scratch::new(),
                     };
                     chain.cur = chain.run(scene);
-                    chain.sampler.rng = PCGSampler {
-                        rng: PCG::new(rng.gen()),
-                    };
+                    chain.sampler.reseed(rng.gen());
                     chain
                 })
                 .collect(),

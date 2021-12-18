@@ -36,6 +36,7 @@ dependencies = [
  "cmake",
  "embree-sys",
  "exr",
+ "flate2",
  "image",
  "indicatif",
  "lazy_static",
@@ -498,6 +499,18 @@ dependencies = [
  "lebe",
  "smallvec",
  "threadpool",
+]
+
+[[package]]
+name = "flate2"
+version = "1.0.22"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e6988e897c1c9c485f43b47a529cef42fde0547f9d8d41a7062518f1d8fc53f"
+dependencies = [
+ "cfg-if",
+ "crc32fast",
+ "libc",
+ "miniz_oxide 0.4.4",
 ]
 
 [[package]]

@@ -38,10 +38,10 @@ log = "*"
 indicatif = "0.16.2"
 exr = "1.3.0"
 tokio = {version="1.*", optional=true, features=["full"]}
-
+flate2 = {version = "1.0.22", optional=true}
 [features]
-default = ["embree","net"]
-net = ["tokio"]
+default = ["embree", "net"]
+net = ["tokio", "flate2"]
 global_mimalloc = ["mimalloc"]
 gpu_nrc = ["cmake", "bindgen", "gpu"]
 embree = ["embree-sys"]

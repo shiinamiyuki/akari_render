@@ -173,11 +173,11 @@ impl Integrator for Sppm {
         ];
         let mut samplers: Vec<Box<dyn Sampler>> = vec![];
         for i in 0..npixels {
-            samplers.push(Box::new(PCGSampler { rng: PCG::new(i) }));
+            samplers.push(Box::new(PCGSampler { rng: PCG::new(i as u64) }));
         }
         let mut photon_samplers: Vec<Box<dyn Sampler>> = vec![];
         for i in 0..self.n_photons {
-            photon_samplers.push(Box::new(PCGSampler { rng: PCG::new(i) }));
+            photon_samplers.push(Box::new(PCGSampler { rng: PCG::new(i as u64) }));
         }
         #[allow(unused_assignments)]
         let mut grid: Option<VisiblePointGrid> = None;
