@@ -198,6 +198,11 @@ impl From<na::SVector<f32, { Spectrum::N_SAMPLES }>> for Spectrum {
         Spectrum { samples: v.cast() }
     }
 }
+impl std::fmt::Debug for Spectrum {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_list().entries(self.samples.iter()).finish()
+    }
+}
 pub fn srgb_to_linear(rgb: &Vec3) -> Vec3 {
     let f = |s| -> Float {
         if s <= 0.04045 {

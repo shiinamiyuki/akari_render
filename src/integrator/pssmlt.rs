@@ -9,6 +9,9 @@ use crate::film::Film;
 use crate::sampler::Sampler;
 use crate::*;
 use crate::{sampler::MltSampler, scene::Scene};
+pub fn target_function(x: Spectrum) -> Float {
+    glm::comp_max(&x.samples).clamp(0.0, 100.0)
+}
 pub struct Chain {
     pub sampler: MltSampler,
     pub cur: FRecord,
@@ -30,7 +33,7 @@ impl Chain {
         let l = PathTracer::li(ray, &mut self.sampler, scene, self.max_depth, true);
         FRecord {
             pixel: *pixel,
-            f: glm::comp_max(&l.samples).clamp(0.0, 100.0),
+            f: target_function(l),
             l,
         }
     }
@@ -120,7 +123,10 @@ impl Integrator for Pssmlt {
             scene,
         );
         let chains: Vec<Mutex<Chain>> = chains.into_iter().map(|x| Mutex::new(x)).collect();
-        log::info!("normalization factor inital estimate: {}", b /  self.n_bootstrap as f32);
+        log::info!(
+            "normalization factor inital estimate: {}",
+            b / self.n_bootstrap as f32
+        );
         let b = AtomicFloat::new(b);
         let large_count = AtomicUsize::new(self.n_bootstrap);
         let progress = crate::util::create_progess_bar(self.spp as usize, "spp");

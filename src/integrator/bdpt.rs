@@ -4,6 +4,7 @@ use crate::integrator::*;
 use crate::sampler::PCGSampler;
 use crate::sampler::Pcg;
 use crate::*;
+use crate::sampler::Sampler;
 pub struct Bdpt {
     pub spp: u32,
     pub max_depth: usize,
@@ -61,6 +62,7 @@ impl Integrator for Bdpt {
                 }
             }
             for _ in 0..self.spp {
+                sampler.start_next_sample();
                 bdpt::generate_camera_path(
                     scene,
                     &pixel,

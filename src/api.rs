@@ -242,7 +242,11 @@ impl<'a> SceneLoaderContext<'a> {
     }
 }
 
-pub fn load_scene<R: FileResolver+ Send + Sync>(path: &Path, gpu_mode: bool, accel: &str) -> Scene {
+pub fn load_scene<R: FileResolver + Send + Sync>(
+    path: &Path,
+    gpu_mode: bool,
+    accel: &str,
+) -> Scene {
     let serialized = std::fs::read_to_string(path).unwrap();
     let canonical = std::fs::canonicalize(path).unwrap();
     let graph: node::Scene = serde_json::from_str(&serialized).unwrap();
@@ -350,6 +354,21 @@ pub fn load_integrator(path: &Path) -> Box<dyn Integrator> {
                 max_depth: max_depth as u32,
                 n_bootstrap,
                 n_chains,
+                direct_spp,
+            })
+        }
+        "erpt" => {
+            let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
+            let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as usize;
+            let n_bootstrap = (|| json.get("n_bootstrap")?.as_u64())().unwrap_or(100000) as usize;
+            let mutations_per_chain =
+                (|| json.get("mutations_per_chain")?.as_u64())().unwrap_or(100) as usize;
+            let direct_spp = (|| json.get("direct_spp")?.as_u64())().unwrap_or(16) as u32;
+            Box::new(erpt::Erpt {
+                spp,
+                max_depth: max_depth as u32,
+                n_bootstrap,
+                mutations_per_chain,
                 direct_spp,
             })
         }

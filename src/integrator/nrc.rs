@@ -583,7 +583,7 @@ impl Integrator for CachedPathTracer {
         let mut cache = RadianceCache::new(model);
         let mut samplers: Vec<Box<dyn Sampler>> = vec![];
         for i in 0..npixels {
-            samplers.push(Box::new(SobolSampler::new(i as u32)));
+            samplers.push(Box::new(SobolSampler::new(i  as u64)));
         }
         let mut states = vec![
             PathState {

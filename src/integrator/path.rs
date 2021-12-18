@@ -155,13 +155,14 @@ impl Integrator for PathTracer {
         let chunks = (npixels + 255) / 256;
         let progress = crate::util::create_progess_bar(chunks, "chunks");
         parallel_for(npixels, 256, |id| {
-            let mut sampler = SobolSampler::new(id as u32);
+            let mut sampler = SobolSampler::new(id as u64);
             let x = (id as u32) % scene.camera.resolution().x;
             let y = (id as u32) / scene.camera.resolution().x;
             let pixel = uvec2(x, y);
             let mut acc_li = Spectrum::zero();
             for _ in 0..self.spp {
-                let (mut ray, _ray_weight) = scene.camera.generate_ray(&pixel, &mut sampler);
+                sampler.start_next_sample();
+                let (ray, _ray_weight) = scene.camera.generate_ray(&pixel, &mut sampler);
                 let li = Self::li(ray, &mut sampler, scene, self.max_depth as usize, false);
                 acc_li += li;
             }

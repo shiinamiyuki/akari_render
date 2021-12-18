@@ -113,12 +113,12 @@ fn sobol(dim: u32, mut i: u32, rng: u32) -> f32 {
     r + shift - (r + shift).floor()
 }
 impl SobolSampler {
-    pub fn new(_index: u32) -> Self {
-        let mut rng = rand::thread_rng();
+    pub fn new(seed: u64) -> Self {
+        let mut pcg = Pcg::new(seed);
         Self {
             dim: 0,
             index: 0,
-            rotation: rng.gen(),
+            rotation: pcg.pcg32(),
         }
     }
 }
@@ -147,7 +147,7 @@ pub struct ReplaySampler<S> {
     replaying: bool,
 }
 impl<S: Sampler> ReplaySampler<S> {
-    fn new(s: S) -> Self {
+    pub fn new(s: S) -> Self {
         Self {
             x: vec![],
             base: s,
@@ -156,7 +156,7 @@ impl<S: Sampler> ReplaySampler<S> {
         }
     }
     fn ensure_ready(&mut self, i: usize) {
-        while i < self.x.len() {
+        while i >= self.x.len() {
             self.x.push(self.base.next1d());
         }
     }
