@@ -3,6 +3,7 @@ use crate::*;
 pub struct Distribution1D {
     pub pmf: Vec<Float>,
     cdf: Vec<Float>,
+    pub int_f: Float,
 }
 
 // the first i s.t. v <= f[i]
@@ -68,6 +69,17 @@ mod tests {
             7
         );
     }
+
+    #[test]
+    fn invert() {
+        use crate::distribution::Distribution1D;
+        let dist = Distribution1D::new(&[0.5, 0.5, 1.0, 1.0]).unwrap();
+        for u0 in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9] {
+            let (x, _) = dist.sample_continuous(u0);
+            let u = dist.invert(x);
+            assert_almost_eq!(u as f64, u0 as f64, 0.001);
+        }
+    }
 }
 
 impl Distribution1D {
@@ -85,7 +97,7 @@ impl Distribution1D {
             sum += *x;
             cdf.push(sum);
         }
-        Some(Self { pmf: f, cdf })
+        Some(Self { pmf: f, cdf, int_f })
     }
     pub fn pdf_discrete(&self, idx: usize) -> Float {
         self.pmf[idx]
@@ -96,8 +108,20 @@ impl Distribution1D {
         let i = if i == 0 { 0 } else { i - 1 };
         (i, self.pmf[i])
     }
+    pub fn invert(&self, x: Float) -> Float {
+        let x = x * self.pmf.len() as Float;
+        let i = x as usize;
+        let du = x - i as Float;
+        let du = if self.cdf[i + 1] > self.cdf[i] {
+            du * (self.cdf[i + 1] - self.cdf[i])
+        } else {
+            du
+        };
+        self.cdf[i] + du
+    }
+
     pub fn sample_continuous(&self, u: Float) -> (Float, Float) {
-        let i = upper_bound(&self.cdf[..], &u) - 1;
+        let i = upper_bound(&self.cdf[..], &u);
         let i = if i == 0 { 0 } else { i - 1 };
         let cnt = self.pmf.len() as Float;
         let du = u - self.cdf[i];
@@ -107,5 +131,30 @@ impl Distribution1D {
             du
         };
         ((i as Float + du) / cnt, self.pmf[i] * cnt)
+    }
+}
+
+pub struct Distribution2D {
+    p_x: Distribution1D,
+    p_yx: Vec<Distribution1D>,
+}
+
+impl Distribution2D {
+    pub fn new(f: &[&[Float]]) -> Option<Self> {
+        let p_yx: Vec<_> = f.iter().map(|f| Distribution1D::new(*f).unwrap()).collect();
+        let p_x = Distribution1D::new(&p_yx.iter().map(|p| p.int_f).collect::<Vec<Float>>())?;
+        Some(Self { p_yx, p_x })
+    }
+    pub fn sample_continuous(&self, u: &Vec2) -> (Vec2, Float) {
+        let (x, pdf_x) = self.p_x.sample_continuous(u.x);
+        let ix = (x.clamp(0.0, 1.0 - 1e-7) * self.p_x.pmf.len() as Float) as usize;
+        let (y, pdf_yx) = self.p_yx[ix].sample_continuous(u.y);
+        (vec2(x, y), pdf_x * pdf_yx)
+    }
+    pub fn invert(&self, x: &Vec2) -> Vec2 {
+        let ix = (x.x.clamp(0.0, 1.0 - 1e-7) * self.p_x.pmf.len() as Float) as usize;
+        let y = self.p_yx[ix].invert(x.y);
+        let x = self.p_x.invert(x.x);
+        vec2(x, y)
     }
 }

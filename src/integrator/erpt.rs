@@ -51,7 +51,6 @@ impl Integrator for Erpt {
                 let mean_chains = e / (self.mutations_per_chain as Float * e_d);
                 let dep_energy =
                     e / (self.spp as Float * mean_chains * self.mutations_per_chain as Float);
-                // let dep_value = li / e * e_d / self.spp as Float;
                 {
                     let num_chains = (rng.gen::<Float>() + mean_chains).floor() as usize;
                     for _ in 0..num_chains {
@@ -69,14 +68,12 @@ impl Integrator for Erpt {
                             cur: mmlt::FRecord { pixel, f: e, l: li },
                             max_depth: self.max_depth as usize,
                         };
-                        // let mut acc_w = 0.0;
                         for _ in 0..self.mutations_per_chain {
                             let proposal = chain.run(scene);
                             let accept_prob = match chain.cur.f {
                                 x if x > 0.0 => (proposal.f / x).min(1.0),
                                 _ => 1.0,
                             };
-                            // acc_w += 1.0 - accept_prob;
                             if proposal.f > 0.0 {
                                 let dep_value =
                                     (proposal.l / proposal.f) * dep_energy * accept_prob;
@@ -89,30 +86,12 @@ impl Integrator for Erpt {
                                 indirect_film.add_sample(&chain.cur.pixel, &dep_value, 1.0);
                             }
                             if accept_prob == 1.0 || rng.gen::<Float>() < accept_prob {
-                                // if acc_w > 0.0 {
-                                //     let dep_value =
-                                //         chain.cur.l / chain.cur.f * acc_w * e_d / self.spp as Float;
-                                //     indirect_film.add_sample(&chain.cur.pixel, &dep_value, 1.0);
-                                // }
                                 chain.cur = proposal;
                                 chain.sampler.accept();
-                                // acc_w = 0.0;
                             } else {
                                 chain.sampler.reject();
-                                // if accept_prob > 0.0 {
-                                //     let dep_value =
-                                //         proposal.l / proposal.f * e_d / self.spp as Float;
-                                //     indirect_film.add_sample(&proposal.pixel, &dep_value, 1.0);
-                                // }
                             }
-                            // let dep_value = chain.cur.l / chain.cur.f * e_d / self.spp as Float;
-                            // indirect_film.add_sample(&chain.cur.pixel, &dep_value, 1.0);
                         }
-                        // if acc_w > 0.0 {
-                        //     let dep_value =
-                        //         chain.cur.l / chain.cur.f * acc_w * e_d / self.spp as Float;
-                        //     indirect_film.add_sample(&chain.cur.pixel, &dep_value, 1.0);
-                        // }
                     }
                 }
                 acc_li += li;
@@ -139,7 +118,6 @@ impl Integrator for Erpt {
                 px.intensity += px_d.intensity / px_d.weight;
             }
         });
-        film.write_exr("erpt.exr");
         film
     }
 }

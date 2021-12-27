@@ -23,6 +23,8 @@ pub mod bidir;
 pub mod integrator;
 pub mod light;
 pub mod ltc;
+#[macro_use]
+mod nn_v2;
 #[cfg(feature = "net")]
 pub mod net;
 pub mod sampler;
@@ -32,6 +34,7 @@ pub mod shape;
 pub mod sobolmat;
 pub mod texture;
 pub mod util;
+pub mod wavefront;
 
 #[macro_use]
 extern crate bitflags;
@@ -793,8 +796,7 @@ impl<T> UnsafeConstPointer<T> {
     }
 }
 
-#[macro_use]
-mod nn_v2;
+
 
 pub trait Base: Any {
     fn as_any(&self) -> &dyn Any;
