@@ -145,6 +145,11 @@ impl Distribution2D {
         let p_x = Distribution1D::new(&p_yx.iter().map(|p| p.int_f).collect::<Vec<Float>>())?;
         Some(Self { p_yx, p_x })
     }
+    pub fn sample_discrete(&self, u: &Vec2) -> ([usize; 2], Float) {
+        let (x, pdf_x) = self.p_x.sample_discrete(u.x);
+        let (y, pdf_y) = self.p_yx[x].sample_discrete(u.y);
+        ([x, y], pdf_x * pdf_y)
+    }
     pub fn sample_continuous(&self, u: &Vec2) -> (Vec2, Float) {
         let (x, pdf_x) = self.p_x.sample_continuous(u.x);
         let ix = (x.clamp(0.0, 1.0 - 1e-7) * self.p_x.pmf.len() as Float) as usize;
