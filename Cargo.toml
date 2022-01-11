@@ -29,7 +29,7 @@ clap = "2.33.3"
 tobj = "2.0.4"
 bson = {version = "1.2.2", features = ["u2i"] }
 lazy_static = "1.*"
-ash = { version = "*", optional = true }
+ash = { version = "0.35", optional = true }
 vkc = {git = "https://github.com/shiinamiyuki/vkc", optional = true }
 embree-sys = {git = "https://github.com/shiinamiyuki/embree-sys", optional = true}
 shaderc = {version = "0.7.2", optional = true}

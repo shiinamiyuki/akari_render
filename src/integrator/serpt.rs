@@ -10,16 +10,62 @@ use integrator::*;
 use pssmlt::Chain;
 use rand::{thread_rng, Rng};
 
-pub struct Erpt {
+use super::mmlt::FRecord;
+
+pub struct Serpt {
     pub spp: u32,
     pub direct_spp: u32,
     pub max_depth: u32,
     pub n_bootstrap: usize,
     pub mutations_per_chain: usize,
+    pub sigma: Float,
     // pub n_chains: usize,
 }
+fn build_filter(width: usize, height: usize, sigma: Float) -> Distribution2D {
+    let cx = width / 2;
+    let cy = height / 2;
+    let w = width.min(height) as Float;
+    let f: Vec<_> = (0..width)
+        .map(|x| {
+            (0..height)
+                .map(|y| {
+                    let fx = (x as isize - cx as isize) as Float / w;
+                    let fy = (y as isize - cy as isize) as Float / w;
+                    (-(fx * fx + fy * fy) / (2.0 * sigma * sigma)).exp()
+                    // 1.0
+                })
+                .collect()
+        })
+        .collect();
+    Distribution2D::new(&f).unwrap()
+}
+impl Chain {
+    pub fn run_filtered(
+        &mut self,
+        scene: &Scene,
+        pixel: &glm::UVec2,
+        filter: &Distribution2D,
+    ) -> FRecord {
+        self.is_large_step = self.sampler.rng.next1d() < self.large_step_prob;
+        self.sampler.start_new_iteration(self.is_large_step);
 
-impl Integrator for Erpt {
+        let offset = self.sampler.next2d();
+        let (offset, _) = filter.sample_continuous(&offset);
+        let offset = offset.component_mul(&scene.camera.resolution().cast::<Float>());
+        let pixel = uvec2(
+            (pixel.x as i32 + offset.x as i32 - scene.camera.resolution().x as i32 / 2).max(0)
+                as u32,
+            (pixel.y as i32 + offset.y as i32 - scene.camera.resolution().y as i32 / 2).max(0)
+                as u32,
+        );
+        let pixel = uvec2(
+            pixel.x.min(scene.camera.resolution().x - 1),
+            pixel.y.min(scene.camera.resolution().y - 1),
+        );
+        self.run_at_pixel(&pixel, scene)
+    }
+}
+impl Integrator for Serpt {
     fn render(&mut self, scene: &Scene) -> Film {
         log::info!("rendering direct lighting...");
         let mut depth0_pt = PathTracer {
@@ -37,6 +83,11 @@ impl Integrator for Erpt {
         let indirect_film = Film::new(&scene.camera.resolution());
         let chunks = (npixels + 255) / 256;
         let progress = crate::util::create_progess_bar(chunks, "chunks");
+        let filter = build_filter(
+            scene.camera.resolution().x as usize,
+            scene.camera.resolution().y as usize,
+            self.sigma,
+        );
         parallel_for(npixels, 256, |id| {
             let mut sampler = ReplaySampler::new(SobolSampler::new(id as u64));
             let x = (id as u32) % scene.camera.resolution().x;
@@ -57,10 +108,11 @@ impl Integrator for Erpt {
                     for _ in 0..num_chains {
                         let mut mlt_sampler = MltSampler::from_replay(&sampler, rng.gen());
                         {
-                            let px = (x as Float + 0.5) / scene.camera.resolution().x as Float;
-                            let py = (y as Float + 0.5) / scene.camera.resolution().y as Float;
-                            mlt_sampler.samples.insert(0, PrimarySample::new(px));
-                            mlt_sampler.samples.insert(1, PrimarySample::new(py));
+                            let px = 0.5;
+                            let py = 0.5;
+                            let xy = filter.invert(&vec2(px, py));
+                            mlt_sampler.samples.insert(0, PrimarySample::new(xy.x));
+                            mlt_sampler.samples.insert(1, PrimarySample::new(xy.y));
                         }
                         let mut chain = Chain {
                             sampler: mlt_sampler,
@@ -70,7 +122,7 @@ impl Integrator for Erpt {
                             max_depth: self.max_depth as usize,
                         };
                         for _ in 0..self.mutations_per_chain {
-                            let proposal = chain.run(scene);
+                            let proposal = chain.run_filtered(scene, &uvec2(x, y), &filter);
                             let accept_prob = match chain.cur.f {
                                 x if x > 0.0 => (proposal.f / x).min(1.0),
                                 _ => 1.0,

@@ -140,8 +140,8 @@ pub struct Distribution2D {
 }
 
 impl Distribution2D {
-    pub fn new(f: &[&[Float]]) -> Option<Self> {
-        let p_yx: Vec<_> = f.iter().map(|f| Distribution1D::new(*f).unwrap()).collect();
+    pub fn new(f: &Vec<Vec<Float>>) -> Option<Self> {
+        let p_yx: Vec<_> = f.iter().map(|f| Distribution1D::new(f).unwrap()).collect();
         let p_x = Distribution1D::new(&p_yx.iter().map(|p| p.int_f).collect::<Vec<Float>>())?;
         Some(Self { p_yx, p_x })
     }

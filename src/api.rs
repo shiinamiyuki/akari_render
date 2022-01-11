@@ -372,6 +372,23 @@ pub fn load_integrator(path: &Path) -> Box<dyn Integrator> {
                 direct_spp,
             })
         }
+        "serpt" => {
+            let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
+            let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as usize;
+            let n_bootstrap = (|| json.get("n_bootstrap")?.as_u64())().unwrap_or(100000) as usize;
+            let mutations_per_chain =
+                (|| json.get("mutations_per_chain")?.as_u64())().unwrap_or(100) as usize;
+            let direct_spp = (|| json.get("direct_spp")?.as_u64())().unwrap_or(16) as u32;
+            let sigma = (|| json.get("sigma")?.as_f64())().unwrap_or(0.1) as Float;
+            Box::new(serpt::Serpt {
+                spp,
+                max_depth: max_depth as u32,
+                n_bootstrap,
+                mutations_per_chain,
+                direct_spp,
+                sigma
+            })
+        }
         "mmlt" => {
             let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
             let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as usize;

@@ -234,7 +234,7 @@ impl GPUScene {
                             .iter()
                             .flat_map(|px| -> [f32; 4] { [*px, *px, *px, 1.0] })
                             .collect();
-                        let image_tex = vkc::resource::Image::from_data(
+                        let image_tex = vkc::resource::Image::from_data_2d(
                             ctx,
                             bytemuck::cast_slice(&pixels),
                             vk::Extent2D {
@@ -262,7 +262,7 @@ impl GPUScene {
                                 [px.samples[0], px.samples[1], px.samples[2], 1.0]
                             })
                             .collect();
-                        let image_tex = vkc::resource::Image::from_data(
+                        let image_tex = vkc::resource::Image::from_data_2d(
                             ctx,
                             bytemuck::cast_slice(&pixels),
                             vk::Extent2D {

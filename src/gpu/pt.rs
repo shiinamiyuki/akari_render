@@ -458,6 +458,7 @@ impl<'a> WavefrontImpl<'a> {
                     .iter()
                     .map(|g| g.mesh.vertex_buffer.handle)
                     .collect(),
+                gpu_scene.accel.geometries.len(),
             );
             let mesh_indices_set = vkc::Set::StorageBufferArray(
                 gpu_scene
@@ -466,6 +467,7 @@ impl<'a> WavefrontImpl<'a> {
                     .iter()
                     .map(|g| g.mesh.index_buffer.handle)
                     .collect(),
+                gpu_scene.accel.geometries.len(),
             );
             let mesh_normals_set = vkc::Set::StorageBufferArray(
                 gpu_scene
@@ -480,6 +482,7 @@ impl<'a> WavefrontImpl<'a> {
                         }
                     })
                     .collect(),
+                gpu_scene.accel.geometries.len(),
             );
             let mesh_texcoords_set = vkc::Set::StorageBufferArray(
                 gpu_scene
@@ -494,6 +497,7 @@ impl<'a> WavefrontImpl<'a> {
                         }
                     })
                     .collect(),
+                gpu_scene.accel.geometries.len(),
             );
             let image_textures_set = vkc::Set::SampledImageArray(
                 gpu_scene
@@ -501,6 +505,7 @@ impl<'a> WavefrontImpl<'a> {
                     .iter()
                     .map(|img| (img.view, vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL))
                     .collect(),
+                gpu_scene.image_textures.len(),
             );
 
             let layout = vkc::Layout {
@@ -591,6 +596,7 @@ impl<'a> WavefrontImpl<'a> {
                             .iter()
                             .map(|dist| dist.alias_table.handle)
                             .collect(),
+                        gpu_scene.mesh_area_distribution.len(),
                     ),
                     vkc::Set::StorageBufferArray(
                         gpu_scene
@@ -598,6 +604,7 @@ impl<'a> WavefrontImpl<'a> {
                             .iter()
                             .map(|dist| dist.pdf.handle)
                             .collect(),
+                        gpu_scene.mesh_area_distribution.len(),
                     ),
                     vkc::Set::Bindings(vec![
                         vkc::Binding::StorageBuffer(
