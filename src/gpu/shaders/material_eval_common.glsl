@@ -42,7 +42,7 @@ float sin_phi(vec3 w){
     }
 }
 float sqr(float x){
-    return x*x;
+    return x * x;
 }
 struct GGXDistribution {
     float ax, ay;
