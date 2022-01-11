@@ -1,5 +1,5 @@
 {
-    "type":"nrc",
+    "type":"pt",
     "spp":32,
     "batch_size":1024,
     "max_depth":5,
