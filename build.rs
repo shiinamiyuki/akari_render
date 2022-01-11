@@ -85,6 +85,7 @@ use shaderc::{
 };
 
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 struct Options {
     nrc: bool,
 }
@@ -147,6 +148,9 @@ fn main() {
 
     let nrc_opt = Options { nrc: true };
     let pt_opt = Options { nrc: false };
+
+    let _ = nrc_opt;
+    let _ = pt_opt;
 
 #   [cfg(feature = "gpu")]
     {

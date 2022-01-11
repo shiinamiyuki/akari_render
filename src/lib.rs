@@ -35,6 +35,7 @@ pub mod sobolmat;
 pub mod texture;
 pub mod util;
 pub mod wavefront;
+pub mod varray;
 
 #[macro_use]
 extern crate bitflags;
