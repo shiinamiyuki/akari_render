@@ -18,6 +18,7 @@ use crate::texture::ImageTexture;
 use crate::texture::Texture;
 use crate::util::FileResolver;
 use crate::util::LocalFileResolver;
+use crate::varray::VArrayMemBuilder;
 use crate::*;
 use core::panic;
 use std::fs::File;
@@ -38,10 +39,12 @@ struct SceneLoaderContext<'a> {
     texture_power: HashMap<usize, Float>,
     mesh_cache: HashMap<String, Arc<TriangleMesh>>,
     file_resolver: Arc<dyn FileResolver + Send + Sync>,
+    vmem: VArrayMemBuilder,
     gpu: bool,
+    ooc: OocOptions,
 }
 impl<'a> SceneLoaderContext<'a> {
-    fn load_texture(&self, node: &node::Texture) -> Arc<dyn Texture> {
+    fn load_texture(&mut self, node: &node::Texture) -> Arc<dyn Texture> {
         match node {
             node::Texture::Float(f) => Arc::new(ConstantTexture { value: *f }),
             node::Texture::Float3(f3) => Arc::new(ConstantTexture {
@@ -67,7 +70,14 @@ impl<'a> SceneLoaderContext<'a> {
                     .with_guessed_format()
                     .unwrap();
                 let img = reader.decode().unwrap().into_rgb8();
-                Arc::new(ImageTexture::<Spectrum>::from_rgb_image(&img))
+                if cfg!(feature = "gpu") || !self.ooc.enable_ooc {
+                    Arc::new(ImageTexture::<Spectrum>::from_rgb_image(&img))
+                } else {
+                    Arc::new(ImageTexture::<Spectrum>::from_rgb_image_virtual(
+                        &img,
+                        &mut self.vmem,
+                    ))
+                }
             }
         }
     }
@@ -241,11 +251,17 @@ impl<'a> SceneLoaderContext<'a> {
         panic!("cannot resolve path {}", path);
     }
 }
-
+#[derive(Clone, Copy)]
+pub struct OocOptions {
+    pub texture_vmem: usize,
+    pub page_size: usize,
+    pub enable_ooc: bool,
+}
 pub fn load_scene<R: FileResolver + Send + Sync>(
     path: &Path,
     gpu_mode: bool,
     accel: &str,
+    ooc: OocOptions,
 ) -> Scene {
     let serialized = std::fs::read_to_string(path).unwrap();
     let canonical = std::fs::canonicalize(path).unwrap();
@@ -257,6 +273,7 @@ pub fn load_scene<R: FileResolver + Send + Sync>(
         shapes: vec![],
         lights: vec![],
         camera: None,
+        ooc,
         file_resolver: Arc::new(LocalFileResolver {
             paths: vec![PathBuf::from(parent_path)],
         }),
@@ -264,9 +281,10 @@ pub fn load_scene<R: FileResolver + Send + Sync>(
         texture_power: HashMap::new(),
         mesh_cache: HashMap::new(),
         gpu: gpu_mode,
+        vmem: VArrayMemBuilder::new(ooc.texture_vmem, ooc.page_size),
     };
     ctx.load();
-
+    ctx.vmem.build();
     let scene = Scene::new(
         ctx.camera.unwrap(),
         ctx.shapes.clone(),

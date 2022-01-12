@@ -9,6 +9,7 @@ Previous version with PPG and SMCMC is in [legacy-cpp](https://github.com/shiina
 
 
 ## Features
+- Out of Core Texture Caching
 - Unidirectional Path Tracing
 - Wavefront Path Tracing
 - SPPM

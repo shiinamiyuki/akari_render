@@ -1,3 +1,4 @@
+use akari::api::OocOptions;
 // use akari::accel::*;
 // use akari::bsdf::*;
 // use akari::camera::*;
@@ -16,6 +17,7 @@ extern crate clap;
 use akari::api;
 use akari::film::Film;
 use akari::profile;
+use akari::varray;
 use clap::{App, Arg};
 
 use log::{Level, Metadata, Record};
@@ -116,7 +118,30 @@ fn main() {
                 .value_name("DEBUG")
                 .takes_value(false),
         )
+        .arg(
+            Arg::with_name("ooc")
+                .long("ooc")
+                .value_name("OOC")
+                .takes_value(false)
+                .help("out of core rendering"),
+        )
+        .arg(
+            Arg::with_name("texture_vmem")
+                .long("texture_vmem")
+                .value_name("texture_vmem")
+                .takes_value(false)
+                .help("maximum memory for textures (MB)"),
+        )
         .get_matches();
+    let ooc = OocOptions {
+        enable_ooc: matches.is_present("ooc"),
+        texture_vmem: matches
+            .value_of("texture_vmem")
+            .map_or(8 * 1024 * 1024 * 1024, |v| {
+                String::from(v).parse::<usize>().unwrap() * 1024 * 1024
+            }),
+        page_size: 16 * 1024,
+    };
     if let Some(threads) = matches.value_of("threads") {
         let threads: usize = String::from(threads).parse().unwrap();
         rayon::ThreadPoolBuilder::new()
@@ -137,7 +162,7 @@ fn main() {
     log::info!("rendering mode {}", if gpu_mode { "gpu" } else { "cpu" });
     let scene = if let Some(scene) = matches.value_of("scene") {
         let path = Path::new(scene);
-        api::load_scene::<LocalFileResolver>(path, gpu_mode, accel.as_str())
+        api::load_scene::<LocalFileResolver>(path, gpu_mode, accel.as_str(), ooc)
     } else {
         log::error!("no filed provided");
         exit(1);

@@ -3,6 +3,8 @@ use crate::accel::Aggregate;
 use crate::camera::*;
 use crate::light::*;
 use crate::shape::*;
+use crate::varray::VArrayMem;
+use crate::varray::VArrayMemBuilder;
 use crate::Intersection;
 use crate::Ray;
 use std::any::Any;
