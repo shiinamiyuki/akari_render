@@ -12,7 +12,7 @@ extern crate tobj;
 pub struct SurfaceSample {
     pub p: Vec3,
     pub texcoords: Vec2,
-    pub pdf: Float,
+    pub pdf: f32,
     pub ng: Vec3,
     pub ns: Vec3,
 }
@@ -21,8 +21,8 @@ pub trait Shape: Sync + Send + Base {
     fn occlude(&self, ray: &Ray) -> bool;
     fn bsdf<'a>(&'a self) -> Option<&'a dyn Bsdf>;
     fn aabb(&self) -> Bounds3f;
-    fn sample_surface(&self, u: &Vec3) -> SurfaceSample;
-    fn area(&self) -> Float;
+    fn sample_surface(&self, u: Vec3) -> SurfaceSample;
+    fn area(&self) -> f32;
     fn children(&self) -> Option<Vec<Arc<dyn Shape>>> {
         None
     }
@@ -31,16 +31,16 @@ pub trait Shape: Sync + Send + Base {
 #[derive(Clone)]
 pub struct Sphere {
     pub center: Vec3,
-    pub radius: Float,
+    pub radius: f32,
     pub bsdf: Arc<dyn Bsdf>,
 }
 impl_base!(Sphere);
 impl Shape for Sphere {
     fn intersect<'a>(&'a self, ray: &Ray) -> Option<Intersection<'a>> {
         let oc = ray.o - self.center;
-        let a = glm::dot(&ray.d, &ray.d);
-        let b = 2.0 * glm::dot(&ray.d, &oc);
-        let c = glm::dot(&oc, &oc) - self.radius * self.radius;
+        let a = ray.d.length_squared();
+        let b = 2.0 * ray.d.dot(oc);
+        let c = oc.length_squared() - self.radius * self.radius;
         let delta = b * b - 4.0 * a * c;
         if delta < 0.0 {
             return None;
@@ -48,8 +48,8 @@ impl Shape for Sphere {
         let t1 = (-b - delta.sqrt()) / (2.0 * a);
         if t1 >= ray.tmin && t1 < ray.tmax {
             let p = ray.at(t1);
-            let n = glm::normalize(&(p - self.center));
-            let uv = dir_to_uv(&n);
+            let n = (p - self.center).normalize();
+            let uv = dir_to_uv(n);
             return Some(Intersection {
                 shape: Some(self),
                 t: t1,
@@ -63,8 +63,8 @@ impl Shape for Sphere {
         let t2 = (-b + delta.sqrt()) / (2.0 * a);
         if t2 >= ray.tmin && t2 < ray.tmax {
             let p = ray.at(t2);
-            let n = glm::normalize(&(p - self.center));
-            let uv = dir_to_uv(&n);
+            let n = (p - self.center).normalize();
+            let uv = dir_to_uv(n);
             return Some(Intersection {
                 shape: Some(self),
                 t: t2,
@@ -79,9 +79,9 @@ impl Shape for Sphere {
     }
     fn occlude(&self, ray: &Ray) -> bool {
         let oc = ray.o - self.center;
-        let a = glm::dot(&ray.d, &ray.d);
-        let b = 2.0 * glm::dot(&ray.d, &oc);
-        let c = glm::dot(&oc, &oc) - self.radius * self.radius;
+        let a = ray.d.length_squared();
+        let b = 2.0 * ray.d.dot(oc);
+        let c = oc.length_squared() - self.radius * self.radius;
         let delta = b * b - 4.0 * a * c;
         if delta < 0.0 {
             return false;
@@ -105,17 +105,17 @@ impl Shape for Sphere {
             max: self.center + vec3(self.radius, self.radius, self.radius),
         }
     }
-    fn sample_surface(&self, u: &Vec3) -> SurfaceSample {
-        let v = uniform_sphere_sampling(&vec2(u.x, u.y));
+    fn sample_surface(&self, u: Vec3) -> SurfaceSample {
+        let v = uniform_sphere_sampling(vec2(u.x, u.y));
         SurfaceSample {
             p: self.center + v * self.radius,
             pdf: uniform_sphere_pdf(),
-            texcoords: dir_to_uv(&v),
+            texcoords: dir_to_uv(v),
             ng: v,
             ns: v,
         }
     }
-    fn area(&self) -> Float {
+    fn area(&self) -> f32 {
         4.0 * PI * self.radius
     }
 }
@@ -127,45 +127,45 @@ pub struct Triangle {
 }
 
 impl Triangle {
-    fn area(&self) -> Float {
+    fn area(&self) -> f32 {
         let e0 = self.vertices[1] - self.vertices[0];
         let e1 = self.vertices[2] - self.vertices[0];
-        glm::cross(&e0, &e1).norm() * 0.5
+        0.5 * e0.cross(e1).length()
     }
     fn ng(&self) -> Vec3 {
         let e0 = self.vertices[1] - self.vertices[0];
         let e1 = self.vertices[2] - self.vertices[0];
-        glm::normalize(&glm::cross(&e0, &e1))
+        e0.cross(e1).normalize()
     }
 }
 
 impl Triangle {
-    fn intersect<'a>(&'a self, ray: &Ray) -> Option<(Float, Vec2)> {
-        let v0 = &self.vertices[0].cast::<Float>();
-        let v1 = &self.vertices[1].cast::<Float>();
-        let v2 = &self.vertices[2].cast::<Float>();
+    fn intersect<'a>(&'a self, ray: &Ray) -> Option<(f32, Vec2)> {
+        let v0 = self.vertices[0];
+        let v1 = self.vertices[1];
+        let v2 = self.vertices[2];
 
         // float a,f,u,v;
         let edge1 = v1 - v0;
         let edge2 = v2 - v0;
-        let h = glm::cross(&ray.d, &edge2); // rayVector.crossProduct(edge2);
-        let a = glm::dot(&edge1, &h); //edge1.dotProduct(h);
+        let h = ray.d.cross(edge2); // rayVector.crossProduct(edge2);
+        let a = edge1.dot(h); //edge1.dotProduct(h);
         if a > -1e-7 && a < 1e-7 {
             return None; // This ray is parallel to this triangle.
         }
         let f = 1.0 / a;
         let s = ray.o - v0;
-        let u = f * glm::dot(&s, &h); //s.dotProduct(h);
+        let u = f * s.dot(h); //s.dotProduct(h);
         if u < 0.0 || u > 1.0 {
             return None;
         }
-        let q = glm::cross(&s, &edge1); //s.crossProduct(edge1);
-        let v = f * glm::dot(&ray.d, &q); //rayVector.dotProduct(q);
+        let q = s.cross(edge1); //s.crossProduct(edge1);
+        let v = f * ray.d.dot(q); //rayVector.dotProduct(q);
         if v < 0.0 || u + v > 1.0 {
             return None;
         }
         // At this stage we can compute t to find out where the intersection point is on the line.
-        let t = f * glm::dot(&edge2, &q); //edge2.dotProduct(q);
+        let t = f * edge2.dot(q); //edge2.dotProduct(q);
         if t >= ray.tmin && t < ray.tmax
         // ray intersection
         {
@@ -184,9 +184,9 @@ impl Triangle {
     }
     fn aabb(&self) -> Bounds3f {
         Bounds3f::default()
-            .insert_point(&self.vertices[0])
-            .insert_point(&self.vertices[1])
-            .insert_point(&self.vertices[2])
+            .insert_point(self.vertices[0])
+            .insert_point(self.vertices[1])
+            .insert_point(self.vertices[2])
     }
 }
 pub struct TriangleMeshAccelData {
@@ -194,26 +194,26 @@ pub struct TriangleMeshAccelData {
 }
 
 impl TriangleMeshAccelData {
-    fn get_tc(&self, face: &glm::UVec3) -> (Vec2, Vec2, Vec2) {
+    fn get_tc(&self, face: &UVec3) -> (Vec2, Vec2, Vec2) {
         self.mesh.get_tc(face)
     }
 }
 impl bvh::BVHData for TriangleMeshAccelData {
     fn aabb(&self, idx: u32) -> Bounds3f {
         let face = self.mesh.indices[idx as usize];
-        let v0 = &self.mesh.vertices[face[0] as usize].cast::<Float>();
-        let v1 = &self.mesh.vertices[face[1] as usize].cast::<Float>();
-        let v2 = &self.mesh.vertices[face[2] as usize].cast::<Float>();
+        let v0: Vec3 = self.mesh.vertices[face[0] as usize].into();
+        let v1: Vec3 = self.mesh.vertices[face[1] as usize].into();
+        let v2: Vec3 = self.mesh.vertices[face[2] as usize].into();
         Bounds3f::default()
-            .insert_point(&v0)
-            .insert_point(&v1)
-            .insert_point(&v2)
+            .insert_point(v0)
+            .insert_point(v1)
+            .insert_point(v2)
     }
     fn intersect<'a>(&'a self, idx: u32, ray: &Ray) -> Option<Intersection<'a>> {
         let face = self.mesh.indices[idx as usize];
-        let v0 = self.mesh.vertices[face[0] as usize].cast::<Float>();
-        let v1 = self.mesh.vertices[face[1] as usize].cast::<Float>();
-        let v2 = self.mesh.vertices[face[2] as usize].cast::<Float>();
+        let v0 = self.mesh.vertices[face[0] as usize].into();
+        let v1 = self.mesh.vertices[face[1] as usize].into();
+        let v2 = self.mesh.vertices[face[2] as usize].into();
 
         let trig = Triangle {
             vertices: [v0, v1, v2],
@@ -240,9 +240,9 @@ impl bvh::BVHData for TriangleMeshAccelData {
     }
     fn occlude(&self, idx: u32, ray: &Ray) -> bool {
         let face = self.mesh.indices[idx as usize];
-        let v0 = self.mesh.vertices[face[0] as usize].cast::<Float>();
-        let v1 = self.mesh.vertices[face[1] as usize].cast::<Float>();
-        let v2 = self.mesh.vertices[face[2] as usize].cast::<Float>();
+        let v0 = self.mesh.vertices[face[0] as usize].into();
+        let v1 = self.mesh.vertices[face[1] as usize].into();
+        let v2 = self.mesh.vertices[face[2] as usize].into();
         Triangle {
             vertices: [v0, v1, v2],
         }
@@ -253,7 +253,7 @@ impl bvh::BVHData for TriangleMeshAccelData {
 pub struct TriangleMeshInstance {
     pub accel: Arc<accel::bvh::BVHAccelerator<TriangleMeshAccelData>>,
     pub bsdf: Arc<dyn Bsdf>,
-    pub area: Float,
+    pub area: f32,
     pub dist: Distribution1D,
 }
 impl_base!(TriangleMeshInstance);
@@ -283,11 +283,11 @@ impl Shape for AggregateProxy {
         panic!("shouldn't be called on cpu")
     }
 
-    fn sample_surface(&self, _u: &Vec3) -> SurfaceSample {
+    fn sample_surface(&self, _u: Vec3) -> SurfaceSample {
         panic!("shouldn't be called on cpu")
     }
 
-    fn area(&self) -> Float {
+    fn area(&self) -> f32 {
         panic!("shouldn't be called on cpu")
     }
     fn children(&self) -> Option<Vec<Arc<dyn Shape>>> {
@@ -311,11 +311,11 @@ impl Shape for MeshInstanceProxy {
         panic!("shouldn't be called on cpu")
     }
 
-    fn sample_surface(&self, _u: &Vec3) -> SurfaceSample {
+    fn sample_surface(&self, _u: Vec3) -> SurfaceSample {
         panic!("shouldn't be called on cpu")
     }
 
-    fn area(&self) -> Float {
+    fn area(&self) -> f32 {
         self.mesh.area()
     }
 }
@@ -329,18 +329,18 @@ impl Shape for TriangleMeshInstance {
             let idx = isct.prim_id as usize;
             let mesh = &*self.accel.data.mesh;
             let face = mesh.indices[idx as usize];
-            let v0 = mesh.vertices[face[0] as usize].cast::<Float>();
-            let v1 = mesh.vertices[face[1] as usize].cast::<Float>();
-            let v2 = mesh.vertices[face[2] as usize].cast::<Float>();
+            let v0 = mesh.vertices[face[0] as usize].into();
+            let v1 = mesh.vertices[face[1] as usize].into();
+            let v2 = mesh.vertices[face[2] as usize].into();
             let trig = Triangle {
                 vertices: [v0, v1, v2],
             };
             let ng = trig.ng();
-            let (tc0, tc1, tc2) = self.accel.data.get_tc(&face);
+            let (tc0, tc1, tc2) = self.accel.data.get_tc(&face.into());
 
             Some(Intersection {
                 shape: Some(self),
-                texcoords: lerp3(&tc0, &tc1, &tc2, &isct.uv),
+                texcoords: lerp3v2(tc0, tc1, tc2, isct.uv),
                 ng,
                 ns: ng,
                 ..isct
@@ -355,10 +355,10 @@ impl Shape for TriangleMeshInstance {
     fn bsdf<'a>(&'a self) -> Option<&'a dyn Bsdf> {
         Some(self.bsdf.as_ref())
     }
-    fn area(&self) -> Float {
+    fn area(&self) -> f32 {
         self.area
     }
-    fn sample_surface(&self, u: &Vec3) -> SurfaceSample {
+    fn sample_surface(&self, u: Vec3) -> SurfaceSample {
         self.accel.data.mesh.sample_surface(u, &self.dist)
     }
 }
@@ -366,42 +366,42 @@ impl Shape for TriangleMeshInstance {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct TriangleMesh {
     pub name: String,
-    pub vertices: Vec<glm::Vec3>,
-    pub normals: Vec<glm::Vec3>,
-    pub texcoords: Vec<glm::Vec2>,
-    pub indices: Vec<glm::UVec3>,
+    pub vertices: Vec<[f32; 3]>,
+    pub normals: Vec<[f32; 3]>,
+    pub texcoords: Vec<[f32; 2]>,
+    pub indices: Vec<[u32; 3]>,
 }
 impl TriangleMesh {
-    pub fn sample_surface(&self, u: &Vec3, dist: &Distribution1D) -> SurfaceSample {
+    pub fn sample_surface(&self, u: Vec3, dist: &Distribution1D) -> SurfaceSample {
         let (idx, pdf_idx) = dist.sample_discrete(u[2]);
         let face = self.indices[idx as usize];
-        let v0 = self.vertices[face[0] as usize].cast::<Float>();
-        let v1 = self.vertices[face[1] as usize].cast::<Float>();
-        let v2 = self.vertices[face[2] as usize].cast::<Float>();
+        let v0 = self.vertices[face[0] as usize].into();
+        let v1 = self.vertices[face[1] as usize].into();
+        let v2 = self.vertices[face[2] as usize].into();
         let trig = Triangle {
             vertices: [v0, v1, v2],
         };
-        let uv = uniform_sample_triangle(&vec2(u.x, u.y));
-        let p = lerp3(&v0, &v1, &v2, &uv);
-        let (tc0, tc1, tc2) = self.get_tc(&face);
+        let uv = uniform_sample_triangle(vec2(u.x, u.y));
+        let p = lerp3v3(v0, v1, v2, uv);
+        let (tc0, tc1, tc2) = self.get_tc(&face.into());
         SurfaceSample {
             p,
             ng: trig.ng(),
             ns: trig.ng(),
-            texcoords: lerp3(&tc0, &tc1, &tc2, &uv),
+            texcoords: lerp3v2(tc0, tc1, tc2, uv),
             pdf: 1.0 / self.get_triangle(idx).area() * pdf_idx,
         }
     }
     pub fn get_triangle(&self, i: usize) -> Triangle {
         let face = self.indices[i];
-        let v0 = self.vertices[face[0] as usize].cast::<Float>();
-        let v1 = self.vertices[face[1] as usize].cast::<Float>();
-        let v2 = self.vertices[face[2] as usize].cast::<Float>();
+        let v0 = self.vertices[face[0] as usize].into();
+        let v1 = self.vertices[face[1] as usize].into();
+        let v2 = self.vertices[face[2] as usize].into();
         Triangle {
             vertices: [v0, v1, v2],
         }
     }
-    pub fn area(&self) -> Float {
+    pub fn area(&self) -> f32 {
         self.indices
             .iter()
             .enumerate()
@@ -417,16 +417,16 @@ impl TriangleMesh {
             .collect();
         Distribution1D::new(f.as_slice()).unwrap()
     }
-    pub fn get_tc(&self, face: &glm::UVec3) -> (Vec2, Vec2, Vec2) {
+    pub fn get_tc(&self, face: &UVec3) -> (Vec2, Vec2, Vec2) {
         if self.texcoords.is_empty() {
             let tc0 = vec2(0.0, 0.0);
             let tc1 = vec2(0.0, 1.0);
             let tc2 = vec2(1.0, 1.0);
             (tc0, tc1, tc2)
         } else {
-            let tc0 = self.texcoords[face[0] as usize].cast::<Float>();
-            let tc1 = self.texcoords[face[1] as usize].cast::<Float>();
-            let tc2 = self.texcoords[face[2] as usize].cast::<Float>();
+            let tc0 = self.texcoords[face[0] as usize].into();
+            let tc1 = self.texcoords[face[1] as usize].into();
+            let tc2 = self.texcoords[face[2] as usize].into();
             (tc0, tc1, tc2)
         }
     }
@@ -461,7 +461,6 @@ pub fn compute_normals(model: &mut TriangleMesh) {
     let mut vertex_neighbors: HashMap<u32, Vec<u32>> = HashMap::new();
     for f in 0..model.indices.len() {
         let face = model.indices[f];
-        // let face= glm::IVec3::from_rows(&[model.F.row(f)]);//[3 * f..3 * f + 3];
         for idx in face.iter() {
             if !vertex_neighbors.contains_key(idx) {
                 vertex_neighbors.insert(*idx, vec![f as u32]);
@@ -469,25 +468,28 @@ pub fn compute_normals(model: &mut TriangleMesh) {
                 vertex_neighbors.get_mut(idx).unwrap().push(f as u32);
             }
         }
-        let triangle: Vec<glm::Vec3> = face
+        let triangle: Vec<Vec3> = face
             .into_iter()
-            .map(|idx| model.vertices[*idx as usize])
+            .map(|idx| model.vertices[*idx as usize].into())
             .collect();
-        let edge0: glm::Vec3 = triangle[1] - triangle[0];
-        let edge1: glm::Vec3 = triangle[2] - triangle[0];
-        let ng = glm::normalize(&glm::cross(&edge0, &edge1));
+        let edge0: Vec3 = triangle[1] - triangle[0];
+        let edge1: Vec3 = triangle[2] - triangle[0];
+        let ng = edge0.cross(edge1).normalize();
         face_normals.push(ng);
     }
 
     model.normals = (0..model.vertices.len())
         .into_iter()
         .map(|v| match vertex_neighbors.get(&(v as u32)) {
-            None => glm::vec3(0.0, 0.0, 0.0),
+            None => [0.0; 3],
 
             Some(faces) => {
-                let ng_sum: glm::Vec3 = faces.into_iter().map(|f| face_normals[*f as usize]).sum();
+                let ng_sum: Vec3 = faces
+                    .into_iter()
+                    .map(|f| face_normals[*f as usize])
+                    .fold(Vec3::ZERO, |a, b| a + b);
                 let ng = ng_sum / (faces.len() as f32);
-                ng
+                ng.into()
             }
         })
         .collect();
@@ -522,32 +524,32 @@ pub fn load_model(obj_file: &str) -> (Vec<TriangleMesh>, Vec<tobj::Model>, Vec<t
         // let mut indices = vec![];
         assert!(mesh.positions.len() % 3 == 0);
         for v in 0..mesh.positions.len() / 3 {
-            vertices.push(glm::vec3(
+            vertices.push([
                 mesh.positions[3 * v],
                 mesh.positions[3 * v + 1],
                 mesh.positions[3 * v + 2],
-            ));
+            ]);
         }
         let mut indices = vec![];
         for f in 0..mesh.indices.len() / 3 {
-            indices.push(uvec3(
+            indices.push([
                 mesh.indices[3 * f],
                 mesh.indices[3 * f + 1],
                 mesh.indices[3 * f + 2],
-            ));
+            ]);
         }
         if !mesh.normals.is_empty() {
             for i in 0..mesh.normals.len() / 3 {
-                normals.push(glm::vec3(
+                normals.push([
                     mesh.normals[3 * i],
                     mesh.normals[3 * i + 1],
                     mesh.normals[3 * i + 2],
-                ));
+                ]);
             }
         }
         if !mesh.texcoords.is_empty() {
             for i in 0..mesh.texcoords.len() / 2 {
-                texcoords.push(glm::vec2(mesh.texcoords[2 * i], mesh.texcoords[2 * i + 1]));
+                texcoords.push([mesh.texcoords[2 * i], mesh.texcoords[2 * i + 1]]);
             }
         }
         let mut imported = TriangleMesh {

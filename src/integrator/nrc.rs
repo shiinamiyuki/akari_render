@@ -14,7 +14,6 @@ use crate::texture::ShadingPoint;
 use crate::*;
 
 use nalgebra as na;
-use nalgebra_glm as glm;
 use rand::Rng;
 
 const POSITION_INPUTS: usize = 3;
@@ -97,8 +96,8 @@ fn nrc_encoding(v: &na::DMatrix<f32>) -> na::DMatrix<f32> {
 }
 // position_encoding_func_v3!(nrc_encoding, INPUT_SIZE, FEATURE_SIZE, MAX_FREQ);
 
-fn sph(v: &Vec3) -> Vec2 {
-    let v = dir_to_spherical(&v);
+fn sph(v: Vec3) -> Vec2 {
+    let v = dir_to_spherical(v);
     vec2(v.x / PI, v.y / (2.0 * PI))
 }
 
@@ -168,18 +167,27 @@ impl RadianceCache {
     }
     fn get_input_vec(r: &QueryRecord) -> InputVec {
         InputVec::from_iterator(
-            r.x.into_iter()
-                .map(|x| *x as f32)
-                .chain(r.n.into_iter().map(|x| *x as f32))
-                .chain(r.dir.into_iter().map(|x| *x as f32))
+            [r.x.x, r.x.y, r.x.z]
+                .into_iter()
+                .map(|x| *x)
+                .chain([r.n.x, r.n.y].into_iter().map(|x| *x))
+                .chain([r.dir.x, r.dir.y].into_iter().map(|x| *x))
                 .chain(once(r.info.roughness))
                 .chain(once(r.info.metallic))
-                .chain(r.info.albedo.samples.into_iter().map(|x| *x as f32)),
+                .chain(
+                    [
+                        r.info.albedo.samples.x,
+                        r.info.albedo.samples.y,
+                        r.info.albedo.samples.z,
+                    ]
+                    .into_iter()
+                    .map(|x| *x),
+                ),
         )
     }
     // returns index to query_result
     fn record_infer(&self, r: &QueryRecord) -> Option<usize> {
-        if !self.bound.contains(&r.x) {
+        if !self.bound.contains(r.x) {
             return None;
         }
         let v = Self::get_input_vec(r);
@@ -190,7 +198,7 @@ impl RadianceCache {
         Some(idx)
     }
     fn infer_single(&self, r: &QueryRecord) -> Option<Spectrum> {
-        if !self.bound.contains(&r.x) {
+        if !self.bound.contains(r.x) {
             return None;
         }
         let v = Self::get_input_vec(r);
@@ -203,12 +211,13 @@ impl RadianceCache {
             )));
         r.iter_mut().for_each(|x| *x = inv_tone_mapping(*x));
         assert!(r.nrows() == Spectrum::N_SAMPLES && r.ncols() == 1);
+        let s: na::SVector<f32, 3> = na::SVector::from_iterator(r.iter().map(|x| *x as f32));
         Some(Spectrum {
-            samples: na::SVector::from_iterator(r.iter().map(|x| *x as Float)),
+            samples: Vec3A::from([s[0], s[1], s[2]]),
         })
     }
     fn record_train(&self, r: &QueryRecord, target: &Spectrum) {
-        if !self.bound.contains(&r.x) {
+        if !self.bound.contains(r.x) {
             return;
         }
         let v = Self::get_input_vec(r);
@@ -221,10 +230,12 @@ impl RadianceCache {
             train.target.len() / Spectrum::N_SAMPLES
         );
         train.queue.extend(v.iter());
+        let albedo = r.info.albedo.samples;
+        let albedo = [albedo.x, albedo.y, albedo.z];
+        let target = [target.samples.x, target.samples.y, target.samples.z];
         let target = target
-            .samples
             .iter()
-            .zip(r.info.albedo.samples.iter())
+            .zip(albedo.iter())
             .map(|(a, b)| if *b != 0.0 { *a / *b } else { 0.0 });
         train.target.extend(target.map(|x| tone_mapping(x as f32)));
     }
@@ -308,7 +319,7 @@ struct VertexTemp {
     beta: Spectrum,
     li: Spectrum,
 }
-fn mis_weight(mut pdf_a: Float, mut pdf_b: Float) -> Float {
+fn mis_weight(mut pdf_a: f32, mut pdf_b: f32) -> f32 {
     pdf_a *= pdf_a;
     pdf_b *= pdf_b;
     pdf_a / (pdf_a + pdf_b)
@@ -331,7 +342,7 @@ impl CachedPathTracer {
         let mut li = Spectrum::zero();
         let mut beta = Spectrum::one();
         let mut prev_n: Option<Vec3> = None;
-        let mut prev_bsdf_pdf: Option<Float> = None;
+        let mut prev_bsdf_pdf: Option<f32> = None;
         let terminatin_coeff = 0.01;
         let mut depth = 0;
         path_tmp.clear();
@@ -343,7 +354,7 @@ impl CachedPathTracer {
         //     });
         //     path.push(Vertex {
         //         x: ray.o,
-        //         dir: dir_to_spherical(&ray.d),
+        //         dir: dir_to_spherical(ray.d),
         //         radiance: Spectrum::zero(),
         //     });
         // }
@@ -384,14 +395,14 @@ impl CachedPathTracer {
         //         }
         //     }
         // };
-        let mut termination_a0: Float = 0.0;
-        let mut termination_a: Float = 0.0;
+        let mut termination_a0: f32 = 0.0;
+        let mut termination_a: f32 = 0.0;
         let mut prev_x: Vec3 = ray.o;
-        let mut prev_pdf: Float = 0.0;
+        let mut prev_pdf: f32 = 0.0;
         loop {
             if let Some(isct) = scene.shape.intersect(&ray) {
                 let ng = isct.ng;
-                let frame = Frame::from_normal(&ng);
+                let frame = Frame::from_normal(ng);
                 let shape = isct.shape.unwrap();
                 let opt_bsdf = shape.bsdf();
                 if opt_bsdf.is_none() {
@@ -399,14 +410,13 @@ impl CachedPathTracer {
                 }
                 let p = ray.at(isct.t);
                 if depth == 0 {
-                    let w = glm::normalize(&(ray.o - p));
-                    termination_a0 =
-                        (ray.o - p).norm_squared() / (4.0 * PI * glm::dot(&w, &ng).abs());
+                    let w = (ray.o - p).normalize();
+                    termination_a0 = (ray.o - p).length_squared() / (4.0 * PI * w.dot(ng).abs());
                 }
                 if depth > 0 {
-                    let w = glm::normalize(&(prev_x - p));
+                    let w = (prev_x - p).normalize();
                     termination_a +=
-                        ((prev_x - p).norm_squared() / (prev_pdf * glm::dot(&w, &ng).abs())).sqrt();
+                        ((prev_x - p).length_squared() / (prev_pdf * w.dot(ng).abs())).sqrt();
                 }
                 let sp = ShadingPoint::from_intersection(&isct);
                 let bsdf = BsdfClosure {
@@ -422,7 +432,7 @@ impl CachedPathTracer {
                         let light_pdf = scene.light_distr.pdf(light)
                             * light
                                 .pdf_li(
-                                    &ray.d,
+                                    ray.d,
                                     &ReferencePoint {
                                         p: ray.o,
                                         n: prev_n.unwrap(),
@@ -459,9 +469,9 @@ impl CachedPathTracer {
                     if enable_cache && depth >= cache_enable_depth {
                         let record = QueryRecord {
                             x: p,
-                            dir: sph(&ray.d),
+                            dir: sph(ray.d),
                             info: bsdf.bsdf.info(&sp),
-                            n: sph(&ng),
+                            n: sph(ng),
                         };
                         if training {
                             if let Some(r) = cache.infer_single(&record) {
@@ -506,16 +516,16 @@ impl CachedPathTracer {
                     };
                     if !sample_self {
                         let p_ref = ReferencePoint { p, n: ng };
-                        let light_sample = light.sample_li(&sampler.next3d(), &p_ref);
+                        let light_sample = light.sample_li(sampler.next3d(), &p_ref);
                         let light_pdf = light_sample.pdf * light_pdf;
                         if !light_sample.li.is_black()
                             && !scene.shape.occlude(&light_sample.shadow_ray)
                         {
-                            let bsdf_pdf = bsdf.evaluate_pdf(&wo, &light_sample.wi);
+                            let bsdf_pdf = bsdf.evaluate_pdf(wo, light_sample.wi);
                             let weight = mis_weight(light_pdf, bsdf_pdf);
                             accumulate_radiance!(
-                                bsdf.evaluate(&wo, &light_sample.wi)
-                                    * glm::dot(&ng, &light_sample.wi).abs()
+                                bsdf.evaluate(wo, light_sample.wi)
+                                    * ng.dot(light_sample.wi).abs()
                                     * light_sample.li
                                     / light_pdf
                                     * weight
@@ -524,10 +534,10 @@ impl CachedPathTracer {
                     }
                 }
 
-                if let Some(bsdf_sample) = bsdf.sample(&sampler.next2d(), &wo) {
-                    let wi = &bsdf_sample.wi;
-                    ray = Ray::spawn(&p, wi).offset_along_normal(&ng);
-                    accumulate_beta!(bsdf_sample.f * glm::dot(wi, &ng).abs() / bsdf_sample.pdf);
+                if let Some(bsdf_sample) = bsdf.sample(sampler.next2d(), wo) {
+                    let wi = bsdf_sample.wi;
+                    ray = Ray::spawn(p, wi).offset_along_normal(ng);
+                    accumulate_beta!(bsdf_sample.f * wi.dot(ng).abs() / bsdf_sample.pdf);
                     prev_x = p;
                     prev_pdf = bsdf_sample.pdf;
                     prev_bsdf_pdf = Some(bsdf_sample.pdf);
@@ -583,7 +593,7 @@ impl Integrator for CachedPathTracer {
         let mut cache = RadianceCache::new(model);
         let mut samplers: Vec<Box<dyn Sampler>> = vec![];
         for i in 0..npixels {
-            samplers.push(Box::new(SobolSampler::new(i  as u64)));
+            samplers.push(Box::new(SobolSampler::new(i as u64)));
         }
         let mut states = vec![
             PathState {
@@ -637,13 +647,13 @@ impl Integrator for CachedPathTracer {
                     let x = (id as u32) % scene.camera.resolution().x;
                     let y = (id as u32) / scene.camera.resolution().x;
                     let pixel = uvec2(x, y);
-                    let (ray, _ray_weight) = scene.camera.generate_ray(&pixel, sampler.as_mut());
+                    let (ray, _ray_weight) = scene.camera.generate_ray(pixel, sampler.as_mut());
                     let path = &mut thread_data.path;
                     let path_tmp = &mut thread_data.path_tmp;
                     // let mut rng = rand::thread_rng();
                     // let training = ((x + iter) % training_freq == 0)
                     // && ((y + iter / training_freq) % training_freq == 0);
-                    let training = true;//rng.gen_bool(1.0 / training_freq);
+                    let training = true; //rng.gen_bool(1.0 / training_freq);
                     if !training {
                         return;
                     }
@@ -664,9 +674,9 @@ impl Integrator for CachedPathTracer {
                             // vertex.dir.into_iter().for_each(|x| assert!(!x.is_nan()));
                             let record = QueryRecord {
                                 x: vertex.x,
-                                dir: sph(&vertex.dir),
+                                dir: sph(vertex.dir),
                                 info: vertex.info,
-                                n: sph(&vertex.n),
+                                n: sph(vertex.n),
                             };
                             cache.record_train(&record, &vertex.radiance);
                         }
@@ -721,8 +731,7 @@ impl Integrator for CachedPathTracer {
                         let x = (id as u32) % scene.camera.resolution().x;
                         let y = (id as u32) / scene.camera.resolution().x;
                         let pixel = uvec2(x, y);
-                        let (ray, _ray_weight) =
-                            scene.camera.generate_ray(&pixel, sampler.as_mut());
+                        let (ray, _ray_weight) = scene.camera.generate_ray(pixel, sampler.as_mut());
                         let path = &mut thread_data.path;
                         let path_tmp = &mut thread_data.path_tmp;
                         let mut rng = rand::thread_rng();
@@ -744,9 +753,9 @@ impl Integrator for CachedPathTracer {
                                 // vertex.dir.into_iter().for_each(|x| assert!(!x.is_nan()));
                                 let record = QueryRecord {
                                     x: vertex.x,
-                                    dir: sph(&vertex.dir),
+                                    dir: sph(vertex.dir),
                                     info: vertex.info,
-                                    n: sph(&vertex.n),
+                                    n: sph(vertex.n),
                                 };
                                 cache.record_train(&record, &vertex.radiance);
                             }
@@ -770,10 +779,11 @@ impl Integrator for CachedPathTracer {
                     let li = {
                         if let Some(idx) = state.query_index {
                             let results = cache.query_result.read();
+                            let s: na::SVector<f32, 3> = na::SVector::from_iterator(
+                                results.column(idx).iter().map(|x| *x as f32),
+                            );
                             let result = Spectrum {
-                                samples: na::SVector::from_iterator(
-                                    results.column(idx).iter().map(|x| *x as Float),
-                                ),
+                                samples: Vec3A::from([s[0], s[1], s[2]]),
                             };
                             state.li + state.beta * result
                         } else {
@@ -802,16 +812,16 @@ impl Integrator for CachedPathTracer {
         //     let x = (id as u32) % scene.camera.resolution().x;
         //     let y = (id as u32) / scene.camera.resolution().x;
         //     let pixel = uvec2(x, y);
-        //     let (ray, _ray_weight) = scene.camera.generate_ray(&pixel, &mut sampler);
+        //     let (ray, _ray_weight) = scene.camera.generate_ray(pixel, &mut sampler);
         //     let lk = cache.read();
         //     let cache = &*lk;
-        //     // let li = cache.infer(&ray.o, &dir_to_spherical(&ray.d));
+        //     // let li = cache.infer(&ray.o, &dir_to_spherical(ray.d));
         //     let mut li = Spectrum::zero();
         //     if let Some(isct) = scene.shape.intersect(&ray) {
         //         let p = ray.o; //ray.at(isct.t * 0.9);
-        //         li = cache.infer(&p, &dir_to_spherical(&ray.d));
+        //         li = cache.infer(&p, &dir_to_spherical(ray.d));
         //         // let n = isct.ng;
-        //         // let frame = Frame::from_normal(&n);
+        //         // let frame = Frame::from_normal(n);
         //         // f
         //         // println!("{}", li.samples);
         //     }

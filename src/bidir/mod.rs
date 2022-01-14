@@ -8,8 +8,8 @@ use crate::texture::ShadingPoint;
 use crate::*;
 #[derive(Clone, Copy)]
 pub struct VertexBase {
-    pub pdf_fwd: Float,
-    pub pdf_rev: Float,
+    pub pdf_fwd: f32,
+    pub pdf_rev: f32,
     pub delta: bool,
     pub beta: Spectrum,
     pub wo: Vec3,
@@ -44,12 +44,12 @@ impl<'a> Vertex<'a> {
         camera: &'a dyn Camera,
         ray: &Ray,
         beta: Spectrum,
-        pdf_fwd: Float,
+        pdf_fwd: f32,
     ) -> Self {
         Self::Camera(CameraVertex {
             camera,
             base: VertexBase {
-                wo: glm::zero(),
+                wo: Vec3::ZERO,
                 pdf_fwd,
                 pdf_rev: 0.0,
                 delta: false,
@@ -64,12 +64,12 @@ impl<'a> Vertex<'a> {
         p: Vec3,
         n: Vec3,
         beta: Spectrum,
-        pdf_fwd: Float,
+        pdf_fwd: f32,
     ) -> Self {
         Self::Light(LightVertex {
             light,
             base: VertexBase {
-                wo: glm::zero(),
+                wo: Vec3::ZERO,
                 pdf_fwd,
                 pdf_rev: 0.0,
                 delta: false,
@@ -85,7 +85,7 @@ impl<'a> Vertex<'a> {
         bsdf: BsdfClosure<'a>,
         wo: Vec3,
         n: Vec3,
-        mut pdf_fwd: Float,
+        mut pdf_fwd: f32,
         prev: &Vertex<'a>,
     ) -> Self {
         let mut v = Self::Surface(SurfaceVertex {
@@ -150,37 +150,35 @@ impl<'a> Vertex<'a> {
             Self::Camera(v) => &mut v.base,
         }
     }
-    pub fn pdf_light_origin(&self, scene: &Scene, next: &Vertex) -> Float {
+    pub fn pdf_light_origin(&self, scene: &Scene, next: &Vertex) -> f32 {
         match self {
             Vertex::Light(v) => {
                 let light_pdf = scene.light_distr.pdf(v.light);
-                let (pdf_pos, _) = v
-                    .light
-                    .pdf_le(&Ray::spawn_to(&self.p(), &next.p()), &self.n());
+                let (pdf_pos, _) = v.light.pdf_le(&Ray::spawn_to(self.p(), next.p()), self.n());
                 light_pdf * pdf_pos
             }
             _ => unreachable!(),
         }
     }
-    pub fn pdf_light(&self, _scene: &Scene, next: &Vertex) -> Float {
+    pub fn pdf_light(&self, _scene: &Scene, next: &Vertex) -> f32 {
         match self {
             Vertex::Light(v) => {
-                let ray = Ray::spawn_to(&self.p(), &next.p());
-                let (_pdf_pos, pdf_dir) = v.light.pdf_le(&ray, &self.n());
+                let ray = Ray::spawn_to(self.p(), next.p());
+                let (_pdf_pos, pdf_dir) = v.light.pdf_le(&ray, self.n());
                 self.convert_pdf_to_area(pdf_dir, next)
             }
             _ => unreachable!(),
         }
     }
-    pub fn pdf(&self, scene: &Scene, prev: Option<&Vertex<'a>>, next: &Vertex<'a>) -> Float {
+    pub fn pdf(&self, scene: &Scene, prev: Option<&Vertex<'a>>, next: &Vertex<'a>) -> f32 {
         let p2 = next.p();
         let p = self.p();
         match self {
             Vertex::Surface(v) => {
                 let p1 = prev.unwrap().p();
-                let wo = glm::normalize(&(p1 - p));
-                let wi = glm::normalize(&(p2 - p));
-                self.convert_pdf_to_area(v.bsdf.evaluate_pdf(&wo, &wi), next)
+                let wo = (p1 - p).normalize();
+                let wi = (p2 - p).normalize();
+                self.convert_pdf_to_area(v.bsdf.evaluate_pdf(wo, wi), next)
             }
             Vertex::Light(_) => self.pdf_light(scene, next),
             _ => unreachable!(),
@@ -189,13 +187,13 @@ impl<'a> Vertex<'a> {
     pub fn f(&self, next: &Vertex<'a>, _mode: TransportMode) -> Spectrum {
         let v1 = self.as_surface().unwrap();
         // let v2 = next.as_surface().unwrap();
-        let wi = glm::normalize(&(next.p() - self.p()));
-        v1.bsdf.evaluate(&self.base().wo, &wi)
+        let wi = (next.p() - self.p()).normalize();
+        v1.bsdf.evaluate(self.base().wo, wi)
     }
     pub fn beta(&self) -> Spectrum {
         self.base().beta
     }
-    pub fn pdf_fwd(&self) -> Float {
+    pub fn pdf_fwd(&self) -> f32 {
         self.base().pdf_fwd
     }
     pub fn p(&self) -> Vec3 {
@@ -206,16 +204,16 @@ impl<'a> Vertex<'a> {
     }
     pub fn le(&self, _scene: &'a Scene, prev: &Vertex<'a>) -> Spectrum {
         if let Some(v) = self.as_light() {
-            v.light.le(&Ray::spawn_to(&prev.p(), &self.p()))
+            v.light.le(&Ray::spawn_to(prev.p(), self.p()))
         } else {
             Spectrum::zero()
         }
     }
-    pub fn convert_pdf_to_area(&self, mut pdf: Float, v2: &Vertex) -> Float {
+    pub fn convert_pdf_to_area(&self, mut pdf: f32, v2: &Vertex) -> f32 {
         let w = v2.p() - self.p();
-        let inv_dist2 = 1.0 / glm::dot(&w, &w);
+        let inv_dist2 = 1.0 / w.length_squared();
         if v2.on_surface() {
-            pdf *= glm::dot(&v2.n(), &(w * inv_dist2.sqrt())).abs();
+            pdf *= v2.n().dot(w * inv_dist2.sqrt()).abs();
         }
         pdf * inv_dist2
     }
@@ -240,7 +238,7 @@ pub fn random_walk<'a>(
     mut ray: Ray,
     sampler: &mut dyn Sampler,
     mut beta: Spectrum,
-    pdf: Float,
+    pdf: f32,
     max_depth: usize,
     mode: TransportMode,
     path: &mut Path<'a>,
@@ -257,7 +255,7 @@ pub fn random_walk<'a>(
     loop {
         if let Some(isct) = scene.shape.intersect(&ray) {
             let ng = isct.ng;
-            let frame = Frame::from_normal(&ng);
+            let frame = Frame::from_normal(ng);
             let shape = isct.shape.unwrap();
             if mode == TransportMode::RADIANCE {
                 if let Some(light) = scene.get_light_of_shape(shape) {
@@ -290,16 +288,16 @@ pub fn random_walk<'a>(
             if depth >= max_depth {
                 break;
             }
-            if let Some(bsdf_sample) = bsdf.sample(&sampler.next2d(), &wo) {
+            if let Some(bsdf_sample) = bsdf.sample(sampler.next2d(), wo) {
                 pdf_fwd = bsdf_sample.pdf;
-                let wi = &bsdf_sample.wi;
+                let wi = bsdf_sample.wi;
                 let prev = &mut path[prev_index];
                 {
-                    pdf_rev = bsdf.evaluate_pdf(&wi, &wo);
+                    pdf_rev = bsdf.evaluate_pdf(wi, wo);
                     prev.base_mut().pdf_rev = vertex.convert_pdf_to_area(pdf_rev, prev);
                 }
-                ray = Ray::spawn(&p, wi).offset_along_normal(&ng);
-                beta *= bsdf_sample.f * glm::dot(wi, &ng).abs() / bsdf_sample.pdf;
+                ray = Ray::spawn(p, wi).offset_along_normal(ng);
+                beta *= bsdf_sample.f * wi.dot(ng).abs() / bsdf_sample.pdf;
             } else {
                 break;
             }
@@ -310,7 +308,7 @@ pub fn random_walk<'a>(
 }
 pub fn generate_camera_path<'a>(
     scene: &'a Scene,
-    pixel: &glm::UVec2,
+    pixel: UVec2,
     sampler: &mut dyn Sampler,
     max_depth: usize,
     path: &mut Path<'a>,
@@ -342,15 +340,15 @@ pub fn generate_light_path<'a>(
     max_depth: usize,
     path: &mut Path<'a>,
 ) {
-    if max_depth == 0{
+    if max_depth == 0 {
         return;
     }
     path.clear();
     let (light, light_pdf) = scene.light_distr.sample(sampler.next1d());
-    let sample = light.sample_le(&[sampler.next2d(), sampler.next2d()]);
+    let sample = light.sample_le([sampler.next2d(), sampler.next2d()]);
     let le = sample.le;
-    let beta = le / (sample.pdf_dir * sample.pdf_pos * light_pdf)
-        * glm::dot(&sample.ray.d, &sample.n).abs();
+    let beta =
+        le / (sample.pdf_dir * sample.pdf_pos * light_pdf) * sample.ray.d.dot(sample.n).abs();
     let vertex = Vertex::create_light_vertex(
         light,
         sample.ray.o,
@@ -374,16 +372,16 @@ pub fn generate_light_path<'a>(
     );
 }
 pub type Path<'a> = Vec<Vertex<'a>>;
-pub fn geometry_term(scene: &Scene, v1: &Vertex, v2: &Vertex) -> Float {
+pub fn geometry_term(scene: &Scene, v1: &Vertex, v2: &Vertex) -> f32 {
     let mut wi = v1.p() - v2.p();
-    let dist2: Float = glm::dot(&wi, &wi);
+    let dist2: f32 = wi.length_squared();
     wi /= dist2.sqrt();
-    let mut ray = Ray::spawn_to(&v1.p(), &v2.p()).offset_along_normal(&v1.n());
+    let mut ray = Ray::spawn_to(v1.p(), v2.p()).offset_along_normal(v1.n());
     ray.tmax *= 0.997;
     if scene.shape.occlude(&ray) {
         0.0
     } else {
-        (glm::dot(&wi, &v1.n()) * glm::dot(&wi, &v2.n()) / dist2).abs()
+        (wi.dot(v1.n()) * wi.dot(v2.n()) / dist2).abs()
     }
 }
 #[derive(Debug, Clone, Copy)]
@@ -412,10 +410,10 @@ pub fn mis_weight<'a>(
     original_eye_path: &Path<'a>,
     sampled: Option<Vertex<'a>>,
     scratch: &mut Scratch<'a>,
-) -> Float {
+) -> f32 {
     let s = strat.s;
     let t = strat.t;
-    // 1.0 / (s + t - 1) as Float
+    // 1.0 / (s + t - 1) as f32
     if s + t == 2 {
         return 1.0;
     }
@@ -567,7 +565,7 @@ pub fn connect_paths<'a>(
                 p: pt.p(),
                 n: pt.n(),
             };
-            let light_sample = light.sample_li(&sampler.next3d(), &p_ref);
+            let light_sample = light.sample_li(sampler.next3d(), &p_ref);
             if !light_sample.li.is_black() {
                 {
                     let mut v = Vertex::create_light_vertex(
@@ -586,7 +584,7 @@ pub fn connect_paths<'a>(
                 }
 
                 if pt.on_surface() {
-                    l *= glm::dot(&light_sample.wi, &p_ref.n).abs();
+                    l *= light_sample.wi.dot(p_ref.n).abs();
                 }
                 if !l.is_black() {
                     if scene.shape.occlude(&light_sample.shadow_ray) {
@@ -594,8 +592,8 @@ pub fn connect_paths<'a>(
                     }
                 }
                 // li += beta
-                //     * bsdf.evaluate(&wo, &light_sample.wi)
-                //     * glm::dot(&ng, &light_sample.wi).abs()
+                //     * bsdf.evaluate(wo, light_sample.wi)
+                //     * ng.dot(light_sample.wi).abs()
                 //     * light_sample.li
                 //     / light_sample.pdf;
             }

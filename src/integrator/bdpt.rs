@@ -65,7 +65,7 @@ impl Integrator for Bdpt {
                 sampler.start_next_sample();
                 bdpt::generate_camera_path(
                     scene,
-                    &pixel,
+                    pixel,
                     &mut sampler,
                     self.max_depth + 2,
                     camera_path,
@@ -95,7 +95,7 @@ impl Integrator for Bdpt {
                     }
                 }
             }
-            acc_li = acc_li / (self.spp as Float);
+            acc_li = acc_li / (self.spp as f32);
 
             film.add_sample(&uvec2(x, y), &acc_li, 1.0);
 
@@ -109,7 +109,7 @@ impl Integrator for Bdpt {
                         let idx = get_index(s, t);
                         pyramid[idx].add_sample(
                             &uvec2(x, y),
-                            &(debug_acc[idx] / (self.spp as Float) as Float),
+                            &(debug_acc[idx] / (self.spp as f32) as f32),
                             1.0,
                         );
                     }

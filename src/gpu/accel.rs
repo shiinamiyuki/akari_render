@@ -124,20 +124,21 @@ impl GeometryInstance {
     }
 }
 
-pub fn mat4_to_rtx_transform(transform: &glm::Mat4) -> [f32; 12] {
+pub fn mat4_to_rtx_transform(transform: &glam::Mat4) -> [f32; 12] {
+    let transform = transform.from_cols_array_2d();
     [
-        transform[(0, 0)],
-        transform[(0, 1)],
-        transform[(0, 2)],
-        transform[(0, 3)],
-        transform[(1, 0)],
-        transform[(1, 1)],
-        transform[(1, 2)],
-        transform[(1, 3)],
-        transform[(2, 0)],
-        transform[(2, 1)],
-        transform[(2, 2)],
-        transform[(2, 3)],
+        transform[0][0],
+        transform[0][1],
+        transform[0][2],
+        transform[0][3],
+        transform[1][0],
+        transform[1][1],
+        transform[1][2],
+        transform[1][3],
+        transform[2][0],
+        transform[2][1],
+        transform[2][2],
+        transform[2][3],
     ]
 }
 impl RTX {

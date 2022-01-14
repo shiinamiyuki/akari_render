@@ -2,15 +2,12 @@ use std::convert::TryInto;
 
 use crate::util::erf_inv;
 use crate::*;
-use exr::prelude::SmallVec;
-use glm::IVec2;
-use rand::Rng;
 
 use crate::sobolmat::SOBOL_MATRIX;
 pub trait Sampler: Sync + Send {
     // fn start_pixel(&mut self, px: &IVec2, res: &IVec2);
     fn start_next_sample(&mut self);
-    fn next1d(&mut self) -> Float;
+    fn next1d(&mut self) -> f32;
     fn next2d(&mut self) -> Vec2 {
         vec2(self.next1d(), self.next1d())
     }
@@ -76,8 +73,8 @@ impl PCGSampler {
     }
 }
 impl Sampler for PCGSampler {
-    fn next1d(&mut self) -> Float {
-        self.rng.pcg32() as Float / (std::u32::MAX as Float)
+    fn next1d(&mut self) -> f32 {
+        self.rng.pcg32() as f32 / (std::u32::MAX as f32)
     }
     // fn start_pixel(&mut self, px: &IVec2, res: &IVec2) {}
     fn start_next_sample(&mut self) {}
@@ -123,10 +120,10 @@ impl SobolSampler {
     }
 }
 impl Sampler for SobolSampler {
-    fn next1d(&mut self) -> Float {
+    fn next1d(&mut self) -> f32 {
         let r = sobol(self.dim, self.index, self.rotation);
         self.dim += 1;
-        r as Float
+        r as f32
     }
     // fn start_pixel(&mut self, px: &IVec2, res: &IVec2) {
     //     self.index = (px.x + px.y * res.x) as u32;
@@ -180,7 +177,7 @@ impl<S: Sampler> Sampler for ReplaySampler<S> {
         }
     }
 
-    fn next1d(&mut self) -> Float {
+    fn next1d(&mut self) -> f32 {
         self.ensure_ready(self.index);
         let x = self.x[self.index];
         self.index += 1;
@@ -189,13 +186,13 @@ impl<S: Sampler> Sampler for ReplaySampler<S> {
 }
 
 pub struct PrimarySample {
-    pub value: Float,
-    pub backup: Float,
+    pub value: f32,
+    pub backup: f32,
     pub last_modified: usize,
     pub modified_backup: usize,
 }
 impl PrimarySample {
-    pub fn new(x: Float) -> Self {
+    pub fn new(x: f32) -> Self {
         Self {
             value: x,
             backup: x,
@@ -221,7 +218,7 @@ pub struct MltSampler {
     pub dimension: usize,
     pub last_large_iteration: usize,
 }
-const SIGMA: Float = 0.01;
+const SIGMA: f32 = 0.01;
 impl MltSampler {
     pub fn from_replay<S>(replay: &ReplaySampler<S>, seed: u64) -> Self {
         let mut s = MltSampler::new(seed);
@@ -254,8 +251,8 @@ impl MltSampler {
             x.value = self.rng.next1d();
         } else {
             let n_small: usize = self.cur_iteration as usize - x.last_modified;
-            let normal_sample = (2.0 as Float).sqrt() * erf_inv(2.0 * self.rng.next1d() - 1.0);
-            let err_sigma = SIGMA * (n_small as Float).sqrt();
+            let normal_sample = (2.0 as f32).sqrt() * erf_inv(2.0 * self.rng.next1d() - 1.0);
+            let err_sigma = SIGMA * (n_small as f32).sqrt();
             x.value += normal_sample * err_sigma;
             x.value -= x.value.floor();
         }
@@ -288,7 +285,7 @@ impl Sampler for MltSampler {
         panic!("call start_new_iteration instead for mlt sampler");
     }
 
-    fn next1d(&mut self) -> Float {
+    fn next1d(&mut self) -> f32 {
         let idx = self.dimension;
         self.dimension += 1;
         while idx >= self.samples.len() {

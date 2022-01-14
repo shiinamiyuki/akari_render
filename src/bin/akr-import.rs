@@ -3,7 +3,7 @@ use akari::linear_to_srgb;
 // use akari::light::*;
 // use akari::shape::*;
 use akari::scenegraph::node;
-use nalgebra_glm as glm;
+use akari::*;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
@@ -22,8 +22,8 @@ fn import(path: &str, scene: &mut node::Scene, forced: bool) {
     println!("# of models: {}", models.len());
     println!("# of materials: {}", materials.len());
     let default_bsdf = node::Bsdf::Principled {
-        color: node::Texture::Srgb(glm::vec3(0.8, 0.8, 0.8)),
-        subsurface_radius: node::Texture::Float3(glm::vec3(1.0, 0.2, 0.1)),
+        color: node::Texture::Srgb([0.8, 0.8, 0.8]),
+        subsurface_radius: node::Texture::Float3([1.0, 0.2, 0.1]),
         subsurface: node::Texture::Float(0.0),
         subsurface_color: node::Texture::Float(0.0),
         metallic: node::Texture::Float(0.0),
@@ -85,12 +85,7 @@ fn import(path: &str, scene: &mut node::Scene, forced: bool) {
                 if has_diffuse {
                     if m.diffuse_texture.is_empty() {
                         *color = node::Texture::Srgb(
-                            linear_to_srgb(&glm::vec3(
-                                m.diffuse[0].into(),
-                                m.diffuse[1].into(),
-                                m.diffuse[2].into(),
-                            ))
-                            .cast::<f32>(),
+                            linear_to_srgb(vec3(m.diffuse[0], m.diffuse[1], m.diffuse[2])).into(),
                         );
                         max_diffuse = m
                             .diffuse
@@ -104,12 +99,8 @@ fn import(path: &str, scene: &mut node::Scene, forced: bool) {
                 } else if has_specular {
                     if m.specular_texture.is_empty() {
                         *color = node::Texture::Srgb(
-                            linear_to_srgb(&glm::vec3(
-                                m.specular[0].into(),
-                                m.specular[1].into(),
-                                m.specular[2].into(),
-                            ))
-                            .cast::<f32>(),
+                            linear_to_srgb(vec3(m.specular[0], m.specular[1], m.specular[2]))
+                                .into(),
                         );
                         max_specular = m
                             .specular
@@ -122,7 +113,7 @@ fn import(path: &str, scene: &mut node::Scene, forced: bool) {
                     }
                     *metallic = node::Texture::Float(1.0);
                 } else {
-                    *color = node::Texture::Srgb(glm::vec3(0.0, 0.0, 0.0))
+                    *color = node::Texture::Srgb([0.0, 0.0, 0.0])
                 }
                 if has_diffuse && has_specular && (max_specular + max_diffuse > 0.0) {
                     *metallic = node::Texture::Float(max_specular / (max_specular + max_diffuse));

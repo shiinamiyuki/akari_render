@@ -21,10 +21,10 @@ impl Shape for Arc<dyn Shape> {
     fn aabb(&self) -> Bounds3f {
         self.as_ref().aabb()
     }
-    fn sample_surface(&self, u: &Vec3) -> SurfaceSample {
+    fn sample_surface(&self, u: Vec3) -> SurfaceSample {
         self.as_ref().sample_surface(u)
     }
-    fn area(&self) -> Float {
+    fn area(&self) -> f32 {
         self.as_ref().area()
     }
     fn children(&self) -> Option<Vec<Arc<dyn Shape>>> {
@@ -52,7 +52,7 @@ impl bvh::BVHData for GenericBVHData {
 
 pub struct Aggregate {
     bvh: bvh::BVHAccelerator<GenericBVHData>,
-    area: Float,
+    area: f32,
 }
 impl Aggregate {
     pub fn shapes(&self) -> impl Iterator<Item = &Arc<dyn Shape>> {
@@ -60,7 +60,7 @@ impl Aggregate {
     }
     pub fn new(shapes: Vec<Arc<dyn Shape>>) -> Self {
         let v: Vec<u32> = (0..shapes.len() as u32).collect();
-        let area: Float = shapes.iter().map(|s| s.area()).sum();
+        let area: f32 = shapes.iter().map(|s| s.area()).sum();
         let data = GenericBVHData { shapes };
         Self {
             bvh: bvh::SweepSAHBuilder::build(data, v).optimize_layout(),
@@ -82,15 +82,15 @@ impl Shape for Aggregate {
     fn aabb(&self) -> Bounds3f {
         Bounds3f::default()
     }
-    fn area(&self) -> Float {
+    fn area(&self) -> f32 {
         self.area
     }
-    fn sample_surface(&self, u: &Vec3) -> SurfaceSample {
-        let len = self.bvh.data.shapes.len() as Float;
-        let i = u[2] as Float * len;
+    fn sample_surface(&self, u: Vec3) -> SurfaceSample {
+        let len = self.bvh.data.shapes.len() as f32;
+        let i = u[2] as f32 * len;
         let i = i as usize;
-        let u = vec3(u[0], u[1], (u[2] - i as Float / len) * (len - i as Float));
-        self.bvh.data.shapes[i].sample_surface(&u)
+        let u = vec3(u[0], u[1], (u[2] - i as f32 / len) * (len - i as f32));
+        self.bvh.data.shapes[i].sample_surface(u)
     }
     fn children(&self) -> Option<Vec<Arc<dyn Shape>>> {
         Some(self.shapes().map(|x| x.clone()).collect())

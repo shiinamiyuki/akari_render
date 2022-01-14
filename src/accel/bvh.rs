@@ -90,7 +90,7 @@ where
         // println!("building {}..{}", begin, end);
         let mut aabb = Bounds3f::default();
         for i in begin..end {
-            aabb.insert_box(&self.data.aabb(references[i as usize]));
+            aabb.insert_box(self.data.aabb(references[i as usize]));
         }
         for i in 0..3 {
             if aabb.size()[i] == 0.0 {
@@ -124,21 +124,21 @@ where
                     references[begin as usize..end as usize].par_sort_unstable_by(|a, b| {
                         let box_a = self.data.aabb(*a);
                         let box_b = self.data.aabb(*b);
-                        OrderedFloat::<Float>(box_a.centroid()[$axis])
-                            .partial_cmp(&OrderedFloat::<Float>(box_b.centroid()[$axis]))
+                        OrderedFloat::<f32>(box_a.centroid()[$axis])
+                            .partial_cmp(&OrderedFloat::<f32>(box_b.centroid()[$axis]))
                             .unwrap()
                     });
                     {
                         let mut aabb = Bounds3f::default();
                         for i in begin..end {
-                            aabb.insert_box(&self.data.aabb(references[i as usize]));
+                            aabb.insert_box(self.data.aabb(references[i as usize]));
                             surface_area_fwd[(i - begin) as usize] = aabb.surface_area() as f64;
                         }
                     }
                     {
                         let mut aabb = Bounds3f::default();
                         for i in (begin..end).rev() {
-                            aabb.insert_box(&self.data.aabb(references[i as usize]));
+                            aabb.insert_box(self.data.aabb(references[i as usize]));
                             surface_area_rev[(i - begin) as usize] = aabb.surface_area() as f64;
                         }
                     }
@@ -280,7 +280,7 @@ where
             .into_par_iter()
             .map(|i| {
                 let mut aabb = nodes[2 * i + 1].aabb;
-                aabb.insert_box(&nodes[2 * i + 2].aabb);
+                aabb.insert_box(nodes[2 * i + 2].aabb);
                 (i, OrderedFloat(aabb.surface_area()))
             })
             .collect();
@@ -305,13 +305,13 @@ where
         }
         self
     }
-    fn intersect_aabb(aabb: &Bounds3f, ray: &Ray, invd: &Vec3) -> Float {
-        let t0 = (aabb.min - ray.o).component_mul(&invd);
-        let t1 = (aabb.max - ray.o).component_mul(&invd);
-        let min = glm::min2(&t0, &t1);
-        let max = glm::max2(&t0, &t1);
-        let tmin = glm::comp_max(&min).max(ray.tmin);
-        let tmax = glm::comp_min(&max).min(ray.tmax);
+    fn intersect_aabb(aabb: &Bounds3f, ray: &Ray, invd: Vec3) -> f32 {
+        let t0 = (aabb.min - ray.o) * invd;
+        let t1 = (aabb.max - ray.o) * invd;
+        let min = t0.min(t1);
+        let max = t0.max(t1);
+        let tmin = min.max_element().max(ray.tmin);
+        let tmax = max.min_element().min(ray.tmax);
         if tmin <= tmax {
             tmin
         } else {
@@ -345,7 +345,7 @@ where
         let mut sp = 0;
         let mut p = Some(&self.nodes[0]);
         let mut ray = *original_ray;
-        let invd: Vec3 = vec3(1.0, 1.0, 1.0).component_div(&ray.d);
+        let invd: Vec3 = vec3(1.0, 1.0, 1.0) / ray.d;
         let mut isct = None;
         if self.nodes[0].is_leaf() {
             return self.intersect_leaf(&self.nodes[0], &mut ray);
@@ -365,8 +365,8 @@ where
             } else {
                 let left = &self.nodes[node.left() as usize];
                 let right = &self.nodes[node.right() as usize];
-                let t_left = Self::intersect_aabb(&left.aabb, &ray, &invd);
-                let t_right = Self::intersect_aabb(&right.aabb, &ray, &invd);
+                let t_left = Self::intersect_aabb(&left.aabb, &ray, invd);
+                let t_right = Self::intersect_aabb(&right.aabb, &ray, invd);
                 if t_left < 0.0 && t_right < 0.0 {
                     if sp > 0 {
                         sp -= 1;
@@ -400,10 +400,10 @@ where
         let mut sp = 0;
         let mut p = Some(&self.nodes[0]);
         let mut ray = *original_ray;
-        let invd: Vec3 = vec3(1.0, 1.0, 1.0).component_div(&ray.d);
+        let invd: Vec3 = vec3(1.0, 1.0, 1.0) / ray.d;
         while p.is_some() {
             let node = p.unwrap();
-            let t = Self::intersect_aabb(&node.aabb, &ray, &invd);
+            let t = Self::intersect_aabb(&node.aabb, &ray, invd);
             if t < 0.0 {
                 if sp > 0 {
                     sp -= 1;

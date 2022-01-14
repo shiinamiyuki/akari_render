@@ -30,9 +30,9 @@ impl Integrator for Erpt {
         let npixels = (scene.camera.resolution().x * scene.camera.resolution().y) as usize;
         log::info!("bootstrapping...");
         let (_, b) = Pssmlt::init_chain(self.max_depth as usize, self.n_bootstrap, 0, scene);
-        let e_avg = b / self.n_bootstrap as Float;
+        let e_avg = b / self.n_bootstrap as f32;
         log::info!("average energy: {}", e_avg);
-        let e_d = e_avg / self.mutations_per_chain as Float;
+        let e_d = e_avg / self.mutations_per_chain as f32;
         log::info!("deposit energy: {}", e_d);
         let indirect_film = Film::new(&scene.camera.resolution());
         let chunks = (npixels + 255) / 256;
@@ -46,19 +46,19 @@ impl Integrator for Erpt {
             let mut rng = thread_rng();
             for _ in 0..self.spp {
                 sampler.start_next_sample();
-                let (ray, _ray_weight) = scene.camera.generate_ray(&pixel, &mut sampler);
+                let (ray, _ray_weight) = scene.camera.generate_ray(pixel, &mut sampler);
                 let li = PathTracer::li(ray, &mut sampler, scene, self.max_depth as usize, true);
                 let e = pssmlt::target_function(li);
-                let mean_chains = e / (self.mutations_per_chain as Float * e_d);
+                let mean_chains = e / (self.mutations_per_chain as f32 * e_d);
                 let dep_energy =
-                    e / (self.spp as Float * mean_chains * self.mutations_per_chain as Float);
+                    e / (self.spp as f32 * mean_chains * self.mutations_per_chain as f32);
                 {
-                    let num_chains = (rng.gen::<Float>() + mean_chains).floor() as usize;
+                    let num_chains = (rng.gen::<f32>() + mean_chains).floor() as usize;
                     for _ in 0..num_chains {
                         let mut mlt_sampler = MltSampler::from_replay(&sampler, rng.gen());
                         {
-                            let px = (x as Float + 0.5) / scene.camera.resolution().x as Float;
-                            let py = (y as Float + 0.5) / scene.camera.resolution().y as Float;
+                            let px = (x as f32 + 0.5) / scene.camera.resolution().x as f32;
+                            let py = (y as f32 + 0.5) / scene.camera.resolution().y as f32;
                             mlt_sampler.samples.insert(0, PrimarySample::new(px));
                             mlt_sampler.samples.insert(1, PrimarySample::new(py));
                         }
@@ -86,7 +86,7 @@ impl Integrator for Erpt {
                                     * (1.0 - accept_prob).clamp(0.0, 1.0);
                                 indirect_film.add_sample(&chain.cur.pixel, &dep_value, 1.0);
                             }
-                            if accept_prob == 1.0 || rng.gen::<Float>() < accept_prob {
+                            if accept_prob == 1.0 || rng.gen::<f32>() < accept_prob {
                                 chain.cur = proposal;
                                 chain.sampler.accept();
                             } else {
@@ -97,7 +97,7 @@ impl Integrator for Erpt {
                 }
                 acc_li += li;
             }
-            acc_li = acc_li / (self.spp as Float);
+            acc_li = acc_li / (self.spp as f32);
             let _ = acc_li;
             // indirect_film.add_sample(&uvec2(x, y), &acc_li, 1.0);
             if (id + 1) % 256 == 0 {

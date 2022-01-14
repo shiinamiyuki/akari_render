@@ -1,5 +1,3 @@
-pub use glm::vec2;
-pub use glm::vec3;
 #[cfg(feature = "global_mimalloc")]
 use mimalloc::MiMalloc;
 #[cfg(feature = "global_mimalloc")]
@@ -7,7 +5,6 @@ use mimalloc::MiMalloc;
 static GLOBAL: MiMalloc = MiMalloc;
 
 pub use nalgebra as na;
-pub use nalgebra_glm as glm;
 use rayon::prelude::*;
 
 pub mod accel;
@@ -34,11 +31,15 @@ pub mod shape;
 pub mod sobolmat;
 pub mod texture;
 pub mod util;
-pub mod wavefront;
 pub mod varray;
+pub mod wavefront;
 
 #[macro_use]
 extern crate bitflags;
+pub use glam::{
+    uvec2, uvec3, uvec4, vec2, vec3, vec4, Mat2, Mat3, Mat3A, Mat4, UVec2, UVec3, UVec4, Vec2,
+    Vec3, Vec3A, Vec4,
+};
 use parking_lot::RwLock;
 use serde::Deserialize;
 use serde::Serialize;
@@ -54,23 +55,7 @@ use std::{
     },
     usize,
 };
-#[cfg(feature = "float_f64")]
-pub type Float = f64;
 
-#[cfg(not(feature = "float_f64"))]
-pub type Float = f32;
-
-pub type Vec3 = glm::TVec3<Float>;
-pub type Vec2 = glm::TVec2<Float>;
-pub type Mat4 = glm::TMat4<Float>;
-pub type Mat3 = glm::TMat3<Float>;
-
-pub fn uvec2(x: u32, y: u32) -> glm::UVec2 {
-    glm::UVec2::new(x, y)
-}
-pub fn uvec3(x: u32, y: u32, z: u32) -> glm::UVec3 {
-    glm::UVec3::new(x, y, z)
-}
 pub fn profile<F: FnOnce() -> T, T>(f: F) -> (T, f64) {
     let now = std::time::Instant::now();
     let ret = f();
@@ -127,40 +112,32 @@ impl Clone for AtomicFloat {
         }
     }
 }
-#[derive(Debug, Clone, Copy)]
-pub struct Bound2<T: na::Scalar> {
-    pub min: glm::TVec2<T>,
-    pub max: glm::TVec2<T>,
+
+#[derive(Clone, Copy, Debug)]
+pub struct Aabb {
+    pub min: Vec3,
+    pub max: Vec3,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct Bound3<T: na::Scalar> {
-    pub min: glm::TVec3<T>,
-    pub max: glm::TVec3<T>,
-}
-
-impl<T> Bound3<T>
-where
-    T: glm::Number,
-{
-    pub fn size(&self) -> glm::TVec3<T> {
+impl Aabb {
+    pub fn size(&self) -> Vec3 {
         self.max - self.min
     }
 
-    pub fn insert_point(&mut self, p: &glm::TVec3<T>) -> Self {
-        self.min = glm::min2(&self.min, p);
-        self.max = glm::max2(&self.max, p);
+    pub fn insert_point(&mut self, p: Vec3) -> Self {
+        self.min = self.min.min(p);
+        self.max = self.max.max(p);
         *self
     }
-    pub fn insert_box(&mut self, aabb: &Self) -> Self {
-        self.min = glm::min2(&self.min, &aabb.min);
-        self.max = glm::max2(&self.max, &aabb.max);
+    pub fn insert_box(&mut self, aabb: Self) -> Self {
+        self.min = self.min.min(aabb.min);
+        self.max = self.max.max(aabb.max);
         *self
     }
 }
-type Bounds3f = Bound3<Float>;
-impl Bound3<Float> {
-    pub fn surface_area(&self) -> Float {
+type Bounds3f = Aabb;
+impl Aabb {
+    pub fn surface_area(&self) -> f32 {
         let s = self.size();
         (s[0] * s[1] + s[1] * s[2] + s[0] * s[2]) * 2.0
     }
@@ -170,55 +147,40 @@ impl Bound3<Float> {
     pub fn diagonal(&self) -> Vec3 {
         self.max - self.min
     }
-    pub fn contains(&self, p: &Vec3) -> bool {
-        glm::all(&glm::less_than_equal(&p, &self.max))
-            && glm::all(&glm::greater_than_equal(&p, &self.min))
+    pub fn contains(&self, p: Vec3) -> bool {
+        p.cmple(self.max).all() && p.cmpge(self.min).all()
+    }
+    pub fn offset(&self, p: Vec3) -> Vec3 {
+        (p - self.min) / self.size()
     }
 }
-impl Default for Bound3<Float> {
+impl Default for Aabb {
     fn default() -> Self {
-        let inf = Float::INFINITY;
+        let inf = f32::INFINITY;
         Self {
             min: vec3(inf, inf, inf),
             max: vec3(-inf, -inf, -inf),
         }
     }
 }
-impl<T> Bound3<T>
-where
-    T: glm::Number + na::ClosedDiv,
-{
-    pub fn offset(&self, p: &glm::TVec3<T>) -> glm::TVec3<T> {
-        (p - self.min).component_div(&self.size())
-    }
+
+#[derive(Clone, Copy, Debug)]
+pub struct RGBSpectrum {
+    pub samples: Vec3A,
 }
 
-#[derive(Clone, Copy)]
-pub struct Spectrum {
-    pub samples: Vec3,
-}
-impl From<na::SVector<f32, { Spectrum::N_SAMPLES }>> for Spectrum {
-    fn from(v: na::SVector<f32, { Spectrum::N_SAMPLES }>) -> Self {
-        Spectrum { samples: v.cast() }
-    }
-}
-impl std::fmt::Debug for Spectrum {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_list().entries(self.samples.iter()).finish()
-    }
-}
-pub fn srgb_to_linear(rgb: &Vec3) -> Vec3 {
-    let f = |s| -> Float {
+pub fn srgb_to_linear(rgb: Vec3) -> Vec3 {
+    let f = |s| -> f32 {
         if s <= 0.04045 {
             s / 12.92
         } else {
-            (((s + 0.055) / 1.055) as Float).powf(2.4)
+            (((s + 0.055) / 1.055) as f32).powf(2.4)
         }
     };
     vec3(f(rgb.x), f(rgb.y), f(rgb.z))
 }
-pub fn linear_to_srgb(linear: &Vec3) -> Vec3 {
-    let f = |l: Float| -> Float {
+pub fn linear_to_srgb(linear: Vec3) -> Vec3 {
+    let f = |l: f32| -> f32 {
         if l <= 0.0031308 {
             l * 12.92
         } else {
@@ -228,81 +190,87 @@ pub fn linear_to_srgb(linear: &Vec3) -> Vec3 {
 
     vec3(f(linear.x), f(linear.y), f(linear.z))
 }
-impl Spectrum {
+impl RGBSpectrum {
     pub const N_SAMPLES: usize = 3;
-    pub fn from_srgb(rgb: &Vec3) -> Spectrum {
-        Spectrum {
-            samples: srgb_to_linear(rgb),
+    pub fn from_srgb(rgb: Vec3) -> RGBSpectrum {
+        RGBSpectrum {
+            samples: srgb_to_linear(rgb).into(),
         }
     }
     pub fn to_srgb(&self) -> Vec3 {
-        linear_to_srgb(&self.samples)
+        linear_to_srgb(self.samples.into())
     }
     pub fn to_rgb_linear(&self) -> Vec3 {
-        self.samples
+        self.samples.into()
     }
-    pub fn from_rgb_linear(rgb: &Vec3) -> Self {
-        Self { samples: *rgb }
-    }
-    pub fn zero() -> Spectrum {
+    pub fn from_rgb_linear(rgb: Vec3) -> Self {
         Self {
-            samples: glm::zero(),
+            samples: rgb.into(),
+        }
+    }
+    pub fn zero() -> RGBSpectrum {
+        Self {
+            samples: Vec3A::ZERO,
         }
     }
     pub fn one() -> Spectrum {
         Self {
-            samples: vec3(1.0, 1.0, 1.0),
+            samples: Vec3A::ONE,
         }
     }
     // not necessarily black, but any value that is either black or invalid
     pub fn is_black(&self) -> bool {
-        self.samples.iter().any(|x| !x.is_finite())
-            || glm::all(&glm::equal(&self.samples, &glm::zero()))
-            || glm::any(&glm::less_than(&self.samples, &glm::zero()))
+        !self.samples.is_finite()
+            || self.samples.cmpeq(Vec3A::ZERO).all()
+            || self.samples.cmplt(Vec3A::ZERO).any()
+        // self.samples.iter().any(|x| !x.is_finite())
+        //     || self.samples.iter().all(|x| x == 0.0)
+        //     || self.samples.iter().any(|x| x < 0.0)
     }
-    pub fn lerp(x: &Spectrum, y: &Spectrum, a: Float) -> Spectrum {
-        *x * (1.0 - a) + *y * a
+    pub fn lerp(x: RGBSpectrum, y: RGBSpectrum, a: f32) -> RGBSpectrum {
+        x * (1.0 - a) + y * a
     }
 }
-pub fn lerp3<const N: usize>(
-    v0: &glm::TVec<Float, N>,
-    v1: &glm::TVec<Float, N>,
-    v2: &glm::TVec<Float, N>,
-    uv: &Vec2,
-) -> glm::TVec<Float, N> {
+pub fn lerp3v3(v0: Vec3, v1: Vec3, v2: Vec3, uv: Vec2) -> Vec3 {
     (1.0 - uv.x - uv.y) * v0 + uv.x * v1 + uv.y * v2
 }
-impl Index<usize> for Spectrum {
-    type Output = Float;
+pub fn lerp3v2(v0: Vec2, v1: Vec2, v2: Vec2, uv: Vec2) -> Vec2 {
+    (1.0 - uv.x - uv.y) * v0 + uv.x * v1 + uv.y * v2
+}
+pub fn lerp_scalar(x: f32, y: f32, a: f32) -> f32 {
+    x + (y - x) * a
+}
+impl Index<usize> for RGBSpectrum {
+    type Output = f32;
     fn index(&self, index: usize) -> &Self::Output {
         &self.samples[index]
     }
 }
-impl IndexMut<usize> for Spectrum {
+impl IndexMut<usize> for RGBSpectrum {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         &mut self.samples[index]
     }
 }
-impl std::ops::Add for Spectrum {
-    type Output = Spectrum;
+impl std::ops::Add for RGBSpectrum {
+    type Output = RGBSpectrum;
     fn add(self, rhs: Spectrum) -> Self::Output {
         Self {
             samples: self.samples + rhs.samples,
         }
     }
 }
-impl std::ops::AddAssign for Spectrum {
+impl std::ops::AddAssign for RGBSpectrum {
     fn add_assign(&mut self, rhs: Self) {
         *self = *self + rhs;
     }
 }
-impl std::ops::MulAssign for Spectrum {
+impl std::ops::MulAssign for RGBSpectrum {
     fn mul_assign(&mut self, rhs: Self) {
         *self = *self * rhs;
     }
 }
-impl std::ops::MulAssign<Float> for Spectrum {
-    fn mul_assign(&mut self, rhs: Float) {
+impl std::ops::MulAssign<f32> for RGBSpectrum {
+    fn mul_assign(&mut self, rhs: f32) {
         *self = *self * rhs;
     }
 }
@@ -310,29 +278,30 @@ impl std::ops::Mul for Spectrum {
     type Output = Spectrum;
     fn mul(self, rhs: Spectrum) -> Self::Output {
         Self {
-            samples: self.samples.component_mul(&rhs.samples),
+            samples: self.samples * rhs.samples,
         }
     }
 }
-impl std::ops::Mul<Float> for Spectrum {
+impl std::ops::Mul<f32> for Spectrum {
     type Output = Spectrum;
-    fn mul(self, rhs: Float) -> Self::Output {
+    fn mul(self, rhs: f32) -> Self::Output {
         Self {
             samples: self.samples * rhs,
         }
     }
 }
-impl std::ops::Div<Float> for Spectrum {
+impl std::ops::Div<f32> for Spectrum {
     type Output = Spectrum;
-    fn div(self, rhs: Float) -> Self::Output {
+    fn div(self, rhs: f32) -> Self::Output {
         Self {
             samples: self.samples / rhs,
         }
     }
 }
-pub fn hsv_to_rgb(hsv: &Vec3) -> Vec3 {
+pub type Spectrum = RGBSpectrum;
+pub fn hsv_to_rgb(hsv: Vec3) -> Vec3 {
     let h = (hsv[0] / 60.0).floor() as u32;
-    let f = hsv[0] / 60.0 - h as Float;
+    let f = hsv[0] / 60.0 - h as f32;
     let p = hsv[2] * (1.0 - hsv[1]);
     let q = hsv[2] * (1.0 - f * hsv[1]);
     let t = hsv[2] * (1.0 - (1.0 - f) * hsv[1]);
@@ -348,9 +317,9 @@ pub fn hsv_to_rgb(hsv: &Vec3) -> Vec3 {
     };
     vec3(r, g, b)
 }
-pub fn rgb_to_hsl(rgb: &Vec3) -> Vec3 {
-    let max = glm::comp_max(rgb);
-    let min = glm::comp_min(rgb);
+pub fn rgb_to_hsl(rgb: Vec3) -> Vec3 {
+    let max = rgb.max_element();
+    let min = rgb.min_element();
     let (r, g, b) = (rgb[0], rgb[1], rgb[2]);
     let h = {
         if max == min {
@@ -382,9 +351,9 @@ pub fn rgb_to_hsl(rgb: &Vec3) -> Vec3 {
     vec3(h, s, l)
 }
 
-pub fn rgb_to_hsv(rgb: &Vec3) -> Vec3 {
-    let max = glm::comp_max(rgb);
-    let min = glm::comp_min(rgb);
+pub fn rgb_to_hsv(rgb: Vec3) -> Vec3 {
+    let max = rgb.max_element();
+    let min = rgb.min_element();
     let (r, g, b) = (rgb[0], rgb[1], rgb[2]);
     let h = {
         if max == min {
@@ -411,13 +380,19 @@ pub fn rgb_to_hsv(rgb: &Vec3) -> Vec3 {
     };
     vec3(h, s, v)
 }
+pub fn int_bits_to_float(x: i32) -> f32 {
+    unsafe { std::mem::transmute(x) }
+}
+pub fn float_bits_to_int(x: f32) -> i32 {
+    unsafe { std::mem::transmute(x) }
+}
 #[derive(Clone, Copy)]
 pub struct Ray {
     pub o: Vec3,
     pub d: Vec3,
-    pub tmin: Float,
-    pub tmax: Float,
-    // pub time: Float,
+    pub tmin: f32,
+    pub tmax: f32,
+    // pub time: f32,
 }
 
 fn origin() -> f32 {
@@ -429,22 +404,16 @@ fn float_scale() -> f32 {
 fn int_scale() -> f32 {
     256.0
 }
-fn offset_ray(p: &Vec3, n: &Vec3) -> Vec3 {
-    let of_i = glm::IVec3::new(
+fn offset_ray(p: Vec3, n: Vec3) -> Vec3 {
+    let of_i = glam::ivec3(
         (int_scale() * n.x) as i32,
         (int_scale() * n.y) as i32,
         (int_scale() * n.z) as i32,
     );
     let p_i = vec3(
-        glm::int_bits_to_float(
-            glm::float_bits_to_int(p.x) + if p.x < 0.0 { -of_i.x } else { of_i.x },
-        ),
-        glm::int_bits_to_float(
-            glm::float_bits_to_int(p.y) + if p.y < 0.0 { -of_i.y } else { of_i.y },
-        ),
-        glm::int_bits_to_float(
-            glm::float_bits_to_int(p.z) + if p.z < 0.0 { -of_i.z } else { of_i.z },
-        ),
+        int_bits_to_float(float_bits_to_int(p.x) + if p.x < 0.0 { -of_i.x } else { of_i.x }),
+        int_bits_to_float(float_bits_to_int(p.y) + if p.y < 0.0 { -of_i.y } else { of_i.y }),
+        int_bits_to_float(float_bits_to_int(p.z) + if p.z < 0.0 { -of_i.z } else { of_i.z }),
     );
     vec3(
         if p.x.abs() < origin() {
@@ -466,26 +435,17 @@ fn offset_ray(p: &Vec3, n: &Vec3) -> Vec3 {
 }
 
 impl Ray {
-    pub fn spawn(o: &Vec3, d: &Vec3) -> Self {
+    pub fn spawn(o: Vec3, d: Vec3) -> Self {
         Self {
-            o: *o,
-            d: *d,
+            o,
+            d,
             tmin: 0.0,
-            tmax: Float::INFINITY,
+            tmax: f32::INFINITY,
         }
     }
-
-    #[cfg(feature = "float_f64")]
-    pub fn offset_along_normal(&self, n: &Vec3) -> Self {
-        Self {
-            tmin: self.tmin,
-            ..*self
-        }
-    }
-    #[cfg(not(feature = "float_f64"))]
-    pub fn offset_along_normal(&self, n: &Vec3) -> Self {
-        let p = offset_ray(&self.o, &if glm::dot(&self.d, n) > 0.0 { *n } else { -n });
-        let diff = glm::length(&(p - self.o)) / glm::length(&self.d);
+    pub fn offset_along_normal(&self, n: Vec3) -> Self {
+        let p = offset_ray(self.o, if self.d.dot(n) > 0.0 { n } else { -n });
+        let diff = (p - self.o).length() / self.d.length();
         Self {
             o: p,
             tmax: if self.tmax.is_infinite() {
@@ -496,22 +456,22 @@ impl Ray {
             ..*self
         }
     }
-    pub fn spawn_to(p1: &Vec3, p2: &Vec3) -> Self {
-        let len = glm::length(&(p1 - p2));
-        let mut ray = Self::spawn(&p1, &glm::normalize(&(p2 - p1)));
+    pub fn spawn_to(p1: Vec3, p2: Vec3) -> Self {
+        let len = (p1 - p2).length();
+        let mut ray = Self::spawn(p1, (p2 - p1).normalize());
         ray.tmax = len;
         ray
     }
-    pub fn spawn_to_offseted(p1: &Vec3, p2: &Vec3, n1: &Vec3, n2: &Vec3) -> Self {
-        let d = glm::normalize(&(p2 - p1));
-        let p1 = offset_ray(p1, &if glm::dot(&d, n1) > 0.0 { *n1 } else { -n1 });
-        let p2 = offset_ray(p2, &if glm::dot(&d, n2) > 0.0 { -n2 } else { *n2 });
-        let mut ray = Self::spawn(&p1, &p1);
-        let len = glm::length(&(p1 - p2));
+    pub fn spawn_to_offseted(p1: Vec3, p2: Vec3, n1: Vec3, n2: Vec3) -> Self {
+        let d = (p2 - p1).normalize();
+        let p1 = offset_ray(p1, if d.dot(n1) > 0.0 { n1 } else { -n1 });
+        let p2 = offset_ray(p2, if d.dot(n2) > 0.0 { -n2 } else { n2 });
+        let mut ray = Self::spawn(p1, p1);
+        let len = (p1 - p2).length();
         ray.tmax = len;
         ray
     }
-    pub fn at(&self, t: Float) -> Vec3 {
+    pub fn at(&self, t: f32) -> Vec3 {
         self.o + t * self.d
     }
 }
@@ -523,97 +483,80 @@ pub struct Frame {
     pub T: Vec3,
 }
 impl Frame {
-    pub fn from_normal(normal: &Vec3) -> Self {
+    pub fn from_normal(normal: Vec3) -> Self {
         let tangent = if normal.x.abs() > normal.y.abs() {
-            glm::normalize(&vec3(-normal.z, 0.0, normal.x))
+            vec3(-normal.z, 0.0, normal.x).normalize()
         } else {
-            glm::normalize(&vec3(0.0, normal.z, -normal.y))
+            vec3(0.0, normal.z, -normal.y).normalize()
         };
         Self {
-            N: *normal,
+            N: normal,
             T: tangent,
-            B: glm::normalize(&glm::cross(normal, &tangent)),
+            B: normal.cross(tangent).normalize(),
         }
     }
-    pub fn to_local(&self, v: &Vec3) -> Vec3 {
-        vec3(
-            glm::dot(&v, &self.T),
-            glm::dot(&v, &self.N),
-            glm::dot(&v, &self.B),
-        )
+    pub fn to_local(&self, v: Vec3) -> Vec3 {
+        vec3(v.dot(self.T), v.dot(self.N), v.dot(self.B))
     }
-    pub fn to_world(&self, v: &Vec3) -> Vec3 {
+    pub fn to_world(&self, v: Vec3) -> Vec3 {
         self.T * v.x + self.N * v.y + self.B * v.z
     }
 }
 #[derive(Clone, Copy)]
 pub struct Transform {
     m4: Mat4,
-    inv_m4: Option<Mat4>,
-    m3: Mat3,
-    inv_m3: Option<Mat3>,
+    inv_m4: Mat4,
+    m3: Mat3A,
+    inv_m3: Mat3A,
 }
 impl Transform {
-    pub fn inverse(&self) -> Option<Transform> {
-        Some(Self {
-            m4: self.inv_m4?,
-            inv_m4: Some(self.m4),
-            m3: self.inv_m3?,
-            inv_m3: Some(self.m3),
-        })
+    pub fn inverse(&self) -> Transform {
+        Self {
+            m4: self.inv_m4,
+            inv_m4: self.m4,
+            m3: self.inv_m3,
+            inv_m3: self.m3,
+        }
     }
     pub fn identity() -> Self {
         Self {
-            m4: glm::identity(),
-            inv_m4: Some(glm::identity()),
-            m3: glm::identity(),
-            inv_m3: Some(glm::identity()),
+            m4: Mat4::IDENTITY,
+            inv_m4: Mat4::IDENTITY,
+            m3: Mat3A::IDENTITY,
+            inv_m3: Mat3A::IDENTITY,
         }
     }
     pub fn from_matrix(m: &Mat4) -> Self {
-        let m3 = glm::mat4_to_mat3(&m);
+        let m3 = Mat3A::from_mat4(*m);
         Self {
             m4: *m,
-            inv_m4: m.try_inverse(),
+            inv_m4: m.inverse(),
             m3,
-            inv_m3: m3.try_inverse(),
+            inv_m3: m3.inverse(),
         }
     }
-    pub fn transform_point(&self, p: &Vec3) -> Vec3 {
-        let q = self.m4 * glm::TVec4::<Float>::new(p.x, p.y, p.z, 1.0);
+    pub fn transform_point(self, p: Vec3) -> Vec3 {
+        let q = self.m4 * vec4(p.x, p.y, p.z, 1.0);
         vec3(q.x, q.y, q.z) / q.w
     }
-    pub fn transform_vector(&self, v: &Vec3) -> Vec3 {
+    pub fn transform_vector(self, v: Vec3) -> Vec3 {
         self.m3 * v
     }
-    pub fn transform_normal(&self, n: &Vec3) -> Vec3 {
-        self.inv_m3.unwrap().transpose() * n
+    pub fn transform_normal(&self, n: Vec3) -> Vec3 {
+        self.inv_m3.transpose() * n
     }
 }
 impl Mul for Transform {
     type Output = Transform;
     fn mul(self, rhs: Transform) -> Self::Output {
-        Self {
-            m4: self.m4 * rhs.m4,
-            inv_m4: if let (Some(a), Some(b)) = (self.inv_m4, rhs.inv_m4) {
-                Some(a * b)
-            } else {
-                None
-            },
-            m3: self.m3 * rhs.m3,
-            inv_m3: if let (Some(a), Some(b)) = (self.inv_m3, rhs.inv_m3) {
-                Some(a * b)
-            } else {
-                None
-            },
-        }
+        Self::from_matrix(&self.m4.mul_mat4(&rhs.m4))
     }
 }
-const PI: Float = std::f64::consts::PI as Float;
-const FRAC_1_PI: Float = std::f64::consts::FRAC_1_PI as Float;
-const FRAC_PI_2: Float = std::f64::consts::FRAC_PI_2 as Float;
-const FRAC_PI_4: Float = std::f64::consts::FRAC_PI_4 as Float;
-pub fn concentric_sample_disk(u: &Vec2) -> Vec2 {
+pub const PI: f32 = std::f32::consts::PI;
+pub const FRAC_1_PI: f32 = std::f32::consts::FRAC_1_PI;
+pub const FRAC_PI_2: f32 = std::f32::consts::FRAC_PI_2;
+pub const FRAC_PI_4: f32 = std::f32::consts::FRAC_PI_4;
+pub fn concentric_sample_disk(u: Vec2) -> Vec2 {
     let u_offset: Vec2 = 2.0 * u - vec2(1.0, 1.0);
     if u_offset.x == 0.0 && u_offset.y == 0.0 {
         return vec2(0.0, 0.0);
@@ -632,26 +575,26 @@ pub fn concentric_sample_disk(u: &Vec2) -> Vec2 {
     };
     r * vec2(theta.cos(), theta.sin())
 }
-pub fn consine_hemisphere_sampling(u: &Vec2) -> Vec3 {
-    let uv = concentric_sample_disk(&u);
-    let r = glm::dot(&uv, &uv);
+pub fn consine_hemisphere_sampling(u: Vec2) -> Vec3 {
+    let uv = concentric_sample_disk(u);
+    let r = uv.length_squared();
     let h = (1.0 - r).sqrt();
     vec3(uv.x, h, uv.y)
 }
-pub fn uniform_sphere_sampling(u: &Vec2) -> Vec3 {
+pub fn uniform_sphere_sampling(u: Vec2) -> Vec3 {
     let z = 1.0 - 2.0 * u[0];
     let r = (1.0 - z * z).max(0.0).sqrt();
     let phi = 2.0 * PI * u[1];
     vec3(r * phi.cos(), z, r * phi.sin())
 }
-pub fn uniform_sphere_pdf() -> Float {
+pub fn uniform_sphere_pdf() -> f32 {
     1.0 / (4.0 * PI)
 }
-pub fn uniform_sample_triangle(u: &Vec2) -> Vec2 {
+pub fn uniform_sample_triangle(u: Vec2) -> Vec2 {
     let mut uf = (u[0] as f64 * (1u64 << 32) as f64) as u64; // Fixed point
-    let mut cx = 0.0 as Float;
-    let mut cy = 0.0 as Float;
-    let mut w = 0.5 as Float;
+    let mut cx = 0.0 as f32;
+    let mut cy = 0.0 as f32;
+    let mut w = 0.5 as f32;
 
     for _ in 0..16 {
         let uu = uf >> 30;
@@ -668,16 +611,16 @@ pub fn uniform_sample_triangle(u: &Vec2) -> Vec2 {
     let b1 = cy + w / 3.0;
     vec2(b0, b1)
 }
-pub fn dir_to_spherical(v: &Vec3) -> Vec2 {
+pub fn dir_to_spherical(v: Vec3) -> Vec2 {
     let theta = v.y.acos();
-    let phi = Float::atan2(v.z, v.x) + PI;
+    let phi = f32::atan2(v.z, v.x) + PI;
     vec2(theta, phi)
 }
-pub fn spherical_to_uv(v: &Vec2) -> Vec2 {
+pub fn spherical_to_uv(v: Vec2) -> Vec2 {
     vec2(v.x / PI, v.y / (2.0 * PI))
 }
-pub fn dir_to_uv(v: &Vec3) -> Vec2 {
-    spherical_to_uv(&dir_to_spherical(v))
+pub fn dir_to_uv(v: Vec3) -> Vec2 {
+    spherical_to_uv(dir_to_spherical(v))
 }
 pub fn parallel_for<F: Fn(usize) -> () + Sync>(count: usize, chunk_size: usize, f: F) {
     let nthreads = rayon::current_num_threads();
@@ -697,28 +640,29 @@ pub fn parallel_for<F: Fn(usize) -> () + Sync>(count: usize, chunk_size: usize, 
     });
 }
 impl Frame {
-    pub fn same_hemisphere(u: &Vec3, v: &Vec3) -> bool {
+    #[inline]
+    pub fn same_hemisphere(u: Vec3, v: Vec3) -> bool {
         u.y * v.y > 0.0
     }
-    pub fn cos_theta(u: &Vec3) -> Float {
+    pub fn cos_theta(u: Vec3) -> f32 {
         u.y
     }
-    pub fn cos2_theta(u: &Vec3) -> Float {
+    pub fn cos2_theta(u: Vec3) -> f32 {
         u.y * u.y
     }
-    pub fn sin2_theta(u: &Vec3) -> Float {
+    pub fn sin2_theta(u: Vec3) -> f32 {
         (1.0 - Self::cos2_theta(u)).clamp(0.0, 1.0)
     }
-    pub fn sin_theta(u: &Vec3) -> Float {
+    pub fn sin_theta(u: Vec3) -> f32 {
         Self::sin2_theta(u).sqrt()
     }
-    pub fn tan_theta(u: &Vec3) -> Float {
+    pub fn tan_theta(u: Vec3) -> f32 {
         Self::sin_theta(u) / Self::cos_theta(u)
     }
-    pub fn abs_cos_theta(u: &Vec3) -> Float {
+    pub fn abs_cos_theta(u: Vec3) -> f32 {
         u.y.abs()
     }
-    pub fn cos_phi(u: &Vec3) -> Float {
+    pub fn cos_phi(u: Vec3) -> f32 {
         let sin = Self::sin_theta(u);
         if sin == 0.0 {
             1.0
@@ -726,7 +670,7 @@ impl Frame {
             (u.x / sin).clamp(-1.0, 1.0)
         }
     }
-    pub fn sin_phi(u: &Vec3) -> Float {
+    pub fn sin_phi(u: Vec3) -> f32 {
         let sin = Self::sin_theta(u);
         if sin == 0.0 {
             0.0
@@ -734,21 +678,21 @@ impl Frame {
             (u.z / sin).clamp(-1.0, 1.0)
         }
     }
-    pub fn cos2_phi(u: &Vec3) -> Float {
+    pub fn cos2_phi(u: Vec3) -> f32 {
         Self::cos_phi(u).powi(2)
     }
-    pub fn sin2_phi(u: &Vec3) -> Float {
+    pub fn sin2_phi(u: Vec3) -> f32 {
         Self::sin_phi(u).powi(2)
     }
 }
-pub fn reflect(w: &Vec3, n: &Vec3) -> Vec3 {
-    -w + 2.0 * glm::dot(w, n) * n
+pub fn reflect(w: Vec3, n: Vec3) -> Vec3 {
+    -w + 2.0 * w.dot(n) * n
 }
 pub struct Intersection<'a> {
     pub shape: Option<&'a dyn shape::Shape>,
     pub uv: Vec2,
     pub texcoords: Vec2,
-    pub t: Float,
+    pub t: f32,
     pub ng: Vec3,
     pub ns: Vec3,
     pub prim_id: u32,
@@ -796,8 +740,6 @@ impl<T> UnsafeConstPointer<T> {
         }
     }
 }
-
-
 
 pub trait Base: Any {
     fn as_any(&self) -> &dyn Any;

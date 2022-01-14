@@ -1,6 +1,6 @@
-use glm::UVec2;
 use parking_lot::Mutex;
 use rand::{thread_rng, Rng};
+use UVec2;
 
 use super::path::PathTracer;
 use super::{mmlt::FRecord, Integrator};
@@ -9,8 +9,8 @@ use crate::film::Film;
 use crate::sampler::Sampler;
 use crate::*;
 use crate::{sampler::MltSampler, scene::Scene};
-pub fn target_function(x: Spectrum) -> Float {
-    glm::comp_max(&x.samples).clamp(0.0, 100.0)
+pub fn target_function(x: Spectrum) -> f32 {
+    x.samples.max_element().clamp(0.0, 100.0)
 }
 pub struct Chain {
     pub sampler: MltSampler,
@@ -28,11 +28,11 @@ pub struct Pssmlt {
     pub direct_spp: u32,
 }
 impl Chain {
-    pub fn run_at_pixel(&mut self, pixel: &UVec2, scene: &Scene) -> FRecord {
+    pub fn run_at_pixel(&mut self, pixel: UVec2, scene: &Scene) -> FRecord {
         let (ray, _) = scene.camera.generate_ray(pixel, &mut self.sampler);
         let l = PathTracer::li(ray, &mut self.sampler, scene, self.max_depth, true);
         FRecord {
-            pixel: *pixel,
+            pixel,
             f: target_function(l),
             l,
         }
@@ -41,16 +41,13 @@ impl Chain {
         self.is_large_step = self.sampler.rng.next1d() < self.large_step_prob;
         self.sampler.start_new_iteration(self.is_large_step);
 
-        let pixel = self
-            .sampler
-            .next2d()
-            .component_mul(&scene.camera.resolution().cast::<Float>());
+        let pixel = self.sampler.next2d() * scene.camera.resolution().as_vec2();
         let pixel = uvec2(pixel.x as u32, pixel.y as u32);
         let pixel = uvec2(
             pixel.x.min(scene.camera.resolution().x - 1),
             pixel.y.min(scene.camera.resolution().y - 1),
         );
-        self.run_at_pixel(&pixel, scene)
+        self.run_at_pixel(pixel, scene)
     }
 }
 impl Pssmlt {
@@ -59,7 +56,7 @@ impl Pssmlt {
         n_bootstrap: usize,
         n_chains: usize,
         scene: &Scene,
-    ) -> (Vec<Chain>, Float) {
+    ) -> (Vec<Chain>, f32) {
         let mut rng = thread_rng();
         let seeds: Vec<_> = { (0..n_bootstrap).map(|_| rng.gen::<u64>()).collect() };
         let fs: Vec<_> = (0..n_bootstrap)
@@ -67,7 +64,7 @@ impl Pssmlt {
                 Chain {
                     sampler: MltSampler::new(seeds[i]),
                     cur: FRecord {
-                        pixel: glm::zero(),
+                        pixel: UVec2::ZERO,
                         f: 0.0,
                         l: Spectrum::zero(),
                     },
@@ -85,11 +82,11 @@ impl Pssmlt {
         (
             (0..n_chains)
                 .map(|_| {
-                    let (i, _) = dist.sample_discrete(rng.gen::<Float>());
+                    let (i, _) = dist.sample_discrete(rng.gen::<f32>());
                     let mut chain = Chain {
                         sampler: MltSampler::new(seeds[i]),
                         cur: FRecord {
-                            pixel: glm::zero(),
+                            pixel: UVec2::ZERO,
                             f: 0.0,
                             l: Spectrum::zero(),
                         },
@@ -102,7 +99,7 @@ impl Pssmlt {
                     chain
                 })
                 .collect(),
-            fs.iter().sum::<Float>(),
+            fs.iter().sum::<f32>(),
         )
     }
 }
@@ -161,7 +158,7 @@ impl Integrator for Pssmlt {
                                 1.0,
                             );
                         }
-                        if accept_prob == 1.0 || rng.gen::<Float>() < accept_prob {
+                        if accept_prob == 1.0 || rng.gen::<f32>() < accept_prob {
                             chain.cur = proposal;
                             chain.sampler.accept();
                         } else {
@@ -182,7 +179,7 @@ impl Integrator for Pssmlt {
             .enumerate()
             .for_each(|(_, p)| {
                 let mut px = p.write();
-                px.intensity = px.intensity * b as Float;
+                px.intensity = px.intensity * b as f32;
             });
         let film = Film::new(&scene.camera.resolution());
         (0..npixels).into_par_iter().for_each(|i| {
@@ -190,7 +187,7 @@ impl Integrator for Pssmlt {
             px.weight = 1.0;
             {
                 let px_i = indirect_film.pixels[i].read();
-                px.intensity += px_i.intensity / self.spp as Float;
+                px.intensity += px_i.intensity / self.spp as f32;
             }
             {
                 let px_d = film_direct.pixels[i].read();

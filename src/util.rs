@@ -91,12 +91,12 @@ where
     }
     r
 }
-pub fn erf_inv(x: Float) -> Float {
-    let clamped_x: Float = clamp_t(x, -0.99999, 0.99999);
-    let mut w: Float = -((1.0 as Float - clamped_x) * (1.0 as Float + clamped_x)).ln();
-    let mut p: Float;
-    if w < 5.0 as Float {
-        w -= 2.5 as Float;
+pub fn erf_inv(x: f32) -> f32 {
+    let clamped_x: f32 = clamp_t(x, -0.99999, 0.99999);
+    let mut w: f32 = -((1.0 as f32 - clamped_x) * (1.0 as f32 + clamped_x)).ln();
+    let mut p: f32;
+    if w < 5.0 as f32 {
+        w -= 2.5 as f32;
         p = 2.810_226_36e-08;
         p = 3.432_739_39e-07 + p * w;
         p = -3.523_387_7e-06 + p * w;
@@ -107,7 +107,7 @@ pub fn erf_inv(x: Float) -> Float {
         p = 0.246_640_727 + p * w;
         p = 1.501_409_41 + p * w;
     } else {
-        w = w.sqrt() - 3.0 as Float;
+        w = w.sqrt() - 3.0 as f32;
         p = -0.000_200_214_257;
         p = 0.000_100_950_558 + p * w;
         p = 0.001_349_343_22 + p * w;
@@ -121,21 +121,21 @@ pub fn erf_inv(x: Float) -> Float {
     p * clamped_x
 }
 
-pub fn erf(x: Float) -> Float {
+pub fn erf(x: f32) -> f32 {
     // constants
-    let a1: Float = 0.254_829_592;
-    let a2: Float = -0.284_496_736;
-    let a3: Float = 1.421_413_741;
-    let a4: Float = -1.453_152_027;
-    let a5: Float = 1.061_405_429;
-    let p: Float = 0.327_591_1;
+    let a1: f32 = 0.254_829_592;
+    let a2: f32 = -0.284_496_736;
+    let a3: f32 = 1.421_413_741;
+    let a4: f32 = -1.453_152_027;
+    let a5: f32 = 1.061_405_429;
+    let p: f32 = 0.327_591_1;
     // save the sign of x
-    let sign = if x < 0.0 as Float { -1.0 } else { 1.0 };
-    let x: Float = x.abs();
+    let sign = if x < 0.0 as f32 { -1.0 } else { 1.0 };
+    let x: f32 = x.abs();
     // A&S formula 7.1.26
-    let t: Float = 1.0 as Float / (1.0 as Float + p * x);
-    let y: Float =
-        1.0 as Float - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * (-x * x).exp();
+    let t: f32 = 1.0 as f32 / (1.0 as f32 + p * x);
+    let y: f32 =
+        1.0 as f32 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * (-x * x).exp();
     sign * y
 }
 

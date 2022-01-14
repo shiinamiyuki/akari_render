@@ -2,14 +2,14 @@ use crate::*;
 #[derive(Copy, Clone)]
 pub struct Pixel {
     pub intensity: Spectrum,
-    pub weight: Float,
+    pub weight: f32,
 }
 pub struct Film {
     pub pixels: Vec<RwLock<Pixel>>,
-    pub resolution: glm::UVec2,
+    pub resolution: UVec2,
 }
 impl Film {
-    pub fn new(resolution: &glm::UVec2) -> Self {
+    pub fn new(resolution: &UVec2) -> Self {
         Self {
             pixels: (0..(resolution.x * resolution.y) as usize)
                 .map(|_| {
@@ -22,7 +22,7 @@ impl Film {
             resolution: *resolution,
         }
     }
-    pub fn add_sample(&self, pixel: &glm::UVec2, value: &Spectrum, weight: Float) {
+    pub fn add_sample(&self, pixel: &UVec2, value: &Spectrum, weight: f32) {
         let value = if value.is_black() {
             Spectrum::zero()
         } else {
@@ -32,7 +32,7 @@ impl Film {
         pixel.intensity = pixel.intensity + value;
         pixel.weight += weight;
     }
-    pub fn get_pixel(&self, pixel: &glm::UVec2) -> Pixel {
+    pub fn get_pixel(&self, pixel: &UVec2) -> Pixel {
         let pixel = self.pixels[(pixel.x + pixel.y * self.resolution.x) as usize].read();
         *pixel
     }

@@ -12,7 +12,6 @@ bindgen = {version ="0.59.1", optional = true}
 
 [dependencies]
 nalgebra = {version ="*", features = ["serde-serialize"] }
-nalgebra-glm = "*"
 glam = "*"
 rayon = "*"
 image = "0.23.14"
@@ -49,8 +48,6 @@ global_mimalloc = ["mimalloc"]
 gpu_nrc = ["cmake", "bindgen", "gpu"]
 embree = ["embree-sys"]
 gpu = ["ash", "shaderc", "vkc"]
-float_f64 = []
-
 [[bin]]
 name="akr-cli"
 path="src/bin/akr-cli.rs"

@@ -2,15 +2,15 @@ use std::convert::TryInto;
 use std::sync::atomic::AtomicUsize;
 
 use crate::distribution::Distribution1D;
-use crate::sampler::{MltSampler, PCGSampler, Sampler, Pcg};
+use crate::sampler::{MltSampler, PCGSampler, Pcg, Sampler};
 use crate::scene::Scene;
 use crate::util::erf_inv;
 use crate::*;
 use bidir::*;
 use film::Film;
-use glm::UVec2;
 use parking_lot::Mutex;
 use rand::{thread_rng, Rng};
+use UVec2;
 
 use super::path::PathTracer;
 use super::Integrator;
@@ -33,7 +33,7 @@ pub struct Mmlt {
 }
 pub struct FRecord {
     pub pixel: UVec2,
-    pub f: Float,
+    pub f: f32,
     pub l: Spectrum,
 }
 
@@ -86,7 +86,7 @@ impl Sampler for MmltSampler {
             s.start_new_iteration(self.large_step);
         }
     }
-    fn next1d(&mut self) -> Float {
+    fn next1d(&mut self) -> f32 {
         self.streams[self.stream as usize].next1d()
     }
 }
@@ -100,20 +100,20 @@ pub struct Chain<'a> {
     pub scratch: Scratch<'a>,
 }
 impl<'a> Chain<'a> {
-    pub fn run_at_pixel(&mut self, pixel: &UVec2, scene: &'a Scene) -> FRecord {
+    pub fn run_at_pixel(&mut self, pixel: UVec2, scene: &'a Scene) -> FRecord {
         let (n_strategies, s, t) = if self.depth == 0 {
             (1, 0, 2)
         } else {
             let n_strategies = self.depth + 1;
-            let s = ((self.sampler.next1d() * n_strategies as Float) as u32).min(n_strategies - 1)
+            let s = ((self.sampler.next1d() * n_strategies as f32) as u32).min(n_strategies - 1)
                 as usize;
             let t = self.depth as usize + 2 - s;
             (n_strategies, s, t)
         };
-        bidir::generate_camera_path(scene, &pixel, &mut self.sampler, t, &mut self.camera_path);
+        bidir::generate_camera_path(scene, pixel, &mut self.sampler, t, &mut self.camera_path);
         if self.camera_path.len() != t {
             return FRecord {
-                pixel: *pixel,
+                pixel,
                 f: 0.0,
                 l: Spectrum::zero(),
             };
@@ -122,7 +122,7 @@ impl<'a> Chain<'a> {
         bidir::generate_light_path(scene, &mut self.sampler, s, &mut self.light_path);
         if self.light_path.len() != s {
             return FRecord {
-                pixel: *pixel,
+                pixel,
                 f: 0.0,
                 l: Spectrum::zero(),
             };
@@ -135,11 +135,11 @@ impl<'a> Chain<'a> {
             &self.camera_path,
             &mut self.sampler,
             &mut self.scratch,
-        ) * n_strategies as Float;
+        ) * n_strategies as f32;
         let l = if l.is_black() { Spectrum::zero() } else { l };
         FRecord {
-            pixel: *pixel,
-            f: glm::comp_max(&l.samples).clamp(0.0, 100.0),
+            pixel,
+            f: l.samples.max_element().clamp(0.0, 100.0),
             l,
         }
     }
@@ -151,16 +151,13 @@ impl<'a> Chain<'a> {
         self.scratch.new_light_path.clear();
         self.scratch.new_eye_path.clear();
 
-        let pixel = self
-            .sampler
-            .next2d()
-            .component_mul(&scene.camera.resolution().cast::<Float>());
+        let pixel = self.sampler.next2d() * scene.camera.resolution().as_vec2();
         let pixel = uvec2(pixel.x as u32, pixel.y as u32);
         let pixel = uvec2(
             pixel.x.min(scene.camera.resolution().x - 1),
             pixel.y.min(scene.camera.resolution().y - 1),
         );
-        self.run_at_pixel(&pixel, scene)
+        self.run_at_pixel(pixel, scene)
     }
 }
 impl Mmlt {
@@ -169,7 +166,7 @@ impl Mmlt {
         n_chains: usize,
         depth: u32,
         scene: &'a Scene,
-    ) -> (Vec<Chain<'a>>, Float) {
+    ) -> (Vec<Chain<'a>>, f32) {
         let mut rng = thread_rng();
         let seeds: Vec<_> = { (0..n_bootstrap).map(|_| rng.gen::<u64>()).collect() };
         let fs: Vec<_> = (0..n_bootstrap)
@@ -177,7 +174,7 @@ impl Mmlt {
                 Chain {
                     sampler: MmltSampler::new(seeds[i]),
                     cur: FRecord {
-                        pixel: glm::zero(),
+                        pixel: UVec2::ZERO,
                         f: 0.0,
                         l: Spectrum::zero(),
                     },
@@ -199,11 +196,11 @@ impl Mmlt {
         (
             (0..n_chains)
                 .map(|_| {
-                    let (i, _) = dist.sample_discrete(rng.gen::<Float>());
+                    let (i, _) = dist.sample_discrete(rng.gen::<f32>());
                     let mut chain = Chain {
                         sampler: MmltSampler::new(seeds[i]),
                         cur: FRecord {
-                            pixel: glm::zero(),
+                            pixel: UVec2::ZERO,
                             f: 0.0,
                             l: Spectrum::zero(),
                         },
@@ -217,7 +214,7 @@ impl Mmlt {
                     chain
                 })
                 .collect(),
-            fs.iter().sum::<Float>(),
+            fs.iter().sum::<f32>(),
         )
     }
 }
@@ -294,7 +291,7 @@ impl Integrator for Mmlt {
                                 1.0,
                             );
                         }
-                        if accept_prob == 1.0 || rng.gen::<Float>() < accept_prob {
+                        if accept_prob == 1.0 || rng.gen::<f32>() < accept_prob {
                             chain.cur = proposal;
                             chain.sampler.accept();
                         } else {
@@ -316,7 +313,7 @@ impl Integrator for Mmlt {
         for (depth, film) in per_depth_film.iter().enumerate() {
             film.pixels.par_iter().enumerate().for_each(|(_, p)| {
                 let mut px = p.write();
-                px.intensity = px.intensity * bs[depth] as Float;
+                px.intensity = px.intensity * bs[depth] as f32;
             });
         }
         let film = Film::new(&scene.camera.resolution());
@@ -327,7 +324,7 @@ impl Integrator for Mmlt {
             for (_, film) in per_depth_film.iter().enumerate() {
                 {
                     let px_d = film.pixels[i].read();
-                    px.intensity += px_d.intensity / self.spp as Float;
+                    px.intensity += px_d.intensity / self.spp as f32;
                 }
             }
             {

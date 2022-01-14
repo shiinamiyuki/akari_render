@@ -26,14 +26,14 @@ fn determine_child(p: &Vec2) -> usize {
     let y = p.y > 0.5;
     (x as usize) + (y as usize) * 2
 }
-fn remap(x: Float) -> Float {
+fn remap(x: f32) -> f32 {
     (if x > 0.5 { (x - 0.5) * 2.0 } else { x * 2.0 }).clamp(0.0, 1.0)
 }
 fn remap2(u: Vec2) -> Vec2 {
     vec2(remap(u.x), remap(u.y))
 }
 // fn unmap(u: &Vec2, p: Vec2) -> Vec2 {
-//     fn f(x: Float, p: Float) -> Float {
+//     fn f(x: f32, p: f32) -> f32 {
 //         (if x > 0.5 { p * 0.5 + 0.5 } else { p * 0.5 }).clamp(0.0, 1.0)
 //     }
 //     vec2(f(u.x, p.x), f(u.y, p.y))
@@ -44,7 +44,7 @@ pub struct QTree {
 }
 
 impl QTree {
-    fn sample_recursive(&self, mut u: Vec2, idx: usize) -> (Vec2, Float) {
+    fn sample_recursive(&self, mut u: Vec2, idx: usize) -> (Vec2, f32) {
         let node = &self.nodes[idx];
         let sum0 = node.sum[0].load(Ordering::Relaxed) + node.sum[1].load(Ordering::Relaxed);
         let sum1 = node.sum[2].load(Ordering::Relaxed) + node.sum[3].load(Ordering::Relaxed);
@@ -89,17 +89,17 @@ impl QTree {
             let x = child_idx & 1;
             let y = child_idx >> 1;
             (
-                vec2(p.x * 0.5 + x as Float * 0.5, p.y * 0.5 + y as Float * 0.5),
+                vec2(p.x * 0.5 + x as f32 * 0.5, p.y * 0.5 + y as f32 * 0.5),
                 pdf1 * pdf,
             )
         } else {
             (u, pdf)
         }
     }
-    pub fn sample(&self, u: &Vec2) -> (Vec2, Float) {
+    pub fn sample(&self, u: &Vec2) -> (Vec2, f32) {
         self.sample_recursive(*u, 0)
     }
-    fn pdf_recursive(&self, d: &Vec2, idx: usize) -> Float {
+    fn pdf_recursive(&self, d: &Vec2, idx: usize) -> f32 {
         let node = &self.nodes[idx];
         let sum0 = node.sum[0].load(Ordering::Relaxed) + node.sum[1].load(Ordering::Relaxed);
         let sum1 = node.sum[2].load(Ordering::Relaxed) + node.sum[3].load(Ordering::Relaxed);
@@ -112,7 +112,7 @@ impl QTree {
                 1.0
             }
     }
-    fn pdf(&self, d: &Vec2) -> Float {
+    fn pdf(&self, d: &Vec2) -> f32 {
         self.pdf_recursive(d, 0)
     }
     fn compute_sum_recursive(&mut self, idx: usize) -> f32 {
@@ -204,11 +204,11 @@ pub struct DTree {
 }
 
 impl DTree {
-    pub fn sample(&self, u: &Vec2) -> (Vec3, Float) {
+    pub fn sample(&self, u: &Vec2) -> (Vec3, f32) {
         let (w, pdf) = self.sampling.sample(u);
         (cylindrical_to_xyz(&w), pdf)
     }
-    pub fn pdf(&self, w: &Vec3) -> Float {
+    pub fn pdf(&self, w: &Vec3) -> f32 {
         self.sampling.pdf(&xyz_to_cylindrical(w))
     }
 }

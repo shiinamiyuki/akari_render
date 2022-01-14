@@ -5,28 +5,28 @@ pub mod node {
 
     #[derive(Clone, Copy, Serialize, Deserialize)]
     pub struct TRS {
-        pub translate: glm::Vec3,
-        pub rotate: glm::Vec3,
-        pub scale: glm::Vec3,
+        pub translate: [f32; 3],
+        pub rotate: [f32; 3],
+        pub scale: [f32; 3],
     }
     impl Default for TRS {
         fn default() -> Self {
             Self {
-                translate: glm::zero(),
-                rotate: glm::zero(),
-                scale: glm::vec3(1.0, 1.0, 1.0),
+                translate: [0.0; 3],
+                rotate: [0.0; 3],
+                scale: [1.0, 1.0, 1.0],
             }
         }
     }
 
     #[derive(Clone, Serialize, Deserialize)]
     pub enum Texture {
-        Float3(glm::Vec3),
+        Float3([f32; 3]),
         Float(f32),
-        Srgb(glm::Vec3),
-        SrgbU8(glm::UVec3),
-        Hsv(glm::Vec3),
-        Hex(glm::Vec3),
+        Srgb([f32; 3]),
+        SrgbU8([u8; 3]),
+        Hsv([f32; 3]),
+        Hex([f32; 3]),
         Image(String),
     }
 
@@ -64,7 +64,7 @@ pub mod node {
     }
     #[derive(Clone, Serialize, Deserialize)]
     pub enum Light {
-        Point { pos: glm::Vec3, emission: Texture },
+        Point { pos: [f32; 3], emission: Texture },
     }
     #[derive(Clone, Serialize, Deserialize)]
     pub enum Camera {

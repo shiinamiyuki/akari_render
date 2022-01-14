@@ -18,10 +18,10 @@ struct VisiblePoint<'a> {
 
 #[allow(non_snake_case)]
 struct SppmPixel<'a> {
-    radius: Float,
+    radius: f32,
     ld: Spectrum,
     M: AtomicU32,
-    N: Float,
+    N: f32,
     phi: [AtomicFloat; Spectrum::N_SAMPLES],
     tau: Spectrum,
     vp: Option<VisiblePoint<'a>>,
@@ -68,7 +68,7 @@ struct VisiblePointGrid<'a> {
     grid_res: [u32; 3],
 }
 impl<'a> VisiblePointGrid<'a> {
-    fn hash(&self, p: &glm::UVec3) -> usize {
+    fn hash(&self, p: &UVec3) -> usize {
         ((p.x as usize * 73856093) ^ (p.y as usize * 19349663) ^ (p.z as usize * 83492791))
             % self.hash_size
     }
@@ -80,16 +80,16 @@ impl<'a> VisiblePointGrid<'a> {
             grid_res,
         }
     }
-    pub fn to_grid(&self, mut p: Vec3) -> glm::UVec3 {
-        p = glm::min2(&self.bound.max, &p);
-        p = glm::max2(&self.bound.min, &p);
-        let mut q = self.bound.offset(&p);
-        q = q.component_mul(&vec3(
-            self.grid_res[0] as Float,
-            self.grid_res[1] as Float,
-            self.grid_res[2] as Float,
-        ));
-        uvec3(q.x as u32, q.y as u32, q.z as u32)
+    pub fn to_grid(&self, mut p: Vec3) -> UVec3 {
+        p = self.bound.max.min(p);
+        p = self.bound.min.max(p);
+        let mut q = self.bound.offset(p);
+        q = q * vec3(
+            self.grid_res[0] as f32,
+            self.grid_res[1] as f32,
+            self.grid_res[2] as f32,
+        );
+        q.as_uvec3()
     }
     pub fn insert(&self, pixel: &'a SppmPixel<'a>) {
         if pixel.vp.is_none() {
@@ -151,7 +151,7 @@ impl<'a> Drop for VisiblePointGrid<'a> {
 pub struct Sppm {
     pub iterations: usize,
     pub max_depth: usize,
-    pub initial_radius: Float,
+    pub initial_radius: f32,
     pub n_photons: usize,
 }
 
@@ -173,11 +173,15 @@ impl Integrator for Sppm {
         ];
         let mut samplers: Vec<Box<dyn Sampler>> = vec![];
         for i in 0..npixels {
-            samplers.push(Box::new(PCGSampler { rng: Pcg::new(i as u64) }));
+            samplers.push(Box::new(PCGSampler {
+                rng: Pcg::new(i as u64),
+            }));
         }
         let mut photon_samplers: Vec<Box<dyn Sampler>> = vec![];
         for i in 0..self.n_photons {
-            photon_samplers.push(Box::new(PCGSampler { rng: Pcg::new(i as u64) }));
+            photon_samplers.push(Box::new(PCGSampler {
+                rng: Pcg::new(i as u64),
+            }));
         }
         #[allow(unused_assignments)]
         let mut grid: Option<VisiblePointGrid> = None;
@@ -196,10 +200,10 @@ impl Integrator for Sppm {
                 let pixel = uvec2(x, y);
 
                 let sampler = unsafe { p_samplers.offset(id as isize).as_mut().unwrap().as_mut() };
-                let (ray, _ray_weight) = scene.camera.generate_ray(&pixel, sampler);
+                let (ray, _ray_weight) = scene.camera.generate_ray(pixel, sampler);
                 if let Some(isct) = scene.shape.intersect(&ray) {
                     let ng = isct.ng;
-                    let frame = Frame::from_normal(&ng);
+                    let frame = Frame::from_normal(ng);
                     let shape = isct.shape.unwrap();
                     let opt_bsdf = shape.bsdf();
                     if opt_bsdf.is_none() {
@@ -229,13 +233,13 @@ impl Integrator for Sppm {
                             min: vp.p - vec3(pixel.radius, pixel.radius, pixel.radius),
                             max: vp.p + vec3(pixel.radius, pixel.radius, pixel.radius),
                         };
-                        bound.insert_box(&p_bound);
+                        bound.insert_box(p_bound);
                         max_radius = max_radius.max(pixel.radius as f64);
                     }
                 }
                 println!("{:?} {}", bound, max_radius);
                 let diag = bound.diagonal();
-                let max_diag = glm::comp_max(&diag) as f64;
+                let max_diag = diag.max_element() as f64;
                 let base_grid_res = (max_diag / max_radius) as u32;
                 let mut grid_res = [0; 3];
                 for i in 0..3 {
@@ -258,15 +262,15 @@ impl Integrator for Sppm {
                         .as_mut()
                 };
                 let (light, light_pdf) = scene.light_distr.sample(sampler.next1d());
-                let sample = light.sample_le(&[sampler.next2d(), sampler.next2d()]);
+                let sample = light.sample_le([sampler.next2d(), sampler.next2d()]);
                 let mut depth = 0;
                 let mut ray = sample.ray;
                 let mut beta = sample.le / (sample.pdf_dir * sample.pdf_pos * light_pdf)
-                    * glm::dot(&sample.n, &ray.d).abs();
+                    * sample.n.dot(ray.d).abs();
                 loop {
                     if let Some(isct) = scene.shape.intersect(&ray) {
                         let ng = isct.ng;
-                        let frame = Frame::from_normal(&ng);
+                        let frame = Frame::from_normal(ng);
                         let shape = isct.shape.unwrap();
                         let opt_bsdf = shape.bsdf();
                         if opt_bsdf.is_none() {
@@ -284,7 +288,7 @@ impl Integrator for Sppm {
                         if depth >= self.max_depth {
                             break;
                         }
-                        
+
                         {
                             // splat to grid
                             let grid = grid.as_ref().unwrap();
@@ -297,10 +301,10 @@ impl Integrator for Sppm {
                                 let vp = pixel.vp.as_ref().unwrap();
                                 let dist2 = {
                                     let v = vp.p - p;
-                                    glm::dot(&v, &v)
+                                    v.length_squared()
                                 };
                                 if dist2 <= pixel.radius * pixel.radius {
-                                    let phi = beta * vp.bsdf.evaluate(&vp.wo, &wi);
+                                    let phi = beta * vp.bsdf.evaluate(vp.wo, wi);
                                     for i in 0..Spectrum::N_SAMPLES {
                                         pixel.phi[i].fetch_add(phi[i] as f32, Ordering::SeqCst);
                                     }
@@ -310,10 +314,10 @@ impl Integrator for Sppm {
                             }
                         }
 
-                        if let Some(bsdf_sample) = bsdf.sample(&sampler.next2d(), &wo) {
-                            let wi = &bsdf_sample.wi;
-                            ray = Ray::spawn(&p, wi).offset_along_normal(&ng);
-                            beta *= bsdf_sample.f * glm::dot(wi, &ng).abs() / bsdf_sample.pdf;
+                        if let Some(bsdf_sample) = bsdf.sample(sampler.next2d(), wo) {
+                            let wi = bsdf_sample.wi;
+                            ray = Ray::spawn(p, wi).offset_along_normal(ng);
+                            beta *= bsdf_sample.f * wi.dot(ng).abs() / bsdf_sample.pdf;
                         } else {
                             break;
                         }
@@ -327,12 +331,12 @@ impl Integrator for Sppm {
                 let gamma = 2.0 / 3.0;
                 #[allow(non_snake_case)]
                 if p.M.load(Ordering::Relaxed) > 0 {
-                    let N_new = p.N + (gamma * p.M.load(Ordering::Relaxed) as Float);
+                    let N_new = p.N + (gamma * p.M.load(Ordering::Relaxed) as f32);
                     let R_new =
-                        p.radius * (N_new / (p.N + p.M.load(Ordering::Relaxed) as Float)).sqrt();
+                        p.radius * (N_new / (p.N + p.M.load(Ordering::Relaxed) as f32)).sqrt();
                     let mut phi = Spectrum::zero();
                     for i in 0..Spectrum::N_SAMPLES {
-                        phi[i] = p.phi[i].load(Ordering::Relaxed) as Float;
+                        phi[i] = p.phi[i].load(Ordering::Relaxed) as f32;
                         p.phi[i].store(0.0, Ordering::SeqCst);
                     }
                     p.tau = (p.tau + p.vp.as_ref().unwrap().beta * phi) * (R_new * R_new)
@@ -347,8 +351,7 @@ impl Integrator for Sppm {
             let y = (id as u32) / scene.camera.resolution().x;
             let pixel = uvec2(x, y);
             let p = unsafe { p_pixels.offset(id as isize).as_ref().unwrap() };
-            let l =
-                p.tau / ((self.iterations * self.n_photons) as Float * PI * p.radius * p.radius);
+            let l = p.tau / ((self.iterations * self.n_photons) as f32 * PI * p.radius * p.radius);
 
             film.add_sample(&pixel, &l, 1.0);
         });

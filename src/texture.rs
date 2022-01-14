@@ -17,8 +17,8 @@ impl ShadingPoint {
 }
 pub trait Texture: Sync + Send + Base {
     fn evaluate_s(&self, sp: &ShadingPoint) -> Spectrum;
-    fn evaluate_f(&self, sp: &ShadingPoint) -> Float;
-    fn power(&self) -> Float;
+    fn evaluate_f(&self, sp: &ShadingPoint) -> f32;
+    fn power(&self) -> f32;
 }
 
 pub struct ConstantTexture<T: Sync + Send> {
@@ -27,14 +27,14 @@ pub struct ConstantTexture<T: Sync + Send> {
 impl Texture for ConstantTexture<f32> {
     fn evaluate_s(&self, _sp: &ShadingPoint) -> Spectrum {
         Spectrum {
-            samples: na::SVector::from_element(self.value as Float),
+            samples: Vec3A::from([self.value as f32; 3]),
         }
     }
-    fn evaluate_f(&self, _sp: &ShadingPoint) -> Float {
-        self.value as Float
+    fn evaluate_f(&self, _sp: &ShadingPoint) -> f32 {
+        self.value as f32
     }
-    fn power(&self) -> Float {
-        self.value as Float
+    fn power(&self) -> f32 {
+        self.value as f32
     }
 }
 impl_base!(ConstantTexture<f32>);
@@ -42,14 +42,14 @@ impl_base!(ConstantTexture<f32>);
 impl Texture for ConstantTexture<f64> {
     fn evaluate_s(&self, _sp: &ShadingPoint) -> Spectrum {
         Spectrum {
-            samples: na::SVector::from_element(self.value as Float),
+            samples: Vec3A::from([self.value as f32; 3]),
         }
     }
-    fn evaluate_f(&self, _sp: &ShadingPoint) -> Float {
-        self.value as Float
+    fn evaluate_f(&self, _sp: &ShadingPoint) -> f32 {
+        self.value as f32
     }
-    fn power(&self) -> Float {
-        self.value as Float
+    fn power(&self) -> f32 {
+        self.value as f32
     }
 }
 impl_base!(ConstantTexture<f64>);
@@ -57,11 +57,11 @@ impl Texture for ConstantTexture<Spectrum> {
     fn evaluate_s(&self, _sp: &ShadingPoint) -> Spectrum {
         self.value
     }
-    fn evaluate_f(&self, _sp: &ShadingPoint) -> Float {
-        self.value[0] as Float
+    fn evaluate_f(&self, _sp: &ShadingPoint) -> f32 {
+        self.value[0] as f32
     }
-    fn power(&self) -> Float {
-        self.value.samples.max() as Float
+    fn power(&self) -> f32 {
+        self.value.samples.max_element() as f32
     }
 }
 impl_base!(ConstantTexture<Spectrum>);
@@ -89,8 +89,8 @@ where
         self.data.read((self.size.0 * ij.1 + ij.0) as usize)
     }
     pub fn get_pixel(&self, uv: &Vec2) -> T {
-        let i = (uv[0] * self.size.0 as Float).round() as u32 % self.size.0;
-        let j = (uv[1] * self.size.1 as Float).round() as u32 % self.size.1;
+        let i = (uv[0] * self.size.0 as f32).round() as u32 % self.size.0;
+        let j = (uv[1] * self.size.1 as f32).round() as u32 % self.size.1;
         self.get_pixel_i((i, j))
     }
     pub fn as_slice(&self) -> &[T] {
@@ -113,8 +113,8 @@ impl ImageTexture<Spectrum> {
             data: ImageStorage::Direct(
                 img.pixels()
                     .map(|px| -> Spectrum {
-                        let rgb = vec3(px[0] as Float, px[1] as Float, px[2] as Float) / 255.0;
-                        Spectrum::from_srgb(&rgb)
+                        let rgb = vec3(px[0] as f32, px[1] as f32, px[2] as f32) / 255.0;
+                        Spectrum::from_srgb(rgb)
                     })
                     .collect(),
             ),
@@ -124,8 +124,8 @@ impl ImageTexture<Spectrum> {
         let pixels: Vec<_> = img
             .pixels()
             .map(|px| -> Spectrum {
-                let rgb = vec3(px[0] as Float, px[1] as Float, px[2] as Float) / 255.0;
-                Spectrum::from_srgb(&rgb)
+                let rgb = vec3(px[0] as f32, px[1] as f32, px[2] as f32) / 255.0;
+                Spectrum::from_srgb(rgb)
             })
             .collect();
         Self {
@@ -138,16 +138,16 @@ impl ImageTexture<Spectrum> {
 impl Texture for ImageTexture<f32> {
     fn evaluate_s(&self, sp: &ShadingPoint) -> Spectrum {
         Spectrum {
-            samples: na::SVector::from_element(self.evaluate_f(sp)),
+            samples: Vec3A::from([self.evaluate_f(sp); 3]),
         }
     }
-    fn evaluate_f(&self, sp: &ShadingPoint) -> Float {
-        self.get_pixel(&sp.texcoord) as Float
+    fn evaluate_f(&self, sp: &ShadingPoint) -> f32 {
+        self.get_pixel(&sp.texcoord) as f32
     }
-    fn power(&self) -> Float {
+    fn power(&self) -> f32 {
         match &self.data {
-            ImageStorage::Direct(data) => data.iter().sum::<f32>() as Float / data.len() as Float,
-            ImageStorage::Cached(data) => data.iter().sum::<f32>() as Float / data.len() as Float,
+            ImageStorage::Direct(data) => data.iter().sum::<f32>() as f32 / data.len() as f32,
+            ImageStorage::Cached(data) => data.iter().sum::<f32>() as f32 / data.len() as f32,
         }
     }
 }
@@ -155,16 +155,16 @@ impl_base!(ImageTexture<f32>);
 impl Texture for ImageTexture<f64> {
     fn evaluate_s(&self, sp: &ShadingPoint) -> Spectrum {
         Spectrum {
-            samples: na::SVector::from_element(self.evaluate_f(sp)),
+            samples: Vec3A::from([self.evaluate_f(sp); 3]),
         }
     }
-    fn evaluate_f(&self, sp: &ShadingPoint) -> Float {
-        self.get_pixel(&sp.texcoord) as Float
+    fn evaluate_f(&self, sp: &ShadingPoint) -> f32 {
+        self.get_pixel(&sp.texcoord) as f32
     }
-    fn power(&self) -> Float {
+    fn power(&self) -> f32 {
         match &self.data {
-            ImageStorage::Direct(data) => data.iter().sum::<f64>() as Float / data.len() as Float,
-            ImageStorage::Cached(data) => data.iter().sum::<f64>() as Float / data.len() as Float,
+            ImageStorage::Direct(data) => data.iter().sum::<f64>() as f32 / data.len() as f32,
+            ImageStorage::Cached(data) => data.iter().sum::<f64>() as f32 / data.len() as f32,
         }
     }
 }
@@ -173,16 +173,16 @@ impl Texture for ImageTexture<Spectrum> {
     fn evaluate_s(&self, sp: &ShadingPoint) -> Spectrum {
         self.get_pixel(&sp.texcoord)
     }
-    fn evaluate_f(&self, sp: &ShadingPoint) -> Float {
-        self.get_pixel(&sp.texcoord)[0] as Float
+    fn evaluate_f(&self, sp: &ShadingPoint) -> f32 {
+        self.get_pixel(&sp.texcoord)[0] as f32
     }
-    fn power(&self) -> Float {
+    fn power(&self) -> f32 {
         match &self.data {
             ImageStorage::Direct(data) => {
-                data.iter().map(|s| s.samples.max()).sum::<Float>() / data.len() as Float
+                data.iter().map(|s| s.samples.max_element()).sum::<f32>() / data.len() as f32
             }
             ImageStorage::Cached(data) => {
-                data.iter().map(|s| s.samples.max()).sum::<Float>() / data.len() as Float
+                data.iter().map(|s| s.samples.max_element()).sum::<f32>() / data.len() as f32
             }
         }
     }

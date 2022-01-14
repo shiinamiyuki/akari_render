@@ -1,20 +1,19 @@
-use crate::glm;
 use crate::Base;
+use crate::*;
 use embree_sys as sys;
 use lazy_static::lazy_static;
-use nalgebra_glm::{vec2, vec3, UVec3};
 use parking_lot::Mutex;
 use rayon::prelude::*;
-use std::{any::Any, collections::HashMap, convert::TryInto,  sync::Arc};
+use std::{any::Any, collections::HashMap, convert::TryInto, sync::Arc};
 use sys::RTCIntersectContext;
 
 use crate::{
     accel::Aggregate,
     bsdf::Bsdf,
     distribution::Distribution1D,
-    impl_base, lerp3,
-    shape::{AggregateProxy, MeshInstanceProxy, Shape, SurfaceSample,TriangleMesh},
-    Bounds3f, Float, Intersection, Ray, Vec3,
+    impl_base,
+    shape::{AggregateProxy, MeshInstanceProxy, Shape, SurfaceSample, TriangleMesh},
+    Bounds3f, Intersection, Ray, Vec3,
 };
 struct Device(sys::RTCDevice);
 unsafe impl Send for Device {}
@@ -82,7 +81,7 @@ pub struct EmbreeInstance {
     instance: sys::RTCGeometry,
     mesh: Arc<dyn Shape>,
     mesh_ref: &'static MeshInstanceProxy,
-    area: Float,
+    area: f32,
     dist: Distribution1D,
 }
 unsafe impl Send for EmbreeInstance {}
@@ -152,14 +151,14 @@ impl Shape for EmbreeInstance {
                 &mut rayhit as *mut _,
             );
             if rayhit.hit.geomID != u32::MAX {
-                let face = self.mesh_ref.mesh.indices[rayhit.hit.primID as usize];
+                let face = self.mesh_ref.mesh.indices[rayhit.hit.primID as usize].into();
                 let (tc0, tc1, tc2) = self.mesh_ref.mesh.get_tc(&face);
                 let uv = vec2(rayhit.hit.u, rayhit.hit.v);
-                let ng = glm::normalize(&vec3(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z));
+                let ng = vec3(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z).normalize();
                 Some(Intersection {
                     shape: Some(self),
                     uv,
-                    texcoords: lerp3(&tc0, &tc1, &tc2, &uv),
+                    texcoords: lerp3v2(tc0, tc1, tc2, uv),
                     t: rayhit.ray.tfar,
                     ng,
                     ns: ng,
@@ -188,10 +187,10 @@ impl Shape for EmbreeInstance {
     fn aabb(&self) -> Bounds3f {
         todo!()
     }
-    fn sample_surface(&self, u: &Vec3) -> SurfaceSample {
+    fn sample_surface(&self, u: Vec3) -> SurfaceSample {
         self.mesh_ref.mesh.sample_surface(u, &self.dist)
     }
-    fn area(&self) -> Float {
+    fn area(&self) -> f32 {
         self.area
     }
 }
@@ -286,13 +285,13 @@ impl Shape for EmbreeTopLevelAccel {
                 let (tc0, tc1, tc2) = self.instances[rayhit.hit.instID[0] as usize]
                     .mesh_ref
                     .mesh
-                    .get_tc(&face);
+                    .get_tc(&face.into());
                 let uv = vec2(rayhit.hit.u, rayhit.hit.v);
-                let ng = glm::normalize(&vec3(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z));
+                let ng = vec3(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z).normalize();
                 Some(Intersection {
                     shape: Some(self.instances[rayhit.hit.instID[0] as usize].as_ref()),
                     uv,
-                    texcoords: lerp3(&tc0, &tc1, &tc2, &uv),
+                    texcoords: lerp3v2(tc0, tc1, tc2, uv),
                     t: rayhit.ray.tfar,
                     ng,
                     ns: ng,
@@ -321,10 +320,10 @@ impl Shape for EmbreeTopLevelAccel {
     fn aabb(&self) -> Bounds3f {
         unimplemented!()
     }
-    fn sample_surface(&self, u: &Vec3) -> SurfaceSample {
+    fn sample_surface(&self, u: Vec3) -> SurfaceSample {
         unimplemented!()
     }
-    fn area(&self) -> Float {
+    fn area(&self) -> f32 {
         unimplemented!()
     }
     fn children(&self) -> Option<Vec<Arc<dyn Shape>>> {

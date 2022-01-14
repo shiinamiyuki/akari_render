@@ -24,19 +24,19 @@ fn main() {
     //     .build_global()
     //     .unwrap();
     let camera = {
-        let m = glm::translate(&glm::identity(), &vec3(0.5, 0.5, 2.0));
+        let m = Mat4::from_translation(vec3(0.5, 0.5, 2.0));
         Arc::new(PerspectiveCamera::new(
-            &uvec2(2048, 2048),
+            uvec2(2048, 2048),
             &Transform::from_matrix(&m),
-            (40.0 as Float).to_radians(),
+            (40.0 as f32).to_radians(),
         ))
     };
     let mut rng = rand::thread_rng();
     let shapes: Vec<_> = (0..6300)
         .map(|_| {
-            let x: Float = rng.gen();
-            let y: Float = rng.gen();
-            let z: Float = rng.gen();
+            let x: f32 = rng.gen();
+            let y: f32 = rng.gen();
+            let z: f32 = rng.gen();
             Arc::new(Sphere {
                 center: vec3(x, y, z),
                 radius: 0.005,
@@ -48,7 +48,7 @@ fn main() {
     let lights = vec![Arc::new(PointLight {
         position: vec3(0.0, 2.0, 0.0),
         emission: Arc::new(ConstantTexture::<Spectrum> {
-            value: Spectrum::from_srgb(&vec3(2.0, 2.0, 2.0)),
+            value: Spectrum::from_srgb(vec3(2.0, 2.0, 2.0)),
         }),
     }) as Arc<dyn Light>];
     let scene = Scene {
@@ -58,7 +58,7 @@ fn main() {
         light_distr: Arc::new(UniformLightDistribution::new(lights.clone())),
         shape,
         camera,
-        meshes:vec![],
+        meshes: vec![],
     };
     let mut integrator = RTAO { spp: 1 };
     let (film, time) = profile(|| integrator.render(&scene));

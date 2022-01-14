@@ -36,7 +36,7 @@ struct SceneLoaderContext<'a> {
     camera: Option<Arc<dyn Camera>>,
     lights: Vec<Arc<dyn Light>>,
     named_bsdfs: HashMap<String, Arc<dyn Bsdf>>,
-    texture_power: HashMap<usize, Float>,
+    texture_power: HashMap<usize, f32>,
     mesh_cache: HashMap<String, Arc<TriangleMesh>>,
     file_resolver: Arc<dyn FileResolver + Send + Sync>,
     vmem: VArrayMemBuilder,
@@ -48,18 +48,20 @@ impl<'a> SceneLoaderContext<'a> {
         match node {
             node::Texture::Float(f) => Arc::new(ConstantTexture { value: *f }),
             node::Texture::Float3(f3) => Arc::new(ConstantTexture {
-                value: Spectrum::from_rgb_linear(f3),
+                value: Spectrum::from_rgb_linear(Vec3::from(*f3)),
             }),
             node::Texture::Srgb(srgb) => Arc::new(ConstantTexture {
-                value: Spectrum::from_srgb(&srgb.cast::<Float>()),
+                value: Spectrum::from_srgb(Vec3::from(*srgb)),
             }),
             node::Texture::SrgbU8(srgb) => Arc::new(ConstantTexture {
-                value: Spectrum::from_srgb(&(srgb.cast::<Float>() / 255.0)),
+                value: Spectrum::from_srgb(
+                    UVec3::from([srgb[0] as u32, srgb[1] as u32, srgb[2] as u32]).as_vec3() / 255.0,
+                ),
             }),
             node::Texture::Hsv(hsv) => {
-                let rgb = hsv_to_rgb(&hsv.cast::<Float>());
+                let rgb = hsv_to_rgb(Vec3::from(*hsv));
                 Arc::new(ConstantTexture {
-                    value: Spectrum::from_srgb(&rgb),
+                    value: Spectrum::from_srgb(rgb),
                 })
             }
             node::Texture::Hex(_) => todo!(),
@@ -96,7 +98,7 @@ impl<'a> SceneLoaderContext<'a> {
         }
     }
     #[allow(dead_code)]
-    fn power(&mut self, tex: Arc<dyn Texture>) -> Float {
+    fn power(&mut self, tex: Arc<dyn Texture>) -> f32 {
         let addr = Arc::into_raw(tex.clone()).cast::<()>() as usize;
         if let Some(p) = self.texture_power.get(&addr) {
             return *p;
@@ -194,25 +196,26 @@ impl<'a> SceneLoaderContext<'a> {
     fn load_light(&mut self, node: &node::Light) -> Arc<dyn Light> {
         match node {
             node::Light::Point { pos, emission } => Arc::new(PointLight {
-                position: pos.cast::<Float>(),
+                position: Vec3::from(*pos),
                 emission: self.load_texture(emission),
             }),
         }
     }
     fn load_transform(&self, trs: node::TRS) -> Transform {
-        let mut m = glm::identity();
+        let mut m = Mat4::IDENTITY;
         let node::TRS {
             translate: t,
             rotate: r,
             scale: s,
         } = trs;
-        let (t, r, s) = (t.cast::<Float>(), r.cast::<Float>(), s.cast::<Float>());
-        let r: Vec3 = na::SVector::from_iterator(r.iter().map(|x| x.to_radians()));
-        m = glm::scale(&glm::identity(), &s) * m;
-        m = glm::rotate(&glm::identity(), r[0], &vec3(1.0, 0.0, 0.0)) * m;
-        m = glm::rotate(&glm::identity(), r[1], &vec3(0.0, 1.0, 0.0)) * m;
-        m = glm::rotate(&glm::identity(), r[2], &vec3(0.0, 0.0, 1.0)) * m;
-        m = glm::translate(&glm::identity(), &t) * m;
+        let (t, r, s) = (t.into(), r.into(), s.into());
+        let r: Vec3 = r;
+        let r = vec3(r.x.to_radians(), r.y.to_radians(), r.z.to_radians());
+        m = Mat4::from_scale(s) * m;
+        m = Mat4::from_axis_angle(vec3(1.0, 0.0, 0.0), r[0]) * m;
+        m = Mat4::from_axis_angle(vec3(0.0, 1.0, 0.0), r[1]) * m;
+        m = Mat4::from_axis_angle(vec3(0.0, 0.0, 1.0), r[2]) * m;
+        m = Mat4::from_translation(t) * m;
 
         Transform::from_matrix(&m)
     }
@@ -225,9 +228,9 @@ impl<'a> SceneLoaderContext<'a> {
                 focal,
                 transform,
             } => Arc::new(PerspectiveCamera::new(
-                &vec2(res.0, res.1),
+                uvec2(res.0, res.1),
                 &self.load_transform(transform),
-                fov.to_radians() as Float,
+                fov.to_radians() as f32,
             )),
         });
         for node in self.graph.shapes.iter() {
