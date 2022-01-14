@@ -32,7 +32,7 @@ fn main() {
         ))
     };
     let mut rng = rand::thread_rng();
-    let shapes: Vec<_> = (0..1000000)
+    let shapes: Vec<_> = (0..6300)
         .map(|_| {
             let x: Float = rng.gen();
             let y: Float = rng.gen();

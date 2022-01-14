@@ -97,7 +97,7 @@ fn main() {
                 .short("o")
                 .long("output")
                 .value_name("OUTPUT")
-                .help("output file"),
+                .help("Output file"),
         )
         .arg(
             Arg::with_name("threads")
@@ -123,14 +123,14 @@ fn main() {
                 .long("ooc")
                 .value_name("OOC")
                 .takes_value(false)
-                .help("out of core rendering"),
+                .help("Out of core rendering"),
         )
         .arg(
             Arg::with_name("texture_vmem")
                 .long("texture_vmem")
                 .value_name("texture_vmem")
                 .takes_value(false)
-                .help("maximum memory for textures (MB)"),
+                .help("Maximum memory for textures (MB)"),
         )
         .get_matches();
     let ooc = OocOptions {
