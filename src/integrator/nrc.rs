@@ -154,8 +154,8 @@ impl RadianceCache {
         Self {
             model: Arc::new(model),
             bound: Bounds3f {
-                min: vec3(1.0, 1.0, 1.0) * -500.0,
-                max: vec3(1.0, 1.0, 1.0) * 500.0,
+                min: (vec3(1.0, 1.0, 1.0) * -500.0).into(),
+                max: (vec3(1.0, 1.0, 1.0) * 500.0).into(),
             },
             query_queue: RwLock::new(vec![]),
             query_result: RwLock::new(na::DMatrix::zeros(0, 0)),
@@ -168,10 +168,10 @@ impl RadianceCache {
     fn get_input_vec(r: &QueryRecord) -> InputVec {
         InputVec::from_iterator(
             [r.x.x, r.x.y, r.x.z]
-                .into_iter()
+                .iter()
                 .map(|x| *x)
-                .chain([r.n.x, r.n.y].into_iter().map(|x| *x))
-                .chain([r.dir.x, r.dir.y].into_iter().map(|x| *x))
+                .chain([r.n.x, r.n.y].iter().map(|x| *x))
+                .chain([r.dir.x, r.dir.y].iter().map(|x| *x))
                 .chain(once(r.info.roughness))
                 .chain(once(r.info.metallic))
                 .chain(
@@ -180,7 +180,7 @@ impl RadianceCache {
                         r.info.albedo.samples.y,
                         r.info.albedo.samples.z,
                     ]
-                    .into_iter()
+                    .iter()
                     .map(|x| *x),
                 ),
         )

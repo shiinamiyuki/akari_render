@@ -29,7 +29,6 @@ mod tests {
     #[test]
     fn test_distr() {
         use crate::distribution::Distribution1D;
-        use crate::f32;
         let dist = Distribution1D::new(&[0.5, 0.5, 1.0, 1.0]).unwrap();
         let f_int: f32 = 3.0;
         assert_almost_eq!(dist.pdf_discrete(0) as f64, (0.5 / f_int) as f64, 0.001f64);

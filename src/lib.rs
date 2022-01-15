@@ -115,18 +115,18 @@ impl Clone for AtomicFloat {
 
 #[derive(Clone, Copy, Debug)]
 pub struct Aabb {
-    pub min: Vec3,
-    pub max: Vec3,
+    pub min: Vec3A,
+    pub max: Vec3A,
 }
 
 impl Aabb {
     pub fn size(&self) -> Vec3 {
-        self.max - self.min
+        (self.max - self.min).into()
     }
 
     pub fn insert_point(&mut self, p: Vec3) -> Self {
-        self.min = self.min.min(p);
-        self.max = self.max.max(p);
+        self.min = self.min.min(p.into());
+        self.max = self.max.max(p.into());
         *self
     }
     pub fn insert_box(&mut self, aabb: Self) -> Self {
@@ -142,24 +142,24 @@ impl Aabb {
         (s[0] * s[1] + s[1] * s[2] + s[0] * s[2]) * 2.0
     }
     pub fn centroid(&self) -> Vec3 {
-        self.min + 0.5 * self.size()
+        Vec3::from(self.min) + 0.5 * self.size()
     }
     pub fn diagonal(&self) -> Vec3 {
-        self.max - self.min
+        (self.max - self.min).into()
     }
     pub fn contains(&self, p: Vec3) -> bool {
-        p.cmple(self.max).all() && p.cmpge(self.min).all()
+        p.cmple(self.max.into()).all() && p.cmpge(self.min.into()).all()
     }
     pub fn offset(&self, p: Vec3) -> Vec3 {
-        (p - self.min) / self.size()
+        (p - Vec3::from(self.min)) / self.size()
     }
 }
 impl Default for Aabb {
     fn default() -> Self {
         let inf = f32::INFINITY;
         Self {
-            min: vec3(inf, inf, inf),
-            max: vec3(-inf, -inf, -inf),
+            min: Vec3A::new(inf, inf, inf),
+            max: Vec3A::new(-inf, -inf, -inf),
         }
     }
 }

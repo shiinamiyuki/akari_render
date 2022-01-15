@@ -101,8 +101,8 @@ impl Shape for Sphere {
     }
     fn aabb(&self) -> Bounds3f {
         Bounds3f {
-            min: self.center - vec3(self.radius, self.radius, self.radius),
-            max: self.center + vec3(self.radius, self.radius, self.radius),
+            min: (self.center - vec3(self.radius, self.radius, self.radius)).into(),
+            max: (self.center + vec3(self.radius, self.radius, self.radius)).into(),
         }
     }
     fn sample_surface(&self, u: Vec3) -> SurfaceSample {

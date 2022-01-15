@@ -34,7 +34,7 @@ impl LTC {
                 glam::dvec3(m[0] as f64, m[1] as f64, m[2] as f64),
                 glam::dvec3(m[3] as f64, m[4] as f64, m[5] as f64),
                 glam::dvec3(m[6] as f64, m[7] as f64, m[8] as f64),
-            ),
+            ).transpose(),
             amp: GGX_LTC_FIT.amp[a + t * SIZE] as f64,
         }
     }

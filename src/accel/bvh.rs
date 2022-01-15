@@ -156,10 +156,6 @@ where
                         .iter()
                         .map(|x| *x)
                         .collect();
-                    // let right: Vec<_> = references[split as usize..end as usize]
-                    //     .iter()
-                    //     .map(|x| *x)
-                    //     .collect();
                     ($axis, split as usize, min_cost, left)
                 }};
             }
@@ -305,9 +301,9 @@ where
         }
         self
     }
-    fn intersect_aabb(aabb: &Bounds3f, ray: &Ray, invd: Vec3) -> f32 {
-        let t0 = (aabb.min - ray.o) * invd;
-        let t1 = (aabb.max - ray.o) * invd;
+    fn intersect_aabb(aabb: &Bounds3f, ray: &Ray, o: Vec3A, invd: Vec3A) -> f32 {
+        let t0 = (aabb.min - o) * invd;
+        let t1 = (aabb.max - o) * invd;
         let min = t0.min(t1);
         let max = t0.max(t1);
         let tmin = min.max_element().max(ray.tmin);
@@ -345,11 +341,13 @@ where
         let mut sp = 0;
         let mut p = Some(&self.nodes[0]);
         let mut ray = *original_ray;
-        let invd: Vec3 = vec3(1.0, 1.0, 1.0) / ray.d;
+        let invd: Vec3A = Vec3A::ONE / Vec3A::from(ray.d);
+        let o = ray.o.into();
         let mut isct = None;
         if self.nodes[0].is_leaf() {
             return self.intersect_leaf(&self.nodes[0], &mut ray);
         }
+
         while p.is_some() {
             let node = p.unwrap();
             if node.is_leaf() {
@@ -365,8 +363,8 @@ where
             } else {
                 let left = &self.nodes[node.left() as usize];
                 let right = &self.nodes[node.right() as usize];
-                let t_left = Self::intersect_aabb(&left.aabb, &ray, invd);
-                let t_right = Self::intersect_aabb(&right.aabb, &ray, invd);
+                let t_left = Self::intersect_aabb(&left.aabb, &ray, o, invd);
+                let t_right = Self::intersect_aabb(&right.aabb, &ray, o, invd);
                 if t_left < 0.0 && t_right < 0.0 {
                     if sp > 0 {
                         sp -= 1;
@@ -400,10 +398,11 @@ where
         let mut sp = 0;
         let mut p = Some(&self.nodes[0]);
         let mut ray = *original_ray;
-        let invd: Vec3 = vec3(1.0, 1.0, 1.0) / ray.d;
+        let invd: Vec3A = Vec3A::ONE / Vec3A::from(ray.d);
+        let o = ray.o.into();
         while p.is_some() {
             let node = p.unwrap();
-            let t = Self::intersect_aabb(&node.aabb, &ray, invd);
+            let t = Self::intersect_aabb(&node.aabb, &ray, o, invd);
             if t < 0.0 {
                 if sp > 0 {
                     sp -= 1;

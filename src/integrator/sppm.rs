@@ -81,8 +81,8 @@ impl<'a> VisiblePointGrid<'a> {
         }
     }
     pub fn to_grid(&self, mut p: Vec3) -> UVec3 {
-        p = self.bound.max.min(p);
-        p = self.bound.min.max(p);
+        p = self.bound.max.min(p.into()).into();
+        p = self.bound.min.max(p.into()).into();
         let mut q = self.bound.offset(p);
         q = q * vec3(
             self.grid_res[0] as f32,
@@ -230,8 +230,8 @@ impl Integrator for Sppm {
                 for pixel in &pixels {
                     if let Some(vp) = &pixel.vp {
                         let p_bound = Bounds3f {
-                            min: vp.p - vec3(pixel.radius, pixel.radius, pixel.radius),
-                            max: vp.p + vec3(pixel.radius, pixel.radius, pixel.radius),
+                            min: (vp.p - vec3(pixel.radius, pixel.radius, pixel.radius)).into(),
+                            max: (vp.p + vec3(pixel.radius, pixel.radius, pixel.radius)).into(),
                         };
                         bound.insert_box(p_bound);
                         max_radius = max_radius.max(pixel.radius as f64);
