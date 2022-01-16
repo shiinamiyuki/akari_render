@@ -1,18 +1,17 @@
 use crate::accel;
-use crate::accel::Aggregate;
+use crate::accel::Accel;
 use crate::camera::*;
 use crate::light::*;
 use crate::shape::*;
 use crate::varray::VArrayMem;
 use crate::varray::VArrayMemBuilder;
-use crate::Intersection;
 use crate::Ray;
 use std::any::Any;
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 pub struct Scene {
-    pub shape: Arc<dyn Shape>,
+    accel: Arc<dyn Accel>,
     pub camera: Arc<dyn Camera>,
     pub lights: Vec<Arc<dyn Light>>,
     pub light_distr: Arc<dyn LightDistribution>,
@@ -31,13 +30,13 @@ impl Scene {
         is_gpu: bool,
     ) -> Self {
         let toplevel = if is_gpu {
-            Arc::new(AggregateProxy { shapes })
+            // Arc::new(AggregateProxy { shapes })
+            todo!()
         } else {
-            accel::build_accel(Arc::new(AggregateProxy { shapes }), accel)
+            accel::build_accel(&shapes, accel)
         };
-        let shapes = toplevel.children().unwrap();
         let mut shape_to_light = HashMap::new();
-        for shape in &shapes {
+        for shape in toplevel.shapes() {
             if let Some(bsdf) = shape.bsdf() {
                 if let Some(emission) = bsdf.emission() {
                     if emission.power() > 0.001 {
@@ -59,7 +58,7 @@ impl Scene {
             lights: lights.clone(),
             shape_to_light,
             light_distr: Arc::new(PowerLightDistribution::new(lights)),
-            shape: toplevel,
+            accel: toplevel,
             meshes,
         }
     }
@@ -73,14 +72,14 @@ impl Scene {
             None
         }
     }
-    pub fn intersect<'a>(&'a self, ray: &Ray) -> Option<Intersection<'a>> {
+    pub fn intersect<'a>(&'a self, ray: &Ray) -> Option<SurfaceInteraction<'a>> {
         self.ray_counter
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        self.shape.intersect(ray)
+        self.accel.intersect(ray)
     }
     pub fn occlude(&self, ray: &Ray) -> bool {
         self.ray_counter
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        self.shape.occlude(ray)
+        self.accel.occlude(ray)
     }
 }

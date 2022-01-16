@@ -253,25 +253,25 @@ pub fn random_walk<'a>(
     let mut pdf_rev = 0.0;
     let mut depth = 0usize;
     loop {
-        if let Some(isct) = scene.shape.intersect(&ray) {
-            let ng = isct.ng;
+        if let Some(si) = scene.intersect(&ray) {
+            let ng = si.ng;
             let frame = Frame::from_normal(ng);
-            let shape = isct.shape.unwrap();
+            let shape = si.shape;
             if mode == TransportMode::RADIANCE {
                 if let Some(light) = scene.get_light_of_shape(shape) {
                     let vertex =
-                        Vertex::create_light_vertex(light, ray.at(isct.t), isct.ng, beta, pdf_fwd);
+                        Vertex::create_light_vertex(light, ray.at(si.t), si.ng, beta, pdf_fwd);
                     path.push(vertex);
                     break;
                 }
             }
-            let opt_bsdf = shape.bsdf();
+            let opt_bsdf = si.bsdf;
             if opt_bsdf.is_none() {
                 break;
             }
-            let p = ray.at(isct.t);
+            let p = ray.at(si.t);
             let bsdf = BsdfClosure {
-                sp: ShadingPoint::from_intersection(&isct),
+                sp: si.sp,
                 frame,
                 bsdf: opt_bsdf.unwrap(),
             };
@@ -378,7 +378,7 @@ pub fn geometry_term(scene: &Scene, v1: &Vertex, v2: &Vertex) -> f32 {
     wi /= dist2.sqrt();
     let mut ray = Ray::spawn_to(v1.p(), v2.p()).offset_along_normal(v1.n());
     ray.tmax *= 0.997;
-    if scene.shape.occlude(&ray) {
+    if scene.occlude(&ray) {
         0.0
     } else {
         (wi.dot(v1.n()) * wi.dot(v2.n()) / dist2).abs()
@@ -587,7 +587,7 @@ pub fn connect_paths<'a>(
                     l *= light_sample.wi.dot(p_ref.n).abs();
                 }
                 if !l.is_black() {
-                    if scene.shape.occlude(&light_sample.shadow_ray) {
+                    if scene.occlude(&light_sample.shadow_ray) {
                         l *= 0.0;
                     }
                 }

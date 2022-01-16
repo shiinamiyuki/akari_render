@@ -201,17 +201,17 @@ impl Integrator for Sppm {
 
                 let sampler = unsafe { p_samplers.offset(id as isize).as_mut().unwrap().as_mut() };
                 let (ray, _ray_weight) = scene.camera.generate_ray(pixel, sampler);
-                if let Some(isct) = scene.shape.intersect(&ray) {
-                    let ng = isct.ng;
+                if let Some(si) = scene.intersect(&ray) {
+                    let ng = si.ng;
                     let frame = Frame::from_normal(ng);
-                    let shape = isct.shape.unwrap();
-                    let opt_bsdf = shape.bsdf();
+                    let shape = si.shape;
+                    let opt_bsdf = si.bsdf;
                     if opt_bsdf.is_none() {
                         return;
                     }
-                    let p = ray.at(isct.t);
+                    let p = ray.at(si.t);
                     let bsdf = BsdfClosure {
-                        sp: ShadingPoint::from_intersection(&isct),
+                        sp: si.sp,
                         frame,
                         bsdf: opt_bsdf.unwrap(),
                     };
@@ -268,17 +268,17 @@ impl Integrator for Sppm {
                 let mut beta = sample.le / (sample.pdf_dir * sample.pdf_pos * light_pdf)
                     * sample.n.dot(ray.d).abs();
                 loop {
-                    if let Some(isct) = scene.shape.intersect(&ray) {
-                        let ng = isct.ng;
+                    if let Some(si) = scene.intersect(&ray) {
+                        let ng = si.ng;
                         let frame = Frame::from_normal(ng);
-                        let shape = isct.shape.unwrap();
-                        let opt_bsdf = shape.bsdf();
+                        let shape = si.shape;
+                        let opt_bsdf = si.bsdf;
                         if opt_bsdf.is_none() {
                             break;
                         }
-                        let p = ray.at(isct.t);
+                        let p = ray.at(si.t);
                         let bsdf = BsdfClosure {
-                            sp: ShadingPoint::from_intersection(&isct),
+                            sp: si.sp,
                             frame,
                             bsdf: opt_bsdf.unwrap(),
                         };

@@ -33,17 +33,17 @@ impl PathTracer {
         {
             let mut depth = 0;
             loop {
-                if let Some(isct) = scene.shape.intersect(&ray) {
-                    let ng = isct.ng;
+                if let Some(si) = scene.intersect(&ray) {
+                    let ng = si.ng;
                     let frame = Frame::from_normal(ng);
-                    let shape = isct.shape.unwrap();
-                    let opt_bsdf = shape.bsdf();
+                    let shape = si.shape;
+                    let opt_bsdf = si.bsdf;
                     if opt_bsdf.is_none() {
                         break;
                     }
-                    let p = ray.at(isct.t);
+                    let p = ray.at(si.t);
                     let bsdf = BsdfClosure {
-                        sp: ShadingPoint::from_intersection(&isct),
+                        sp: si.sp,
                         frame,
                         bsdf: opt_bsdf.unwrap(),
                     };
@@ -104,7 +104,7 @@ impl PathTracer {
                             let light_pdf = light_sample.pdf * light_pdf;
                             if !indirect_only || depth > 1 {
                                 if !light_sample.li.is_black()
-                                    && !scene.shape.occlude(&light_sample.shadow_ray)
+                                    && !scene.occlude(&light_sample.shadow_ray)
                                 {
                                     let bsdf_pdf = bsdf.evaluate_pdf(wo, light_sample.wi);
                                     let weight = if light.is_delta() {
@@ -132,7 +132,7 @@ impl PathTracer {
                         ray = Ray::spawn(p, wi).offset_along_normal(ng);
                         beta *= bsdf_sample.f * wi.dot(ng).abs() / bsdf_sample.pdf;
                         prev_bsdf_pdf = Some(bsdf_sample.pdf);
-                        prev_n = Some(isct.ng);
+                        prev_n = Some(si.ng);
                     } else {
                         break;
                     }

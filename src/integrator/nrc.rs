@@ -400,15 +400,15 @@ impl CachedPathTracer {
         let mut prev_x: Vec3 = ray.o;
         let mut prev_pdf: f32 = 0.0;
         loop {
-            if let Some(isct) = scene.shape.intersect(&ray) {
-                let ng = isct.ng;
+            if let Some(si) = scene.intersect(&ray) {
+                let ng = si.ng;
                 let frame = Frame::from_normal(ng);
-                let shape = isct.shape.unwrap();
-                let opt_bsdf = shape.bsdf();
+                let shape = si.shape;
+                let opt_bsdf = si.bsdf;
                 if opt_bsdf.is_none() {
                     break;
                 }
-                let p = ray.at(isct.t);
+                let p = ray.at(si.t);
                 if depth == 0 {
                     let w = (ray.o - p).normalize();
                     termination_a0 = (ray.o - p).length_squared() / (4.0 * PI * w.dot(ng).abs());
@@ -418,7 +418,7 @@ impl CachedPathTracer {
                     termination_a +=
                         ((prev_x - p).length_squared() / (prev_pdf * w.dot(ng).abs())).sqrt();
                 }
-                let sp = ShadingPoint::from_intersection(&isct);
+                let sp = si.sp;
                 let bsdf = BsdfClosure {
                     sp,
                     frame,
@@ -519,7 +519,7 @@ impl CachedPathTracer {
                         let light_sample = light.sample_li(sampler.next3d(), &p_ref);
                         let light_pdf = light_sample.pdf * light_pdf;
                         if !light_sample.li.is_black()
-                            && !scene.shape.occlude(&light_sample.shadow_ray)
+                            && !scene.occlude(&light_sample.shadow_ray)
                         {
                             let bsdf_pdf = bsdf.evaluate_pdf(wo, light_sample.wi);
                             let weight = mis_weight(light_pdf, bsdf_pdf);
@@ -541,7 +541,7 @@ impl CachedPathTracer {
                     prev_x = p;
                     prev_pdf = bsdf_sample.pdf;
                     prev_bsdf_pdf = Some(bsdf_sample.pdf);
-                    prev_n = Some(isct.ng);
+                    prev_n = Some(si.ng);
                 } else {
                     break;
                 }
@@ -817,10 +817,10 @@ impl Integrator for CachedPathTracer {
         //     let cache = &*lk;
         //     // let li = cache.infer(&ray.o, &dir_to_spherical(ray.d));
         //     let mut li = Spectrum::zero();
-        //     if let Some(isct) = scene.shape.intersect(&ray) {
-        //         let p = ray.o; //ray.at(isct.t * 0.9);
+        //     if let Some(si) = scene.intersect(&ray) {
+        //         let p = ray.o; //ray.at(si.t * 0.9);
         //         li = cache.infer(&p, &dir_to_spherical(ray.d));
-        //         // let n = isct.ng;
+        //         // let n = si.ng;
         //         // let frame = Frame::from_normal(n);
         //         // f
         //         // println!("{}", li.samples);

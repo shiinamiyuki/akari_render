@@ -1,5 +1,6 @@
-use crate::Base;
+use crate::texture::ShadingPoint;
 use crate::*;
+use crate::{shape::SurfaceInteraction, Base};
 use embree_sys as sys;
 use lazy_static::lazy_static;
 use parking_lot::Mutex;
@@ -8,12 +9,11 @@ use std::{any::Any, collections::HashMap, convert::TryInto, sync::Arc};
 use sys::RTCIntersectContext;
 
 use crate::{
-    accel::Aggregate,
     bsdf::Bsdf,
     distribution::Distribution1D,
     impl_base,
-    shape::{AggregateProxy, MeshInstanceProxy, Shape, SurfaceSample, TriangleMesh},
-    Bounds3f, Intersection, Ray, Vec3,
+    shape::{MeshInstanceProxy, Shape, SurfaceSample, TriangleMesh},
+    Bounds3f, Ray, Vec3,
 };
 struct Device(sys::RTCDevice);
 unsafe impl Send for Device {}
@@ -75,6 +75,7 @@ impl EmbreeMeshAccel {
         Self { scene }
     }
 }
+#[allow(dead_code)]
 pub struct EmbreeInstance {
     base: sys::RTCScene,
     instance_scene: sys::RTCScene,
@@ -125,7 +126,7 @@ impl Drop for EmbreeInstance {
 }
 impl_base!(EmbreeInstance);
 impl Shape for EmbreeInstance {
-    fn intersect<'a>(&'a self, ray: &Ray) -> Option<Intersection<'a>> {
+    fn intersect(&self, ray: &Ray) -> Option<RayHit> {
         unsafe {
             let mut rayhit = sys::RTCRayHit {
                 ray: to_rtc_ray(ray),
@@ -151,18 +152,14 @@ impl Shape for EmbreeInstance {
                 &mut rayhit as *mut _,
             );
             if rayhit.hit.geomID != u32::MAX {
-                let face = self.mesh_ref.mesh.indices[rayhit.hit.primID as usize].into();
-                let (tc0, tc1, tc2) = self.mesh_ref.mesh.get_tc(&face);
                 let uv = vec2(rayhit.hit.u, rayhit.hit.v);
                 let ng = vec3(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z).normalize();
-                Some(Intersection {
-                    shape: Some(self),
+                Some(RayHit {
                     uv,
-                    texcoords: lerp3v2(tc0, tc1, tc2, uv),
                     t: rayhit.ray.tfar,
                     ng,
-                    ns: ng,
                     prim_id: rayhit.hit.primID,
+                    geom_id: u32::MAX,
                 })
             } else {
                 None
@@ -182,7 +179,7 @@ impl Shape for EmbreeInstance {
         }
     }
     fn bsdf<'a>(&'a self) -> Option<&'a dyn Bsdf> {
-        self.mesh.bsdf()
+        self.mesh_ref.bsdf()
     }
     fn aabb(&self) -> Bounds3f {
         todo!()
@@ -192,6 +189,14 @@ impl Shape for EmbreeInstance {
     }
     fn area(&self) -> f32 {
         self.area
+    }
+
+    fn shading_triangle<'a>(&'a self, prim_id: u32) -> shape::ShadingTriangle<'a> {
+        self.mesh_ref.shading_triangle(prim_id)
+    }
+
+    fn triangle(&self, prim_id: u32) -> shape::Triangle {
+        self.mesh_ref.triangle(prim_id)
     }
 }
 pub struct EmbreeTopLevelAccel {
@@ -209,23 +214,13 @@ impl Drop for EmbreeTopLevelAccel {
 }
 
 impl EmbreeTopLevelAccel {
-    pub(crate) unsafe fn new(shape: Arc<dyn Shape>) -> Self {
+    pub(crate) unsafe fn new(shapes: &Vec<Arc<dyn Shape>>) -> Self {
         init_device();
-        let aggregate = shape
-            .as_ref()
-            .as_any()
-            .downcast_ref::<AggregateProxy>()
-            .unwrap_or_else(|| {
-                panic!("expected AggregateProxy but found {:?}", shape.type_name());
-            });
         let mut cache: HashMap<*const dyn Any, EmbreeMeshAccel> = HashMap::new();
-        let shapes: Vec<_> = aggregate
-            .shapes
+        let shapes: Vec<_> = shapes
             .iter()
             .map(|shape_| {
                 let shape = shape_.as_ref().as_any();
-                assert!(!shape.is::<AggregateProxy>());
-                assert!(!shape.is::<Aggregate>());
                 if let Some(mesh) = shape.downcast_ref::<MeshInstanceProxy>() {
                     let base = mesh.mesh.clone();
                     if !cache.contains_key(&Arc::as_ptr(&(base.clone() as Arc<dyn Any>))) {
@@ -257,8 +252,11 @@ impl EmbreeTopLevelAccel {
 }
 
 impl_base!(EmbreeTopLevelAccel);
-impl Shape for EmbreeTopLevelAccel {
-    fn intersect<'a>(&'a self, ray: &Ray) -> Option<Intersection<'a>> {
+impl accel::Accel for EmbreeTopLevelAccel {
+    fn shapes(&self) -> Vec<Arc<dyn Shape>> {
+        self.instances.iter().map(|x| x.clone() as Arc<dyn Shape>).collect()
+    }
+    fn intersect<'a>(&'a self, ray: &Ray) -> Option<SurfaceInteraction<'a>> {
         unsafe {
             let mut rayhit = sys::RTCRayHit {
                 ray: to_rtc_ray(ray),
@@ -281,21 +279,21 @@ impl Shape for EmbreeTopLevelAccel {
             sys::rtcIntersect1(self.scene, &mut ctx as *mut _, &mut rayhit as *mut _);
             if rayhit.hit.geomID != u32::MAX {
                 let instance = &self.instances[rayhit.hit.instID[0] as usize];
-                let face = instance.mesh_ref.mesh.indices[rayhit.hit.primID as usize];
-                let (tc0, tc1, tc2) = self.instances[rayhit.hit.instID[0] as usize]
-                    .mesh_ref
-                    .mesh
-                    .get_tc(&face.into());
                 let uv = vec2(rayhit.hit.u, rayhit.hit.v);
                 let ng = vec3(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z).normalize();
-                Some(Intersection {
-                    shape: Some(self.instances[rayhit.hit.instID[0] as usize].as_ref()),
-                    uv,
-                    texcoords: lerp3v2(tc0, tc1, tc2, uv),
+                let triangle = instance.shading_triangle(rayhit.hit.primID);
+                let ns = triangle.ns(uv);
+                let texcoord = triangle.texcoord(uv);
+                Some(SurfaceInteraction {
+                    shape: instance.as_ref(),
+                    bsdf: triangle.bsdf,
+                    triangle,
                     t: rayhit.ray.tfar,
+                    uv,
                     ng,
-                    ns: ng,
-                    prim_id: rayhit.hit.primID,
+                    ns,
+                    sp: ShadingPoint { texcoord },
+                    texcoord,
                 })
             } else {
                 None
@@ -313,26 +311,6 @@ impl Shape for EmbreeTopLevelAccel {
             sys::rtcOccluded1(self.scene, &mut ctx as *mut _, &mut ray as *mut _);
             ray.tfar < 0.0
         }
-    }
-    fn bsdf<'a>(&'a self) -> Option<&'a dyn Bsdf> {
-        unimplemented!()
-    }
-    fn aabb(&self) -> Bounds3f {
-        unimplemented!()
-    }
-    fn sample_surface(&self, u: Vec3) -> SurfaceSample {
-        unimplemented!()
-    }
-    fn area(&self) -> f32 {
-        unimplemented!()
-    }
-    fn children(&self) -> Option<Vec<Arc<dyn Shape>>> {
-        Some(
-            self.instances
-                .iter()
-                .map(|i| i.clone() as Arc<dyn Shape>)
-                .collect(),
-        )
     }
 }
 

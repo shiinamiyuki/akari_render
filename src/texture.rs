@@ -1,4 +1,5 @@
 use crate::{
+    shape::{Shape, SurfaceInteraction},
     varray::{VArray, VArrayMemBuilder},
     *,
 };
@@ -9,12 +10,14 @@ pub struct ShadingPoint {
     pub texcoord: Vec2,
 }
 impl ShadingPoint {
-    pub fn from_intersection<'a>(isct: &Intersection<'a>) -> Self {
+    pub fn from_rayhit(shape: &dyn Shape, ray_hit: RayHit) -> Self {
+        let triangle = shape.shading_triangle(ray_hit.prim_id);
         Self {
-            texcoord: isct.texcoords,
+            texcoord: triangle.texcoord(ray_hit.uv),
         }
     }
 }
+
 pub trait Texture: Sync + Send + Base {
     fn evaluate_s(&self, sp: &ShadingPoint) -> Spectrum;
     fn evaluate_f(&self, sp: &ShadingPoint) -> f32;

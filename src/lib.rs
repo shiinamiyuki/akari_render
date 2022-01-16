@@ -688,14 +688,13 @@ impl Frame {
 pub fn reflect(w: Vec3, n: Vec3) -> Vec3 {
     -w + 2.0 * w.dot(n) * n
 }
-pub struct Intersection<'a> {
-    pub shape: Option<&'a dyn shape::Shape>,
+#[derive(Clone, Copy, Debug)]
+pub struct RayHit {
     pub uv: Vec2,
-    pub texcoords: Vec2,
     pub t: f32,
     pub ng: Vec3,
-    pub ns: Vec3,
     pub prim_id: u32,
+    pub geom_id: u32,
 }
 
 #[derive(Clone, Copy)]

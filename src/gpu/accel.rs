@@ -24,7 +24,7 @@ use vkc::Context;
 
 // #[derive(Clone, Copy, Pod, Zeroable)]
 // #[repr(C)]
-// pub struct GPUBVHNode {
+// pub struct GPUBvhNode {
 //     pub aabb: GPUAABB,
 //     pub axis: u32,
 //     pub first: u32,
@@ -33,14 +33,14 @@ use vkc::Context;
 //     pub right: u32,
 // }
 
-// pub struct GPUBVH {
-//     pub nodes: TBuffer<GPUBVHNode>,
+// pub struct GPUBvh {
+//     pub nodes: TBuffer<GPUBvhNode>,
 //     pub references: TBuffer<u32>,
 // }
 
-// pub struct GPUTopLevelBVH {
-//     pub top: GPUBVH,
-//     pub bvhes: Vec<GPUBVH>,
+// pub struct GPUTopLevelBvh {
+//     pub top: GPUBvh,
+//     pub bvhes: Vec<GPUBvh>,
 // }
 
 pub struct RTX {

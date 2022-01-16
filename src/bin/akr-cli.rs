@@ -188,6 +188,11 @@ fn main() {
         log::info!("Rendering with {} threads", rayon::current_num_threads());
         let (film, time) = profile(|| -> Film { integrator.as_mut().render(&scene) });
         log::info!("Took {}s", time);
+        log::info!(
+            "Trace {} rays, average {}M rays/s",
+            scene.ray_counter.load(std::sync::atomic::Ordering::Relaxed),
+            scene.ray_counter.load(std::sync::atomic::Ordering::Relaxed) as f64 / 1e6 / time,
+        );
         let image = film.to_rgb_image();
         image.save(output).unwrap();
     } else {

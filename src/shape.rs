@@ -1,6 +1,7 @@
-use crate::accel::bvh::BVHAccelerator;
+use crate::accel::bvh::BvhAccelerator;
 use crate::accel::bvh::SweepSAHBuilder;
 use crate::distribution::Distribution1D;
+use crate::texture::ShadingPoint;
 use crate::*;
 use crate::{accel::bvh, bsdf::Bsdf};
 
@@ -8,7 +9,19 @@ use serde::{Deserialize, Serialize};
 use std::process::exit;
 use std::sync::Arc;
 extern crate tobj;
-
+#[derive(Clone, Copy)]
+pub struct SurfaceInteraction<'a> {
+    pub shape: &'a dyn Shape,
+    pub bsdf: Option<&'a dyn Bsdf>,
+    pub triangle: ShadingTriangle<'a>,
+    pub uv: Vec2,
+    pub sp: ShadingPoint,
+    pub ng: Vec3,
+    pub ns: Vec3,
+    pub t: f32,
+    pub texcoord: Vec2,
+}
+#[derive(Clone, Copy)]
 pub struct SurfaceSample {
     pub p: Vec3,
     pub texcoords: Vec2,
@@ -17,113 +30,20 @@ pub struct SurfaceSample {
     pub ns: Vec3,
 }
 pub trait Shape: Sync + Send + Base {
-    fn intersect<'a>(&'a self, ray: &Ray) -> Option<Intersection<'a>>;
+    fn intersect(&self, ray: &Ray) -> Option<RayHit>;
     fn occlude(&self, ray: &Ray) -> bool;
     fn bsdf<'a>(&'a self) -> Option<&'a dyn Bsdf>;
+    fn shading_triangle<'a>(&'a self, prim_id: u32) -> ShadingTriangle<'a>;
+    fn triangle(&self, prim_id: u32) -> Triangle;
     fn aabb(&self) -> Bounds3f;
     fn sample_surface(&self, u: Vec3) -> SurfaceSample;
     fn area(&self) -> f32;
-    fn children(&self) -> Option<Vec<Arc<dyn Shape>>> {
-        None
-    }
 }
 
-#[derive(Clone)]
-pub struct Sphere {
-    pub center: Vec3,
-    pub radius: f32,
-    pub bsdf: Arc<dyn Bsdf>,
-}
-impl_base!(Sphere);
-impl Shape for Sphere {
-    fn intersect<'a>(&'a self, ray: &Ray) -> Option<Intersection<'a>> {
-        let oc = ray.o - self.center;
-        let a = ray.d.length_squared();
-        let b = 2.0 * ray.d.dot(oc);
-        let c = oc.length_squared() - self.radius * self.radius;
-        let delta = b * b - 4.0 * a * c;
-        if delta < 0.0 {
-            return None;
-        }
-        let t1 = (-b - delta.sqrt()) / (2.0 * a);
-        if t1 >= ray.tmin && t1 < ray.tmax {
-            let p = ray.at(t1);
-            let n = (p - self.center).normalize();
-            let uv = dir_to_uv(n);
-            return Some(Intersection {
-                shape: Some(self),
-                t: t1,
-                uv,
-                texcoords: uv,
-                ng: n,
-                ns: n,
-                prim_id: 0,
-            });
-        }
-        let t2 = (-b + delta.sqrt()) / (2.0 * a);
-        if t2 >= ray.tmin && t2 < ray.tmax {
-            let p = ray.at(t2);
-            let n = (p - self.center).normalize();
-            let uv = dir_to_uv(n);
-            return Some(Intersection {
-                shape: Some(self),
-                t: t2,
-                uv,
-                texcoords: uv,
-                ng: n,
-                ns: n,
-                prim_id: 0,
-            });
-        }
-        None
-    }
-    fn occlude(&self, ray: &Ray) -> bool {
-        let oc = ray.o - self.center;
-        let a = ray.d.length_squared();
-        let b = 2.0 * ray.d.dot(oc);
-        let c = oc.length_squared() - self.radius * self.radius;
-        let delta = b * b - 4.0 * a * c;
-        if delta < 0.0 {
-            return false;
-        }
-        let t1 = (-b - delta.sqrt()) / (2.0 * a);
-        if t1 >= ray.tmin && t1 < ray.tmax {
-            return true;
-        }
-        let t2 = (-b + delta.sqrt()) / (2.0 * a);
-        if t2 >= ray.tmin && t2 < ray.tmax {
-            return true;
-        }
-        false
-    }
-    fn bsdf<'a>(&'a self) -> Option<&'a dyn Bsdf> {
-        Some(&*self.bsdf)
-    }
-    fn aabb(&self) -> Bounds3f {
-        Bounds3f {
-            min: (self.center - vec3(self.radius, self.radius, self.radius)).into(),
-            max: (self.center + vec3(self.radius, self.radius, self.radius)).into(),
-        }
-    }
-    fn sample_surface(&self, u: Vec3) -> SurfaceSample {
-        let v = uniform_sphere_sampling(vec2(u.x, u.y));
-        SurfaceSample {
-            p: self.center + v * self.radius,
-            pdf: uniform_sphere_pdf(),
-            texcoords: dir_to_uv(v),
-            ng: v,
-            ns: v,
-        }
-    }
-    fn area(&self) -> f32 {
-        4.0 * PI * self.radius
-    }
-}
-#[derive(Clone)]
+#[derive(Copy, Clone, Debug)]
+#[repr(transparent)]
 pub struct Triangle {
     pub vertices: [Vec3; 3],
-    // pub texcoords: [Vec2; 3],
-    // pub bsdf: Option<Arc<dyn Bsdf>>,
 }
 
 impl Triangle {
@@ -174,14 +94,7 @@ impl Triangle {
             None
         }
     }
-
-    fn occlude(&self, ray: &Ray) -> bool {
-        if let Some(_) = self.intersect(ray) {
-            true
-        } else {
-            false
-        }
-    }
+    #[allow(dead_code)]
     fn aabb(&self) -> Bounds3f {
         Bounds3f::default()
             .insert_point(self.vertices[0])
@@ -189,16 +102,33 @@ impl Triangle {
             .insert_point(self.vertices[2])
     }
 }
+#[derive(Copy, Clone)]
+pub struct ShadingTriangle<'a> {
+    pub vertices: [Vec3; 3],
+    pub texcoords: [Vec2; 3],
+    pub normals: [Vec3; 3],
+    pub bsdf: Option<&'a dyn Bsdf>,
+}
+impl<'a> ShadingTriangle<'a> {
+    pub fn texcoord(&self, uv: Vec2) -> Vec2 {
+        lerp3v2(self.texcoords[0], self.texcoords[1], self.texcoords[2], uv)
+    }
+    pub fn ns(&self, uv: Vec2) -> Vec3 {
+        lerp3v3(self.normals[0], self.normals[1], self.normals[2], uv)
+    }
+}
+impl<'a> Into<Triangle> for ShadingTriangle<'a> {
+    fn into(self) -> Triangle {
+        Triangle {
+            vertices: self.vertices,
+        }
+    }
+}
 pub struct TriangleMeshAccelData {
     pub mesh: Arc<TriangleMesh>,
 }
 
-impl TriangleMeshAccelData {
-    fn get_tc(&self, face: &UVec3) -> (Vec2, Vec2, Vec2) {
-        self.mesh.get_tc(face)
-    }
-}
-impl bvh::BVHData for TriangleMeshAccelData {
+impl bvh::BvhData for TriangleMeshAccelData {
     fn aabb(&self, idx: u32) -> Bounds3f {
         let face = self.mesh.indices[idx as usize];
         let v0: Vec3 = self.mesh.vertices[face[0] as usize].into();
@@ -209,49 +139,10 @@ impl bvh::BVHData for TriangleMeshAccelData {
             .insert_point(v1)
             .insert_point(v2)
     }
-    fn intersect<'a>(&'a self, idx: u32, ray: &Ray) -> Option<Intersection<'a>> {
-        let face = self.mesh.indices[idx as usize];
-        let v0 = self.mesh.vertices[face[0] as usize].into();
-        let v1 = self.mesh.vertices[face[1] as usize].into();
-        let v2 = self.mesh.vertices[face[2] as usize].into();
-
-        let trig = Triangle {
-            vertices: [v0, v1, v2],
-        };
-        let t_uv = trig.intersect(ray);
-        if let Some(t_uv) = t_uv {
-            //let (tc0, tc1, tc2) = self.get_tc(&face);
-            // let ng = trig.ng();
-            Some(Intersection {
-                shape: None,
-                uv: t_uv.1,
-                texcoords: vec2(0.0, 0.0), //lerp3(&tc0, &tc1, &tc2, &t_uv.1),
-                ng: vec3(0.0, 0.0, 0.0),
-                ns: vec3(0.0, 0.0, 0.0),
-                t: t_uv.0,
-                prim_id: idx,
-            })
-        } else {
-            None
-        }
-    }
-    fn bsdf<'a>(&'a self, _: u32) -> Option<&'a dyn Bsdf> {
-        panic!("dont call this")
-    }
-    fn occlude(&self, idx: u32, ray: &Ray) -> bool {
-        let face = self.mesh.indices[idx as usize];
-        let v0 = self.mesh.vertices[face[0] as usize].into();
-        let v1 = self.mesh.vertices[face[1] as usize].into();
-        let v2 = self.mesh.vertices[face[2] as usize].into();
-        Triangle {
-            vertices: [v0, v1, v2],
-        }
-        .occlude(ray)
-    }
 }
 
 pub struct TriangleMeshInstance {
-    pub accel: Arc<accel::bvh::BVHAccelerator<TriangleMeshAccelData>>,
+    pub accel: Arc<accel::bvh::BvhAccelerator<TriangleMeshAccelData>>,
     pub bsdf: Arc<dyn Bsdf>,
     pub area: f32,
     pub dist: Distribution1D,
@@ -262,57 +153,37 @@ pub struct MeshInstanceProxy {
     pub bsdf: Arc<dyn Bsdf>,
 }
 impl_base!(MeshInstanceProxy);
-pub struct AggregateProxy {
-    pub shapes: Vec<Arc<dyn Shape>>,
-}
-impl_base!(AggregateProxy);
-impl Shape for AggregateProxy {
-    fn intersect<'a>(&'a self, _ray: &Ray) -> Option<Intersection<'a>> {
-        panic!("shouldn't be called on cpu")
-    }
 
-    fn occlude(&self, _ray: &Ray) -> bool {
-        panic!("shouldn't be called on cpu")
-    }
-
-    fn bsdf<'a>(&'a self) -> Option<&'a dyn Bsdf> {
-        panic!("shouldn't be called on cpu")
-    }
-
-    fn aabb(&self) -> Bounds3f {
-        panic!("shouldn't be called on cpu")
-    }
-
-    fn sample_surface(&self, _u: Vec3) -> SurfaceSample {
-        panic!("shouldn't be called on cpu")
-    }
-
-    fn area(&self) -> f32 {
-        panic!("shouldn't be called on cpu")
-    }
-    fn children(&self) -> Option<Vec<Arc<dyn Shape>>> {
-        Some(self.shapes.clone())
-    }
-}
 impl Shape for MeshInstanceProxy {
-    fn intersect<'a>(&'a self, _ray: &Ray) -> Option<Intersection<'a>> {
-        panic!("shouldn't be called on cpu")
+    fn intersect(&self, _ray: &Ray) -> Option<RayHit> {
+        panic!("shouldn't be called")
     }
 
     fn occlude(&self, _ray: &Ray) -> bool {
-        panic!("shouldn't be called on cpu")
+        panic!("shouldn't be called")
     }
 
     fn bsdf<'a>(&'a self) -> Option<&'a dyn Bsdf> {
         Some(self.bsdf.as_ref())
     }
 
+    fn shading_triangle<'a>(&'a self, prim_id: u32) -> ShadingTriangle<'a> {
+        ShadingTriangle {
+            bsdf: self.bsdf(),
+            ..self.mesh.shading_triangle(prim_id as usize)
+        }
+    }
+
+    fn triangle(&self, prim_id: u32) -> Triangle {
+        self.mesh.triangle(prim_id as usize)
+    }
+
     fn aabb(&self) -> Bounds3f {
-        panic!("shouldn't be called on cpu")
+        panic!("shouldn't be called")
     }
 
     fn sample_surface(&self, _u: Vec3) -> SurfaceSample {
-        panic!("shouldn't be called on cpu")
+        panic!("shouldn't be called")
     }
 
     fn area(&self) -> f32 {
@@ -324,33 +195,39 @@ impl Shape for TriangleMeshInstance {
     fn aabb(&self) -> Bounds3f {
         self.accel.aabb
     }
-    fn intersect<'a>(&'a self, ray: &Ray) -> Option<Intersection<'a>> {
-        if let Some(isct) = self.accel.intersect(ray) {
-            let idx = isct.prim_id as usize;
-            let mesh = &*self.accel.data.mesh;
-            let face = mesh.indices[idx as usize];
-            let v0 = mesh.vertices[face[0] as usize].into();
-            let v1 = mesh.vertices[face[1] as usize].into();
-            let v2 = mesh.vertices[face[2] as usize].into();
-            let trig = Triangle {
-                vertices: [v0, v1, v2],
-            };
-            let ng = trig.ng();
-            let (tc0, tc1, tc2) = self.accel.data.get_tc(&face.into());
-
-            Some(Intersection {
-                shape: Some(self),
-                texcoords: lerp3v2(tc0, tc1, tc2, isct.uv),
-                ng,
-                ns: ng,
-                ..isct
-            })
-        } else {
-            None
-        }
+    fn intersect(&self, ray: &Ray) -> Option<RayHit> {
+        let mut hit = None;
+        self.accel.traverse(*ray, |ray, prim_id| {
+            let triangle = self.triangle(prim_id);
+            if let Some((t, uv)) = triangle.intersect(ray) {
+                ray.tmax = t;
+                hit = Some((t, uv, prim_id));
+            }
+            false
+        });
+        hit.map(|(t, uv, prim_id)| {
+            let triangle = self.triangle(prim_id);
+            RayHit {
+                t,
+                uv,
+                prim_id,
+                geom_id: 0,
+                ng: triangle.ng(),
+            }
+        })
     }
     fn occlude(&self, ray: &Ray) -> bool {
-        self.accel.occlude(ray)
+        let mut occluded = false;
+        self.accel.traverse(*ray, |ray, prim_id| {
+            let triangle = self.triangle(prim_id);
+            if triangle.intersect(ray).is_some() {
+                occluded = true;
+                true
+            } else {
+                false
+            }
+        });
+        occluded
     }
     fn bsdf<'a>(&'a self) -> Option<&'a dyn Bsdf> {
         Some(self.bsdf.as_ref())
@@ -360,6 +237,17 @@ impl Shape for TriangleMeshInstance {
     }
     fn sample_surface(&self, u: Vec3) -> SurfaceSample {
         self.accel.data.mesh.sample_surface(u, &self.dist)
+    }
+
+    fn shading_triangle<'a>(&'a self, prim_id: u32) -> ShadingTriangle<'a> {
+        ShadingTriangle {
+            bsdf: self.bsdf(),
+            ..self.accel.data.mesh.shading_triangle(prim_id as usize)
+        }
+    }
+
+    fn triangle(&self, prim_id: u32) -> Triangle {
+        self.accel.data.mesh.triangle(prim_id as usize)
     }
 }
 
@@ -374,7 +262,7 @@ pub struct TriangleMesh {
 impl TriangleMesh {
     pub fn sample_surface(&self, u: Vec3, dist: &Distribution1D) -> SurfaceSample {
         let (idx, pdf_idx) = dist.sample_discrete(u[2]);
-        let face = self.indices[idx as usize];
+        let face: UVec3 = self.indices[idx as usize].into();
         let v0 = self.vertices[face[0] as usize].into();
         let v1 = self.vertices[face[1] as usize].into();
         let v2 = self.vertices[face[2] as usize].into();
@@ -383,16 +271,16 @@ impl TriangleMesh {
         };
         let uv = uniform_sample_triangle(vec2(u.x, u.y));
         let p = lerp3v3(v0, v1, v2, uv);
-        let (tc0, tc1, tc2) = self.get_tc(&face.into());
+        let [tc0, tc1, tc2] = self.texcoords(face);
         SurfaceSample {
             p,
             ng: trig.ng(),
             ns: trig.ng(),
             texcoords: lerp3v2(tc0, tc1, tc2, uv),
-            pdf: 1.0 / self.get_triangle(idx).area() * pdf_idx,
+            pdf: 1.0 / self.triangle(idx).area() * pdf_idx,
         }
     }
-    pub fn get_triangle(&self, i: usize) -> Triangle {
+    pub fn triangle(&self, i: usize) -> Triangle {
         let face = self.indices[i];
         let v0 = self.vertices[face[0] as usize].into();
         let v1 = self.vertices[face[1] as usize].into();
@@ -401,11 +289,25 @@ impl TriangleMesh {
             vertices: [v0, v1, v2],
         }
     }
+    pub fn shading_triangle<'a>(&self, i: usize) -> ShadingTriangle<'a> {
+        let face: UVec3 = self.indices[i].into();
+        let v0: Vec3 = self.vertices[face[0] as usize].into();
+        let v1: Vec3 = self.vertices[face[1] as usize].into();
+        let v2: Vec3 = self.vertices[face[2] as usize].into();
+
+        let ng = (v1 - v0).cross(v2 - v0).normalize();
+        ShadingTriangle {
+            vertices: [v0, v1, v2],
+            texcoords: self.texcoords(face),
+            bsdf: None,
+            normals: self.normals(face, ng),
+        }
+    }
     pub fn area(&self) -> f32 {
         self.indices
             .iter()
             .enumerate()
-            .map(|(i, _face)| self.get_triangle(i).area())
+            .map(|(i, _face)| self.triangle(i).area())
             .sum()
     }
     pub fn area_distribution(&self) -> Distribution1D {
@@ -413,27 +315,37 @@ impl TriangleMesh {
             .indices
             .iter()
             .enumerate()
-            .map(|(i, _face)| self.get_triangle(i).area())
+            .map(|(i, _face)| self.triangle(i).area())
             .collect();
         Distribution1D::new(f.as_slice()).unwrap()
     }
-    pub fn get_tc(&self, face: &UVec3) -> (Vec2, Vec2, Vec2) {
+    pub fn texcoords(&self, face: UVec3) -> [Vec2; 3] {
         if self.texcoords.is_empty() {
             let tc0 = vec2(0.0, 0.0);
             let tc1 = vec2(0.0, 1.0);
             let tc2 = vec2(1.0, 1.0);
-            (tc0, tc1, tc2)
+            [tc0, tc1, tc2]
         } else {
             let tc0 = self.texcoords[face[0] as usize].into();
             let tc1 = self.texcoords[face[1] as usize].into();
             let tc2 = self.texcoords[face[2] as usize].into();
-            (tc0, tc1, tc2)
+            [tc0, tc1, tc2]
+        }
+    }
+    pub fn normals(&self, face: UVec3, ng: Vec3) -> [Vec3; 3] {
+        if self.normals.is_empty() {
+            [ng; 3]
+        } else {
+            let ns0 = self.normals[face[0] as usize].into();
+            let ns1 = self.normals[face[1] as usize].into();
+            let ns2 = self.normals[face[2] as usize].into();
+            [ns0, ns1, ns2]
         }
     }
 }
 
 impl TriangleMesh {
-    pub fn build_accel(self: &Arc<TriangleMesh>) -> BVHAccelerator<TriangleMeshAccelData> {
+    pub fn build_accel(self: &Arc<TriangleMesh>) -> BvhAccelerator<TriangleMeshAccelData> {
         let accel = SweepSAHBuilder::build(
             TriangleMeshAccelData { mesh: self.clone() },
             (0..self.indices.len() as u32).collect(),
@@ -443,7 +355,7 @@ impl TriangleMesh {
     }
     pub fn create_instance(
         bsdf: Arc<dyn Bsdf>,
-        accel: Arc<BVHAccelerator<TriangleMeshAccelData>>,
+        accel: Arc<BvhAccelerator<TriangleMeshAccelData>>,
         mesh: Arc<TriangleMesh>,
     ) -> Arc<dyn Shape> {
         let instance = TriangleMeshInstance {
@@ -469,7 +381,7 @@ pub fn compute_normals(model: &mut TriangleMesh) {
             }
         }
         let triangle: Vec<Vec3> = face
-            .into_iter()
+            .iter()
             .map(|idx| model.vertices[*idx as usize].into())
             .collect();
         let edge0: Vec3 = triangle[1] - triangle[0];

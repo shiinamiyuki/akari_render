@@ -22,9 +22,9 @@ impl Integrator for RTAO {
                 let (mut ray, _ray_weight) = scene.camera.generate_ray(pixel, &mut sampler);
                 let mut li = Spectrum::zero();
                 {
-                    if let Some(isct) = scene.intersect(&ray) {
-                        // li = Spectrum { samples: isct.ng }
-                        let ng = isct.ng;
+                    if let Some(si) = scene.intersect(&ray) {
+                        // li = Spectrum { samples: si.ng }
+                        let ng = si.ng;
                         let frame = Frame::from_normal(ng);
                         let wi = {
                             let w = consine_hemisphere_sampling(sampler.next2d());
@@ -32,7 +32,7 @@ impl Integrator for RTAO {
                         };
 
                         // li = Spectrum{samples:wi};
-                        let p = ray.at(isct.t);
+                        let p = ray.at(si.t);
                         ray = Ray::spawn(p, wi).offset_along_normal(ng);
                         if !scene.occlude(&ray) {
                             li = Spectrum::one();

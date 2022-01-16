@@ -169,9 +169,9 @@ impl Light for AreaLight {
 
     fn pdf_li(&self, wi: Vec3, ref_: &ReferencePoint) -> (f32, f32) {
         let ray = Ray::spawn(ref_.p, wi);
-        if let Some(isct) = self.shape.intersect(&ray) {
+        if let Some(hit) = self.shape.intersect(&ray) {
             let pdf_area = 1.0 / self.shape.area();
-            let pdf_sa = pdf_area * isct.t * isct.t / wi.dot(isct.ng).abs();
+            let pdf_sa = pdf_area * hit.t * hit.t / wi.dot(hit.ng).abs();
             (pdf_area, pdf_sa)
         } else {
             (0.0, 0.0)
@@ -179,9 +179,9 @@ impl Light for AreaLight {
     }
 
     fn le(&self, ray: &Ray) -> Spectrum {
-        if let Some(isct) = self.shape.intersect(ray) {
+        if let Some(hit) = self.shape.intersect(ray) {
             self.emission
-                .evaluate_s(&ShadingPoint::from_intersection(&isct))
+                .evaluate_s(&ShadingPoint::from_rayhit(&self.shape, hit))
         } else {
             Spectrum::zero()
         }

@@ -1,18 +1,19 @@
 use crate::bsdf::*;
 use crate::shape::*;
+use crate::texture::ShadingPoint;
 use crate::*;
 use ordered_float::OrderedFloat;
-use std::sync::Mutex;
+use parking_lot::Mutex;
 
 use super::*;
 #[derive(Clone, Copy, Debug, Default)]
-pub struct BVHNode {
+pub struct BvhNode {
     // pub axis: u8,
     pub aabb: Bounds3f,
     pub left_or_first_primitive: u32,
     pub count: u32,
 }
-impl BVHNode {
+impl BvhNode {
     pub fn is_leaf(&self) -> bool {
         self.count > 0
     }
@@ -23,34 +24,31 @@ impl BVHNode {
         self.left_or_first_primitive + 1
     }
 }
-pub trait BVHData {
-    fn intersect<'a>(&'a self, idx: u32, ray: &Ray) -> Option<Intersection<'a>>;
-    fn occlude(&self, idx: u32, ray: &Ray) -> bool;
-    fn bsdf<'a>(&'a self, idx: u32) -> Option<&'a dyn Bsdf>;
+pub trait BvhData: Send + Sync {
     fn aabb(&self, idx: u32) -> Bounds3f;
 }
-pub struct BVHAccelerator<T: BVHData> {
+pub struct BvhAccelerator<T: BvhData> {
     pub data: T,
     pub references: Vec<u32>,
-    pub nodes: Vec<BVHNode>,
+    pub nodes: Vec<BvhNode>,
     pub aabb: Bounds3f,
 }
 
-pub struct SweepSAHBuilder<T: BVHData> {
+pub struct SweepSAHBuilder<T: BvhData> {
     pub data: T,
-    pub nodes: Mutex<Option<Vec<BVHNode>>>,
+    pub nodes: Mutex<Option<Vec<BvhNode>>>,
     pub aabb: Mutex<Bounds3f>,
 }
 impl<T> SweepSAHBuilder<T>
 where
-    T: BVHData + Sync + 'static,
+    T: BvhData + Sync + 'static,
 {
-    pub fn build(data: T, mut references: Vec<u32>) -> BVHAccelerator<T> {
+    pub fn build(data: T, mut references: Vec<u32>) -> BvhAccelerator<T> {
         let n_prims = references.len();
-        let (data, nodes, aabb) = {
+        let ((data, nodes, aabb), t) = profile(|| {
             let builder = Self {
                 data,
-                nodes: Mutex::new(Some(vec![BVHNode::default()])),
+                nodes: Mutex::new(Some(vec![BvhNode::default()])),
                 aabb: Mutex::new(Bounds3f::default()),
             };
 
@@ -58,21 +56,22 @@ where
             // bvh.references = references;
 
             let nodes = {
-                let mut nodes = builder.nodes.lock().unwrap();
+                let mut nodes = builder.nodes.lock();
                 nodes.replace(vec![]).unwrap()
             };
-            let aabb = *builder.aabb.lock().unwrap();
+            let aabb = *builder.aabb.lock();
             (builder.data, nodes, aabb)
-        };
+        });
 
-        let bvh = BVHAccelerator {
+        let bvh = BvhAccelerator {
             data,
             nodes,
             references,
             aabb,
         };
         log::info!(
-            "built bvh for {} references; nodes: {}",
+            "BVH built in {}s, refs: {}, nodes:{}",
+            t,
             n_prims,
             bvh.nodes.len()
         );
@@ -98,20 +97,20 @@ where
             }
         }
         if depth == 0 {
-            let mut self_aabb = self.aabb.lock().unwrap();
+            let mut self_aabb = self.aabb.lock();
             *self_aabb = aabb;
         }
         if end - begin <= 4 || depth >= 40 {
             if end - begin == 0 {
                 panic!("");
             }
-            let node = BVHNode {
+            let node = BvhNode {
                 // axis: 0,
                 aabb,
                 left_or_first_primitive: begin,
                 count: end - begin,
             };
-            let mut nodes = self.nodes.lock().unwrap();
+            let mut nodes = self.nodes.lock();
             let nodes = nodes.as_mut().unwrap();
             nodes[node_idx as usize] = node;
         } else {
@@ -222,13 +221,13 @@ where
                 }
                 let p_ref = UnsafePointer::new(references as *mut Vec<u32>);
                 let child_idx = {
-                    let mut nodes = self.nodes.lock().unwrap();
+                    let mut nodes = self.nodes.lock();
                     let nodes = nodes.as_mut().unwrap();
-                    let dummy = BVHNode::default();
+                    let dummy = BvhNode::default();
                     let child_idx = nodes.len() as u32;
                     nodes.push(dummy);
                     nodes.push(dummy);
-                    nodes[node_idx as usize] = BVHNode {
+                    nodes[node_idx as usize] = BvhNode {
                         // axis: axis as u8,
                         aabb,
                         left_or_first_primitive: child_idx,
@@ -264,43 +263,10 @@ where
     }
 }
 
-impl<T> BVHAccelerator<T>
+impl<T> BvhAccelerator<T>
 where
-    T: BVHData,
+    T: BvhData,
 {
-    pub fn optimize_layout(mut self) -> Self {
-        let nodes = std::mem::replace(&mut self.nodes, vec![]);
-        assert!(nodes.len() % 2 == 1);
-        let pair_count = (nodes.len() - 1) / 2;
-        let mut pair_areas: Vec<_> = (0..pair_count)
-            .into_par_iter()
-            .map(|i| {
-                let mut aabb = nodes[2 * i + 1].aabb;
-                aabb.insert_box(nodes[2 * i + 2].aabb);
-                (i, OrderedFloat(aabb.surface_area()))
-            })
-            .collect();
-        pair_areas.par_sort_unstable_by(|a, b| b.1.cmp(&a.1));
-        let mut map: Vec<_> = vec![usize::MAX; pair_count];
-        for (i, p) in pair_areas.iter().enumerate() {
-            map[p.0] = i;
-        }
-        self.nodes = vec![BVHNode::default(); nodes.len()];
-        self.nodes[0] = nodes[0];
-
-        for i in 0..pair_count {
-            let j = pair_areas[i].0;
-            self.nodes[1 + 2 * i] = nodes[1 + 2 * j];
-            self.nodes[1 + 2 * i + 1] = nodes[1 + 2 * j + 1];
-        }
-        for i in 0..self.nodes.len() {
-            if !self.nodes[i].is_leaf() {
-                self.nodes[i].left_or_first_primitive =
-                    map[((self.nodes[i].left_or_first_primitive - 1) / 2) as usize] as u32 * 2 + 1;
-            }
-        }
-        self
-    }
     fn intersect_aabb(aabb: &Bounds3f, ray: &Ray, o: Vec3A, invd: Vec3A) -> f32 {
         let t0 = (aabb.min - o) * invd;
         let t1 = (aabb.max - o) * invd;
@@ -314,45 +280,33 @@ where
             -1.0
         }
     }
-    fn intersect_leaf<'a>(&'a self, node: &BVHNode, ray: &mut Ray) -> Option<Intersection<'a>> {
-        let first = node.left_or_first_primitive;
-        let last = node.left_or_first_primitive + node.count;
-        let mut ret = None;
-        for i in first..last {
-            if let Some(isct) = self.data.intersect(self.references[i as usize], ray) {
-                ray.tmax = isct.t;
-                ret = Some(isct);
-            }
-        }
-        ret
-    }
-    fn occlude_leaf<'a>(&'a self, node: &BVHNode, ray: &mut Ray) -> bool {
+    fn traverse_leaf<F: FnMut(&mut Ray, u32) -> bool>(
+        &self,
+        node: &BvhNode,
+        ray: &mut Ray,
+        f: &mut F,
+    ) -> bool {
         let first = node.left_or_first_primitive;
         let last = node.left_or_first_primitive + node.count;
         for i in first..last {
-            if let Some(_) = self.data.intersect(self.references[i as usize], ray) {
+            if f(ray, self.references[i as usize]) {
                 return true;
             }
         }
         false
     }
-    pub fn intersect<'a>(&'a self, original_ray: &Ray) -> Option<Intersection<'a>> {
+    // break when f returns true
+    pub fn traverse<F: FnMut(&mut Ray, u32) -> bool>(&self, mut ray: Ray, mut f: F) {
+        let inv_d = Vec3A::ONE / Vec3A::from(ray.d);
         let mut stack: [u32; 32] = [0; 32];
         let mut sp = 0;
         let mut p = Some(&self.nodes[0]);
-        let mut ray = *original_ray;
-        let invd: Vec3A = Vec3A::ONE / Vec3A::from(ray.d);
         let o = ray.o.into();
-        let mut isct = None;
-        if self.nodes[0].is_leaf() {
-            return self.intersect_leaf(&self.nodes[0], &mut ray);
-        }
-
         while p.is_some() {
             let node = p.unwrap();
             if node.is_leaf() {
-                if let Some(hit) = self.intersect_leaf(node, &mut ray) {
-                    isct = Some(hit);
+                if self.traverse_leaf(node, &mut ray, &mut f) {
+                    break;
                 }
                 if sp > 0 {
                     sp -= 1;
@@ -363,8 +317,8 @@ where
             } else {
                 let left = &self.nodes[node.left() as usize];
                 let right = &self.nodes[node.right() as usize];
-                let t_left = Self::intersect_aabb(&left.aabb, &ray, o, invd);
-                let t_right = Self::intersect_aabb(&right.aabb, &ray, o, invd);
+                let t_left = Self::intersect_aabb(&left.aabb, &ray, o, inv_d);
+                let t_right = Self::intersect_aabb(&right.aabb, &ray, o, inv_d);
                 if t_left < 0.0 && t_right < 0.0 {
                     if sp > 0 {
                         sp -= 1;
@@ -391,43 +345,85 @@ where
                 }
             }
         }
-        isct
     }
-    pub fn occlude(&self, original_ray: &Ray) -> bool {
-        let mut stack: [u32; 32] = [0; 32];
-        let mut sp = 0;
-        let mut p = Some(&self.nodes[0]);
-        let mut ray = *original_ray;
-        let invd: Vec3A = Vec3A::ONE / Vec3A::from(ray.d);
-        let o = ray.o.into();
-        while p.is_some() {
-            let node = p.unwrap();
-            let t = Self::intersect_aabb(&node.aabb, &ray, o, invd);
-            if t < 0.0 {
-                if sp > 0 {
-                    sp -= 1;
-                    p = Some(&self.nodes[stack[sp] as usize]);
-                } else {
-                    p = None;
-                }
-                continue;
-            }
-            if node.is_leaf() {
-                if self.occlude_leaf(node, &mut ray) {
-                    return true;
-                }
-                if sp > 0 {
-                    sp -= 1;
-                    p = Some(&self.nodes[stack[sp] as usize]);
-                } else {
-                    p = None;
-                }
-            } else {
-                stack[sp] = node.right();
-                sp += 1;
-                p = Some(&self.nodes[node.left() as usize]);
+
+    pub fn optimize_layout(mut self) -> Self {
+        let nodes = std::mem::replace(&mut self.nodes, vec![]);
+        assert!(nodes.len() % 2 == 1);
+        let pair_count = (nodes.len() - 1) / 2;
+        let mut pair_areas: Vec<_> = (0..pair_count)
+            .into_par_iter()
+            .map(|i| {
+                let mut aabb = nodes[2 * i + 1].aabb;
+                aabb.insert_box(nodes[2 * i + 2].aabb);
+                (i, OrderedFloat(aabb.surface_area()))
+            })
+            .collect();
+        pair_areas.par_sort_unstable_by(|a, b| b.1.cmp(&a.1));
+        let mut map: Vec<_> = vec![usize::MAX; pair_count];
+        for (i, p) in pair_areas.iter().enumerate() {
+            map[p.0] = i;
+        }
+        self.nodes = vec![BvhNode::default(); nodes.len()];
+        self.nodes[0] = nodes[0];
+
+        for i in 0..pair_count {
+            let j = pair_areas[i].0;
+            self.nodes[1 + 2 * i] = nodes[1 + 2 * j];
+            self.nodes[1 + 2 * i + 1] = nodes[1 + 2 * j + 1];
+        }
+        for i in 0..self.nodes.len() {
+            if !self.nodes[i].is_leaf() {
+                self.nodes[i].left_or_first_primitive =
+                    map[((self.nodes[i].left_or_first_primitive - 1) / 2) as usize] as u32 * 2 + 1;
             }
         }
-        false
+        self
+    }
+}
+impl Accel for BvhAccelerator<TopLevelBvhData> {
+    fn intersect<'a>(&'a self, ray: &Ray) -> Option<SurfaceInteraction<'a>> {
+        let mut hit = None;
+        self.traverse(*ray, |ray, geom_id| {
+            if let Some(hit_) = self.data.shapes[geom_id as usize].intersect(ray) {
+                hit = Some(RayHit { geom_id, ..hit_ });
+                ray.tmax = hit_.t;
+            }
+            false
+        });
+        hit.map(|hit| {
+            let uv = hit.uv;
+            let ng = hit.ng;
+            let shape = self.data.shapes[hit.geom_id as usize].as_ref();
+            let triangle = shape.shading_triangle(hit.prim_id);
+            let ns = triangle.ns(uv);
+            let texcoord = triangle.texcoord(uv);
+            SurfaceInteraction::<'a> {
+                shape,
+                bsdf: triangle.bsdf,
+                triangle,
+                t: hit.t,
+                uv,
+                ng,
+                ns,
+                sp: ShadingPoint { texcoord },
+                texcoord,
+            }
+        })
+    }
+
+    fn occlude(&self, ray: &Ray) -> bool {
+        let mut occluded = false;
+        self.traverse(*ray, |ray, geom_id| {
+            if self.data.shapes[geom_id as usize].occlude(ray) {
+                occluded = true;
+                return true;
+            }
+            false
+        });
+        occluded
+    }
+    fn shapes(&self) -> Vec<Arc<dyn Shape>> {
+        self.data.shapes.clone()
     }
 }
