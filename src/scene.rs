@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 pub struct Scene {
-    accel: Arc<dyn Accel>,
+    pub accel: Arc<dyn Accel>,
     pub camera: Arc<dyn Camera>,
     pub lights: Vec<Arc<dyn Light>>,
     pub light_distr: Arc<dyn LightDistribution>,
@@ -73,7 +73,9 @@ impl Scene {
     pub fn intersect<'a>(&'a self, ray: &Ray) -> Option<SurfaceInteraction<'a>> {
         self.ray_counter
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        self.accel.intersect(ray)
+        self.accel
+            .intersect(ray)
+            .map(|hit| self.accel.hit_to_iteraction(hit))
     }
     pub fn occlude(&self, ray: &Ray) -> bool {
         self.ray_counter

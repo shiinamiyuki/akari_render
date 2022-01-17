@@ -434,7 +434,26 @@ where
 macro_rules! impl_bvh_accel {
     ($t:ty) => {
         impl Accel for $t {
-            fn intersect<'a>(&'a self, ray: &Ray) -> Option<SurfaceInteraction<'a>> {
+            fn hit_to_iteraction<'a>(&'a self, hit: RayHit) -> SurfaceInteraction<'a> {
+                let uv = hit.uv;
+                let ng = hit.ng;
+                let shape = self.data.shapes[hit.geom_id as usize].as_ref();
+                let triangle = shape.shading_triangle(hit.prim_id);
+                let ns = triangle.ns(uv);
+                let texcoord = triangle.texcoord(uv);
+                SurfaceInteraction::<'a> {
+                    shape,
+                    bsdf: triangle.bsdf,
+                    triangle,
+                    t: hit.t,
+                    uv,
+                    ng,
+                    ns,
+                    sp: ShadingPoint { texcoord },
+                    texcoord,
+                }
+            }
+            fn intersect(&self, ray: &Ray) -> Option<RayHit> {
                 let mut hit = None;
                 self.traverse(*ray, |ray, geom_id| {
                     if let Some(hit_) = self.data.shapes[geom_id as usize].intersect(ray) {
@@ -443,25 +462,7 @@ macro_rules! impl_bvh_accel {
                     }
                     false
                 });
-                hit.map(|hit| {
-                    let uv = hit.uv;
-                    let ng = hit.ng;
-                    let shape = self.data.shapes[hit.geom_id as usize].as_ref();
-                    let triangle = shape.shading_triangle(hit.prim_id);
-                    let ns = triangle.ns(uv);
-                    let texcoord = triangle.texcoord(uv);
-                    SurfaceInteraction::<'a> {
-                        shape,
-                        bsdf: triangle.bsdf,
-                        triangle,
-                        t: hit.t,
-                        uv,
-                        ng,
-                        ns,
-                        sp: ShadingPoint { texcoord },
-                        texcoord,
-                    }
-                })
+                hit
             }
 
             fn occlude(&self, ray: &Ray) -> bool {
@@ -481,6 +482,5 @@ macro_rules! impl_bvh_accel {
         }
     };
 }
-
 
 impl_bvh_accel!(BvhAccel<TopLevelBvhData>);

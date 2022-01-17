@@ -109,7 +109,7 @@ impl ImageTexture<Spectrum> {
                 Spectrum::from_srgb(rgb)
             })
             .collect();
-        data.append_slice(&pixels);
+        data.extend_from_slice(&pixels);
         Self {
             size: (img.width(), img.height()),
             data,
@@ -128,7 +128,7 @@ impl ImageTexture<Spectrum> {
                 Spectrum::from_srgb(rgb)
             })
             .collect();
-        data.append_slice(&pixels);
+        data.extend_from_slice(&pixels);
         Self {
             size: (img.width(), img.height()),
             data,

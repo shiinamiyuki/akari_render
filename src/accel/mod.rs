@@ -51,7 +51,8 @@ impl bvh::BvhData for TopLevelBvhData {
 }
 
 pub trait Accel: Send + Sync {
-    fn intersect<'a>(&'a self, ray: &Ray) -> Option<SurfaceInteraction<'a>>;
+    fn hit_to_iteraction<'a>(&'a self, hit: RayHit) -> SurfaceInteraction<'a>;
+    fn intersect(&self, ray: &Ray) -> Option<RayHit>;
     fn occlude(&self, ray: &Ray) -> bool;
     fn shapes(&self) -> Vec<Arc<dyn Shape>>;
 }

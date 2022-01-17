@@ -254,9 +254,30 @@ impl EmbreeTopLevelAccel {
 impl_base!(EmbreeTopLevelAccel);
 impl accel::Accel for EmbreeTopLevelAccel {
     fn shapes(&self) -> Vec<Arc<dyn Shape>> {
-        self.instances.iter().map(|x| x.clone() as Arc<dyn Shape>).collect()
+        self.instances
+            .iter()
+            .map(|x| x.clone() as Arc<dyn Shape>)
+            .collect()
     }
-    fn intersect<'a>(&'a self, ray: &Ray) -> Option<SurfaceInteraction<'a>> {
+    fn hit_to_iteraction<'a>(&'a self, rayhit: RayHit) -> SurfaceInteraction<'a> {
+        let instance = &self.instances[rayhit.geom_id as usize];
+        let triangle = instance.shading_triangle(rayhit.prim_id);
+        let uv = rayhit.uv;
+        let ns = triangle.ns(uv);
+        let texcoord = triangle.texcoord(uv);
+        SurfaceInteraction {
+            shape: instance.as_ref(),
+            bsdf: triangle.bsdf,
+            triangle,
+            t: rayhit.t,
+            uv,
+            ng: rayhit.ng,
+            ns,
+            sp: ShadingPoint { texcoord },
+            texcoord,
+        }
+    }
+    fn intersect(&self, ray: &Ray) -> Option<RayHit> {
         unsafe {
             let mut rayhit = sys::RTCRayHit {
                 ray: to_rtc_ray(ray),
@@ -278,22 +299,14 @@ impl accel::Accel for EmbreeTopLevelAccel {
             };
             sys::rtcIntersect1(self.scene, &mut ctx as *mut _, &mut rayhit as *mut _);
             if rayhit.hit.geomID != u32::MAX {
-                let instance = &self.instances[rayhit.hit.instID[0] as usize];
-                let uv = vec2(rayhit.hit.u, rayhit.hit.v);
                 let ng = vec3(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z).normalize();
-                let triangle = instance.shading_triangle(rayhit.hit.primID);
-                let ns = triangle.ns(uv);
-                let texcoord = triangle.texcoord(uv);
-                Some(SurfaceInteraction {
-                    shape: instance.as_ref(),
-                    bsdf: triangle.bsdf,
-                    triangle,
-                    t: rayhit.ray.tfar,
+                let uv = vec2(rayhit.hit.u, rayhit.hit.v);
+                Some(RayHit {
                     uv,
+                    t: rayhit.ray.tfar,
                     ng,
-                    ns,
-                    sp: ShadingPoint { texcoord },
-                    texcoord,
+                    prim_id: rayhit.hit.primID,
+                    geom_id: rayhit.hit.geomID,
                 })
             } else {
                 None

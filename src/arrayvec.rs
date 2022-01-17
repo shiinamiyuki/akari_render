@@ -73,7 +73,7 @@ impl<T: Clone, S: ArrayVecStorage<T>> ArrayVec<T, S> {
             self.len = new_len;
         }
     }
-    pub fn append_slice(&mut self, data: &[T]) {
+    pub fn extend_from_slice(&mut self, data: &[T]) {
         assert!(data.len() + self.len() <= self.capacity());
         for i in 0..data.len() {
             unsafe {
@@ -106,6 +106,9 @@ impl<T, S: ArrayVecStorage<T>> ArrayVec<T, S> {
                 std::ptr::read(self.ptr.offset(i as isize) as *const T);
             }
         }
+    }
+    pub fn clear(&mut self){
+        self.shrink(0);
     }
     pub fn capacity(&self) -> usize {
         self.capacity

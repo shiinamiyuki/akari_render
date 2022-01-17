@@ -20,8 +20,10 @@ pub mod bidir;
 pub mod integrator;
 pub mod light;
 pub mod ltc;
+pub mod radix_sort;
 #[macro_use]
 mod nn_v2;
+pub mod arrayvec;
 #[cfg(feature = "net")]
 pub mod net;
 pub mod sampler;
@@ -31,7 +33,6 @@ pub mod shape;
 pub mod sobolmat;
 pub mod texture;
 pub mod util;
-pub mod arrayvec;
 pub mod wavefront;
 
 #[macro_use]
@@ -394,7 +395,16 @@ pub struct Ray {
     pub tmax: f32,
     // pub time: f32,
 }
-
+impl Default for Ray {
+    fn default() -> Self {
+        Self {
+            o: Vec3::ZERO,
+            d: Vec3::ZERO,
+            tmin: 0.0,
+            tmax: -f32::INFINITY,
+        }
+    }
+}
 fn origin() -> f32 {
     1.0 / 32.0
 }
@@ -435,6 +445,9 @@ fn offset_ray(p: Vec3, n: Vec3) -> Vec3 {
 }
 
 impl Ray {
+    pub fn is_invalid(&self) -> bool {
+        self.tmax < self.tmin
+    }
     pub fn spawn(o: Vec3, d: Vec3) -> Self {
         Self {
             o,
@@ -639,6 +652,73 @@ pub fn parallel_for<F: Fn(usize) -> () + Sync>(count: usize, chunk_size: usize, 
         }
     });
 }
+#[allow(dead_code)]
+pub fn parallel_for_slice<T, F: Fn(usize, &mut T) -> () + Sync>(
+    slice: &mut [T],
+    chunk_size: usize,
+    f: F,
+) {
+    let mut p_slice = UnsafePointer::new(slice.as_mut_ptr());
+    let len = slice.len();
+    parallel_for(len, chunk_size, |i| {
+        let slice = unsafe { std::slice::from_raw_parts_mut(p_slice.p, len) };
+        f(i, &mut slice[i]);
+    });
+}
+#[allow(dead_code)]
+pub fn parallel_for_slice_packet<T, F: Fn(usize, &mut [T]) -> () + Sync>(
+    slice: &mut [T],
+    chunk_size: usize,
+    packet_size: usize,
+    f: F,
+) {
+    let mut p_slice = UnsafePointer::new(slice.as_mut_ptr());
+    let len = slice.len();
+    let count = (len + packet_size - 1) / packet_size;
+    parallel_for(count, chunk_size, |i| {
+        let end = (i + packet_size).min(len);
+        let slice = unsafe { std::slice::from_raw_parts_mut(p_slice.p, len) };
+        f(i, &mut slice[i..end]);
+    });
+}
+#[allow(dead_code)]
+pub fn parallel_for_slice2<T, U, F: Fn(usize, &mut T, &mut U) -> () + Sync>(
+    slice_0: &mut [T],
+    slice_1: &mut [U],
+    chunk_size: usize,
+    f: F,
+) {
+    assert_eq!(slice_0.len(), slice_1.len());
+    let mut p_slice_0 = UnsafePointer::new(slice_0.as_mut_ptr());
+    let mut p_slice_1 = UnsafePointer::new(slice_1.as_mut_ptr());
+    let len = slice_0.len();
+    parallel_for(len, chunk_size, |i| {
+        let slice_0 = unsafe { std::slice::from_raw_parts_mut(p_slice_0.p, len) };
+        let slice_1 = unsafe { std::slice::from_raw_parts_mut(p_slice_1.p, len) };
+        f(i, &mut slice_0[i], &mut slice_1[i]);
+    });
+}
+#[allow(dead_code)]
+pub fn parallel_for_slice3<T, U, S, F: Fn(usize, &mut T, &mut U, &mut S) -> () + Sync>(
+    slice_0: &mut [T],
+    slice_1: &mut [U],
+    slice_2: &mut [S],
+    chunk_size: usize,
+    f: F,
+) {
+    assert_eq!(slice_0.len(), slice_1.len());
+    assert_eq!(slice_0.len(), slice_2.len());
+    let mut p_slice_0 = UnsafePointer::new(slice_0.as_mut_ptr());
+    let mut p_slice_1 = UnsafePointer::new(slice_1.as_mut_ptr());
+    let mut p_slice_2 = UnsafePointer::new(slice_2.as_mut_ptr());
+    let len = slice_0.len();
+    parallel_for(len, chunk_size, |i| {
+        let slice_0 = unsafe { std::slice::from_raw_parts_mut(p_slice_0.p, len) };
+        let slice_1 = unsafe { std::slice::from_raw_parts_mut(p_slice_1.p, len) };
+        let slice_2 = unsafe { std::slice::from_raw_parts_mut(p_slice_2.p, len) };
+        f(i, &mut slice_0[i], &mut slice_1[i], &mut slice_2[i]);
+    });
+}
 impl Frame {
     #[inline]
     pub fn same_hemisphere(u: Vec3, v: Vec3) -> bool {
@@ -696,7 +776,22 @@ pub struct RayHit {
     pub prim_id: u32,
     pub geom_id: u32,
 }
-
+impl RayHit {
+    pub fn is_invalid(&self) -> bool {
+        self.prim_id == u32::MAX || self.geom_id == u32::MAX
+    }
+}
+impl Default for RayHit {
+    fn default() -> Self {
+        Self {
+            uv: Vec2::ZERO,
+            t: -f32::INFINITY,
+            ng: Vec3::ZERO,
+            prim_id: u32::MAX,
+            geom_id: u32::MAX,
+        }
+    }
+}
 #[derive(Clone, Copy)]
 pub struct UnsafePointer<T> {
     p: *mut T,
