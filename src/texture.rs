@@ -1,6 +1,6 @@
 use crate::{
+    arrayvec::{ArrayVec, DynStorage, VirtualStorage},
     shape::{Shape, SurfaceInteraction},
-    varray::{VArray, VArrayMemBuilder},
     *,
 };
 use nalgebra as na;
@@ -68,20 +68,9 @@ impl Texture for ConstantTexture<Spectrum> {
     }
 }
 impl_base!(ConstantTexture<Spectrum>);
-pub enum ImageStorage<T: Copy + Clone + Sync + Send + 'static> {
-    Cached(VArray<T>),
-    Direct(Vec<T>),
-}
-impl<T: Copy + Clone + Sync + Send + 'static> ImageStorage<T> {
-    pub fn read(&self, i: usize) -> T {
-        match self {
-            ImageStorage::Cached(c) => c.read(i),
-            ImageStorage::Direct(d) => d[i],
-        }
-    }
-}
+
 pub struct ImageTexture<T: Copy + Clone + Sync + Send + 'static> {
-    data: ImageStorage<T>,
+    data: ArrayVec<T, DynStorage<T>>,
     size: (u32, u32),
 }
 impl<T> ImageTexture<T>
@@ -89,7 +78,7 @@ where
     T: Copy + Clone + Sync + Send + 'static,
 {
     pub fn get_pixel_i(&self, ij: (u32, u32)) -> T {
-        self.data.read((self.size.0 * ij.1 + ij.0) as usize)
+        self.data[(self.size.0 * ij.1 + ij.0) as usize]
     }
     pub fn get_pixel(&self, uv: &Vec2) -> T {
         let i = (uv[0] * self.size.0 as f32).round() as u32 % self.size.0;
@@ -97,10 +86,7 @@ where
         self.get_pixel_i((i, j))
     }
     pub fn as_slice(&self) -> &[T] {
-        match &self.data {
-            ImageStorage::Cached(_) => panic!("use direct storage!"),
-            ImageStorage::Direct(d) => d.as_slice(),
-        }
+        self.data.as_slice()
     }
     pub fn width(&self) -> u32 {
         self.size.0
@@ -111,19 +97,11 @@ where
 }
 impl ImageTexture<Spectrum> {
     pub fn from_rgb_image(img: &image::RgbImage) -> Self {
-        Self {
-            size: (img.width(), img.height()),
-            data: ImageStorage::Direct(
-                img.pixels()
-                    .map(|px| -> Spectrum {
-                        let rgb = vec3(px[0] as f32, px[1] as f32, px[2] as f32) / 255.0;
-                        Spectrum::from_srgb(rgb)
-                    })
-                    .collect(),
-            ),
-        }
-    }
-    pub fn from_rgb_image_virtual(img: &image::RgbImage, vmem: &mut VArrayMemBuilder) -> Self {
+        let mut data = unsafe {
+            ArrayVec::from_storage(Box::new(Vec::with_capacity(
+                (img.width() * img.height()) as usize,
+            )) as DynStorage<_>)
+        };
         let pixels: Vec<_> = img
             .pixels()
             .map(|px| -> Spectrum {
@@ -131,9 +109,29 @@ impl ImageTexture<Spectrum> {
                 Spectrum::from_srgb(rgb)
             })
             .collect();
+        data.append_slice(&pixels);
         Self {
             size: (img.width(), img.height()),
-            data: ImageStorage::Cached(vmem.allocate(&pixels)),
+            data,
+        }
+    }
+    pub fn from_rgb_image_virtual(img: &image::RgbImage) -> Self {
+        let mut data = unsafe {
+            ArrayVec::from_storage(Box::new(VirtualStorage::new(
+                (img.width() * img.height()) as usize,
+            )) as DynStorage<_>)
+        };
+        let pixels: Vec<_> = img
+            .pixels()
+            .map(|px| -> Spectrum {
+                let rgb = vec3(px[0] as f32, px[1] as f32, px[2] as f32) / 255.0;
+                Spectrum::from_srgb(rgb)
+            })
+            .collect();
+        data.append_slice(&pixels);
+        Self {
+            size: (img.width(), img.height()),
+            data,
         }
     }
 }
@@ -148,10 +146,7 @@ impl Texture for ImageTexture<f32> {
         self.get_pixel(&sp.texcoord) as f32
     }
     fn power(&self) -> f32 {
-        match &self.data {
-            ImageStorage::Direct(data) => data.iter().sum::<f32>() as f32 / data.len() as f32,
-            ImageStorage::Cached(data) => data.iter().sum::<f32>() as f32 / data.len() as f32,
-        }
+        self.data.iter().sum::<f32>() as f32 / self.data.len() as f32
     }
 }
 impl_base!(ImageTexture<f32>);
@@ -165,10 +160,7 @@ impl Texture for ImageTexture<f64> {
         self.get_pixel(&sp.texcoord) as f32
     }
     fn power(&self) -> f32 {
-        match &self.data {
-            ImageStorage::Direct(data) => data.iter().sum::<f64>() as f32 / data.len() as f32,
-            ImageStorage::Cached(data) => data.iter().sum::<f64>() as f32 / data.len() as f32,
-        }
+        self.data.iter().sum::<f64>() as f32 / self.data.len() as f32
     }
 }
 impl_base!(ImageTexture<f64>);
@@ -180,14 +172,11 @@ impl Texture for ImageTexture<Spectrum> {
         self.get_pixel(&sp.texcoord)[0] as f32
     }
     fn power(&self) -> f32 {
-        match &self.data {
-            ImageStorage::Direct(data) => {
-                data.iter().map(|s| s.samples.max_element()).sum::<f32>() / data.len() as f32
-            }
-            ImageStorage::Cached(data) => {
-                data.iter().map(|s| s.samples.max_element()).sum::<f32>() / data.len() as f32
-            }
-        }
+        self.data
+            .iter()
+            .map(|s| s.samples.max_element())
+            .sum::<f32>()
+            / self.data.len() as f32
     }
 }
 impl_base!(ImageTexture<Spectrum>);

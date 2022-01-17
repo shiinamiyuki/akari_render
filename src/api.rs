@@ -18,7 +18,6 @@ use crate::texture::ImageTexture;
 use crate::texture::Texture;
 use crate::util::FileResolver;
 use crate::util::LocalFileResolver;
-use crate::varray::VArrayMemBuilder;
 use crate::*;
 use core::panic;
 use std::fs::File;
@@ -39,7 +38,6 @@ struct SceneLoaderContext<'a> {
     texture_power: HashMap<usize, f32>,
     mesh_cache: HashMap<String, Arc<TriangleMesh>>,
     file_resolver: Arc<dyn FileResolver + Send + Sync>,
-    vmem: VArrayMemBuilder,
     gpu: bool,
     ooc: OocOptions,
 }
@@ -75,10 +73,7 @@ impl<'a> SceneLoaderContext<'a> {
                 if cfg!(feature = "gpu") || !self.ooc.enable_ooc {
                     Arc::new(ImageTexture::<Spectrum>::from_rgb_image(&img))
                 } else {
-                    Arc::new(ImageTexture::<Spectrum>::from_rgb_image_virtual(
-                        &img,
-                        &mut self.vmem,
-                    ))
+                    Arc::new(ImageTexture::<Spectrum>::from_rgb_image_virtual(&img))
                 }
             }
         }
@@ -256,8 +251,6 @@ impl<'a> SceneLoaderContext<'a> {
 }
 #[derive(Clone, Copy)]
 pub struct OocOptions {
-    pub texture_vmem: usize,
-    pub page_size: usize,
     pub enable_ooc: bool,
 }
 pub fn load_scene<R: FileResolver + Send + Sync>(
@@ -284,10 +277,8 @@ pub fn load_scene<R: FileResolver + Send + Sync>(
         texture_power: HashMap::new(),
         mesh_cache: HashMap::new(),
         gpu: gpu_mode,
-        vmem: VArrayMemBuilder::new(ooc.texture_vmem, ooc.page_size),
     };
     ctx.load();
-    ctx.vmem.build();
     let scene = Scene::new(
         ctx.camera.unwrap(),
         ctx.shapes.clone(),

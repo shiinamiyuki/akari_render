@@ -31,7 +31,7 @@ pub mod shape;
 pub mod sobolmat;
 pub mod texture;
 pub mod util;
-pub mod varray;
+pub mod arrayvec;
 pub mod wavefront;
 
 #[macro_use]

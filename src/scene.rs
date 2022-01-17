@@ -3,8 +3,6 @@ use crate::accel::Accel;
 use crate::camera::*;
 use crate::light::*;
 use crate::shape::*;
-use crate::varray::VArrayMem;
-use crate::varray::VArrayMemBuilder;
 use crate::Ray;
 use std::any::Any;
 use std::collections::HashMap;
