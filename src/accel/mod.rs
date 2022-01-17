@@ -3,11 +3,13 @@ use crate::shape::*;
 use crate::*;
 use std::collections::HashSet;
 
-use self::bvh::BvhAccelerator;
+use self::bvh::BvhAccel;
 use self::bvh::SweepSAHBuilder;
+#[macro_use]
 pub mod bvh;
 #[cfg(feature = "embree")]
 pub mod embree;
+pub mod qbvh;
 impl_base!(Arc<dyn Shape>);
 impl Shape for Arc<dyn Shape> {
     fn intersect<'a>(&'a self, ray: &Ray) -> Option<RayHit> {
@@ -55,8 +57,8 @@ pub trait Accel: Send + Sync {
 }
 
 pub fn build_accel(shapes: &Vec<Arc<dyn Shape>>, accel: &str) -> Arc<dyn Accel> {
-    if accel == "bvh" {
-        build_accel_custom_bvh(shapes)
+    if accel == "bvh" || accel == "qbvh" {
+        build_accel_custom_bvh(shapes, accel)
     } else if accel == "embree" {
         build_accel_embree(shapes)
     } else {
@@ -72,9 +74,8 @@ fn build_accel_embree(shapes: &Vec<Arc<dyn Shape>>) -> Arc<dyn Accel> {
 fn build_accel_embree(shapes: &Vec<Arc<dyn Shape>>) -> Arc<dyn Accel> {
     unimplemented!()
 }
-fn build_accel_custom_bvh(shapes: &Vec<Arc<dyn Shape>>) -> Arc<dyn Accel> {
-    let mut cache: HashMap<*const dyn Any, Arc<BvhAccelerator<TriangleMeshAccelData>>> =
-        HashMap::new();
+fn build_accel_custom_bvh(shapes: &Vec<Arc<dyn Shape>>, accel_type: &str) -> Arc<dyn Accel> {
+    let mut cache: HashMap<*const dyn Any, Arc<MeshBvh>> = HashMap::new();
     let shapes: Vec<_> = shapes
         .iter()
         .map(|shape_| {
@@ -83,6 +84,11 @@ fn build_accel_custom_bvh(shapes: &Vec<Arc<dyn Shape>>) -> Arc<dyn Accel> {
                 let base = mesh.mesh.clone();
                 if !cache.contains_key(&Arc::as_ptr(&(base.clone() as Arc<dyn Any>))) {
                     let accel = base.clone().build_accel();
+                    let accel = match accel_type {
+                        "bvh" => MeshBvh::Bvh(accel),
+                        "qbvh" => MeshBvh::QBvh(qbvh::QBvhAccelBuilder::new(accel).build()),
+                        _ => unreachable!(),
+                    };
                     cache.insert(
                         Arc::as_ptr(&(base.clone() as Arc<dyn Any>)),
                         Arc::new(accel),
@@ -101,7 +107,11 @@ fn build_accel_custom_bvh(shapes: &Vec<Arc<dyn Shape>>) -> Arc<dyn Accel> {
     let bvh_data = TopLevelBvhData {
         shapes: shapes.clone(),
     };
-    let bvh: BvhAccelerator<TopLevelBvhData> =
+    let bvh: BvhAccel<TopLevelBvhData> =
         SweepSAHBuilder::build(bvh_data, (0..shapes.len() as u32).collect());
-    Arc::new(bvh)
+    match accel_type {
+        "bvh" => Arc::new(bvh),
+        "qbvh" => Arc::new(qbvh::QBvhAccelBuilder::new(bvh).build()),
+        _ => unreachable!(),
+    }
 }

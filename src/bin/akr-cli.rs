@@ -89,6 +89,8 @@ fn main() {
         .arg(
             Arg::with_name("accel")
                 .long("as")
+                .alias("accel")
+                .alias("acc")
                 .value_name("ACCEL")
                 .help("Acceleration structure (possible values: 'bvh', 'embree')"),
         )

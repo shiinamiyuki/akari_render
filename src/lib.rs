@@ -6,7 +6,7 @@ static GLOBAL: MiMalloc = MiMalloc;
 
 pub use nalgebra as na;
 use rayon::prelude::*;
-
+#[macro_use]
 pub mod accel;
 pub mod api;
 pub mod bsdf;

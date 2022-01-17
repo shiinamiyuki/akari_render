@@ -1,17 +1,16 @@
-use crate::bsdf::*;
 use crate::shape::*;
 use crate::texture::ShadingPoint;
-use crate::*;
+
 use ordered_float::OrderedFloat;
 use parking_lot::Mutex;
 
 use super::*;
 #[derive(Clone, Copy, Debug, Default)]
 pub struct BvhNode {
-    // pub axis: u8,
     pub aabb: Bounds3f,
     pub left_or_first_primitive: u32,
-    pub count: u32,
+    pub count: u8,
+    pub axis: u8,
 }
 impl BvhNode {
     pub fn is_leaf(&self) -> bool {
@@ -27,11 +26,11 @@ impl BvhNode {
 pub trait BvhData: Send + Sync {
     fn aabb(&self, idx: u32) -> Bounds3f;
 }
-pub struct BvhAccelerator<T: BvhData> {
-    pub data: T,
-    pub references: Vec<u32>,
-    pub nodes: Vec<BvhNode>,
-    pub aabb: Bounds3f,
+pub struct BvhAccel<T: BvhData> {
+    pub(crate) data: T,
+    pub(crate) references: Vec<u32>,
+    pub(crate) nodes: Vec<BvhNode>,
+    pub(crate) aabb: Bounds3f,
 }
 
 pub struct SweepSAHBuilder<T: BvhData> {
@@ -43,7 +42,8 @@ impl<T> SweepSAHBuilder<T>
 where
     T: BvhData + Sync + 'static,
 {
-    pub fn build(data: T, mut references: Vec<u32>) -> BvhAccelerator<T> {
+    pub fn build(data: T, mut references: Vec<u32>) -> BvhAccel<T> {
+        assert!(!references.is_empty());
         let n_prims = references.len();
         let ((data, nodes, aabb), t) = profile(|| {
             let builder = Self {
@@ -63,7 +63,7 @@ where
             (builder.data, nodes, aabb)
         });
 
-        let bvh = BvhAccelerator {
+        let bvh = BvhAccel {
             data,
             nodes,
             references,
@@ -100,15 +100,15 @@ where
             let mut self_aabb = self.aabb.lock();
             *self_aabb = aabb;
         }
-        if end - begin <= 4 || depth >= 40 {
+        if end - begin <= 1 || depth >= 40 {
             if end - begin == 0 {
                 panic!("");
             }
             let node = BvhNode {
-                // axis: 0,
+                axis: 0,
                 aabb,
                 left_or_first_primitive: begin,
-                count: end - begin,
+                count: (end - begin) as u8,
             };
             let mut nodes = self.nodes.lock();
             let nodes = nodes.as_mut().unwrap();
@@ -228,7 +228,7 @@ where
                     nodes.push(dummy);
                     nodes.push(dummy);
                     nodes[node_idx as usize] = BvhNode {
-                        // axis: axis as u8,
+                        axis: best_split.0 as u8,
                         aabb,
                         left_or_first_primitive: child_idx,
                         count: 0,
@@ -263,7 +263,7 @@ where
     }
 }
 
-impl<T> BvhAccelerator<T>
+impl<T> BvhAccel<T>
 where
     T: BvhData,
 {
@@ -286,61 +286,110 @@ where
         ray: &mut Ray,
         f: &mut F,
     ) -> bool {
-        let first = node.left_or_first_primitive;
-        let last = node.left_or_first_primitive + node.count;
-        for i in first..last {
-            if f(ray, self.references[i as usize]) {
-                return true;
+        unsafe {
+            let first = node.left_or_first_primitive;
+            let last = node.left_or_first_primitive + node.count as u32;
+            for i in first..last {
+                if f(ray, *self.references.get_unchecked(i as usize)) {
+                    return true;
+                }
             }
+            false
         }
-        false
     }
     // break when f returns true
+    // pub fn traverse<F: FnMut(&mut Ray, u32) -> bool>(&self, mut ray: Ray, mut f: F) {
+    //     let inv_d = Vec3A::ONE / Vec3A::from(ray.d);
+    //     let mut stack: [u32; 32] = [0; 32];
+    //     let mut sp = 0;
+    //     let mut p = Some(&self.nodes[0]);
+    //     let o = ray.o.into();
+    //     while p.is_some() {
+    //         let node = p.unwrap();
+    //         let t = Self::intersect_aabb(&node.aabb, &ray, o, inv_d);
+    //         if t < 0.0 {
+    //             if sp > 0 {
+    //                 sp -= 1;
+    //                 p = Some(&self.nodes[stack[sp] as usize]);
+    //             } else {
+    //                 p = None;
+    //             }
+    //         } else {
+    //             if node.is_leaf() {
+    //                 if self.traverse_leaf(node, &mut ray, &mut f) {
+    //                     break;
+    //                 }
+    //                 if sp > 0 {
+    //                     sp -= 1;
+    //                     p = Some(&self.nodes[stack[sp] as usize]);
+    //                 } else {
+    //                     p = None;
+    //                 }
+    //             } else {
+    //                 let left = &self.nodes[node.left() as usize];
+    //                 let right = &self.nodes[node.right() as usize];
+    //                 let axis = node.axis as usize;
+    //                 if ray.d[axis] < 0.0 {
+    //                     p = Some(right);
+    //                     stack[sp] = node.left();
+    //                     sp += 1;
+    //                 } else {
+    //                     p = Some(left);
+    //                     stack[sp] = node.right();
+    //                     sp += 1;
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
+
+    // break when f returns true
     pub fn traverse<F: FnMut(&mut Ray, u32) -> bool>(&self, mut ray: Ray, mut f: F) {
-        let inv_d = Vec3A::ONE / Vec3A::from(ray.d);
-        let mut stack: [u32; 32] = [0; 32];
-        let mut sp = 0;
-        let mut p = Some(&self.nodes[0]);
-        let o = ray.o.into();
-        while p.is_some() {
-            let node = p.unwrap();
-            if node.is_leaf() {
-                if self.traverse_leaf(node, &mut ray, &mut f) {
-                    break;
-                }
-                if sp > 0 {
-                    sp -= 1;
-                    p = Some(&self.nodes[stack[sp] as usize]);
-                } else {
-                    p = None;
-                }
-            } else {
-                let left = &self.nodes[node.left() as usize];
-                let right = &self.nodes[node.right() as usize];
-                let t_left = Self::intersect_aabb(&left.aabb, &ray, o, inv_d);
-                let t_right = Self::intersect_aabb(&right.aabb, &ray, o, inv_d);
-                if t_left < 0.0 && t_right < 0.0 {
+        unsafe {
+            let inv_d = Vec3A::ONE / Vec3A::from(ray.d);
+            let mut stack: [u32; 32] = [0; 32];
+            let mut sp = 0;
+            let mut p = Some(&self.nodes[0]);
+            let o = ray.o.into();
+            while let Some(node) = p {
+                if node.is_leaf() {
+                    if self.traverse_leaf(node, &mut ray, &mut f) {
+                        break;
+                    }
                     if sp > 0 {
                         sp -= 1;
-                        p = Some(&self.nodes[stack[sp] as usize]);
+                        p = Some(self.nodes.get_unchecked(stack[sp] as usize));
                     } else {
                         p = None;
                     }
-                    continue;
-                }
-                if t_left < 0.0 {
-                    p = Some(right);
-                } else if t_right < 0.0 {
-                    p = Some(left);
                 } else {
-                    if t_left < t_right {
-                        stack[sp] = node.right();
-                        sp += 1;
+                    let left = &self.nodes.get_unchecked(node.left() as usize);
+                    let right = &self.nodes.get_unchecked(node.right() as usize);
+                    let t_left = Self::intersect_aabb(&left.aabb, &ray, o, inv_d);
+                    let t_right = Self::intersect_aabb(&right.aabb, &ray, o, inv_d);
+                    if t_left < 0.0 && t_right < 0.0 {
+                        if sp > 0 {
+                            sp -= 1;
+                            p = Some(self.nodes.get_unchecked(stack[sp] as usize));
+                        } else {
+                            p = None;
+                        }
+                        continue;
+                    }
+                    if t_left < 0.0 {
+                        p = Some(right);
+                    } else if t_right < 0.0 {
                         p = Some(left);
                     } else {
-                        stack[sp] = node.left();
-                        sp += 1;
-                        p = Some(right);
+                        if t_left < t_right {
+                            stack[sp] = node.right();
+                            sp += 1;
+                            p = Some(left);
+                        } else {
+                            stack[sp] = node.left();
+                            sp += 1;
+                            p = Some(right);
+                        }
                     }
                 }
             }
@@ -381,49 +430,57 @@ where
         self
     }
 }
-impl Accel for BvhAccelerator<TopLevelBvhData> {
-    fn intersect<'a>(&'a self, ray: &Ray) -> Option<SurfaceInteraction<'a>> {
-        let mut hit = None;
-        self.traverse(*ray, |ray, geom_id| {
-            if let Some(hit_) = self.data.shapes[geom_id as usize].intersect(ray) {
-                hit = Some(RayHit { geom_id, ..hit_ });
-                ray.tmax = hit_.t;
+#[macro_export]
+macro_rules! impl_bvh_accel {
+    ($t:ty) => {
+        impl Accel for $t {
+            fn intersect<'a>(&'a self, ray: &Ray) -> Option<SurfaceInteraction<'a>> {
+                let mut hit = None;
+                self.traverse(*ray, |ray, geom_id| {
+                    if let Some(hit_) = self.data.shapes[geom_id as usize].intersect(ray) {
+                        hit = Some(RayHit { geom_id, ..hit_ });
+                        ray.tmax = hit_.t;
+                    }
+                    false
+                });
+                hit.map(|hit| {
+                    let uv = hit.uv;
+                    let ng = hit.ng;
+                    let shape = self.data.shapes[hit.geom_id as usize].as_ref();
+                    let triangle = shape.shading_triangle(hit.prim_id);
+                    let ns = triangle.ns(uv);
+                    let texcoord = triangle.texcoord(uv);
+                    SurfaceInteraction::<'a> {
+                        shape,
+                        bsdf: triangle.bsdf,
+                        triangle,
+                        t: hit.t,
+                        uv,
+                        ng,
+                        ns,
+                        sp: ShadingPoint { texcoord },
+                        texcoord,
+                    }
+                })
             }
-            false
-        });
-        hit.map(|hit| {
-            let uv = hit.uv;
-            let ng = hit.ng;
-            let shape = self.data.shapes[hit.geom_id as usize].as_ref();
-            let triangle = shape.shading_triangle(hit.prim_id);
-            let ns = triangle.ns(uv);
-            let texcoord = triangle.texcoord(uv);
-            SurfaceInteraction::<'a> {
-                shape,
-                bsdf: triangle.bsdf,
-                triangle,
-                t: hit.t,
-                uv,
-                ng,
-                ns,
-                sp: ShadingPoint { texcoord },
-                texcoord,
-            }
-        })
-    }
 
-    fn occlude(&self, ray: &Ray) -> bool {
-        let mut occluded = false;
-        self.traverse(*ray, |ray, geom_id| {
-            if self.data.shapes[geom_id as usize].occlude(ray) {
-                occluded = true;
-                return true;
+            fn occlude(&self, ray: &Ray) -> bool {
+                let mut occluded = false;
+                self.traverse(*ray, |ray, geom_id| {
+                    if self.data.shapes[geom_id as usize].occlude(ray) {
+                        occluded = true;
+                        return true;
+                    }
+                    false
+                });
+                occluded
             }
-            false
-        });
-        occluded
-    }
-    fn shapes(&self) -> Vec<Arc<dyn Shape>> {
-        self.data.shapes.clone()
-    }
+            fn shapes(&self) -> Vec<Arc<dyn Shape>> {
+                self.data.shapes.clone()
+            }
+        }
+    };
 }
+
+
+impl_bvh_accel!(BvhAccel<TopLevelBvhData>);

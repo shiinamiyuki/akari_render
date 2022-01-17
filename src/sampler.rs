@@ -79,7 +79,7 @@ impl Sampler for PCGSampler {
     // fn start_pixel(&mut self, px: &IVec2, res: &IVec2) {}
     fn start_next_sample(&mut self) {}
 }
-
+#[derive(Clone, Copy)]
 pub struct SobolSampler {
     dim: u32,
     rotation: u32,

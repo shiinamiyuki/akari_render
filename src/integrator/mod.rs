@@ -7,6 +7,7 @@ pub mod nrc;
 pub mod path;
 pub mod ppg;
 pub mod sppm;
+// pub mod spath;
 use crate::{film::Film, scene::Scene};
 
 pub trait Integrator {

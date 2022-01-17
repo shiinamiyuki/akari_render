@@ -1,5 +1,6 @@
-use crate::accel::bvh::BvhAccelerator;
+use crate::accel::bvh::BvhAccel;
 use crate::accel::bvh::SweepSAHBuilder;
+use crate::accel::qbvh::QBvhAccel;
 use crate::distribution::Distribution1D;
 use crate::texture::ShadingPoint;
 use crate::*;
@@ -124,6 +125,31 @@ impl<'a> Into<Triangle> for ShadingTriangle<'a> {
         }
     }
 }
+
+pub enum MeshBvh {
+    Bvh(BvhAccel<TriangleMeshAccelData>),
+    QBvh(QBvhAccel<TriangleMeshAccelData>),
+}
+impl MeshBvh {
+    pub fn aabb(&self) -> Aabb {
+        match self {
+            MeshBvh::Bvh(x) => x.aabb,
+            MeshBvh::QBvh(x) => x.aabb,
+        }
+    }
+    pub fn data(&self) -> &TriangleMeshAccelData {
+        match self {
+            MeshBvh::Bvh(x) => &x.data,
+            MeshBvh::QBvh(x) => &x.data,
+        }
+    }
+    pub fn traverse<F: FnMut(&mut Ray, u32) -> bool>(&self, mut ray: Ray, mut f: F) {
+        match self {
+            MeshBvh::Bvh(x) => x.traverse(ray, f),
+            MeshBvh::QBvh(x) => x.traverse(ray, f),
+        }
+    }
+}
 pub struct TriangleMeshAccelData {
     pub mesh: Arc<TriangleMesh>,
 }
@@ -142,7 +168,7 @@ impl bvh::BvhData for TriangleMeshAccelData {
 }
 
 pub struct TriangleMeshInstance {
-    pub accel: Arc<accel::bvh::BvhAccelerator<TriangleMeshAccelData>>,
+    pub accel: Arc<MeshBvh>,
     pub bsdf: Arc<dyn Bsdf>,
     pub area: f32,
     pub dist: Distribution1D,
@@ -193,7 +219,7 @@ impl Shape for MeshInstanceProxy {
 
 impl Shape for TriangleMeshInstance {
     fn aabb(&self) -> Bounds3f {
-        self.accel.aabb
+        self.accel.aabb()
     }
     fn intersect(&self, ray: &Ray) -> Option<RayHit> {
         let mut hit = None;
@@ -236,18 +262,18 @@ impl Shape for TriangleMeshInstance {
         self.area
     }
     fn sample_surface(&self, u: Vec3) -> SurfaceSample {
-        self.accel.data.mesh.sample_surface(u, &self.dist)
+        self.accel.data().mesh.sample_surface(u, &self.dist)
     }
 
     fn shading_triangle<'a>(&'a self, prim_id: u32) -> ShadingTriangle<'a> {
         ShadingTriangle {
             bsdf: self.bsdf(),
-            ..self.accel.data.mesh.shading_triangle(prim_id as usize)
+            ..self.accel.data().mesh.shading_triangle(prim_id as usize)
         }
     }
 
     fn triangle(&self, prim_id: u32) -> Triangle {
-        self.accel.data.mesh.triangle(prim_id as usize)
+        self.accel.data().mesh.triangle(prim_id as usize)
     }
 }
 
@@ -345,7 +371,7 @@ impl TriangleMesh {
 }
 
 impl TriangleMesh {
-    pub fn build_accel(self: &Arc<TriangleMesh>) -> BvhAccelerator<TriangleMeshAccelData> {
+    pub fn build_accel(self: &Arc<TriangleMesh>) -> BvhAccel<TriangleMeshAccelData> {
         let accel = SweepSAHBuilder::build(
             TriangleMeshAccelData { mesh: self.clone() },
             (0..self.indices.len() as u32).collect(),
@@ -355,7 +381,7 @@ impl TriangleMesh {
     }
     pub fn create_instance(
         bsdf: Arc<dyn Bsdf>,
-        accel: Arc<BvhAccelerator<TriangleMeshAccelData>>,
+        accel: Arc<MeshBvh>,
         mesh: Arc<TriangleMesh>,
     ) -> Arc<dyn Shape> {
         let instance = TriangleMeshInstance {
