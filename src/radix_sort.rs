@@ -1,7 +1,7 @@
-use std::sync::atomic::AtomicUsize;
-
 use parking_lot::RwLock;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{
+    IndexedParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator,
+};
 
 use crate::{parallel_for, UnsafePointer};
 
@@ -14,6 +14,16 @@ struct Sort<'a, T, F> {
 }
 impl<'a, T: 'static + Send + Sync + Clone + Copy, F: Fn(&T) -> u64 + Send + Sync> Sort<'a, T, F> {
     fn round(&mut self, r: u64) {
+        // if self.tmp.is_empty() {
+        //     self.tmp = self.slice.par_iter().map(|i| *i).collect();
+        // } else {
+        //     self.tmp
+        //         .par_iter_mut()
+        //         .zip(self.slice.par_iter())
+        //         .for_each(|(a, b)| {
+        //             *a = *b;
+        //         });
+        // }
         self.tmp.clear();
         self.tmp.extend_from_slice(self.slice);
         let parts = rayon::current_num_threads();
@@ -67,7 +77,7 @@ impl<'a, T: 'static + Send + Sync + Clone + Copy, F: Fn(&T) -> u64 + Send + Sync
         });
     }
     pub fn run(&mut self) {
-        assert_eq!(64 % self.bits, 0);
+        // assert_eq!(64 % self.bits, 0);
         let mut r = 0;
         while r < 64 {
             self.round(r);
@@ -82,7 +92,7 @@ pub fn par_radix_sort_by<
     slice: &mut [T],
     key: F,
 ) {
-    let bits = 4;
+    let bits = 8;
     let buckets = 1u64 << bits;
     let len = slice.len();
     let mut sort = Sort {
@@ -106,14 +116,23 @@ mod test {
     #[test]
     fn test_large() {
         use super::*;
+        use crate::profile;
         use rand::thread_rng;
         use rand::Rng;
         use rayon::slice::ParallelSliceMut;
         let mut rng = thread_rng();
-        let mut v1: Vec<u64> = (0..10000000).map(|_| rng.gen::<u64>()).collect();
+        let mut v1: Vec<u64> = (0..100000).map(|_| rng.gen::<u64>()).collect();
         let mut v2 = v1.clone();
-        par_radix_sort_by(v1.as_mut_slice(), |x| *x as u64);
-        v2.par_sort();
+
+        let t1 = profile(|| {
+            par_radix_sort_by(v1.as_mut_slice(), |x| *x as u64);
+        })
+        .1;
+        let t2 = profile(|| {
+            v2.par_sort_unstable();
+        })
+        .1;
         assert_eq!(v1, v2);
+        println!("{} {}", t1, t2);
     }
 }
