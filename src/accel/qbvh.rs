@@ -34,28 +34,32 @@ mod test {
         assert_eq!(std::mem::size_of::<QBvhNode>(), 128);
     }
 }
+#[inline(always)]
+fn bool4_to_u32(x: [bool; 4]) -> u32 {
+    (x[0] as u32) | ((x[1] as u32) << 1) | ((x[2] as u32) << 2) | ((x[3] as u32) << 3)
+}
 impl QBvhNode {
     // #[inline(always)]
     // fn prim_start(children: UVec4) -> UVec4 {
     //     Self::child_indices(children)
     // }
     #[inline]
-    fn leaf_mask(&self) -> BVec4A {
-        BVec4A::new(
+    fn leaf_mask(&self) -> u32 {
+        bool4_to_u32([
             self.count[0] != 0 && self.count[0] != INVALID_CHILD,
             self.count[1] != 0 && self.count[1] != INVALID_CHILD,
             self.count[2] != 0 && self.count[2] != INVALID_CHILD,
             self.count[3] != 0 && self.count[3] != INVALID_CHILD,
-        )
+        ])
     }
     #[inline]
-    fn children_mask(&self) -> BVec4A {
-        BVec4A::new(
+    fn children_mask(&self) -> u32 {
+        bool4_to_u32([
             self.count[0] == 0,
             self.count[1] == 0,
             self.count[2] == 0,
             self.count[3] == 0,
-        )
+        ])
     }
     fn intersect(
         &self,
@@ -147,28 +151,25 @@ impl<T: BvhData> QBvhAccel<T> {
                 let leaf_mask = node.leaf_mask();
                 let children = node.children;
                 if mask.any() {
+                    let mask = mask.bitmask();
                     let hit_leaves = leaf_mask & mask;
-                    let m = hit_leaves.bitmask();
-                    if m != 0 {
-                        for i in 0..4 {
-                            if 0 != (m & (1 << i)) {
-                                let start = children[i as usize] as usize;
-                                let count = node.count[i as usize] as usize;
-                                for p in start..start + count {
-                                    if f(&mut ray, *self.references.get_unchecked(p)) {
-                                        return;
-                                    }
-                                }
-                            }
-                        }
-                    }
                     let hit_children = node.children_mask() & mask;
-                    let m = hit_children.bitmask();
                     for j in 0..4 {
                         let i = indices[j];
-                        if 0 != (m & (1 << i)) {
-                            stack[sp] = children[i as usize];
-                            sp += 1;
+                        if 0 != (hit_leaves & (1 << i)) {
+                            let start = children[i as usize] as usize;
+                            // only 1 primitive
+                            {
+                                let p = start;
+                                if f(&mut ray, *self.references.get_unchecked(p)) {
+                                    return;
+                                }
+                            }
+                        } else {
+                            if 0 != (hit_children & (1 << i)) {
+                                stack[sp] = children[i as usize];
+                                sp += 1;
+                            }
                         }
                     }
                 }
@@ -309,6 +310,12 @@ impl<T: BvhData> QBvhAccelBuilder<T> {
         } else {
             self.recursive_build(0);
         }
+        log::info!(
+            "QBVH: {} refs {} BVH nodes -> {} QBVH nodes",
+            self.references.len(),
+            self.bvh_nodes.len(),
+            self.qbvh_nodes.len()
+        );
         // println!("{:?}", self.qbvh_nodes);
         let references = std::mem::replace(&mut self.references, vec![]);
         let nodes = std::mem::replace(&mut self.qbvh_nodes, vec![]);

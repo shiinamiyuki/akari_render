@@ -66,30 +66,22 @@ impl Triangle {
         let v1 = self.vertices[1];
         let v2 = self.vertices[2];
 
-        // float a,f,u,v;
         let edge1 = v1 - v0;
         let edge2 = v2 - v0;
-        let h = ray.d.cross(edge2); // rayVector.crossProduct(edge2);
-        let a = edge1.dot(h); //edge1.dotProduct(h);
+        let h = ray.d.cross(edge2);
+        let a = edge1.dot(h);
         if a > -1e-7 && a < 1e-7 {
-            return None; // This ray is parallel to this triangle.
+            return None;
         }
         let f = 1.0 / a;
         let s = ray.o - v0;
-        let u = f * s.dot(h); //s.dotProduct(h);
-        if u < 0.0 || u > 1.0 {
-            return None;
-        }
-        let q = s.cross(edge1); //s.crossProduct(edge1);
-        let v = f * ray.d.dot(q); //rayVector.dotProduct(q);
-        if v < 0.0 || u + v > 1.0 {
-            return None;
-        }
-        // At this stage we can compute t to find out where the intersection point is on the line.
-        let t = f * edge2.dot(q); //edge2.dotProduct(q);
-        if t >= ray.tmin && t < ray.tmax
-        // ray intersection
-        {
+        let u = f * s.dot(h);
+        let q = s.cross(edge1);
+        let v = f * ray.d.dot(q);
+        let t = f * edge2.dot(q);
+        let hit = t >= ray.tmin && t < ray.tmax && u >= 0.0 && u <= 1.0 && v >= 0.0 && u + v <= 1.0;
+
+        if hit {
             Some((t, vec2(u, v)))
         } else {
             None
