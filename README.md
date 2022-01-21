@@ -9,12 +9,14 @@ Previous version with PPG and SMCMC is in [legacy-cpp](https://github.com/shiina
 
 
 ## Features
-- Out of Core Texture Caching
+- Out of Core Rendering
 - Unidirectional Path Tracing
 - Wavefront Path Tracing
 - SPPM
 - BDPT
 - [Neural Radiance Cache](https://arxiv.org/pdf/2106.12372.pdf)
+- Quad-BVH
+- Ray Packet Traversal
 
 ## Build & Run
 ```
