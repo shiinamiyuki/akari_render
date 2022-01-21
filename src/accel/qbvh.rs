@@ -19,6 +19,16 @@ struct QBvhNode {
     count: [u8; 4],
     // axes: [u32; 3],
 }
+impl Default for QBvhNode {
+    fn default() -> Self {
+        Self {
+            min: [Vec4::ZERO; 3],
+            max: [Vec4::ZERO; 3],
+            children: UVec4::ZERO,
+            count: [INVALID_CHILD; 4],
+        }
+    }
+}
 impl std::fmt::Debug for QBvhNode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("QBvhNode")
@@ -127,7 +137,15 @@ pub struct QBvhAccel<T: BvhData> {
 }
 
 impl<T: BvhData> QBvhAccel<T> {
-    // break when f returns true
+    pub fn traverse4<F: FnMut(&mut Ray4, BVec4A, u32) -> BVec4A>(
+        &self,
+        ray4: &mut Ray4,
+        mut active_mask: BVec4A,
+        mut f: F,
+    ) {
+        todo!()
+    }
+
     pub fn traverse<F: FnMut(&mut Ray, u32) -> bool>(&self, mut ray: Ray, mut f: F) {
         unsafe {
             let inv_d = Vec3::ONE / ray.d;
@@ -158,9 +176,8 @@ impl<T: BvhData> QBvhAccel<T> {
                         let i = indices[j];
                         if 0 != (hit_leaves & (1 << i)) {
                             let start = children[i as usize] as usize;
-                            // only 1 primitive
-                            {
-                                let p = start;
+                            let count = node.count[i as usize] as usize;
+                            for p in start..(start + count) {
                                 if f(&mut ray, *self.references.get_unchecked(p)) {
                                     return;
                                 }
@@ -168,7 +185,7 @@ impl<T: BvhData> QBvhAccel<T> {
                         } else {
                             if 0 != (hit_children & (1 << i)) {
                                 stack[sp] = children[i as usize];
-                                sp += 1;
+                                sp += (0 != (hit_children & (1 << i))) as usize;
                             }
                         }
                     }
@@ -272,15 +289,32 @@ impl<T: BvhData> QBvhAccelBuilder<T> {
             children: UVec4::ZERO,
         }
     }
-    pub fn recursive_build(&mut self, bvh_node: usize) -> usize {
+    pub fn recursive_build(&mut self, bvh_node: usize, qbvh_idx: usize) {
         let children = self.collapse4(bvh_node);
+        let n_children = children
+            .iter()
+            .map(|c| -> usize {
+                {
+                    match c {
+                        BvhNodeChild::Child { .. } => 1,
+                        _ => 0,
+                    }
+                }
+            })
+            .sum::<usize>();
         let qbvh_node = self.create_qbvh_node(bvh_node);
-        let qbvh_idx = self.qbvh_nodes.len();
-        self.qbvh_nodes.push(qbvh_node);
+        self.qbvh_nodes[qbvh_idx] = qbvh_node;
+        let base = self.qbvh_nodes.len();
+        for _ in 0..n_children {
+            self.qbvh_nodes.push(Default::default());
+        }
+        let mut cnt = 0;
         for (i, c) in children.iter().enumerate() {
             match c {
                 BvhNodeChild::Child { idx, .. } => {
-                    self.qbvh_nodes[qbvh_idx].children[i] = self.recursive_build(*idx) as u32;
+                    self.qbvh_nodes[qbvh_idx].children[i] = (base + cnt) as u32;
+                    self.recursive_build(*idx, base + cnt);
+                    cnt += 1;
                 }
                 BvhNodeChild::Leaf { first, .. } => {
                     self.qbvh_nodes[qbvh_idx].children[i] = *first as u32;
@@ -288,7 +322,6 @@ impl<T: BvhData> QBvhAccelBuilder<T> {
                 _ => {}
             }
         }
-        qbvh_idx
     }
     pub fn build(mut self) -> QBvhAccel<T> {
         if self.bvh_nodes[0].is_leaf() {
@@ -308,7 +341,8 @@ impl<T: BvhData> QBvhAccelBuilder<T> {
                 count: [root.count, INVALID_CHILD, INVALID_CHILD, INVALID_CHILD],
             })
         } else {
-            self.recursive_build(0);
+            self.qbvh_nodes.push(Default::default());
+            self.recursive_build(0, 0);
         }
         log::info!(
             "QBVH: {} refs {} BVH nodes -> {} QBVH nodes",

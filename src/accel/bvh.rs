@@ -280,6 +280,37 @@ where
             -1.0
         }
     }
+    fn intersect_aabb4(
+        aabb: &Bounds3f,
+        ray: &Ray4,
+        active_mask: BVec4A,
+        inv_dx: Vec4,
+        inv_dy: Vec4,
+        inv_dz: Vec4,
+    ) -> (BVec4A, Vec4) {
+        let t0x = (aabb.min[0] - ray.o[0]) * inv_dx;
+        let t0y = (aabb.min[1] - ray.o[1]) * inv_dy;
+        let t0z = (aabb.min[2] - ray.o[2]) * inv_dz;
+
+        let t1x = (aabb.max[0] - ray.o[0]) * inv_dx;
+        let t1y = (aabb.max[1] - ray.o[1]) * inv_dy;
+        let t1z = (aabb.max[2] - ray.o[2]) * inv_dz;
+
+        let tminx = t0x.min(t1x);
+        let tminy = t0y.min(t1y);
+        let tminz = t0z.min(t1z);
+
+        let tmaxx = t0x.max(t1x);
+        let tmaxy = t0y.max(t1y);
+        let tmaxz = t0z.max(t1z);
+
+        let tmin = tminx.max(tminy).max(tminz).max(ray.tmin);
+        let tmax = tmaxx.min(tmaxy).min(tmaxz).min(ray.tmax);
+
+        let mask = tmin.cmplt(tmax) & active_mask;
+
+        (mask, tmin)
+    }
     fn traverse_leaf<F: FnMut(&mut Ray, u32) -> bool>(
         &self,
         node: &BvhNode,
@@ -342,8 +373,90 @@ where
     //         }
     //     }
     // }
+    // break when f returns false
+    pub fn traverse4<F: FnMut(&mut Ray4, BVec4A, u32) -> BVec4A>(
+        &self,
+        ray4: &mut Ray4,
+        mut active_mask: BVec4A,
+        mut f: F,
+    ) {
+        unsafe {
+            let inv_dx = Vec4::ONE / ray4.o[0];
+            let inv_dy = Vec4::ONE / ray4.o[1];
+            let inv_dz = Vec4::ONE / ray4.o[2];
 
-    // break when f returns true
+            let mut stack: [u32; 32] = [0; 32];
+            let mut sp = 0;
+            let mut p = Some(&self.nodes[0]);
+            while let Some(node) = p {
+                if !active_mask.any() {
+                    break;
+                }
+                if node.is_leaf() {
+                    let first = node.left_or_first_primitive;
+                    let last = node.left_or_first_primitive + node.count as u32;
+                    for i in first..last {
+                        active_mask &= f(
+                            ray4,
+                            active_mask,
+                            *self.references.get_unchecked(i as usize),
+                        );
+                    }
+                    if sp > 0 {
+                        sp -= 1;
+                        p = Some(self.nodes.get_unchecked(stack[sp] as usize));
+                    } else {
+                        p = None;
+                    }
+                } else {
+                    let left = self.nodes.get_unchecked(node.left() as usize);
+                    let right = self.nodes.get_unchecked(node.right() as usize);
+
+                    let (left_mask, left_t) = Self::intersect_aabb4(
+                        &left.aabb,
+                        ray4,
+                        active_mask,
+                        inv_dx,
+                        inv_dy,
+                        inv_dz,
+                    );
+                    let (right_mask, right_t) = Self::intersect_aabb4(
+                        &right.aabb,
+                        ray4,
+                        active_mask,
+                        inv_dx,
+                        inv_dy,
+                        inv_dz,
+                    );
+                    if !left_mask.any() && !right_mask.any() {
+                        if sp > 0 {
+                            sp -= 1;
+                            p = Some(self.nodes.get_unchecked(stack[sp] as usize));
+                        } else {
+                            p = None;
+                        }
+                        continue;
+                    }
+                    if !left_mask.any() {
+                        p = Some(right);
+                    } else if !right_mask.any() {
+                        p = Some(left);
+                    } else {
+                        if (left_t.cmplt(right_t) & left_mask & right_mask).any() {
+                            stack[sp] = node.right();
+                            sp += 1;
+                            p = Some(left);
+                        } else {
+                            stack[sp] = node.left();
+                            sp += 1;
+                            p = Some(right);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // break when f returns false
     pub fn traverse<F: FnMut(&mut Ray, u32) -> bool>(&self, mut ray: Ray, mut f: F) {
         unsafe {
             let inv_d = Vec3A::ONE / Vec3A::from(ray.d);
@@ -363,8 +476,8 @@ where
                         p = None;
                     }
                 } else {
-                    let left = &self.nodes.get_unchecked(node.left() as usize);
-                    let right = &self.nodes.get_unchecked(node.right() as usize);
+                    let left = self.nodes.get_unchecked(node.left() as usize);
+                    let right = self.nodes.get_unchecked(node.right() as usize);
                     let t_left = Self::intersect_aabb(&left.aabb, &ray, o, inv_d);
                     let t_right = Self::intersect_aabb(&right.aabb, &ray, o, inv_d);
                     if t_left < 0.0 && t_right < 0.0 {
@@ -460,9 +573,43 @@ macro_rules! impl_bvh_accel {
                         hit = Some(RayHit { geom_id, ..hit_ });
                         ray.tmax = hit_.t;
                     }
-                    false
+                    true
                 });
                 hit
+            }
+            fn intersect4(&self, ray: &[Ray; 4], mask: [bool; 4]) -> [Option<RayHit>; 4] {
+                todo!()
+                // let mut hits = [None; 4];
+                // let ray4 = Ray4::from(*ray);
+                // let mask = BVec4A::new(mask[0], mask[1], mask[2], mask[3]);
+                // self.traverse4(ray4, mask, |ray4, mask, geom_id| {
+                //     let hits_ = self.data.shapes[geom_id as usize].intersect4(ray, mask);
+                //     for i in 0..4 {
+                //         if let Some(hit_) = hits_[i] {
+                //             hits[i] = Some(RayHit { geom_id, ..hit_ });
+                //             ray[i].tmax = hit_.t;
+                //         }
+                //     }
+                //     true
+                // });
+                // hits
+            }
+            fn occlude4(&self, ray: &[Ray; 4], mask: [bool; 4]) -> [bool; 4] {
+                todo!()
+                // let ray4 = Ray4::from(*ray);
+                // let mut mask = BVec4A::new(mask[0], mask[1], mask[2], mask[3]);
+                // self.traverse4(ray4, mask, |ray4, mask, geom_id| {
+                //     let occluded = self.data.shapes[geom_id as usize].occlude4(ray4, mask);
+                //     mask &= !BVec4A::new(occluded[0], occluded[1], occluded[2], occluded[3]);
+                //     mask
+                // });
+                // let mask = mask.bitmask();
+                // [
+                //     (mask & 1) == 0,
+                //     (mask & 2) == 0,
+                //     (mask & 4) == 0,
+                //     (mask & 8) == 0,
+                // ]
             }
 
             fn occlude(&self, ray: &Ray) -> bool {
@@ -470,9 +617,9 @@ macro_rules! impl_bvh_accel {
                 self.traverse(*ray, |ray, geom_id| {
                     if self.data.shapes[geom_id as usize].occlude(ray) {
                         occluded = true;
-                        return true;
+                        return false;
                     }
-                    false
+                    true
                 });
                 occluded
             }

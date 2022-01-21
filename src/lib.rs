@@ -395,6 +395,32 @@ pub struct Ray {
     pub tmax: f32,
     // pub time: f32,
 }
+#[derive(Clone, Copy)]
+pub struct Ray4 {
+    pub o: [Vec4; 3],
+    pub d: [Vec4; 3],
+    pub tmin: Vec4,
+    pub tmax: Vec4,
+    // pub time: f32,
+}
+impl From<[Ray; 4]> for Ray4 {
+    fn from(ray: [Ray; 4]) -> Self {
+        Ray4 {
+            o: [
+                Vec4::splat(ray[0].o.x),
+                Vec4::splat(ray[1].o.x),
+                Vec4::splat(ray[2].o.x),
+            ],
+            d: [
+                Vec4::splat(ray[0].d.x),
+                Vec4::splat(ray[1].d.x),
+                Vec4::splat(ray[2].d.x),
+            ],
+            tmin: vec4(ray[0].tmin, ray[1].tmin, ray[2].tmin, ray[3].tmin),
+            tmax: vec4(ray[0].tmax, ray[1].tmax, ray[2].tmax, ray[3].tmax),
+        }
+    }
+}
 impl Default for Ray {
     fn default() -> Self {
         Self {

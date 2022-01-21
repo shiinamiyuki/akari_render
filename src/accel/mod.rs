@@ -1,3 +1,5 @@
+use glam::BVec4A;
+
 use crate::bsdf::*;
 use crate::shape::*;
 use crate::*;
@@ -53,8 +55,27 @@ impl bvh::BvhData for TopLevelBvhData {
 pub trait Accel: Send + Sync {
     fn hit_to_iteraction<'a>(&'a self, hit: RayHit) -> SurfaceInteraction<'a>;
     fn intersect(&self, ray: &Ray) -> Option<RayHit>;
+
     fn occlude(&self, ray: &Ray) -> bool;
     fn shapes(&self) -> Vec<Arc<dyn Shape>>;
+    fn intersect4(&self, rays: &[Ray; 4], mask: [bool; 4]) -> [Option<RayHit>; 4] {
+        let mut hits = [None; 4];
+        for i in 0..4 {
+            if mask[i] {
+                hits[i] = self.intersect(&rays[i]);
+            }
+        }
+        hits
+    }
+    fn occlude4(&self, rays: &[Ray; 4], mask: [bool; 4]) -> [bool; 4] {
+        let mut occluded = [false; 4];
+        for i in 0..4 {
+            if mask[i] {
+                occluded[i] = self.occlude(&rays[i]);
+            }
+        }
+        occluded
+    }
 }
 
 pub fn build_accel(shapes: &Vec<Arc<dyn Shape>>, accel: &str) -> Arc<dyn Accel> {

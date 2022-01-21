@@ -6,6 +6,8 @@ use crate::texture::ShadingPoint;
 use crate::*;
 use crate::{accel::bvh, bsdf::Bsdf};
 
+use glam::BVec4;
+use glam::BVec4A;
 use serde::{Deserialize, Serialize};
 use std::process::exit;
 use std::sync::Arc;
@@ -61,7 +63,50 @@ impl Triangle {
 }
 
 impl Triangle {
-    fn intersect<'a>(&'a self, ray: &Ray) -> Option<(f32, Vec2)> {
+    pub fn intersect4(&self, ray: &Ray4, active_mask: BVec4A) -> (BVec4A, Vec4, [Vec4; 2]) {
+        let v0 = self.vertices[0];
+        let v1 = self.vertices[1];
+        let v2 = self.vertices[2];
+
+        let e1 = v1 - v0;
+        let e2 = v2 - v0;
+
+        let e1 = [Vec4::splat(e1[0]), Vec4::splat(e1[1]), Vec4::splat(e1[2])];
+        let e2 = [Vec4::splat(e2[0]), Vec4::splat(e2[1]), Vec4::splat(e2[2])];
+
+        let hx = ray.d[1] * e2[2] - ray.d[2] * e2[1];
+        let hy = ray.d[2] * e2[0] - ray.d[0] * e2[2];
+        let hz = ray.d[0] * e2[1] - ray.d[1] * e2[0];
+
+        let a = e1[0] * hx + e1[1] * hy + e1[2] * hz;
+        let mask = a.cmpgt(Vec4::splat(-1e-7)) & a.cmplt(Vec4::splat(1e-7)) & active_mask;
+        if !mask.any() {
+            return (mask, Vec4::ZERO, [Vec4::ZERO; 2]);
+        }
+
+        let f = Vec4::ONE / a;
+        let sx = ray.o[0] - v0[0];
+        let sy = ray.o[1] - v0[1];
+        let sz = ray.o[2] - v0[2];
+        let u = f * (sx * hx + sy * hy + sz * hz);
+
+        let qx = sy * e1[2] - sz * e1[1];
+        let qy = sz * e1[0] - sx * e1[2];
+        let qz = sx * e1[1] - sy * e1[0];
+
+        let v = f * (ray.d[0] * qx + ray.d[1] * qy + ray.d[2] * qz);
+        let t = f * (e2[0] * qx + e2[1] * qy + e2[2] * qz);
+
+        let mask = mask
+            & t.cmpge(ray.tmin)
+            & t.cmplt(ray.tmax)
+            & u.cmpge(Vec4::splat(0.0))
+            & u.cmple(Vec4::splat(1.0))
+            & v.cmpge(Vec4::splat(0.0))
+            & (u + v).cmple(Vec4::splat(1.0));
+        (mask, t, [u, v])
+    }
+    pub fn intersect(&self, ray: &Ray) -> Option<(f32, Vec2)> {
         let v0 = self.vertices[0];
         let v1 = self.vertices[1];
         let v2 = self.vertices[2];
@@ -221,7 +266,7 @@ impl Shape for TriangleMeshInstance {
                 ray.tmax = t;
                 hit = Some((t, uv, prim_id));
             }
-            false
+            true
         });
         hit.map(|(t, uv, prim_id)| {
             let triangle = self.triangle(prim_id);
@@ -240,9 +285,9 @@ impl Shape for TriangleMeshInstance {
             let triangle = self.triangle(prim_id);
             if triangle.intersect(ray).is_some() {
                 occluded = true;
-                true
-            } else {
                 false
+            } else {
+                true
             }
         });
         occluded

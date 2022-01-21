@@ -50,7 +50,7 @@ fn mis_weight(mut pdf_a: f32, mut pdf_b: f32) -> f32 {
 }
 impl<'a> StreamPathTracerSession<'a> {
     fn intersect(&self, items: &mut [ClosestHit]) {
-        parallel_for_slice(items, 1024, |i, item| {
+        parallel_for_slice(items, 1024, |_, item| {
             if item.ray.is_invalid() {
                 return;
             }
@@ -59,6 +59,9 @@ impl<'a> StreamPathTracerSession<'a> {
                 .accel
                 .intersect(&item.ray)
                 .unwrap_or(Default::default());
+        });
+        parallel_for_slice(items, 1024, |_, item| {
+            
         });
     }
     fn test_shadow_rays(&self, items: &mut [ShadowRay]) {
@@ -111,7 +114,7 @@ impl<'a> StreamPathTracerSession<'a> {
         self.ray_id = self.ray_id.min(self.batch_size).min(total);
         let mut path_states: Vec<_> = (ray_id..self.ray_id)
             .into_par_iter()
-            .map(|id| {
+            .map(|_| {
                 let mut rng = thread_rng();
 
                 let sampler = SobolSampler::new(rng.gen());

@@ -5,49 +5,43 @@ use rayon::iter::{
 
 use crate::{parallel_for, UnsafePointer};
 
-struct Sort<'a, T, F> {
-    slice: &'a mut [T],
-    tmp: Vec<T>,
+struct Sort<T, F> {
+    src: UnsafePointer<T>,
+    dst: UnsafePointer<T>,
     key: F,
     buckets: usize,
+    len: usize,
     bits: u64,
+    buffer: Vec<RwLock<Vec<T>>>,
+    buffer_size: usize,
 }
-impl<'a, T: 'static + Send + Sync + Clone + Copy, F: Fn(&T) -> u64 + Send + Sync> Sort<'a, T, F> {
-    fn round(&mut self, r: u64) {
-        // if self.tmp.is_empty() {
-        //     self.tmp = self.slice.par_iter().map(|i| *i).collect();
-        // } else {
-        //     self.tmp
-        //         .par_iter_mut()
-        //         .zip(self.slice.par_iter())
-        //         .for_each(|(a, b)| {
-        //             *a = *b;
-        //         });
-        // }
-        self.tmp.clear();
-        self.tmp.extend_from_slice(self.slice);
+impl<T: 'static + Send + Sync + Clone + Copy + Default, F: Fn(&T) -> u64 + Send + Sync> Sort<T, F> {
+    fn round(&mut self, r: u64, last: bool) {
         let parts = rayon::current_num_threads();
         let counts: Vec<RwLock<Vec<usize>>> = (0..parts)
             .map(|_| RwLock::new(vec![0; self.buckets]))
             .collect();
-        let p_slice = UnsafePointer::new(self.slice.as_mut_ptr());
-        let chunk = (self.slice.len() + parts - 1) / parts;
-        let len = self.slice.len();
-        let tmp = &self.tmp;
+        let chunk = (self.len + parts - 1) / parts;
+        let len = self.len;
+        let mask = (1 << self.bits) - 1u64;
         let compute_bucket = |item| {
             let k = (self.key)(item);
-            let mask = (1 << self.bits) - 1u64;
             let k = k >> r;
             let k = k & mask;
             k
         };
         parallel_for(parts, 1, |p| {
-            let slice = unsafe { std::slice::from_raw_parts(p_slice.p, tmp.len()) };
-            let mut counts = counts[p].write();
+            let src = unsafe { std::slice::from_raw_parts(self.src.p, self.len) };
+            // let mut dst = unsafe { std::slice::from_raw_parts_mut(self.dst, self.len) };
+            let mut counts = counts[p].try_write().unwrap();
             for i in p * chunk..((p + 1) * chunk).min(len) {
-                let item = &slice[i];
+                // let item = &slice[i];
+                let item = unsafe { src.get_unchecked(i) };
                 let b = compute_bucket(item);
-                counts[b as usize] += 1;
+                // counts[b as usize] += 1;
+                unsafe {
+                    *counts.get_unchecked_mut(b as usize) += 1;
+                }
             }
         });
         let offsets: Vec<RwLock<Vec<usize>>> = (0..parts)
@@ -64,29 +58,70 @@ impl<'a, T: 'static + Send + Sync + Clone + Copy, F: Fn(&T) -> u64 + Send + Sync
             }
         }
 
-        assert_eq!(base, self.slice.len());
+        assert_eq!(base, self.len);
         parallel_for(parts, 1, |p| {
-            let mut offsets = offsets[p].write();
-            let slice = unsafe { std::slice::from_raw_parts_mut(p_slice.p, self.tmp.len()) };
-            for i in p * chunk..((p + 1) * chunk).min(len) {
-                let item = &self.tmp[i];
+            let src = unsafe { std::slice::from_raw_parts(self.src.p, self.len) };
+            let dst = unsafe { std::slice::from_raw_parts_mut(self.dst.p, self.len) };
+            let mut offsets = offsets[p].try_write().unwrap();
+            let mut buf_cnt = vec![0usize; self.buckets];
+            let mut buffer = self.buffer[p].try_write().unwrap();
+            let hi = ((p + 1) * chunk).min(len);
+            for i in p * chunk..hi {
+                let item = unsafe { src.get_unchecked(i) }; //&self.tmp[i];
                 let b = compute_bucket(item) as usize;
-                slice[offsets[b]] = *item;
-                offsets[b] += 1;
+                // slice[offsets[b]] = *item;
+                unsafe {
+                    *buffer.get_unchecked_mut(b * self.buffer_size + *buf_cnt.get_unchecked(b)) =
+                        *item;
+                    *buf_cnt.get_unchecked_mut(b) += 1;
+                    if *buf_cnt.get_unchecked(b) == self.buffer_size {
+                        let cnt = *buf_cnt.get_unchecked(b);
+                        let offset = *offsets.get_unchecked(b);
+                        // dst[offset..offset + cnt].copy_from_slice(
+                        // &buffer[b * self.buffer_size..b * self.buffer_size + cnt],
+                        // );
+                        std::ptr::copy_nonoverlapping(
+                            buffer[b * self.buffer_size..b * self.buffer_size + cnt].as_ptr(),
+                            dst[offset..offset + cnt].as_mut_ptr(),
+                            cnt,
+                        );
+                        *offsets.get_unchecked_mut(b) += cnt;
+                        *buf_cnt.get_unchecked_mut(b) = 0;
+                    }
+                    if i + 1 == hi {
+                        for b in 0..self.buckets {
+                            let cnt = *buf_cnt.get_unchecked(b);
+                            let offset = *offsets.get_unchecked(b);
+                            std::ptr::copy_nonoverlapping(
+                                buffer[b * self.buffer_size..b * self.buffer_size + cnt].as_ptr(),
+                                dst[offset..offset + cnt].as_mut_ptr(),
+                                cnt,
+                            );
+                            *offsets.get_unchecked_mut(b) += cnt;
+                        }
+                        buf_cnt.fill(0);
+                    }
+                }
+
+                // offsets[b] += 1;
             }
         });
+        if !last {
+            std::mem::swap(&mut self.src, &mut self.dst);
+        }
     }
     pub fn run(&mut self) {
         // assert_eq!(64 % self.bits, 0);
         let mut r = 0;
         while r < 64 {
-            self.round(r);
+            self.round(r, r + self.bits >= 64);
             r += self.bits;
         }
     }
 }
+#[allow(dead_code)]
 pub fn par_radix_sort_by<
-    T: 'static + Send + Sync + Clone + Copy,
+    T: 'static + Send + Sync + Clone + Copy + Default,
     F: Fn(&T) -> u64 + Send + Sync,
 >(
     slice: &mut [T],
@@ -94,13 +129,19 @@ pub fn par_radix_sort_by<
 ) {
     let bits = 8;
     let buckets = 1u64 << bits;
-    let len = slice.len();
+    let mut tmp = slice.to_vec();
+    let buffer_size = (128 * 1024 / buckets as usize / std::mem::size_of::<T>()).max(1);
     let mut sort = Sort {
-        slice,
+        src: UnsafePointer::new(slice.as_mut_ptr()),
+        dst: UnsafePointer::new(tmp.as_mut_ptr()),
         key,
         bits,
+        len: slice.len(),
         buckets: buckets as usize,
-        tmp: Vec::with_capacity(len),
+        buffer_size,
+        buffer: (0..rayon::current_num_threads())
+            .map(|_| RwLock::new(vec![Default::default(); buffer_size * buckets as usize]))
+            .collect(),
     };
     sort.run();
 }
@@ -121,7 +162,7 @@ mod test {
         use rand::Rng;
         use rayon::slice::ParallelSliceMut;
         let mut rng = thread_rng();
-        let mut v1: Vec<u64> = (0..100000).map(|_| rng.gen::<u64>()).collect();
+        let mut v1: Vec<u32> = (0..20000).map(|_| rng.gen::<u32>()).collect();
         let mut v2 = v1.clone();
 
         let t1 = profile(|| {
