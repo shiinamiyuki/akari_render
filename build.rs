@@ -1,83 +1,3 @@
-use std::fs::File;
-use std::io::{self, BufRead};
-use std::path::Path;
-use std::slice::Iter;
-fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
-where
-    P: AsRef<Path>,
-{
-    let file = File::open(filename)?;
-    Ok(io::BufReader::new(file).lines())
-}
-
-fn read_mat(iter: &mut Iter<f64>) -> Vec<f64> {
-    let mut data = vec![];
-    let a = *iter.next().unwrap() as usize;
-    let b = *iter.next().unwrap() as usize;
-    assert!(a == 64 && b == 64);
-    for _ in 0..a * b {
-        data.push(*iter.next().unwrap());
-    }
-    data
-}
-fn write_ltc_fit() {
-    let lines = read_lines("src/ltc/ltc.mat").unwrap();
-    let numbers: Vec<_> = lines
-        .into_iter()
-        .filter(|line| line.is_ok())
-        .map(|x| x.unwrap())
-        .filter(|line| !line.starts_with("#"))
-        .flat_map(|line| {
-            line.split(" ")
-                .map(|x| String::from(x))
-                .collect::<Vec<String>>()
-        })
-        .filter(|x| !x.is_empty())
-        .map(|x| x.parse::<f64>().unwrap())
-        .collect();
-    let mut iter = numbers.iter();
-    let tab_amp = read_mat(&mut iter);
-    let tab00 = read_mat(&mut iter);
-    let tab10 = read_mat(&mut iter);
-    let tab20 = read_mat(&mut iter);
-    let tab01 = read_mat(&mut iter);
-    let tab11 = read_mat(&mut iter);
-    let tab21 = read_mat(&mut iter);
-    let tab02 = read_mat(&mut iter);
-    let tab12 = read_mat(&mut iter);
-    let tab22 = read_mat(&mut iter);
-    assert!(iter.next().is_none());
-    let mut out = String::new();
-    out += "use super::GgxLtcfit;\n";
-    out += "#[allow(dead_code)]\npub const GGX_LTC_FIT:GgxLtcfit = GgxLtcfit{\nmat:[";
-    for i in 0..64 * 64 {
-        let m00 = tab00[i];
-        let m10 = tab10[i];
-        let m20 = tab20[i];
-        let m01 = tab01[i];
-        let m11 = tab11[i];
-        let m21 = tab21[i];
-        let m02 = tab02[i];
-        let m12 = tab12[i];
-        let m22 = tab22[i];
-
-        out += &format!(
-            "  [{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6}],\n",
-            m00, m10, m20, m01, m11, m21, m02, m12, m22
-        );
-
-        // out += &format!(
-        //     "  [{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6}],\n",
-        //     m00, m01, m02, m10, m11, m12, m20, m21, m22
-        // );
-    }
-    out += "],\n  amp:[\n";
-    for i in 0..64 * 64 {
-        out += &format!("{:.6},", tab_amp[i]);
-    }
-    out += "]};\n";
-    std::fs::write("src/ltc/fit.rs", out).unwrap();
-}
 #[cfg(feature = "gpu")]
 use shaderc::{
     CompileOptions, Compiler, IncludeCallbackResult, ResolvedInclude,
@@ -141,10 +61,7 @@ fn compile_shader(path: &str, shader_kind: ShaderKind, output: &str, options: Op
 
 
 fn main() {
-    println!("cargo:rerun-if-changed=src/ltc/ltc.mat");
-
     println!("cargo:rerun-if-changed=src/gpu/shaders");
-    write_ltc_fit();
 
     let nrc_opt = Options { nrc: true };
     let pt_opt = Options { nrc: false };

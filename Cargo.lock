@@ -27,6 +27,7 @@ dependencies = [
 name = "akari"
 version = "0.1.0"
 dependencies = [
+ "akari_const",
  "ash",
  "bindgen",
  "bitflags",
@@ -58,6 +59,10 @@ dependencies = [
  "tokio",
  "vkc",
 ]
+
+[[package]]
+name = "akari_const"
+version = "0.1.0"
 
 [[package]]
 name = "ansi_term"
