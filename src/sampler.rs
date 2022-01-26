@@ -3,7 +3,7 @@ use std::convert::TryInto;
 use crate::util::erf_inv;
 use crate::*;
 
-use crate::sobolmat::SOBOL_MATRIX;
+use akari_const::SOBOL_MATRIX;
 pub trait Sampler: Sync + Send {
     // fn start_pixel(&mut self, px: &IVec2, res: &IVec2);
     fn start_next_sample(&mut self);

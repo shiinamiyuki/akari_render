@@ -1,5 +1,5 @@
 use crate::{
-    arrayvec::{ArrayVec, DynStorage, VirtualStorage},
+    util::arrayvec::{ArrayVec, DynStorage, VirtualStorage},
     shape::{Shape, SurfaceInteraction},
     *,
 };

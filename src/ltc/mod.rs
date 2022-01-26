@@ -1,17 +1,10 @@
 use crate::{
     bsdf::{Bsdf, BsdfFlags, BsdfSample},
-    ltc::fit::GGX_LTC_FIT,
     texture::Texture,
     *,
 };
+use akari_const::GGX_LTC_FIT;
 use glam::DMat3;
-use lazy_static::lazy_static;
-mod fit;
-#[allow(dead_code)]
-pub struct GgxLtcfit {
-    pub mat: [[f32; 9]; 64 * 64],
-    pub amp: [f32; 64 * 64],
-}
 
 pub struct GgxLtcBsdf {
     pub color: Arc<dyn Texture>,
@@ -34,7 +27,8 @@ impl LTC {
                 glam::dvec3(m[0] as f64, m[1] as f64, m[2] as f64),
                 glam::dvec3(m[3] as f64, m[4] as f64, m[5] as f64),
                 glam::dvec3(m[6] as f64, m[7] as f64, m[8] as f64),
-            ).transpose(),
+            )
+            .transpose(),
             amp: GGX_LTC_FIT.amp[a + t * SIZE] as f64,
         }
     }

@@ -18,6 +18,7 @@ struct PathState {
     beta: Spectrum,
     prev_n: Vec3,
     prev_bsdf_pdf: f32,
+    pixel: u32,
     is_delta: bool,
 }
 #[derive(Clone, Copy)]
@@ -60,9 +61,7 @@ impl<'a> StreamPathTracerSession<'a> {
                 .intersect(&item.ray)
                 .unwrap_or(Default::default());
         });
-        parallel_for_slice(items, 1024, |_, item| {
-            
-        });
+        parallel_for_slice(items, 1024, |_, item| {});
     }
     fn test_shadow_rays(&self, items: &mut [ShadowRay]) {
         parallel_for_slice(items, 1024, |i, item| {

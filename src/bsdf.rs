@@ -393,3 +393,61 @@ impl Bsdf for GPUBsdfProxy {
         panic!("shouldn't be called on cpu")
     }
 }
+
+struct BsdfTester<B: Bsdf> {
+    bsdf: B,
+}
+impl<B: Bsdf> BsdfTester<B> {
+    #[allow(dead_code)]
+    fn run(&self) -> f32 {
+        use crate::sampler::PCGSampler;
+        use crate::sampler::Sampler;
+        let n = 10000000u64;
+        let mut sampler = PCGSampler::new(0);
+        let wo = vec3(0.2, 0.4, 0.0).normalize();
+        let integral = (0..n)
+            .map(|_| {
+                if let Some(s) = self.bsdf.sample(
+                    &ShadingPoint {
+                        texcoord: vec2(0.0, 0.0),
+                    },
+                    sampler.next2d(),
+                    wo,
+                ) {
+                    (1.0 / s.pdf) as f64
+                } else {
+                    0.0
+                }
+            })
+            .sum::<f64>()
+            / n as f64;
+        integral as f32
+    }
+}
+
+// mod test {
+//     use crate::bsdf::BsdfTester;
+
+//     #[test]
+//     fn test_bsdf() {
+//         use super::DiffuseBsdf;
+//         use crate::ltc::GgxLtcBsdf;
+//         use crate::texture::ConstantTexture;
+//         use std::sync::Arc;
+//         let ltc = GgxLtcBsdf {
+//             roughness: Arc::new(ConstantTexture::<f32> { value: 0.1 }),
+//             color: Arc::new(ConstantTexture::<f32> { value: 0.5 }),
+//         };
+//         // let ltc = DiffuseBsdf {
+//         //     color: Arc::new(ConstantTexture::<f32> { value: 0.1 }),
+//         // };
+//         let tester = BsdfTester { bsdf: ltc };
+//         let pi = tester.run();
+//         assert!(
+//             (pi - 2.0 * crate::PI).abs() < 1e-2,
+//             "integral={}, 2pi={}",
+//             pi,
+//             2.0 * crate::PI
+//         );
+//     }
+// }

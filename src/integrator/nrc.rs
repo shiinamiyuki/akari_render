@@ -6,7 +6,7 @@ use crate::bsdf::*;
 use crate::film::*;
 use crate::integrator::*;
 use crate::light::*;
-use crate::nn_v2::*;
+use crate::util::nn_v2::*;
 use crate::sampler::*;
 use crate::scene::*;
 use crate::shape::*;
