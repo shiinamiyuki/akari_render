@@ -277,6 +277,62 @@ impl accel::Accel for EmbreeTopLevelAccel {
             texcoord,
         }
     }
+    fn intersect4(&self, rays: &[Ray; 4], mask: [bool; 4]) -> [Option<RayHit>; 4] {
+        let mut rayhit4 = sys::RTCRayHit4 {
+            ray: to_rtc_ray4(rays),
+            hit: sys::RTCHit4 {
+                Ng_x: [0.0; 4],
+                Ng_y: [0.0; 4],
+                Ng_z: [0.0; 4],
+                u: [0.0; 4],
+                v: [0.0; 4],
+                primID: [u32::MAX; 4],
+                geomID: [u32::MAX; 4],
+                instID: [[u32::MAX; 4]],
+            },
+        };
+        let mut ctx = RTCIntersectContext {
+            flags: sys::RTCIntersectContextFlags_RTC_INTERSECT_CONTEXT_FLAG_INCOHERENT,
+            filter: None,
+            instID: [u32::MAX],
+        };
+        unsafe {
+            let mut valid = [-1; 4];
+            for i in 0..4 {
+                if !mask[i] {
+                    valid[i] = 0;
+                }
+            }
+            sys::rtcIntersect4(
+                &mut valid as *mut _,
+                self.scene,
+                &mut ctx as *mut _,
+                &mut rayhit4 as *mut _,
+            );
+            let mut hits = [None; 4];
+            for i in 0..4 {
+                hits[i] = if rayhit4.hit.geomID[i] != u32::MAX {
+                    let ng = vec3(
+                        rayhit4.hit.Ng_x[i],
+                        rayhit4.hit.Ng_y[i],
+                        rayhit4.hit.Ng_z[i],
+                    )
+                    .normalize();
+                    let uv = vec2(rayhit4.hit.u[i], rayhit4.hit.v[i]);
+                    Some(RayHit {
+                        uv,
+                        t: rayhit4.ray.tfar[i],
+                        ng,
+                        prim_id: rayhit4.hit.primID[i],
+                        geom_id: rayhit4.hit.instID[0][i],
+                    })
+                } else {
+                    None
+                }
+            }
+            hits
+        }
+    }
     fn intersect(&self, ray: &Ray) -> Option<RayHit> {
         unsafe {
             let mut rayhit = sys::RTCRayHit {
@@ -306,11 +362,38 @@ impl accel::Accel for EmbreeTopLevelAccel {
                     t: rayhit.ray.tfar,
                     ng,
                     prim_id: rayhit.hit.primID,
-                    geom_id: rayhit.hit.geomID,
+                    geom_id: rayhit.hit.instID[0],
                 })
             } else {
                 None
             }
+        }
+    }
+    fn occlude4(&self, rays: &[Ray; 4], mask: [bool; 4]) -> [bool; 4] {
+        let mut ray4 = to_rtc_ray4(rays);
+        let mut ctx = RTCIntersectContext {
+            flags: sys::RTCIntersectContextFlags_RTC_INTERSECT_CONTEXT_FLAG_INCOHERENT,
+            filter: None,
+            instID: [u32::MAX],
+        };
+        unsafe {
+            let mut valid = [-1; 4];
+            for i in 0..4 {
+                if !mask[i] {
+                    valid[i] = 0;
+                }
+            }
+            sys::rtcOccluded4(
+                &mut valid as *mut _,
+                self.scene,
+                &mut ctx as *mut _,
+                &mut ray4 as *mut _,
+            );
+            let mut occluded = [false; 4];
+            for i in 0..4 {
+                occluded[i] = ray4.tfar[i] < 0.0
+            }
+            occluded
         }
     }
     fn occlude(&self, ray: &Ray) -> bool {
@@ -327,6 +410,22 @@ impl accel::Accel for EmbreeTopLevelAccel {
     }
 }
 
+fn to_rtc_ray4(ray: &[Ray; 4]) -> sys::RTCRay4 {
+    sys::RTCRay4 {
+        org_x: [ray[0].o.x, ray[1].o.x, ray[2].o.x, ray[3].o.x],
+        org_y: [ray[0].o.y, ray[1].o.y, ray[2].o.y, ray[3].o.y],
+        org_z: [ray[0].o.z, ray[1].o.z, ray[2].o.z, ray[3].o.z],
+        dir_x: [ray[0].d.x, ray[1].d.x, ray[2].d.x, ray[3].d.x],
+        dir_y: [ray[0].d.y, ray[1].d.y, ray[2].d.y, ray[3].d.y],
+        dir_z: [ray[0].d.z, ray[1].d.z, ray[2].d.z, ray[3].d.z],
+        time: [0.0; 4],
+        tnear: [ray[0].tmin, ray[1].tmin, ray[2].tmin, ray[3].tmin],
+        tfar: [ray[0].tmax, ray[1].tmax, ray[2].tmax, ray[3].tmax],
+        id: [0; 4],
+        mask: [0; 4],
+        flags: [0; 4],
+    }
+}
 fn to_rtc_ray(ray: &Ray) -> sys::RTCRay {
     let rtc_ray = sys::RTCRay {
         org_x: ray.o.x,

@@ -29,7 +29,6 @@ pub mod shape;
 pub mod texture;
 pub mod util;
 
-
 #[macro_use]
 extern crate bitflags;
 pub use glam::{
@@ -402,14 +401,14 @@ impl From<[Ray; 4]> for Ray4 {
     fn from(ray: [Ray; 4]) -> Self {
         Ray4 {
             o: [
-                Vec4::splat(ray[0].o.x),
-                Vec4::splat(ray[1].o.x),
-                Vec4::splat(ray[2].o.x),
+                vec4(ray[0].o.x, ray[1].o.x, ray[2].o.x, ray[3].o.x),
+                vec4(ray[0].o.y, ray[1].o.y, ray[2].o.y, ray[3].o.y),
+                vec4(ray[0].o.z, ray[1].o.z, ray[2].o.z, ray[3].o.z),
             ],
             d: [
-                Vec4::splat(ray[0].d.x),
-                Vec4::splat(ray[1].d.x),
-                Vec4::splat(ray[2].d.x),
+                vec4(ray[0].d.x, ray[1].d.x, ray[2].d.x, ray[3].d.x),
+                vec4(ray[0].d.y, ray[1].d.y, ray[2].d.y, ray[3].d.y),
+                vec4(ray[0].d.z, ray[1].d.z, ray[2].d.z, ray[3].d.z),
             ],
             tmin: vec4(ray[0].tmin, ray[1].tmin, ray[2].tmin, ray[3].tmin),
             tmax: vec4(ray[0].tmax, ray[1].tmax, ray[2].tmax, ray[3].tmax),
@@ -693,13 +692,13 @@ pub fn parallel_for_slice_packet<T, F: Fn(usize, &mut [T]) -> () + Sync>(
     packet_size: usize,
     f: F,
 ) {
-    let mut p_slice = UnsafePointer::new(slice.as_mut_ptr());
+    let p_slice = UnsafePointer::new(slice.as_mut_ptr());
     let len = slice.len();
     let count = (len + packet_size - 1) / packet_size;
     parallel_for(count, chunk_size, |i| {
-        let end = (i + packet_size).min(len);
+        let end = (i * packet_size + packet_size).min(len);
         let slice = unsafe { std::slice::from_raw_parts_mut(p_slice.p, len) };
-        f(i, &mut slice[i..end]);
+        f(i, &mut slice[(i * packet_size)..end]);
     });
 }
 #[allow(dead_code)]
@@ -710,8 +709,8 @@ pub fn parallel_for_slice2<T, U, F: Fn(usize, &mut T, &mut U) -> () + Sync>(
     f: F,
 ) {
     assert_eq!(slice_0.len(), slice_1.len());
-    let mut p_slice_0 = UnsafePointer::new(slice_0.as_mut_ptr());
-    let mut p_slice_1 = UnsafePointer::new(slice_1.as_mut_ptr());
+    let p_slice_0 = UnsafePointer::new(slice_0.as_mut_ptr());
+    let p_slice_1 = UnsafePointer::new(slice_1.as_mut_ptr());
     let len = slice_0.len();
     parallel_for(len, chunk_size, |i| {
         let slice_0 = unsafe { std::slice::from_raw_parts_mut(p_slice_0.p, len) };
@@ -729,9 +728,9 @@ pub fn parallel_for_slice3<T, U, S, F: Fn(usize, &mut T, &mut U, &mut S) -> () +
 ) {
     assert_eq!(slice_0.len(), slice_1.len());
     assert_eq!(slice_0.len(), slice_2.len());
-    let mut p_slice_0 = UnsafePointer::new(slice_0.as_mut_ptr());
-    let mut p_slice_1 = UnsafePointer::new(slice_1.as_mut_ptr());
-    let mut p_slice_2 = UnsafePointer::new(slice_2.as_mut_ptr());
+    let p_slice_0 = UnsafePointer::new(slice_0.as_mut_ptr());
+    let p_slice_1 = UnsafePointer::new(slice_1.as_mut_ptr());
+    let p_slice_2 = UnsafePointer::new(slice_2.as_mut_ptr());
     let len = slice_0.len();
     parallel_for(len, chunk_size, |i| {
         let slice_0 = unsafe { std::slice::from_raw_parts_mut(p_slice_0.p, len) };
@@ -741,7 +740,13 @@ pub fn parallel_for_slice3<T, U, S, F: Fn(usize, &mut T, &mut U, &mut S) -> () +
     });
 }
 #[allow(dead_code)]
-pub fn parallel_for_slice4<T, U, S, R, F: Fn(usize, &mut T, &mut U, &mut S, &mut R) -> () + Sync>(
+pub fn parallel_for_slice4<
+    T,
+    U,
+    S,
+    R,
+    F: Fn(usize, &mut T, &mut U, &mut S, &mut R) -> () + Sync,
+>(
     slice_0: &mut [T],
     slice_1: &mut [U],
     slice_2: &mut [S],
@@ -751,17 +756,23 @@ pub fn parallel_for_slice4<T, U, S, R, F: Fn(usize, &mut T, &mut U, &mut S, &mut
 ) {
     assert_eq!(slice_0.len(), slice_1.len());
     assert_eq!(slice_0.len(), slice_2.len());
-    let mut p_slice_0 = UnsafePointer::new(slice_0.as_mut_ptr());
-    let mut p_slice_1 = UnsafePointer::new(slice_1.as_mut_ptr());
-    let mut p_slice_2 = UnsafePointer::new(slice_2.as_mut_ptr());
-    let mut p_slice_3 = UnsafePointer::new(slice_3.as_mut_ptr());
+    let p_slice_0 = UnsafePointer::new(slice_0.as_mut_ptr());
+    let p_slice_1 = UnsafePointer::new(slice_1.as_mut_ptr());
+    let p_slice_2 = UnsafePointer::new(slice_2.as_mut_ptr());
+    let p_slice_3 = UnsafePointer::new(slice_3.as_mut_ptr());
     let len = slice_0.len();
     parallel_for(len, chunk_size, |i| {
         let slice_0 = unsafe { std::slice::from_raw_parts_mut(p_slice_0.p, len) };
         let slice_1 = unsafe { std::slice::from_raw_parts_mut(p_slice_1.p, len) };
         let slice_2 = unsafe { std::slice::from_raw_parts_mut(p_slice_2.p, len) };
         let slice_3 = unsafe { std::slice::from_raw_parts_mut(p_slice_3.p, len) };
-        f(i, &mut slice_0[i], &mut slice_1[i], &mut slice_2[i], &mut slice_3[i]);
+        f(
+            i,
+            &mut slice_0[i],
+            &mut slice_1[i],
+            &mut slice_2[i],
+            &mut slice_3[i],
+        );
     });
 }
 impl Frame {

@@ -98,6 +98,17 @@ fn mis_weight(mut pdf_a: f32, mut pdf_b: f32) -> f32 {
     pdf_a / (pdf_a + pdf_b)
 }
 impl<'a> StreamPathTracerSession<'a> {
+    #[allow(dead_code)]
+    fn sort_rays(&self, path_states: &mut [PathState], rayhits: &mut [ClosestHit]) {
+        rayhits.par_sort_by_key(|rayhit| {
+            let mut k = 0;
+            for i in 0..3 {
+                k |= (if rayhit.ray.d[i] < 0.0 { 0 } else { 1 }) << i;
+            }
+            k
+        });
+        util::par_permute(path_states, |i| rayhits[i].state_idx as usize);
+    }
     fn render(&mut self) {
         let mut path_states = vec![];
         let mut rayhits = vec![];
@@ -116,28 +127,45 @@ impl<'a> StreamPathTracerSession<'a> {
         }
     }
     fn intersect(&self, items: &mut [ClosestHit]) {
-        parallel_for_slice(items, 1024, |_, item| {
-            // assert!(!item.is_invalid());
-            if item.is_invalid() {
-                return;
+        parallel_for_slice_packet(items, 1024, 4, |_, item| {
+            let accel = &self.scene.accel;
+            let mut ray4 = [Ray::default(); 4];
+            let mut mask = [false; 4];
+            for i in 0..item.len() {
+                ray4[i] = item[i].ray;
+                mask[i] = !item[i].is_invalid();
             }
-            item.hit = self
-                .scene
-                .accel
-                .intersect(&item.ray)
-                .unwrap_or(Default::default());
+            let hits = accel.intersect4(&ray4, mask);
+            for i in 0..item.len() {
+                item[i].hit = hits[i].unwrap_or(Default::default());
+            }
+            self.scene
+                .ray_counter
+                .fetch_add(item.len() as u64, Ordering::Relaxed);
         });
     }
     fn trace_shadow_rays(&self, path_states: &mut [PathState], shadow_rays: &mut [ShadowRay]) {
         let p_path_states = UnsafePointer::new(path_states.as_mut_ptr());
-        parallel_for_slice(shadow_rays, 1024, |i, shadow_ray| {
-            let path_state = unsafe { &mut *p_path_states.p.offset(i as isize) };
-            if shadow_ray.is_invalid() {
-                return;
+        parallel_for_slice_packet(shadow_rays, 1024, 4, |p, shadow_ray| {
+            let accel = &self.scene.accel;
+            let mut ray4 = [Ray::default(); 4];
+            let mut mask = [false; 4];
+            for i in 0..shadow_ray.len() {
+                ray4[i] = shadow_ray[i].ray;
+                mask[i] = !shadow_ray[i].is_invalid();
             }
-            if !self.scene.accel.occlude(&shadow_ray.ray) {
-                path_state.l += shadow_ray.ld;
+            let occluded = accel.occlude4(&ray4, mask);
+            for i in 0..shadow_ray.len() {
+                if mask[i] {
+                    let path_state = unsafe { &mut *p_path_states.p.offset((p * 4 + i) as isize) };
+                    if !occluded[i] {
+                        path_state.l += shadow_ray[i].ld;
+                    }
+                }
             }
+            self.scene
+                .ray_counter
+                .fetch_add(shadow_ray.len() as u64, Ordering::Relaxed);
         });
     }
     fn eval_materials(
@@ -153,6 +181,9 @@ impl<'a> StreamPathTracerSession<'a> {
             &mut bsdfs,
             1024,
             |i, path_state, rayhits, bsdf_ctx| {
+                if rayhits.is_invalid() {
+                    return;
+                }
                 assert_eq!(i, rayhits.state_idx as usize);
                 let prev_ray = rayhits.ray;
                 let ray = prev_ray;
@@ -313,13 +344,13 @@ impl<'a> StreamPathTracerSession<'a> {
         let ray_id = self.ray_id;
         let total = self.npixels * self.spp as usize;
         self.ray_id = (self.ray_id + count).min(total);
+        let count = self.ray_id - ray_id;
         let new_len = path_states.len() + count;
         let old_len = path_states.len();
         assert_eq!(path_states.len(), rayhits.len());
         let new_states: Vec<_> = (ray_id..self.ray_id)
             .into_par_iter()
-            .map(|i| {
-                let id = i + ray_id;
+            .map(|id| {
                 let pixel_id = id / self.spp as usize;
                 let mut sampler = SobolSampler::new(self.seeds[pixel_id]);
                 sampler.index = (id % self.spp as usize) as u32;
@@ -337,7 +368,7 @@ impl<'a> StreamPathTracerSession<'a> {
             .collect();
         path_states.extend_from_slice(&new_states);
         std::mem::drop(new_states);
-        rayhits.resize(rayhits.len(), Default::default());
+        rayhits.resize(new_len, Default::default());
         parallel_for_slice2(
             &mut path_states[old_len..new_len],
             &mut rayhits[old_len..new_len],
