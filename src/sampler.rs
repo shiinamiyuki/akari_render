@@ -81,9 +81,9 @@ impl Sampler for PCGSampler {
 }
 #[derive(Clone, Copy)]
 pub struct SobolSampler {
-    dim: u32,
-    rotation: u32,
-    index: u32,
+    pub(crate) dim: u32,
+    pub(crate) rotation: u32,
+    pub(crate) index: u32,
 }
 fn cmj_hash_simple(mut i: u32, p: u32) -> u32 {
     i = (i ^ 61) ^ p;

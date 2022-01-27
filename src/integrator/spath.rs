@@ -1,6 +1,16 @@
-use crate::{bsdf::BsdfClosure, scene::Scene, *};
+use crate::{
+    bsdf::{BsdfClosure, BsdfFlags},
+    film::Film,
+    light::{Light, ReferencePoint},
+    scene::Scene,
+    shape::{Shape, SurfaceInteraction},
+    *,
+};
+use indicatif::ProgressBar;
 use rand::{thread_rng, Rng};
 use sampler::{Sampler, SobolSampler};
+
+use super::Integrator;
 
 // Streaming Path Tracer
 
@@ -20,21 +30,56 @@ struct PathState {
     prev_bsdf_pdf: f32,
     pixel: u32,
     is_delta: bool,
+    depth: u32,
 }
 #[derive(Clone, Copy)]
 struct ShadowRay {
     ray: Ray,
-    state_id: u32,
-    occluded: bool,
+    state_idx: u32,
+    ld: Spectrum,
+}
+impl Default for ShadowRay {
+    fn default() -> Self {
+        Self {
+            ray: Default::default(),
+            state_idx: u32::MAX,
+            ld: Spectrum::zero(),
+        }
+    }
+}
+impl ShadowRay {
+    fn is_invalid(&self) -> bool {
+        self.state_idx == u32::MAX || self.ray.is_invalid()
+    }
 }
 
 #[derive(Clone, Copy)]
 struct ClosestHit {
     ray: Ray,
     hit: RayHit,
-    state_id: u32,
+    state_idx: u32,
 }
-
+impl Default for ClosestHit {
+    fn default() -> Self {
+        Self {
+            ray: Default::default(),
+            state_idx: u32::MAX,
+            hit: Default::default(),
+        }
+    }
+}
+impl ClosestHit {
+    fn is_invalid(&self) -> bool {
+        self.state_idx == u32::MAX || self.ray.is_invalid()
+    }
+}
+#[derive(Clone, Copy)]
+struct BsdfSampleContext<'a> {
+    bsdf: BsdfClosure<'a>,
+    wo: Vec3,
+    si: SurfaceInteraction<'a>,
+    p: Vec3,
+}
 struct StreamPathTracerSession<'a> {
     spp: u32,
     max_depth: u32,
@@ -42,7 +87,10 @@ struct StreamPathTracerSession<'a> {
     sort_rays: bool,
     npixels: usize,
     ray_id: usize,
+    seeds: Vec<u64>,
     scene: &'a Scene,
+    film: &'a mut Film,
+    progress: &'a ProgressBar,
 }
 fn mis_weight(mut pdf_a: f32, mut pdf_b: f32) -> f32 {
     pdf_a *= pdf_a;
@@ -50,9 +98,27 @@ fn mis_weight(mut pdf_a: f32, mut pdf_b: f32) -> f32 {
     pdf_a / (pdf_a + pdf_b)
 }
 impl<'a> StreamPathTracerSession<'a> {
+    fn render(&mut self) {
+        let mut path_states = vec![];
+        let mut rayhits = vec![];
+        let mut shadow_rays = vec![];
+        loop {
+            let new_states = self.batch_size - path_states.len();
+            if new_states > 0 {
+                self.generate_rays(new_states, &mut path_states, &mut rayhits);
+            }
+            if path_states.is_empty() {
+                break;
+            }
+            self.intersect(&mut rayhits);
+            self.eval_materials(&mut path_states, &mut rayhits, &mut shadow_rays);
+            self.trace_shadow_rays(&mut path_states, &mut shadow_rays);
+        }
+    }
     fn intersect(&self, items: &mut [ClosestHit]) {
         parallel_for_slice(items, 1024, |_, item| {
-            if item.ray.is_invalid() {
+            // assert!(!item.is_invalid());
+            if item.is_invalid() {
                 return;
             }
             item.hit = self
@@ -61,35 +127,41 @@ impl<'a> StreamPathTracerSession<'a> {
                 .intersect(&item.ray)
                 .unwrap_or(Default::default());
         });
-        parallel_for_slice(items, 1024, |_, item| {});
     }
-    fn test_shadow_rays(&self, items: &mut [ShadowRay]) {
-        parallel_for_slice(items, 1024, |i, item| {
-            if item.ray.is_invalid() {
+    fn trace_shadow_rays(&self, path_states: &mut [PathState], shadow_rays: &mut [ShadowRay]) {
+        let p_path_states = UnsafePointer::new(path_states.as_mut_ptr());
+        parallel_for_slice(shadow_rays, 1024, |i, shadow_ray| {
+            let path_state = unsafe { &mut *p_path_states.p.offset(i as isize) };
+            if shadow_ray.is_invalid() {
                 return;
             }
-            item.occluded = self.scene.accel.occlude(&item.ray);
+            if !self.scene.accel.occlude(&shadow_ray.ray) {
+                path_state.l += shadow_ray.ld;
+            }
         });
     }
     fn eval_materials(
         &self,
-        path_states: &mut [PathState],
-        hits: &[RayHit],
-        rays: &mut [Ray],
-        shadow_rays: &mut [Ray],
+        path_states: &mut Vec<PathState>,
+        rayhits: &mut Vec<ClosestHit>,
+        shadow_rays: &mut Vec<ShadowRay>,
     ) {
+        let mut bsdfs: Vec<Option<BsdfSampleContext<'a>>> = vec![None; path_states.len()];
         parallel_for_slice3(
             path_states,
-            rays,
-            shadow_rays,
+            rayhits,
+            &mut bsdfs,
             1024,
-            |i, path_state, ray, shadow_ray| {
-                let prev_ray = *ray;
-                *ray = Ray::default();
-                let hit = hits[i];
+            |i, path_state, rayhits, bsdf_ctx| {
+                assert_eq!(i, rayhits.state_idx as usize);
+                let prev_ray = rayhits.ray;
+                let ray = prev_ray;
+                rayhits.ray = Ray::default();
+                let hit = rayhits.hit;
                 if hit.is_invalid() {
                     return;
                 }
+                rayhits.hit = Default::default();
                 let si = self.scene.accel.hit_to_iteraction(hit);
                 let ng = si.ng;
                 let frame = Frame::from_normal(ng);
@@ -104,35 +176,173 @@ impl<'a> StreamPathTracerSession<'a> {
                     frame,
                     bsdf: opt_bsdf.unwrap(),
                 };
+                let depth = path_state.depth;
+                if let Some(light) = self.scene.get_light_of_shape(shape) {
+                    if depth == 0 {
+                        path_state.l += path_state.beta * light.le(&ray);
+                    } else {
+                        if depth > 1 {
+                            let light_pdf = self.scene.light_distr.pdf(light)
+                                * light
+                                    .pdf_li(
+                                        ray.d,
+                                        &ReferencePoint {
+                                            p: ray.o,
+                                            n: path_state.prev_n,
+                                        },
+                                    )
+                                    .1;
+                            let bsdf_pdf = path_state.prev_bsdf_pdf;
+                            assert!(light_pdf.is_finite());
+                            assert!(light_pdf >= 0.0);
+                            let weight = if path_state.is_delta {
+                                1.0
+                            } else {
+                                mis_weight(bsdf_pdf, light_pdf)
+                            };
+
+                            path_state.l += path_state.beta * light.le(&ray) * weight;
+                        }
+                    }
+                }
+                let wo = -ray.d;
+
+                if path_state.depth >= self.max_depth {
+                    return;
+                }
+                path_state.depth += 1;
+                *bsdf_ctx = Some(BsdfSampleContext { p, wo, bsdf, si });
+            },
+        );
+        {
+            let mut i = 0;
+            let mut done = 0;
+            while i < path_states.len() {
+                if bsdfs[i].is_none() {
+                    let state = path_states[i];
+                    {
+                        let pixel_id = state.pixel;
+                        let py = pixel_id / self.scene.camera.resolution().x;
+                        let px = pixel_id % self.scene.camera.resolution().x;
+                        self.film.add_sample(&uvec2(px, py), &state.l, 1.0);
+                    }
+                    let last = path_states.len() - 1;
+                    bsdfs.swap(i, last);
+                    bsdfs.pop();
+                    path_states.swap(i, last);
+                    path_states.pop();
+                    done += 1;
+                } else {
+                    i += 1;
+                }
+            }
+            self.progress.inc(done);
+            rayhits.resize(path_states.len(), ClosestHit::default());
+            shadow_rays.resize(path_states.len(), ShadowRay::default());
+        }
+        parallel_for_slice4(
+            path_states,
+            &mut bsdfs,
+            shadow_rays,
+            rayhits,
+            1024,
+            |i, path_state, bsdf_ctx, shadow_ray, rayhit| {
+                *shadow_ray = Default::default();
+                let BsdfSampleContext { p, wo, bsdf, si } = bsdf_ctx.unwrap();
+                let shape = si.shape;
+                let scene = self.scene;
+                let sampler = &mut path_state.sampler;
+                {
+                    let (light, light_pdf) = scene.light_distr.sample(sampler.next1d());
+                    let sample_self = if let Some(light2) = scene.get_light_of_shape(shape) {
+                        if light as *const dyn Light == light2 as *const dyn Light {
+                            true
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    };
+                    if !sample_self {
+                        let p_ref = ReferencePoint { p, n: si.ng };
+                        let light_sample = light.sample_li(sampler.next3d(), &p_ref);
+                        let light_pdf = light_sample.pdf * light_pdf;
+                        let bsdf_pdf = bsdf.evaluate_pdf(wo, light_sample.wi);
+                        let weight = if light.is_delta() {
+                            1.0
+                        } else {
+                            mis_weight(light_pdf, bsdf_pdf)
+                        };
+                        let ld = path_state.beta
+                            * bsdf.evaluate(wo, light_sample.wi)
+                            * si.ng.dot(light_sample.wi).abs()
+                            * light_sample.li
+                            / light_pdf
+                            * weight;
+                        *shadow_ray = ShadowRay {
+                            state_idx: i as u32,
+                            ray: light_sample.shadow_ray,
+                            ld,
+                        };
+                    }
+                }
+                if let Some(bsdf_sample) = bsdf.sample(sampler.next2d(), wo) {
+                    path_state.is_delta = bsdf_sample.flag.contains(BsdfFlags::SPECULAR);
+                    let wi = bsdf_sample.wi;
+                    let ray = Ray::spawn(p, wi).offset_along_normal(si.ng);
+                    path_state.beta *= bsdf_sample.f * wi.dot(si.ng).abs() / bsdf_sample.pdf;
+                    path_state.prev_bsdf_pdf = bsdf_sample.pdf;
+                    path_state.prev_n = si.ng;
+                    *rayhit = ClosestHit {
+                        ray,
+                        hit: Default::default(),
+                        state_idx: i as u32,
+                    };
+                } else {
+                    *rayhit = Default::default();
+                }
             },
         );
     }
-    fn generate_rays(&mut self) -> (Vec<PathState>, Vec<Ray>) {
+    fn generate_rays(
+        &mut self,
+        count: usize,
+        path_states: &mut Vec<PathState>,
+        rayhits: &mut Vec<ClosestHit>,
+    ) {
         let ray_id = self.ray_id;
         let total = self.npixels * self.spp as usize;
-        self.ray_id = self.ray_id.min(self.batch_size).min(total);
-        let mut path_states: Vec<_> = (ray_id..self.ray_id)
+        self.ray_id = (self.ray_id + count).min(total);
+        let new_len = path_states.len() + count;
+        let old_len = path_states.len();
+        assert_eq!(path_states.len(), rayhits.len());
+        let new_states: Vec<_> = (ray_id..self.ray_id)
             .into_par_iter()
-            .map(|_| {
-                let mut rng = thread_rng();
-
-                let sampler = SobolSampler::new(rng.gen());
-
+            .map(|i| {
+                let id = i + ray_id;
+                let pixel_id = id / self.spp as usize;
+                let mut sampler = SobolSampler::new(self.seeds[pixel_id]);
+                sampler.index = (id % self.spp as usize) as u32;
                 PathState {
                     sampler,
-                    // ray,
+                    depth: 0,
                     l: Spectrum::zero(),
                     beta: Spectrum::one(),
                     prev_n: Vec3::ZERO,
                     prev_bsdf_pdf: 0.0,
                     is_delta: false,
+                    pixel: pixel_id as u32,
                 }
             })
             .collect();
-        let rays: Vec<_> = path_states
-            .par_iter_mut()
-            .enumerate()
-            .map(|(i, state)| {
+        path_states.extend_from_slice(&new_states);
+        std::mem::drop(new_states);
+        rayhits.resize(rayhits.len(), Default::default());
+        parallel_for_slice2(
+            &mut path_states[old_len..new_len],
+            &mut rayhits[old_len..new_len],
+            1024,
+            |i, state, rayhit| {
                 let id = i + ray_id;
                 let pixel_id = id / self.spp as usize;
                 let py = pixel_id / self.scene.camera.resolution().x as usize;
@@ -143,9 +353,43 @@ impl<'a> StreamPathTracerSession<'a> {
                     .scene
                     .camera
                     .generate_ray(uvec2(px as u32, py as u32), sampler);
-                ray
-            })
-            .collect();
-        (path_states, rays)
+                *rayhit = ClosestHit {
+                    ray,
+                    state_idx: (i + old_len) as u32,
+                    hit: RayHit::default(),
+                };
+            },
+        )
+    }
+}
+
+impl Integrator for StreamPathTracer {
+    fn render(&mut self, scene: &Scene) -> film::Film {
+        log::info!("rendering {}spp ... with StreamPathTracer", self.spp);
+        let npixels = (scene.camera.resolution().x * scene.camera.resolution().y) as usize;
+        let mut film = Film::new(&scene.camera.resolution());
+        let total = npixels * self.spp as usize;
+        let progress = crate::util::create_progess_bar(total, "samples");
+        {
+            let mut session = StreamPathTracerSession {
+                spp: self.spp,
+                film: &mut film,
+                progress: &progress,
+                max_depth: self.max_depth,
+                batch_size: self.batch_size,
+                sort_rays: self.sort_rays,
+                npixels,
+                ray_id: 0,
+                seeds: (0..npixels)
+                    .map(|_| {
+                        let mut rng = thread_rng();
+                        rng.gen::<u64>()
+                    })
+                    .collect(),
+                scene,
+            };
+            session.render();
+        }
+        film
     }
 }

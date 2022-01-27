@@ -740,6 +740,30 @@ pub fn parallel_for_slice3<T, U, S, F: Fn(usize, &mut T, &mut U, &mut S) -> () +
         f(i, &mut slice_0[i], &mut slice_1[i], &mut slice_2[i]);
     });
 }
+#[allow(dead_code)]
+pub fn parallel_for_slice4<T, U, S, R, F: Fn(usize, &mut T, &mut U, &mut S, &mut R) -> () + Sync>(
+    slice_0: &mut [T],
+    slice_1: &mut [U],
+    slice_2: &mut [S],
+    slice_3: &mut [R],
+    chunk_size: usize,
+    f: F,
+) {
+    assert_eq!(slice_0.len(), slice_1.len());
+    assert_eq!(slice_0.len(), slice_2.len());
+    let mut p_slice_0 = UnsafePointer::new(slice_0.as_mut_ptr());
+    let mut p_slice_1 = UnsafePointer::new(slice_1.as_mut_ptr());
+    let mut p_slice_2 = UnsafePointer::new(slice_2.as_mut_ptr());
+    let mut p_slice_3 = UnsafePointer::new(slice_3.as_mut_ptr());
+    let len = slice_0.len();
+    parallel_for(len, chunk_size, |i| {
+        let slice_0 = unsafe { std::slice::from_raw_parts_mut(p_slice_0.p, len) };
+        let slice_1 = unsafe { std::slice::from_raw_parts_mut(p_slice_1.p, len) };
+        let slice_2 = unsafe { std::slice::from_raw_parts_mut(p_slice_2.p, len) };
+        let slice_3 = unsafe { std::slice::from_raw_parts_mut(p_slice_3.p, len) };
+        f(i, &mut slice_0[i], &mut slice_1[i], &mut slice_2[i], &mut slice_3[i]);
+    });
+}
 impl Frame {
     #[inline]
     pub fn same_hemisphere(u: Vec3, v: Vec3) -> bool {

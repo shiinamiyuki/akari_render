@@ -1,11 +1,11 @@
-use std::{cell::UnsafeCell, io::Read, path::PathBuf, ffi::OsString};
+use std::{cell::UnsafeCell, ffi::OsString, io::Read, path::PathBuf};
 
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 
 use crate::*;
 use lazy_static::lazy_static;
-pub mod radix_sort;
 pub mod arrayvec;
+pub mod radix_sort;
 #[macro_use]
 pub mod nn_v2;
 pub struct CurrentDirGuard {
@@ -137,8 +137,7 @@ pub fn erf(x: f32) -> f32 {
     let x: f32 = x.abs();
     // A&S formula 7.1.26
     let t: f32 = 1.0 as f32 / (1.0 as f32 + p * x);
-    let y: f32 =
-        1.0 as f32 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * (-x * x).exp();
+    let y: f32 = 1.0 as f32 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * (-x * x).exp();
     sign * y
 }
 
@@ -162,4 +161,16 @@ impl FileResolver for LocalFileResolver {
         }
         None
     }
+}
+
+pub fn par_permute<T: Clone + Send + Sync, F: Fn(usize) -> usize + Sync + Send>(
+    data: &mut [T],
+    index: F,
+) {
+    use rayon::iter::*;
+    let tmp: Vec<_> = (0..data.len())
+        .into_par_iter()
+        .map(|i| data[index(i)].clone())
+        .collect();
+    data.clone_from_slice(&tmp);
 }

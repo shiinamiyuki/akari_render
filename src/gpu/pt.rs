@@ -29,7 +29,7 @@ impl WavefrontPathTracer {
             self.spp,
             self.training_iters,
         );
-        log::info!("Integrator: {}", "Wavefront Path Tracer");
+        log::info!("integrator: {}", "Wavefront Path Tracer");
         imp.render();
         {
             let mapped = imp.film.map_range(.., vk::MemoryMapFlags::empty());
