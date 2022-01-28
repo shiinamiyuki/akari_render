@@ -1,4 +1,5 @@
 use crate::texture::ShadingPoint;
+use crate::util::profile::profile;
 use crate::*;
 use crate::{shape::SurfaceInteraction, Base};
 use embree_sys as sys;
@@ -127,6 +128,7 @@ impl Drop for EmbreeInstance {
 impl_base!(EmbreeInstance);
 impl Shape for EmbreeInstance {
     fn intersect(&self, ray: &Ray) -> Option<RayHit> {
+        let _profiler = profile("EmbreeInstance::intersect");
         unsafe {
             let mut rayhit = sys::RTCRayHit {
                 ray: to_rtc_ray(ray),
@@ -167,6 +169,7 @@ impl Shape for EmbreeInstance {
         }
     }
     fn occlude(&self, ray: &Ray) -> bool {
+        let _profiler = profile("EmbreeInstance::occlude");
         unsafe {
             let mut ray = to_rtc_ray(ray);
             let mut ctx = RTCIntersectContext {
@@ -278,6 +281,7 @@ impl accel::Accel for EmbreeTopLevelAccel {
         }
     }
     fn intersect4(&self, rays: &[Ray; 4], mask: [bool; 4]) -> [Option<RayHit>; 4] {
+        let _profiler = profile("EmbreeTopLevelAccel::intersect4");
         let mut rayhit4 = sys::RTCRayHit4 {
             ray: to_rtc_ray4(rays),
             hit: sys::RTCHit4 {
@@ -334,6 +338,7 @@ impl accel::Accel for EmbreeTopLevelAccel {
         }
     }
     fn intersect(&self, ray: &Ray) -> Option<RayHit> {
+        let _profiler = profile("EmbreeTopLevelAccel::intersect");
         unsafe {
             let mut rayhit = sys::RTCRayHit {
                 ray: to_rtc_ray(ray),
@@ -370,6 +375,7 @@ impl accel::Accel for EmbreeTopLevelAccel {
         }
     }
     fn occlude4(&self, rays: &[Ray; 4], mask: [bool; 4]) -> [bool; 4] {
+        let _profiler = profile("EmbreeTopLevelAccel::occlude4");
         let mut ray4 = to_rtc_ray4(rays);
         let mut ctx = RTCIntersectContext {
             flags: sys::RTCIntersectContextFlags_RTC_INTERSECT_CONTEXT_FLAG_INCOHERENT,
@@ -397,6 +403,7 @@ impl accel::Accel for EmbreeTopLevelAccel {
         }
     }
     fn occlude(&self, ray: &Ray) -> bool {
+        let _profiler = profile("EmbreeTopLevelAccel::occlude");
         unsafe {
             let mut ray = to_rtc_ray(ray);
             let mut ctx = RTCIntersectContext {

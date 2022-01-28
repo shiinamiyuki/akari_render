@@ -1,10 +1,8 @@
-use std::convert::TryInto;
 use std::sync::atomic::AtomicUsize;
 
 use crate::distribution::Distribution1D;
-use crate::sampler::{MltSampler, PCGSampler, Pcg, Sampler};
+use crate::sampler::{MltSampler, PCGSampler, Sampler};
 use crate::scene::Scene;
-use crate::util::erf_inv;
 use crate::*;
 use bidir::*;
 use film::Film;

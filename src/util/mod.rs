@@ -8,6 +8,8 @@ pub mod arrayvec;
 pub mod radix_sort;
 #[macro_use]
 pub mod nn_v2;
+#[macro_use]
+pub mod profile;
 pub struct CurrentDirGuard {
     current_dir: PathBuf,
 }

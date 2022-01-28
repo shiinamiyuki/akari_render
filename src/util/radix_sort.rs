@@ -157,7 +157,7 @@ mod test {
     #[test]
     fn test_large() {
         use super::*;
-        use crate::profile;
+        use crate::profile_fn;
         use rand::thread_rng;
         use rand::Rng;
         use rayon::slice::ParallelSliceMut;
@@ -165,11 +165,11 @@ mod test {
         let mut v1: Vec<u32> = (0..2000000).map(|_| rng.gen::<u32>()).collect();
         let mut v2 = v1.clone();
 
-        let t1 = profile(|| {
+        let t1 = profile_fn(|| {
             par_radix_sort_by(v1.as_mut_slice(), |x| *x as u64);
         })
         .1;
-        let t2 = profile(|| {
+        let t2 = profile_fn(|| {
             v2.par_sort_unstable();
         })
         .1;

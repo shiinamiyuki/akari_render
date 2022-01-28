@@ -51,12 +51,12 @@ use std::{
     usize,
 };
 
-pub fn profile<F: FnOnce() -> T, T>(f: F) -> (T, f64) {
+pub fn profile_fn<F: FnOnce() -> T, T>(f: F) -> (T, f64) {
     let now = std::time::Instant::now();
     let ret = f();
     (ret, now.elapsed().as_secs_f64())
 }
-pub fn profile_ms<F: FnOnce() -> T, T>(f: F) -> (T, f64) {
+pub fn profile_fn_ms<F: FnOnce() -> T, T>(f: F) -> (T, f64) {
     let now = std::time::Instant::now();
     let ret = f();
     (ret, now.elapsed().as_secs_f64() * 1000.0)

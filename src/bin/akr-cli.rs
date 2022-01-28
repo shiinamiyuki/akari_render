@@ -16,7 +16,7 @@ use std::process::exit;
 extern crate clap;
 use akari::api;
 use akari::film::Film;
-use akari::profile;
+use akari::profile_fn;
 use clap::{App, Arg};
 
 use log::{Level, Metadata, Record};
@@ -60,7 +60,7 @@ fn render_gpu(
     log::info!("building GPUAccel");
     let gpu_scene = GPUScene::new(&ctx, scene);
     log::info!("rendering...");
-    let (film, time) = profile(|| -> Film { integrator.render(&gpu_scene, &scene) });
+    let (film, time) = profile_fn(|| -> Film { integrator.render(&gpu_scene, &scene) });
     log::info!("took {}s", time);
     let image = film.to_rgb_image();
     image.save(output).unwrap();
@@ -126,7 +126,16 @@ fn main() {
                 .takes_value(false)
                 .help("Out of core rendering"),
         )
+        .arg(
+            Arg::with_name("profiling")
+                .long("prof")
+                .value_name("profiling")
+                .takes_value(false)
+                .help("Enable profiler"),
+        )
         .get_matches();
+    let profiling = matches.is_present("profiling");
+    akari::util::profile::enable_profiler(profiling);
     let ooc = OocOptions {
         enable_ooc: matches.is_present("ooc"),
     };
@@ -174,13 +183,16 @@ fn main() {
         };
         log::info!("acceleration Structure: {}", accel);
         log::info!("rendering with {} threads", rayon::current_num_threads());
-        let (film, time) = profile(|| -> Film { integrator.as_mut().render(&scene) });
+        let (film, time) = profile_fn(|| -> Film { integrator.as_mut().render(&scene) });
         log::info!("took {}s", time);
         log::info!(
             "traced {} rays, average {}M rays/s",
             scene.ray_counter.load(std::sync::atomic::Ordering::Relaxed),
             scene.ray_counter.load(std::sync::atomic::Ordering::Relaxed) as f64 / 1e6 / time,
         );
+        if profiling {
+            akari::util::profile::print_stats();
+        }
         let image = film.to_rgb_image();
         image.save(output).unwrap();
     } else {

@@ -714,7 +714,7 @@ impl Integrator for CachedPathTracer {
             let chunk_size = 512 * 512;
             let mut chunk_offset = 0;
             while chunk_offset < npixels {
-                rt_time += profile(|| {
+                rt_time += profile_fn(|| {
                     parallel_for(chunk_size.min(npixels - chunk_offset), 256, |id| {
                         let id = id + chunk_offset;
                         let samplers = unsafe { p_samplers.as_mut().unwrap() };
@@ -763,7 +763,7 @@ impl Integrator for CachedPathTracer {
                     });
                 })
                 .1;
-                infer_time += profile(|| {
+                infer_time += profile_fn(|| {
                     parallel_for(trained_caches.len(), 1, |i| {
                         trained_caches[i].infer();
                     });

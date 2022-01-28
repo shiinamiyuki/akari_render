@@ -4,6 +4,7 @@ use crate::{
     light::{Light, ReferencePoint},
     scene::Scene,
     shape::{Shape, SurfaceInteraction},
+    util::profile::profile,
     *,
 };
 use indicatif::ProgressBar;
@@ -100,6 +101,7 @@ fn mis_weight(mut pdf_a: f32, mut pdf_b: f32) -> f32 {
 impl<'a> StreamPathTracerSession<'a> {
     #[allow(dead_code)]
     fn sort_rays(&self, path_states: &mut [PathState], rayhits: &mut [ClosestHit]) {
+        let _profiler = profile("StreamPathTracerSession::sort_rays");
         rayhits.par_sort_by_key(|rayhit| {
             let mut k = 0;
             for i in 0..3 {
@@ -108,6 +110,17 @@ impl<'a> StreamPathTracerSession<'a> {
             k
         });
         util::par_permute(path_states, |i| rayhits[i].state_idx as usize);
+    }
+    #[allow(dead_code)]
+    fn sort_shadow_rays(&self, shadow_rays: &mut [ShadowRay]) {
+        let _profiler = profile("StreamPathTracerSession::sort_shadow_rays");
+        shadow_rays.par_sort_by_key(|shadow_ray| {
+            let mut k = 0;
+            for i in 0..3 {
+                k |= (if shadow_ray.ray.d[i] < 0.0 { 0 } else { 1 }) << i;
+            }
+            k
+        });
     }
     fn render(&mut self) {
         let mut path_states = vec![];
@@ -127,6 +140,7 @@ impl<'a> StreamPathTracerSession<'a> {
         }
     }
     fn intersect(&self, items: &mut [ClosestHit]) {
+        let _profiler = profile("StreamPathTracerSession::intersect");
         parallel_for_slice_packet(items, 1024, 4, |_, item| {
             let accel = &self.scene.accel;
             let mut ray4 = [Ray::default(); 4];
@@ -145,6 +159,7 @@ impl<'a> StreamPathTracerSession<'a> {
         });
     }
     fn trace_shadow_rays(&self, path_states: &mut [PathState], shadow_rays: &mut [ShadowRay]) {
+        let _profiler = profile("StreamPathTracerSession::trace_shadow_rays");
         let p_path_states = UnsafePointer::new(path_states.as_mut_ptr());
         parallel_for_slice_packet(shadow_rays, 1024, 4, |p, shadow_ray| {
             let accel = &self.scene.accel;
@@ -174,6 +189,7 @@ impl<'a> StreamPathTracerSession<'a> {
         rayhits: &mut Vec<ClosestHit>,
         shadow_rays: &mut Vec<ShadowRay>,
     ) {
+        let _profiler = profile("StreamPathTracerSession::eval_materials");
         let mut bsdfs: Vec<Option<BsdfSampleContext<'a>>> = vec![None; path_states.len()];
         parallel_for_slice3(
             path_states,

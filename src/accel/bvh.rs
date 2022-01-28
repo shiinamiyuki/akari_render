@@ -45,7 +45,7 @@ where
     pub fn build(data: T, mut references: Vec<u32>) -> BvhAccel<T> {
         assert!(!references.is_empty());
         let n_prims = references.len();
-        let ((data, nodes, aabb), t) = profile(|| {
+        let ((data, nodes, aabb), t) = profile_fn(|| {
             let builder = Self {
                 data,
                 nodes: Mutex::new(Some(vec![BvhNode::default()])),
