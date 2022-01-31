@@ -321,11 +321,11 @@ where
             let first = node.left_or_first_primitive;
             let last = node.left_or_first_primitive + node.count as u32;
             for i in first..last {
-                if f(ray, *self.references.get_unchecked(i as usize)) {
-                    return true;
+                if !f(ray, *self.references.get_unchecked(i as usize)) {
+                    return false;
                 }
             }
-            false
+            true
         }
     }
     // break when f returns true
@@ -466,7 +466,7 @@ where
             let o = ray.o.into();
             while let Some(node) = p {
                 if node.is_leaf() {
-                    if self.traverse_leaf(node, &mut ray, &mut f) {
+                    if !self.traverse_leaf(node, &mut ray, &mut f) {
                         break;
                     }
                     if sp > 0 {

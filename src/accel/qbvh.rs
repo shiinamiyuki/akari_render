@@ -178,7 +178,7 @@ impl<T: BvhData> QBvhAccel<T> {
                             let start = children[i as usize] as usize;
                             let count = node.count[i as usize] as usize;
                             for p in start..(start + count) {
-                                if f(&mut ray, *self.references.get_unchecked(p)) {
+                                if !f(&mut ray, *self.references.get_unchecked(p)) {
                                     return;
                                 }
                             }
