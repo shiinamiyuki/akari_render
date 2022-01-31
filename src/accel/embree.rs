@@ -1,11 +1,12 @@
 use crate::texture::ShadingPoint;
-use crate::util::profile::profile;
+use crate::util::profile::scope;
 use crate::*;
 use crate::{shape::SurfaceInteraction, Base};
 use embree_sys as sys;
 use lazy_static::lazy_static;
 use parking_lot::Mutex;
 use rayon::prelude::*;
+use std::ffi::c_void;
 use std::{any::Any, collections::HashMap, convert::TryInto, sync::Arc};
 use sys::RTCIntersectContext;
 
@@ -31,49 +32,71 @@ fn init_device() {
 }
 struct EmbreeMeshAccel {
     scene: sys::RTCScene,
+    mesh: Arc<TriangleMesh>,
 }
 unsafe impl Send for EmbreeMeshAccel {}
 unsafe impl Sync for EmbreeMeshAccel {}
 impl EmbreeMeshAccel {
-    unsafe fn new(mesh: &TriangleMesh) -> Self {
+    unsafe fn new(mesh: Arc<TriangleMesh>) -> Self {
         init_device();
         let device = DEVICE.lock();
         let device = device.0;
         let scene = sys::rtcNewScene(device);
         let geometry = sys::rtcNewGeometry(device, sys::RTCGeometryType_RTC_GEOMETRY_TYPE_TRIANGLE);
-        let vb = sys::rtcSetNewGeometryBuffer(
-            geometry,
-            sys::RTCBufferType_RTC_BUFFER_TYPE_VERTEX,
-            0,
-            sys::RTCFormat_RTC_FORMAT_FLOAT3,
-            (3 * std::mem::size_of::<f32>()).try_into().unwrap(),
-            mesh.vertices.len().try_into().unwrap(),
-        );
         assert!(std::mem::size_of::<Vec3>() == std::mem::size_of::<[f32; 3]>());
         assert!(std::mem::align_of::<Vec3>() == std::mem::align_of::<[f32; 3]>());
         assert!(std::mem::size_of::<UVec3>() == std::mem::size_of::<[u32; 3]>());
         assert!(std::mem::align_of::<UVec3>() == std::mem::align_of::<[u32; 3]>());
-        let vb = std::slice::from_raw_parts_mut(vb as *mut [f32; 3], mesh.vertices.len());
-        vb.par_iter_mut()
-            .enumerate()
-            .for_each(|(i, v)| *v = mesh.vertices[i].into());
-        let ib = sys::rtcSetNewGeometryBuffer(
+        sys::rtcSetSharedGeometryBuffer(
+            geometry,
+            sys::RTCBufferType_RTC_BUFFER_TYPE_VERTEX,
+            0,
+            sys::RTCFormat_RTC_FORMAT_FLOAT3,
+            mesh.vertices.as_ptr() as *const c_void,
+            0,
+            (3 * std::mem::size_of::<f32>()).try_into().unwrap(),
+            mesh.vertices.len().try_into().unwrap(),
+        );
+        sys::rtcSetSharedGeometryBuffer(
             geometry,
             sys::RTCBufferType_RTC_BUFFER_TYPE_INDEX,
             0,
             sys::RTCFormat_RTC_FORMAT_UINT3,
+            mesh.indices.as_ptr() as *const c_void,
+            0,
             (3 * std::mem::size_of::<u32>()).try_into().unwrap(),
             mesh.indices.len().try_into().unwrap(),
         );
-        let ib = std::slice::from_raw_parts_mut(ib as *mut [u32; 3], mesh.indices.len());
-        ib.par_iter_mut()
-            .enumerate()
-            .for_each(|(i, v)| *v = mesh.indices[i].into());
+        // let vb = sys::rtcSetNewGeometryBuffer(
+        //     geometry,
+        //     sys::RTCBufferType_RTC_BUFFER_TYPE_VERTEX,
+        //     0,
+        //     sys::RTCFormat_RTC_FORMAT_FLOAT3,
+        //     (3 * std::mem::size_of::<f32>()).try_into().unwrap(),
+        //     mesh.vertices.len().try_into().unwrap(),
+        // );
+
+        // let vb = std::slice::from_raw_parts_mut(vb as *mut [f32; 3], mesh.vertices.len());
+        // vb.par_iter_mut()
+        //     .enumerate()
+        //     .for_each(|(i, v)| *v = mesh.vertices[i].into());
+        // let ib = sys::rtcSetNewGeometryBuffer(
+        //     geometry,
+        //     sys::RTCBufferType_RTC_BUFFER_TYPE_INDEX,
+        //     0,
+        //     sys::RTCFormat_RTC_FORMAT_UINT3,
+        //     (3 * std::mem::size_of::<u32>()).try_into().unwrap(),
+        //     mesh.indices.len().try_into().unwrap(),
+        // );
+        // let ib = std::slice::from_raw_parts_mut(ib as *mut [u32; 3], mesh.indices.len());
+        // ib.par_iter_mut()
+        //     .enumerate()
+        //     .for_each(|(i, v)| *v = mesh.indices[i].into());
         sys::rtcCommitGeometry(geometry);
         sys::rtcAttachGeometry(scene, geometry);
         sys::rtcReleaseGeometry(geometry);
         sys::rtcCommitScene(scene);
-        Self { scene }
+        Self { scene, mesh }
     }
 }
 #[allow(dead_code)]
@@ -128,7 +151,7 @@ impl Drop for EmbreeInstance {
 impl_base!(EmbreeInstance);
 impl Shape for EmbreeInstance {
     fn intersect(&self, ray: &Ray) -> Option<RayHit> {
-        let _profiler = profile("EmbreeInstance::intersect");
+        let _profiler = scope("EmbreeInstance::intersect");
         unsafe {
             let mut rayhit = sys::RTCRayHit {
                 ray: to_rtc_ray(ray),
@@ -169,7 +192,7 @@ impl Shape for EmbreeInstance {
         }
     }
     fn occlude(&self, ray: &Ray) -> bool {
-        let _profiler = profile("EmbreeInstance::occlude");
+        let _profiler = scope("EmbreeInstance::occlude");
         unsafe {
             let mut ray = to_rtc_ray(ray);
             let mut ctx = RTCIntersectContext {
@@ -227,7 +250,7 @@ impl EmbreeTopLevelAccel {
                 if let Some(mesh) = shape.downcast_ref::<MeshInstanceProxy>() {
                     let base = mesh.mesh.clone();
                     if !cache.contains_key(&Arc::as_ptr(&(base.clone() as Arc<dyn Any>))) {
-                        let accel = EmbreeMeshAccel::new(&base);
+                        let accel = EmbreeMeshAccel::new(base.clone());
                         cache.insert(Arc::as_ptr(&(base.clone() as Arc<dyn Any>)), accel);
                     }
                     let accel = cache
@@ -281,7 +304,7 @@ impl accel::Accel for EmbreeTopLevelAccel {
         }
     }
     fn intersect4(&self, rays: &[Ray; 4], mask: [bool; 4]) -> [Option<RayHit>; 4] {
-        let _profiler = profile("EmbreeTopLevelAccel::intersect4");
+        let _profiler = scope("EmbreeTopLevelAccel::intersect4");
         let mut rayhit4 = sys::RTCRayHit4 {
             ray: to_rtc_ray4(rays),
             hit: sys::RTCHit4 {
@@ -338,7 +361,7 @@ impl accel::Accel for EmbreeTopLevelAccel {
         }
     }
     fn intersect(&self, ray: &Ray) -> Option<RayHit> {
-        let _profiler = profile("EmbreeTopLevelAccel::intersect");
+        let _profiler = scope("EmbreeTopLevelAccel::intersect");
         unsafe {
             let mut rayhit = sys::RTCRayHit {
                 ray: to_rtc_ray(ray),
@@ -375,7 +398,7 @@ impl accel::Accel for EmbreeTopLevelAccel {
         }
     }
     fn occlude4(&self, rays: &[Ray; 4], mask: [bool; 4]) -> [bool; 4] {
-        let _profiler = profile("EmbreeTopLevelAccel::occlude4");
+        let _profiler = scope("EmbreeTopLevelAccel::occlude4");
         let mut ray4 = to_rtc_ray4(rays);
         let mut ctx = RTCIntersectContext {
             flags: sys::RTCIntersectContextFlags_RTC_INTERSECT_CONTEXT_FLAG_INCOHERENT,
@@ -403,7 +426,7 @@ impl accel::Accel for EmbreeTopLevelAccel {
         }
     }
     fn occlude(&self, ray: &Ray) -> bool {
-        let _profiler = profile("EmbreeTopLevelAccel::occlude");
+        let _profiler = scope("EmbreeTopLevelAccel::occlude");
         unsafe {
             let mut ray = to_rtc_ray(ray);
             let mut ctx = RTCIntersectContext {

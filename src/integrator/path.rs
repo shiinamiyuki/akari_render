@@ -7,7 +7,7 @@ use crate::sampler::*;
 use crate::scene::*;
 use crate::shape::*;
 use crate::texture::ShadingPoint;
-use crate::util::profile::profile;
+use crate::util::profile::scope;
 use crate::*;
 pub struct PathTracer {
     pub spp: u32,
@@ -36,6 +36,7 @@ impl PathTracer {
             loop {
                 if let Some(si) = scene.intersect(&ray) {
                     let ng = si.ng;
+                    let ns = si.ns;
                     let frame = Frame::from_normal(ng);
                     let shape = si.shape;
                     let opt_bsdf = si.bsdf;
@@ -48,7 +49,7 @@ impl PathTracer {
                         frame,
                         bsdf: opt_bsdf.unwrap(),
                     };
-                    let _profiler = profile("PathTracer::li::<env hit>");
+                    let _profiler = scope("PathTracer::li::<env hit>");
                     if let Some(light) = scene.get_light_of_shape(shape) {
                         // li += beta * light.le(&ray);
                         if depth == 0 {
@@ -89,7 +90,7 @@ impl PathTracer {
                     }
                     depth += 1;
                     {
-                        let _profiler = profile("PathTracer::li::<light sampling>");
+                        let _profiler = scope("PathTracer::li::<light sampling>");
                         let (light, light_pdf) = scene.light_distr.sample(sampler.next1d());
                         let sample_self = if let Some(light2) = scene.get_light_of_shape(shape) {
                             if light as *const dyn Light == light2 as *const dyn Light {
@@ -119,7 +120,7 @@ impl PathTracer {
                                     assert!(light_pdf >= 0.0);
                                     li += beta
                                         * bsdf.evaluate(wo, light_sample.wi)
-                                        * ng.dot(light_sample.wi).abs()
+                                        * ns.dot(light_sample.wi).abs()
                                         * light_sample.li
                                         / light_pdf
                                         * weight;
@@ -129,12 +130,12 @@ impl PathTracer {
                     }
 
                     {
-                        let _profiler = profile("PathTracer::li::<bsdf sampling>");
+                        let _profiler = scope("PathTracer::li::<bsdf sampling>");
                         if let Some(bsdf_sample) = bsdf.sample(sampler.next2d(), wo) {
                             is_delta = bsdf_sample.flag.contains(BsdfFlags::SPECULAR);
                             let wi = bsdf_sample.wi;
                             ray = Ray::spawn(p, wi).offset_along_normal(ng);
-                            beta *= bsdf_sample.f * wi.dot(ng).abs() / bsdf_sample.pdf;
+                            beta *= bsdf_sample.f * wi.dot(ns).abs() / bsdf_sample.pdf;
                             prev_bsdf_pdf = Some(bsdf_sample.pdf);
                             prev_n = Some(si.ng);
                         } else {

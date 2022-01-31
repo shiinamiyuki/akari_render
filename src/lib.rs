@@ -27,6 +27,7 @@ pub mod scene;
 pub mod scenegraph;
 pub mod shape;
 pub mod texture;
+#[macro_use]
 pub mod util;
 
 #[macro_use]

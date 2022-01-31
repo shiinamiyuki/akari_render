@@ -26,8 +26,7 @@ ordered-float = "2.1.1"
 bitflags = "1.2.1"
 statrs = "0.14.0"
 clap = "2.33.3"
-tobj = "2.0.4"
-bson = {version = "1.2.2", features = ["u2i"] }
+tobj = "3.2.0"
 lazy_static = "1.*"
 ash = { version = "0.35", optional = true }
 vkc = {git = "https://github.com/shiinamiyuki/vkc", optional = true }

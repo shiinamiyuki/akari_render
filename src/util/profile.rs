@@ -3,8 +3,11 @@ use parking_lot::RwLock;
 use std::cell::{RefCell, UnsafeCell};
 use std::cmp::Reverse;
 use std::collections::HashMap;
+use std::hash::Hash;
 use std::sync::atomic::AtomicBool;
 use std::time::Duration;
+
+use crate::util::foreach_rayon_thread;
 // pub fn clear_stats() {}
 
 static mut ENABLE: bool = false;
@@ -74,12 +77,35 @@ pub fn enable_profiler(enable: bool) {
         ENABLE = enable;
     }
 }
-pub struct FuncStat {
+#[derive(Clone, Copy)]
+struct StrLiteral(&'static str);
+impl PartialEq for StrLiteral {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.as_ptr() == other.0.as_ptr()
+    }
+}
+impl PartialOrd for StrLiteral {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.0.as_ptr().partial_cmp(&other.0.as_ptr())
+    }
+}
+impl Eq for StrLiteral {}
+impl Ord for StrLiteral {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
+impl Hash for StrLiteral {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.as_ptr().hash(state)
+    }
+}
+struct FuncStat {
     #[allow(dead_code)]
-    pub name: &'static str,
-    pub n_calls: u64,
-    pub total_time: Duration,
-    pub children: HashMap<&'static str, FuncStat>,
+    name: &'static str,
+    n_calls: u64,
+    total_time: Duration,
+    children: HashMap<StrLiteral, FuncStat>,
 }
 
 impl FuncStat {
@@ -100,10 +126,10 @@ impl FuncStat {
     }
     fn with<F: FnOnce(&mut FuncStat) -> T, T>(&mut self, name: &'static str, f: F) -> T {
         loop {
-            if let Some(fs) = self.children.get_mut(name) {
+            if let Some(fs) = self.children.get_mut(&StrLiteral(name)) {
                 return f(fs);
             } else {
-                self.children.insert(name, FuncStat::new(name));
+                self.children.insert(StrLiteral(name), FuncStat::new(name));
             }
         }
     }
@@ -116,7 +142,7 @@ impl FuncStat {
                     f.merge(other_f);
                     break;
                 } else {
-                    self.children.insert(name, FuncStat::new(name));
+                    self.children.insert(*name, FuncStat::new(name.0));
                 }
             }
         }
@@ -154,38 +180,7 @@ fn flush_local_stats() {
 pub fn flush_stats() {
     assert!(rayon::current_thread_index().is_none());
     flush_local_stats();
-    let nthr = rayon::current_num_threads();
-    let flags: Vec<_> = (0..nthr).map(|_| RwLock::new(false)).collect();
-    let flush = || {
-        let idx = rayon::current_thread_index().unwrap();
-        let mut flag = flags[idx].write();
-        if *flag == false {
-            flush_local_stats();
-            *flag = true;
-        }
-    };
-    use std::sync::{Condvar, Mutex};
-    let done = Mutex::new(false);
-    let cv = Condvar::new();
-    rayon::scope(|s| {
-        flush();
-        loop {
-            let done_ = flags.iter().all(|x| *x.read());
-            if done_ {
-                let mut done = done.lock().unwrap();
-                *done = true;
-                cv.notify_all();
-                break;
-            }
-            s.spawn(|_| {
-                flush();
-                let mut done = done.lock().unwrap();
-                while !*done {
-                    done = cv.wait(done).unwrap();
-                }
-            });
-        }
-    });
+    foreach_rayon_thread(flush_local_stats);
 }
 impl Drop for Statistics {
     fn drop(&mut self) {
@@ -244,6 +239,6 @@ impl Drop for ScopedProfiler {
     }
 }
 #[must_use]
-pub fn profile(name: &'static str) -> ScopedProfiler {
+pub fn scope(name: &'static str) -> ScopedProfiler {
     ScopedProfiler::new(name)
 }

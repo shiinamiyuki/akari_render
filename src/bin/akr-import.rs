@@ -3,11 +3,13 @@ use akari::linear_to_srgb;
 // use akari::light::*;
 // use akari::shape::*;
 use akari::scenegraph::node;
+use akari::util::binserde;
 use akari::*;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
 use std::io::BufWriter;
+use std::io::Write;
 use std::path::Path;
 use std::process::exit;
 
@@ -15,8 +17,8 @@ extern crate clap;
 // use akari::api;
 use clap::{App, Arg};
 
-fn import(path: &str, scene: &mut node::Scene, forced: bool) {
-    let (imported_models, models, materials) = akari::shape::load_model(path);
+fn import(path: &str, scene: &mut node::Scene, forced: bool, generate_normal: Option<f32>) {
+    let (imported_models, models, materials) = akari::shape::load_model(path, generate_normal);
     let mut cvt_mat: HashMap<String, node::Bsdf> = HashMap::new();
     let mut cvt_names = vec![];
     println!("# of models: {}", models.len());
@@ -134,10 +136,14 @@ fn import(path: &str, scene: &mut node::Scene, forced: bool) {
             i
         );
         let model_path = path.parent().unwrap().join(model_name.clone());
+        // {
+        //     let bson_data = bson::to_document(&imported_models[i]).unwrap();
+        //     let mut file = File::create(model_path).unwrap();
+        //     bson_data.to_writer(&mut file).unwrap();
+        // }
         {
-            let bson_data = bson::to_document(&imported_models[i]).unwrap();
             let mut file = File::create(model_path).unwrap();
-            bson_data.to_writer(&mut file).unwrap();
+            binserde::Encode::encode(&imported_models[i], &mut file).unwrap();
         }
         let j: node::Shape = if let Some(id) = mesh.material_id {
             // serde_json::json!({
@@ -196,13 +202,29 @@ fn main() {
                 .long("force")
                 .value_name("FORCE"),
         )
+        .arg(
+            Arg::with_name("generate_normal")
+                .short("g")
+                .long("gn")
+                .takes_value(false)
+        )
+        .arg(
+            Arg::with_name("face_angle")
+                .short("a")
+                .value_name("FACE ANGLE"),
+        )
         .get_matches();
     let forced = if let Some(_) = matches.value_of("force") {
         true
     } else {
         false
     };
-
+    let face_angle = if let Some(s) = matches.value_of("face_angle") {
+        s.parse::<f32>().unwrap()
+    } else {
+        15.0
+    };
+    let generate_normal = matches.is_present("generate_normal");
     let mut scene: node::Scene = {
         let path = matches.value_of("scene").unwrap();
         match File::open(path) {
@@ -225,7 +247,16 @@ fn main() {
             },
         }
     };
-    import(matches.value_of("model").unwrap(), &mut scene, forced);
+    import(
+        matches.value_of("model").unwrap(),
+        &mut scene,
+        forced,
+        if generate_normal {
+            Some(face_angle)
+        } else {
+            None
+        },
+    );
     {
         let path = matches.value_of("scene").unwrap();
         let file = File::create(path).unwrap();

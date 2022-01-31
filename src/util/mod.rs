@@ -10,6 +10,8 @@ pub mod radix_sort;
 pub mod nn_v2;
 #[macro_use]
 pub mod profile;
+#[macro_use]
+pub mod binserde;
 pub struct CurrentDirGuard {
     current_dir: PathBuf,
 }
@@ -175,4 +177,40 @@ pub fn par_permute<T: Clone + Send + Sync, F: Fn(usize) -> usize + Sync + Send>(
         .map(|i| data[index(i)].clone())
         .collect();
     data.clone_from_slice(&tmp);
+}
+
+pub fn foreach_rayon_thread<F: Fn() + Send + Sync>(f: F) {
+    assert!(rayon::current_thread_index().is_none());
+    let nthr = rayon::current_num_threads();
+    let flags: Vec<_> = (0..nthr).map(|_| RwLock::new(false)).collect();
+    let exec = || {
+        let idx = rayon::current_thread_index().unwrap();
+        let mut flag = flags[idx].write();
+        if *flag == false {
+            f();
+            *flag = true;
+        }
+    };
+    use std::sync::{Condvar, Mutex};
+    let done = Mutex::new(false);
+    let cv = Condvar::new();
+    rayon::scope(|s| {
+        exec();
+        loop {
+            let done_ = flags.iter().all(|x| *x.read());
+            if done_ {
+                let mut done = done.lock().unwrap();
+                *done = true;
+                cv.notify_all();
+                break;
+            }
+            s.spawn(|_| {
+                exec();
+                let mut done = done.lock().unwrap();
+                while !*done {
+                    done = cv.wait(done).unwrap();
+                }
+            });
+        }
+    });
 }

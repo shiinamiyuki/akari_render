@@ -4,6 +4,7 @@ use crate::camera::*;
 use crate::gpu::pt::WavefrontPathTracer;
 // use crate::film::*;
 use crate::integrator::ao::RTAO;
+use crate::integrator::normalvis::NormalVis;
 use crate::integrator::nrc::CachedPathTracer;
 use crate::integrator::path::PathTracer;
 use crate::integrator::spath::StreamPathTracer;
@@ -17,12 +18,14 @@ use crate::shape::*;
 use crate::texture::ConstantTexture;
 use crate::texture::ImageTexture;
 use crate::texture::Texture;
+use crate::util::binserde::Decode;
 use crate::util::FileResolver;
 use crate::util::LocalFileResolver;
 use crate::*;
 use core::panic;
 use std::fs::File;
 use std::io::BufReader;
+use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
@@ -176,8 +179,9 @@ impl<'a> SceneLoaderContext<'a> {
                     } else {
                         let mut file = self.resolve_file(path);
                         let model = Arc::new({
-                            let bson_data = bson::Document::from_reader(&mut file).unwrap();
-                            bson::from_document::<TriangleMesh>(bson_data).unwrap()
+                            // let bson_data = bson::Document::from_reader(&mut file).unwrap();
+                            // bson::from_document::<TriangleMesh>(bson_data).unwrap()
+                            TriangleMesh::decode(&mut file).unwrap()
                         });
                         self.mesh_cache.insert(path.clone(), model.clone());
                         model
@@ -427,6 +431,7 @@ pub fn load_integrator(path: &Path) -> Box<dyn Integrator> {
             let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
             Box::new(RTAO { spp })
         }
+        "normal" => Box::new(NormalVis {}),
         "cached" | "nrc" => {
             let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
             let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as u32;

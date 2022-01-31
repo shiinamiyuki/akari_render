@@ -3,6 +3,8 @@ use crate::accel::bvh::SweepSAHBuilder;
 use crate::accel::qbvh::QBvhAccel;
 use crate::distribution::Distribution1D;
 use crate::texture::ShadingPoint;
+use crate::util::binserde::Decode;
+use crate::util::binserde::Encode;
 use crate::*;
 use crate::{accel::bvh, bsdf::Bsdf};
 
@@ -152,7 +154,16 @@ impl<'a> ShadingTriangle<'a> {
         lerp3v2(self.texcoords[0], self.texcoords[1], self.texcoords[2], uv)
     }
     pub fn ns(&self, uv: Vec2) -> Vec3 {
-        lerp3v3(self.normals[0], self.normals[1], self.normals[2], uv)
+        lerp3v3(self.normals[0], self.normals[1], self.normals[2], uv).normalize()
+    }
+    pub fn p(&self, uv: Vec2) -> Vec3 {
+        lerp3v3(self.vertices[0], self.vertices[1], self.vertices[2], uv)
+    }
+    pub fn ng(&self) -> Vec3 {
+        Triangle {
+            vertices: self.vertices,
+        }
+        .ng()
     }
 }
 impl<'a> Into<Triangle> for ShadingTriangle<'a> {
@@ -313,6 +324,11 @@ impl Shape for TriangleMeshInstance {
         self.accel.data().mesh.triangle(prim_id as usize)
     }
 }
+#[derive(Serialize, Deserialize, Clone)]
+pub struct MeshFlags {
+    pub reuse_texcoord_indices: bool,
+    pub reuse_normal_indices: bool,
+}
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct TriangleMesh {
@@ -321,25 +337,62 @@ pub struct TriangleMesh {
     pub normals: Vec<[f32; 3]>,
     pub texcoords: Vec<[f32; 2]>,
     pub indices: Vec<[u32; 3]>,
+    pub normal_indices: Vec<[u32; 3]>,
+    pub texcoord_indices: Vec<[u32; 3]>,
+}
+impl Encode for TriangleMesh {
+    fn encode<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        self.name.encode(writer)?;
+        self.vertices.encode(writer)?;
+        self.normals.encode(writer)?;
+        self.texcoords.encode(writer)?;
+        self.indices.encode(writer)?;
+        self.normal_indices.encode(writer)?;
+        self.texcoord_indices.encode(writer)?;
+        Ok(())
+    }
+}
+impl Decode for TriangleMesh {
+    fn decode<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self>
+    where
+        Self: Sized,
+    {
+        let name = Decode::decode(reader)?;
+        let vertices = Decode::decode(reader)?;
+        let normals = Decode::decode(reader)?;
+        let texcoords = Decode::decode(reader)?;
+        let indices = Decode::decode(reader)?;
+        let normal_indices = Decode::decode(reader)?;
+        let texcoord_indices = Decode::decode(reader)?;
+        Ok(Self {
+            name,
+            vertices,
+            normal_indices,
+            texcoord_indices,
+            texcoords,
+            indices,
+            normals,
+        })
+    }
 }
 impl TriangleMesh {
     pub fn sample_surface(&self, u: Vec3, dist: &Distribution1D) -> SurfaceSample {
         let (idx, pdf_idx) = dist.sample_discrete(u[2]);
-        let face: UVec3 = self.indices[idx as usize].into();
-        let v0 = self.vertices[face[0] as usize].into();
-        let v1 = self.vertices[face[1] as usize].into();
-        let v2 = self.vertices[face[2] as usize].into();
-        let trig = Triangle {
-            vertices: [v0, v1, v2],
-        };
+        // let face: UVec3 = self.indices[idx as usize].into();
+        // let v0 = self.vertices[face[0] as usize].into();
+        // let v1 = self.vertices[face[1] as usize].into();
+        // let v2 = self.vertices[face[2] as usize].into();
+        // let trig = Triangle {
+        //     vertices: [v0, v1, v2],
+        // };
+        let trig = self.shading_triangle(idx);
         let uv = uniform_sample_triangle(vec2(u.x, u.y));
-        let p = lerp3v3(v0, v1, v2, uv);
-        let [tc0, tc1, tc2] = self.texcoords(face);
+        let p = trig.p(uv);
         SurfaceSample {
             p,
             ng: trig.ng(),
-            ns: trig.ng(),
-            texcoords: lerp3v2(tc0, tc1, tc2, uv),
+            ns: trig.ns(uv),
+            texcoords: trig.texcoord(uv),
             pdf: 1.0 / self.triangle(idx).area() * pdf_idx,
         }
     }
@@ -361,9 +414,9 @@ impl TriangleMesh {
         let ng = (v1 - v0).cross(v2 - v0).normalize();
         ShadingTriangle {
             vertices: [v0, v1, v2],
-            texcoords: self.texcoords(face),
+            texcoords: self.texcoords(i),
             bsdf: None,
-            normals: self.normals(face, ng),
+            normals: self.normals(i, ng),
         }
     }
     pub fn area(&self) -> f32 {
@@ -382,23 +435,25 @@ impl TriangleMesh {
             .collect();
         Distribution1D::new(f.as_slice()).unwrap()
     }
-    pub fn texcoords(&self, face: UVec3) -> [Vec2; 3] {
+    pub fn texcoords(&self, i: usize) -> [Vec2; 3] {
         if self.texcoords.is_empty() {
             let tc0 = vec2(0.0, 0.0);
             let tc1 = vec2(0.0, 1.0);
             let tc2 = vec2(1.0, 1.0);
             [tc0, tc1, tc2]
         } else {
+            let face: UVec3 = self.texcoord_indices[i].into();
             let tc0 = self.texcoords[face[0] as usize].into();
             let tc1 = self.texcoords[face[1] as usize].into();
             let tc2 = self.texcoords[face[2] as usize].into();
             [tc0, tc1, tc2]
         }
     }
-    pub fn normals(&self, face: UVec3, ng: Vec3) -> [Vec3; 3] {
+    pub fn normals(&self, i: usize, ng: Vec3) -> [Vec3; 3] {
         if self.normals.is_empty() {
             [ng; 3]
         } else {
+            let face: UVec3 = self.normal_indices[i].into();
             let ns0 = self.normals[face[0] as usize].into();
             let ns1 = self.normals[face[1] as usize].into();
             let ns2 = self.normals[face[2] as usize].into();
@@ -430,9 +485,10 @@ impl TriangleMesh {
         Arc::new(instance)
     }
 }
-pub fn compute_normals(model: &mut TriangleMesh) {
+pub fn compute_normals(model: &mut TriangleMesh, angle: f32) {
+    let angle = angle.to_radians();
     model.normals.clear();
-    let mut face_normals = vec![];
+    let mut face_normal_areas = vec![];
     let mut vertex_neighbors: HashMap<u32, Vec<u32>> = HashMap::new();
     for f in 0..model.indices.len() {
         let face = model.indices[f];
@@ -450,29 +506,55 @@ pub fn compute_normals(model: &mut TriangleMesh) {
         let edge0: Vec3 = triangle[1] - triangle[0];
         let edge1: Vec3 = triangle[2] - triangle[0];
         let ng = edge0.cross(edge1).normalize();
-        face_normals.push(ng);
+        let area = edge0.cross(edge1).length();
+        face_normal_areas.push((ng, area));
     }
-
-    model.normals = (0..model.vertices.len())
-        .into_iter()
-        .map(|v| match vertex_neighbors.get(&(v as u32)) {
-            None => [0.0; 3],
-
-            Some(faces) => {
-                let ng_sum: Vec3 = faces
-                    .into_iter()
-                    .map(|f| face_normals[*f as usize])
-                    .fold(Vec3::ZERO, |a, b| a + b);
-                let ng = ng_sum / (faces.len() as f32);
-                ng.into()
-            }
+    model.normal_indices = (0..model.indices.len())
+        .map(|i| {
+            let i = i as u32;
+           [3 * i, 3 * i + 1, 3 * i + 2]
+        })
+        .collect();
+    model.normals = model
+        .indices
+        .iter()
+        .enumerate()
+        .flat_map(|(i, face)| {
+            let (ng, area) = face_normal_areas[i];
+            let vertex_neighbors = &vertex_neighbors;
+            let face_normal_areas = &face_normal_areas;
+            face.iter()
+                .map(move |corner| -> [f32; 3] {
+                    let neighbors = vertex_neighbors.get(corner).unwrap();
+                    let mut w = area;
+                    let mut ns = area * ng;
+                    for n in neighbors {
+                        let (n, a) = face_normal_areas[*n as usize];
+                        if n.dot(ng).acos() < angle {
+                            ns += n * w;
+                            w += a;
+                        }
+                    }
+                    (ns / w).normalize().into()
+                })
+                .into_iter()
         })
         .collect();
 }
 
-pub fn load_model(obj_file: &str) -> (Vec<TriangleMesh>, Vec<tobj::Model>, Vec<tobj::Material>) {
-    let (models, materials) = tobj::load_obj(&obj_file, true).expect("Failed to load file");
-
+pub fn load_model(
+    obj_file: &str,
+    generate_normal: Option<f32>,
+) -> (Vec<TriangleMesh>, Vec<tobj::Model>, Vec<tobj::Material>) {
+    let (models, materials) = tobj::load_obj(
+        &obj_file,
+        &tobj::LoadOptions {
+            triangulate: true,
+            ..Default::default()
+        },
+    )
+    .expect("Failed to load file");
+    let materials = materials.unwrap();
     let mut imported_models = vec![];
     // println!("# of models: {}", models.len());
     // println!("# of materials: {}", materials.len());
@@ -506,6 +588,8 @@ pub fn load_model(obj_file: &str) -> (Vec<TriangleMesh>, Vec<tobj::Model>, Vec<t
             ]);
         }
         let mut indices = vec![];
+        let mut normal_indices = vec![];
+        let mut texcoord_indices = vec![];
         for f in 0..mesh.indices.len() / 3 {
             indices.push([
                 mesh.indices[3 * f],
@@ -513,7 +597,7 @@ pub fn load_model(obj_file: &str) -> (Vec<TriangleMesh>, Vec<tobj::Model>, Vec<t
                 mesh.indices[3 * f + 2],
             ]);
         }
-        if !mesh.normals.is_empty() {
+        if !mesh.normals.is_empty() && generate_normal.is_none() {
             for i in 0..mesh.normals.len() / 3 {
                 normals.push([
                     mesh.normals[3 * i],
@@ -521,10 +605,24 @@ pub fn load_model(obj_file: &str) -> (Vec<TriangleMesh>, Vec<tobj::Model>, Vec<t
                     mesh.normals[3 * i + 2],
                 ]);
             }
+            for i in 0..mesh.normal_indices.len() / 3 {
+                normal_indices.push([
+                    mesh.normal_indices[3 * i],
+                    mesh.normal_indices[3 * i + 1],
+                    mesh.normal_indices[3 * i + 2],
+                ]);
+            }
         }
         if !mesh.texcoords.is_empty() {
             for i in 0..mesh.texcoords.len() / 2 {
                 texcoords.push([mesh.texcoords[2 * i], mesh.texcoords[2 * i + 1]]);
+            }
+            for i in 0..mesh.texcoord_indices.len() / 3 {
+                texcoord_indices.push([
+                    mesh.texcoord_indices[3 * i],
+                    mesh.texcoord_indices[3 * i + 1],
+                    mesh.texcoord_indices[3 * i + 2],
+                ]);
             }
         }
         let mut imported = TriangleMesh {
@@ -533,9 +631,13 @@ pub fn load_model(obj_file: &str) -> (Vec<TriangleMesh>, Vec<tobj::Model>, Vec<t
             normals,
             indices,
             texcoords,
+            texcoord_indices,
+            normal_indices,
         };
-        if mesh.normals.is_empty() {
-            compute_normals(&mut imported);
+        if mesh.normals.is_empty() || generate_normal.is_some() {
+            // todo!()
+            println!("computing normals for {}", m.name);
+            compute_normals(&mut imported, generate_normal.unwrap());
         }
 
         // let mut next_face = 0;
