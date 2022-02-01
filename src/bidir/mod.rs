@@ -154,7 +154,7 @@ impl<'a> Vertex<'a> {
     }
     pub fn is_delta_light(&self) -> bool {
         match self {
-            Self::Light(v) => (v.light.flags() | LightFlags::DELTA) != LightFlags::NONE,
+            Self::Light(v) => v.light.flags().intersects( LightFlags::DELTA),//(v.light.flags() | LightFlags::DELTA) != LightFlags::NONE,
             _ => unreachable!(),
         }
     }
@@ -251,7 +251,9 @@ impl<'a> Vertex<'a> {
     }
     pub fn le(&self, _scene: &'a Scene, prev: &Vertex<'a>) -> Spectrum {
         if let Some(v) = self.as_light() {
-            v.light.le(&Ray::spawn_to(prev.p(), self.p()))
+            let mut ray = Ray::spawn_to(prev.p(), self.p());
+            ray.tmax *= 1.0 + 1e-3;
+            v.light.le(&ray)
         } else {
             Spectrum::zero()
         }
@@ -305,12 +307,14 @@ pub fn random_walk<'a, 'b>(
     loop {
         if let Some(si) = scene.intersect(&ray) {
             let ng = si.ng;
-            let frame = Frame::from_normal(ng);
             let shape = si.shape;
+            let prev_index = depth;
+            let prev = &mut path[prev_index];
             if mode == TransportMode::RADIANCE {
                 if let Some(light) = scene.get_light_of_shape(shape) {
-                    let vertex =
+                    let mut vertex =
                         Vertex::create_light_vertex(light, ray.at(si.t), si.ng, beta, pdf_fwd);
+                    vertex.base_mut().pdf_fwd = prev.convert_pdf_to_area(pdf_fwd, &vertex);
                     path.push(vertex);
                     break;
                 }
@@ -323,8 +327,6 @@ pub fn random_walk<'a, 'b>(
             let bsdf = opt_bsdf.unwrap();
             let wo = -ray.d;
 
-            let prev_index = depth;
-            let prev = &mut path[prev_index];
             let vertex =
                 Vertex::create_surface_vertex(beta, p, bsdf.clone(), wo, ng, pdf_fwd, prev);
             // pdf_rev = vertex.pdf(scene, prev, next)
@@ -461,6 +463,8 @@ where
     if s + t == 2 {
         return 1.0;
     }
+
+    // return 1.0 / (s + t - 1) as f32;
     eye_path.clear();
     light_path.clear();
     for i in 0..s {
@@ -550,7 +554,7 @@ where
         if x == 0.0 {
             1.0
         } else {
-            x * x
+            x
         }
     };
     if t > 0 {
@@ -558,6 +562,8 @@ where
         let mut ri = 1.0;
         for i in (2..=t - 1).rev() {
             ri *= remap(eye_path[i].base().pdf_rev) / remap(eye_path[i].base().pdf_fwd);
+            // cond_dbg!(s == 0, eye_path[i].base().pdf_rev);
+            // cond_dbg!(s == 0, eye_path[i].base().pdf_fwd);
             if !eye_path[i].base().delta {
                 sum_ri += ri;
             }
@@ -567,18 +573,22 @@ where
         let mut ri = 1.0;
         for i in (0..=s - 1).rev() {
             ri *= remap(light_path[i].base().pdf_rev) / remap(light_path[i].base().pdf_fwd);
+            // cond_dbg!(s == 1, light_path[i].base().pdf_rev);
+            // cond_dbg!(s == 1, light_path[i].base().pdf_fwd);
             let delta_light = if i > 0 {
                 light_path[i - 1].base().delta
             } else {
                 light_path[0].is_delta_light()
             };
+            assert!(!delta_light);
             if !light_path[i].base().delta && !delta_light {
                 sum_ri += ri;
             }
         }
     }
+    // cond_dbg!(s==0, sum_ri);
     // println!("{}", 1.0 / (1.0 + sum_ri));
-    1.0 / (1.0 + sum_ri)
+    (1.0 / (1.0 as f64 + sum_ri as f64)) as f32
 }
 pub fn connect_paths<'a, 'b>(
     scene: &'a Scene,
@@ -588,7 +598,7 @@ pub fn connect_paths<'a, 'b>(
     sampler: &mut dyn Sampler,
     new_light_path: &mut Path<'b>,
     new_eye_path: &mut Path<'b>,
-) -> Spectrum
+) -> (Spectrum, f32)
 where
     'a: 'b,
 {
@@ -597,7 +607,7 @@ where
     let mut sampled: Option<Vertex> = None;
     let mut l = Spectrum::zero();
     if t > 1 && s != 0 && eye_path[t - 1].as_light().is_some() {
-        return Spectrum::zero();
+        return (Spectrum::zero(), 0.0);
     } else if s == 0 {
         let pt = &eye_path[t - 1];
         l = pt.beta() * pt.le(scene, &eye_path[t - 2]);
@@ -670,5 +680,5 @@ where
             new_eye_path,
         )
     };
-    l * mis_weight
+    (l, mis_weight)
 }

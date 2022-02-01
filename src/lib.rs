@@ -921,3 +921,13 @@ macro_rules! impl_base {
         }
     };
 }
+#[macro_export]
+macro_rules! cond_dbg {
+    ($cond:expr, $t:expr) => {
+        if $cond {
+            dbg!($t)
+        } else {
+            $t
+        }
+    };
+}

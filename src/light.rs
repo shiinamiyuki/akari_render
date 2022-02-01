@@ -68,7 +68,7 @@ impl PowerLightDistribution {
 
         for (i, light) in lights.iter().enumerate() {
             let pdf = dist.pdf_discrete(i);
-            pdf_map.insert(light.address(), pdf);
+            pdf_map.insert(Arc::as_ptr(light).cast::<()>() as usize, pdf);
         }
         Self {
             lights,
@@ -83,7 +83,10 @@ impl LightDistribution for PowerLightDistribution {
         (self.lights[idx].as_ref(), pdf)
     }
     fn pdf<'a>(&self, light: &'a dyn Light) -> f32 {
-        if let Some(pdf) = self.pdf_map.get(&light.address()) {
+        if let Some(pdf) = self
+            .pdf_map
+            .get(&((light as *const dyn Light).cast::<()>() as usize))
+        {
             *pdf
         } else {
             0.0

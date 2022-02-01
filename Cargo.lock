@@ -42,6 +42,7 @@ dependencies = [
  "ash",
  "bindgen",
  "bitflags",
+ "bumpalo",
  "bytemuck",
  "clap",
  "cmake",

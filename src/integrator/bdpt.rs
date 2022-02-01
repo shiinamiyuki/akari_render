@@ -74,7 +74,7 @@ impl Integrator for Bdpt {
                             if (s == 1 && t == 1) || depth < 0 || depth > self.max_depth as isize {
                                 continue;
                             }
-                            let li = bdpt::connect_paths(
+                            let (li, weight) = bdpt::connect_paths(
                                 scene,
                                 bdpt::ConnectionStrategy {
                                     s: s as usize,
@@ -87,9 +87,10 @@ impl Integrator for Bdpt {
                                 &mut new_camera_path,
                             );
                             if self.debug {
-                                debug_acc[get_index(s, t)] += li;
+                                let l =li * weight;
+                                debug_acc[get_index(s, t)] += li * weight;
                             }
-                            acc_li += li;
+                            acc_li += li * weight;
                         }
                     }
                     light_path.clear();

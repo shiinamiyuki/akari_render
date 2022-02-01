@@ -130,7 +130,7 @@ impl Chain {
             };
         }
         self.sampler.use_stream(Stream::Connect);
-        let l = bidir::connect_paths(
+        let (l, w) = bidir::connect_paths(
             scene,
             ConnectionStrategy { s, t },
             &light_path,
@@ -138,7 +138,8 @@ impl Chain {
             &mut self.sampler,
             &mut &mut new_light_path,
             &mut new_camera_path,
-        ) * n_strategies as f32;
+        );
+        let l = l * w * n_strategies as f32;
         let l = if l.is_black() { Spectrum::zero() } else { l };
         FRecord {
             pixel,
