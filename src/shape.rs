@@ -1,6 +1,7 @@
 use crate::accel::bvh::BvhAccel;
 use crate::accel::bvh::SweepSAHBuilder;
 use crate::accel::qbvh::QBvhAccel;
+use crate::bsdf::BsdfClosure;
 use crate::distribution::Distribution1D;
 use crate::texture::ShadingPoint;
 use crate::util::binserde::Decode;
@@ -8,6 +9,7 @@ use crate::util::binserde::Encode;
 use crate::*;
 use crate::{accel::bvh, bsdf::Bsdf};
 
+use bumpalo::Bump;
 use glam::BVec4;
 use glam::BVec4A;
 use serde::{Deserialize, Serialize};
@@ -25,6 +27,22 @@ pub struct SurfaceInteraction<'a> {
     pub ns: Vec3,
     pub t: f32,
     pub texcoord: Vec2,
+}
+impl<'a> SurfaceInteraction<'a> {
+    pub fn evaluate_bsdf<'b>(&self, arena: &'b Bump) -> Option<BsdfClosure<'b>>
+    where
+        'a: 'b,
+    {
+        if let Some(bsdf) = self.bsdf {
+            let frame = Frame::from_normal(self.ns);
+            Some(BsdfClosure {
+                frame,
+                closure: bsdf.evaluate(&self.sp, arena),
+            })
+        } else {
+            None
+        }
+    }
 }
 #[derive(Clone, Copy)]
 pub struct SurfaceSample {
@@ -512,7 +530,7 @@ pub fn compute_normals(model: &mut TriangleMesh, angle: f32) {
     model.normal_indices = (0..model.indices.len())
         .map(|i| {
             let i = i as u32;
-           [3 * i, 3 * i + 1, 3 * i + 2]
+            [3 * i, 3 * i + 1, 3 * i + 2]
         })
         .collect();
     model.normals = model

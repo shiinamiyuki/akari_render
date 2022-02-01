@@ -1,29 +1,19 @@
+use bumpalo::Bump;
+
 use crate::bidir::*;
 use crate::film::*;
 use crate::integrator::*;
 use crate::sampler::PCGSampler;
 use crate::sampler::Pcg;
-use crate::*;
 use crate::sampler::Sampler;
+use crate::util::PerThread;
+use crate::*;
 pub struct Bdpt {
     pub spp: u32,
     pub max_depth: usize,
     pub debug: bool,
 }
-#[derive(Clone)]
-struct BdptPerThreadData<'a> {
-    scratch: Scratch<'a>,
-    camera_path: Vec<Vertex<'a>>,
-    light_path: Vec<Vertex<'a>>,
-}
-impl<'a> BdptPerThreadData<'a> {
-    fn reset(&mut self) {
-        self.scratch.new_eye_path.clear();
-        self.scratch.new_light_path.clear();
-        self.camera_path.clear();
-        self.light_path.clear();
-    }
-}
+
 impl Integrator for Bdpt {
     fn render(&mut self, scene: &Scene) -> Film {
         let npixels = (scene.camera.resolution().x * scene.camera.resolution().y) as usize;
@@ -37,22 +27,16 @@ impl Integrator for Bdpt {
         let get_index = |s, t| (t - 2) as usize * (3 + self.max_depth) + s as usize;
         let chunks = (npixels + 255) / 256;
         let progress = crate::util::create_progess_bar(chunks, "chunks");
-        let per_thread_data = util::PerThread::<BdptPerThreadData>::new(BdptPerThreadData {
-            scratch: Scratch::new(),
-            camera_path: vec![],
-            light_path: vec![],
-        });
+        let arenas = PerThread::new(|| Bump::new());
         parallel_for(npixels, 256, |id| {
-            let mut sampler = PCGSampler { rng: Pcg::new(id as u64) };
+            let mut sampler = PCGSampler {
+                rng: Pcg::new(id as u64),
+            };
             let x = (id as u32) % scene.camera.resolution().x;
             let y = (id as u32) / scene.camera.resolution().x;
             let pixel = uvec2(x, y);
             let mut acc_li = Spectrum::zero();
-            let data = per_thread_data.get_mut();
-            data.reset();
-            let camera_path = &mut data.camera_path;
-            let light_path = &mut data.light_path;
-            let scratch = &mut data.scratch;
+
             let mut debug_acc = vec![];
             if self.debug {
                 for _t in 2..=self.max_depth + 2 {
@@ -62,38 +46,56 @@ impl Integrator for Bdpt {
                 }
             }
             for _ in 0..self.spp {
-                sampler.start_next_sample();
-                bdpt::generate_camera_path(
-                    scene,
-                    pixel,
-                    &mut sampler,
-                    self.max_depth + 2,
-                    camera_path,
-                );
-                bdpt::generate_light_path(scene, &mut sampler, self.max_depth + 1, light_path);
-                for t in 2..=camera_path.len() as isize {
-                    for s in 0..=light_path.len() as isize {
-                        let depth = s + t - 2;
-                        if (s == 1 && t == 1) || depth < 0 || depth > self.max_depth as isize {
-                            continue;
+                let arena = arenas.get_mut();
+                {
+                    let mut camera_path = Path::new(arena, self.max_depth + 2);
+                    let mut light_path = Path::new(arena, self.max_depth + 1);
+                    let mut new_camera_path = Path::new(arena, self.max_depth + 2);
+                    let mut new_light_path = Path::new(arena, self.max_depth + 1);
+                    sampler.start_next_sample();
+                    bdpt::generate_camera_path(
+                        scene,
+                        pixel,
+                        &mut sampler,
+                        self.max_depth + 2,
+                        &mut camera_path,
+                        arena,
+                    );
+                    bdpt::generate_light_path(
+                        scene,
+                        &mut sampler,
+                        self.max_depth + 1,
+                        &mut light_path,
+                        arena,
+                    );
+                    for t in 2..=camera_path.len() as isize {
+                        for s in 0..=light_path.len() as isize {
+                            let depth = s + t - 2;
+                            if (s == 1 && t == 1) || depth < 0 || depth > self.max_depth as isize {
+                                continue;
+                            }
+                            let li = bdpt::connect_paths(
+                                scene,
+                                bdpt::ConnectionStrategy {
+                                    s: s as usize,
+                                    t: t as usize,
+                                },
+                                &light_path,
+                                &camera_path,
+                                &mut sampler,
+                                &mut new_light_path,
+                                &mut new_camera_path,
+                            );
+                            if self.debug {
+                                debug_acc[get_index(s, t)] += li;
+                            }
+                            acc_li += li;
                         }
-                        let li = bdpt::connect_paths(
-                            scene,
-                            bdpt::ConnectionStrategy {
-                                s: s as usize,
-                                t: t as usize,
-                            },
-                            light_path,
-                            camera_path,
-                            &mut sampler,
-                            scratch,
-                        );
-                        if self.debug {
-                            debug_acc[get_index(s, t)] += li;
-                        }
-                        acc_li += li;
                     }
+                    light_path.clear();
+                    camera_path.clear();
                 }
+                arena.reset();
             }
             acc_li = acc_li / (self.spp as f32);
 

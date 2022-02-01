@@ -6,13 +6,15 @@ use crate::bsdf::*;
 use crate::film::*;
 use crate::integrator::*;
 use crate::light::*;
-use crate::util::nn_v2::*;
 use crate::sampler::*;
 use crate::scene::*;
 use crate::shape::*;
 use crate::texture::ShadingPoint;
+use crate::util::nn_v2::*;
+use crate::util::PerThread;
 use crate::*;
 
+use bumpalo::Bump;
 use nalgebra as na;
 use rand::Rng;
 
@@ -338,6 +340,7 @@ impl CachedPathTracer {
         enable_cache: bool,
         use_cache_after: u32,
         cache: &RadianceCache,
+        arena: &Bump,
     ) -> PathState {
         let mut li = Spectrum::zero();
         let mut beta = Spectrum::one();
@@ -404,7 +407,7 @@ impl CachedPathTracer {
                 let ng = si.ng;
                 let frame = Frame::from_normal(ng);
                 let shape = si.shape;
-                let opt_bsdf = si.bsdf;
+                let opt_bsdf = si.evaluate_bsdf(arena);
                 if opt_bsdf.is_none() {
                     break;
                 }
@@ -419,11 +422,7 @@ impl CachedPathTracer {
                         ((prev_x - p).length_squared() / (prev_pdf * w.dot(ng).abs())).sqrt();
                 }
                 let sp = si.sp;
-                let bsdf = BsdfClosure {
-                    sp,
-                    frame,
-                    bsdf: opt_bsdf.unwrap(),
-                };
+                let bsdf = opt_bsdf.unwrap();
                 if let Some(light) = scene.get_light_of_shape(shape) {
                     // li += beta * light.le(&ray);
                     if depth == 0 {
@@ -454,7 +453,7 @@ impl CachedPathTracer {
                     path.push(Vertex {
                         x: p,
                         n: ng,
-                        info: bsdf.bsdf.info(&sp),
+                        info: bsdf.info(),
                         dir: ray.d,
                         radiance: Spectrum::zero(),
                     });
@@ -470,7 +469,7 @@ impl CachedPathTracer {
                         let record = QueryRecord {
                             x: p,
                             dir: sph(ray.d),
-                            info: bsdf.bsdf.info(&sp),
+                            info: bsdf.info(),
                             n: sph(ng),
                         };
                         if training {
@@ -518,9 +517,7 @@ impl CachedPathTracer {
                         let p_ref = ReferencePoint { p, n: ng };
                         let light_sample = light.sample_li(sampler.next3d(), &p_ref);
                         let light_pdf = light_sample.pdf * light_pdf;
-                        if !light_sample.li.is_black()
-                            && !scene.occlude(&light_sample.shadow_ray)
-                        {
+                        if !light_sample.li.is_black() && !scene.occlude(&light_sample.shadow_ray) {
                             let bsdf_pdf = bsdf.evaluate_pdf(wo, light_sample.wi);
                             let weight = mis_weight(light_pdf, bsdf_pdf);
                             accumulate_radiance!(
@@ -611,6 +608,7 @@ impl Integrator for CachedPathTracer {
             };
             rayon::current_num_threads()
         ];
+        let arenas = PerThread::new(|| Bump::new());
         let training_freq = npixels as f64 / self.batch_size as f64;
         for iter in 0..self.training_iters {
             let now = std::time::Instant::now();
@@ -657,6 +655,7 @@ impl Integrator for CachedPathTracer {
                     if !training {
                         return;
                     }
+                    let arena = arenas.get_mut();
                     let _li = self.li(
                         scene,
                         ray,
@@ -668,6 +667,7 @@ impl Integrator for CachedPathTracer {
                         false,
                         1,
                         &cache,
+                        arena,
                     );
                     if training {
                         for vertex in path.iter() {
@@ -681,6 +681,7 @@ impl Integrator for CachedPathTracer {
                             cache.record_train(&record, &vertex.radiance);
                         }
                     }
+                    arena.reset();
                 });
             }
             {
@@ -736,6 +737,7 @@ impl Integrator for CachedPathTracer {
                         let path_tmp = &mut thread_data.path_tmp;
                         let mut rng = rand::thread_rng();
                         let training = rng.gen_bool(1.0 / training_freq);
+                        let arena = arenas.get_mut();
                         *state = self.li(
                             scene,
                             ray,
@@ -747,7 +749,9 @@ impl Integrator for CachedPathTracer {
                             !training,
                             if self.visualize_cache { 0 } else { 1 },
                             &trained_cache,
+                            arena
                         );
+                        arena.reset();
                         if training {
                             for vertex in path.iter() {
                                 // vertex.dir.into_iter().for_each(|x| assert!(!x.is_nan()));

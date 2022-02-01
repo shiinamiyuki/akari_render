@@ -3,8 +3,11 @@ use std::sync::atomic::AtomicUsize;
 use crate::distribution::Distribution1D;
 use crate::sampler::{MltSampler, PCGSampler, Sampler};
 use crate::scene::Scene;
+use crate::shape::Shape;
+use crate::util::PerThread;
 use crate::*;
 use bidir::*;
+use bumpalo::Bump;
 use film::Film;
 use parking_lot::Mutex;
 use rand::{thread_rng, Rng};
@@ -89,16 +92,13 @@ impl Sampler for MmltSampler {
     }
 }
 
-pub struct Chain<'a> {
+pub struct Chain {
     pub sampler: MmltSampler,
     pub cur: FRecord,
     pub depth: u32,
-    pub light_path: Vec<Vertex<'a>>,
-    pub camera_path: Vec<Vertex<'a>>,
-    pub scratch: Scratch<'a>,
 }
-impl<'a> Chain<'a> {
-    pub fn run_at_pixel(&mut self, pixel: UVec2, scene: &'a Scene) -> FRecord {
+impl Chain {
+    pub fn run_at_pixel(&mut self, pixel: UVec2, scene: &Scene, arena: &Bump) -> FRecord {
         let (n_strategies, s, t) = if self.depth == 0 {
             (1, 0, 2)
         } else {
@@ -108,8 +108,12 @@ impl<'a> Chain<'a> {
             let t = self.depth as usize + 2 - s;
             (n_strategies, s, t)
         };
-        bidir::generate_camera_path(scene, pixel, &mut self.sampler, t, &mut self.camera_path);
-        if self.camera_path.len() != t {
+        let mut camera_path = Path::new(arena, self.depth as usize + 2);
+        let mut light_path = Path::new(arena, self.depth as usize + 1);
+        let mut new_camera_path = Path::new(arena, self.depth as usize + 2);
+        let mut new_light_path = Path::new(arena, self.depth as usize + 1);
+        bidir::generate_camera_path(scene, pixel, &mut self.sampler, t, &mut camera_path, arena);
+        if camera_path.len() != t {
             return FRecord {
                 pixel,
                 f: 0.0,
@@ -117,8 +121,8 @@ impl<'a> Chain<'a> {
             };
         }
         self.sampler.use_stream(Stream::Light);
-        bidir::generate_light_path(scene, &mut self.sampler, s, &mut self.light_path);
-        if self.light_path.len() != s {
+        bidir::generate_light_path(scene, &mut self.sampler, s, &mut light_path, arena);
+        if light_path.len() != s {
             return FRecord {
                 pixel,
                 f: 0.0,
@@ -129,10 +133,11 @@ impl<'a> Chain<'a> {
         let l = bidir::connect_paths(
             scene,
             ConnectionStrategy { s, t },
-            &self.light_path,
-            &self.camera_path,
+            &light_path,
+            &camera_path,
             &mut self.sampler,
-            &mut self.scratch,
+            &mut &mut new_light_path,
+            &mut new_camera_path,
         ) * n_strategies as f32;
         let l = if l.is_black() { Spectrum::zero() } else { l };
         FRecord {
@@ -141,13 +146,9 @@ impl<'a> Chain<'a> {
             l,
         }
     }
-    pub fn run(&mut self, scene: &'a Scene) -> FRecord {
+    pub fn run(&mut self, scene: &Scene, arena: &Bump) -> FRecord {
         self.sampler.start_next_sample();
         self.sampler.use_stream(Stream::Camera);
-        self.light_path.clear();
-        self.camera_path.clear();
-        self.scratch.new_light_path.clear();
-        self.scratch.new_eye_path.clear();
 
         let pixel = self.sampler.next2d() * scene.camera.resolution().as_vec2();
         let pixel = uvec2(pixel.x as u32, pixel.y as u32);
@@ -155,16 +156,17 @@ impl<'a> Chain<'a> {
             pixel.x.min(scene.camera.resolution().x - 1),
             pixel.y.min(scene.camera.resolution().y - 1),
         );
-        self.run_at_pixel(pixel, scene)
+        self.run_at_pixel(pixel, scene, arena)
     }
 }
 impl Mmlt {
-    pub fn init_chain<'a>(
+    pub fn init_chain(
         n_bootstrap: usize,
         n_chains: usize,
         depth: u32,
-        scene: &'a Scene,
-    ) -> (Vec<Chain<'a>>, f32) {
+        scene: &Scene,
+        arena: &Bump,
+    ) -> (Vec<Chain>, f32) {
         let mut rng = thread_rng();
         let seeds: Vec<_> = { (0..n_bootstrap).map(|_| rng.gen::<u64>()).collect() };
         let fs: Vec<_> = (0..n_bootstrap)
@@ -176,12 +178,9 @@ impl Mmlt {
                         f: 0.0,
                         l: Spectrum::zero(),
                     },
-                    light_path: vec![],
-                    camera_path: vec![],
                     depth,
-                    scratch: Scratch::new(),
                 }
-                .run(scene)
+                .run(scene, arena)
                 .f
             })
             .collect();
@@ -202,12 +201,9 @@ impl Mmlt {
                             f: 0.0,
                             l: Spectrum::zero(),
                         },
-                        light_path: vec![],
-                        camera_path: vec![],
                         depth,
-                        scratch: Scratch::new(),
                     };
-                    chain.cur = chain.run(scene);
+                    chain.cur = chain.run(scene, arena);
                     chain.sampler.reseed(rng.gen());
                     chain
                 })
@@ -226,9 +222,16 @@ impl Integrator for Mmlt {
         let film_direct = depth0_pt.render(scene);
         let npixels = (scene.camera.resolution().x * scene.camera.resolution().y) as usize;
         log::info!("bootstrapping...");
+        let arenas = PerThread::new(|| Bump::new());
+
         let per_depth_chains: Vec<_> = (2..=self.max_depth)
             .into_par_iter()
-            .map(|depth| Self::init_chain(self.n_bootstrap, self.n_chains, depth, scene))
+            .map(|depth| {
+                let arena = arenas.get_mut();
+                let chain = Self::init_chain(self.n_bootstrap, self.n_chains, depth, scene, arena);
+                arena.reset();
+                chain
+            })
             .collect();
         let per_depth_film: Vec<_> = per_depth_chains
             .iter()
@@ -248,6 +251,7 @@ impl Integrator for Mmlt {
                 chains
             })
             .collect();
+
         {
             let bs: Vec<_> = depth_fs
                 .iter()
@@ -262,11 +266,12 @@ impl Integrator for Mmlt {
             (0..npixels).into_par_iter().for_each(|_| {
                 let mut rng = thread_rng();
                 let (depth, depth_pdf) = depth_dist.sample_discrete(rng.gen());
+                let arena = arenas.get_mut();
                 loop {
                     let chains = &per_depth_chains[depth];
                     let chain = &chains[rng.gen::<usize>() % chains.len()];
                     if let Some(mut chain) = chain.try_lock() {
-                        let proposal = chain.run(scene);
+                        let proposal = chain.run(scene, arena);
                         let accept_prob = match chain.cur.f {
                             x if x > 0.0 => (proposal.f / x).min(1.0),
                             _ => 1.0,
@@ -298,6 +303,7 @@ impl Integrator for Mmlt {
                         break;
                     }
                 }
+                arena.reset();
             });
             progress.inc(1);
         }

@@ -1,3 +1,4 @@
+use bumpalo::Bump;
 use parking_lot::Mutex;
 use rand::{thread_rng, Rng};
 use UVec2;
@@ -7,6 +8,7 @@ use super::{mmlt::FRecord, Integrator};
 use crate::distribution::Distribution1D;
 use crate::film::Film;
 use crate::sampler::Sampler;
+use crate::util::PerThread;
 use crate::*;
 use crate::{sampler::MltSampler, scene::Scene};
 pub fn target_function(x: Spectrum) -> f32 {
@@ -28,16 +30,16 @@ pub struct Pssmlt {
     pub direct_spp: u32,
 }
 impl Chain {
-    pub fn run_at_pixel(&mut self, pixel: UVec2, scene: &Scene) -> FRecord {
+    pub fn run_at_pixel(&mut self, pixel: UVec2, scene: &Scene, arena: &Bump) -> FRecord {
         let (ray, _) = scene.camera.generate_ray(pixel, &mut self.sampler);
-        let l = PathTracer::li(ray, &mut self.sampler, scene, self.max_depth, true);
+        let l = PathTracer::li(ray, &mut self.sampler, scene, self.max_depth, true, arena);
         FRecord {
             pixel,
             f: target_function(l),
             l,
         }
     }
-    pub fn run(&mut self, scene: &Scene) -> FRecord {
+    pub fn run(&mut self, scene: &Scene, arena: &Bump) -> FRecord {
         self.is_large_step = self.sampler.rng.next1d() < self.large_step_prob;
         self.sampler.start_new_iteration(self.is_large_step);
 
@@ -47,7 +49,7 @@ impl Chain {
             pixel.x.min(scene.camera.resolution().x - 1),
             pixel.y.min(scene.camera.resolution().y - 1),
         );
-        self.run_at_pixel(pixel, scene)
+        self.run_at_pixel(pixel, scene, arena)
     }
 }
 impl Pssmlt {
@@ -56,12 +58,13 @@ impl Pssmlt {
         n_bootstrap: usize,
         n_chains: usize,
         scene: &Scene,
+        arena: &mut Bump,
     ) -> (Vec<Chain>, f32) {
         let mut rng = thread_rng();
         let seeds: Vec<_> = { (0..n_bootstrap).map(|_| rng.gen::<u64>()).collect() };
         let fs: Vec<_> = (0..n_bootstrap)
             .map(|i| {
-                Chain {
+                let f = Chain {
                     sampler: MltSampler::new(seeds[i]),
                     cur: FRecord {
                         pixel: UVec2::ZERO,
@@ -72,8 +75,10 @@ impl Pssmlt {
                     large_step_prob: 0.3,
                     max_depth,
                 }
-                .run(scene)
-                .f
+                .run(scene, arena)
+                .f;
+                arena.reset();
+                f
             })
             .collect();
         let dist = Distribution1D::new(&fs).unwrap_or_else(|| {
@@ -94,7 +99,7 @@ impl Pssmlt {
                         large_step_prob: 0.3,
                         max_depth,
                     };
-                    chain.cur = chain.run(scene);
+                    chain.cur = chain.run(scene, arena);
                     chain.sampler.reseed(rng.gen());
                     chain
                 })
@@ -113,12 +118,16 @@ impl Integrator for Pssmlt {
         let film_direct = depth0_pt.render(scene);
         let npixels = (scene.camera.resolution().x * scene.camera.resolution().y) as usize;
         log::info!("bootstrapping...");
+        let arenas = PerThread::new(|| Bump::new());
+        let mut arena = Bump::new();
         let (chains, b) = Self::init_chain(
             self.max_depth as usize,
             self.n_bootstrap,
             self.n_chains,
             scene,
+            &mut arena,
         );
+        std::mem::drop(arena);
         let chains: Vec<Mutex<Chain>> = chains.into_iter().map(|x| Mutex::new(x)).collect();
         log::info!(
             "normalization factor inital estimate: {}",
@@ -132,10 +141,11 @@ impl Integrator for Pssmlt {
         for _ in 0..self.spp {
             (0..npixels).into_par_iter().for_each(|_| {
                 let mut rng = thread_rng();
+                let arena = arenas.get_mut();
                 loop {
                     let chain = &chains[rng.gen::<usize>() % chains.len()];
                     if let Some(mut chain) = chain.try_lock() {
-                        let proposal = chain.run(scene);
+                        let proposal = chain.run(scene, arena);
                         let accept_prob = match chain.cur.f {
                             x if x > 0.0 => (proposal.f / x).min(1.0),
                             _ => 1.0,
@@ -167,6 +177,7 @@ impl Integrator for Pssmlt {
                         break;
                     }
                 }
+                arena.reset();
             });
             progress.inc(1);
         }

@@ -193,8 +193,12 @@ fn main() {
         if profiling {
             akari::util::profile::print_stats();
         }
-        let image = film.to_rgb_image();
-        image.save(output).unwrap();
+        if output.ends_with(".exr") {
+            film.write_exr(&output);
+        } else {
+            let image = film.to_rgb_image();
+            image.save(output).unwrap();
+        }
     } else {
         #[cfg(feature = "gpu")]
         {

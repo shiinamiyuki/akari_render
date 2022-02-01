@@ -7,7 +7,7 @@ use crate::integrator::ao::RTAO;
 use crate::integrator::normalvis::NormalVis;
 use crate::integrator::nrc::CachedPathTracer;
 use crate::integrator::path::PathTracer;
-use crate::integrator::spath::StreamPathTracer;
+// use crate::integrator::spath::StreamPathTracer;
 use crate::integrator::*;
 use crate::light::*;
 use crate::ltc::GgxLtcBsdf;
@@ -350,18 +350,18 @@ pub fn load_integrator(path: &Path) -> Box<dyn Integrator> {
             let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as u32;
             Box::new(PathTracer { spp, max_depth })
         }
-        "spath" => {
-            let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
-            let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as u32;
-            let batch_size = (|| json.get("batch_size")?.as_u64())().unwrap_or(1 << 15) as usize;
-            let sort_rays = (|| json.get("sort_rays")?.as_bool())().unwrap_or(true);
-            Box::new(StreamPathTracer {
-                spp,
-                max_depth,
-                batch_size,
-                sort_rays,
-            })
-        }
+        // "spath" => {
+        //     let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
+        //     let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as u32;
+        //     let batch_size = (|| json.get("batch_size")?.as_u64())().unwrap_or(1 << 15) as usize;
+        //     let sort_rays = (|| json.get("sort_rays")?.as_bool())().unwrap_or(true);
+        //     Box::new(StreamPathTracer {
+        //         spp,
+        //         max_depth,
+        //         batch_size,
+        //         sort_rays,
+        //     })
+        // }
         "bdpt" => {
             let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
             let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as usize;
@@ -415,18 +415,18 @@ pub fn load_integrator(path: &Path) -> Box<dyn Integrator> {
                 direct_spp,
             })
         }
-        "sppm" => {
-            let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as usize;
-            let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as usize;
-            let n_photons = (|| json.get("n_photons")?.as_u64())().unwrap_or(100000) as usize;
-            let initial_radius = (|| json.get("initial_radius")?.as_f64())().unwrap_or(0.1) as f32;
-            Box::new(sppm::Sppm {
-                iterations: spp,
-                max_depth,
-                n_photons,
-                initial_radius,
-            })
-        }
+        // "sppm" => {
+        //     let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as usize;
+        //     let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as usize;
+        //     let n_photons = (|| json.get("n_photons")?.as_u64())().unwrap_or(100000) as usize;
+        //     let initial_radius = (|| json.get("initial_radius")?.as_f64())().unwrap_or(0.1) as f32;
+        //     Box::new(sppm::Sppm {
+        //         iterations: spp,
+        //         max_depth,
+        //         n_photons,
+        //         initial_radius,
+        //     })
+        // }
         "ao" | "rtao" => {
             let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
             Box::new(RTAO { spp })

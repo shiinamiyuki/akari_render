@@ -5,7 +5,9 @@ use crate::sampler::{
     MltSampler, PCGSampler, Pcg, PrimarySample, ReplaySampler, Sampler, SobolSampler,
 };
 use crate::scene::Scene;
+use crate::util::PerThread;
 use crate::*;
+use bumpalo::Bump;
 use integrator::*;
 use pssmlt::Chain;
 use rand::{thread_rng, Rng};
@@ -29,7 +31,14 @@ impl Integrator for Erpt {
         let film_direct = depth0_pt.render(scene);
         let npixels = (scene.camera.resolution().x * scene.camera.resolution().y) as usize;
         log::info!("bootstrapping...");
-        let (_, b) = Pssmlt::init_chain(self.max_depth as usize, self.n_bootstrap, 0, scene);
+        let mut arena = Bump::new();
+        let (_, b) = Pssmlt::init_chain(
+            self.max_depth as usize,
+            self.n_bootstrap,
+            0,
+            scene,
+            &mut arena,
+        );
         let e_avg = b / self.n_bootstrap as f32;
         log::info!("average energy: {}", e_avg);
         let e_d = e_avg / self.mutations_per_chain as f32;
@@ -37,6 +46,7 @@ impl Integrator for Erpt {
         let indirect_film = Film::new(&scene.camera.resolution());
         let chunks = (npixels + 255) / 256;
         let progress = crate::util::create_progess_bar(chunks, "chunks");
+        let arenas = PerThread::new(|| Bump::new());
         parallel_for(npixels, 256, |id| {
             let mut sampler = ReplaySampler::new(SobolSampler::new(id as u64));
             let x = (id as u32) % scene.camera.resolution().x;
@@ -44,10 +54,18 @@ impl Integrator for Erpt {
             let pixel = uvec2(x, y);
             let mut acc_li = Spectrum::zero();
             let mut rng = thread_rng();
+            let arena = arenas.get_mut();
             for _ in 0..self.spp {
                 sampler.start_next_sample();
                 let (ray, _ray_weight) = scene.camera.generate_ray(pixel, &mut sampler);
-                let li = PathTracer::li(ray, &mut sampler, scene, self.max_depth as usize, true);
+                let li = PathTracer::li(
+                    ray,
+                    &mut sampler,
+                    scene,
+                    self.max_depth as usize,
+                    true,
+                    arena,
+                );
                 let e = pssmlt::target_function(li);
                 let mean_chains = e / (self.mutations_per_chain as f32 * e_d);
                 let dep_energy =
@@ -70,7 +88,7 @@ impl Integrator for Erpt {
                             max_depth: self.max_depth as usize,
                         };
                         for _ in 0..self.mutations_per_chain {
-                            let proposal = chain.run(scene);
+                            let proposal = chain.run(scene, arena);
                             let accept_prob = match chain.cur.f {
                                 x if x > 0.0 => (proposal.f / x).min(1.0),
                                 _ => 1.0,
@@ -96,6 +114,7 @@ impl Integrator for Erpt {
                     }
                 }
                 acc_li += li;
+                arena.reset();
             }
             acc_li = acc_li / (self.spp as f32);
             let _ = acc_li;

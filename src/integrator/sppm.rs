@@ -1,3 +1,5 @@
+use bumpalo::Bump;
+
 use crate::bsdf::*;
 // use crate::camera::*;
 use crate::film::*;
@@ -7,6 +9,7 @@ use crate::sampler::*;
 use crate::scene::*;
 use crate::shape::*;
 use crate::texture::ShadingPoint;
+use crate::util::PerThread;
 use crate::*;
 #[derive(Clone)]
 struct VisiblePoint<'a> {
@@ -189,6 +192,7 @@ impl Integrator for Sppm {
         let p_samplers = &UnsafePointer::new(samplers.as_mut_ptr());
         let p_pixels = &UnsafePointer::new(pixels.as_mut_ptr());
         let p_photon_samplers = &UnsafePointer::new(photon_samplers.as_mut_ptr());
+        let mut arenas = PerThread::new(|| Bump::new());
         for _iteration in 0..self.iterations {
             parallel_for(npixels, 256, |id| {
                 let sppm_pixel = unsafe { p_pixels.offset(id as isize).as_mut().unwrap() };
@@ -201,20 +205,17 @@ impl Integrator for Sppm {
 
                 let sampler = unsafe { p_samplers.offset(id as isize).as_mut().unwrap().as_mut() };
                 let (ray, _ray_weight) = scene.camera.generate_ray(pixel, sampler);
+                let arena = arenas.get_mut();
                 if let Some(si) = scene.intersect(&ray) {
                     let ng = si.ng;
                     let frame = Frame::from_normal(ng);
                     let shape = si.shape;
-                    let opt_bsdf = si.bsdf;
+                    let opt_bsdf = si.evaluate_bsdf(arena);
                     if opt_bsdf.is_none() {
                         return;
                     }
                     let p = ray.at(si.t);
-                    let bsdf = BsdfClosure {
-                        sp: si.sp,
-                        frame,
-                        bsdf: opt_bsdf.unwrap(),
-                    };
+                    let bsdf = opt_bsdf.unwrap();
                     let wo = -ray.d;
                     sppm_pixel.vp = Some(VisiblePoint {
                         p,
@@ -224,6 +225,7 @@ impl Integrator for Sppm {
                     });
                 }
             });
+            arenas.inner().iter().for_each(|a| a.reset());
             {
                 let mut bound = Bounds3f::default();
                 let mut max_radius = 0.0 as f64;

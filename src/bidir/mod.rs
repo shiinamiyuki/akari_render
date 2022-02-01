@@ -1,3 +1,7 @@
+use std::ops::DerefMut;
+
+use bumpalo::Bump;
+
 use crate::bsdf::*;
 use crate::camera::*;
 use crate::light::*;
@@ -39,6 +43,49 @@ pub enum Vertex<'a> {
     Surface(SurfaceVertex<'a>),
 }
 
+pub struct Path<'a> {
+    vertices: *mut Vertex<'a>,
+    len: usize,
+    capacity: usize,
+}
+impl<'a> std::ops::Deref for Path<'a> {
+    type Target = [Vertex<'a>];
+    fn deref(&self) -> &Self::Target {
+        unsafe { std::slice::from_raw_parts(self.vertices, self.len) }
+    }
+}
+impl<'a> std::ops::DerefMut for Path<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { std::slice::from_raw_parts_mut(self.vertices, self.len) }
+    }
+}
+impl<'a> Path<'a> {
+    pub fn new<'b: 'a>(arena: &'b Bump, capacity: usize) -> Self {
+        Self {
+            capacity,
+            len: 0,
+            vertices: arena
+                .alloc_layout(std::alloc::Layout::array::<Vertex<'a>>(capacity).unwrap())
+                .as_ptr() as *mut Vertex<'a>,
+        }
+    }
+    pub fn push(&mut self, v: Vertex<'a>) {
+        if self.len == self.capacity {
+            panic!("too many vertice");
+        } else {
+            unsafe { std::ptr::write(self.vertices.offset(self.len as isize), v) }
+            self.len += 1;
+        }
+    }
+    pub fn clear(&mut self) {
+        for i in 0..self.len {
+            unsafe {
+                std::mem::drop(std::ptr::read(self.vertices.offset(i as isize)));
+            }
+        }
+        self.len = 0;
+    }
+}
 impl<'a> Vertex<'a> {
     pub fn create_camera_vertex(
         camera: &'a dyn Camera,
@@ -233,7 +280,7 @@ pub enum TransportMode {
     IMPORTANCE,
     RADIANCE,
 }
-pub fn random_walk<'a>(
+pub fn random_walk<'a, 'b>(
     scene: &'a Scene,
     mut ray: Ray,
     sampler: &mut dyn Sampler,
@@ -241,8 +288,11 @@ pub fn random_walk<'a>(
     pdf: f32,
     max_depth: usize,
     mode: TransportMode,
-    path: &mut Path<'a>,
-) {
+    path: &mut Path<'b>,
+    arena: &'b Bump,
+) where
+    'a: 'b,
+{
     assert!(pdf > 0.0, "pdf is {}", pdf);
     assert!(path.len() == 1);
     if max_depth == 0 {
@@ -265,16 +315,12 @@ pub fn random_walk<'a>(
                     break;
                 }
             }
-            let opt_bsdf = si.bsdf;
+            let opt_bsdf = si.evaluate_bsdf(arena);
             if opt_bsdf.is_none() {
                 break;
             }
             let p = ray.at(si.t);
-            let bsdf = BsdfClosure {
-                sp: si.sp,
-                frame,
-                bsdf: opt_bsdf.unwrap(),
-            };
+            let bsdf = opt_bsdf.unwrap();
             let wo = -ray.d;
 
             let prev_index = depth;
@@ -306,13 +352,16 @@ pub fn random_walk<'a>(
         }
     }
 }
-pub fn generate_camera_path<'a>(
+pub fn generate_camera_path<'a, 'b>(
     scene: &'a Scene,
     pixel: UVec2,
     sampler: &mut dyn Sampler,
     max_depth: usize,
-    path: &mut Path<'a>,
-) {
+    path: &mut Path<'b>,
+    arena: &'b Bump,
+) where
+    'a: 'b,
+{
     assert!(max_depth > 0);
     path.clear();
     let camera = scene.camera.as_ref();
@@ -332,14 +381,18 @@ pub fn generate_camera_path<'a>(
         max_depth - 1,
         TransportMode::RADIANCE,
         path,
+        arena,
     );
 }
-pub fn generate_light_path<'a>(
+pub fn generate_light_path<'a, 'b>(
     scene: &'a Scene,
     sampler: &mut dyn Sampler,
     max_depth: usize,
-    path: &mut Path<'a>,
-) {
+    path: &mut Path<'b>,
+    arena: &'b Bump,
+) where
+    'a: 'b,
+{
     if max_depth == 0 {
         return;
     }
@@ -369,9 +422,9 @@ pub fn generate_light_path<'a>(
         max_depth - 1,
         TransportMode::IMPORTANCE,
         path,
+        arena,
     );
 }
-pub type Path<'a> = Vec<Vertex<'a>>;
 pub fn geometry_term(scene: &Scene, v1: &Vertex, v2: &Vertex) -> f32 {
     let mut wi = v1.p() - v2.p();
     let dist2: f32 = wi.length_squared();
@@ -389,36 +442,25 @@ pub struct ConnectionStrategy {
     pub s: usize,
     pub t: usize,
 }
-#[derive(Clone)]
-pub struct Scratch<'a> {
-    pub new_light_path: Path<'a>,
-    pub new_eye_path: Path<'a>,
-    // strat:Option<ConnectionStrategy>,
-}
-impl<'a> Scratch<'a> {
-    pub fn new() -> Self {
-        Self {
-            new_light_path: Vec::new(),
-            new_eye_path: Vec::new(),
-        }
-    }
-}
-pub fn mis_weight<'a>(
+
+pub fn mis_weight<'a, 'b>(
     scene: &'a Scene,
     strat: ConnectionStrategy,
-    original_light_path: &Path<'a>,
-    original_eye_path: &Path<'a>,
-    sampled: Option<Vertex<'a>>,
-    scratch: &mut Scratch<'a>,
-) -> f32 {
+    original_light_path: &Path<'b>,
+    original_eye_path: &Path<'b>,
+    sampled: Option<Vertex<'b>>,
+    light_path: &mut Path<'b>,
+    eye_path: &mut Path<'b>,
+) -> f32
+where
+    'a: 'b,
+{
     let s = strat.s;
     let t = strat.t;
     // 1.0 / (s + t - 1) as f32
     if s + t == 2 {
         return 1.0;
     }
-    let eye_path = &mut scratch.new_eye_path;
-    let light_path = &mut scratch.new_light_path;
     eye_path.clear();
     light_path.clear();
     for i in 0..s {
@@ -440,22 +482,22 @@ pub fn mis_weight<'a>(
     // update vertices
     {
         let qs = if s > 0 {
-            &mut light_path[s - 1] as *mut Vertex<'a>
+            &mut light_path[s - 1] as *mut Vertex<'b>
         } else {
             std::ptr::null_mut()
         };
         let qs_minus = if s > 1 {
-            &mut light_path[s - 2] as *mut Vertex<'a>
+            &mut light_path[s - 2] as *mut Vertex<'b>
         } else {
             std::ptr::null_mut()
         };
         let pt = if t > 0 {
-            &mut eye_path[t - 1] as *mut Vertex<'a>
+            &mut eye_path[t - 1] as *mut Vertex<'b>
         } else {
             std::ptr::null_mut()
         };
         let pt_minus = if t > 1 {
-            &mut eye_path[t - 2] as *mut Vertex<'a>
+            &mut eye_path[t - 2] as *mut Vertex<'b>
         } else {
             std::ptr::null_mut()
         };
@@ -538,14 +580,18 @@ pub fn mis_weight<'a>(
     // println!("{}", 1.0 / (1.0 + sum_ri));
     1.0 / (1.0 + sum_ri)
 }
-pub fn connect_paths<'a>(
+pub fn connect_paths<'a, 'b>(
     scene: &'a Scene,
     strat: ConnectionStrategy,
-    light_path: &Path<'a>,
-    eye_path: &Path<'a>,
+    light_path: &Path<'b>,
+    eye_path: &Path<'b>,
     sampler: &mut dyn Sampler,
-    scratch: &mut Scratch<'a>,
-) -> Spectrum {
+    new_light_path: &mut Path<'b>,
+    new_eye_path: &mut Path<'b>,
+) -> Spectrum
+where
+    'a: 'b,
+{
     let s = strat.s;
     let t = strat.t;
     let mut sampled: Option<Vertex> = None;
@@ -614,7 +660,15 @@ pub fn connect_paths<'a>(
     let mis_weight = if l.is_black() {
         0.0
     } else {
-        mis_weight(scene, strat, light_path, eye_path, sampled, scratch)
+        mis_weight(
+            scene,
+            strat,
+            light_path,
+            eye_path,
+            sampled,
+            new_light_path,
+            new_eye_path,
+        )
     };
     l * mis_weight
 }

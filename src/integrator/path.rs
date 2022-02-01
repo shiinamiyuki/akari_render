@@ -1,3 +1,5 @@
+use bumpalo::Bump;
+
 use crate::bsdf::*;
 // use crate::camera::*;
 use crate::film::*;
@@ -8,6 +10,7 @@ use crate::scene::*;
 use crate::shape::*;
 use crate::texture::ShadingPoint;
 use crate::util::profile::scope;
+use crate::util::PerThread;
 use crate::*;
 pub struct PathTracer {
     pub spp: u32,
@@ -25,6 +28,7 @@ impl PathTracer {
         scene: &Scene,
         max_depth: usize,
         indirect_only: bool,
+        arena: &Bump,
     ) -> Spectrum {
         let mut li = Spectrum::zero();
         let mut beta = Spectrum::one();
@@ -39,16 +43,12 @@ impl PathTracer {
                     let ns = si.ns;
                     let frame = Frame::from_normal(ng);
                     let shape = si.shape;
-                    let opt_bsdf = si.bsdf;
+                    let opt_bsdf = si.evaluate_bsdf(arena);
                     if opt_bsdf.is_none() {
                         break;
                     }
                     let p = ray.at(si.t);
-                    let bsdf = BsdfClosure {
-                        sp: si.sp,
-                        frame,
-                        bsdf: opt_bsdf.unwrap(),
-                    };
+                    let bsdf = opt_bsdf.unwrap();
                     let _profiler = scope("PathTracer::li::<env hit>");
                     if let Some(light) = scene.get_light_of_shape(shape) {
                         // li += beta * light.le(&ray);
@@ -161,17 +161,30 @@ impl Integrator for PathTracer {
         let film = Film::new(&scene.camera.resolution());
         let chunks = (npixels + 255) / 256;
         let progress = crate::util::create_progess_bar(chunks, "chunks");
+        let arenas = PerThread::new(|| Bump::new());
         parallel_for(npixels, 256, |id| {
             let mut sampler = SobolSampler::new(id as u64);
             let x = (id as u32) % scene.camera.resolution().x;
             let y = (id as u32) / scene.camera.resolution().x;
             let pixel = uvec2(x, y);
             let mut acc_li = Spectrum::zero();
+            let arena = arenas.get_mut();
             for _ in 0..self.spp {
-                sampler.start_next_sample();
-                let (ray, _ray_weight) = scene.camera.generate_ray(pixel, &mut sampler);
-                let li = Self::li(ray, &mut sampler, scene, self.max_depth as usize, false);
-                acc_li += li;
+                {
+                    let arena = &*arena;
+                    sampler.start_next_sample();
+                    let (ray, _ray_weight) = scene.camera.generate_ray(pixel, &mut sampler);
+                    let li = Self::li(
+                        ray,
+                        &mut sampler,
+                        scene,
+                        self.max_depth as usize,
+                        false,
+                        arena,
+                    );
+                    acc_li += li;
+                }
+                arena.reset();
             }
             acc_li = acc_li / (self.spp as f32);
             film.add_sample(&uvec2(x, y), &acc_li, 1.0);

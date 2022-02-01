@@ -1,16 +1,20 @@
 use crate::{
-    bsdf::{Bsdf, BsdfFlags, BsdfSample},
-    texture::Texture,
+    bsdf::{Bsdf, BsdfFlags, BsdfSample, LocalBsdfClosure},
+    texture::{Texture, ShadingPoint},
     *,
 };
 use akari_const::GGX_LTC_FIT;
+use bumpalo::Bump;
 use glam::DMat3;
 
 pub struct GgxLtcBsdf {
     pub color: Arc<dyn Texture>,
     pub roughness: Arc<dyn Texture>,
 }
-
+pub struct GgxLtcBsdfClosure {
+    pub color: Spectrum,
+    pub roughness: f32,
+}
 pub struct LTC {
     mat: DMat3,
     amp: f64,
@@ -67,14 +71,14 @@ fn frame_from_wo(wo: Vec3) -> Frame {
     Frame { T, B, N }
 }
 impl_base!(GgxLtcBsdf);
-impl Bsdf for GgxLtcBsdf {
-    fn evaluate(&self, sp: &texture::ShadingPoint, wo: Vec3, wi: Vec3) -> Spectrum {
+impl LocalBsdfClosure for GgxLtcBsdfClosure {
+    fn evaluate(&self, wo: Vec3, wi: Vec3) -> Spectrum {
         if !Frame::same_hemisphere(wo, wi) {
             return Spectrum::zero();
         }
         let theta = Frame::abs_cos_theta(wo);
-        let alpha = self.roughness.evaluate_f(sp).powi(2);
-        let color = self.color.evaluate_s(sp);
+        let alpha = self.roughness.powi(2);
+        let color = self.color;
         let ltc = LTC::from_theta_alpha(theta, alpha);
         let frame = frame_from_wo(wo);
         let f = ltc
@@ -87,12 +91,12 @@ impl Bsdf for GgxLtcBsdf {
         }
     }
 
-    fn evaluate_pdf(&self, sp: &texture::ShadingPoint, wo: Vec3, wi: Vec3) -> f32 {
+    fn evaluate_pdf(&self, wo: Vec3, wi: Vec3) -> f32 {
         if !Frame::same_hemisphere(wo, wi) {
             return 0.0;
         }
         let theta = Frame::abs_cos_theta(wo);
-        let alpha = self.roughness.evaluate_f(sp).powi(2);
+        let alpha = self.roughness.powi(2);
         let ltc = LTC::from_theta_alpha(theta, alpha);
         let frame = frame_from_wo(wo);
         let pdf = ltc
@@ -105,13 +109,13 @@ impl Bsdf for GgxLtcBsdf {
         }
     }
 
-    fn sample(&self, sp: &texture::ShadingPoint, u: Vec2, wo: Vec3) -> Option<BsdfSample> {
+    fn sample(&self, u: Vec2, wo: Vec3) -> Option<BsdfSample> {
         let theta = Frame::abs_cos_theta(wo);
-        let alpha = self.roughness.evaluate_f(sp).powi(2);
+        let alpha = self.roughness.powi(2);
         let ltc = LTC::from_theta_alpha(theta, alpha);
         let mut wi = ltc.sample(u.x, u.y);
         let frame = frame_from_wo(wo);
-        let color = self.color.evaluate_s(sp);
+        let color = self.color;
         let (f, pdf) = ltc.eval_f_pdf(wi);
         if !(pdf > 0.0) && !(f > 0.0) {
             return None;
@@ -131,11 +135,23 @@ impl Bsdf for GgxLtcBsdf {
         })
     }
 
-    fn info(&self, sp: &texture::ShadingPoint) -> bsdf::BsdfInfo {
+    fn info(&self) -> bsdf::BsdfInfo {
         bsdf::BsdfInfo {
-            albedo: self.color.evaluate_s(sp),
-            roughness: self.roughness.evaluate_f(sp),
+            albedo: self.color,
+            roughness: self.roughness,
             metallic: 1.0,
         }
+    }
+}
+impl Bsdf for GgxLtcBsdf {
+    fn evaluate<'a, 'b: 'a>(
+        &'b self,
+        sp: &ShadingPoint,
+        arena: &'a Bump,
+    ) -> &'a dyn LocalBsdfClosure {
+        arena.alloc(GgxLtcBsdfClosure {
+            color: self.color.evaluate_s(sp),
+            roughness: self.roughness.evaluate_f(sp),
+        })
     }
 }

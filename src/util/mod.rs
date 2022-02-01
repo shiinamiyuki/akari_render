@@ -12,6 +12,7 @@ pub mod nn_v2;
 pub mod profile;
 #[macro_use]
 pub mod binserde;
+
 pub struct CurrentDirGuard {
     current_dir: PathBuf,
 }
@@ -25,28 +26,6 @@ impl CurrentDirGuard {
 impl Drop for CurrentDirGuard {
     fn drop(&mut self) {
         std::env::set_current_dir(&self.current_dir).unwrap();
-    }
-}
-pub fn serialize_pod<T: bytemuck::Pod>(pod: T, bytes: &mut Vec<u8>) {
-    bytes.extend(bytemuck::cast_slice::<T, u8>(&[pod]));
-}
-pub fn serialize_pods<T: bytemuck::Pod>(pods: &Vec<T>, bytes: &mut Vec<u8>) {
-    serialize_pod(pods.len(), bytes);
-    bytes.extend_from_slice(bytemuck::cast_slice::<T, u8>(&pods[..]));
-}
-
-pub fn deserialize_pod<T: bytemuck::Pod, In: Read>(pod: &mut T, s: &mut In) {
-    let tmp = unsafe { std::slice::from_raw_parts_mut(pod as *mut T, 1) };
-    s.read(bytemuck::cast_slice_mut::<T, u8>(tmp)).unwrap();
-}
-pub fn deserialize_pods<T: bytemuck::Pod, In: Read>(pods: &mut Vec<T>, s: &mut In) {
-    let mut len: usize = 0;
-    deserialize_pod(&mut len, s);
-    assert!(pods.is_empty());
-    pods.reserve(len);
-    {
-        let slice = unsafe { std::slice::from_raw_parts_mut(pods.as_mut_ptr(), len) };
-        s.read(bytemuck::cast_slice_mut::<T, u8>(slice)).unwrap();
     }
 }
 
@@ -68,14 +47,17 @@ pub fn create_progess_bar(count: usize, what: &str) -> ProgressBar {
 pub struct PerThread<T> {
     data: UnsafeCell<Vec<T>>,
 }
-unsafe impl<T: Sync + Send + Clone> Sync for PerThread<T> {}
-unsafe impl<T: Sync + Send + Clone> Send for PerThread<T> {}
-impl<T: Sync + Send + Clone> PerThread<T> {
-    pub fn new(v: T) -> Self {
+unsafe impl<T> Sync for PerThread<T> {}
+unsafe impl<T> Send for PerThread<T> {}
+impl<T> PerThread<T> {
+    pub fn new<F: Fn() -> T>(f: F) -> Self {
         let num_threads = rayon::current_num_threads();
         Self {
-            data: UnsafeCell::new(vec![v; num_threads]),
+            data: UnsafeCell::new((0..num_threads).map(|_| f()).collect()),
         }
+    }
+    pub fn inner(&mut self) -> &[T] {
+        self.data.get_mut().as_slice()
     }
     pub fn get(&self) -> &T {
         unsafe { &self.data.get().as_ref().unwrap()[rayon::current_thread_index().unwrap()] }
