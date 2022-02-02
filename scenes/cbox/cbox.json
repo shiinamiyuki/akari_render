@@ -1,0 +1,617 @@
+{
+    "named_bsdfs": {
+        "shortBox": {
+            "Principled": {
+                "color": {
+                    "Srgb": [
+                        0.8676987886428833,
+                        0.8596959114074707,
+                        0.8433891534805298
+                    ]
+                },
+                "subsurface": {
+                    "Float": 0.0
+                },
+                "subsurface_radius": {
+                    "Float3": [
+                        1.0,
+                        0.20000000298023224,
+                        0.10000000149011612
+                    ]
+                },
+                "subsurface_color": {
+                    "Float": 0.0
+                },
+                "metallic": {
+                    "Float": 0.0
+                },
+                "specular": {
+                    "Float": 0.0
+                },
+                "specular_tint": {
+                    "Float": 0.0
+                },
+                "roughness": {
+                    "Float": 0.4000000059604645
+                },
+                "anisotropic": {
+                    "Float": 0.0
+                },
+                "anisotropic_rotation": {
+                    "Float": 0.0
+                },
+                "sheen": {
+                    "Float": 0.0
+                },
+                "sheen_tint": {
+                    "Float": 0.5
+                },
+                "clearcoat": {
+                    "Float": 0.0
+                },
+                "clearcoat_roughness": {
+                    "Float": 0.029999999329447746
+                },
+                "ior": {
+                    "Float": 1.4500000476837158
+                },
+                "transmission": {
+                    "Float": 0.0
+                },
+                "emission": {
+                    "Float": 0.0
+                },
+                "hint": "ltc"
+            }
+        },
+        "rightWall": {
+            "Principled": {
+                "color": {
+                    "Srgb": [
+                        0.4100208580493927,
+                        0.701410710811615,
+                        0.33361509442329407
+                    ]
+                },
+                "subsurface": {
+                    "Float": 0.0
+                },
+                "subsurface_radius": {
+                    "Float3": [
+                        1.0,
+                        0.20000000298023224,
+                        0.10000000149011612
+                    ]
+                },
+                "subsurface_color": {
+                    "Float": 0.0
+                },
+                "metallic": {
+                    "Float": 0.0
+                },
+                "specular": {
+                    "Float": 0.0
+                },
+                "specular_tint": {
+                    "Float": 0.0
+                },
+                "roughness": {
+                    "Float": 0.4000000059604645
+                },
+                "anisotropic": {
+                    "Float": 0.0
+                },
+                "anisotropic_rotation": {
+                    "Float": 0.0
+                },
+                "sheen": {
+                    "Float": 0.0
+                },
+                "sheen_tint": {
+                    "Float": 0.5
+                },
+                "clearcoat": {
+                    "Float": 0.0
+                },
+                "clearcoat_roughness": {
+                    "Float": 0.029999999329447746
+                },
+                "ior": {
+                    "Float": 1.4500000476837158
+                },
+                "transmission": {
+                    "Float": 0.0
+                },
+                "emission": {
+                    "Float": 0.0
+                },
+                "hint": "ltc"
+            }
+        },
+        "ceiling": {
+            "Principled": {
+                "color": {
+                    "Srgb": [
+                        0.8676987886428833,
+                        0.8596959114074707,
+                        0.8433891534805298
+                    ]
+                },
+                "subsurface": {
+                    "Float": 0.0
+                },
+                "subsurface_radius": {
+                    "Float3": [
+                        1.0,
+                        0.20000000298023224,
+                        0.10000000149011612
+                    ]
+                },
+                "subsurface_color": {
+                    "Float": 0.0
+                },
+                "metallic": {
+                    "Float": 0.0
+                },
+                "specular": {
+                    "Float": 0.0
+                },
+                "specular_tint": {
+                    "Float": 0.0
+                },
+                "roughness": {
+                    "Float": 0.4000000059604645
+                },
+                "anisotropic": {
+                    "Float": 0.0
+                },
+                "anisotropic_rotation": {
+                    "Float": 0.0
+                },
+                "sheen": {
+                    "Float": 0.0
+                },
+                "sheen_tint": {
+                    "Float": 0.5
+                },
+                "clearcoat": {
+                    "Float": 0.0
+                },
+                "clearcoat_roughness": {
+                    "Float": 0.029999999329447746
+                },
+                "ior": {
+                    "Float": 1.4500000476837158
+                },
+                "transmission": {
+                    "Float": 0.0
+                },
+                "emission": {
+                    "Float": 0.0
+                },
+                "hint": "ltc"
+            }
+        },
+        "floor": {
+            "Principled": {
+                "color": {
+                    "Srgb": [
+                        0.8676987886428833,
+                        0.8596959114074707,
+                        0.8433891534805298
+                    ]
+                },
+                "subsurface": {
+                    "Float": 0.0
+                },
+                "subsurface_radius": {
+                    "Float3": [
+                        1.0,
+                        0.20000000298023224,
+                        0.10000000149011612
+                    ]
+                },
+                "subsurface_color": {
+                    "Float": 0.0
+                },
+                "metallic": {
+                    "Float": 0.0
+                },
+                "specular": {
+                    "Float": 0.0
+                },
+                "specular_tint": {
+                    "Float": 0.0
+                },
+                "roughness": {
+                    "Float": 0.4000000059604645
+                },
+                "anisotropic": {
+                    "Float": 0.0
+                },
+                "anisotropic_rotation": {
+                    "Float": 0.0
+                },
+                "sheen": {
+                    "Float": 0.0
+                },
+                "sheen_tint": {
+                    "Float": 0.5
+                },
+                "clearcoat": {
+                    "Float": 0.0
+                },
+                "clearcoat_roughness": {
+                    "Float": 0.029999999329447746
+                },
+                "ior": {
+                    "Float": 1.4500000476837158
+                },
+                "transmission": {
+                    "Float": 0.0
+                },
+                "emission": {
+                    "Float": 0.0
+                },
+                "hint": "ltc"
+            }
+        },
+        "leftWall": {
+            "Principled": {
+                "color": {
+                    "Srgb": [
+                        0.8152506351470947,
+                        0.2827792763710022,
+                        0.24780049920082092
+                    ]
+                },
+                "subsurface": {
+                    "Float": 0.0
+                },
+                "subsurface_radius": {
+                    "Float3": [
+                        1.0,
+                        0.20000000298023224,
+                        0.10000000149011612
+                    ]
+                },
+                "subsurface_color": {
+                    "Float": 0.0
+                },
+                "metallic": {
+                    "Float": 0.0
+                },
+                "specular": {
+                    "Float": 0.0
+                },
+                "specular_tint": {
+                    "Float": 0.0
+                },
+                "roughness": {
+                    "Float": 0.4000000059604645
+                },
+                "anisotropic": {
+                    "Float": 0.0
+                },
+                "anisotropic_rotation": {
+                    "Float": 0.0
+                },
+                "sheen": {
+                    "Float": 0.0
+                },
+                "sheen_tint": {
+                    "Float": 0.5
+                },
+                "clearcoat": {
+                    "Float": 0.0
+                },
+                "clearcoat_roughness": {
+                    "Float": 0.029999999329447746
+                },
+                "ior": {
+                    "Float": 1.4500000476837158
+                },
+                "transmission": {
+                    "Float": 0.0
+                },
+                "emission": {
+                    "Float": 0.0
+                },
+                "hint": "ltc"
+            }
+        },
+        "tallBox": {
+            "Principled": {
+                "color": {
+                    "Srgb": [
+                        0.8676987886428833,
+                        0.8596959114074707,
+                        0.8433891534805298
+                    ]
+                },
+                "subsurface": {
+                    "Float": 0.0
+                },
+                "subsurface_radius": {
+                    "Float3": [
+                        1.0,
+                        0.20000000298023224,
+                        0.10000000149011612
+                    ]
+                },
+                "subsurface_color": {
+                    "Float": 0.0
+                },
+                "metallic": {
+                    "Float": 1.0
+                },
+                "specular": {
+                    "Float": 0.0
+                },
+                "specular_tint": {
+                    "Float": 0.0
+                },
+                "roughness": {
+                    "Float": 0.01
+                },
+                "anisotropic": {
+                    "Float": 0.0
+                },
+                "anisotropic_rotation": {
+                    "Float": 0.0
+                },
+                "sheen": {
+                    "Float": 0.0
+                },
+                "sheen_tint": {
+                    "Float": 0.5
+                },
+                "clearcoat": {
+                    "Float": 0.0
+                },
+                "clearcoat_roughness": {
+                    "Float": 0.029999999329447746
+                },
+                "ior": {
+                    "Float": 1.4500000476837158
+                },
+                "transmission": {
+                    "Float": 0.0
+                },
+                "emission": {
+                    "Float": 0.0
+                },
+                "hint": "ltc"
+            }
+        },
+        "backWall": {
+            "Principled": {
+                "color": {
+                    "Srgb": [
+                        0.8676987886428833,
+                        0.8596959114074707,
+                        0.8433891534805298
+                    ]
+                },
+                "subsurface": {
+                    "Float": 0.0
+                },
+                "subsurface_radius": {
+                    "Float3": [
+                        1.0,
+                        0.20000000298023224,
+                        0.10000000149011612
+                    ]
+                },
+                "subsurface_color": {
+                    "Float": 0.0
+                },
+                "metallic": {
+                    "Float": 0.0
+                },
+                "specular": {
+                    "Float": 0.0
+                },
+                "specular_tint": {
+                    "Float": 0.0
+                },
+                "roughness": {
+                    "Float": 0.4000000059604645
+                },
+                "anisotropic": {
+                    "Float": 0.0
+                },
+                "anisotropic_rotation": {
+                    "Float": 0.0
+                },
+                "sheen": {
+                    "Float": 0.0
+                },
+                "sheen_tint": {
+                    "Float": 0.5
+                },
+                "clearcoat": {
+                    "Float": 0.0
+                },
+                "clearcoat_roughness": {
+                    "Float": 0.029999999329447746
+                },
+                "ior": {
+                    "Float": 1.4500000476837158
+                },
+                "transmission": {
+                    "Float": 0.0
+                },
+                "emission": {
+                    "Float": 0.0
+                },
+                "hint": "ltc"
+            }
+        },
+        "light": {
+            "Principled": {
+                "color": {
+                    "Srgb": [
+                        0.8962438106536865,
+                        0.8962438106536865,
+                        0.8962438106536865
+                    ]
+                },
+                "subsurface": {
+                    "Float": 0.0
+                },
+                "subsurface_radius": {
+                    "Float3": [
+                        1.0,
+                        0.20000000298023224,
+                        0.10000000149011612
+                    ]
+                },
+                "subsurface_color": {
+                    "Float": 0.0
+                },
+                "metallic": {
+                    "Float": 0.0
+                },
+                "specular": {
+                    "Float": 0.0
+                },
+                "specular_tint": {
+                    "Float": 0.0
+                },
+                "roughness": {
+                    "Float": 0.4000000059604645
+                },
+                "anisotropic": {
+                    "Float": 0.0
+                },
+                "anisotropic_rotation": {
+                    "Float": 0.0
+                },
+                "sheen": {
+                    "Float": 0.0
+                },
+                "sheen_tint": {
+                    "Float": 0.5
+                },
+                "clearcoat": {
+                    "Float": 0.0
+                },
+                "clearcoat_roughness": {
+                    "Float": 0.029999999329447746
+                },
+                "ior": {
+                    "Float": 1.4500000476837158
+                },
+                "transmission": {
+                    "Float": 0.0
+                },
+                "emission": {
+                    "Float3": [
+                        17.0,
+                        12.0,
+                        4.0
+                    ]
+                },
+                "hint": "ltc"
+            }
+        }
+    },
+    "camera": {
+        "Perspective": {
+            "res": [
+                512,
+                512
+            ],
+            "fov": 15.0,
+            "lens_radius": 0.0,
+            "focal": 1.0,
+            "transform": {
+                "translate": [
+                    0.0,
+                    1.0,
+                    9.0
+                ],
+                "rotate": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            }
+        }
+    },
+    "lights": [
+        
+    ],
+    "shapes": [
+        {
+            "Mesh": [
+                "CornellBox-Original_floor_0.mesh",
+                {
+                    "Named": "floor"
+                }
+            ]
+        },
+        {
+            "Mesh": [
+                "CornellBox-Original_ceiling_1.mesh",
+                {
+                    "Named": "ceiling"
+                }
+            ]
+        },
+        {
+            "Mesh": [
+                "CornellBox-Original_backWall_2.mesh",
+                {
+                    "Named": "backWall"
+                }
+            ]
+        },
+        {
+            "Mesh": [
+                "CornellBox-Original_rightWall_3.mesh",
+                {
+                    "Named": "rightWall"
+                }
+            ]
+        },
+        {
+            "Mesh": [
+                "CornellBox-Original_leftWall_4.mesh",
+                {
+                    "Named": "leftWall"
+                }
+            ]
+        },
+        {
+            "Mesh": [
+                "CornellBox-Original_shortBox_5.mesh",
+                {
+                    "Named": "shortBox"
+                }
+            ]
+        },
+        {
+            "Mesh": [
+                "CornellBox-Original_tallBox_6.mesh",
+                {
+                    "Named": "tallBox"
+                }
+            ]
+        },
+        {
+            "Mesh": [
+                "CornellBox-Original_light_7.mesh",
+                {
+                    "Named": "light"
+                }
+            ]
+        }
+    ]
+}

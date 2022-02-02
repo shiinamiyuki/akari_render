@@ -68,11 +68,12 @@ impl Decode for String {
 }
 
 mod test {
-    use std::io::Cursor;
+    
 
     #[test]
     fn test_serde() {
         use super::*;
+        use std::io::Cursor;
         let s0: String = "Hello world".into();
         let s1: String = "Binary serde good!".into();
         let v0: Vec<[f32; 3]> = vec![[0.2, 0.3, 0.4]; 16];

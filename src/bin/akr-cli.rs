@@ -181,7 +181,7 @@ fn main() {
             log::error!("no filed provided");
             exit(1);
         };
-        log::info!("acceleration Structure: {}", accel);
+        log::info!("acceleration structure: {}", accel);
         log::info!("rendering with {} threads", rayon::current_num_threads());
         let (film, time) = profile_fn(|| -> Film { integrator.as_mut().render(&scene) });
         log::info!("took {}s", time);

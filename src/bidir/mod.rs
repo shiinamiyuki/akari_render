@@ -580,7 +580,7 @@ where
             } else {
                 light_path[0].is_delta_light()
             };
-            assert!(!delta_light);
+            // assert!(!delta_light);
             if !light_path[i].base().delta && !delta_light {
                 sum_ri += ri;
             }

@@ -652,7 +652,7 @@ pub fn load_model(
             texcoord_indices,
             normal_indices,
         };
-        if mesh.normals.is_empty() || generate_normal.is_some() {
+        if mesh.normals.is_empty() && generate_normal.is_some() {
             // todo!()
             println!("computing normals for {}", m.name);
             compute_normals(&mut imported, generate_normal.unwrap());
