@@ -21,6 +21,11 @@ Previous version with PPG and SMCMC is in [legacy-cpp](https://github.com/shiina
 ## Build & Run
 ```
 cargo build --relase
-cargo run --release --bin akr-cli -- -s ./scenes/cbox.json -a ./scenes/integrator.json
-cargo run --release --features gpu --bin akr-cli -- -s ./scenes/cbox.json -a ./scenes/integrator.json --gpu
+cargo run --release --bin akr-cli -- -s ./scenes/cbox/cbox.json -a ./scenes/cbox/integrator.json
+
+# On Mac:
+cargo run --release --bin akr-cli -- -s ./scenes/cbox/cbox.json -a ./scenes/cbox/integrator.json --as qbvh
+
+# GPU Rendering is broken now
+# cargo run --release --features gpu --bin akr-cli -- -s ./scenes/cbox.json -a ./scenes/integrator.json --gpu
 ```
