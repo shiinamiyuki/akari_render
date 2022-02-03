@@ -355,7 +355,7 @@ impl Integrator for Sppm {
             let p = unsafe { p_pixels.offset(id as isize).as_ref().unwrap() };
             let l = p.tau / ((self.iterations * self.n_photons) as f32 * PI * p.radius * p.radius);
 
-            film.add_sample(&pixel, &l, 1.0);
+            film.add_sample(pixel, &l, 1.0);
         });
         film
     }

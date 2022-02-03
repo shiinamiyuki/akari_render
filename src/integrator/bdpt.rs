@@ -19,12 +19,12 @@ impl Integrator for Bdpt {
         let npixels = (scene.camera.resolution().x * scene.camera.resolution().y) as usize;
         let film = Film::new(&scene.camera.resolution());
         let mut pyramid = Vec::new();
-        for _t in 2..=self.max_depth + 2 {
+        for _t in 1..=self.max_depth + 2 {
             for _s in 0..self.max_depth + 2 {
                 pyramid.push(Film::new(&scene.camera.resolution()));
             }
         }
-        let get_index = |s, t| (t - 2) as usize * (3 + self.max_depth) + s as usize;
+        let get_index = |s, t| (t - 1) as usize * (3 + self.max_depth) + s as usize;
         let chunks = (npixels + 255) / 256;
         let progress = crate::util::create_progess_bar(chunks, "chunks");
         let arenas = PerThread::new(|| Bump::new());
@@ -39,7 +39,7 @@ impl Integrator for Bdpt {
 
             let mut debug_acc = vec![];
             if self.debug {
-                for _t in 2..=self.max_depth + 2 {
+                for _t in 1..=self.max_depth + 2 {
                     for _s in 0..=self.max_depth + 2 {
                         debug_acc.push(Spectrum::zero());
                     }
@@ -68,13 +68,13 @@ impl Integrator for Bdpt {
                         &mut light_path,
                         arena,
                     );
-                    for t in 2..=camera_path.len() as isize {
+                    for t in 1..=camera_path.len() as isize {
                         for s in 0..=light_path.len() as isize {
                             let depth = s + t - 2;
                             if (s == 1 && t == 1) || depth < 0 || depth > self.max_depth as isize {
                                 continue;
                             }
-                            let (li, weight) = bdpt::connect_paths(
+                            let (li, weight, raster) = bdpt::connect_paths(
                                 scene,
                                 bdpt::ConnectionStrategy {
                                     s: s as usize,
@@ -86,11 +86,22 @@ impl Integrator for Bdpt {
                                 &mut new_light_path,
                                 &mut new_camera_path,
                             );
-                            if self.debug {
-                                let l =li * weight;
-                                debug_acc[get_index(s, t)] += li * weight;
+                            if t == 1 {
+                                if let Some(raster) = raster {
+                                    film.add_splat(raster, &(li * weight / self.spp as f32));
+                                    if self.debug {
+                                        // let l =li * weight;
+                                        pyramid[get_index(s, t)]
+                                            .add_splat(raster, &(li * weight / self.spp as f32));
+                                    }
+                                }
+                            } else {
+                                if self.debug {
+                                    // let l =li * weight;
+                                    debug_acc[get_index(s, t)] += li * weight;
+                                }
+                                acc_li += li * weight;
                             }
-                            acc_li += li * weight;
                         }
                     }
                     light_path.clear();
@@ -100,7 +111,7 @@ impl Integrator for Bdpt {
             }
             acc_li = acc_li / (self.spp as f32);
 
-            film.add_sample(&uvec2(x, y), &acc_li, 1.0);
+            film.add_sample(uvec2(x, y), &acc_li, 1.0);
 
             if self.debug {
                 for t in 2..=(self.max_depth + 2) as isize {
@@ -111,7 +122,7 @@ impl Integrator for Bdpt {
                         }
                         let idx = get_index(s, t);
                         pyramid[idx].add_sample(
-                            &uvec2(x, y),
+                            uvec2(x, y),
                             &(debug_acc[idx] / (self.spp as f32) as f32),
                             1.0,
                         );
@@ -124,7 +135,7 @@ impl Integrator for Bdpt {
         });
         progress.finish();
         if self.debug {
-            for t in 2..=(self.max_depth + 2) as isize {
+            for t in 1..=(self.max_depth + 2) as isize {
                 for s in 0..=(self.max_depth + 2) as isize {
                     let depth = s + t - 2;
                     if (s == 1 && t == 1) || depth < 0 || depth > self.max_depth as isize {

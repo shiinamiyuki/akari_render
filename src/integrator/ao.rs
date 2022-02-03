@@ -44,7 +44,7 @@ impl Integrator for RTAO {
             acc_li = acc_li / (self.spp as f32);
             {
                 let film = &mut film.write();
-                film.add_sample(&uvec2(x, y), &acc_li, 1.0);
+                film.add_sample(uvec2(x, y), &acc_li, 1.0);
             }
         });
         film.into_inner()

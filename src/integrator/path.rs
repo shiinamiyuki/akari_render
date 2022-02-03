@@ -41,7 +41,6 @@ impl PathTracer {
                 if let Some(si) = scene.intersect(&ray) {
                     let ng = si.ng;
                     let ns = si.ns;
-                    let frame = Frame::from_normal(ng);
                     let shape = si.shape;
                     let opt_bsdf = si.evaluate_bsdf(arena);
                     if opt_bsdf.is_none() {
@@ -105,7 +104,7 @@ impl PathTracer {
                             let p_ref = ReferencePoint { p, n: ng };
                             let light_sample = light.sample_li(sampler.next3d(), &p_ref);
                             let light_pdf = light_sample.pdf * light_pdf;
-                            if !indirect_only || depth > 1 {
+                            if (!indirect_only || depth > 1) && light_pdf > 0.0 && light_pdf.is_finite(){
                                 if !light_sample.li.is_black()
                                     && !scene.occlude(&light_sample.shadow_ray)
                                 {
@@ -187,7 +186,7 @@ impl Integrator for PathTracer {
                 arena.reset();
             }
             acc_li = acc_li / (self.spp as f32);
-            film.add_sample(&uvec2(x, y), &acc_li, 1.0);
+            film.add_sample(uvec2(x, y), &acc_li, 1.0);
             if (id + 1) % 256 == 0 {
                 progress.inc(1);
             }

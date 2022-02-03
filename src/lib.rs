@@ -46,7 +46,7 @@ use std::{
     collections::HashMap,
     ops::{Index, IndexMut, Mul},
     sync::{
-        atomic::{AtomicPtr, AtomicU32, Ordering},
+        atomic::{AtomicU32, Ordering},
         Arc,
     },
     usize,
@@ -62,6 +62,32 @@ pub fn profile_fn_ms<F: FnOnce() -> T, T>(f: F) -> (T, f64) {
     let ret = f();
     (ret, now.elapsed().as_secs_f64() * 1000.0)
 }
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct RobustSum<T> {
+    sum: T,
+    c: T,
+}
+impl<T> RobustSum<T>
+where
+    T: Clone + Copy + std::ops::Add<Output = T> + std::ops::Sub<Output = T>,
+{
+    pub fn new(init: T) -> Self {
+        Self {
+            sum: init,
+            c: init - init,
+        }
+    }
+    pub fn add(&mut self, v: T) {
+        let y = v - self.c;
+        let t = self.sum + y;
+        self.c = (t - self.sum) - y;
+        self.sum = t;
+    }
+    pub fn sum(&self) -> T {
+        self.sum
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct AtomicFloat {
     bits: AtomicU32,
@@ -204,12 +230,12 @@ impl RGBSpectrum {
             samples: rgb.into(),
         }
     }
-    pub fn zero() -> RGBSpectrum {
+    pub const fn zero() -> RGBSpectrum {
         Self {
             samples: Vec3A::ZERO,
         }
     }
-    pub fn one() -> Spectrum {
+    pub const fn one() -> Spectrum {
         Self {
             samples: Vec3A::ONE,
         }
@@ -252,6 +278,14 @@ impl std::ops::Add for RGBSpectrum {
     fn add(self, rhs: Spectrum) -> Self::Output {
         Self {
             samples: self.samples + rhs.samples,
+        }
+    }
+}
+impl std::ops::Sub for RGBSpectrum {
+    type Output = RGBSpectrum;
+    fn sub(self, rhs: Spectrum) -> Self::Output {
+        Self {
+            samples: self.samples - rhs.samples,
         }
     }
 }
@@ -382,7 +416,7 @@ pub fn int_bits_to_float(x: i32) -> f32 {
 pub fn float_bits_to_int(x: f32) -> i32 {
     unsafe { std::mem::transmute(x) }
 }
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Ray {
     pub o: Vec3,
     pub d: Vec3,
@@ -509,6 +543,13 @@ impl Ray {
         self.o + t * self.d
     }
 }
+
+#[derive(Clone, Copy)]
+pub struct ReferencePoint {
+    pub p: Vec3,
+    pub n: Vec3,
+}
+
 #[allow(non_snake_case)]
 #[derive(Clone, Copy)]
 pub struct Frame {
@@ -921,6 +962,7 @@ macro_rules! impl_base {
         }
     };
 }
+
 #[macro_export]
 macro_rules! cond_dbg {
     ($cond:expr, $t:expr) => {

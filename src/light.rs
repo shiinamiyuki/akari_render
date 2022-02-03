@@ -20,11 +20,7 @@ pub struct LightSample {
     pub p: Vec3,
     pub n: Vec3,
 }
-#[derive(Clone, Copy)]
-pub struct ReferencePoint {
-    pub p: Vec3,
-    pub n: Vec3,
-}
+
 bitflags! {
     pub struct LightFlags : u8 {
         const NONE = 0b0;
@@ -153,7 +149,12 @@ impl Light for AreaLight {
         let wi = surface_sample.p - ref_.p;
         let dist2 = wi.length_squared();
         let wi = wi / dist2.sqrt();
-        let pdf = surface_sample.pdf * dist2 / wi.dot(surface_sample.ng).abs();
+        let cos_theta = -wi.dot(surface_sample.ng);
+        let pdf = if cos_theta <= 0.0 {
+            0.0
+        } else {
+            surface_sample.pdf * dist2 / cos_theta
+        };
         let mut ray = Ray::spawn_to(surface_sample.p, ref_.p);
         ray.tmax *= 0.997;
         LightSample {
@@ -173,9 +174,13 @@ impl Light for AreaLight {
     fn pdf_li(&self, wi: Vec3, ref_: &ReferencePoint) -> (f32, f32) {
         let ray = Ray::spawn(ref_.p, wi);
         if let Some(hit) = self.shape.intersect(&ray) {
-            let pdf_area = 1.0 / self.shape.area();
-            let pdf_sa = pdf_area * hit.t * hit.t / wi.dot(hit.ng).abs();
-            (pdf_area, pdf_sa)
+            if ray.d.dot(hit.ng) < 0.0 {
+                let pdf_area = 1.0 / self.shape.area();
+                let pdf_sa = pdf_area * hit.t * hit.t / wi.dot(hit.ng).abs();
+                (pdf_area, pdf_sa)
+            } else {
+                (0.0, 0.0)
+            }
         } else {
             (0.0, 0.0)
         }
@@ -183,8 +188,12 @@ impl Light for AreaLight {
 
     fn le(&self, ray: &Ray) -> Spectrum {
         if let Some(hit) = self.shape.intersect(ray) {
-            self.emission
-                .evaluate_s(&ShadingPoint::from_rayhit(&self.shape, hit))
+            if hit.ng.dot(ray.d) < 0.0 {
+                self.emission
+                    .evaluate_s(&ShadingPoint::from_rayhit(&self.shape, hit))
+            } else {
+                Spectrum::zero()
+            }
         } else {
             Spectrum::zero()
         }

@@ -96,13 +96,13 @@ impl Integrator for Erpt {
                             if proposal.f > 0.0 {
                                 let dep_value =
                                     (proposal.l / proposal.f) * dep_energy * accept_prob;
-                                indirect_film.add_sample(&proposal.pixel, &dep_value, 1.0);
+                                indirect_film.add_sample(proposal.pixel, &dep_value, 1.0);
                             }
                             if chain.cur.f > 0.0 {
                                 let dep_value = (chain.cur.l / chain.cur.f)
                                     * dep_energy
                                     * (1.0 - accept_prob).clamp(0.0, 1.0);
-                                indirect_film.add_sample(&chain.cur.pixel, &dep_value, 1.0);
+                                indirect_film.add_sample(chain.cur.pixel, &dep_value, 1.0);
                             }
                             if accept_prob == 1.0 || rng.gen::<f32>() < accept_prob {
                                 chain.cur = proposal;
@@ -118,7 +118,7 @@ impl Integrator for Erpt {
             }
             acc_li = acc_li / (self.spp as f32);
             let _ = acc_li;
-            // indirect_film.add_sample(&uvec2(x, y), &acc_li, 1.0);
+            // indirect_film.add_sample(uvec2(x, y), &acc_li, 1.0);
             if (id + 1) % 256 == 0 {
                 progress.inc(1);
             }
@@ -127,15 +127,15 @@ impl Integrator for Erpt {
         let film = Film::new(&scene.camera.resolution());
         (0..npixels).into_par_iter().for_each(|i| {
             let mut px = film.pixels[i].write();
-            px.weight = 1.0;
+            px.weight = RobustSum::new(1.0);
             {
                 let px_i = indirect_film.pixels[i].read();
-                px.intensity += px_i.intensity;
+                px.intensity.add(px_i.intensity.sum());
             }
             {
                 let px_d = film_direct.pixels[i].read();
-                assert!(px_d.weight > 0.0);
-                px.intensity += px_d.intensity / px_d.weight;
+                assert!(px_d.weight.sum() > 0.0);
+                px.intensity.add(px_d.intensity.sum() / px_d.weight.sum());
             }
         });
         film

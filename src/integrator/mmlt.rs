@@ -130,7 +130,8 @@ impl Chain {
             };
         }
         self.sampler.use_stream(Stream::Connect);
-        let (l, w) = bidir::connect_paths(
+        todo!();
+        let (l, w, _) = bidir::connect_paths(
             scene,
             ConnectionStrategy { s, t },
             &light_path,
@@ -283,14 +284,14 @@ impl Integrator for Mmlt {
                         }
                         if proposal.f > 0.0 {
                             per_depth_film[depth].add_sample(
-                                &proposal.pixel,
+                                proposal.pixel,
                                 &(proposal.l * accept_prob / (proposal.f * depth_pdf)),
                                 1.0,
                             );
                         }
                         if chain.cur.f > 0.0 {
                             per_depth_film[depth].add_sample(
-                                &chain.cur.pixel,
+                                chain.cur.pixel,
                                 &(chain.cur.l * (1.0 - accept_prob) / (chain.cur.f * depth_pdf)),
                                 1.0,
                             );
@@ -318,24 +319,24 @@ impl Integrator for Mmlt {
         for (depth, film) in per_depth_film.iter().enumerate() {
             film.pixels.par_iter().enumerate().for_each(|(_, p)| {
                 let mut px = p.write();
-                px.intensity = px.intensity * bs[depth] as f32;
+                px.intensity = RobustSum::new(px.intensity.sum() * bs[depth] as f32);
             });
         }
         let film = Film::new(&scene.camera.resolution());
 
         (0..npixels).into_par_iter().for_each(|i| {
             let mut px = film.pixels[i].write();
-            px.weight = 1.0;
+            px.weight = RobustSum::new(1.0);
             for (_, film) in per_depth_film.iter().enumerate() {
                 {
                     let px_d = film.pixels[i].read();
-                    px.intensity += px_d.intensity / self.spp as f32;
+                    px.intensity.add(px_d.intensity.sum / self.spp as f32);
                 }
             }
             {
                 let px_d = film_direct.pixels[i].read();
-                assert!(px_d.weight > 0.0);
-                px.intensity += px_d.intensity / px_d.weight;
+                assert!(px_d.weight.sum() > 0.0);
+                px.intensity.add(px_d.intensity.sum() / px_d.weight.sum());
             }
         });
         // film.write_exr("mmlt.exr");

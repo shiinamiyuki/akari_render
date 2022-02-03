@@ -271,7 +271,7 @@ impl<'a> StreamPathTracerSession<'a> {
                         let pixel_id = state.pixel;
                         let py = pixel_id / self.scene.camera.resolution().x;
                         let px = pixel_id % self.scene.camera.resolution().x;
-                        self.film.add_sample(&uvec2(px, py), &state.l, 1.0);
+                        self.film.add_sample(uvec2(px, py), &state.l, 1.0);
                     }
                     let last = path_states.len() - 1;
                     bsdfs.swap(i, last);

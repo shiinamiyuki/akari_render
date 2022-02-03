@@ -154,7 +154,7 @@ impl<'a> Vertex<'a> {
     }
     pub fn is_delta_light(&self) -> bool {
         match self {
-            Self::Light(v) => v.light.flags().intersects( LightFlags::DELTA),//(v.light.flags() | LightFlags::DELTA) != LightFlags::NONE,
+            Self::Light(v) => v.light.flags().intersects(LightFlags::DELTA), //(v.light.flags() | LightFlags::DELTA) != LightFlags::NONE,
             _ => unreachable!(),
         }
     }
@@ -231,7 +231,7 @@ impl<'a> Vertex<'a> {
             _ => unreachable!(),
         }
     }
-    pub fn f(&self, next: &Vertex<'a>, _mode: TransportMode) -> Spectrum {
+    pub fn f(&self, next: &Vertex<'a>, _mode: TraceDir) -> Spectrum {
         let v1 = self.as_surface().unwrap();
         // let v2 = next.as_surface().unwrap();
         let wi = (next.p() - self.p()).normalize();
@@ -278,9 +278,9 @@ impl<'a> Vertex<'a> {
     }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum TransportMode {
-    IMPORTANCE,
-    RADIANCE,
+pub enum TraceDir {
+    LightToCamera,
+    CameraToLight,
 }
 pub fn random_walk<'a, 'b>(
     scene: &'a Scene,
@@ -289,7 +289,7 @@ pub fn random_walk<'a, 'b>(
     mut beta: Spectrum,
     pdf: f32,
     max_depth: usize,
-    mode: TransportMode,
+    mode: TraceDir,
     path: &mut Path<'b>,
     arena: &'b Bump,
 ) where
@@ -310,7 +310,7 @@ pub fn random_walk<'a, 'b>(
             let shape = si.shape;
             let prev_index = depth;
             let prev = &mut path[prev_index];
-            if mode == TransportMode::RADIANCE {
+            if mode == TraceDir::CameraToLight {
                 if let Some(light) = scene.get_light_of_shape(shape) {
                     let mut vertex =
                         Vertex::create_light_vertex(light, ray.at(si.t), si.ng, beta, pdf_fwd);
@@ -381,7 +381,7 @@ pub fn generate_camera_path<'a, 'b>(
         beta,
         pdf_dir,
         max_depth - 1,
-        TransportMode::RADIANCE,
+        TraceDir::CameraToLight,
         path,
         arena,
     );
@@ -422,7 +422,7 @@ pub fn generate_light_path<'a, 'b>(
         beta,
         sample.pdf_dir,
         max_depth - 1,
-        TransportMode::IMPORTANCE,
+        TraceDir::LightToCamera,
         path,
         arena,
     );
@@ -464,7 +464,7 @@ where
         return 1.0;
     }
 
-    // return 1.0 / (s + t - 1) as f32;
+    return 1.0 / (s + t) as f32;
     eye_path.clear();
     light_path.clear();
     for i in 0..s {
@@ -590,6 +590,8 @@ where
     // println!("{}", 1.0 / (1.0 + sum_ri));
     (1.0 / (1.0 as f64 + sum_ri as f64)) as f32
 }
+
+// let (l, weight, raster) = connect_paths(...);
 pub fn connect_paths<'a, 'b>(
     scene: &'a Scene,
     strat: ConnectionStrategy,
@@ -598,7 +600,7 @@ pub fn connect_paths<'a, 'b>(
     sampler: &mut dyn Sampler,
     new_light_path: &mut Path<'b>,
     new_eye_path: &mut Path<'b>,
-) -> (Spectrum, f32)
+) -> (Spectrum, f32, Option<UVec2>)
 where
     'a: 'b,
 {
@@ -606,13 +608,39 @@ where
     let t = strat.t;
     let mut sampled: Option<Vertex> = None;
     let mut l = Spectrum::zero();
+    let mut raster = None;
     if t > 1 && s != 0 && eye_path[t - 1].as_light().is_some() {
-        return (Spectrum::zero(), 0.0);
+        return (Spectrum::zero(), 0.0, None);
     } else if s == 0 {
         let pt = &eye_path[t - 1];
         l = pt.beta() * pt.le(scene, &eye_path[t - 2]);
     } else if t == 1 {
-        unreachable!();
+        let qs = &light_path[s - 1];
+        if qs.connectible() {
+            let p_ref = ReferencePoint {
+                p: qs.p(),
+                n: qs.n(),
+            };
+            if let Some(sample) = scene.camera.sample_wi(sampler.next2d(), &p_ref) {
+                if sample.pdf > 0.0 && !sample.we.is_black() {
+                    sampled = Some(Vertex::create_camera_vertex(
+                        scene.camera.as_ref(),
+                        &sample.ray,
+                        sample.we / sample.pdf,
+                        0.0,
+                    ));
+                    raster = Some(sample.raster);
+                    if !scene.occlude(&sample.ray) {
+                        l = qs.beta()
+                            * qs.f(sampled.as_ref().unwrap(), TraceDir::LightToCamera)
+                            * sampled.as_ref().unwrap().beta();
+                        if qs.on_surface() {
+                            l *= sample.wi.dot(qs.n()).abs();
+                        }
+                    }
+                }
+            }
+        }
     } else if s == 1 {
         let pt = &eye_path[t - 1];
         if pt.connectible() && !pt.as_light().is_some() {
@@ -622,7 +650,7 @@ where
                 n: pt.n(),
             };
             let light_sample = light.sample_li(sampler.next3d(), &p_ref);
-            if !light_sample.li.is_black() {
+            if !light_sample.li.is_black() && light_sample.pdf > 0.0 {
                 {
                     let mut v = Vertex::create_light_vertex(
                         light,
@@ -636,7 +664,7 @@ where
                 }
                 {
                     let sampled = sampled.as_ref().unwrap();
-                    l = pt.beta() * pt.f(sampled, TransportMode::RADIANCE) * sampled.beta();
+                    l = pt.beta() * pt.f(sampled, TraceDir::CameraToLight) * sampled.beta();
                 }
 
                 if pt.on_surface() {
@@ -660,8 +688,8 @@ where
         if pt.connectible() && qs.connectible() && !pt.as_light().is_some() {
             l = qs.beta()
                 * pt.beta()
-                * pt.f(qs, TransportMode::RADIANCE)
-                * qs.f(pt, TransportMode::IMPORTANCE);
+                * pt.f(qs, TraceDir::CameraToLight)
+                * qs.f(pt, TraceDir::LightToCamera);
             if !l.is_black() {
                 l *= geometry_term(scene, pt, qs);
             }
@@ -680,5 +708,5 @@ where
             new_eye_path,
         )
     };
-    (l, mis_weight)
+    (l, mis_weight, raster)
 }

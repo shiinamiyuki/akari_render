@@ -794,7 +794,7 @@ impl Integrator for CachedPathTracer {
                             state.li
                         }
                     };
-                    film.add_sample(&pixel, &li, 1.0);
+                    film.add_sample(pixel, &li, 1.0);
                 });
 
                 chunk_offset += chunk_size;
@@ -829,7 +829,7 @@ impl Integrator for CachedPathTracer {
         //         // f
         //         // println!("{}", li.samples);
         //     }
-        //     film.add_sample(&uvec2(x, y), &li, 1.0);
+        //     film.add_sample(uvec2(x, y), &li, 1.0);
         // });
         film
     }

@@ -1,10 +1,21 @@
 use crate::*;
 use sampler::*;
+#[derive(Clone, Copy)]
+pub struct CameraSample {
+    pub p: Vec3,
+    pub wi: Vec3,
+    pub pdf: f32,
+    pub n: Vec3,
+    pub raster: UVec2,
+    pub ray: Ray,
+    pub we: Spectrum,
+}
 pub trait Camera: Sync + Send + Base {
     fn generate_ray(&self, pixel: UVec2, sampler: &mut dyn Sampler) -> (Ray, Spectrum);
     fn resolution(&self) -> UVec2;
     fn we(&self, ray: &Ray) -> (Option<UVec2>, Spectrum);
     fn pdf_we(&self, ray: &Ray) -> (f32, f32);
+    fn sample_wi(&self, u: Vec2, p: &ReferencePoint) -> Option<CameraSample>;
     fn n(&self) -> Vec3;
 }
 
@@ -32,12 +43,16 @@ impl PerspectiveCamera {
         } else {
             m = Mat4::from_scale(vec3(s * fres.x / fres.y, s, 1.0)) * m;
         }
+        m = Mat4::from_translation(vec3(0.0, 0.0, -1.0)) * m;
         let r2c = Transform::from_matrix(&m);
         let a = {
             let p_min = r2c.transform_point(vec3(0.0, 0.0, 0.0));
             let p_max = r2c.transform_point(vec3(resolution.x as f32, resolution.y as f32, 0.0));
-            ((p_max.x - p_min.x) * (p_max.y * p_min.y)).abs()
+            let p_min = p_min / p_min.z;
+            let p_max = p_max / p_max.z;
+            ((p_max.x - p_min.x) * (p_max.y - p_min.y)).abs()
         };
+        assert!(a > 0.0);
         Self {
             resolution,
             c2w: *transform,
@@ -54,14 +69,14 @@ impl Camera for PerspectiveCamera {
         // let p_lens = consine_hemisphere_sampling(sampler.next2d())
         let fpixel: Vec2 = pixel.as_vec2();
         let p_film = sampler.next2d() + fpixel;
-        let p = {
-            let v = self.r2c.transform_point(vec3(p_film.x, p_film.y, 0.0));
-            vec2(v.x, v.y)
-        };
+
         let mut ray = Ray::spawn(
             Vec3::ZERO,
-            (vec3(p.x, p.y, 0.0) - vec3(0.0, 0.0, 1.0)).normalize(),
+            self.r2c
+                .transform_point(vec3(p_film.x, p_film.y, 0.0))
+                .normalize(),
         );
+
         // ray.tmin = (1.0 / ray.d.z).abs();
         ray.o = self.c2w.transform_point(ray.o);
         ray.d = self.c2w.transform_vector(ray.d);
@@ -70,15 +85,39 @@ impl Camera for PerspectiveCamera {
     fn resolution(&self) -> UVec2 {
         self.resolution
     }
+    fn sample_wi(&self, _u: Vec2, ref_: &ReferencePoint) -> Option<CameraSample> {
+        // TODO: area lens
+        let p_lens = Vec2::ZERO;
+        let p_lens_world = self.c2w.transform_point(p_lens.extend(0.0));
+
+        let wi = p_lens_world - ref_.p;
+        let dist = wi.length();
+        let wi = wi / dist;
+
+        let lens_area = 1.0f32;
+        let n = self.n();
+        let pdf = (dist * dist) / (n.dot(wi).abs() * lens_area);
+        let mut ray = Ray::spawn_to(p_lens_world, ref_.p);
+        ray.tmax *= 1.0 - 1e-3;
+        let (raster, we) = self.we(&ray);
+        Some(CameraSample {
+            p: p_lens_world,
+            wi,
+            pdf,
+            ray,
+            raster: raster?,
+            we,
+            n,
+        })
+    }
     fn we(&self, ray: &Ray) -> (Option<UVec2>, Spectrum) {
         let cos_theta = ray.d.dot(self.c2w.transform_vector(vec3(0.0, 0.0, -1.0)));
         if cos_theta <= 0.0 {
             return (None, Spectrum::zero());
         }
         let p_focus = ray.at(1.0 / cos_theta);
-        let p_raster = self
-            .c2r
-            .transform_point(self.w2c.transform_point(p_focus));
+        let p_raster = self.c2r.transform_point(self.w2c.transform_point(p_focus));
+        // assert!(p_raster.z.abs() < 1e-3);
         if p_raster.x < 0.0
             || p_raster.x >= self.resolution().x as f32
             || p_raster.y < 0.0
@@ -99,9 +138,7 @@ impl Camera for PerspectiveCamera {
             return (0.0, 0.0);
         }
         let p_focus = ray.at(1.0 / cos_theta);
-        let p_raster = self
-            .c2r
-            .transform_point(self.w2c.transform_point(p_focus));
+        let p_raster = self.c2r.transform_point(self.w2c.transform_point(p_focus));
         if p_raster.x < 0.0
             || p_raster.x >= self.resolution().x as f32
             || p_raster.y < 0.0

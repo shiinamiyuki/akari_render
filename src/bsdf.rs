@@ -1,5 +1,6 @@
 use bumpalo::Bump;
 
+use crate::sampler::SobolSampler;
 use crate::texture::{ShadingPoint, Texture};
 use crate::*;
 
@@ -439,30 +440,7 @@ impl Bsdf for GPUBsdfProxy {
     }
 }
 
-struct BsdfTester<B: LocalBsdfClosure> {
-    bsdf: B,
-}
-impl<B: LocalBsdfClosure> BsdfTester<B> {
-    #[allow(dead_code)]
-    fn run(&self) -> f32 {
-        use crate::sampler::PCGSampler;
-        use crate::sampler::Sampler;
-        let n = 10000000u64;
-        let mut sampler = PCGSampler::new(0);
-        let wo = vec3(0.2, 0.4, 0.0).normalize();
-        let integral = (0..n)
-            .map(|_| {
-                if let Some(s) = self.bsdf.sample(sampler.next2d(), wo) {
-                    (1.0 / s.pdf) as f64
-                } else {
-                    0.0
-                }
-            })
-            .sum::<f64>()
-            / n as f64;
-        integral as f32
-    }
-}
+
 
 // mod test {
 //     use crate::bsdf::BsdfTester;

@@ -156,14 +156,14 @@ impl Integrator for Pssmlt {
                         }
                         if proposal.f > 0.0 {
                             indirect_film.add_sample(
-                                &proposal.pixel,
+                                proposal.pixel,
                                 &(proposal.l * accept_prob / proposal.f),
                                 1.0,
                             );
                         }
                         if chain.cur.f > 0.0 {
                             indirect_film.add_sample(
-                                &chain.cur.pixel,
+                                chain.cur.pixel,
                                 &(chain.cur.l * (1.0 - accept_prob) / chain.cur.f),
                                 1.0,
                             );
@@ -190,20 +190,20 @@ impl Integrator for Pssmlt {
             .enumerate()
             .for_each(|(_, p)| {
                 let mut px = p.write();
-                px.intensity = px.intensity * b as f32;
+                px.intensity = RobustSum::new(px.intensity.sum() * b as f32);
             });
         let film = Film::new(&scene.camera.resolution());
         (0..npixels).into_par_iter().for_each(|i| {
             let mut px = film.pixels[i].write();
-            px.weight = 1.0;
+            px.weight = RobustSum::new(1.0);
             {
                 let px_i = indirect_film.pixels[i].read();
-                px.intensity += px_i.intensity / self.spp as f32;
+                px.intensity.add(px_i.intensity.sum() / self.spp as f32);
             }
             {
                 let px_d = film_direct.pixels[i].read();
-                assert!(px_d.weight > 0.0);
-                px.intensity += px_d.intensity / px_d.weight;
+                assert!(px_d.weight.sum() > 0.0);
+                px.intensity.add(px_d.intensity.sum() / px_d.weight.sum());
             }
         });
         film
