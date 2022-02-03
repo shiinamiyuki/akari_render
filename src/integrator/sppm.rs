@@ -264,7 +264,7 @@ impl Integrator for Sppm {
                         .as_mut()
                 };
                 let (light, light_pdf) = scene.light_distr.sample(sampler.next1d());
-                let sample = light.sample_le([sampler.next2d(), sampler.next2d()]);
+                let sample = light.sample_le(sampler.next3d(), sampler.next2d());
                 let mut depth = 0;
                 let mut ray = sample.ray;
                 let mut beta = sample.le / (sample.pdf_dir * sample.pdf_pos * light_pdf)

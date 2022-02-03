@@ -30,7 +30,7 @@ bitflags! {
     }
 }
 pub trait Light: Sync + Send + Base {
-    fn sample_le(&self, u: [Vec2; 2]) -> LightRaySample;
+    fn sample_le(&self, u0: Vec3, u1: Vec2) -> LightRaySample;
     fn sample_li(&self, u: Vec3, p: &ReferencePoint) -> LightSample;
     // (pdf_pos,pdf_dir)
     fn pdf_le(&self, ray: &Ray, n: Vec3) -> (f32, f32);
@@ -126,9 +126,9 @@ pub struct AreaLight {
 }
 impl_base!(AreaLight);
 impl Light for AreaLight {
-    fn sample_le(&self, u: [Vec2; 2]) -> LightRaySample {
-        let p = self.shape.sample_surface(vec3(u[0].x, u[0].y, 0.0));
-        let dir = consine_hemisphere_sampling(u[1]);
+    fn sample_le(&self, u0: Vec3, u1: Vec2) -> LightRaySample {
+        let p = self.shape.sample_surface(u0);
+        let dir = consine_hemisphere_sampling(u1);
         let frame = Frame::from_normal(p.ng);
         LightRaySample {
             le: self.emission.evaluate_s(&ShadingPoint {
@@ -224,8 +224,8 @@ impl PointLight {
     }
 }
 impl Light for PointLight {
-    fn sample_le(&self, u: [Vec2; 2]) -> LightRaySample {
-        let w = uniform_sphere_sampling(u[0]);
+    fn sample_le(&self, _: Vec3, u1: Vec2) -> LightRaySample {
+        let w = uniform_sphere_sampling(u1);
         LightRaySample {
             le: self.evaluate(w),
             pdf_pos: 1.0,

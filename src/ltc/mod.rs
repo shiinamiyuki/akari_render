@@ -1,5 +1,5 @@
 use crate::{
-    bsdf::{Bsdf, BsdfFlags, BsdfSample, LocalBsdfClosure},
+    bsdf::{Bsdf, BsdfFlags, BsdfSample, LocalBsdfClosure, SpecularBsdfClosure},
     texture::{Texture, ShadingPoint},
     *,
 };
@@ -149,9 +149,17 @@ impl Bsdf for GgxLtcBsdf {
         sp: &ShadingPoint,
         arena: &'a Bump,
     ) -> &'a dyn LocalBsdfClosure {
-        arena.alloc(GgxLtcBsdfClosure {
-            color: self.color.evaluate_s(sp),
-            roughness: self.roughness.evaluate_f(sp),
-        })
+        let roughness = self.roughness.evaluate_f(sp);
+        let color = self.color.evaluate_s(sp);
+        if roughness >= 0.1 {
+            arena.alloc(GgxLtcBsdfClosure {
+                color,
+                roughness,
+            })
+        }else{
+            arena.alloc(SpecularBsdfClosure {
+                color,
+            })
+        }
     }
 }

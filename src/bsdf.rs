@@ -401,13 +401,13 @@ impl LocalBsdfClosure for SpecularBsdfClosure {
             metallic: 1.0,
         }
     }
-    fn evaluate(&self, wo: Vec3, wi: Vec3) -> Spectrum {
+    fn evaluate(&self, _wo: Vec3, _wi: Vec3) -> Spectrum {
         Spectrum::zero()
     }
-    fn evaluate_pdf(&self, wo: Vec3, wi: Vec3) -> f32 {
+    fn evaluate_pdf(&self, _wo: Vec3, _wi: Vec3) -> f32 {
         0.0
     }
-    fn sample(&self, u: Vec2, wo: Vec3) -> Option<BsdfSample> {
+    fn sample(&self, _u: Vec2, wo: Vec3) -> Option<BsdfSample> {
         let r = self.color;
 
         let wi = reflect(wo, vec3(0.0, 1.0, 0.0));

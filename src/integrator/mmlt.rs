@@ -102,7 +102,7 @@ impl Chain {
         let (n_strategies, s, t) = if self.depth == 0 {
             (1, 0, 2)
         } else {
-            let n_strategies = self.depth + 1;
+            let n_strategies = self.depth + 2;
             let s = ((self.sampler.next1d() * n_strategies as f32) as u32).min(n_strategies - 1)
                 as usize;
             let t = self.depth as usize + 2 - s;
@@ -130,8 +130,7 @@ impl Chain {
             };
         }
         self.sampler.use_stream(Stream::Connect);
-        todo!();
-        let (l, w, _) = bidir::connect_paths(
+        let (l, w, raster) = bidir::connect_paths(
             scene,
             ConnectionStrategy { s, t },
             &light_path,
@@ -142,6 +141,11 @@ impl Chain {
         );
         let l = l * w * n_strategies as f32;
         let l = if l.is_black() { Spectrum::zero() } else { l };
+        let pixel = if let Some(raster) = raster {
+            raster
+        } else {
+            pixel
+        };
         FRecord {
             pixel,
             f: l.samples.max_element().clamp(0.0, 100.0),

@@ -228,7 +228,12 @@ impl<'a> Vertex<'a> {
                 self.convert_pdf_to_area(v.bsdf.evaluate_pdf(wo, wi), next)
             }
             Vertex::Light(_) => self.pdf_light(scene, next),
-            _ => unreachable!(),
+            Vertex::Camera(v) => {
+                assert!(prev.is_none());
+                let ray = Ray::spawn_to(self.p(), next.p());
+                let (_, pdf_dir) = v.camera.pdf_we(&ray);
+                self.convert_pdf_to_area(pdf_dir, next)
+            }
         }
     }
     pub fn f(&self, next: &Vertex<'a>, _mode: TraceDir) -> Spectrum {
@@ -400,7 +405,7 @@ pub fn generate_light_path<'a, 'b>(
     }
     path.clear();
     let (light, light_pdf) = scene.light_distr.sample(sampler.next1d());
-    let sample = light.sample_le([sampler.next2d(), sampler.next2d()]);
+    let sample = light.sample_le(sampler.next3d(), sampler.next2d());
     let le = sample.le;
     let beta =
         le / (sample.pdf_dir * sample.pdf_pos * light_pdf) * sample.ray.d.dot(sample.n).abs();
@@ -464,7 +469,6 @@ where
         return 1.0;
     }
 
-    return 1.0 / (s + t) as f32;
     eye_path.clear();
     light_path.clear();
     for i in 0..s {
@@ -557,14 +561,14 @@ where
             x
         }
     };
-    if t > 0 {
+    if t > 1 {
         // camera path
         let mut ri = 1.0;
-        for i in (2..=t - 1).rev() {
+        for i in (1..=t - 1).rev() {
             ri *= remap(eye_path[i].base().pdf_rev) / remap(eye_path[i].base().pdf_fwd);
             // cond_dbg!(s == 0, eye_path[i].base().pdf_rev);
             // cond_dbg!(s == 0, eye_path[i].base().pdf_fwd);
-            if !eye_path[i].base().delta {
+            if !eye_path[i].base().delta && !eye_path[i - 1].base().delta {
                 sum_ri += ri;
             }
         }
@@ -623,21 +627,22 @@ where
             };
             if let Some(sample) = scene.camera.sample_wi(sampler.next2d(), &p_ref) {
                 if sample.pdf > 0.0 && !sample.we.is_black() {
-                    sampled = Some(Vertex::create_camera_vertex(
+                    let v = Vertex::create_camera_vertex(
                         scene.camera.as_ref(),
                         &sample.ray,
                         sample.we / sample.pdf,
                         0.0,
-                    ));
+                    );
                     raster = Some(sample.raster);
-                    if !scene.occlude(&sample.ray) {
-                        l = qs.beta()
-                            * qs.f(sampled.as_ref().unwrap(), TraceDir::LightToCamera)
-                            * sampled.as_ref().unwrap().beta();
+                    l = qs.beta() * qs.f(&v, TraceDir::LightToCamera) * v.beta();
+                    if !l.is_black() && !scene.occlude(&sample.vis_ray) {
                         if qs.on_surface() {
                             l *= sample.wi.dot(qs.n()).abs();
                         }
+                    } else {
+                        l = Spectrum::zero();
                     }
+                    sampled = Some(v);
                 }
             }
         }

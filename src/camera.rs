@@ -8,6 +8,7 @@ pub struct CameraSample {
     pub n: Vec3,
     pub raster: UVec2,
     pub ray: Ray,
+    pub vis_ray: Ray,
     pub we: Spectrum,
 }
 pub trait Camera: Sync + Send + Base {
@@ -92,19 +93,20 @@ impl Camera for PerspectiveCamera {
 
         let wi = p_lens_world - ref_.p;
         let dist = wi.length();
-        let wi = wi / dist;
+        let wi = wi.normalize();
 
         let lens_area = 1.0f32;
         let n = self.n();
         let pdf = (dist * dist) / (n.dot(wi).abs() * lens_area);
-        let mut ray = Ray::spawn_to(p_lens_world, ref_.p);
-        ray.tmax *= 1.0 - 1e-3;
+        let ray = Ray::spawn_to(p_lens_world, ref_.p);
         let (raster, we) = self.we(&ray);
+        let vis_ray = Ray::spawn_to(ref_.p, p_lens_world).offset_along_normal(ref_.n);
         Some(CameraSample {
             p: p_lens_world,
             wi,
             pdf,
             ray,
+            vis_ray,
             raster: raster?,
             we,
             n,
@@ -126,10 +128,9 @@ impl Camera for PerspectiveCamera {
             return (None, Spectrum::zero());
         }
         let lens_area = 1.0;
-        let cos2_theta = cos_theta * cos_theta;
         (
             Some(uvec2(p_raster.x as u32, p_raster.y as u32)),
-            Spectrum::one() / (self.a * lens_area * cos2_theta * cos2_theta),
+            Spectrum::one() / (self.a * lens_area * cos_theta.powi(4)),
         )
     }
     fn pdf_we(&self, ray: &Ray) -> (f32, f32) {
@@ -147,10 +148,9 @@ impl Camera for PerspectiveCamera {
             return (0.0, 0.0);
         }
         let lens_area = 1.0;
-        let cos2_theta = cos_theta * cos_theta;
-        (1.0 / lens_area, self.a * cos2_theta * cos_theta)
+        (1.0 / lens_area, 1.0 / (self.a * cos_theta.powi(3)))
     }
     fn n(&self) -> Vec3 {
-        self.c2w.transform_vector(vec3(0.0, 0.0, -1.0))
+        self.c2w.transform_normal(vec3(0.0, 0.0, -1.0))
     }
 }
