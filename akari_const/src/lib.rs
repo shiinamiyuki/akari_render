@@ -4,5 +4,7 @@ pub struct GgxLtcfit {
 }
 mod ltc;
 mod sobolmat;
+use std::{os::raw::c_char, path::PathBuf};
+
 pub use ltc::GGX_LTC_FIT;
 pub use sobolmat::*;

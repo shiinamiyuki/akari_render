@@ -96,13 +96,13 @@ impl Integrator for Erpt {
                             if proposal.f > 0.0 {
                                 let dep_value =
                                     (proposal.l / proposal.f) * dep_energy * accept_prob;
-                                indirect_film.add_sample(proposal.pixel, &dep_value, 1.0);
+                                indirect_film.add_sample(proposal.pixel, dep_value, 1.0);
                             }
                             if chain.cur.f > 0.0 {
                                 let dep_value = (chain.cur.l / chain.cur.f)
                                     * dep_energy
                                     * (1.0 - accept_prob).clamp(0.0, 1.0);
-                                indirect_film.add_sample(chain.cur.pixel, &dep_value, 1.0);
+                                indirect_film.add_sample(chain.cur.pixel, dep_value, 1.0);
                             }
                             if accept_prob == 1.0 || rng.gen::<f32>() < accept_prob {
                                 chain.cur = proposal;

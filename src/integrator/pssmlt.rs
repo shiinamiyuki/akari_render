@@ -157,14 +157,14 @@ impl Integrator for Pssmlt {
                         if proposal.f > 0.0 {
                             indirect_film.add_sample(
                                 proposal.pixel,
-                                &(proposal.l * accept_prob / proposal.f),
+                                (proposal.l * accept_prob / proposal.f),
                                 1.0,
                             );
                         }
                         if chain.cur.f > 0.0 {
                             indirect_film.add_sample(
                                 chain.cur.pixel,
-                                &(chain.cur.l * (1.0 - accept_prob) / chain.cur.f),
+                                (chain.cur.l * (1.0 - accept_prob) / chain.cur.f),
                                 1.0,
                             );
                         }

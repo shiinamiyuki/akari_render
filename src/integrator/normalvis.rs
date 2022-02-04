@@ -26,7 +26,7 @@ impl Integrator for NormalVis {
 
                 film.add_sample(
                     uvec2(x, y),
-                    &Spectrum::from_rgb_linear(ns * 0.5 + 0.5),
+                    Spectrum::from_rgb_linear(ns * 0.5 + 0.5),
                     1.0,
                 );
             }

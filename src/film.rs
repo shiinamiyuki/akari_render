@@ -31,21 +31,21 @@ impl Film {
             resolution: *resolution,
         }
     }
-    pub fn add_sample(&self, pixel: UVec2, value: &Spectrum, weight: f32) {
+    pub fn add_sample(&self, pixel: UVec2, value: Spectrum, weight: f32) {
         let value = if value.is_black() {
             Spectrum::zero()
         } else {
-            *value
+            value
         };
         let mut pixel = self.pixels[(pixel.x + pixel.y * self.resolution.x) as usize].write();
         pixel.intensity.add(value);
         pixel.weight.add(weight);
     }
-    pub fn add_splat(&self, pixel: UVec2, value: &Spectrum) {
+    pub fn add_splat(&self, pixel: UVec2, value: Spectrum) {
         let value = if value.is_black() {
             Spectrum::zero()
         } else {
-            *value
+            value
         };
         let mut pixel = self.pixels[(pixel.x + pixel.y * self.resolution.x) as usize].write();
         pixel.splat.add(value);

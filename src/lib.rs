@@ -32,6 +32,7 @@ pub mod util;
 
 #[macro_use]
 extern crate bitflags;
+
 pub use glam::{
     uvec2, uvec3, uvec4, vec2, vec3, vec4, Mat2, Mat3, Mat3A, Mat4, UVec2, UVec3, UVec4, Vec2,
     Vec3, Vec3A, Vec4,

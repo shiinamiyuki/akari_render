@@ -7,8 +7,6 @@ use crate::integrator::*;
 use crate::light::*;
 use crate::sampler::*;
 use crate::scene::*;
-use crate::shape::*;
-use crate::texture::ShadingPoint;
 use crate::util::profile::scope;
 use crate::util::PerThread;
 use crate::*;
@@ -186,7 +184,7 @@ impl Integrator for PathTracer {
                 arena.reset();
             }
             acc_li = acc_li / (self.spp as f32);
-            film.add_sample(uvec2(x, y), &acc_li, 1.0);
+            film.add_sample(uvec2(x, y), acc_li, 1.0);
             if (id + 1) % 256 == 0 {
                 progress.inc(1);
             }

@@ -289,14 +289,14 @@ impl Integrator for Mmlt {
                         if proposal.f > 0.0 {
                             per_depth_film[depth].add_sample(
                                 proposal.pixel,
-                                &(proposal.l * accept_prob / (proposal.f * depth_pdf)),
+                                (proposal.l * accept_prob / (proposal.f * depth_pdf)),
                                 1.0,
                             );
                         }
                         if chain.cur.f > 0.0 {
                             per_depth_film[depth].add_sample(
                                 chain.cur.pixel,
-                                &(chain.cur.l * (1.0 - accept_prob) / (chain.cur.f * depth_pdf)),
+                                (chain.cur.l * (1.0 - accept_prob) / (chain.cur.f * depth_pdf)),
                                 1.0,
                             );
                         }

@@ -12,8 +12,8 @@ pub mod nn_v2;
 pub mod profile;
 #[macro_use]
 pub mod binserde;
+pub mod rgb2spec;
 pub mod tiledtexture;
-
 pub struct CurrentDirGuard {
     current_dir: PathBuf,
 }

@@ -88,11 +88,11 @@ impl Integrator for Bdpt {
                             );
                             if t == 1 {
                                 if let Some(raster) = raster {
-                                    film.add_splat(raster, &(li * weight / self.spp as f32));
+                                    film.add_splat(raster, li * weight / self.spp as f32);
                                     if self.debug {
                                         // let l =li * weight;
                                         pyramid[get_index(s, t)]
-                                            .add_splat(raster, &(li * weight / self.spp as f32));
+                                            .add_splat(raster, li * weight / self.spp as f32);
                                     }
                                 }
                             } else {
@@ -111,7 +111,7 @@ impl Integrator for Bdpt {
             }
             acc_li = acc_li / (self.spp as f32);
 
-            film.add_sample(uvec2(x, y), &acc_li, 1.0);
+            film.add_sample(uvec2(x, y), acc_li, 1.0);
 
             if self.debug {
                 for t in 2..=(self.max_depth + 2) as isize {
@@ -123,7 +123,7 @@ impl Integrator for Bdpt {
                         let idx = get_index(s, t);
                         pyramid[idx].add_sample(
                             uvec2(x, y),
-                            &(debug_acc[idx] / (self.spp as f32) as f32),
+                            debug_acc[idx] / (self.spp as f32) as f32,
                             1.0,
                         );
                     }

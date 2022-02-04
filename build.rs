@@ -1,8 +1,75 @@
 #[cfg(feature = "gpu")]
-use shaderc::{
-    CompileOptions, Compiler, IncludeCallbackResult, ResolvedInclude,
-    ShaderKind,
-};
+use shaderc::{CompileOptions, Compiler, IncludeCallbackResult, ResolvedInclude, ShaderKind};
+use std::fs::create_dir;
+use std::path::Path;
+use std::{path::PathBuf, process::Command};
+// fn use_this_when_cc_supports_vs22() -> PathBuf {
+//     let mut config = cmake::Config::new("src/pbrt-v4-rgb2spec-opt");
+//     config
+//         .define("CMAKE_BUILD_TYPE", "Release")
+//         .build_arg("--config")
+//         .build_arg("RELEASE");
+//     config.build()
+// }
+fn compile_rgb2spec_opt() -> PathBuf {
+    if !Path::new("src/pbrt-v4-rgb2spec-opt/build").exists() {
+        create_dir("src/pbrt-v4-rgb2spec-opt/build").unwrap();
+    }
+    Command::new("cmake")
+        .args([".."])
+        .current_dir("./src/pbrt-v4-rgb2spec-opt/build")
+        .output()
+        .expect("cmake failed to start");
+    let mut cmd = Command::new("cmake");
+    cmd.args(["--build", "."]);
+    if cfg!(target_os = "windows") {
+        cmd.args(["--config", "Release"]);
+    }
+    cmd.current_dir("./src/pbrt-v4-rgb2spec-opt/build")
+        .output()
+        .expect("cmake failed to start");
+    if cfg!(target_os = "windows") {
+        PathBuf::from("./src/pbrt-v4-rgb2spec-opt/build/Release")
+    } else {
+        PathBuf::from("./src/pbrt-v4-rgb2spec-opt/build")
+    }
+}
+// fn run_rgb2spec_opt(dir: PathBuf) {
+//     let mut rgb2spec = dir.clone();
+//     rgb2spec.push("rgb2spec_opt");
+//     if cfg!(target_os = "windows") {
+//         rgb2spec.set_extension("exe");
+//     }
+//     let color_spaces = ["ACES2065_1", "DCI_P3", "REC2020", "sRGB"];
+//     let curent_dir = current_dir().unwrap();
+//     for color_space in color_spaces {
+//         let mut output = curent_dir.clone();
+//         output.push(format!(
+//             "src/rgbspectrum_{}",
+//             color_space.to_ascii_lowercase()
+//         ));
+//         if output.clone().into_boxed_path().exists() {
+//             continue;
+//         }
+//         let args: Vec<OsString> = vec!["64".into(), output.into_os_string(), color_space.into()];
+//         Command::new(&rgb2spec)
+//             .args(args)
+//             .current_dir(canonicalize(current_dir().unwrap()).unwrap())
+//             .output()
+//             .expect(&format!(
+//                 "{} failed to start",
+//                 rgb2spec.clone().into_os_string().into_string().unwrap()
+//             ));
+//     }
+// }
+fn rgb2spec() {
+    println!("cargo:rerun-if-changed=src/pbrt-v4-rgb2spec-opt/rgb2spec_opt.cpp");
+    let dst = compile_rgb2spec_opt();
+    println!(
+        "cargo:rustc-link-search={}",
+        dst.into_os_string().into_string().unwrap()
+    );
+}
 
 #[derive(Debug, Clone, Copy)]
 #[allow(dead_code)]
@@ -44,8 +111,6 @@ fn compile_shader_imp(path: &String, shader_kind: ShaderKind, output: &String, o
     file.write_all(spirv.as_binary_u8()).unwrap();
 }
 
-
-
 #[cfg(feature = "gpu")]
 fn compile_shader(path: &str, shader_kind: ShaderKind, output: &str, options: Options) {
     if !Path::new("src/gpu/spv").exists() {
@@ -59,8 +124,8 @@ fn compile_shader(path: &str, shader_kind: ShaderKind, output: &str, options: Op
     )
 }
 
-
 fn main() {
+    rgb2spec();
     println!("cargo:rerun-if-changed=src/gpu/shaders");
 
     let nrc_opt = Options { nrc: true };
@@ -69,7 +134,7 @@ fn main() {
     let _ = nrc_opt;
     let _ = pt_opt;
 
-#   [cfg(feature = "gpu")]
+    #[cfg(feature = "gpu")]
     {
         compile_shader(
             "closest.rgen.glsl",
