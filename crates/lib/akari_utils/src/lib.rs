@@ -1,6 +1,6 @@
 use akari_common::*;
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
-use parking_lot::{Mutex, RwLock};
+use parking_lot::*;
 use serde::{Deserialize, Serialize};
 use std::{
     cell::UnsafeCell,

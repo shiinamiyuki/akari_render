@@ -1,5 +1,3 @@
-use std::ops::DerefMut;
-
 use bumpalo::Bump;
 
 use crate::bsdf::*;
@@ -7,8 +5,6 @@ use crate::camera::*;
 use crate::light::*;
 use crate::sampler::*;
 use crate::scene::*;
-use crate::shape::*;
-use crate::texture::ShadingPoint;
 use crate::*;
 #[derive(Clone, Copy)]
 pub struct VertexBase {

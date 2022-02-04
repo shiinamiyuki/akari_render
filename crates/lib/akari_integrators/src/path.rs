@@ -1,15 +1,13 @@
 use bumpalo::Bump;
-
 use crate::bsdf::*;
-// use crate::camera::*;
 use crate::film::*;
-
 use crate::light::*;
 use crate::sampler::*;
 use crate::scene::*;
 use crate::util::profile::scope;
 use crate::util::PerThread;
 use crate::*;
+
 pub struct PathTracer {
     pub spp: u32,
     pub max_depth: u32,

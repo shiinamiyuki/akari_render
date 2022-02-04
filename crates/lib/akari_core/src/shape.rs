@@ -209,7 +209,7 @@ impl MeshBvh {
             MeshBvh::QBvh(x) => &x.data,
         }
     }
-    pub fn traverse<F: FnMut(&mut Ray, u32) -> bool>(&self, mut ray: Ray, mut f: F) {
+    pub fn traverse<F: FnMut(&mut Ray, u32) -> bool>(&self, ray: Ray, f: F) {
         match self {
             MeshBvh::Bvh(x) => x.traverse(ray, f),
             MeshBvh::QBvh(x) => x.traverse(ray, f),

@@ -378,6 +378,16 @@ impl Aabb {
         *self
     }
 }
+pub fn lerp3v3(v0: Vec3, v1: Vec3, v2: Vec3, uv: Vec2) -> Vec3 {
+    (1.0 - uv.x - uv.y) * v0 + uv.x * v1 + uv.y * v2
+}
+pub fn lerp3v2(v0: Vec2, v1: Vec2, v2: Vec2, uv: Vec2) -> Vec2 {
+    (1.0 - uv.x - uv.y) * v0 + uv.x * v1 + uv.y * v2
+}
+pub fn lerp_scalar(x: f32, y: f32, a: f32) -> f32 {
+    x + (y - x) * a
+}
+
 pub type Bounds3f = Aabb;
 impl Aabb {
     pub fn surface_area(&self) -> f32 {

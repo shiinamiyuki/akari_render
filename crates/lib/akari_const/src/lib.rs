@@ -4,6 +4,7 @@ pub struct GgxLtcfit {
 }
 mod ltc;
 mod sobolmat;
-
+mod cie;
 pub use ltc::GGX_LTC_FIT;
 pub use sobolmat::*;
+pub use cie::*;

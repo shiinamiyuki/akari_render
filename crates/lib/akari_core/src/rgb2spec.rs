@@ -1,3 +1,4 @@
+use crate::*;
 pub const SPECTRUM_TABLE_RES: usize = 64;
 pub type Rgb2SpectrumTable =
     [[[[[f32; 3]; SPECTRUM_TABLE_RES]; SPECTRUM_TABLE_RES]; SPECTRUM_TABLE_RES]; 3];
@@ -20,6 +21,7 @@ fn load_rgb2spec_data(gamut: &str, file: String) -> Rgb2SpectrumData {
     let data_file = data_file.into_boxed_path();
     if !data_file.exists() {
         unsafe {
+            log::info!("{} does not exist, generating...", data_file.display());
             let mut scale: Rgb2SpectrumScale = [0.0f32; SPECTRUM_TABLE_RES];
             let mut table: Rgb2SpectrumTable =
                 [[[[[0.0f32; 3]; SPECTRUM_TABLE_RES]; SPECTRUM_TABLE_RES]; SPECTRUM_TABLE_RES]; 3];

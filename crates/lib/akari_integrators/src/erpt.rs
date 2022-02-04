@@ -1,9 +1,6 @@
-use crate::distribution::{Distribution1D, Distribution2D};
 use crate::path::PathTracer;
 use crate::pssmlt::Pssmlt;
-use crate::sampler::{
-    MltSampler, PCGSampler, Pcg, PrimarySample, ReplaySampler, Sampler, SobolSampler,
-};
+use crate::sampler::{MltSampler, PrimarySample, ReplaySampler, Sampler, SobolSampler};
 use crate::scene::Scene;
 use crate::util::PerThread;
 use crate::*;

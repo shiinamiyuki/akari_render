@@ -68,82 +68,7 @@ impl RGBSpectrum {
         x * (1.0 - a) + y * a
     }
 }
-pub fn lerp3v3(v0: Vec3, v1: Vec3, v2: Vec3, uv: Vec2) -> Vec3 {
-    (1.0 - uv.x - uv.y) * v0 + uv.x * v1 + uv.y * v2
-}
-pub fn lerp3v2(v0: Vec2, v1: Vec2, v2: Vec2, uv: Vec2) -> Vec2 {
-    (1.0 - uv.x - uv.y) * v0 + uv.x * v1 + uv.y * v2
-}
-pub fn lerp_scalar(x: f32, y: f32, a: f32) -> f32 {
-    x + (y - x) * a
-}
-impl Index<usize> for RGBSpectrum {
-    type Output = f32;
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.samples[index]
-    }
-}
-impl IndexMut<usize> for RGBSpectrum {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.samples[index]
-    }
-}
-impl std::ops::Add for RGBSpectrum {
-    type Output = RGBSpectrum;
-    fn add(self, rhs: Spectrum) -> Self::Output {
-        Self {
-            samples: self.samples + rhs.samples,
-        }
-    }
-}
-impl std::ops::Sub for RGBSpectrum {
-    type Output = RGBSpectrum;
-    fn sub(self, rhs: Spectrum) -> Self::Output {
-        Self {
-            samples: self.samples - rhs.samples,
-        }
-    }
-}
-impl std::ops::AddAssign for RGBSpectrum {
-    fn add_assign(&mut self, rhs: Self) {
-        *self = *self + rhs;
-    }
-}
-impl std::ops::MulAssign for RGBSpectrum {
-    fn mul_assign(&mut self, rhs: Self) {
-        *self = *self * rhs;
-    }
-}
-impl std::ops::MulAssign<f32> for RGBSpectrum {
-    fn mul_assign(&mut self, rhs: f32) {
-        *self = *self * rhs;
-    }
-}
-impl std::ops::Mul for Spectrum {
-    type Output = Spectrum;
-    fn mul(self, rhs: Spectrum) -> Self::Output {
-        Self {
-            samples: self.samples * rhs.samples,
-        }
-    }
-}
-impl std::ops::Mul<f32> for Spectrum {
-    type Output = Spectrum;
-    fn mul(self, rhs: f32) -> Self::Output {
-        Self {
-            samples: self.samples * rhs,
-        }
-    }
-}
-impl std::ops::Div<f32> for Spectrum {
-    type Output = Spectrum;
-    fn div(self, rhs: f32) -> Self::Output {
-        Self {
-            samples: self.samples / rhs,
-        }
-    }
-}
-pub type Spectrum = RGBSpectrum;
+
 pub fn hsv_to_rgb(hsv: Vec3) -> Vec3 {
     let h = (hsv[0] / 60.0).floor() as u32;
     let f = hsv[0] / 60.0 - h as f32;
@@ -225,3 +150,159 @@ pub fn rgb_to_hsv(rgb: Vec3) -> Vec3 {
     };
     vec3(h, s, v)
 }
+
+pub fn xyz_to_linear_srgb(xyz: Vec3) -> Vec3 {
+    let m = mat3(
+        vec3(3.240479f32, -0.969256f32, 0.055648f32),
+        vec3(-1.537150f32, 1.875991f32, -0.204043f32),
+        vec3(-0.498535f32, 0.041556f32, 1.057311f32),
+    );
+    m * xyz
+}
+
+impl Index<usize> for RGBSpectrum {
+    type Output = f32;
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.samples[index]
+    }
+}
+impl IndexMut<usize> for RGBSpectrum {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.samples[index]
+    }
+}
+impl std::ops::Add for RGBSpectrum {
+    type Output = RGBSpectrum;
+    fn add(self, rhs: Spectrum) -> Self::Output {
+        Self {
+            samples: self.samples + rhs.samples,
+        }
+    }
+}
+impl std::ops::Sub for RGBSpectrum {
+    type Output = RGBSpectrum;
+    fn sub(self, rhs: Spectrum) -> Self::Output {
+        Self {
+            samples: self.samples - rhs.samples,
+        }
+    }
+}
+impl std::ops::AddAssign for RGBSpectrum {
+    fn add_assign(&mut self, rhs: Self) {
+        *self = *self + rhs;
+    }
+}
+impl std::ops::MulAssign for RGBSpectrum {
+    fn mul_assign(&mut self, rhs: Self) {
+        *self = *self * rhs;
+    }
+}
+impl std::ops::MulAssign<f32> for RGBSpectrum {
+    fn mul_assign(&mut self, rhs: f32) {
+        *self = *self * rhs;
+    }
+}
+impl std::ops::Mul for Spectrum {
+    type Output = Spectrum;
+    fn mul(self, rhs: Spectrum) -> Self::Output {
+        Self {
+            samples: self.samples * rhs.samples,
+        }
+    }
+}
+impl std::ops::Mul<f32> for Spectrum {
+    type Output = Spectrum;
+    fn mul(self, rhs: f32) -> Self::Output {
+        Self {
+            samples: self.samples * rhs,
+        }
+    }
+}
+impl std::ops::Div<f32> for Spectrum {
+    type Output = Spectrum;
+    fn div(self, rhs: f32) -> Self::Output {
+        Self {
+            samples: self.samples / rhs,
+        }
+    }
+}
+#[derive(Clone, Copy, Debug, Default)]
+pub struct SampledSpectrum {
+    samples: Vec4,
+}
+impl SampledSpectrum {
+    pub fn new(samples: Vec4) -> Self {
+        Self { samples }
+    }
+    pub fn max_element(&self) -> f32 {
+        self.samples.max_element()
+    }
+}
+impl Index<usize> for SampledSpectrum {
+    type Output = f32;
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.samples[index]
+    }
+}
+impl IndexMut<usize> for SampledSpectrum {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.samples[index]
+    }
+}
+impl std::ops::Add for SampledSpectrum {
+    type Output = SampledSpectrum;
+    fn add(self, rhs: SampledSpectrum) -> Self::Output {
+        Self {
+            samples: self.samples + rhs.samples,
+        }
+    }
+}
+impl std::ops::Sub for SampledSpectrum {
+    type Output = SampledSpectrum;
+    fn sub(self, rhs: SampledSpectrum) -> Self::Output {
+        Self {
+            samples: self.samples - rhs.samples,
+        }
+    }
+}
+impl std::ops::AddAssign for SampledSpectrum {
+    fn add_assign(&mut self, rhs: Self) {
+        *self = *self + rhs;
+    }
+}
+impl std::ops::MulAssign for SampledSpectrum {
+    fn mul_assign(&mut self, rhs: Self) {
+        *self = *self * rhs;
+    }
+}
+impl std::ops::MulAssign<f32> for SampledSpectrum {
+    fn mul_assign(&mut self, rhs: f32) {
+        *self = *self * rhs;
+    }
+}
+impl std::ops::Mul for SampledSpectrum {
+    type Output = SampledSpectrum;
+    fn mul(self, rhs: SampledSpectrum) -> Self::Output {
+        Self {
+            samples: self.samples * rhs.samples,
+        }
+    }
+}
+impl std::ops::Mul<f32> for SampledSpectrum {
+    type Output = SampledSpectrum;
+    fn mul(self, rhs: f32) -> Self::Output {
+        Self {
+            samples: self.samples * rhs,
+        }
+    }
+}
+impl std::ops::Div<f32> for SampledSpectrum {
+    type Output = SampledSpectrum;
+    fn div(self, rhs: f32) -> Self::Output {
+        Self {
+            samples: self.samples / rhs,
+        }
+    }
+}
+
+pub type Spectrum = RGBSpectrum;

@@ -141,9 +141,9 @@ impl<T: BvhData> QBvhAccel<T> {
     #[allow(unused_mut)]
     pub fn traverse4<F: FnMut(&mut Ray4, BVec4A, u32) -> BVec4A>(
         &self,
-        ray4: &mut Ray4,
-        mut active_mask: BVec4A,
-        mut f: F,
+        _ray4: &mut Ray4,
+        mut _active_mask: BVec4A,
+        mut _f: F,
     ) {
         todo!()
     }
@@ -265,13 +265,13 @@ impl<T: BvhData> QBvhAccelBuilder<T> {
         for j in 0..3 {
             for i in 0..4 {
                 min[j][i] = match children[i] {
-                    BvhNodeChild::Child { aabb, idx } => aabb.min[j],
-                    BvhNodeChild::Leaf { aabb, first, count } => aabb.min[j],
+                    BvhNodeChild::Child { aabb, .. } => aabb.min[j],
+                    BvhNodeChild::Leaf { aabb, .. } => aabb.min[j],
                     BvhNodeChild::Empty => 0.0,
                 };
                 max[j][i] = match children[i] {
-                    BvhNodeChild::Child { aabb, idx } => aabb.max[j],
-                    BvhNodeChild::Leaf { aabb, first, count } => aabb.max[j],
+                    BvhNodeChild::Child { aabb, .. } => aabb.max[j],
+                    BvhNodeChild::Leaf { aabb, .. } => aabb.max[j],
                     BvhNodeChild::Empty => 0.0,
                 };
             }

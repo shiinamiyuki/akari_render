@@ -579,7 +579,7 @@ macro_rules! impl_bvh_accel {
                 hit
             }
             #[allow(dead_code)]
-            fn intersect4(&self, ray: &[Ray; 4], mask: [bool; 4]) -> [Option<RayHit>; 4] {
+            fn intersect4(&self, _ray: &[Ray; 4], _mask: [bool; 4]) -> [Option<RayHit>; 4] {
                 todo!()
                 // let mut hits = [None; 4];
                 // let ray4 = Ray4::from(*ray);
@@ -597,7 +597,7 @@ macro_rules! impl_bvh_accel {
                 // hits
             }
             #[allow(dead_code)]
-            fn occlude4(&self, ray: &[Ray; 4], mask: [bool; 4]) -> [bool; 4] {
+            fn occlude4(&self, _ray: &[Ray; 4], _mask: [bool; 4]) -> [bool; 4] {
                 todo!()
                 // let ray4 = Ray4::from(*ray);
                 // let mut mask = BVec4A::new(mask[0], mask[1], mask[2], mask[3]);

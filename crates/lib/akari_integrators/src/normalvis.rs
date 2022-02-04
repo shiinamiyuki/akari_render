@@ -22,9 +22,7 @@ impl Integrator for NormalVis {
             let (ray, _ray_weight) = scene.camera.generate_ray(pixel, &mut sampler);
 
             if let Some(si) = scene.intersect(&ray) {
-                // li = Spectrum { samples: si.ng }
                 let ns = si.ns;
-
                 film.add_sample(uvec2(x, y), Spectrum::from_rgb_linear(ns * 0.5 + 0.5), 1.0);
             }
         });

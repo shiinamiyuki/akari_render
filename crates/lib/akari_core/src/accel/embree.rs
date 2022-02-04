@@ -32,6 +32,7 @@ fn init_device() {
 }
 struct EmbreeMeshAccel {
     scene: sys::RTCScene,
+    #[allow(dead_code)]
     mesh: Arc<TriangleMesh>,
 }
 unsafe impl Send for EmbreeMeshAccel {}

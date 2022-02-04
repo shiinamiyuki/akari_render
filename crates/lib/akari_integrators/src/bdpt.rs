@@ -89,14 +89,12 @@ impl Integrator for Bdpt {
                                 if let Some(raster) = raster {
                                     film.add_splat(raster, li * weight / self.spp as f32);
                                     if self.debug {
-                                        // let l =li * weight;
                                         pyramid[get_index(s, t)]
                                             .add_splat(raster, li * weight / self.spp as f32);
                                     }
                                 }
                             } else {
                                 if self.debug {
-                                    // let l =li * weight;
                                     debug_acc[get_index(s, t)] += li * weight;
                                 }
                                 acc_li += li * weight;
