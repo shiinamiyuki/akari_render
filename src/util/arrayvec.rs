@@ -117,7 +117,7 @@ impl<T, S: ArrayVecStorage<T>> ArrayVec<T, S> {
         self.len
     }
     pub fn push(&mut self, val: T) -> Result<(), ()> {
-        if self.len + 1 >= self.capacity {
+        if self.len + 1 > self.capacity {
             Err(())
         } else {
             unsafe {

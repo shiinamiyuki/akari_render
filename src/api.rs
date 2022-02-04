@@ -75,9 +75,9 @@ impl<'a> SceneLoaderContext<'a> {
                     .unwrap();
                 let img = reader.decode().unwrap().into_rgb8();
                 if cfg!(feature = "gpu") || !self.ooc.enable_ooc {
-                    Arc::new(ImageTexture::<Spectrum>::from_rgb_image(&img))
+                    Arc::new(ImageTexture::<Spectrum>::from_rgb_image(&img, false))
                 } else {
-                    Arc::new(ImageTexture::<Spectrum>::from_rgb_image_virtual(&img))
+                    Arc::new(ImageTexture::<Spectrum>::from_rgb_image(&img, true))
                 }
             }
         }
