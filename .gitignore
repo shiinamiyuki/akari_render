@@ -12,4 +12,4 @@ src/ltc/fit.rs
 
 src/gpu/spv/*.spv
 # src/gpu/nrc_sys.rs
-src/pbrt-v4-rgb2spec-opt/build
+crates/lib/akari_core/src/pbrt-v4-rgb2spec-opt/build
