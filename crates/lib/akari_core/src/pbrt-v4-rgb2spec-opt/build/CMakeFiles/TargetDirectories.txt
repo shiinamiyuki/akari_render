@@ -1,3 +1,0 @@
-C:/Users/miyuki/source/repos/akari_render/src/pbrt-v4-rgb2spec-opt/build/CMakeFiles/rgb2spec_opt.dir
-C:/Users/miyuki/source/repos/akari_render/src/pbrt-v4-rgb2spec-opt/build/CMakeFiles/ALL_BUILD.dir
-C:/Users/miyuki/source/repos/akari_render/src/pbrt-v4-rgb2spec-opt/build/CMakeFiles/ZERO_CHECK.dir
