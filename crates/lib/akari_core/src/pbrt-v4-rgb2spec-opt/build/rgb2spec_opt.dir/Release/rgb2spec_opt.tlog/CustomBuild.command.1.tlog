@@ -1,0 +1,10 @@
+^C:\USERS\MIYUKI\SOURCE\REPOS\AKARI_RENDER\SRC\PBRT-V4-RGB2SPEC-OPT\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/miyuki/source/repos/akari_render/src/pbrt-v4-rgb2spec-opt -BC:/Users/miyuki/source/repos/akari_render/src/pbrt-v4-rgb2spec-opt/build --check-stamp-file C:/Users/miyuki/source/repos/akari_render/src/pbrt-v4-rgb2spec-opt/build/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
