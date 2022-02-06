@@ -142,7 +142,7 @@ pub fn srgb_to_xyz(srgb: Vec3) -> Vec3 {
         0.357580, 0.715160, 0.119193, //.
         0.180423, 0.072169, 0.950227,
     ];
-    let m = Mat3::from_cols_array(&m).transpose();
+    let m = Mat3::from_cols_array(&m);
     m * srgb
 }
 
@@ -277,7 +277,7 @@ impl RgbSigmoidPolynomial {
                 0.0
             }
         } else {
-            0.5f32 + x / (2.0 + (1.0 + x * x).sqrt())
+            0.5f32 + x / (2.0 * (1.0 + x * x).sqrt())
         }
     }
     pub fn new(c0: f32, c1: f32, c2: f32) -> Self {
@@ -312,6 +312,7 @@ pub enum RgbColorSpaceId {
     Rec2020,
     DCIP3,
 }
+#[derive(Clone, Copy)]
 pub struct RgbColorSpace {
     id: RgbColorSpaceId,
     rgb2spec_data: &'static Rgb2SpectrumData,
@@ -333,7 +334,12 @@ impl RgbColorSpace {
             RgbColorSpaceId::DCIP3 => todo!(),
         }
     }
+    pub fn illuminant(&self) -> &'static dyn Spectrum {
+        self.illuminant
+    }
     pub fn rgb2spec(&self, rgb: Vec3) -> RgbSigmoidPolynomial {
+        debug_assert!(rgb.max_element() <= 1.0);
+        debug_assert!(rgb.min_element() >= 0.0);
         if rgb[0] == rgb[1] && rgb[1] == rgb[2] {
             return RgbSigmoidPolynomial::new(
                 0.0,
@@ -356,12 +362,12 @@ impl RgbColorSpace {
         };
         let z = rgb[maxc];
         let x = rgb[(maxc + 1) % 3] / z * (SPECTRUM_TABLE_RES - 1) as f32;
-        let y = rgb[(maxc + 1) % 3] / z * (SPECTRUM_TABLE_RES - 1) as f32;
+        let y = rgb[(maxc + 2) % 3] / z * (SPECTRUM_TABLE_RES - 1) as f32;
 
         let znodes = &self.rgb2spec_data.scale;
 
-        let xi = (x as usize).min(SPECTRUM_TABLE_RES - 1);
-        let yi = (y as usize).min(SPECTRUM_TABLE_RES - 1);
+        let xi = (x as usize).min(SPECTRUM_TABLE_RES - 2);
+        let yi = (y as usize).min(SPECTRUM_TABLE_RES - 2);
         let zi = find_largest(znodes, |s| *s < z);
 
         let dx = x - xi as f32;

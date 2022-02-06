@@ -22,6 +22,7 @@ impl ShadingPoint {
 
 pub trait Texture: Sync + Send + Base {
     fn evaluate_s(&self, sp: &ShadingPoint, lambda: SampledWavelengths) -> SampledSpectrum;
+    fn evaluate_illum(&self, sp: &ShadingPoint, lambda: SampledWavelengths) -> SampledSpectrum;
     fn evaluate_f(&self, sp: &ShadingPoint) -> f32;
     fn power(&self) -> f32;
 }
@@ -34,6 +35,9 @@ impl Texture for ConstantFloatTexture {
     fn evaluate_f(&self, _sp: &ShadingPoint) -> f32 {
         self.0 as f32
     }
+    fn evaluate_illum(&self, sp: &ShadingPoint, lambda: SampledWavelengths) -> SampledSpectrum {
+        SampledSpectrum::splat(self.0)
+    }
     fn power(&self) -> f32 {
         self.0 as f32
     }
@@ -42,11 +46,24 @@ impl_base!(ConstantFloatTexture);
 pub struct ConstantRgbTexture {
     rgb: Vec3,
     rep: RgbSigmoidPolynomial,
+    scale: f32,
+    colorspace: RgbColorSpace,
 }
 impl ConstantRgbTexture {
-    pub fn new(rgb: Vec3, colorspace: &RgbColorSpace) -> Self {
+    pub fn new(mut rgb: Vec3, colorspace: RgbColorSpace) -> Self {
+        let mut scale = rgb.max_element();
+        if scale < 1.0 {
+            scale = 1.0;
+        } else {
+            rgb /= scale;
+        }
         let rep = colorspace.rgb2spec(rgb);
-        Self { rep, rgb }
+        Self {
+            rep,
+            rgb,
+            colorspace,
+            scale,
+        }
     }
 }
 impl Texture for ConstantRgbTexture {
@@ -55,6 +72,12 @@ impl Texture for ConstantRgbTexture {
     }
     fn evaluate_f(&self, _sp: &ShadingPoint) -> f32 {
         self.rgb[0] as f32
+    }
+    fn evaluate_illum(&self, _sp: &ShadingPoint, lambda: SampledWavelengths) -> SampledSpectrum {
+        let scale = self.scale;
+        let illuminant = self.colorspace.illuminant();
+        let i = illuminant.sample(lambda);
+        self.rep.sample(lambda) * i * scale
     }
     fn power(&self) -> f32 {
         self.rep.max_element()

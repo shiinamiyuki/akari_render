@@ -3,97 +3,57 @@ pub const SPECTRUM_TABLE_RES: usize = 64;
 pub type Rgb2SpectrumTable =
     [[[[[f32; 3]; SPECTRUM_TABLE_RES]; SPECTRUM_TABLE_RES]; SPECTRUM_TABLE_RES]; 3];
 pub type Rgb2SpectrumScale = [f32; SPECTRUM_TABLE_RES];
-
-pub struct Rgb2SpectrumData {
-    pub scale: Rgb2SpectrumScale,
-    pub table: Rgb2SpectrumTable,
-}
-
-extern "C" {
-    pub fn gen_rgb2spec_table(res: u32, gamut_s: *const c_char, scale: *mut f32, table: *mut f32);
-}
-
-fn load_rgb2spec_data(gamut: &str, file: String) -> Rgb2SpectrumData {
-    let exe_path = std::env::current_exe().unwrap();
-    let parent = exe_path.parent().unwrap();
-    let mut data_file = PathBuf::from(parent);
-    data_file.push(&file);
-    let data_file = data_file.into_boxed_path();
-    if !data_file.exists() {
-        unsafe {
-            log::info!("{} does not exist, generating...", data_file.display());
-            let mut scale: Rgb2SpectrumScale = [0.0f32; SPECTRUM_TABLE_RES];
-            let mut table: Rgb2SpectrumTable =
-                [[[[[0.0f32; 3]; SPECTRUM_TABLE_RES]; SPECTRUM_TABLE_RES]; SPECTRUM_TABLE_RES]; 3];
-            assert_eq!(
-                table.len(),
-                size_of::<Rgb2SpectrumTable>() / size_of::<f32>()
-            );
-            let gamut = CString::new(gamut).unwrap();
-            gen_rgb2spec_table(
-                SPECTRUM_TABLE_RES as u32,
-                gamut.as_ptr(),
-                scale.as_mut_ptr(),
-                table.as_mut_ptr() as *mut f32,
-            );
-            let mut file = std::fs::File::create(&data_file).unwrap();
-            file.write_all(std::slice::from_raw_parts(
-                scale.as_ptr() as *const u8,
-                size_of::<Rgb2SpectrumScale>(),
-            ))
-            .unwrap();
-            file.write_all(std::slice::from_raw_parts(
-                table.as_ptr() as *const u8,
-                size_of::<Rgb2SpectrumTable>(),
-            ))
-            .unwrap();
-        }
-        load_rgb2spec_data(gamut, file)
-    } else {
-        let mut file = std::fs::File::open(&data_file).unwrap();
-        let mut scale: Rgb2SpectrumScale = [0.0f32; SPECTRUM_TABLE_RES];
-        let mut table: Rgb2SpectrumTable =
-            [[[[[0.0f32; 3]; SPECTRUM_TABLE_RES]; SPECTRUM_TABLE_RES]; SPECTRUM_TABLE_RES]; 3];
-        unsafe {
-            file.read_exact(std::slice::from_raw_parts_mut(
-                scale.as_mut_ptr() as *mut u8,
-                size_of::<Rgb2SpectrumScale>(),
-            ))
-            .unwrap();
-            file.read_exact(std::slice::from_raw_parts_mut(
-                table.as_mut_ptr() as *mut u8,
-                size_of::<Rgb2SpectrumTable>(),
-            ))
-            .unwrap();
-        }
-        Rgb2SpectrumData { scale, table }
-    }
-}
-
 use std::{
     ffi::CString,
     io::{Read, Write},
     mem::size_of,
     os::raw::c_char,
-    path::PathBuf,
+    path::PathBuf, sync::Arc,
 };
 
+pub struct Rgb2SpectrumData {
+    pub scale: Rgb2SpectrumScale,
+    pub table: Rgb2SpectrumTable,
+}
+impl Rgb2SpectrumData {
+    pub const _DUMMY: Self = Self {
+        scale: [0.0f32; SPECTRUM_TABLE_RES],
+        table: [[[[[0.0f32; 3]; SPECTRUM_TABLE_RES]; SPECTRUM_TABLE_RES]; SPECTRUM_TABLE_RES]; 3],
+    };
+}
+
+fn load_rgb2spec_data(bytes: &[u8]) -> Arc<Rgb2SpectrumData> {
+    let raw = unsafe {
+        std::slice::from_raw_parts(bytes.as_ptr() as *const f32, bytes.len() / size_of::<f32>())
+    };
+    assert_eq!(bytes.len(), size_of::<Rgb2SpectrumData>());
+    let mut data = Arc::new(Rgb2SpectrumData::_DUMMY);
+    unsafe {
+        let data = Arc::get_mut(&mut data).unwrap();
+        std::ptr::copy_nonoverlapping(raw.as_ptr(), data.scale.as_mut_ptr(), SPECTRUM_TABLE_RES);
+        std::ptr::copy_nonoverlapping(
+            raw[SPECTRUM_TABLE_RES..].as_ptr(),
+            data.table.as_mut_ptr() as *mut f32,
+            SPECTRUM_TABLE_RES.pow(3) * 9,
+        );
+    }
+    data
+}
+
 macro_rules! rgb2spec_mod {
-    ($name:ident) => {
+    ($name:ident, $file:literal) => {
         pub mod $name {
             use super::*;
             use lazy_static::lazy_static;
             lazy_static! {
-                pub static ref DATA: Rgb2SpectrumData = load_rgb2spec_data(
-                    stringify!($name),
-                    format!("rgbspectrum_{}", stringify!($name))
-                );
+                pub static ref DATA: Arc<Rgb2SpectrumData> =
+                    load_rgb2spec_data(include_bytes!($file));
             }
         }
     };
 }
 
-rgb2spec_mod!(aces2065_1);
-rgb2spec_mod!(dpi_p3);
-rgb2spec_mod!(srgb);
-rgb2spec_mod!(rec2020);
+rgb2spec_mod!(aces2065_1, "rgbspectrum_aces2065_1");
+rgb2spec_mod!(dci_p3, "rgbspectrum_dci_p3");
+rgb2spec_mod!(srgb, "rgbspectrum_srgb");
+rgb2spec_mod!(rec2020, "rgbspectrum_rec2020");

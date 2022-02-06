@@ -1,5 +1,5 @@
 use akari::bsdf::{DiffuseBsdfClosure, LocalBsdfClosure};
-use akari::sampler::{PCGSampler, SobolSampler};
+use akari::sampler::{PCGSampler, Sampler, SobolSampler};
 use akari::util::PerThread;
 use akari::*;
 use bsdf::ltc::GgxLtcBsdfClosure;
@@ -77,7 +77,31 @@ fn test_ggx() {
         roughness += 0.05;
     }
 }
+fn test_rgb2spec_(rgb: Vec3) {
+    // println!("{} {}", rgb, xyz_to_srgb(srgb_to_xyz(rgb)));
+    let mut sampler = PCGSampler::new(0);
+    let colorspace = RgbColorSpace::new(RgbColorSpaceId::SRgb);
+    let rep = colorspace.rgb2spec(rgb);
+    let mut sum = RobustSum::new(color::XYZ::zero());
+    let n = 1000000;
+    for _ in 0..n {
+        let swl = SampledWavelengths::sample_visible(sampler.next1d());
+        let s = rep.sample(swl);
+        let xyz = swl.cie_xyz(s);
+        sum.add(xyz);
+    }
+    let xyz = sum.sum() / n as f32;
+    let rgb2 = SRgb::from(xyz);
+    println!("{} {}", rgb, rgb2.values());
+}
 fn main() {
     test_diffuse();
     test_ggx();
+    test_rgb2spec_(Vec3::ONE);
+    test_rgb2spec_(Vec3::X * 0.5);
+    test_rgb2spec_(Vec3::Y * 0.5);
+    test_rgb2spec_(Vec3::Z * 0.5);
+    test_rgb2spec_(Vec3::X);
+    test_rgb2spec_(Vec3::Y);
+    test_rgb2spec_(Vec3::Z);
 }

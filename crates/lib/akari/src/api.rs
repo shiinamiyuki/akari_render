@@ -58,21 +58,21 @@ impl<'a> SceneLoaderContext<'a> {
         match node {
             node::Texture::Float(f) => Arc::new(ConstantFloatTexture(*f)),
             node::Texture::Float3(f3) => {
-                Arc::new(ConstantRgbTexture::new(Vec3::from(*f3), &colorspace))
+                Arc::new(ConstantRgbTexture::new(Vec3::from(*f3), colorspace))
             }
             node::Texture::Srgb(srgb) => Arc::new(ConstantRgbTexture::new(
                 srgb_to_linear(Vec3::from(*srgb)),
-                &colorspace,
+                colorspace,
             )),
             node::Texture::SrgbU8(srgb) => Arc::new(ConstantRgbTexture::new(
                 srgb_to_linear(
                     UVec3::from([srgb[0] as u32, srgb[1] as u32, srgb[2] as u32]).as_vec3() / 255.0,
                 ),
-                &colorspace,
+                colorspace,
             )),
             node::Texture::Hsv(hsv) => {
                 let rgb = hsv_to_rgb(Vec3::from(*hsv));
-                Arc::new(ConstantRgbTexture::new(srgb_to_linear(rgb), &colorspace))
+                Arc::new(ConstantRgbTexture::new(srgb_to_linear(rgb), colorspace))
             }
             node::Texture::Hex(_) => todo!(),
             node::Texture::Image(path) => {
@@ -228,6 +228,22 @@ impl<'a> SceneLoaderContext<'a> {
 
         Transform::from_matrix(&m)
     }
+    fn load_transform2(&self, trs: node::TR) -> Transform {
+        let mut m = Mat4::IDENTITY;
+        let node::TR {
+            translate: t,
+            rotate: r,
+        } = trs;
+        let (t, r) = (t.into(), r.into());
+        let r: Vec3 = r;
+        let r = vec3(r.x.to_radians(), r.y.to_radians(), r.z.to_radians());
+        m = Mat4::from_axis_angle(vec3(1.0, 0.0, 0.0), r[0]) * m;
+        m = Mat4::from_axis_angle(vec3(0.0, 1.0, 0.0), r[1]) * m;
+        m = Mat4::from_axis_angle(vec3(0.0, 0.0, 1.0), r[2]) * m;
+        m = Mat4::from_translation(t) * m;
+
+        Transform::from_matrix(&m)
+    }
     fn load(&mut self) {
         self.camera = Some(match self.graph.camera {
             node::Camera::Perspective {
@@ -238,7 +254,7 @@ impl<'a> SceneLoaderContext<'a> {
                 transform,
             } => Arc::new(PerspectiveCamera::new(
                 uvec2(res.0, res.1),
-                &self.load_transform(transform),
+                &self.load_transform2(transform),
                 fov.to_radians() as f32,
             )),
         });

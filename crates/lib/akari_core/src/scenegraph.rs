@@ -11,6 +11,11 @@ pub mod node {
         pub rotate: [f32; 3],
         pub scale: [f32; 3],
     }
+    #[derive(Clone, Copy, Serialize, Deserialize)]
+    pub struct TR {
+        pub translate: [f32; 3],
+        pub rotate: [f32; 3],
+    }
     impl Default for TRS {
         fn default() -> Self {
             Self {
@@ -75,7 +80,7 @@ pub mod node {
             fov: f32, // in degress
             lens_radius: f32,
             focal: f32,
-            transform: TRS,
+            transform: TR,
         },
     }
 

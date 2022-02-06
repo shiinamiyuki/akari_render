@@ -5,7 +5,7 @@ use crate::{
     function::{Dense1D, DenseSlice1D, Function1D, PiecewiseLinear1D},
     *,
 };
-use akari_const::{CIE_SAMPLES, CIE_Y};
+use akari_const::{CIE_LAMBDA_MAX, CIE_LAMBDA_MIN, CIE_SAMPLES, CIE_Y};
 use lazy_static::lazy_static;
 pub const SPECTRUM_SAMPLES: usize = 4;
 #[derive(Clone, Copy, Debug, Default)]
@@ -53,13 +53,11 @@ impl SampledWavelengths {
         let z = &DenselySampledSpectrum2::CIE_Z;
         let avg = |s: SampledSpectrum| (s[0] + s[1] + s[2] + s[3]) / SPECTRUM_SAMPLES as f32;
         let pdf = Vec4::select(self.pdf.cmple(Vec4::ZERO), Vec4::ONE, self.pdf);
-        XYZ::new(
-            vec3(
-                avg((s * x.sample(*self)) / pdf),
-                avg((s * y.sample(*self)) / pdf),
-                avg((s * z.sample(*self)) / pdf),
-            ) * INV_CIE_Y_INTEGRAL,
-        )
+        XYZ::new(vec3(
+            avg((s * x.sample(*self)) / pdf),
+            avg((s * y.sample(*self)) / pdf),
+            avg((s * z.sample(*self)) / pdf),
+        )) * INV_CIE_Y_INTEGRAL
     }
     pub fn sample_visible(u: f32) -> Self {
         let mut w = Self {
@@ -70,6 +68,18 @@ impl SampledWavelengths {
             let up = (u + i as f32 / SPECTRUM_SAMPLES as f32).fract();
             w.lambda[i] = sample_visible_wavelenghts(up);
             w.pdf[i] = visible_wavelenghts_pdf(w.lambda[i]);
+        }
+        w
+    }
+    pub fn sample_uniform(u: f32) -> Self {
+        let mut w = Self {
+            lambda: Vec4::ZERO,
+            pdf: Vec4::ZERO,
+        };
+        for i in 0..SPECTRUM_SAMPLES {
+            let up = (u + i as f32 / SPECTRUM_SAMPLES as f32).fract();
+            w.lambda[i] = lerp(CIE_LAMBDA_MIN, CIE_LAMBDA_MAX, up);
+            w.pdf[i] = 1.0 / (CIE_LAMBDA_MAX - CIE_LAMBDA_MIN);
         }
         w
     }
@@ -103,9 +113,16 @@ impl Spectrum for RgbAlbedoSpectrum {
 pub struct RgbIlluminantSpectrum {
     spd: RgbSigmoidPolynomial,
     scale: f32,
-    illuminant: DenselySampledSpectrum,
+    illuminant: &'static dyn Spectrum,
 }
 impl RgbIlluminantSpectrum {
+    pub fn new(rep: RgbSigmoidPolynomial, scale: f32, illuminant: &'static dyn Spectrum) -> Self {
+        Self {
+            spd: rep,
+            scale,
+            illuminant,
+        }
+    }
     pub fn sample(&self, swl: SampledWavelengths) -> SampledSpectrum {
         self.spd.sample(swl) * self.scale * self.illuminant.sample(swl)
     }
@@ -157,18 +174,33 @@ pub type PiecewiseLinearSpectrum = GenericSpectrum<PiecewiseLinear1D>;
 pub type DenselySampledSpectrum = GenericSpectrum<Dense1D>;
 pub type DenselySampledSpectrum2 = GenericSpectrum<DenseSlice1D>;
 impl PiecewiseLinearSpectrum {
-    pub fn from_interleaved(yx: &[f32]) -> Self {
-        PiecewiseLinear1D::from_interleaved(yx).into()
+    pub fn from_interleaved(xy: &[f32], normalize: bool) -> Self {
+        let mut s: Self = PiecewiseLinear1D::from_interleaved(xy).into();
+        if !normalize {
+            return s;
+        }
+        let y = &DenselySampledSpectrum2::CIE_Y;
+        s.scale(CIE_Y_INTEGRAL / inner_product(&s, &y));
+        s
+    }
+    pub fn scale(&mut self, k: f32) {
+        self.f.scale(k);
     }
 }
 pub trait Spectrum: Base + Send + Sync {
     fn sample(&self, lambda: SampledWavelengths) -> SampledSpectrum;
 }
-
+pub fn inner_product<F1: Function1D, F2: Function1D>(
+    s1: &GenericSpectrum<F1>,
+    s2: &GenericSpectrum<F2>,
+) -> f32 {
+    function::inner_product::<F1, F2>(&s1.f, &s2.f, 1.0)
+}
 fn init_spectrum_data() -> HashMap<&'static str, Arc<dyn Spectrum>> {
+    log::info!("initialize spectrum data");
     let mut map: HashMap<&'static str, Arc<dyn Spectrum>> = HashMap::new();
-    let illuma = PiecewiseLinearSpectrum::from_interleaved(&akari_const::CIE_ILLUM_A);
-    let illumd65 = PiecewiseLinearSpectrum::from_interleaved(&akari_const::CIE_ILLUM_D65);
+    let illuma = PiecewiseLinearSpectrum::from_interleaved(&akari_const::CIE_ILLUM_A, true);
+    let illumd65 = PiecewiseLinearSpectrum::from_interleaved(&akari_const::CIE_ILLUM_D65, true);
     map.insert("stdillum-A", Arc::new(illuma));
     map.insert("stdillum-D65", Arc::new(illumd65));
     map

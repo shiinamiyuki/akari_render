@@ -58,7 +58,7 @@ pub fn uniform_sample_triangle(u: Vec2) -> Vec2 {
 
 pub fn visible_wavelenghts_pdf(lambda: f32) -> f32 {
     if lambda >= 360.0 && lambda <= 830.0 {
-        0.0039398042f32 / ((0.0072f32 * (lambda - 538f32)).cosh()).sqrt()
+        0.0039398042f32 / ((0.0072f32 * (lambda - 538f32)).cosh()).powi(2)
     } else {
         0.0
     }

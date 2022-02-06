@@ -19,7 +19,7 @@ pub fn upper_bound<T: PartialOrd>(f: &[T], v: &T) -> usize {
     //     }
     // }
     // lo
-    f.partition_point(|x| *x < *v)
+    f.partition_point(|x| *x < *v).min(f.len() - 1)
 }
 
 #[cfg(test)]

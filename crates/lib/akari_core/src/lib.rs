@@ -103,11 +103,7 @@ pub fn downcast_mut<U: 'static, T: Base + ?Sized>(obj: &mut T) -> Option<&mut U>
 }
 pub fn find_largest<T, P: FnMut(&T) -> bool>(slice: &[T], pred: P) -> usize {
     let i = slice.partition_point(pred);
-    if i == 0 {
-        0
-    } else {
-        i - 1
-    }
+    (i - 1).clamp(0, slice.len() - 2)
 }
 #[macro_export]
 macro_rules! impl_base {

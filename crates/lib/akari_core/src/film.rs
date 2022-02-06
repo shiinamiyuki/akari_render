@@ -81,18 +81,25 @@ impl Film {
         exr::prelude::write_rgba_file(
             path,
             self.resolution.x as usize,
-            self.resolution.y as usize, // write an image with 2048x2048 pixels
+            self.resolution.y as usize,
             |x, y| {
                 let pixel = *self.pixels[x + y * self.resolution.x as usize].read();
                 let value = pixel.color();
                 let srgb: SRgb = value.into();
-                (
-                    // generate (or lookup in your own image) an f32 rgb color for each of the 2048x2048 pixels
-                    value.values().x,
-                    value.values().y,
-                    value.values().z,
-                    1.0,
-                )
+                (srgb.values().x, srgb.values().y, srgb.values().z, 1.0)
+            },
+        )
+        .unwrap();
+    }
+    pub fn write_exr_xyz(&self, path: &str) {
+        exr::prelude::write_rgba_file(
+            path,
+            self.resolution.x as usize,
+            self.resolution.y as usize,
+            |x, y| {
+                let pixel = *self.pixels[x + y * self.resolution.x as usize].read();
+                let value = pixel.color();
+                (value.values().x, value.values().y, value.values().z, 1.0)
             },
         )
         .unwrap();
