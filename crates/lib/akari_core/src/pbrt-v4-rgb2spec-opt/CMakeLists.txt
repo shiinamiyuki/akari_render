@@ -4,4 +4,4 @@ project (PBRT-V4-RGB2SPEC-OPT LANGUAGES CXX C)
 set (CMAKE_CXX_STANDARD 17)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_executable(rgb2spec_opt rgb2spec_opt.cpp)
+add_library(rgb2spec_opt STATIC rgb2spec_opt.cpp)

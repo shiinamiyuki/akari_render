@@ -1,6 +1,5 @@
 #[cfg(feature = "gpu")]
 use shaderc::{CompileOptions, Compiler, IncludeCallbackResult, ResolvedInclude, ShaderKind};
-use std::env::current_dir;
 use std::fs::{canonicalize, create_dir};
 use std::path::Path;
 use std::{path::PathBuf, process::Command};
@@ -30,46 +29,44 @@ fn compile_rgb2spec_opt() -> PathBuf {
         .output()
         .expect("cmake failed to start");
     if cfg!(target_os = "windows") {
-        PathBuf::from("./src/pbrt-v4-rgb2spec-opt/build/Release")
+        PathBuf::from("src/pbrt-v4-rgb2spec-opt/build/Release")
     } else {
-        PathBuf::from("./src/pbrt-v4-rgb2spec-opt/build")
+        PathBuf::from("src/pbrt-v4-rgb2spec-opt/build")
     }
 }
-fn run_rgb2spec_opt(dir: PathBuf) {
-    let mut rgb2spec = dir.clone();
-    rgb2spec.push("rgb2spec_opt");
-    if cfg!(target_os = "windows") {
-        rgb2spec.set_extension("exe");
-    }
-    let color_spaces = ["ACES2065_1", "DCI_P3", "REC2020", "sRGB"];
-    let curent_dir = current_dir().unwrap();
-    for color_space in color_spaces {
-        let mut output = curent_dir.clone();
-        output.push(format!(
-            "src/rgbspectrum_{}",
-            color_space.to_ascii_lowercase()
-        ));
-        if output.clone().into_boxed_path().exists() {
-            continue;
-        }
-        let args: Vec<String> = vec![
-            "64".into(),
-            output.into_os_string().into_string().unwrap(),
-            color_space.into(),
-        ];
-        Command::new(&rgb2spec)
-            .args(args)
-            .current_dir(canonicalize(current_dir().unwrap()).unwrap())
-            .output()
-            .expect(&format!(
-                "{} failed to start",
-                rgb2spec.clone().into_os_string().into_string().unwrap()
-            ));
-    }
-}
+// fn run_rgb2spec_opt(dir: PathBuf) {
+//     let mut rgb2spec = dir.clone();
+//     rgb2spec.push("rgb2spec_opt");
+//     if cfg!(target_os = "windows") {
+//         rgb2spec.set_extension("exe");
+//     }
+//     let color_spaces = ["ACES2065_1", "DCI_P3", "REC2020", "sRGB"];
+//     let curent_dir = current_dir().unwrap();
+//     for color_space in color_spaces {
+//         let mut output = curent_dir.clone();
+//         output.push(format!(
+//             "src/rgbspectrum_{}",
+//             color_space.to_ascii_lowercase()
+//         ));
+//         if output.clone().into_boxed_path().exists() {
+//             continue;
+//         }
+//         let args: Vec<OsString> = vec!["64".into(), output.into_os_string(), color_space.into()];
+//         Command::new(&rgb2spec)
+//             .args(args)
+//             .current_dir(canonicalize(current_dir().unwrap()).unwrap())
+//             .output()
+//             .expect(&format!(
+//                 "{} failed to start",
+//                 rgb2spec.clone().into_os_string().into_string().unwrap()
+//             ));
+//     }
+// }
 fn rgb2spec() {
-    let dst = compile_rgb2spec_opt();
-    run_rgb2spec_opt(dst);
+    println!("cargo:rerun-if-changed=src/pbrt-v4-rgb2spec-opt/rgb2spec_opt.cpp");
+    let dst = canonicalize(compile_rgb2spec_opt()).unwrap();
+    println!("cargo:rustc-link-search=native={}", dst.display());
+    println!("cargo:rustc-link-lib=static=rgb2spec_opt");
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -127,7 +124,6 @@ fn compile_shader(path: &str, shader_kind: ShaderKind, output: &str, options: Op
 
 fn main() {
     rgb2spec();
-    println!("cargo:rerun-if-changed=src/gpu/shaders");
 
     let nrc_opt = Options { nrc: true };
     let pt_opt = Options { nrc: false };
@@ -137,6 +133,7 @@ fn main() {
 
     #[cfg(feature = "gpu")]
     {
+        println!("cargo:rerun-if-changed=src/gpu/shaders");
         compile_shader(
             "closest.rgen.glsl",
             ShaderKind::RayGeneration,
