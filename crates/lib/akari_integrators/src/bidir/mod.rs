@@ -11,7 +11,7 @@ pub struct VertexBase {
     pub pdf_fwd: f32,
     pub pdf_rev: f32,
     pub delta: bool,
-    pub beta: Spectrum,
+    pub beta: SampledSpectrum,
     pub wo: Vec3,
     pub p: Vec3,
     pub n: Vec3,
@@ -86,7 +86,7 @@ impl<'a> Vertex<'a> {
     pub fn create_camera_vertex(
         camera: &'a dyn Camera,
         ray: &Ray,
-        beta: Spectrum,
+        beta: SampledSpectrum,
         pdf_fwd: f32,
     ) -> Self {
         Self::Camera(CameraVertex {
@@ -106,7 +106,7 @@ impl<'a> Vertex<'a> {
         light: &'a dyn Light,
         p: Vec3,
         n: Vec3,
-        beta: Spectrum,
+        beta: SampledSpectrum,
         pdf_fwd: f32,
     ) -> Self {
         Self::Light(LightVertex {
@@ -123,7 +123,7 @@ impl<'a> Vertex<'a> {
         })
     }
     pub fn create_surface_vertex(
-        beta: Spectrum,
+        beta: SampledSpectrum,
         p: Vec3,
         bsdf: BsdfClosure<'a>,
         wo: Vec3,
@@ -232,13 +232,13 @@ impl<'a> Vertex<'a> {
             }
         }
     }
-    pub fn f(&self, next: &Vertex<'a>, _mode: TraceDir) -> Spectrum {
+    pub fn f(&self, next: &Vertex<'a>, _mode: TraceDir) -> SampledSpectrum {
         let v1 = self.as_surface().unwrap();
         // let v2 = next.as_surface().unwrap();
         let wi = (next.p() - self.p()).normalize();
         v1.bsdf.evaluate(self.base().wo, wi)
     }
-    pub fn beta(&self) -> Spectrum {
+    pub fn beta(&self) -> SampledSpectrum {
         self.base().beta
     }
     pub fn pdf_fwd(&self) -> f32 {
@@ -250,13 +250,13 @@ impl<'a> Vertex<'a> {
     pub fn n(&self) -> Vec3 {
         self.base().n
     }
-    pub fn le(&self, _scene: &'a Scene, prev: &Vertex<'a>) -> Spectrum {
+    pub fn le(&self, _scene: &'a Scene, prev: &Vertex<'a>) -> SampledSpectrum {
         if let Some(v) = self.as_light() {
             let mut ray = Ray::spawn_to(prev.p(), self.p());
             ray.tmax *= 1.0 + 1e-3;
             v.light.le(&ray)
         } else {
-            Spectrum::zero()
+            SampledSpectrum::zero()
         }
     }
     pub fn convert_pdf_to_area(&self, mut pdf: f32, v2: &Vertex) -> f32 {
@@ -287,7 +287,7 @@ pub fn random_walk<'a, 'b>(
     scene: &'a Scene,
     mut ray: Ray,
     sampler: &mut dyn Sampler,
-    mut beta: Spectrum,
+    mut beta: SampledSpectrum,
     pdf: f32,
     max_depth: usize,
     mode: TraceDir,
@@ -600,17 +600,17 @@ pub fn connect_paths<'a, 'b>(
     sampler: &mut dyn Sampler,
     new_light_path: &mut Path<'b>,
     new_eye_path: &mut Path<'b>,
-) -> (Spectrum, f32, Option<UVec2>)
+) -> (SampledSpectrum, f32, Option<UVec2>)
 where
     'a: 'b,
 {
     let s = strat.s;
     let t = strat.t;
     let mut sampled: Option<Vertex> = None;
-    let mut l = Spectrum::zero();
+    let mut l = SampledSpectrum::zero();
     let mut raster = None;
     if t > 1 && s != 0 && eye_path[t - 1].as_light().is_some() {
-        return (Spectrum::zero(), 0.0, None);
+        return (SampledSpectrum::zero(), 0.0, None);
     } else if s == 0 {
         let pt = &eye_path[t - 1];
         l = pt.beta() * pt.le(scene, &eye_path[t - 2]);
@@ -636,7 +636,7 @@ where
                             l *= sample.wi.dot(qs.n()).abs();
                         }
                     } else {
-                        l = Spectrum::zero();
+                        l = SampledSpectrum::zero();
                     }
                     sampled = Some(v);
                 }

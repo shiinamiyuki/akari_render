@@ -9,14 +9,24 @@ pub struct CameraSample {
     pub raster: UVec2,
     pub ray: Ray,
     pub vis_ray: Ray,
-    pub we: Spectrum,
+    pub we: SampledSpectrum,
 }
 pub trait Camera: Sync + Send + Base {
-    fn generate_ray(&self, pixel: UVec2, sampler: &mut dyn Sampler) -> (Ray, Spectrum);
+    fn generate_ray(
+        &self,
+        pixel: UVec2,
+        sampler: &mut dyn Sampler,
+        lambda: SampledWavelengths,
+    ) -> (Ray, SampledSpectrum);
     fn resolution(&self) -> UVec2;
-    fn we(&self, ray: &Ray) -> (Option<UVec2>, Spectrum);
+    fn we(&self, ray: &Ray, lambda: SampledWavelengths) -> (Option<UVec2>, SampledSpectrum);
     fn pdf_we(&self, ray: &Ray) -> (f32, f32);
-    fn sample_wi(&self, u: Vec2, p: &ReferencePoint) -> Option<CameraSample>;
+    fn sample_wi(
+        &self,
+        u: Vec2,
+        p: &ReferencePoint,
+        lambda: SampledWavelengths,
+    ) -> Option<CameraSample>;
     fn n(&self) -> Vec3;
 }
 
@@ -66,7 +76,12 @@ impl PerspectiveCamera {
     }
 }
 impl Camera for PerspectiveCamera {
-    fn generate_ray(&self, pixel: UVec2, sampler: &mut dyn Sampler) -> (Ray, Spectrum) {
+    fn generate_ray(
+        &self,
+        pixel: UVec2,
+        sampler: &mut dyn Sampler,
+        _lambda: SampledWavelengths,
+    ) -> (Ray, SampledSpectrum) {
         // let p_lens = consine_hemisphere_sampling(sampler.next2d())
         let fpixel: Vec2 = pixel.as_vec2();
         let p_film = sampler.next2d() + fpixel;
@@ -81,12 +96,17 @@ impl Camera for PerspectiveCamera {
         // ray.tmin = (1.0 / ray.d.z).abs();
         ray.o = self.c2w.transform_point(ray.o);
         ray.d = self.c2w.transform_vector(ray.d);
-        (ray, Spectrum::one())
+        (ray, SampledSpectrum::one())
     }
     fn resolution(&self) -> UVec2 {
         self.resolution
     }
-    fn sample_wi(&self, _u: Vec2, ref_: &ReferencePoint) -> Option<CameraSample> {
+    fn sample_wi(
+        &self,
+        _u: Vec2,
+        ref_: &ReferencePoint,
+        lambda: SampledWavelengths,
+    ) -> Option<CameraSample> {
         // TODO: area lens
         let p_lens = Vec2::ZERO;
         let p_lens_world = self.c2w.transform_point(p_lens.extend(0.0));
@@ -99,7 +119,7 @@ impl Camera for PerspectiveCamera {
         let n = self.n();
         let pdf = (dist * dist) / (n.dot(wi).abs() * lens_area);
         let ray = Ray::spawn_to(p_lens_world, ref_.p);
-        let (raster, we) = self.we(&ray);
+        let (raster, we) = self.we(&ray, lambda);
         let vis_ray = Ray::spawn_to(ref_.p, p_lens_world).offset_along_normal(ref_.n);
         Some(CameraSample {
             p: p_lens_world,
@@ -112,10 +132,10 @@ impl Camera for PerspectiveCamera {
             n,
         })
     }
-    fn we(&self, ray: &Ray) -> (Option<UVec2>, Spectrum) {
+    fn we(&self, ray: &Ray, _lambda: SampledWavelengths) -> (Option<UVec2>, SampledSpectrum) {
         let cos_theta = ray.d.dot(self.c2w.transform_vector(vec3(0.0, 0.0, -1.0)));
         if cos_theta <= 0.0 {
-            return (None, Spectrum::zero());
+            return (None, SampledSpectrum::zero());
         }
         let p_focus = ray.at(1.0 / cos_theta);
         let p_raster = self.c2r.transform_point(self.w2c.transform_point(p_focus));
@@ -125,12 +145,12 @@ impl Camera for PerspectiveCamera {
             || p_raster.y < 0.0
             || p_raster.y >= self.resolution().y as f32
         {
-            return (None, Spectrum::zero());
+            return (None, SampledSpectrum::zero());
         }
         let lens_area = 1.0;
         (
             Some(uvec2(p_raster.x as u32, p_raster.y as u32)),
-            Spectrum::one() / (self.a * lens_area * cos_theta.powi(4)),
+            SampledSpectrum::one() / (self.a * lens_area * cos_theta.powi(4)),
         )
     }
     fn pdf_we(&self, ray: &Ray) -> (f32, f32) {

@@ -25,8 +25,8 @@ pub struct StreamPathTracer {
 #[derive(Clone, Copy)]
 struct PathState {
     sampler: SobolSampler,
-    l: Spectrum,
-    beta: Spectrum,
+    l: SampledSpectrum,
+    beta: SampledSpectrum,
     prev_n: Vec3,
     prev_bsdf_pdf: f32,
     pixel: u32,
@@ -37,14 +37,14 @@ struct PathState {
 struct ShadowRay {
     ray: Ray,
     state_idx: u32,
-    ld: Spectrum,
+    ld: SampledSpectrum,
 }
 impl Default for ShadowRay {
     fn default() -> Self {
         Self {
             ray: Default::default(),
             state_idx: u32::MAX,
-            ld: Spectrum::zero(),
+            ld: SampledSpectrum::zero(),
         }
     }
 }
@@ -373,8 +373,8 @@ impl<'a> StreamPathTracerSession<'a> {
                 PathState {
                     sampler,
                     depth: 0,
-                    l: Spectrum::zero(),
-                    beta: Spectrum::one(),
+                    l: SampledSpectrum::zero(),
+                    beta: SampledSpectrum::one(),
                     prev_n: Vec3::ZERO,
                     prev_bsdf_pdf: 0.0,
                     is_delta: false,

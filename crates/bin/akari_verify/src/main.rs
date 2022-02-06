@@ -2,11 +2,11 @@ use akari::bsdf::{DiffuseBsdfClosure, LocalBsdfClosure};
 use akari::sampler::{PCGSampler, SobolSampler};
 use akari::util::PerThread;
 use akari::*;
-use bsdf::DiffuseBsdf;
 use bsdf::ltc::GgxLtcBsdfClosure;
+use bsdf::DiffuseBsdf;
+use glam::*;
 use rand::thread_rng;
 use rand::Rng;
-use glam::*;
 pub struct BsdfTester<B: LocalBsdfClosure> {
     bsdf: B,
 }
@@ -61,7 +61,7 @@ fn verify<B: LocalBsdfClosure>(bsdf: B) {
 
 fn test_diffuse() {
     let diffuse = DiffuseBsdfClosure {
-        color: Spectrum::one(),
+        color: SampledSpectrum::one(),
     };
     verify(diffuse);
 }
@@ -69,7 +69,7 @@ fn test_ggx() {
     let mut roughness = 0.01;
     while roughness < 1.0 {
         let bsdf = GgxLtcBsdfClosure {
-            color: Spectrum::one(),
+            color: SampledSpectrum::one(),
             roughness,
         };
         println!("roughness = {}", roughness);

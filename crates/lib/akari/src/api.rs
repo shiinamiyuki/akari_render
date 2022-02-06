@@ -3,9 +3,9 @@ use crate::camera::*;
 #[cfg(feature = "gpu")]
 use crate::gpu::pt::WavefrontPathTracer;
 // use crate::film::*;
-use crate::integrator::ao::RTAO;
-use crate::integrator::normalvis::NormalVis;
-use crate::integrator::nrc::CachedPathTracer;
+// use crate::integrator::ao::RTAO;
+// use crate::integrator::normalvis::NormalVis;
+// use crate::integrator::nrc::CachedPathTracer;
 use crate::integrator::path::PathTracer;
 // use crate::integrator::spath::StreamPathTracer;
 
@@ -15,8 +15,8 @@ use crate::light::*;
 use crate::scene::*;
 use crate::scenegraph::*;
 use crate::shape::*;
-use crate::texture::ConstantTexture;
-use crate::texture::ImageTexture;
+use crate::texture::{ConstantFloatTexture, ConstantRgbTexture};
+// use crate::texture::ImageTexture;
 use crate::texture::Texture;
 use crate::util::binserde::Decode;
 use crate::util::FileResolver;
@@ -24,10 +24,10 @@ use crate::util::LocalFileResolver;
 use crate::*;
 use core::panic;
 use glam::*;
-use integrator::bdpt;
-use integrator::erpt;
-use integrator::mmlt;
-use integrator::pssmlt;
+// use integrator::bdpt;
+// use integrator::erpt;
+// use integrator::mmlt;
+// use integrator::pssmlt;
 use integrator::Integrator;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -54,38 +54,40 @@ struct SceneLoaderContext<'a> {
 }
 impl<'a> SceneLoaderContext<'a> {
     fn load_texture(&mut self, node: &node::Texture) -> Arc<dyn Texture> {
+        let colorspace = RgbColorSpace::new(RgbColorSpaceId::SRgb);
         match node {
-            node::Texture::Float(f) => Arc::new(ConstantTexture { value: *f }),
-            node::Texture::Float3(f3) => Arc::new(ConstantTexture {
-                value: Spectrum::from_rgb_linear(Vec3::from(*f3)),
-            }),
-            node::Texture::Srgb(srgb) => Arc::new(ConstantTexture {
-                value: Spectrum::from_srgb(Vec3::from(*srgb)),
-            }),
-            node::Texture::SrgbU8(srgb) => Arc::new(ConstantTexture {
-                value: Spectrum::from_srgb(
+            node::Texture::Float(f) => Arc::new(ConstantFloatTexture(*f)),
+            node::Texture::Float3(f3) => {
+                Arc::new(ConstantRgbTexture::new(Vec3::from(*f3), &colorspace))
+            }
+            node::Texture::Srgb(srgb) => Arc::new(ConstantRgbTexture::new(
+                srgb_to_linear(Vec3::from(*srgb)),
+                &colorspace,
+            )),
+            node::Texture::SrgbU8(srgb) => Arc::new(ConstantRgbTexture::new(
+                srgb_to_linear(
                     UVec3::from([srgb[0] as u32, srgb[1] as u32, srgb[2] as u32]).as_vec3() / 255.0,
                 ),
-            }),
+                &colorspace,
+            )),
             node::Texture::Hsv(hsv) => {
                 let rgb = hsv_to_rgb(Vec3::from(*hsv));
-                Arc::new(ConstantTexture {
-                    value: Spectrum::from_srgb(rgb),
-                })
+                Arc::new(ConstantRgbTexture::new(srgb_to_linear(rgb), &colorspace))
             }
             node::Texture::Hex(_) => todo!(),
             node::Texture::Image(path) => {
-                let file = self.resolve_file(path);
-                let reader = BufReader::new(file);
-                let reader = image::io::Reader::new(reader)
-                    .with_guessed_format()
-                    .unwrap();
-                let img = reader.decode().unwrap().into_rgb8();
-                if cfg!(feature = "gpu") || !self.ooc.enable_ooc {
-                    Arc::new(ImageTexture::<Spectrum>::from_rgb_image(&img, false))
-                } else {
-                    Arc::new(ImageTexture::<Spectrum>::from_rgb_image(&img, true))
-                }
+                todo!()
+                // let file = self.resolve_file(path);
+                // let reader = BufReader::new(file);
+                // let reader = image::io::Reader::new(reader)
+                //     .with_guessed_format()
+                //     .unwrap();
+                // let img = reader.decode().unwrap().into_rgb8();
+                // if cfg!(feature = "gpu") || !self.ooc.enable_ooc {
+                //     Arc::new(ImageTexture::<Spectrum>::from_rgb_image(&img, false))
+                // } else {
+                //     Arc::new(ImageTexture::<Spectrum>::from_rgb_image(&img, true))
+                // }
             }
         }
     }
@@ -367,59 +369,59 @@ pub fn load_integrator(path: &Path) -> Box<dyn Integrator> {
         //         sort_rays,
         //     })
         // }
-        "bdpt" => {
-            let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
-            let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as usize;
-            let debug = (|| json.get("bdpt_debug")?.as_bool())().unwrap_or(false);
-            Box::new(bdpt::Bdpt {
-                spp,
-                max_depth,
-                debug,
-            })
-        }
-        "pssmlt" => {
-            let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
-            let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as usize;
-            let n_bootstrap = (|| json.get("n_bootstrap")?.as_u64())().unwrap_or(100000) as usize;
-            let n_chains = (|| json.get("n_chains")?.as_u64())().unwrap_or(1024) as usize;
-            let direct_spp = (|| json.get("direct_spp")?.as_u64())().unwrap_or(16) as u32;
-            Box::new(pssmlt::Pssmlt {
-                spp,
-                max_depth: max_depth as u32,
-                n_bootstrap,
-                n_chains,
-                direct_spp,
-            })
-        }
-        "erpt" => {
-            let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
-            let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as usize;
-            let n_bootstrap = (|| json.get("n_bootstrap")?.as_u64())().unwrap_or(100000) as usize;
-            let mutations_per_chain =
-                (|| json.get("mutations_per_chain")?.as_u64())().unwrap_or(100) as usize;
-            let direct_spp = (|| json.get("direct_spp")?.as_u64())().unwrap_or(16) as u32;
-            Box::new(erpt::Erpt {
-                spp,
-                max_depth: max_depth as u32,
-                n_bootstrap,
-                mutations_per_chain,
-                direct_spp,
-            })
-        }
-        "mmlt" => {
-            let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
-            let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as usize;
-            let n_bootstrap = (|| json.get("n_bootstrap")?.as_u64())().unwrap_or(100000) as usize;
-            let n_chains = (|| json.get("n_chains")?.as_u64())().unwrap_or(1024) as usize;
-            let direct_spp = (|| json.get("direct_spp")?.as_u64())().unwrap_or(16) as u32;
-            Box::new(mmlt::Mmlt {
-                spp,
-                max_depth: max_depth as u32,
-                n_bootstrap,
-                n_chains,
-                direct_spp,
-            })
-        }
+        // "bdpt" => {
+        //     let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
+        //     let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as usize;
+        //     let debug = (|| json.get("bdpt_debug")?.as_bool())().unwrap_or(false);
+        //     Box::new(bdpt::Bdpt {
+        //         spp,
+        //         max_depth,
+        //         debug,
+        //     })
+        // }
+        // "pssmlt" => {
+        //     let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
+        //     let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as usize;
+        //     let n_bootstrap = (|| json.get("n_bootstrap")?.as_u64())().unwrap_or(100000) as usize;
+        //     let n_chains = (|| json.get("n_chains")?.as_u64())().unwrap_or(1024) as usize;
+        //     let direct_spp = (|| json.get("direct_spp")?.as_u64())().unwrap_or(16) as u32;
+        //     Box::new(pssmlt::Pssmlt {
+        //         spp,
+        //         max_depth: max_depth as u32,
+        //         n_bootstrap,
+        //         n_chains,
+        //         direct_spp,
+        //     })
+        // }
+        // "erpt" => {
+        //     let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
+        //     let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as usize;
+        //     let n_bootstrap = (|| json.get("n_bootstrap")?.as_u64())().unwrap_or(100000) as usize;
+        //     let mutations_per_chain =
+        //         (|| json.get("mutations_per_chain")?.as_u64())().unwrap_or(100) as usize;
+        //     let direct_spp = (|| json.get("direct_spp")?.as_u64())().unwrap_or(16) as u32;
+        //     Box::new(erpt::Erpt {
+        //         spp,
+        //         max_depth: max_depth as u32,
+        //         n_bootstrap,
+        //         mutations_per_chain,
+        //         direct_spp,
+        //     })
+        // }
+        // "mmlt" => {
+        //     let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
+        //     let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as usize;
+        //     let n_bootstrap = (|| json.get("n_bootstrap")?.as_u64())().unwrap_or(100000) as usize;
+        //     let n_chains = (|| json.get("n_chains")?.as_u64())().unwrap_or(1024) as usize;
+        //     let direct_spp = (|| json.get("direct_spp")?.as_u64())().unwrap_or(16) as u32;
+        //     Box::new(mmlt::Mmlt {
+        //         spp,
+        //         max_depth: max_depth as u32,
+        //         n_bootstrap,
+        //         n_chains,
+        //         direct_spp,
+        //     })
+        // }
         // "sppm" => {
         //     let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as usize;
         //     let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as usize;
@@ -432,27 +434,27 @@ pub fn load_integrator(path: &Path) -> Box<dyn Integrator> {
         //         initial_radius,
         //     })
         // }
-        "ao" | "rtao" => {
-            let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
-            Box::new(RTAO { spp })
-        }
-        "normal" => Box::new(NormalVis {}),
-        "cached" | "nrc" => {
-            let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
-            let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as u32;
-            let batch_size = (|| json.get("batch_size")?.as_u64())().unwrap_or(512) as u32;
-            let training_iters = (|| json.get("training_iters")?.as_u64())().unwrap_or(1024) as u32;
-            let visualize_cache = (|| json.get("visualize_cache")?.as_bool())().unwrap_or(false);
-            let learning_rate = (|| json.get("learning_rate")?.as_f64())().unwrap_or(0.001) as f32;
-            Box::new(CachedPathTracer {
-                spp,
-                max_depth,
-                visualize_cache,
-                batch_size,
-                training_iters,
-                learning_rate,
-            })
-        }
+        // "ao" | "rtao" => {
+        //     let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
+        //     Box::new(RTAO { spp })
+        // }
+        // "normal" => Box::new(NormalVis {}),
+        // "cached" | "nrc" => {
+        //     let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
+        //     let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as u32;
+        //     let batch_size = (|| json.get("batch_size")?.as_u64())().unwrap_or(512) as u32;
+        //     let training_iters = (|| json.get("training_iters")?.as_u64())().unwrap_or(1024) as u32;
+        //     let visualize_cache = (|| json.get("visualize_cache")?.as_bool())().unwrap_or(false);
+        //     let learning_rate = (|| json.get("learning_rate")?.as_f64())().unwrap_or(0.001) as f32;
+        //     Box::new(CachedPathTracer {
+        //         spp,
+        //         max_depth,
+        //         visualize_cache,
+        //         batch_size,
+        //         training_iters,
+        //         learning_rate,
+        //     })
+        // }
         _ => unimplemented!(),
     }
 }

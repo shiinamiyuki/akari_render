@@ -1,308 +1,184 @@
-use std::ops::{Index, IndexMut};
+use std::{collections::HashMap, sync::Arc};
 
-use crate::*;
-#[derive(Clone, Copy, Debug)]
-pub struct RGBSpectrum {
-    pub samples: Vec3A,
-}
-
-pub fn srgb_to_linear(rgb: Vec3) -> Vec3 {
-    let f = |s| -> f32 {
-        if s <= 0.04045 {
-            s / 12.92
-        } else {
-            (((s + 0.055) / 1.055) as f32).powf(2.4)
-        }
-    };
-    vec3(f(rgb.x), f(rgb.y), f(rgb.z))
-}
-pub fn linear_to_srgb(linear: Vec3) -> Vec3 {
-    let f = |l: f32| -> f32 {
-        if l <= 0.0031308 {
-            l * 12.92
-        } else {
-            l.powf(1.0 / 2.4) * 1.055 - 0.055
-        }
-    };
-
-    vec3(f(linear.x), f(linear.y), f(linear.z))
-}
-impl RGBSpectrum {
-    pub const N_SAMPLES: usize = 3;
-    pub fn from_srgb(rgb: Vec3) -> RGBSpectrum {
-        RGBSpectrum {
-            samples: srgb_to_linear(rgb).into(),
-        }
-    }
-    pub fn to_srgb(&self) -> Vec3 {
-        linear_to_srgb(self.samples.into())
-    }
-    pub fn to_rgb_linear(&self) -> Vec3 {
-        self.samples.into()
-    }
-    pub fn from_rgb_linear(rgb: Vec3) -> Self {
-        Self {
-            samples: rgb.into(),
-        }
-    }
-    pub const fn zero() -> RGBSpectrum {
-        Self {
-            samples: Vec3A::ZERO,
-        }
-    }
-    pub const fn one() -> Spectrum {
-        Self {
-            samples: Vec3A::ONE,
-        }
-    }
-    // not necessarily black, but any value that is either black or invalid
-    pub fn is_black(&self) -> bool {
-        !self.samples.is_finite()
-            || self.samples.cmpeq(Vec3A::ZERO).all()
-            || self.samples.cmplt(Vec3A::ZERO).any()
-        // self.samples.iter().any(|x| !x.is_finite())
-        //     || self.samples.iter().all(|x| x == 0.0)
-        //     || self.samples.iter().any(|x| x < 0.0)
-    }
-    pub fn lerp(x: RGBSpectrum, y: RGBSpectrum, a: f32) -> RGBSpectrum {
-        x * (1.0 - a) + y * a
-    }
-}
-
-pub fn hsv_to_rgb(hsv: Vec3) -> Vec3 {
-    let h = (hsv[0] / 60.0).floor() as u32;
-    let f = hsv[0] / 60.0 - h as f32;
-    let p = hsv[2] * (1.0 - hsv[1]);
-    let q = hsv[2] * (1.0 - f * hsv[1]);
-    let t = hsv[2] * (1.0 - (1.0 - f) * hsv[1]);
-    let v = hsv[2];
-    let (r, g, b) = match h {
-        0 => (v, t, p),
-        1 => (q, v, p),
-        2 => (p, v, t),
-        3 => (p, q, v),
-        4 => (t, p, v),
-        5 => (v, p, q),
-        _ => unreachable!(),
-    };
-    vec3(r, g, b)
-}
-pub fn rgb_to_hsl(rgb: Vec3) -> Vec3 {
-    let max = rgb.max_element();
-    let min = rgb.min_element();
-    let (r, g, b) = (rgb[0], rgb[1], rgb[2]);
-    let h = {
-        if max == min {
-            0.0
-        } else if max == r && g >= b {
-            60.0 * (g - b) / (max - min)
-        } else if max == r && g < b {
-            60.0 * (g - b) / (max - min) + 360.0
-        } else if max == g {
-            60.0 * (b - r) / (max - min) + 120.0
-        } else if max == b {
-            60.0 * (r - g) / (max - min) + 240.0
-        } else {
-            unreachable!()
-        }
-    };
-    let l = 0.5 * (max + min);
-    let s = {
-        if l == 0.0 || max == min {
-            0.0
-        } else if 0.0 < l || l <= 0.5 {
-            (max - min) / (2.0 * l)
-        } else if l > 0.5 {
-            (max - min) / (2.0 - 2.0 * l)
-        } else {
-            unreachable!()
-        }
-    };
-    vec3(h, s, l)
-}
-
-pub fn rgb_to_hsv(rgb: Vec3) -> Vec3 {
-    let max = rgb.max_element();
-    let min = rgb.min_element();
-    let (r, g, b) = (rgb[0], rgb[1], rgb[2]);
-    let h = {
-        if max == min {
-            0.0
-        } else if max == r && g >= b {
-            60.0 * (g - b) / (max - min)
-        } else if max == r && g < b {
-            60.0 * (g - b) / (max - min) + 360.0
-        } else if max == g {
-            60.0 * (b - r) / (max - min) + 120.0
-        } else if max == b {
-            60.0 * (r - g) / (max - min) + 240.0
-        } else {
-            unreachable!()
-        }
-    };
-    let v = max;
-    let s = {
-        if max == 0.0 {
-            0.0
-        } else {
-            (max - min) / max
-        }
-    };
-    vec3(h, s, v)
-}
-
-pub fn xyz_to_linear_srgb(xyz: Vec3) -> Vec3 {
-    let m = mat3(
-        vec3(3.240479f32, -0.969256f32, 0.055648f32),
-        vec3(-1.537150f32, 1.875991f32, -0.204043f32),
-        vec3(-0.498535f32, 0.041556f32, 1.057311f32),
-    );
-    m * xyz
-}
-
-impl Index<usize> for RGBSpectrum {
-    type Output = f32;
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.samples[index]
-    }
-}
-impl IndexMut<usize> for RGBSpectrum {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.samples[index]
-    }
-}
-impl std::ops::Add for RGBSpectrum {
-    type Output = RGBSpectrum;
-    fn add(self, rhs: Spectrum) -> Self::Output {
-        Self {
-            samples: self.samples + rhs.samples,
-        }
-    }
-}
-impl std::ops::Sub for RGBSpectrum {
-    type Output = RGBSpectrum;
-    fn sub(self, rhs: Spectrum) -> Self::Output {
-        Self {
-            samples: self.samples - rhs.samples,
-        }
-    }
-}
-impl std::ops::AddAssign for RGBSpectrum {
-    fn add_assign(&mut self, rhs: Self) {
-        *self = *self + rhs;
-    }
-}
-impl std::ops::MulAssign for RGBSpectrum {
-    fn mul_assign(&mut self, rhs: Self) {
-        *self = *self * rhs;
-    }
-}
-impl std::ops::MulAssign<f32> for RGBSpectrum {
-    fn mul_assign(&mut self, rhs: f32) {
-        *self = *self * rhs;
-    }
-}
-impl std::ops::Mul for Spectrum {
-    type Output = Spectrum;
-    fn mul(self, rhs: Spectrum) -> Self::Output {
-        Self {
-            samples: self.samples * rhs.samples,
-        }
-    }
-}
-impl std::ops::Mul<f32> for Spectrum {
-    type Output = Spectrum;
-    fn mul(self, rhs: f32) -> Self::Output {
-        Self {
-            samples: self.samples * rhs,
-        }
-    }
-}
-impl std::ops::Div<f32> for Spectrum {
-    type Output = Spectrum;
-    fn div(self, rhs: f32) -> Self::Output {
-        Self {
-            samples: self.samples / rhs,
-        }
-    }
-}
+pub use crate::color::*;
+use crate::{
+    function::{Dense1D, DenseSlice1D, Function1D, PiecewiseLinear1D},
+    *,
+};
+use akari_const::{CIE_SAMPLES, CIE_Y};
+use lazy_static::lazy_static;
+pub const SPECTRUM_SAMPLES: usize = 4;
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SampledSpectrum {
-    samples: Vec4,
-}
-impl SampledSpectrum {
-    pub fn new(samples: Vec4) -> Self {
-        Self { samples }
-    }
-    pub fn max_element(&self) -> f32 {
-        self.samples.max_element()
-    }
-}
-impl Index<usize> for SampledSpectrum {
-    type Output = f32;
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.samples[index]
-    }
-}
-impl IndexMut<usize> for SampledSpectrum {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.samples[index]
-    }
-}
-impl std::ops::Add for SampledSpectrum {
-    type Output = SampledSpectrum;
-    fn add(self, rhs: SampledSpectrum) -> Self::Output {
-        Self {
-            samples: self.samples + rhs.samples,
-        }
-    }
-}
-impl std::ops::Sub for SampledSpectrum {
-    type Output = SampledSpectrum;
-    fn sub(self, rhs: SampledSpectrum) -> Self::Output {
-        Self {
-            samples: self.samples - rhs.samples,
-        }
-    }
-}
-impl std::ops::AddAssign for SampledSpectrum {
-    fn add_assign(&mut self, rhs: Self) {
-        *self = *self + rhs;
-    }
-}
-impl std::ops::MulAssign for SampledSpectrum {
-    fn mul_assign(&mut self, rhs: Self) {
-        *self = *self * rhs;
-    }
-}
-impl std::ops::MulAssign<f32> for SampledSpectrum {
-    fn mul_assign(&mut self, rhs: f32) {
-        *self = *self * rhs;
-    }
-}
-impl std::ops::Mul for SampledSpectrum {
-    type Output = SampledSpectrum;
-    fn mul(self, rhs: SampledSpectrum) -> Self::Output {
-        Self {
-            samples: self.samples * rhs.samples,
-        }
-    }
-}
-impl std::ops::Mul<f32> for SampledSpectrum {
-    type Output = SampledSpectrum;
-    fn mul(self, rhs: f32) -> Self::Output {
-        Self {
-            samples: self.samples * rhs,
-        }
-    }
-}
-impl std::ops::Div<f32> for SampledSpectrum {
-    type Output = SampledSpectrum;
-    fn div(self, rhs: f32) -> Self::Output {
-        Self {
-            samples: self.samples / rhs,
-        }
-    }
+    values: Vec4,
 }
 
-pub type Spectrum = RGBSpectrum;
+impl_color_like!(SampledSpectrum, Vec4);
+#[allow(dead_code)]
+fn cie_y_integral() -> f32 {
+    let mut s = 0.0;
+    let mut i = 0;
+    while i < CIE_SAMPLES - 1 {
+        s += 0.5 * (CIE_Y[i] + CIE_Y[i + 1]);
+        i += 1;
+    }
+    s
+}
+mod test {
+
+    #[test]
+    fn test_cie_y_integral() {
+        use super::*;
+        use akari_common::statrs::assert_almost_eq;
+
+        use crate::spectrum::cie_y_integral;
+        assert_almost_eq!(cie_y_integral() as f64, CIE_Y_INTEGRAL as f64, 0.001);
+    }
+}
+pub const CIE_Y_INTEGRAL: f32 = 106.85694885253906;
+pub const INV_CIE_Y_INTEGRAL: f32 = 1.0 / CIE_Y_INTEGRAL;
+#[derive(Clone, Copy, Debug)]
+pub struct SampledWavelengths {
+    lambda: Vec4,
+    pdf: Vec4,
+}
+
+impl SampledWavelengths {
+    pub fn pdf(&self) -> SampledSpectrum {
+        SampledSpectrum::new(self.pdf)
+    }
+    pub fn cie_xyz(&self, s: SampledSpectrum) -> XYZ {
+        let x = &DenselySampledSpectrum2::CIE_X;
+        let y = &DenselySampledSpectrum2::CIE_Y;
+        let z = &DenselySampledSpectrum2::CIE_Z;
+        let avg = |s: SampledSpectrum| (s[0] + s[1] + s[2] + s[3]) / SPECTRUM_SAMPLES as f32;
+        let pdf = Vec4::select(self.pdf.cmple(Vec4::ZERO), Vec4::ONE, self.pdf);
+        XYZ::new(
+            vec3(
+                avg((s * x.sample(*self)) / pdf),
+                avg((s * y.sample(*self)) / pdf),
+                avg((s * z.sample(*self)) / pdf),
+            ) * INV_CIE_Y_INTEGRAL,
+        )
+    }
+    pub fn sample_visible(u: f32) -> Self {
+        let mut w = Self {
+            lambda: Vec4::ZERO,
+            pdf: Vec4::ZERO,
+        };
+        for i in 0..SPECTRUM_SAMPLES {
+            let up = (u + i as f32 / SPECTRUM_SAMPLES as f32).fract();
+            w.lambda[i] = sample_visible_wavelenghts(up);
+            w.pdf[i] = visible_wavelenghts_pdf(w.lambda[i]);
+        }
+        w
+    }
+}
+impl std::ops::Index<usize> for SampledWavelengths {
+    type Output = f32;
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.lambda[index]
+    }
+}
+#[derive(Clone, Copy, Debug)]
+pub struct RgbUnboundedSpectrum {
+    spd: RgbSigmoidPolynomial,
+    scale: f32,
+}
+impl Spectrum for RgbUnboundedSpectrum {
+    fn sample(&self, swl: SampledWavelengths) -> SampledSpectrum {
+        self.spd.sample(swl) * self.scale
+    }
+}
+#[derive(Clone, Copy, Debug)]
+pub struct RgbAlbedoSpectrum {
+    spd: RgbSigmoidPolynomial,
+}
+
+impl Spectrum for RgbAlbedoSpectrum {
+    fn sample(&self, swl: SampledWavelengths) -> SampledSpectrum {
+        self.spd.sample(swl)
+    }
+}
+pub struct RgbIlluminantSpectrum {
+    spd: RgbSigmoidPolynomial,
+    scale: f32,
+    illuminant: DenselySampledSpectrum,
+}
+impl RgbIlluminantSpectrum {
+    pub fn sample(&self, swl: SampledWavelengths) -> SampledSpectrum {
+        self.spd.sample(swl) * self.scale * self.illuminant.sample(swl)
+    }
+}
+impl DenselySampledSpectrum2 {
+    pub const CIE_X: DenselySampledSpectrum2 = DenselySampledSpectrum2 {
+        f: DenseSlice1D::new(
+            (akari_const::CIE_LAMBDA_MIN, akari_const::CIE_LAMBDA_MAX),
+            &akari_const::CIE_X,
+        ),
+    };
+    pub const CIE_Y: DenselySampledSpectrum2 = DenselySampledSpectrum2 {
+        f: DenseSlice1D::new(
+            (akari_const::CIE_LAMBDA_MIN, akari_const::CIE_LAMBDA_MAX),
+            &akari_const::CIE_Y,
+        ),
+    };
+    pub const CIE_Z: DenselySampledSpectrum2 = DenselySampledSpectrum2 {
+        f: DenseSlice1D::new(
+            (akari_const::CIE_LAMBDA_MIN, akari_const::CIE_LAMBDA_MAX),
+            &akari_const::CIE_Z,
+        ),
+    };
+}
+
+#[derive(Clone)]
+pub struct GenericSpectrum<F: Function1D> {
+    f: F,
+}
+impl<F> From<F> for GenericSpectrum<F>
+where
+    F: Function1D + 'static,
+{
+    fn from(f: F) -> Self {
+        Self { f }
+    }
+}
+impl<F: Function1D + 'static> Spectrum for GenericSpectrum<F> {
+    fn sample(&self, swl: SampledWavelengths) -> SampledSpectrum {
+        SampledSpectrum::new(vec4(
+            self.f.evaluate(swl[0]),
+            self.f.evaluate(swl[1]),
+            self.f.evaluate(swl[2]),
+            self.f.evaluate(swl[3]),
+        ))
+    }
+}
+pub type PiecewiseLinearSpectrum = GenericSpectrum<PiecewiseLinear1D>;
+pub type DenselySampledSpectrum = GenericSpectrum<Dense1D>;
+pub type DenselySampledSpectrum2 = GenericSpectrum<DenseSlice1D>;
+impl PiecewiseLinearSpectrum {
+    pub fn from_interleaved(yx: &[f32]) -> Self {
+        PiecewiseLinear1D::from_interleaved(yx).into()
+    }
+}
+pub trait Spectrum: Base + Send + Sync {
+    fn sample(&self, lambda: SampledWavelengths) -> SampledSpectrum;
+}
+
+fn init_spectrum_data() -> HashMap<&'static str, Arc<dyn Spectrum>> {
+    let mut map: HashMap<&'static str, Arc<dyn Spectrum>> = HashMap::new();
+    let illuma = PiecewiseLinearSpectrum::from_interleaved(&akari_const::CIE_ILLUM_A);
+    let illumd65 = PiecewiseLinearSpectrum::from_interleaved(&akari_const::CIE_ILLUM_D65);
+    map.insert("stdillum-A", Arc::new(illuma));
+    map.insert("stdillum-D65", Arc::new(illumd65));
+    map
+}
+lazy_static! {
+    static ref NAMED_SPECTRUM: HashMap<&'static str, Arc<dyn Spectrum>> = init_spectrum_data();
+}
+pub fn spectrum_from_name(name: &str) -> &'static dyn Spectrum {
+    NAMED_SPECTRUM
+        .get(name)
+        .expect(&format!("invalid spectrum {}", name))
+        .as_ref()
+}

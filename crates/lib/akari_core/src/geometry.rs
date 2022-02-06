@@ -215,61 +215,6 @@ impl Mul for Transform {
     }
 }
 
-pub fn concentric_sample_disk(u: Vec2) -> Vec2 {
-    let u_offset: Vec2 = 2.0 * u - vec2(1.0, 1.0);
-    if u_offset.x == 0.0 && u_offset.y == 0.0 {
-        return vec2(0.0, 0.0);
-    }
-
-    let (theta, r) = {
-        if u_offset.x.abs() > u_offset.y.abs() {
-            let r = u_offset.x;
-            let theta = FRAC_PI_4 * (u_offset.y / u_offset.x);
-            (theta, r)
-        } else {
-            let r = u_offset.y;
-            let theta = FRAC_PI_2 - FRAC_PI_4 * (u_offset.x / u_offset.y);
-            (theta, r)
-        }
-    };
-    r * vec2(theta.cos(), theta.sin())
-}
-pub fn consine_hemisphere_sampling(u: Vec2) -> Vec3 {
-    let uv = concentric_sample_disk(u);
-    let r = uv.length_squared();
-    let h = (1.0 - r).sqrt();
-    vec3(uv.x, h, uv.y)
-}
-pub fn uniform_sphere_sampling(u: Vec2) -> Vec3 {
-    let z = 1.0 - 2.0 * u[0];
-    let r = (1.0 - z * z).max(0.0).sqrt();
-    let phi = 2.0 * PI * u[1];
-    vec3(r * phi.cos(), z, r * phi.sin())
-}
-pub fn uniform_sphere_pdf() -> f32 {
-    1.0 / (4.0 * PI)
-}
-pub fn uniform_sample_triangle(u: Vec2) -> Vec2 {
-    let mut uf = (u[0] as f64 * (1u64 << 32) as f64) as u64; // Fixed point
-    let mut cx = 0.0 as f32;
-    let mut cy = 0.0 as f32;
-    let mut w = 0.5 as f32;
-
-    for _ in 0..16 {
-        let uu = uf >> 30;
-        let flip = (uu & 3) == 0;
-
-        cy += if (uu & 1) == 0 { 1.0 } else { 0.0 } * w;
-        cx += if (uu & 2) == 0 { 1.0 } else { 0.0 } * w;
-
-        w *= if flip { -0.5 } else { 0.5 };
-        uf <<= 2;
-    }
-
-    let b0 = cx + w / 3.0;
-    let b1 = cy + w / 3.0;
-    vec2(b0, b1)
-}
 pub fn dir_to_spherical(v: Vec3) -> Vec2 {
     let theta = v.y.acos();
     let phi = f32::atan2(v.z, v.x) + PI;
@@ -377,15 +322,6 @@ impl Aabb {
         self.max = self.max.max(aabb.max);
         *self
     }
-}
-pub fn lerp3v3(v0: Vec3, v1: Vec3, v2: Vec3, uv: Vec2) -> Vec3 {
-    (1.0 - uv.x - uv.y) * v0 + uv.x * v1 + uv.y * v2
-}
-pub fn lerp3v2(v0: Vec2, v1: Vec2, v2: Vec2, uv: Vec2) -> Vec2 {
-    (1.0 - uv.x - uv.y) * v0 + uv.x * v1 + uv.y * v2
-}
-pub fn lerp_scalar(x: f32, y: f32, a: f32) -> f32 {
-    x + (y - x) * a
 }
 
 pub type Bounds3f = Aabb;

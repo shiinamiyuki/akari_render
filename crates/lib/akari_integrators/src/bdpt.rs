@@ -34,13 +34,13 @@ impl Integrator for Bdpt {
             let x = (id as u32) % scene.camera.resolution().x;
             let y = (id as u32) / scene.camera.resolution().x;
             let pixel = uvec2(x, y);
-            let mut acc_li = Spectrum::zero();
+            let mut acc_li = SampledSpectrum::zero();
 
             let mut debug_acc = vec![];
             if self.debug {
                 for _t in 1..=self.max_depth + 2 {
                     for _s in 0..=self.max_depth + 2 {
-                        debug_acc.push(Spectrum::zero());
+                        debug_acc.push(SampledSpectrum::zero());
                     }
                 }
             }

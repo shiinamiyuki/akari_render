@@ -14,7 +14,7 @@ pub struct GgxLtcBsdf {
     pub roughness: Arc<dyn Texture>,
 }
 pub struct GgxLtcBsdfClosure {
-    pub color: Spectrum,
+    pub color: SampledSpectrum,
     pub roughness: f32,
 }
 pub struct LTC {
@@ -74,9 +74,9 @@ fn frame_from_wo(wo: Vec3) -> Frame {
 }
 impl_base!(GgxLtcBsdf);
 impl LocalBsdfClosure for GgxLtcBsdfClosure {
-    fn evaluate(&self, wo: Vec3, wi: Vec3) -> Spectrum {
+    fn evaluate(&self, wo: Vec3, wi: Vec3) -> SampledSpectrum {
         if !Frame::same_hemisphere(wo, wi) {
-            return Spectrum::zero();
+            return SampledSpectrum::zero();
         }
         let theta = Frame::abs_cos_theta(wo);
         let alpha = self.roughness.powi(2);
@@ -87,7 +87,7 @@ impl LocalBsdfClosure for GgxLtcBsdfClosure {
             .eval_f_pdf(frame.to_local(vec3(wi.x, wi.y.abs(), wi.z)))
             .0;
         if f.is_nan() {
-            Spectrum::zero()
+            SampledSpectrum::zero()
         } else {
             color * f
         }
@@ -149,10 +149,11 @@ impl Bsdf for GgxLtcBsdf {
     fn evaluate<'a, 'b: 'a>(
         &'b self,
         sp: &ShadingPoint,
+        lambda: SampledWavelengths,
         arena: &'a Bump,
     ) -> &'a dyn LocalBsdfClosure {
         let roughness = self.roughness.evaluate_f(sp);
-        let color = self.color.evaluate_s(sp);
+        let color = self.color.evaluate_s(sp, lambda);
         if roughness >= 0.1 {
             arena.alloc(GgxLtcBsdfClosure { color, roughness })
         } else {

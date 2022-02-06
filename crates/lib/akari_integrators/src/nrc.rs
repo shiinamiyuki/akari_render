@@ -144,8 +144,8 @@ struct QueryRecord {
 
 #[derive(Clone, Copy)]
 struct PathState {
-    beta: Spectrum,
-    li: Spectrum,
+    beta: SampledSpectrum,
+    li: SampledSpectrum,
     query_index: Option<usize>,
     thread_index: usize,
 }
@@ -194,10 +194,10 @@ impl RadianceCache {
         let mut queue = self.query_queue.write();
         let idx = queue.len() / INPUT_SIZE;
         queue.extend(v.iter());
-        // let s: Spectrum = self.model.infer(&nrc_encoding(&v)).into();
+        // let s: SampledSpectrum = self.model.infer(&nrc_encoding(&v)).into();
         Some(idx)
     }
-    fn infer_single(&self, r: &QueryRecord) -> Option<Spectrum> {
+    fn infer_single(&self, r: &QueryRecord) -> Option<SampledSpectrum> {
         if !self.bound.contains(r.x) {
             return None;
         }
@@ -210,13 +210,13 @@ impl RadianceCache {
                 v.as_slice(),
             )));
         r.iter_mut().for_each(|x| *x = inv_tone_mapping(*x));
-        assert!(r.nrows() == Spectrum::N_SAMPLES && r.ncols() == 1);
+        assert!(r.nrows() == SampledSpectrum::N_SAMPLES && r.ncols() == 1);
         let s: na::SVector<f32, 3> = na::SVector::from_iterator(r.iter().map(|x| *x as f32));
-        Some(Spectrum {
+        Some(SampledSpectrum {
             samples: Vec3A::from([s[0], s[1], s[2]]),
         })
     }
-    fn record_train(&self, r: &QueryRecord, target: &Spectrum) {
+    fn record_train(&self, r: &QueryRecord, target: &SampledSpectrum) {
         if !self.bound.contains(r.x) {
             return;
         }
@@ -224,10 +224,10 @@ impl RadianceCache {
         let mut train = self.train.write();
         assert_eq!(
             train.queue.len() / INPUT_SIZE,
-            train.target.len() / Spectrum::N_SAMPLES,
+            train.target.len() / SampledSpectrum::N_SAMPLES,
             "train record lens diff! {} and {}",
             train.queue.len() / INPUT_SIZE,
-            train.target.len() / Spectrum::N_SAMPLES
+            train.target.len() / SampledSpectrum::N_SAMPLES
         );
         train.queue.extend(v.iter());
         let albedo = r.info.albedo.samples;
@@ -269,14 +269,14 @@ impl RadianceCache {
     fn train(&mut self) -> f32 {
         let mut train = self.train.write();
         assert!(train.queue.len() % INPUT_SIZE == 0);
-        assert!(train.target.len() % Spectrum::N_SAMPLES == 0);
+        assert!(train.target.len() % SampledSpectrum::N_SAMPLES == 0);
         let queue = &train.queue;
         let mut inputs =
             na::DMatrix::<f32>::from_column_slice(INPUT_SIZE, queue.len() / INPUT_SIZE, &queue[..]);
         inputs = nrc_encoding(&inputs);
         let targets = na::DMatrix::<f32>::from_column_slice(
-            Spectrum::N_SAMPLES,
-            &train.target.len() / Spectrum::N_SAMPLES,
+            SampledSpectrum::N_SAMPLES,
+            &train.target.len() / SampledSpectrum::N_SAMPLES,
             &train.target[..],
         );
         let loss = Arc::get_mut(&mut self.model)
@@ -312,12 +312,12 @@ struct Vertex {
     dir: Vec3,
     info: BsdfInfo,
     n: Vec3,
-    radiance: Spectrum,
+    radiance: SampledSpectrum,
 }
 #[derive(Copy, Clone)]
 struct VertexTemp {
-    beta: Spectrum,
-    li: Spectrum,
+    beta: SampledSpectrum,
+    li: SampledSpectrum,
 }
 fn mis_weight(mut pdf_a: f32, mut pdf_b: f32) -> f32 {
     pdf_a *= pdf_a;
@@ -340,8 +340,8 @@ impl CachedPathTracer {
         cache: &RadianceCache,
         arena: &Bump,
     ) -> PathState {
-        let mut li = Spectrum::zero();
-        let mut beta = Spectrum::one();
+        let mut li = SampledSpectrum::zero();
+        let mut beta = SampledSpectrum::one();
         let mut prev_n: Option<Vec3> = None;
         let mut prev_bsdf_pdf: Option<f32> = None;
         let terminatin_coeff = 0.01;
@@ -350,13 +350,13 @@ impl CachedPathTracer {
         path.clear();
         // if training {
         //     path_tmp.push(VertexTemp {
-        //         beta: Spectrum::one(),
-        //         li: Spectrum::zero(),
+        //         beta: SampledSpectrum::one(),
+        //         li: SampledSpectrum::zero(),
         //     });
         //     path.push(Vertex {
         //         x: ray.o,
         //         dir: dir_to_spherical(ray.d),
-        //         radiance: Spectrum::zero(),
+        //         radiance: SampledSpectrum::zero(),
         //     });
         // }
 
@@ -382,10 +382,10 @@ impl CachedPathTracer {
             }};
         }
         // let accumulate_beta = {
-        //     // let p_li = &mut li as *mut Spectrum;
-        //     let p_beta = &mut beta as *mut Spectrum;
+        //     // let p_li = &mut li as *mut SampledSpectrum;
+        //     let p_beta = &mut beta as *mut SampledSpectrum;
         //     let p_path_tmp = path_tmp as *mut Vec<VertexTemp>;
-        //     move |b: Spectrum| unsafe {
+        //     move |b: SampledSpectrum| unsafe {
         //         // *p_li += *p_beta * l;
         //         *p_beta *= b;
         //         let path_tmp = &mut *p_path_tmp;
@@ -443,15 +443,15 @@ impl CachedPathTracer {
                 }
                 if training && depth <= use_cache_after {
                     path_tmp.push(VertexTemp {
-                        beta: Spectrum::one(),
-                        li: Spectrum::zero(),
+                        beta: SampledSpectrum::one(),
+                        li: SampledSpectrum::zero(),
                     });
                     path.push(Vertex {
                         x: p,
                         n: ng,
                         info: bsdf.info(),
                         dir: ray.d,
-                        radiance: Spectrum::zero(),
+                        radiance: SampledSpectrum::zero(),
                     });
                 }
                 {
@@ -579,7 +579,7 @@ impl Integrator for CachedPathTracer {
                 Layer::new(Some(Activation::Relu), 64, 64, false),
                 Layer::new(Some(Activation::Relu), 64, 64, false),
                 Layer::new(Some(Activation::Relu), 64, 64, false),
-                Layer::new(Some(Activation::Sigmoid), 64, Spectrum::N_SAMPLES, false),
+                Layer::new(Some(Activation::Sigmoid), 64, SampledSpectrum::N_SAMPLES, false),
             ];
             MLP::new(layers, opt)
         };
@@ -590,8 +590,8 @@ impl Integrator for CachedPathTracer {
         }
         let mut states = vec![
             PathState {
-                beta: Spectrum::one(),
-                li: Spectrum::zero(),
+                beta: SampledSpectrum::one(),
+                li: SampledSpectrum::zero(),
                 query_index: None,
                 thread_index: 0,
             };
@@ -782,7 +782,7 @@ impl Integrator for CachedPathTracer {
                             let s: na::SVector<f32, 3> = na::SVector::from_iterator(
                                 results.column(idx).iter().map(|x| *x as f32),
                             );
-                            let result = Spectrum {
+                            let result = SampledSpectrum {
                                 samples: Vec3A::from([s[0], s[1], s[2]]),
                             };
                             state.li + state.beta * result
@@ -816,7 +816,7 @@ impl Integrator for CachedPathTracer {
         //     let lk = cache.read();
         //     let cache = &*lk;
         //     // let li = cache.infer(&ray.o, &dir_to_spherical(ray.d));
-        //     let mut li = Spectrum::zero();
+        //     let mut li = SampledSpectrum::zero();
         //     if let Some(si) = scene.intersect(&ray) {
         //         let p = ray.o; //ray.at(si.t * 0.9);
         //         li = cache.infer(&p, &dir_to_spherical(ray.d));

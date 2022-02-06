@@ -8,7 +8,7 @@ use crate::scene::Scene;
 use crate::shape::{AggregateProxy, MeshInstanceProxy};
 use crate::sobolmat::{SOBOL_BITS, SOBOL_MATRIX, SOBOL_MAX_DIMENSION};
 use crate::texture::{ConstantTexture, ImageTexture, Texture};
-use crate::{downcast_ref, Spectrum};
+use crate::{downcast_ref, SampledSpectrum};
 
 use super::accel::GPUAccel;
 use super::mesh::GPUMeshInstance;
@@ -197,91 +197,96 @@ impl GPUScene {
                 *id
             } else {
                 let any = texture.as_any();
-                let gpu_texture: GPUTexture =
-                    if let Some(texture) = any.downcast_ref::<ConstantTexture<f32>>() {
-                        GPUTexture {
-                            ty: GPUTexture::TYPE_FLOAT,
-                            _pad0: [0; 2],
-                            data: [texture.value; 4],
-                            image_tex_id: -1,
-                        }
-                    } else if let Some(texture) = any.downcast_ref::<ConstantTexture<f64>>() {
-                        log::warn!(
+                let gpu_texture: GPUTexture = if let Some(texture) =
+                    any.downcast_ref::<ConstantTexture<f32>>()
+                {
+                    GPUTexture {
+                        ty: GPUTexture::TYPE_FLOAT,
+                        _pad0: [0; 2],
+                        data: [texture.value; 4],
+                        image_tex_id: -1,
+                    }
+                } else if let Some(texture) = any.downcast_ref::<ConstantTexture<f64>>() {
+                    log::warn!(
                         "ConstantTexture<f64> is implitly converted to ConstantTexture<f32> on gpu"
                     );
-                        GPUTexture {
-                            ty: GPUTexture::TYPE_FLOAT,
-                            _pad0: [0; 2],
-                            data: [texture.value as f32; 4],
-                            image_tex_id: -1,
-                        }
-                    } else if let Some(texture) = any.downcast_ref::<ConstantTexture<Spectrum>>() {
-                        assert!(Spectrum::N_SAMPLES == 3, "currently only rgb is supported");
-                        GPUTexture {
-                            ty: GPUTexture::TYPE_SPECTRUM,
-                            _pad0: [0; 2],
-                            data: [
-                                texture.value.samples[0],
-                                texture.value.samples[1],
-                                texture.value.samples[2],
-                                0.0,
-                            ],
-                            image_tex_id: -1,
-                        }
-                    } else if let Some(texture) = any.downcast_ref::<ImageTexture<f32>>() {
-                        let pixels: Vec<f32> = texture
-                            .as_slice()
-                            .iter()
-                            .flat_map(|px| -> [f32; 4] { [*px, *px, *px, 1.0] })
-                            .collect();
-                        let image_tex = vkc::resource::Image::from_data_2d(
-                            ctx,
-                            bytemuck::cast_slice(&pixels),
-                            vk::Extent2D {
-                                width: texture.width(),
-                                height: texture.height(),
-                            },
-                            vk::Format::R32G32B32A32_SFLOAT,
-                        );
+                    GPUTexture {
+                        ty: GPUTexture::TYPE_FLOAT,
+                        _pad0: [0; 2],
+                        data: [texture.value as f32; 4],
+                        image_tex_id: -1,
+                    }
+                } else if let Some(texture) = any.downcast_ref::<ConstantTexture<SampledSpectrum>>()
+                {
+                    assert!(
+                        SampledSpectrum::N_SAMPLES == 3,
+                        "currently only rgb is supported"
+                    );
+                    GPUTexture {
+                        ty: GPUTexture::TYPE_SPECTRUM,
+                        _pad0: [0; 2],
+                        data: [
+                            texture.value.samples[0],
+                            texture.value.samples[1],
+                            texture.value.samples[2],
+                            0.0,
+                        ],
+                        image_tex_id: -1,
+                    }
+                } else if let Some(texture) = any.downcast_ref::<ImageTexture<f32>>() {
+                    let pixels: Vec<f32> = texture
+                        .as_slice()
+                        .iter()
+                        .flat_map(|px| -> [f32; 4] { [*px, *px, *px, 1.0] })
+                        .collect();
+                    let image_tex = vkc::resource::Image::from_data_2d(
+                        ctx,
+                        bytemuck::cast_slice(&pixels),
+                        vk::Extent2D {
+                            width: texture.width(),
+                            height: texture.height(),
+                        },
+                        vk::Format::R32G32B32A32_SFLOAT,
+                    );
 
-                        let id = builder.image_textures.len();
-                        builder.image_textures.push(image_tex);
-                        GPUTexture {
-                            ty: GPUTexture::TEXTURE_FLOAT_IMAGE,
-                            _pad0: [0; 2],
-                            data: [1.0; 4],
-                            image_tex_id: id as i32,
-                        }
-                    } else if let Some(_texture) = any.downcast_ref::<ImageTexture<f64>>() {
-                        panic!("f64 texture not supported")
-                    } else if let Some(texture) = any.downcast_ref::<ImageTexture<Spectrum>>() {
-                        let pixels: Vec<f32> = texture
-                            .as_slice()
-                            .iter()
-                            .flat_map(|px| -> [f32; 4] {
-                                [px.samples[0], px.samples[1], px.samples[2], 1.0]
-                            })
-                            .collect();
-                        let image_tex = vkc::resource::Image::from_data_2d(
-                            ctx,
-                            bytemuck::cast_slice(&pixels),
-                            vk::Extent2D {
-                                width: texture.width(),
-                                height: texture.height(),
-                            },
-                            vk::Format::R32G32B32A32_SFLOAT,
-                        );
-                        let id = builder.image_textures.len();
-                        builder.image_textures.push(image_tex);
-                        GPUTexture {
-                            ty: GPUTexture::TEXTURE_SPECTRUM_IMAGE,
-                            _pad0: [0; 2],
-                            data: [1.0; 4],
-                            image_tex_id: id as i32,
-                        }
-                    } else {
-                        unreachable!()
-                    };
+                    let id = builder.image_textures.len();
+                    builder.image_textures.push(image_tex);
+                    GPUTexture {
+                        ty: GPUTexture::TEXTURE_FLOAT_IMAGE,
+                        _pad0: [0; 2],
+                        data: [1.0; 4],
+                        image_tex_id: id as i32,
+                    }
+                } else if let Some(_texture) = any.downcast_ref::<ImageTexture<f64>>() {
+                    panic!("f64 texture not supported")
+                } else if let Some(texture) = any.downcast_ref::<ImageTexture<SampledSpectrum>>() {
+                    let pixels: Vec<f32> = texture
+                        .as_slice()
+                        .iter()
+                        .flat_map(|px| -> [f32; 4] {
+                            [px.samples[0], px.samples[1], px.samples[2], 1.0]
+                        })
+                        .collect();
+                    let image_tex = vkc::resource::Image::from_data_2d(
+                        ctx,
+                        bytemuck::cast_slice(&pixels),
+                        vk::Extent2D {
+                            width: texture.width(),
+                            height: texture.height(),
+                        },
+                        vk::Format::R32G32B32A32_SFLOAT,
+                    );
+                    let id = builder.image_textures.len();
+                    builder.image_textures.push(image_tex);
+                    GPUTexture {
+                        ty: GPUTexture::TEXTURE_SPECTRUM_IMAGE,
+                        _pad0: [0; 2],
+                        data: [1.0; 4],
+                        image_tex_id: id as i32,
+                    }
+                } else {
+                    unreachable!()
+                };
                 let id = builder.textures.len() as i32;
                 builder.textures.push(gpu_texture);
                 builder.texture_to_id.insert(addr, id);

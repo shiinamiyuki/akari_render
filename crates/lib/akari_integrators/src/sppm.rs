@@ -16,17 +16,17 @@ struct VisiblePoint<'a> {
     pub bsdf: BsdfClosure<'a>,
     pub p: Vec3,
     pub wo: Vec3,
-    pub beta: Spectrum,
+    pub beta: SampledSpectrum,
 }
 
 #[allow(non_snake_case)]
 struct SppmPixel<'a> {
     radius: f32,
-    ld: Spectrum,
+    ld: SampledSpectrum,
     M: AtomicU32,
     N: f32,
-    phi: [AtomicFloat; Spectrum::N_SAMPLES],
-    tau: Spectrum,
+    phi: [AtomicFloat; SampledSpectrum::N_SAMPLES],
+    tau: SampledSpectrum,
     vp: Option<VisiblePoint<'a>>,
 }
 
@@ -165,10 +165,10 @@ impl Integrator for Sppm {
         let mut pixels: Vec<SppmPixel> = vec![
             SppmPixel {
                 radius: self.initial_radius,
-                ld: Spectrum::zero(),
+                ld: SampledSpectrum::zero(),
                 N: 0.0,
                 M: AtomicU32::new(0),
-                tau: Spectrum::zero(),
+                tau: SampledSpectrum::zero(),
                 vp: None,
                 phi: Default::default(),
             };
@@ -219,7 +219,7 @@ impl Integrator for Sppm {
                     let wo = -ray.d;
                     sppm_pixel.vp = Some(VisiblePoint {
                         p,
-                        beta: Spectrum::one(),
+                        beta: SampledSpectrum::one(),
                         bsdf,
                         wo,
                     });
@@ -307,7 +307,7 @@ impl Integrator for Sppm {
                                 };
                                 if dist2 <= pixel.radius * pixel.radius {
                                     let phi = beta * vp.bsdf.evaluate(vp.wo, wi);
-                                    for i in 0..Spectrum::N_SAMPLES {
+                                    for i in 0..SampledSpectrum::N_SAMPLES {
                                         pixel.phi[i].fetch_add(phi[i] as f32, Ordering::SeqCst);
                                     }
                                     pixel.M.fetch_add(1, Ordering::Relaxed);
@@ -336,8 +336,8 @@ impl Integrator for Sppm {
                     let N_new = p.N + (gamma * p.M.load(Ordering::Relaxed) as f32);
                     let R_new =
                         p.radius * (N_new / (p.N + p.M.load(Ordering::Relaxed) as f32)).sqrt();
-                    let mut phi = Spectrum::zero();
-                    for i in 0..Spectrum::N_SAMPLES {
+                    let mut phi = SampledSpectrum::zero();
+                    for i in 0..SampledSpectrum::N_SAMPLES {
                         phi[i] = p.phi[i].load(Ordering::Relaxed) as f32;
                         p.phi[i].store(0.0, Ordering::SeqCst);
                     }

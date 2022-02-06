@@ -34,7 +34,7 @@ pub struct Mmlt {
 pub struct FRecord {
     pub pixel: UVec2,
     pub f: f32,
-    pub l: Spectrum,
+    pub l: SampledSpectrum,
 }
 
 pub struct MmltSampler {
@@ -116,7 +116,7 @@ impl Chain {
             return FRecord {
                 pixel,
                 f: 0.0,
-                l: Spectrum::zero(),
+                l: SampledSpectrum::zero(),
             };
         }
         self.sampler.use_stream(Stream::Light);
@@ -125,7 +125,7 @@ impl Chain {
             return FRecord {
                 pixel,
                 f: 0.0,
-                l: Spectrum::zero(),
+                l: SampledSpectrum::zero(),
             };
         }
         self.sampler.use_stream(Stream::Connect);
@@ -139,7 +139,7 @@ impl Chain {
             &mut new_camera_path,
         );
         let l = l * w * n_strategies as f32;
-        let l = if l.is_black() { Spectrum::zero() } else { l };
+        let l = if l.is_black() { SampledSpectrum::zero() } else { l };
         let pixel = if let Some(raster) = raster {
             raster
         } else {
@@ -181,7 +181,7 @@ impl Mmlt {
                     cur: FRecord {
                         pixel: UVec2::ZERO,
                         f: 0.0,
-                        l: Spectrum::zero(),
+                        l: SampledSpectrum::zero(),
                     },
                     depth,
                 }
@@ -204,7 +204,7 @@ impl Mmlt {
                         cur: FRecord {
                             pixel: UVec2::ZERO,
                             f: 0.0,
-                            l: Spectrum::zero(),
+                            l: SampledSpectrum::zero(),
                         },
                         depth,
                     };

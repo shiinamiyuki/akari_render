@@ -11,7 +11,7 @@ use crate::sampler::Sampler;
 use crate::util::PerThread;
 use crate::*;
 use crate::{sampler::MltSampler, scene::Scene};
-pub fn target_function(x: Spectrum) -> f32 {
+pub fn target_function(x: SampledSpectrum) -> f32 {
     x.samples.max_element().clamp(0.0, 100.0)
 }
 pub struct Chain {
@@ -69,7 +69,7 @@ impl Pssmlt {
                     cur: FRecord {
                         pixel: UVec2::ZERO,
                         f: 0.0,
-                        l: Spectrum::zero(),
+                        l: SampledSpectrum::zero(),
                     },
                     is_large_step: true,
                     large_step_prob: 0.3,
@@ -93,7 +93,7 @@ impl Pssmlt {
                         cur: FRecord {
                             pixel: UVec2::ZERO,
                             f: 0.0,
-                            l: Spectrum::zero(),
+                            l: SampledSpectrum::zero(),
                         },
                         is_large_step: true,
                         large_step_prob: 0.3,

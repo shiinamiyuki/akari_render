@@ -8,17 +8,18 @@ pub struct Distribution1D {
 
 // the first i s.t. v <= f[i]
 pub fn upper_bound<T: PartialOrd>(f: &[T], v: &T) -> usize {
-    let mut lo = 0;
-    let mut hi = f.len() - 1;
-    while lo < hi {
-        let mid = (lo + hi) / 2;
-        if f[mid] < *v {
-            lo = mid + 1;
-        } else {
-            hi = mid;
-        }
-    }
-    lo
+    // let mut lo = 0;
+    // let mut hi = f.len() - 1;
+    // while lo < hi {
+    //     let mid = (lo + hi) / 2;
+    //     if f[mid] < *v {
+    //         lo = mid + 1;
+    //     } else {
+    //         hi = mid;
+    //     }
+    // }
+    // lo
+    f.partition_point(|x| *x < *v)
 }
 
 #[cfg(test)]

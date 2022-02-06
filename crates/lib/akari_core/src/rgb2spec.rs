@@ -80,9 +80,8 @@ use std::{
 
 macro_rules! rgb2spec_mod {
     ($name:ident) => {
-        mod $name {
+        pub mod $name {
             use super::*;
-            use crate::*;
             use lazy_static::lazy_static;
             lazy_static! {
                 pub static ref DATA: Rgb2SpectrumData = load_rgb2spec_data(

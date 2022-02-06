@@ -11,3 +11,18 @@ members = [
   "crates/bin/akari_import",
   "crates/bin/akari_verify",
 ]
+
+[profile.dev]
+opt-level = 3
+debug = false
+split-debuginfo = '...'  # Platform-specific.
+debug-assertions = true
+overflow-checks = true
+lto = false
+panic = 'unwind'
+incremental = true
+codegen-units = 256
+rpath = false
+
+[profile.release]
+lto = true

@@ -146,11 +146,9 @@ pub trait FileResolver {
 pub struct LocalFileResolver {
     pub(crate) paths: Vec<PathBuf>,
 }
-impl LocalFileResolver{
-    pub fn new(paths: Vec<PathBuf>)->Self{
-        Self{
-            paths
-        }
+impl LocalFileResolver {
+    pub fn new(paths: Vec<PathBuf>) -> Self {
+        Self { paths }
     }
 }
 

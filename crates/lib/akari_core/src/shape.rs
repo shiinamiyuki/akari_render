@@ -29,7 +29,11 @@ pub struct SurfaceInteraction<'a> {
     pub texcoord: Vec2,
 }
 impl<'a> SurfaceInteraction<'a> {
-    pub fn evaluate_bsdf<'b>(&self, arena: &'b Bump) -> Option<BsdfClosure<'b>>
+    pub fn evaluate_bsdf<'b>(
+        &self,
+        lambda: SampledWavelengths,
+        arena: &'b Bump,
+    ) -> Option<BsdfClosure<'b>>
     where
         'a: 'b,
     {
@@ -37,7 +41,7 @@ impl<'a> SurfaceInteraction<'a> {
             let frame = Frame::from_normal(self.ns);
             Some(BsdfClosure {
                 frame,
-                closure: bsdf.evaluate(&self.sp, arena),
+                closure: bsdf.evaluate(&self.sp, lambda, arena),
             })
         } else {
             None
@@ -169,13 +173,13 @@ pub struct ShadingTriangle<'a> {
 }
 impl<'a> ShadingTriangle<'a> {
     pub fn texcoord(&self, uv: Vec2) -> Vec2 {
-        lerp3v2(self.texcoords[0], self.texcoords[1], self.texcoords[2], uv)
+        lerp3(self.texcoords[0], self.texcoords[1], self.texcoords[2], uv)
     }
     pub fn ns(&self, uv: Vec2) -> Vec3 {
-        lerp3v3(self.normals[0], self.normals[1], self.normals[2], uv).normalize()
+        lerp3(self.normals[0], self.normals[1], self.normals[2], uv).normalize()
     }
     pub fn p(&self, uv: Vec2) -> Vec3 {
-        lerp3v3(self.vertices[0], self.vertices[1], self.vertices[2], uv)
+        lerp3(self.vertices[0], self.vertices[1], self.vertices[2], uv)
     }
     pub fn ng(&self) -> Vec3 {
         Triangle {

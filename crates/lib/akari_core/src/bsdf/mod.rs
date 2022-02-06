@@ -25,13 +25,13 @@ bitflags! {
 }
 pub struct BsdfSample {
     pub wi: Vec3,
-    pub f: Spectrum,
+    pub f: SampledSpectrum,
     pub pdf: f32,
     pub flag: BsdfFlags,
 }
 #[derive(Clone, Copy)]
 pub struct BsdfInfo {
-    pub albedo: Spectrum,
+    pub albedo: SampledSpectrum,
     pub roughness: f32,
     pub metallic: f32,
 }
@@ -40,6 +40,7 @@ pub trait Bsdf: Sync + Send + Base {
     fn evaluate<'a, 'b: 'a>(
         &'b self,
         sp: &ShadingPoint,
+        lambda: SampledWavelengths,
         arena: &'a Bump,
     ) -> &'a dyn LocalBsdfClosure;
     fn emission(&self) -> Option<Arc<dyn Texture>> {
@@ -47,7 +48,7 @@ pub trait Bsdf: Sync + Send + Base {
     }
 }
 pub trait LocalBsdfClosure: Sync + Send {
-    fn evaluate(&self, wo: Vec3, wi: Vec3) -> Spectrum;
+    fn evaluate(&self, wo: Vec3, wi: Vec3) -> SampledSpectrum;
     fn evaluate_pdf(&self, wo: Vec3, wi: Vec3) -> f32;
     fn sample(&self, u: Vec2, wo: Vec3) -> Option<BsdfSample>;
     fn info(&self) -> BsdfInfo;
@@ -62,7 +63,7 @@ pub struct BsdfClosure<'a> {
 }
 
 impl<'a> BsdfClosure<'a> {
-    pub fn evaluate(&self, wo: Vec3, wi: Vec3) -> Spectrum {
+    pub fn evaluate(&self, wo: Vec3, wi: Vec3) -> SampledSpectrum {
         self.closure
             .evaluate(self.frame.to_local(wo), self.frame.to_local(wi))
     }
@@ -92,7 +93,7 @@ pub struct EmissiveBsdfClosure<'a> {
     pub emission: &'a dyn Texture,
 }
 impl<'a> LocalBsdfClosure for EmissiveBsdfClosure<'a> {
-    fn evaluate(&self, wo: Vec3, wi: Vec3) -> Spectrum {
+    fn evaluate(&self, wo: Vec3, wi: Vec3) -> SampledSpectrum {
         self.base.evaluate(wo, wi)
     }
     fn evaluate_pdf(&self, wo: Vec3, wi: Vec3) -> f32 {
@@ -113,10 +114,11 @@ impl Bsdf for EmissiveBsdf {
     fn evaluate<'a, 'b: 'a>(
         &'b self,
         sp: &ShadingPoint,
+        lambda: SampledWavelengths,
         arena: &'a Bump,
     ) -> &'a dyn LocalBsdfClosure {
         arena.alloc(EmissiveBsdfClosure {
-            base: self.base.evaluate(sp, arena),
+            base: self.base.evaluate(sp, lambda, arena),
             emission: self.emission.as_ref(),
         })
     }
@@ -130,21 +132,21 @@ pub struct MixBsdf<A: Bsdf, B: Bsdf> {
     pub frac: Arc<dyn Texture>,
 }
 
-impl<A, B> Base for MixBsdf<A, B>
-where
-    A: Bsdf + 'static,
-    B: Bsdf + 'static,
-{
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-    fn type_name(&self) -> &'static str {
-        std::any::type_name::<Self>()
-    }
-}
+// impl<A, B> Base for MixBsdf<A, B>
+// where
+//     A: Bsdf + 'static,
+//     B: Bsdf + 'static,
+// {
+//     fn as_any(&self) -> &dyn Any {
+//         self
+//     }
+//     fn as_any_mut(&mut self) -> &mut dyn Any {
+//         self
+//     }
+//     fn type_name(&self) -> &'static str {
+//         std::any::type_name::<Self>()
+//     }
+// }
 impl<A, B> Bsdf for MixBsdf<A, B>
 where
     A: Bsdf + 'static,
@@ -153,11 +155,12 @@ where
     fn evaluate<'a, 'b: 'a>(
         &'b self,
         sp: &ShadingPoint,
+        lambda: SampledWavelengths,
         arena: &'a Bump,
     ) -> &'a dyn LocalBsdfClosure {
         arena.alloc(MixBsdfClosure {
-            bsdf_a: self.bsdf_a.evaluate(sp, arena),
-            bsdf_b: self.bsdf_b.evaluate(sp, arena),
+            bsdf_a: self.bsdf_a.evaluate(sp, lambda, arena),
+            bsdf_b: self.bsdf_b.evaluate(sp, lambda, arena),
             frac: self.frac.evaluate_f(sp),
         })
     }
@@ -168,15 +171,15 @@ pub struct MixBsdfClosure<'a> {
     pub frac: f32,
 }
 impl<'a> LocalBsdfClosure for MixBsdfClosure<'a> {
-    fn evaluate(&self, wo: Vec3, wi: Vec3) -> Spectrum {
-        Spectrum::lerp(
+    fn evaluate(&self, wo: Vec3, wi: Vec3) -> SampledSpectrum {
+        SampledSpectrum::lerp(
             self.bsdf_a.evaluate(wo, wi),
             self.bsdf_b.evaluate(wo, wi),
             self.frac,
         )
     }
     fn evaluate_pdf(&self, wo: Vec3, wi: Vec3) -> f32 {
-        lerp_scalar(
+        lerp(
             self.bsdf_a.evaluate_pdf(wo, wi),
             self.bsdf_b.evaluate_pdf(wo, wi),
             self.frac,
@@ -230,9 +233,9 @@ impl<'a> LocalBsdfClosure for MixBsdfClosure<'a> {
         let info_b = self.bsdf_b.info();
         let frac = self.frac;
         BsdfInfo {
-            roughness: lerp_scalar(info_a.roughness, info_b.roughness, frac),
-            albedo: Spectrum::lerp(info_a.albedo, info_b.albedo, frac),
-            metallic: lerp_scalar(info_a.metallic, info_b.metallic, frac),
+            roughness: lerp(info_a.roughness, info_b.roughness, frac),
+            albedo: SampledSpectrum::lerp(info_a.albedo, info_b.albedo, frac),
+            metallic: lerp(info_a.metallic, info_b.metallic, frac),
         }
     }
 }
@@ -243,10 +246,10 @@ impl<'a> LocalBsdfClosure for MixBsdfClosure<'a> {
 //     pub sheen: Arc<dyn Texture>,
 // }
 // struct DisneyBsdfClosure {
-//     color: Spectrum,
+//     color: SampledSpectrum,
 //     roughness: f32,
 //     sheen: f32,
-//     tint: Spectrum,
+//     tint: SampledSpectrum,
 //     sheen_tint: f32,
 // }
 // pub fn schlick_weight(cos_theta: f32) -> f32 {
@@ -286,23 +289,23 @@ impl<'a> LocalBsdfClosure for MixBsdfClosure<'a> {
 
 //         0.25 * clearcoat * d * f * gl * gv
 //     }
-//     fn evaluate_tint(color: Spectrum) -> Spectrum {
+//     fn evaluate_tint(color: SampledSpectrum) -> SampledSpectrum {
 //         let rgb = color.to_rgb_linear();
 //         let luminance = vec3(0.3, 0.6, 0.1).dot(rgb);
 //         if luminance > 0.0 {
 //             color * (1.0 / luminance)
 //         } else {
-//             Spectrum::from_rgb_linear(vec3(1.0, 1.0, 1.0))
+//             SampledSpectrum::from_rgb_linear(vec3(1.0, 1.0, 1.0))
 //         }
 //     }
-//     fn evaluate_sheen(&self, sp: &ShadingPoint, wo: Vec3, wi: Vec3, wm: Vec3) -> Spectrum {
+//     fn evaluate_sheen(&self, sp: &ShadingPoint, wo: Vec3, wi: Vec3, wm: Vec3) -> SampledSpectrum {
 //         let sheen = self.sheen;
 //         if sheen <= 0.0 {
-//             return Spectrum::zero();
+//             return SampledSpectrum::zero();
 //         }
 //         let dot_hl = wm.dot(wi);
 //         let tint = Self::evaluate_tint(self.color);
-//         Spectrum::lerp(Spectrum::one(), tint, self.sheen_tint) * self.sheen * schlick_weight(dot_hl)
+//         SampledSpectrum::lerp(SampledSpectrum::one(), tint, self.sheen_tint) * self.sheen * schlick_weight(dot_hl)
 //     }
 //     fn ggx_aniso_d(wh: Vec3, ax: f32, ay: f32) -> f32 {
 //         let dot_hx2 = wh.x * wh.x;
@@ -336,15 +339,16 @@ impl Bsdf for DiffuseBsdf {
     fn evaluate<'a, 'b: 'a>(
         &'b self,
         sp: &ShadingPoint,
+        lambda: SampledWavelengths,
         arena: &'a Bump,
     ) -> &'a dyn LocalBsdfClosure {
         arena.alloc(DiffuseBsdfClosure {
-            color: self.color.evaluate_s(sp),
+            color: self.color.evaluate_s(sp, lambda),
         })
     }
 }
 pub struct DiffuseBsdfClosure {
-    pub color: Spectrum,
+    pub color: SampledSpectrum,
 }
 impl LocalBsdfClosure for DiffuseBsdfClosure {
     fn info(&self) -> BsdfInfo {
@@ -354,12 +358,12 @@ impl LocalBsdfClosure for DiffuseBsdfClosure {
             metallic: 0.0,
         }
     }
-    fn evaluate(&self, wo: Vec3, wi: Vec3) -> Spectrum {
+    fn evaluate(&self, wo: Vec3, wi: Vec3) -> SampledSpectrum {
         let r = self.color;
         if Frame::same_hemisphere(wo, wi) {
             r * FRAC_1_PI
         } else {
-            Spectrum::zero()
+            SampledSpectrum::zero()
         }
     }
     fn evaluate_pdf(&self, wo: Vec3, wi: Vec3) -> f32 {
@@ -394,7 +398,7 @@ pub struct SpecularBsdf {
 }
 impl_base!(SpecularBsdf);
 pub struct SpecularBsdfClosure {
-    pub color: Spectrum,
+    pub color: SampledSpectrum,
 }
 impl LocalBsdfClosure for SpecularBsdfClosure {
     fn info(&self) -> BsdfInfo {
@@ -404,8 +408,8 @@ impl LocalBsdfClosure for SpecularBsdfClosure {
             metallic: 1.0,
         }
     }
-    fn evaluate(&self, _wo: Vec3, _wi: Vec3) -> Spectrum {
-        Spectrum::zero()
+    fn evaluate(&self, _wo: Vec3, _wi: Vec3) -> SampledSpectrum {
+        SampledSpectrum::zero()
     }
     fn evaluate_pdf(&self, _wo: Vec3, _wi: Vec3) -> f32 {
         0.0
@@ -436,8 +440,9 @@ impl Bsdf for GPUBsdfProxy {
     }
     fn evaluate<'a, 'b: 'a>(
         &'b self,
-        sp: &ShadingPoint,
-        arena: &'a Bump,
+        _sp: &ShadingPoint,
+        _lambda: SampledWavelengths,
+        _arena: &'a Bump,
     ) -> &'a dyn LocalBsdfClosure {
         panic!("shouldn't be called on cpu")
     }

@@ -1,4 +1,3 @@
-use bumpalo::Bump;
 use crate::bsdf::*;
 use crate::film::*;
 use crate::light::*;
@@ -7,6 +6,7 @@ use crate::scene::*;
 use crate::util::profile::scope;
 use crate::util::PerThread;
 use crate::*;
+use bumpalo::Bump;
 
 pub struct PathTracer {
     pub spp: u32,
@@ -20,14 +20,15 @@ fn mis_weight(mut pdf_a: f32, mut pdf_b: f32) -> f32 {
 impl PathTracer {
     pub fn li(
         mut ray: Ray,
+        lambda: SampledWavelengths,
         sampler: &mut dyn Sampler,
         scene: &Scene,
         max_depth: usize,
         indirect_only: bool,
         arena: &Bump,
-    ) -> Spectrum {
-        let mut li = Spectrum::zero();
-        let mut beta = Spectrum::one();
+    ) -> SampledSpectrum {
+        let mut li = SampledSpectrum::zero();
+        let mut beta = SampledSpectrum::one();
         let mut prev_n: Option<Vec3> = None;
         let mut prev_bsdf_pdf: Option<f32> = None;
         let mut is_delta = false;
@@ -38,7 +39,7 @@ impl PathTracer {
                     let ng = si.ng;
                     let ns = si.ns;
                     let shape = si.shape;
-                    let opt_bsdf = si.evaluate_bsdf(arena);
+                    let opt_bsdf = si.evaluate_bsdf(lambda, arena);
                     if opt_bsdf.is_none() {
                         break;
                     }
@@ -49,7 +50,7 @@ impl PathTracer {
                         // li += beta * light.le(&ray);
                         if depth == 0 {
                             if !indirect_only {
-                                li += beta * light.le(&ray);
+                                li += beta * light.le(&ray, lambda);
                             }
                         } else {
                             if !indirect_only || depth > 1 {
@@ -72,7 +73,7 @@ impl PathTracer {
                                     mis_weight(bsdf_pdf, light_pdf)
                                 };
 
-                                li += beta * light.le(&ray) * weight;
+                                li += beta * light.le(&ray, lambda) * weight;
                             }
                         }
                     }
@@ -98,7 +99,7 @@ impl PathTracer {
                         };
                         if !sample_self {
                             let p_ref = ReferencePoint { p, n: ng };
-                            let light_sample = light.sample_li(sampler.next3d(), &p_ref);
+                            let light_sample = light.sample_li(sampler.next3d(), &p_ref, lambda);
                             let light_pdf = light_sample.pdf * light_pdf;
                             if (!indirect_only || depth > 1)
                                 && light_pdf > 0.0
@@ -146,7 +147,7 @@ impl PathTracer {
             }
         }
         if li.is_black() {
-            Spectrum::zero()
+            SampledSpectrum::zero()
         } else {
             li
         }
@@ -160,32 +161,33 @@ impl Integrator for PathTracer {
         let chunks = (npixels + 255) / 256;
         let progress = crate::util::create_progess_bar(chunks, "chunks");
         let arenas = PerThread::new(|| Bump::new());
+
         parallel_for(npixels, 256, |id| {
             let mut sampler = SobolSampler::new(id as u64);
             let x = (id as u32) % scene.camera.resolution().x;
             let y = (id as u32) / scene.camera.resolution().x;
             let pixel = uvec2(x, y);
-            let mut acc_li = Spectrum::zero();
             let arena = arenas.get_mut();
             for _ in 0..self.spp {
                 {
                     let arena = &*arena;
                     sampler.start_next_sample();
-                    let (ray, _ray_weight) = scene.camera.generate_ray(pixel, &mut sampler);
+                    let lambda = SampledWavelengths::sample_visible(sampler.next1d());
+                    let (ray, _ray_weight) = scene.camera.generate_ray(pixel, &mut sampler, lambda);
                     let li = Self::li(
                         ray,
+                        lambda,
                         &mut sampler,
                         scene,
                         self.max_depth as usize,
                         false,
                         arena,
                     );
-                    acc_li += li;
+                    film.add_sample(uvec2(x, y), li, lambda, 1.0);
                 }
                 arena.reset();
             }
-            acc_li = acc_li / (self.spp as f32);
-            film.add_sample(uvec2(x, y), acc_li, 1.0);
+
             if (id + 1) % 256 == 0 {
                 progress.inc(1);
             }

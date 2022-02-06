@@ -48,7 +48,7 @@ impl Integrator for Erpt {
             let x = (id as u32) % scene.camera.resolution().x;
             let y = (id as u32) / scene.camera.resolution().x;
             let pixel = uvec2(x, y);
-            let mut acc_li = Spectrum::zero();
+            let mut acc_li = SampledSpectrum::zero();
             let mut rng = thread_rng();
             let arena = arenas.get_mut();
             for _ in 0..self.spp {

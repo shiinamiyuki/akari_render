@@ -5,7 +5,6 @@ use akari::linear_to_srgb;
 use akari::scenegraph::node;
 use akari::util::binserde;
 use akari::*;
-use glam::*;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
