@@ -322,16 +322,33 @@ impl RgbColorSpace {
     pub fn new(id: RgbColorSpaceId) -> Self {
         match id {
             RgbColorSpaceId::SRgb => {
-                let data: &'static Rgb2SpectrumData = &rgb2spec::srgb::DATA;
                 Self {
                     id,
-                    rgb2spec_data: data,
+                    rgb2spec_data: &rgb2spec::srgb::DATA,
                     illuminant: spectrum_from_name("stdillum-D65"),
                 }
             }
-            RgbColorSpaceId::Aces2065_1 => todo!(),
-            RgbColorSpaceId::Rec2020 => todo!(),
-            RgbColorSpaceId::DCIP3 => todo!(),
+            RgbColorSpaceId::Aces2065_1 => {
+                Self {
+                    id,
+                    rgb2spec_data: &rgb2spec::aces2065_1::DATA,
+                    illuminant: spectrum_from_name("stdillum-D65"),
+                }
+            },
+            RgbColorSpaceId::Rec2020 => {
+                Self {
+                    id,
+                    rgb2spec_data: &rgb2spec::rec2020::DATA,
+                    illuminant: spectrum_from_name("stdillum-D65"),
+                }
+            },
+            RgbColorSpaceId::DCIP3 => {
+                Self {
+                    id,
+                    rgb2spec_data: &rgb2spec::dci_p3::DATA,
+                    illuminant: spectrum_from_name("stdillum-D65"),
+                }
+            },
         }
     }
     pub fn illuminant(&self) -> &'static dyn Spectrum {

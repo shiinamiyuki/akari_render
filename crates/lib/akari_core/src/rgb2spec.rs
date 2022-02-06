@@ -99,7 +99,7 @@ macro_rules! rgb2spec_mod {
     };
 }
 
-// rgb2spec_mod!(aces2065_1);
-// rgb2spec_mod!(dpi_p3);
+rgb2spec_mod!(aces2065_1);
+rgb2spec_mod!(dci_p3);
 rgb2spec_mod!(srgb);
-// rgb2spec_mod!(rec2020);
+rgb2spec_mod!(rec2020);
