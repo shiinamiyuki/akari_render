@@ -268,10 +268,10 @@ fn store4(bytes_: &mut [u8], value: Vec4, format: PixelFormat) {
         std::ptr::copy_nonoverlapping(bytes.as_ptr(), bytes_.as_mut_ptr(), format.size());
     }
 }
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum WrappingMode {
     Zero,
-    Extent,
+    Clamp,
     Repeat,
 }
 impl TiledImage {
@@ -284,7 +284,7 @@ impl TiledImage {
     fn index_offset(&self, p: UVec2) -> (usize, usize) {
         let p_tile = p / self.div_tile_size;
         let tile_idx = p_tile.x + p_tile.y * self.ntiles.x;
-        let offset = p - tile_idx * self.metadata.tile_size;
+        let offset = p - p_tile * self.metadata.tile_size;
         let pixel_idx = offset.x + offset.y * self.metadata.tile_size;
         let stride = self.metadata.format.size();
         let i = pixel_idx as usize * stride;
@@ -304,11 +304,11 @@ impl TiledImage {
         let res = self.dimension().as_ivec2();
 
         match wrap {
-            WrappingMode::Extent => {
+            WrappingMode::Clamp => {
                 p = p.clamp(IVec2::ZERO, res - 1);
             }
             WrappingMode::Repeat => {
-                p = p % res;
+                p = (p % res + res) % res;
             }
             WrappingMode::Zero => {
                 let oob = (p.cmplt(IVec2::ZERO) | p.cmpge(res)).any();
@@ -317,8 +317,10 @@ impl TiledImage {
                 }
             }
         }
+        debug_assert!((p.cmpge(IVec2::ZERO)).all(), "{:?} {:?}", p, wrap);
         let p = p.as_uvec2();
         let (tile_idx, i) = self.index_offset(p);
+        debug_assert!(tile_idx < self.data.len(), "{:?}", p);
         let tile = &self.data[tile_idx];
         let stride = self.metadata.format.size();
         let bytes = &tile.0[i..i + stride];

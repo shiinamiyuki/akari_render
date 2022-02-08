@@ -1,3 +1,6 @@
+use akari_common::glam::Vec4Swizzles;
+use util::RobustSum;
+
 use crate::{
     shape::{Shape, SurfaceInteraction},
     util::image::TiledImage,
@@ -72,80 +75,57 @@ impl SpectrumTexture for ConstantRgbTexture {
 }
 impl_base!(ConstantRgbTexture);
 
-// pub struct ImageTexture<T: Copy + Clone + Sync + Send + 'static> {
-//     data: TiledArray2D<T, 16>,
-//     size: (u32, u32),
-// }
-// impl<T> ImageTexture<T>
-// where
-//     T: Copy
-//         + Clone
-//         + Sync
-//         + Send
-//         + 'static
-//         + std::ops::Add<Output = T>
-//         + std::ops::Sub<Output = T>
-//         + std::ops::Div<f32, Output = T>,
-// {
-//     pub fn get_pixel_i(&self, ij: (u32, u32)) -> T {
-//         self.data[(ij.0 as usize, ij.1 as usize)]
-//     }
-//     pub fn get_pixel(&self, uv: Vec2) -> T {
-//         let mut uv = uv.fract();
-//         uv.y = 1.0 - uv.y;
-//         let i = (uv[0] * self.size.0 as f32).round() as u32 % self.size.0;
-//         let j = (uv[1] * self.size.1 as f32).round() as u32 % self.size.1;
-//         self.get_pixel_i((i, j))
-//     }
-//     pub fn width(&self) -> u32 {
-//         self.size.0
-//     }
-//     pub fn height(&self) -> u32 {
-//         self.size.1
-//     }
-// }
-// impl ImageTexture<Spectrum> {
-//     pub fn from_rgb_image(img: &image::RgbImage, use_virtual_memory: bool) -> Self {
-//         let data = TiledArray2D::new(
-//             [img.width() as usize, img.height() as usize],
-//             |x, y| {
-//                 let px = img.get_pixel(x as u32, y as u32);
-//                 let rgb = vec3(px[0] as f32, px[1] as f32, px[2] as f32) / 255.0;
-//                 Spectrum::from_srgb(rgb)
-//             },
-//             Spectrum::zero(),
-//             use_virtual_memory,
-//         );
-//         Self {
-//             size: (img.width(), img.height()),
-//             data,
-//         }
-//     }
-// }
+pub struct ImageSpectrumTexture {
+    image: TiledImage,
+    colorspace: RgbColorSpace,
+    invert_y: bool,
+}
+impl ImageSpectrumTexture {
+    pub fn from_rgb_image(image: &akari_common::image::RgbImage, invert_y: bool) -> Self {
+        let colorspace = RgbColorSpace::new(RgbColorSpaceId::SRgb);
+        Self {
+            colorspace,
+            image: TiledImage::from_fn(
+                image.width(),
+                image.height(),
+                util::image::PixelFormat::SRgb8,
+                |x, y| {
+                    let px = image.get_pixel(x, y);
+                    let rgb = vec3(px[0] as f32, px[1] as f32, px[2] as f32) / 255.0;
+                    srgb_to_linear(rgb).extend(1.0)
+                },
+            ),
+            invert_y,
+        }
+    }
+}
+impl SpectrumTexture for ImageSpectrumTexture {
+    fn evaluate(&self, sp: &ShadingPoint, lambda: SampledWavelengths) -> SampledSpectrum {
+        let mut tc = sp.texcoord;
+        if self.invert_y {
+            tc.y = 1.0 - tc.y;
+        }
+        let rgba = self.image.loadf(tc, util::image::WrappingMode::Repeat);
+        let rep = self.colorspace.rgb2spec(rgba.xyz());
+        rep.sample(lambda)
+    }
 
-// impl Texture for ImageTexture<f32> {
-//     fn evaluate(&self, sp: &ShadingPoint) -> Spectrum {
-//         Spectrum {
-//             samples: Vec3A::from([self.evaluate(sp); 3]),
-//         }
-//     }
-//     fn evaluate(&self, sp: &ShadingPoint) -> f32 {
-//         self.get_pixel(sp.texcoord) as f32
-//     }
-//     fn power(&self) -> f32 {
-//         self.data.average()
-//     }
-// }
-// impl_base!(ImageTexture<f32>);
-// impl Texture for ImageTexture<Spectrum> {
-//     fn evaluate(&self, sp: &ShadingPoint) -> Spectrum {
-//         self.get_pixel(sp.texcoord)
-//     }
-//     fn evaluate(&self, sp: &ShadingPoint) -> f32 {
-//         self.get_pixel(sp.texcoord)[0] as f32
-//     }
-//     fn power(&self) -> f32 {
-//         self.data.average().samples.max_element()
-//     }
-// }
-// impl_base!(ImageTexture<Spectrum>);
+    fn power(&self) -> f32 {
+        let mut sum = RobustSum::new(0.0);
+        for y in 0..self.image.dimension().y {
+            for x in 0..self.image.dimension().x {
+                let rgb = self
+                    .image
+                    .load(uvec2(x, y).as_ivec2(), util::image::WrappingMode::Clamp)
+                    .xyz();
+                let xyz = srgb_to_xyz(rgb);
+                sum.add(xyz.y);
+            }
+        }
+        sum.sum() / (self.image.dimension().x * self.image.dimension().y) as f32
+    }
+
+    fn colorspace(&self) -> Option<RgbColorSpace> {
+        Some(self.colorspace)
+    }
+}

@@ -23,6 +23,7 @@ use crate::util::binserde::Decode;
 use crate::util::FileResolver;
 use crate::util::LocalFileResolver;
 use crate::*;
+use akari_core::texture::ImageSpectrumTexture;
 use core::panic;
 use glam::*;
 use std::process::exit;
@@ -121,18 +122,13 @@ impl<'a> SceneLoaderContext<'a> {
             }
             node::Texture::Hex(_) => todo!(),
             node::Texture::Image(path) => {
-                todo!()
-                // let file = self.resolve_file(path);
-                // let reader = BufReader::new(file);
-                // let reader = image::io::Reader::new(reader)
-                //     .with_guessed_format()
-                //     .unwrap();
-                // let img = reader.decode().unwrap().into_rgb8();
-                // if cfg!(feature = "gpu") || !self.ooc.enable_ooc {
-                //     Arc::new(ImageTexture::<Spectrum>::from_rgb_image(&img, false))
-                // } else {
-                //     Arc::new(ImageTexture::<Spectrum>::from_rgb_image(&img, true))
-                // }
+                let file = self.resolve_file(path);
+                let reader = BufReader::new(file);
+                let reader = image::io::Reader::new(reader)
+                    .with_guessed_format()
+                    .unwrap();
+                let img = reader.decode().unwrap().into_rgb8();
+                Arc::new(ImageSpectrumTexture::from_rgb_image(&img, true))
             }
         }
     }
@@ -177,21 +173,21 @@ impl<'a> SceneLoaderContext<'a> {
             }),
             node::Bsdf::Principled {
                 color,
-                subsurface:_,
-                subsurface_color:_,
-                subsurface_radius:_,
-                sheen:_,
-                sheen_tint:_,
-                specular:_,
-                specular_tint:_,
+                subsurface: _,
+                subsurface_color: _,
+                subsurface_radius: _,
+                sheen: _,
+                sheen_tint: _,
+                specular: _,
+                specular_tint: _,
                 metallic,
                 roughness,
-                anisotropic:_,
-                anisotropic_rotation:_,
-                clearcoat:_,
-                clearcoat_roughness:_,
-                ior:_,
-                transmission:_,
+                anisotropic: _,
+                anisotropic_rotation: _,
+                clearcoat: _,
+                clearcoat_roughness: _,
+                ior: _,
+                transmission: _,
                 emission,
                 hint,
             } => {
