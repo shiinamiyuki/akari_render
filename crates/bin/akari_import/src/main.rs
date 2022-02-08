@@ -240,7 +240,7 @@ fn main() {
                     fov: 80.0,
                     focal: 1.0,
                     lens_radius: 0.0,
-                    transform: node::TRS::default(),
+                    transform: node::TR::default(),
                 },
             },
         }

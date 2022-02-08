@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     bsdf::{Bsdf, BsdfFlags, BsdfSample, LocalBsdfClosure, SpecularBsdfClosure},
-    texture::{ShadingPoint, Texture},
+    texture::{FloatTexture, ShadingPoint, SpectrumTexture},
     *,
 };
 use akari_const::GGX_LTC_FIT;
@@ -10,8 +10,8 @@ use bumpalo::Bump;
 use glam::DMat3;
 
 pub struct GgxLtcBsdf {
-    pub color: Arc<dyn Texture>,
-    pub roughness: Arc<dyn Texture>,
+    pub color: Arc<dyn SpectrumTexture>,
+    pub roughness: Arc<dyn FloatTexture>,
 }
 pub struct GgxLtcBsdfClosure {
     pub color: SampledSpectrum,
@@ -152,8 +152,8 @@ impl Bsdf for GgxLtcBsdf {
         lambda: SampledWavelengths,
         arena: &'a Bump,
     ) -> &'a dyn LocalBsdfClosure {
-        let roughness = self.roughness.evaluate_f(sp);
-        let color = self.color.evaluate_s(sp, lambda);
+        let roughness = self.roughness.evaluate(sp);
+        let color = self.color.evaluate(sp, lambda);
         if roughness >= 0.1 {
             arena.alloc(GgxLtcBsdfClosure { color, roughness })
         } else {

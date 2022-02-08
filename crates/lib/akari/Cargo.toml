@@ -13,3 +13,6 @@ akari_integrators = {path = "../akari_integrators"}
 akari_utils = {path = "../akari_utils"}
 serde = {version = "1.*", features = ["derive"]}
 
+[[bin]]
+name="playground"
+path="src/playground.rs"

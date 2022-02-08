@@ -139,13 +139,11 @@ fn main() {
     let ooc = OocOptions {
         enable_ooc: matches.is_present("ooc"),
     };
+    let mut config = Config::default();
     if let Some(threads) = matches.value_of("threads") {
-        let threads: usize = String::from(threads).parse().unwrap();
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(threads)
-            .build_global()
-            .unwrap();
+        config.num_threads = String::from(threads).parse().unwrap();
     }
+    akari::init(config);
     let accel = if let Some(accel) = matches.value_of("accel") {
         String::from(accel)
     } else {

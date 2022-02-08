@@ -1,4 +1,7 @@
-use akari_common::*;
+use akari_common::{
+    glam::{vec3, Vec3},
+    *,
+};
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use parking_lot::*;
 use serde::{Deserialize, Serialize};
@@ -16,8 +19,19 @@ pub mod nn_v2;
 pub mod profile;
 #[macro_use]
 pub mod binserde;
-pub mod tiledtexture;
-
+pub mod fastdiv;
+pub mod image;
+pub mod lrucache;
+pub mod rcu;
+pub mod texcache;
+pub fn log2(mut x: u32) -> u32 {
+    let mut l = 0;
+    while x > 0 {
+        x >>= 1;
+        l += 1;
+    }
+    l
+}
 pub fn int_bits_to_float(x: i32) -> f32 {
     unsafe { std::mem::transmute(x) }
 }
@@ -92,6 +106,20 @@ where
     }
     r
 }
+
+pub fn left_shift2(mut x: u64) -> u64 {
+    x &= 0xffffffff;
+    x = (x ^ (x << 16)) & 0x0000ffff0000ffff;
+    x = (x ^ (x << 8)) & 0x00ff00ff00ff00ff;
+    x = (x ^ (x << 4)) & 0x0f0f0f0f0f0f0f0f;
+    x = (x ^ (x << 2)) & 0x3333333333333333;
+    x = (x ^ (x << 1)) & 0x5555555555555555;
+    x
+}
+pub fn encode_morton2(x: u64, y: u64) -> u64 {
+    (left_shift2(y) << 1) | left_shift2(x)
+}
+
 pub fn erf_inv(x: f32) -> f32 {
     let clamped_x: f32 = clamp_t(x, -0.99999, 0.99999);
     let mut w: f32 = -((1.0 as f32 - clamped_x) * (1.0 as f32 + clamped_x)).ln();
@@ -443,4 +471,124 @@ pub fn parallel_for_slice4<
             &mut slice_3[i],
         );
     });
+}
+pub fn srgb_to_linear1(s: f32) -> f32 {
+    if s <= 0.04045 {
+        s / 12.92
+    } else {
+        (((s + 0.055) / 1.055) as f32).powf(2.4)
+    }
+}
+pub fn srgb_to_linear1_u8(s: u8) -> f32 {
+    akari_const::SRGB_TO_LINEAR[s as usize]
+}
+
+pub fn srgb_to_linear_u8(rgb: [u8;3]) -> Vec3 {
+    vec3(
+        srgb_to_linear1_u8(rgb[0]),
+        srgb_to_linear1_u8(rgb[1]),
+        srgb_to_linear1_u8(rgb[2]),
+    )
+}
+pub fn srgb_to_linear(rgb: Vec3) -> Vec3 {
+    vec3(
+        srgb_to_linear1(rgb.x),
+        srgb_to_linear1(rgb.y),
+        srgb_to_linear1(rgb.z),
+    )
+}
+pub fn linear_to_srgb1(l: f32) -> f32 {
+    if l <= 0.0031308 {
+        l * 12.92
+    } else {
+        l.powf(1.0 / 2.4) * 1.055 - 0.055
+    }
+}
+pub fn linear_to_srgb(linear: Vec3) -> Vec3 {
+    vec3(
+        linear_to_srgb1(linear.x),
+        linear_to_srgb1(linear.y),
+        linear_to_srgb1(linear.z),
+    )
+}
+pub fn rgb_to_hsv(rgb: Vec3) -> Vec3 {
+    let max = rgb.max_element();
+    let min = rgb.min_element();
+    let (r, g, b) = (rgb[0], rgb[1], rgb[2]);
+    let h = {
+        if max == min {
+            0.0
+        } else if max == r && g >= b {
+            60.0 * (g - b) / (max - min)
+        } else if max == r && g < b {
+            60.0 * (g - b) / (max - min) + 360.0
+        } else if max == g {
+            60.0 * (b - r) / (max - min) + 120.0
+        } else if max == b {
+            60.0 * (r - g) / (max - min) + 240.0
+        } else {
+            unreachable!()
+        }
+    };
+    let v = max;
+    let s = {
+        if max == 0.0 {
+            0.0
+        } else {
+            (max - min) / max
+        }
+    };
+    vec3(h, s, v)
+}
+
+pub fn hsv_to_rgb(hsv: Vec3) -> Vec3 {
+    let h = (hsv[0] / 60.0).floor() as u32;
+    let f = hsv[0] / 60.0 - h as f32;
+    let p = hsv[2] * (1.0 - hsv[1]);
+    let q = hsv[2] * (1.0 - f * hsv[1]);
+    let t = hsv[2] * (1.0 - (1.0 - f) * hsv[1]);
+    let v = hsv[2];
+    let (r, g, b) = match h {
+        0 => (v, t, p),
+        1 => (q, v, p),
+        2 => (p, v, t),
+        3 => (p, q, v),
+        4 => (t, p, v),
+        5 => (v, p, q),
+        _ => unreachable!(),
+    };
+    vec3(r, g, b)
+}
+pub fn rgb_to_hsl(rgb: Vec3) -> Vec3 {
+    let max = rgb.max_element();
+    let min = rgb.min_element();
+    let (r, g, b) = (rgb[0], rgb[1], rgb[2]);
+    let h = {
+        if max == min {
+            0.0
+        } else if max == r && g >= b {
+            60.0 * (g - b) / (max - min)
+        } else if max == r && g < b {
+            60.0 * (g - b) / (max - min) + 360.0
+        } else if max == g {
+            60.0 * (b - r) / (max - min) + 120.0
+        } else if max == b {
+            60.0 * (r - g) / (max - min) + 240.0
+        } else {
+            unreachable!()
+        }
+    };
+    let l = 0.5 * (max + min);
+    let s = {
+        if l == 0.0 || max == min {
+            0.0
+        } else if 0.0 < l || l <= 0.5 {
+            (max - min) / (2.0 * l)
+        } else if l > 0.5 {
+            (max - min) / (2.0 - 2.0 * l)
+        } else {
+            unreachable!()
+        }
+    };
+    vec3(h, s, l)
 }

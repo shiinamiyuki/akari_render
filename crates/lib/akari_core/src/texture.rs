@@ -1,9 +1,6 @@
 use crate::{
     shape::{Shape, SurfaceInteraction},
-    util::{
-        arrayvec::{ArrayVec, DynStorage, VirtualStorage},
-        tiledtexture::TiledArray2D,
-    },
+    util::image::TiledImage,
     *,
 };
 // use image
@@ -20,23 +17,19 @@ impl ShadingPoint {
     }
 }
 
-pub trait Texture: Sync + Send + Base {
-    fn evaluate_s(&self, sp: &ShadingPoint, lambda: SampledWavelengths) -> SampledSpectrum;
-    fn evaluate_illum(&self, sp: &ShadingPoint, lambda: SampledWavelengths) -> SampledSpectrum;
-    fn evaluate_f(&self, sp: &ShadingPoint) -> f32;
+pub trait FloatTexture: Sync + Send + Base {
+    fn evaluate(&self, sp: &ShadingPoint) -> f32;
     fn power(&self) -> f32;
 }
-
+pub trait SpectrumTexture: Sync + Send + Base {
+    fn evaluate(&self, sp: &ShadingPoint, lambda: SampledWavelengths) -> SampledSpectrum;
+    fn power(&self) -> f32;
+    fn colorspace(&self) -> Option<RgbColorSpace>;
+}
 pub struct ConstantFloatTexture(pub f32);
-impl Texture for ConstantFloatTexture {
-    fn evaluate_s(&self, _sp: &ShadingPoint, _: SampledWavelengths) -> SampledSpectrum {
-        SampledSpectrum::splat(self.0)
-    }
-    fn evaluate_f(&self, _sp: &ShadingPoint) -> f32 {
+impl FloatTexture for ConstantFloatTexture {
+    fn evaluate(&self, _sp: &ShadingPoint) -> f32 {
         self.0 as f32
-    }
-    fn evaluate_illum(&self, sp: &ShadingPoint, lambda: SampledWavelengths) -> SampledSpectrum {
-        SampledSpectrum::splat(self.0)
     }
     fn power(&self) -> f32 {
         self.0 as f32
@@ -66,21 +59,15 @@ impl ConstantRgbTexture {
         }
     }
 }
-impl Texture for ConstantRgbTexture {
-    fn evaluate_s(&self, _sp: &ShadingPoint, lambda: SampledWavelengths) -> SampledSpectrum {
-        self.rep.sample(lambda)
-    }
-    fn evaluate_f(&self, _sp: &ShadingPoint) -> f32 {
-        self.rgb[0] as f32
-    }
-    fn evaluate_illum(&self, _sp: &ShadingPoint, lambda: SampledWavelengths) -> SampledSpectrum {
-        let scale = self.scale;
-        let illuminant = self.colorspace.illuminant();
-        let i = illuminant.sample(lambda);
-        self.rep.sample(lambda) * i * scale
+impl SpectrumTexture for ConstantRgbTexture {
+    fn evaluate(&self, _sp: &ShadingPoint, lambda: SampledWavelengths) -> SampledSpectrum {
+        self.rep.sample(lambda) * self.scale
     }
     fn power(&self) -> f32 {
-        self.rep.max_element()
+        self.rep.max_element() * self.scale
+    }
+    fn colorspace(&self) -> Option<RgbColorSpace> {
+        Some(self.colorspace)
     }
 }
 impl_base!(ConstantRgbTexture);
@@ -137,12 +124,12 @@ impl_base!(ConstantRgbTexture);
 // }
 
 // impl Texture for ImageTexture<f32> {
-//     fn evaluate_s(&self, sp: &ShadingPoint) -> Spectrum {
+//     fn evaluate(&self, sp: &ShadingPoint) -> Spectrum {
 //         Spectrum {
-//             samples: Vec3A::from([self.evaluate_f(sp); 3]),
+//             samples: Vec3A::from([self.evaluate(sp); 3]),
 //         }
 //     }
-//     fn evaluate_f(&self, sp: &ShadingPoint) -> f32 {
+//     fn evaluate(&self, sp: &ShadingPoint) -> f32 {
 //         self.get_pixel(sp.texcoord) as f32
 //     }
 //     fn power(&self) -> f32 {
@@ -151,10 +138,10 @@ impl_base!(ConstantRgbTexture);
 // }
 // impl_base!(ImageTexture<f32>);
 // impl Texture for ImageTexture<Spectrum> {
-//     fn evaluate_s(&self, sp: &ShadingPoint) -> Spectrum {
+//     fn evaluate(&self, sp: &ShadingPoint) -> Spectrum {
 //         self.get_pixel(sp.texcoord)
 //     }
-//     fn evaluate_f(&self, sp: &ShadingPoint) -> f32 {
+//     fn evaluate(&self, sp: &ShadingPoint) -> f32 {
 //         self.get_pixel(sp.texcoord)[0] as f32
 //     }
 //     fn power(&self) -> f32 {

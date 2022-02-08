@@ -1,9 +1,8 @@
 use akari::bsdf::{DiffuseBsdfClosure, LocalBsdfClosure};
-use akari::sampler::{PCGSampler, Sampler, SobolSampler};
+use akari::sampler::{PCGSampler, Sampler};
 use akari::util::PerThread;
 use akari::*;
 use bsdf::ltc::GgxLtcBsdfClosure;
-use bsdf::DiffuseBsdf;
 use glam::*;
 use rand::thread_rng;
 use rand::Rng;
@@ -17,7 +16,6 @@ impl<B: LocalBsdfClosure> BsdfTester<B> {
     }
     #[allow(dead_code)]
     pub fn test_2pi(&self, wo: Vec3) -> f32 {
-        use akari::sampler::Sampler;
         let n = 1u64 << 20;
         let mut local_sum = PerThread::new(|| 0.0f64);
         rayon::scope(|s| {

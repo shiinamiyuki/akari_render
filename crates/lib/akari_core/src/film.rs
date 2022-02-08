@@ -1,6 +1,6 @@
 use crate::*;
-use akari_utils::*;
 use color::XYZ;
+use util::RobustSum;
 #[derive(Copy, Clone)]
 pub struct Pixel {
     pub intensity: RobustSum<XYZ>,
@@ -70,7 +70,7 @@ impl Film {
             let pixel = self.get_pixel(uvec2(x, y));
             let value = pixel.color();
             let srgb: SRgb = value.into();
-            let srgb = srgb_to_linear(srgb.values().clamp(Vec3::ZERO, Vec3::ONE - 1e-5)) * 255.0;
+            let srgb = linear_to_srgb(srgb.values().clamp(Vec3::ZERO, Vec3::ONE)) * 255.0;
             // let srgb = value.to_srgb() * 255.0;
             image::Rgb([srgb.x as u8, srgb.y as u8, srgb.z as u8])
         });

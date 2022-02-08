@@ -39,8 +39,9 @@ impl Scene {
                 if let Some(emission) = bsdf.emission() {
                     if emission.power() > 0.001 {
                         let light: Arc<dyn Light> = Arc::new(AreaLight {
-                            emission,
+                            emission: emission.clone(),
                             shape: shape.clone(),
+                            colorspace: emission.colorspace(),
                         });
                         lights.push(light.clone());
                         shape_to_light

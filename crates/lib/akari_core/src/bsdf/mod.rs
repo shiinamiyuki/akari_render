@@ -3,7 +3,7 @@ use std::sync::Arc;
 use bumpalo::Bump;
 
 use crate::sampler::SobolSampler;
-use crate::texture::{ShadingPoint, Texture};
+use crate::texture::{FloatTexture, ShadingPoint, SpectrumTexture};
 use crate::*;
 pub mod ltc;
 use bitflags::bitflags;
@@ -43,7 +43,7 @@ pub trait Bsdf: Sync + Send + Base {
         lambda: SampledWavelengths,
         arena: &'a Bump,
     ) -> &'a dyn LocalBsdfClosure;
-    fn emission(&self) -> Option<Arc<dyn Texture>> {
+    fn emission(&self) -> Option<Arc<dyn SpectrumTexture>> {
         None
     }
 }
@@ -52,7 +52,7 @@ pub trait LocalBsdfClosure: Sync + Send {
     fn evaluate_pdf(&self, wo: Vec3, wi: Vec3) -> f32;
     fn sample(&self, u: Vec2, wo: Vec3) -> Option<BsdfSample>;
     fn info(&self) -> BsdfInfo;
-    fn emission(&self) -> Option<&dyn Texture> {
+    fn emission(&self) -> Option<&dyn SpectrumTexture> {
         None
     }
 }
@@ -79,18 +79,18 @@ impl<'a> BsdfClosure<'a> {
     pub fn info(&self) -> BsdfInfo {
         self.closure.info()
     }
-    pub fn emission(&self) -> Option<Arc<dyn Texture>> {
+    pub fn emission(&self) -> Option<Arc<dyn SpectrumTexture>> {
         None
     }
 }
 pub struct EmissiveBsdf {
     pub base: Arc<dyn Bsdf>,
-    pub emission: Arc<dyn Texture>,
+    pub emission: Arc<dyn SpectrumTexture>,
 }
 impl_base!(EmissiveBsdf);
 pub struct EmissiveBsdfClosure<'a> {
     pub base: &'a dyn LocalBsdfClosure,
-    pub emission: &'a dyn Texture,
+    pub emission: &'a dyn SpectrumTexture,
 }
 impl<'a> LocalBsdfClosure for EmissiveBsdfClosure<'a> {
     fn evaluate(&self, wo: Vec3, wi: Vec3) -> SampledSpectrum {
@@ -105,7 +105,7 @@ impl<'a> LocalBsdfClosure for EmissiveBsdfClosure<'a> {
     fn info(&self) -> BsdfInfo {
         self.base.info()
     }
-    fn emission(&self) -> Option<&dyn Texture> {
+    fn emission(&self) -> Option<&dyn SpectrumTexture> {
         Some(self.emission)
     }
 }
@@ -122,14 +122,14 @@ impl Bsdf for EmissiveBsdf {
             emission: self.emission.as_ref(),
         })
     }
-    fn emission(&self) -> Option<Arc<dyn Texture>> {
+    fn emission(&self) -> Option<Arc<dyn SpectrumTexture>> {
         Some(self.emission.clone())
     }
 }
 pub struct MixBsdf<A: Bsdf, B: Bsdf> {
     pub bsdf_a: A,
     pub bsdf_b: B,
-    pub frac: Arc<dyn Texture>,
+    pub frac: Arc<dyn FloatTexture>,
 }
 
 // impl<A, B> Base for MixBsdf<A, B>
@@ -161,7 +161,7 @@ where
         arena.alloc(MixBsdfClosure {
             bsdf_a: self.bsdf_a.evaluate(sp, lambda, arena),
             bsdf_b: self.bsdf_b.evaluate(sp, lambda, arena),
-            frac: self.frac.evaluate_f(sp),
+            frac: self.frac.evaluate(sp),
         })
     }
 }
@@ -298,7 +298,7 @@ impl<'a> LocalBsdfClosure for MixBsdfClosure<'a> {
 //             SampledSpectrum::from_rgb_linear(vec3(1.0, 1.0, 1.0))
 //         }
 //     }
-//     fn evaluate_sheen(&self, sp: &ShadingPoint, wo: Vec3, wi: Vec3, wm: Vec3) -> SampledSpectrum {
+//     fn evaluateheen(&self, sp: &ShadingPoint, wo: Vec3, wi: Vec3, wm: Vec3) -> SampledSpectrum {
 //         let sheen = self.sheen;
 //         if sheen <= 0.0 {
 //             return SampledSpectrum::zero();
@@ -332,7 +332,7 @@ impl<'a> LocalBsdfClosure for MixBsdfClosure<'a> {
 // }
 
 pub struct DiffuseBsdf {
-    pub color: Arc<dyn Texture>,
+    pub color: Arc<dyn SpectrumTexture>,
 }
 impl_base!(DiffuseBsdf);
 impl Bsdf for DiffuseBsdf {
@@ -343,7 +343,7 @@ impl Bsdf for DiffuseBsdf {
         arena: &'a Bump,
     ) -> &'a dyn LocalBsdfClosure {
         arena.alloc(DiffuseBsdfClosure {
-            color: self.color.evaluate_s(sp, lambda),
+            color: self.color.evaluate(sp, lambda),
         })
     }
 }
@@ -394,7 +394,7 @@ impl LocalBsdfClosure for DiffuseBsdfClosure {
 }
 
 pub struct SpecularBsdf {
-    pub color: Arc<dyn Texture>,
+    pub color: Arc<dyn SpectrumTexture>,
 }
 impl_base!(SpecularBsdf);
 pub struct SpecularBsdfClosure {
@@ -428,14 +428,14 @@ impl LocalBsdfClosure for SpecularBsdfClosure {
 }
 
 pub struct GPUBsdfProxy {
-    pub color: Arc<dyn Texture>,
-    pub metallic: Arc<dyn Texture>,
-    pub roughness: Arc<dyn Texture>,
-    pub emission: Arc<dyn Texture>,
+    pub color: Arc<dyn SpectrumTexture>,
+    pub metallic: Arc<dyn FloatTexture>,
+    pub roughness: Arc<dyn FloatTexture>,
+    pub emission: Arc<dyn SpectrumTexture>,
 }
 impl_base!(GPUBsdfProxy);
 impl Bsdf for GPUBsdfProxy {
-    fn emission(&self) -> Option<Arc<dyn Texture>> {
+    fn emission(&self) -> Option<Arc<dyn SpectrumTexture>> {
         Some(self.emission.clone())
     }
     fn evaluate<'a, 'b: 'a>(

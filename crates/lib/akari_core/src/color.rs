@@ -1,9 +1,9 @@
-use akari_common::glam::mat3;
-
 use crate::{
     rgb2spec::{Rgb2SpectrumData, SPECTRUM_TABLE_RES},
     *,
 };
+use akari_common::glam::mat3;
+pub use util::{hsv_to_rgb, linear_to_srgb, rgb_to_hsl, rgb_to_hsv, srgb_to_linear};
 
 #[derive(Clone, Copy, Debug)]
 pub struct XYZ {
@@ -19,108 +19,6 @@ impl From<XYZ> for SRgb {
     fn from(xyz: XYZ) -> Self {
         Self::new(xyz_to_srgb(xyz.values()))
     }
-}
-pub fn srgb_to_linear(rgb: Vec3) -> Vec3 {
-    let f = |s| -> f32 {
-        if s <= 0.04045 {
-            s / 12.92
-        } else {
-            (((s + 0.055) / 1.055) as f32).powf(2.4)
-        }
-    };
-    vec3(f(rgb.x), f(rgb.y), f(rgb.z))
-}
-pub fn linear_to_srgb(linear: Vec3) -> Vec3 {
-    let f = |l: f32| -> f32 {
-        if l <= 0.0031308 {
-            l * 12.92
-        } else {
-            l.powf(1.0 / 2.4) * 1.055 - 0.055
-        }
-    };
-
-    vec3(f(linear.x), f(linear.y), f(linear.z))
-}
-pub fn rgb_to_hsv(rgb: Vec3) -> Vec3 {
-    let max = rgb.max_element();
-    let min = rgb.min_element();
-    let (r, g, b) = (rgb[0], rgb[1], rgb[2]);
-    let h = {
-        if max == min {
-            0.0
-        } else if max == r && g >= b {
-            60.0 * (g - b) / (max - min)
-        } else if max == r && g < b {
-            60.0 * (g - b) / (max - min) + 360.0
-        } else if max == g {
-            60.0 * (b - r) / (max - min) + 120.0
-        } else if max == b {
-            60.0 * (r - g) / (max - min) + 240.0
-        } else {
-            unreachable!()
-        }
-    };
-    let v = max;
-    let s = {
-        if max == 0.0 {
-            0.0
-        } else {
-            (max - min) / max
-        }
-    };
-    vec3(h, s, v)
-}
-
-pub fn hsv_to_rgb(hsv: Vec3) -> Vec3 {
-    let h = (hsv[0] / 60.0).floor() as u32;
-    let f = hsv[0] / 60.0 - h as f32;
-    let p = hsv[2] * (1.0 - hsv[1]);
-    let q = hsv[2] * (1.0 - f * hsv[1]);
-    let t = hsv[2] * (1.0 - (1.0 - f) * hsv[1]);
-    let v = hsv[2];
-    let (r, g, b) = match h {
-        0 => (v, t, p),
-        1 => (q, v, p),
-        2 => (p, v, t),
-        3 => (p, q, v),
-        4 => (t, p, v),
-        5 => (v, p, q),
-        _ => unreachable!(),
-    };
-    vec3(r, g, b)
-}
-pub fn rgb_to_hsl(rgb: Vec3) -> Vec3 {
-    let max = rgb.max_element();
-    let min = rgb.min_element();
-    let (r, g, b) = (rgb[0], rgb[1], rgb[2]);
-    let h = {
-        if max == min {
-            0.0
-        } else if max == r && g >= b {
-            60.0 * (g - b) / (max - min)
-        } else if max == r && g < b {
-            60.0 * (g - b) / (max - min) + 360.0
-        } else if max == g {
-            60.0 * (b - r) / (max - min) + 120.0
-        } else if max == b {
-            60.0 * (r - g) / (max - min) + 240.0
-        } else {
-            unreachable!()
-        }
-    };
-    let l = 0.5 * (max + min);
-    let s = {
-        if l == 0.0 || max == min {
-            0.0
-        } else if 0.0 < l || l <= 0.5 {
-            (max - min) / (2.0 * l)
-        } else if l > 0.5 {
-            (max - min) / (2.0 - 2.0 * l)
-        } else {
-            unreachable!()
-        }
-    };
-    vec3(h, s, l)
 }
 
 pub fn xyz_to_srgb(xyz: Vec3) -> Vec3 {
@@ -321,33 +219,25 @@ pub struct RgbColorSpace {
 impl RgbColorSpace {
     pub fn new(id: RgbColorSpaceId) -> Self {
         match id {
-            RgbColorSpaceId::SRgb => {
-                Self {
-                    id,
-                    rgb2spec_data: &rgb2spec::srgb::DATA,
-                    illuminant: spectrum_from_name("stdillum-D65"),
-                }
-            }
-            RgbColorSpaceId::Aces2065_1 => {
-                Self {
-                    id,
-                    rgb2spec_data: &rgb2spec::aces2065_1::DATA,
-                    illuminant: spectrum_from_name("stdillum-D65"),
-                }
+            RgbColorSpaceId::SRgb => Self {
+                id,
+                rgb2spec_data: &rgb2spec::srgb::DATA,
+                illuminant: spectrum_from_name("stdillum-D65"),
             },
-            RgbColorSpaceId::Rec2020 => {
-                Self {
-                    id,
-                    rgb2spec_data: &rgb2spec::rec2020::DATA,
-                    illuminant: spectrum_from_name("stdillum-D65"),
-                }
+            RgbColorSpaceId::Aces2065_1 => Self {
+                id,
+                rgb2spec_data: &rgb2spec::aces2065_1::DATA,
+                illuminant: spectrum_from_name("stdillum-D65"),
             },
-            RgbColorSpaceId::DCIP3 => {
-                Self {
-                    id,
-                    rgb2spec_data: &rgb2spec::dci_p3::DATA,
-                    illuminant: spectrum_from_name("stdillum-D65"),
-                }
+            RgbColorSpaceId::Rec2020 => Self {
+                id,
+                rgb2spec_data: &rgb2spec::rec2020::DATA,
+                illuminant: spectrum_from_name("stdillum-D65"),
+            },
+            RgbColorSpaceId::DCIP3 => Self {
+                id,
+                rgb2spec_data: &rgb2spec::dci_p3::DATA,
+                illuminant: spectrum_from_name("stdillum-D65"),
             },
         }
     }

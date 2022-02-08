@@ -18,4 +18,17 @@ pub use serde_json;
 pub use tempfile;
 pub use tobj;
 pub extern crate serde;
+pub use flate2;
+pub use half;
+pub use num_cpus;
 pub use statrs;
+
+mod test {
+    #[test]
+    fn test_endianess() {
+        assert!(
+            cfg!(target_endian = "little"),
+            "only little endian is supported"
+        );
+    }
+}

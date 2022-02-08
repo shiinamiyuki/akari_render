@@ -4,7 +4,7 @@ use std::sync::Arc;
 use crate::distribution::Distribution1D;
 use crate::shape::Shape;
 use crate::texture::ShadingPoint;
-use crate::texture::Texture;
+use crate::texture::SpectrumTexture;
 use crate::*;
 use bitflags::bitflags;
 #[derive(Clone, Copy)]
@@ -126,16 +126,29 @@ impl LightDistribution for UniformLightDistribution {
 
 pub struct AreaLight {
     pub shape: Arc<dyn Shape>,
-    pub emission: Arc<dyn Texture>,
+    pub emission: Arc<dyn SpectrumTexture>,
+    pub colorspace: Option<RgbColorSpace>,
 }
 impl_base!(AreaLight);
+impl AreaLight {
+    fn evaluate(&self, sp: &ShadingPoint, lambda: SampledWavelengths) -> SampledSpectrum {
+        let s = self.emission.evaluate(sp, lambda);
+        if let Some(colorspace) = self.colorspace {
+            let illuminant = colorspace.illuminant();
+            let i = illuminant.sample(lambda);
+            s * i
+        } else {
+            s
+        }
+    }
+}
 impl Light for AreaLight {
     fn sample_le(&self, u0: Vec3, u1: Vec2, lambda: SampledWavelengths) -> LightRaySample {
         let p = self.shape.sample_surface(u0);
         let dir = consine_hemisphere_sampling(u1);
         let frame = Frame::from_normal(p.ng);
         LightRaySample {
-            le: self.emission.evaluate_illum(
+            le: self.evaluate(
                 &ShadingPoint {
                     texcoord: p.texcoords,
                 },
@@ -150,7 +163,7 @@ impl Light for AreaLight {
 
     fn sample_li(&self, u: Vec3, ref_: &ReferencePoint, lambda: SampledWavelengths) -> LightSample {
         let surface_sample = self.shape.sample_surface(u);
-        let li = self.emission.evaluate_illum(
+        let li = self.evaluate(
             &ShadingPoint {
                 texcoord: surface_sample.texcoords,
             },
@@ -199,8 +212,7 @@ impl Light for AreaLight {
     fn le(&self, ray: &Ray, lambda: SampledWavelengths) -> SampledSpectrum {
         if let Some(hit) = self.shape.intersect(ray) {
             if hit.ng.dot(ray.d) < 0.0 {
-                self.emission
-                    .evaluate_illum(&ShadingPoint::from_rayhit(&self.shape, hit), lambda)
+                self.evaluate(&ShadingPoint::from_rayhit(&self.shape, hit), lambda)
             } else {
                 SampledSpectrum::zero()
             }
@@ -223,14 +235,22 @@ impl Light for AreaLight {
 
 pub struct PointLight {
     pub position: Vec3,
-    pub emission: Arc<dyn Texture>,
+    pub emission: Arc<dyn SpectrumTexture>,
+    pub colorspace: Option<RgbColorSpace>,
 }
 impl_base!(PointLight);
 impl PointLight {
     fn evaluate(&self, w: Vec3, lambda: SampledWavelengths) -> SampledSpectrum {
         let uv = spherical_to_uv(dir_to_spherical(w));
         let sp = ShadingPoint { texcoord: uv };
-        self.emission.evaluate_illum(&sp, lambda)
+        let s = self.emission.evaluate(&sp, lambda);
+        if let Some(colorspace) = self.colorspace {
+            let illuminant = colorspace.illuminant();
+            let i = illuminant.sample(lambda);
+            s * i
+        } else {
+            s
+        }
     }
 }
 impl Light for PointLight {

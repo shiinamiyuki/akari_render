@@ -1,4 +1,7 @@
-use std::io::{Read, Write};
+use std::{
+    io::{Read, Write},
+    mem::MaybeUninit,
+};
 
 // minimal binary ser/de
 // we cannot use bincode 2.0 as it is unstable as of 01-31-2022
@@ -11,10 +14,39 @@ pub trait Decode {
 pub trait Encode {
     fn encode<W: Write>(&self, writer: &mut W) -> std::io::Result<()>;
 }
-macro_rules! impl_serde_vec_t {
+#[macro_export]
+macro_rules! impl_binserde {
     ($t:ty) => {
+        impl Decode for $t {
+            fn decode<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self>
+            where
+                Self: Sized,
+            {
+                let mut data = std::mem::MaybeUninit::<$t>::uninit();
+                let slice = unsafe {
+                    std::slice::from_raw_parts_mut(
+                        data.as_mut_ptr() as *mut u8,
+                        std::mem::size_of::<$t>(),
+                    )
+                };
+                reader.read_exact(slice)?;
+                unsafe { Ok(data.assume_init()) }
+            }
+        }
+        impl Encode for $t {
+            fn encode<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+                let slice = unsafe {
+                    std::slice::from_raw_parts(
+                        self as *const Self as *const u8,
+                        std::mem::size_of::<$t>(),
+                    )
+                };
+                writer.write_all(slice)?;
+                Ok(())
+            }
+        }
         impl Decode for Vec<$t> {
-            fn decode<R: Read>(reader: &mut R) -> std::io::Result<Self>
+            fn decode<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self>
             where
                 Self: Sized,
             {
@@ -32,7 +64,7 @@ macro_rules! impl_serde_vec_t {
             }
         }
         impl Encode for [$t] {
-            fn encode<W: Write>(&self, writer: &mut W) -> std::io::Result<()> {
+            fn encode<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
                 let len: [u8; 8] = (self.len() as u64).to_le_bytes();
                 let stride = std::mem::size_of::<$t>();
                 let slice = unsafe {
@@ -45,13 +77,14 @@ macro_rules! impl_serde_vec_t {
         }
     };
 }
-impl_serde_vec_t!(f32);
-impl_serde_vec_t!([f32; 2]);
-impl_serde_vec_t!([f32; 3]);
-impl_serde_vec_t!(u32);
-impl_serde_vec_t!([u32; 2]);
-impl_serde_vec_t!([u32; 3]);
-impl_serde_vec_t!(u8);
+impl_binserde!(f32);
+impl_binserde!([f32; 2]);
+impl_binserde!([f32; 3]);
+impl_binserde!(u32);
+impl_binserde!([u32; 2]);
+impl_binserde!([u32; 3]);
+impl_binserde!(u8);
+
 impl Encode for String {
     fn encode<W: Write>(&self, writer: &mut W) -> std::io::Result<()> {
         self.as_bytes().encode(writer)

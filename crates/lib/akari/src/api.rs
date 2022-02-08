@@ -17,13 +17,15 @@ use crate::scenegraph::*;
 use crate::shape::*;
 use crate::texture::{ConstantFloatTexture, ConstantRgbTexture};
 // use crate::texture::ImageTexture;
-use crate::texture::Texture;
+use crate::texture::FloatTexture;
+use crate::texture::SpectrumTexture;
 use crate::util::binserde::Decode;
 use crate::util::FileResolver;
 use crate::util::LocalFileResolver;
 use crate::*;
 use core::panic;
 use glam::*;
+use std::process::exit;
 // use integrator::bdpt;
 // use integrator::erpt;
 // use integrator::mmlt;
@@ -40,7 +42,7 @@ use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
 struct SceneLoaderContext<'a> {
-    parent_path: &'a Path,
+    parent_path: PathBuf,
     graph: &'a node::Scene,
     shapes: Vec<Arc<dyn Shape>>,
     camera: Option<Arc<dyn Camera>>,
@@ -53,10 +55,53 @@ struct SceneLoaderContext<'a> {
     ooc: OocOptions,
 }
 impl<'a> SceneLoaderContext<'a> {
-    fn load_texture(&mut self, node: &node::Texture) -> Arc<dyn Texture> {
-        let colorspace = RgbColorSpace::new(RgbColorSpaceId::SRgb);
+    fn load_float_texture(&mut self, node: &node::Texture) -> Arc<dyn FloatTexture> {
         match node {
             node::Texture::Float(f) => Arc::new(ConstantFloatTexture(*f)),
+            node::Texture::Float3(f3) => {
+                log::warn!("float texture expecte but found {:?}", f3);
+                Arc::new(ConstantFloatTexture(f3[0]))
+            }
+            node::Texture::Srgb(srgb) => {
+                log::warn!("float texture expecte but found {:?}", srgb);
+                Arc::new(ConstantFloatTexture(srgb_to_linear(Vec3::from(*srgb))[0]))
+            }
+            node::Texture::SrgbU8(srgb) => {
+                log::warn!("float texture expecte but found {:?}", srgb);
+                Arc::new(ConstantFloatTexture(
+                    srgb_to_linear(
+                        UVec3::from([srgb[0] as u32, srgb[1] as u32, srgb[2] as u32]).as_vec3()
+                            / 255.0,
+                    )[0],
+                ))
+            }
+            node::Texture::Hsv(hsv) => {
+                log::error!("float texture expecte but found {:?}", hsv);
+                exit(-1);
+            }
+            node::Texture::Hex(_) => todo!(),
+            node::Texture::Image(path) => {
+                todo!()
+                // let file = self.resolve_file(path);
+                // let reader = BufReader::new(file);
+                // let reader = image::io::Reader::new(reader)
+                //     .with_guessed_format()
+                //     .unwrap();
+                // let img = reader.decode().unwrap().into_rgb8();
+                // if cfg!(feature = "gpu") || !self.ooc.enable_ooc {
+                //     Arc::new(ImageTexture::<Spectrum>::from_rgb_image(&img, false))
+                // } else {
+                //     Arc::new(ImageTexture::<Spectrum>::from_rgb_image(&img, true))
+                // }
+            }
+        }
+    }
+    fn load_spectrum_texture(&mut self, node: &node::Texture) -> Arc<dyn SpectrumTexture> {
+        let colorspace = RgbColorSpace::new(RgbColorSpaceId::SRgb);
+        match node {
+            node::Texture::Float(f) => {
+                Arc::new(ConstantRgbTexture::new(Vec3::splat(*f), colorspace))
+            }
             node::Texture::Float3(f3) => {
                 Arc::new(ConstantRgbTexture::new(Vec3::from(*f3), colorspace))
             }
@@ -106,7 +151,17 @@ impl<'a> SceneLoaderContext<'a> {
         }
     }
     #[allow(dead_code)]
-    fn power(&mut self, tex: Arc<dyn Texture>) -> f32 {
+    fn power_f(&mut self, tex: Arc<dyn FloatTexture>) -> f32 {
+        let addr = Arc::into_raw(tex.clone()).cast::<()>() as usize;
+        if let Some(p) = self.texture_power.get(&addr) {
+            return *p;
+        }
+        let p = tex.power();
+        self.texture_power.insert(addr, p);
+        p
+    }
+    #[allow(dead_code)]
+    fn power_s(&mut self, tex: Arc<dyn SpectrumTexture>) -> f32 {
         let addr = Arc::into_raw(tex.clone()).cast::<()>() as usize;
         if let Some(p) = self.texture_power.get(&addr) {
             return *p;
@@ -118,40 +173,40 @@ impl<'a> SceneLoaderContext<'a> {
     fn load_bsdf(&mut self, node: &node::Bsdf) -> Arc<dyn Bsdf> {
         match node {
             node::Bsdf::Diffuse { color } => Arc::new(DiffuseBsdf {
-                color: self.load_texture(color),
+                color: self.load_spectrum_texture(color),
             }),
             node::Bsdf::Principled {
                 color,
-                subsurface,
-                subsurface_color,
-                subsurface_radius,
-                sheen,
-                sheen_tint,
-                specular,
-                specular_tint,
+                subsurface:_,
+                subsurface_color:_,
+                subsurface_radius:_,
+                sheen:_,
+                sheen_tint:_,
+                specular:_,
+                specular_tint:_,
                 metallic,
                 roughness,
-                anisotropic,
-                anisotropic_rotation,
-                clearcoat,
-                clearcoat_roughness,
-                ior,
-                transmission,
+                anisotropic:_,
+                anisotropic_rotation:_,
+                clearcoat:_,
+                clearcoat_roughness:_,
+                ior:_,
+                transmission:_,
                 emission,
                 hint,
             } => {
                 if !self.gpu {
                     if hint == "ltc" {
-                        let color = self.load_texture(color);
-                        let emission = self.load_texture(emission);
+                        let color = self.load_spectrum_texture(color);
+                        let emission = self.load_spectrum_texture(emission);
 
                         let bsdf = Arc::new(MixBsdf {
-                            frac: self.load_texture(metallic),
+                            frac: self.load_float_texture(metallic),
                             bsdf_a: DiffuseBsdf {
                                 color: color.clone(),
                             },
                             bsdf_b: GgxLtcBsdf {
-                                roughness: self.load_texture(roughness),
+                                roughness: self.load_float_texture(roughness),
                                 color: color.clone(),
                             },
                         });
@@ -169,10 +224,10 @@ impl<'a> SceneLoaderContext<'a> {
                     }
                 } else {
                     Arc::new(GPUBsdfProxy {
-                        color: self.load_texture(color),
-                        metallic: self.load_texture(metallic),
-                        roughness: self.load_texture(roughness),
-                        emission: self.load_texture(emission),
+                        color: self.load_spectrum_texture(color),
+                        metallic: self.load_float_texture(metallic),
+                        roughness: self.load_float_texture(roughness),
+                        emission: self.load_spectrum_texture(emission),
                     })
                 }
             }
@@ -204,10 +259,14 @@ impl<'a> SceneLoaderContext<'a> {
     }
     fn load_light(&mut self, node: &node::Light) -> Arc<dyn Light> {
         match node {
-            node::Light::Point { pos, emission } => Arc::new(PointLight {
-                position: Vec3::from(*pos),
-                emission: self.load_texture(emission),
-            }),
+            node::Light::Point { pos, emission } => {
+                let emission = self.load_spectrum_texture(emission);
+                Arc::new(PointLight {
+                    position: Vec3::from(*pos),
+                    emission: emission.clone(),
+                    colorspace: emission.colorspace(),
+                })
+            }
         }
     }
     fn load_transform(&self, trs: node::TRS) -> Transform {
@@ -291,10 +350,13 @@ pub fn load_scene<R: FileResolver + Send + Sync>(
 ) -> Scene {
     let serialized = std::fs::read_to_string(path).unwrap();
     let canonical = std::fs::canonicalize(path).unwrap();
-    let graph: node::Scene = serde_json::from_str(&serialized).unwrap();
+    let graph: node::Scene = serde_json::from_str(&serialized).unwrap_or_else(|e| {
+        eprintln!("error during scene loading:{:?}", e);
+        exit(-1);
+    });
     let parent_path = canonical.parent().unwrap();
     let mut ctx = SceneLoaderContext {
-        parent_path,
+        parent_path: PathBuf::from(parent_path),
         graph: &graph,
         shapes: vec![],
         lights: vec![],

@@ -62,12 +62,15 @@ dependencies = [
  "bytemuck",
  "clap",
  "exr",
+ "flate2",
  "glam",
+ "half",
  "image",
  "indicatif",
  "lazy_static",
  "log",
  "nalgebra 0.30.1",
+ "num_cpus",
  "ordered-float",
  "parking_lot",
  "rand",
@@ -128,6 +131,7 @@ name = "akari_utils"
 version = "0.1.0"
 dependencies = [
  "akari_common",
+ "akari_const",
  "serde",
 ]
 
@@ -490,6 +494,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3fcf0cee53519c866c09b5de1f6c56ff9d647101f81c1964fa632e148896cdf"
 dependencies = [
  "instant",
+]
+
+[[package]]
+name = "flate2"
+version = "1.0.22"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e6988e897c1c9c485f43b47a529cef42fde0547f9d8d41a7062518f1d8fc53f"
+dependencies = [
+ "cfg-if",
+ "crc32fast",
+ "libc",
+ "miniz_oxide 0.4.4",
 ]
 
 [[package]]

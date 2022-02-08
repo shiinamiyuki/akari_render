@@ -25,7 +25,14 @@ pub mod node {
             }
         }
     }
-
+    impl Default for TR {
+        fn default() -> Self {
+            Self {
+                translate: [0.0; 3],
+                rotate: [0.0; 3],
+            }
+        }
+    }
     #[derive(Clone, Serialize, Deserialize)]
     pub enum Texture {
         Float3([f32; 3]),
@@ -91,4 +98,28 @@ pub mod node {
         pub lights: Vec<Light>,
         pub shapes: Vec<Shape>,
     }
+}
+
+pub mod api {
+    use serde::{Deserialize, Serialize};
+
+    pub type Handle = String;
+    #[derive(Clone, Serialize, Deserialize, Debug)]
+    pub struct ImportMesh {
+        pub filename: String,
+        pub scene: Handle,
+    }
+    #[derive(Clone, Serialize, Deserialize, Debug)]
+    pub struct UpdateMesh {
+        pub filename: String,
+        pub mesh: Handle,
+        pub scene: Handle,
+    }
+    #[derive(Clone, Serialize, Deserialize, Debug)]
+    pub struct ConvertTextureTiled {
+        pub filename: String,
+        pub scene: Handle,
+        pub tile_size: usize,
+    }
+    pub enum Command {}
 }
