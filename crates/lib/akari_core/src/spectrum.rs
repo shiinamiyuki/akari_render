@@ -47,6 +47,12 @@ impl SampledWavelengths {
     pub fn pdf(&self) -> SampledSpectrum {
         SampledSpectrum::new(self.pdf)
     }
+    pub fn none() -> Self {
+        Self {
+            lambda: Vec4::ZERO,
+            pdf: Vec4::ZERO,
+        }
+    }
     pub fn cie_xyz(&self, s: SampledSpectrum) -> XYZ {
         let x = &DenselySampledSpectrum2::CIE_X;
         let y = &DenselySampledSpectrum2::CIE_Y;

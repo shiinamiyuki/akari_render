@@ -35,6 +35,7 @@ pub struct FRecord {
     pub pixel: UVec2,
     pub f: f32,
     pub l: SampledSpectrum,
+    pub lambda: SampledWavelengths,
 }
 
 pub struct MmltSampler {
@@ -97,7 +98,13 @@ pub struct Chain {
     pub depth: u32,
 }
 impl Chain {
-    pub fn run_at_pixel(&mut self, pixel: UVec2, scene: &Scene, arena: &Bump) -> FRecord {
+    pub fn run_at_pixel(
+        &mut self,
+        pixel: UVec2,
+        scene: &Scene,
+        mut lambda: SampledWavelengths,
+        arena: &Bump,
+    ) -> FRecord {
         let (n_strategies, s, t) = if self.depth == 0 {
             (1, 0, 2)
         } else {
@@ -111,21 +118,38 @@ impl Chain {
         let mut light_path = Path::new(arena, self.depth as usize + 1);
         let mut new_camera_path = Path::new(arena, self.depth as usize + 2);
         let mut new_light_path = Path::new(arena, self.depth as usize + 1);
-        bidir::generate_camera_path(scene, pixel, &mut self.sampler, t, &mut camera_path, arena);
+        bidir::generate_camera_path(
+            scene,
+            pixel,
+            &mut self.sampler,
+            &mut lambda,
+            t,
+            &mut camera_path,
+            arena,
+        );
         if camera_path.len() != t {
             return FRecord {
                 pixel,
                 f: 0.0,
                 l: SampledSpectrum::zero(),
+                lambda,
             };
         }
         self.sampler.use_stream(Stream::Light);
-        bidir::generate_light_path(scene, &mut self.sampler, s, &mut light_path, arena);
+        bidir::generate_light_path(
+            scene,
+            &mut self.sampler,
+            &mut lambda,
+            s,
+            &mut light_path,
+            arena,
+        );
         if light_path.len() != s {
             return FRecord {
                 pixel,
                 f: 0.0,
                 l: SampledSpectrum::zero(),
+                lambda,
             };
         }
         self.sampler.use_stream(Stream::Connect);
@@ -135,11 +159,16 @@ impl Chain {
             &light_path,
             &camera_path,
             &mut self.sampler,
+            &mut lambda,
             &mut &mut new_light_path,
             &mut new_camera_path,
         );
         let l = l * w * n_strategies as f32;
-        let l = if l.is_black() { SampledSpectrum::zero() } else { l };
+        let l = if l.is_black() {
+            SampledSpectrum::zero()
+        } else {
+            l
+        };
         let pixel = if let Some(raster) = raster {
             raster
         } else {
@@ -147,21 +176,22 @@ impl Chain {
         };
         FRecord {
             pixel,
-            f: l.samples.max_element().clamp(0.0, 100.0),
+            f: lambda.clone().cie_xyz(l).values().y.clamp(0.0, 100.0),
             l,
+            lambda,
         }
     }
     pub fn run(&mut self, scene: &Scene, arena: &Bump) -> FRecord {
         self.sampler.start_next_sample();
         self.sampler.use_stream(Stream::Camera);
-
+        let lambda = SampledWavelengths::sample_visible(self.sampler.next1d());
         let pixel = self.sampler.next2d() * scene.camera.resolution().as_vec2();
         let pixel = uvec2(pixel.x as u32, pixel.y as u32);
         let pixel = uvec2(
             pixel.x.min(scene.camera.resolution().x - 1),
             pixel.y.min(scene.camera.resolution().y - 1),
         );
-        self.run_at_pixel(pixel, scene, arena)
+        self.run_at_pixel(pixel, scene, lambda, arena)
     }
 }
 impl Mmlt {
@@ -182,6 +212,7 @@ impl Mmlt {
                         pixel: UVec2::ZERO,
                         f: 0.0,
                         l: SampledSpectrum::zero(),
+                        lambda: SampledWavelengths::none(),
                     },
                     depth,
                 }
@@ -205,6 +236,7 @@ impl Mmlt {
                             pixel: UVec2::ZERO,
                             f: 0.0,
                             l: SampledSpectrum::zero(),
+                            lambda: SampledWavelengths::none(),
                         },
                         depth,
                     };
@@ -289,6 +321,7 @@ impl Integrator for Mmlt {
                             per_depth_film[depth].add_sample(
                                 proposal.pixel,
                                 proposal.l * accept_prob / (proposal.f * depth_pdf),
+                                proposal.lambda.clone(),
                                 1.0,
                             );
                         }
@@ -296,6 +329,7 @@ impl Integrator for Mmlt {
                             per_depth_film[depth].add_sample(
                                 chain.cur.pixel,
                                 chain.cur.l * (1.0 - accept_prob) / (chain.cur.f * depth_pdf),
+                                chain.cur.lambda.clone(),
                                 1.0,
                             );
                         }
@@ -320,7 +354,7 @@ impl Integrator for Mmlt {
             .collect();
         log::info!("normalization factor: {:?}", bs);
         for (depth, film) in per_depth_film.iter().enumerate() {
-            film.pixels.par_iter().enumerate().for_each(|(_, p)| {
+            film.pixels().par_iter().enumerate().for_each(|(_, p)| {
                 let mut px = p.write();
                 px.intensity = RobustSum::new(px.intensity.sum() * bs[depth] as f32);
             });
@@ -328,16 +362,16 @@ impl Integrator for Mmlt {
         let film = Film::new(&scene.camera.resolution());
 
         (0..npixels).into_par_iter().for_each(|i| {
-            let mut px = film.pixels[i].write();
+            let mut px = film.pixels()[i].write();
             px.weight = RobustSum::new(1.0);
             for (_, film) in per_depth_film.iter().enumerate() {
                 {
-                    let px_d = film.pixels[i].read();
+                    let px_d = film.pixels()[i].read();
                     px.intensity.add(px_d.intensity.sum() / self.spp as f32);
                 }
             }
             {
-                let px_d = film_direct.pixels[i].read();
+                let px_d = film_direct.pixels()[i].read();
                 assert!(px_d.weight.sum() > 0.0);
                 px.intensity.add(px_d.intensity.sum() / px_d.weight.sum());
             }

@@ -20,6 +20,9 @@ pub struct Film {
     resolution: UVec2,
 }
 impl Film {
+    pub fn pixels(&self) -> &[RwLock<Pixel>] {
+        self.pixels.as_slice()
+    }
     pub fn resolution(&self) -> UVec2 {
         self.resolution
     }
