@@ -34,13 +34,13 @@ bitflags! {
     }
 }
 pub trait Light: Sync + Send + Base {
-    fn sample_le(&self, u0: Vec3, u1: Vec2, lambda: SampledWavelengths) -> LightRaySample;
-    fn sample_li(&self, u: Vec3, p: &ReferencePoint, lambda: SampledWavelengths) -> LightSample;
+    fn sample_le(&self, u0: Vec3, u1: Vec2, lambda: &SampledWavelengths) -> LightRaySample;
+    fn sample_li(&self, u: Vec3, p: &ReferencePoint, lambda: &SampledWavelengths) -> LightSample;
     // (pdf_pos,pdf_dir)
     fn pdf_le(&self, ray: &Ray, n: Vec3) -> (f32, f32);
     // (pdf_pos,pdf_dir)
     fn pdf_li(&self, wi: Vec3, p: &ReferencePoint) -> (f32, f32);
-    fn le(&self, ray: &Ray, lambda: SampledWavelengths) -> SampledSpectrum;
+    fn le(&self, ray: &Ray, lambda: &SampledWavelengths) -> SampledSpectrum;
     fn flags(&self) -> LightFlags;
     fn power(&self) -> f32;
     fn address(&self) -> usize; // ????
@@ -131,7 +131,7 @@ pub struct AreaLight {
 }
 impl_base!(AreaLight);
 impl AreaLight {
-    fn evaluate(&self, sp: &ShadingPoint, lambda: SampledWavelengths) -> SampledSpectrum {
+    fn evaluate(&self, sp: &ShadingPoint, lambda: &SampledWavelengths) -> SampledSpectrum {
         let s = self.emission.evaluate(sp, lambda);
         if let Some(colorspace) = self.colorspace {
             let illuminant = colorspace.illuminant();
@@ -143,7 +143,7 @@ impl AreaLight {
     }
 }
 impl Light for AreaLight {
-    fn sample_le(&self, u0: Vec3, u1: Vec2, lambda: SampledWavelengths) -> LightRaySample {
+    fn sample_le(&self, u0: Vec3, u1: Vec2, lambda: &SampledWavelengths) -> LightRaySample {
         let p = self.shape.sample_surface(u0);
         let dir = consine_hemisphere_sampling(u1);
         let frame = Frame::from_normal(p.ng);
@@ -161,7 +161,7 @@ impl Light for AreaLight {
         }
     }
 
-    fn sample_li(&self, u: Vec3, ref_: &ReferencePoint, lambda: SampledWavelengths) -> LightSample {
+    fn sample_li(&self, u: Vec3, ref_: &ReferencePoint, lambda: &SampledWavelengths) -> LightSample {
         let surface_sample = self.shape.sample_surface(u);
         let li = self.evaluate(
             &ShadingPoint {
@@ -209,7 +209,7 @@ impl Light for AreaLight {
         }
     }
 
-    fn le(&self, ray: &Ray, lambda: SampledWavelengths) -> SampledSpectrum {
+    fn le(&self, ray: &Ray, lambda: &SampledWavelengths) -> SampledSpectrum {
         if let Some(hit) = self.shape.intersect(ray) {
             if hit.ng.dot(ray.d) < 0.0 {
                 self.evaluate(&ShadingPoint::from_rayhit(&self.shape, hit), lambda)
@@ -240,7 +240,7 @@ pub struct PointLight {
 }
 impl_base!(PointLight);
 impl PointLight {
-    fn evaluate(&self, w: Vec3, lambda: SampledWavelengths) -> SampledSpectrum {
+    fn evaluate(&self, w: Vec3, lambda: &SampledWavelengths) -> SampledSpectrum {
         let uv = spherical_to_uv(dir_to_spherical(w));
         let sp = ShadingPoint { texcoord: uv };
         let s = self.emission.evaluate(&sp, lambda);
@@ -254,7 +254,7 @@ impl PointLight {
     }
 }
 impl Light for PointLight {
-    fn sample_le(&self, _: Vec3, u1: Vec2, lambda: SampledWavelengths) -> LightRaySample {
+    fn sample_le(&self, _: Vec3, u1: Vec2, lambda: &SampledWavelengths) -> LightRaySample {
         let w = uniform_sphere_sampling(u1);
         LightRaySample {
             le: self.evaluate(w, lambda),
@@ -264,7 +264,12 @@ impl Light for PointLight {
             n: w,
         }
     }
-    fn sample_li(&self, _: Vec3, ref_: &ReferencePoint, lambda: SampledWavelengths) -> LightSample {
+    fn sample_li(
+        &self,
+        _: Vec3,
+        ref_: &ReferencePoint,
+        lambda: &SampledWavelengths,
+    ) -> LightSample {
         let mut ray = Ray::spawn_to(self.position, ref_.p);
         let len2 = {
             let v = self.position - ref_.p;
@@ -287,7 +292,7 @@ impl Light for PointLight {
     fn pdf_li(&self, _wi: Vec3, _p: &ReferencePoint) -> (f32, f32) {
         (0.0, 0.0)
     }
-    fn le(&self, _: &Ray, _lambda: SampledWavelengths) -> SampledSpectrum {
+    fn le(&self, _: &Ray, _lambda: &SampledWavelengths) -> SampledSpectrum {
         SampledSpectrum::zero()
         // unimplemented!("point light cannot be hit")
     }

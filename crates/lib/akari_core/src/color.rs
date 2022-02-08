@@ -193,7 +193,7 @@ impl RgbSigmoidPolynomial {
             result
         }
     }
-    pub fn sample(&self, swl: SampledWavelengths) -> SampledSpectrum {
+    pub fn sample(&self, swl: &SampledWavelengths) -> SampledSpectrum {
         SampledSpectrum::new(vec4(
             self.evaluate(swl[0]),
             self.evaluate(swl[1]),

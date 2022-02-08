@@ -31,7 +31,7 @@ pub struct SurfaceInteraction<'a> {
 impl<'a> SurfaceInteraction<'a> {
     pub fn evaluate_bsdf<'b>(
         &self,
-        lambda: SampledWavelengths,
+        lambda: &mut SampledWavelengths,
         arena: &'b Bump,
     ) -> Option<BsdfClosure<'b>>
     where

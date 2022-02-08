@@ -25,7 +25,7 @@ pub trait FloatTexture: Sync + Send + Base {
     fn power(&self) -> f32;
 }
 pub trait SpectrumTexture: Sync + Send + Base {
-    fn evaluate(&self, sp: &ShadingPoint, lambda: SampledWavelengths) -> SampledSpectrum;
+    fn evaluate(&self, sp: &ShadingPoint, lambda: &SampledWavelengths) -> SampledSpectrum;
     fn power(&self) -> f32;
     fn colorspace(&self) -> Option<RgbColorSpace>;
 }
@@ -63,7 +63,7 @@ impl ConstantRgbTexture {
     }
 }
 impl SpectrumTexture for ConstantRgbTexture {
-    fn evaluate(&self, _sp: &ShadingPoint, lambda: SampledWavelengths) -> SampledSpectrum {
+    fn evaluate(&self, _sp: &ShadingPoint, lambda: &SampledWavelengths) -> SampledSpectrum {
         self.rep.sample(lambda) * self.scale
     }
     fn power(&self) -> f32 {
@@ -100,7 +100,7 @@ impl ImageSpectrumTexture {
     }
 }
 impl SpectrumTexture for ImageSpectrumTexture {
-    fn evaluate(&self, sp: &ShadingPoint, lambda: SampledWavelengths) -> SampledSpectrum {
+    fn evaluate(&self, sp: &ShadingPoint, lambda: &SampledWavelengths) -> SampledSpectrum {
         let mut tc = sp.texcoord;
         if self.invert_y {
             tc.y = 1.0 - tc.y;

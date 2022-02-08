@@ -149,7 +149,7 @@ impl Bsdf for GgxLtcBsdf {
     fn evaluate<'a, 'b: 'a>(
         &'b self,
         sp: &ShadingPoint,
-        lambda: SampledWavelengths,
+        lambda: &mut SampledWavelengths,
         arena: &'a Bump,
     ) -> &'a dyn LocalBsdfClosure {
         let roughness = self.roughness.evaluate(sp);

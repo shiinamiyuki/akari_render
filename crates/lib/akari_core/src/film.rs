@@ -2,6 +2,7 @@ use crate::*;
 use color::XYZ;
 use util::RobustSum;
 #[derive(Copy, Clone)]
+#[repr(align(64))]
 pub struct Pixel {
     pub intensity: RobustSum<XYZ>,
     pub weight: RobustSum<f32>,

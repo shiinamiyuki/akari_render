@@ -37,7 +37,7 @@ mod test {
 }
 pub const CIE_Y_INTEGRAL: f32 = 106.85694885253906;
 pub const INV_CIE_Y_INTEGRAL: f32 = 1.0 / CIE_Y_INTEGRAL;
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)] // Mark as non-copy to as we need to keep track of lambda
 pub struct SampledWavelengths {
     lambda: Vec4,
     pdf: Vec4,
@@ -51,12 +51,14 @@ impl SampledWavelengths {
         let x = &DenselySampledSpectrum2::CIE_X;
         let y = &DenselySampledSpectrum2::CIE_Y;
         let z = &DenselySampledSpectrum2::CIE_Z;
-        let avg = |s: SampledSpectrum| (s[0] + s[1] + s[2] + s[3]) / SPECTRUM_SAMPLES as f32;
-        let pdf = Vec4::select(self.pdf.cmple(Vec4::ZERO), Vec4::ONE, self.pdf);
+        let avg = |s: Vec4| (s[0] + s[1] + s[2] + s[3]) / SPECTRUM_SAMPLES as f32;
+        // let pdf = Vec4::select(self.pdf.cmple(Vec4::ZERO), Vec4::ONE, self.pdf);
+        let safe_div =
+            |x, pdf: Vec4| -> Vec4 { Vec4::select(pdf.cmple(Vec4::ZERO), Vec4::ZERO, x / pdf) };
         XYZ::new(vec3(
-            avg((s * x.sample(*self)) / pdf),
-            avg((s * y.sample(*self)) / pdf),
-            avg((s * z.sample(*self)) / pdf),
+            avg(safe_div((s * x.sample(&self.clone())).values(), self.pdf)),
+            avg(safe_div((s * y.sample(&self.clone())).values(), self.pdf)),
+            avg(safe_div((s * z.sample(&self.clone())).values(), self.pdf)),
         )) * INV_CIE_Y_INTEGRAL
     }
     pub fn sample_visible(u: f32) -> Self {
@@ -83,6 +85,12 @@ impl SampledWavelengths {
         }
         w
     }
+    pub fn terminate_secondary(&mut self) {
+        for i in 1..SPECTRUM_SAMPLES {
+            self.pdf[i] = 0.0;
+        }
+        self.pdf[0] /= SPECTRUM_SAMPLES as f32;
+    }
 }
 impl std::ops::Index<usize> for SampledWavelengths {
     type Output = f32;
@@ -96,7 +104,7 @@ pub struct RgbUnboundedSpectrum {
     scale: f32,
 }
 impl Spectrum for RgbUnboundedSpectrum {
-    fn sample(&self, swl: SampledWavelengths) -> SampledSpectrum {
+    fn sample(&self, swl: &SampledWavelengths) -> SampledSpectrum {
         self.spd.sample(swl) * self.scale
     }
 }
@@ -106,7 +114,7 @@ pub struct RgbAlbedoSpectrum {
 }
 
 impl Spectrum for RgbAlbedoSpectrum {
-    fn sample(&self, swl: SampledWavelengths) -> SampledSpectrum {
+    fn sample(&self, swl: &SampledWavelengths) -> SampledSpectrum {
         self.spd.sample(swl)
     }
 }
@@ -123,7 +131,7 @@ impl RgbIlluminantSpectrum {
             illuminant,
         }
     }
-    pub fn sample(&self, swl: SampledWavelengths) -> SampledSpectrum {
+    pub fn sample(&self, swl: &SampledWavelengths) -> SampledSpectrum {
         self.spd.sample(swl) * self.scale * self.illuminant.sample(swl)
     }
 }
@@ -161,7 +169,7 @@ where
     }
 }
 impl<F: Function1D + 'static> Spectrum for GenericSpectrum<F> {
-    fn sample(&self, swl: SampledWavelengths) -> SampledSpectrum {
+    fn sample(&self, swl: &SampledWavelengths) -> SampledSpectrum {
         SampledSpectrum::new(vec4(
             self.f.evaluate(swl[0]),
             self.f.evaluate(swl[1]),
@@ -188,7 +196,7 @@ impl PiecewiseLinearSpectrum {
     }
 }
 pub trait Spectrum: Base + Send + Sync {
-    fn sample(&self, lambda: SampledWavelengths) -> SampledSpectrum;
+    fn sample(&self, lambda: &SampledWavelengths) -> SampledSpectrum;
 }
 pub fn inner_product<F1: Function1D, F2: Function1D>(
     s1: &GenericSpectrum<F1>,

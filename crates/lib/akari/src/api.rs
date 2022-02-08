@@ -27,7 +27,7 @@ use akari_core::texture::ImageSpectrumTexture;
 use core::panic;
 use glam::*;
 use std::process::exit;
-// use integrator::bdpt;
+use integrator::bdpt;
 // use integrator::erpt;
 // use integrator::mmlt;
 // use integrator::pssmlt;
@@ -443,16 +443,16 @@ pub fn load_integrator(path: &Path) -> Box<dyn Integrator> {
         //         sort_rays,
         //     })
         // }
-        // "bdpt" => {
-        //     let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
-        //     let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as usize;
-        //     let debug = (|| json.get("bdpt_debug")?.as_bool())().unwrap_or(false);
-        //     Box::new(bdpt::Bdpt {
-        //         spp,
-        //         max_depth,
-        //         debug,
-        //     })
-        // }
+        "bdpt" => {
+            let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
+            let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as usize;
+            let debug = (|| json.get("bdpt_debug")?.as_bool())().unwrap_or(false);
+            Box::new(bdpt::Bdpt {
+                spp,
+                max_depth,
+                debug,
+            })
+        }
         // "pssmlt" => {
         //     let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
         //     let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as usize;

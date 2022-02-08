@@ -84,7 +84,7 @@ fn test_rgb2spec_(rgb: Vec3) {
     let n = 1000000;
     for _ in 0..n {
         let swl = SampledWavelengths::sample_visible(sampler.next1d());
-        let s = rep.sample(swl);
+        let s = rep.sample(&swl);
         let xyz = swl.cie_xyz(s);
         sum.add(xyz);
     }

@@ -40,7 +40,7 @@ pub trait Bsdf: Sync + Send + Base {
     fn evaluate<'a, 'b: 'a>(
         &'b self,
         sp: &ShadingPoint,
-        lambda: SampledWavelengths,
+        lambda: &mut SampledWavelengths,
         arena: &'a Bump,
     ) -> &'a dyn LocalBsdfClosure;
     fn emission(&self) -> Option<Arc<dyn SpectrumTexture>> {
@@ -114,7 +114,7 @@ impl Bsdf for EmissiveBsdf {
     fn evaluate<'a, 'b: 'a>(
         &'b self,
         sp: &ShadingPoint,
-        lambda: SampledWavelengths,
+        lambda: &mut SampledWavelengths,
         arena: &'a Bump,
     ) -> &'a dyn LocalBsdfClosure {
         arena.alloc(EmissiveBsdfClosure {
@@ -155,7 +155,7 @@ where
     fn evaluate<'a, 'b: 'a>(
         &'b self,
         sp: &ShadingPoint,
-        lambda: SampledWavelengths,
+        lambda: &mut SampledWavelengths,
         arena: &'a Bump,
     ) -> &'a dyn LocalBsdfClosure {
         arena.alloc(MixBsdfClosure {
@@ -339,7 +339,7 @@ impl Bsdf for DiffuseBsdf {
     fn evaluate<'a, 'b: 'a>(
         &'b self,
         sp: &ShadingPoint,
-        lambda: SampledWavelengths,
+        lambda: &mut SampledWavelengths,
         arena: &'a Bump,
     ) -> &'a dyn LocalBsdfClosure {
         arena.alloc(DiffuseBsdfClosure {
@@ -441,7 +441,7 @@ impl Bsdf for GPUBsdfProxy {
     fn evaluate<'a, 'b: 'a>(
         &'b self,
         _sp: &ShadingPoint,
-        _lambda: SampledWavelengths,
+        _lambda: &mut SampledWavelengths,
         _arena: &'a Bump,
     ) -> &'a dyn LocalBsdfClosure {
         panic!("shouldn't be called on cpu")

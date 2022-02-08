@@ -16,16 +16,16 @@ pub trait Camera: Sync + Send + Base {
         &self,
         pixel: UVec2,
         sampler: &mut dyn Sampler,
-        lambda: SampledWavelengths,
+        lambda: &SampledWavelengths,
     ) -> (Ray, SampledSpectrum);
     fn resolution(&self) -> UVec2;
-    fn we(&self, ray: &Ray, lambda: SampledWavelengths) -> (Option<UVec2>, SampledSpectrum);
+    fn we(&self, ray: &Ray, lambda: &SampledWavelengths) -> (Option<UVec2>, SampledSpectrum);
     fn pdf_we(&self, ray: &Ray) -> (f32, f32);
     fn sample_wi(
         &self,
         u: Vec2,
         p: &ReferencePoint,
-        lambda: SampledWavelengths,
+        lambda: &SampledWavelengths,
     ) -> Option<CameraSample>;
     fn n(&self) -> Vec3;
 }
@@ -80,7 +80,7 @@ impl Camera for PerspectiveCamera {
         &self,
         pixel: UVec2,
         sampler: &mut dyn Sampler,
-        _lambda: SampledWavelengths,
+        _lambda: &SampledWavelengths,
     ) -> (Ray, SampledSpectrum) {
         // let p_lens = consine_hemisphere_sampling(sampler.next2d())
         let fpixel: Vec2 = pixel.as_vec2();
@@ -105,7 +105,7 @@ impl Camera for PerspectiveCamera {
         &self,
         _u: Vec2,
         ref_: &ReferencePoint,
-        lambda: SampledWavelengths,
+        lambda: &SampledWavelengths,
     ) -> Option<CameraSample> {
         // TODO: area lens
         let p_lens = Vec2::ZERO;
@@ -132,7 +132,7 @@ impl Camera for PerspectiveCamera {
             n,
         })
     }
-    fn we(&self, ray: &Ray, _lambda: SampledWavelengths) -> (Option<UVec2>, SampledSpectrum) {
+    fn we(&self, ray: &Ray, _lambda: &SampledWavelengths) -> (Option<UVec2>, SampledSpectrum) {
         let cos_theta = ray.d.dot(self.c2w.transform_vector(vec3(0.0, 0.0, -1.0)));
         if cos_theta <= 0.0 {
             return (None, SampledSpectrum::zero());

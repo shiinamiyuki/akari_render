@@ -34,17 +34,17 @@ impl Integrator for Bdpt {
             let x = (id as u32) % scene.camera.resolution().x;
             let y = (id as u32) / scene.camera.resolution().x;
             let pixel = uvec2(x, y);
-            let mut acc_li = SampledSpectrum::zero();
 
             let mut debug_acc = vec![];
             if self.debug {
                 for _t in 1..=self.max_depth + 2 {
                     for _s in 0..=self.max_depth + 2 {
-                        debug_acc.push(SampledSpectrum::zero());
+                        debug_acc.push(XYZ::zero());
                     }
                 }
             }
             for _ in 0..self.spp {
+                let mut acc_li = SampledSpectrum::zero();
                 let arena = arenas.get_mut();
                 {
                     let mut camera_path = Path::new(arena, self.max_depth + 2);
@@ -52,10 +52,12 @@ impl Integrator for Bdpt {
                     let mut new_camera_path = Path::new(arena, self.max_depth + 2);
                     let mut new_light_path = Path::new(arena, self.max_depth + 1);
                     sampler.start_next_sample();
+                    let mut lambda = SampledWavelengths::sample_visible(sampler.next1d());
                     bdpt::generate_camera_path(
                         scene,
                         pixel,
                         &mut sampler,
+                        &mut lambda,
                         self.max_depth + 2,
                         &mut camera_path,
                         arena,
@@ -63,12 +65,14 @@ impl Integrator for Bdpt {
                     bdpt::generate_light_path(
                         scene,
                         &mut sampler,
+                        &mut lambda,
                         self.max_depth + 1,
                         &mut light_path,
                         arena,
                     );
                     for t in 1..=camera_path.len() as isize {
                         for s in 0..=light_path.len() as isize {
+                            let lambda = lambda.clone();
                             let depth = s + t - 2;
                             if (s == 1 && t == 1) || depth < 0 || depth > self.max_depth as isize {
                                 continue;
@@ -82,20 +86,28 @@ impl Integrator for Bdpt {
                                 &light_path,
                                 &camera_path,
                                 &mut sampler,
+                                &lambda,
                                 &mut new_light_path,
                                 &mut new_camera_path,
                             );
                             if t == 1 {
                                 if let Some(raster) = raster {
-                                    film.add_splat(raster, li * weight / self.spp as f32);
+                                    film.add_splat(
+                                        raster,
+                                        li * weight / self.spp as f32,
+                                        lambda.clone(),
+                                    );
                                     if self.debug {
-                                        pyramid[get_index(s, t)]
-                                            .add_splat(raster, li * weight / self.spp as f32);
+                                        pyramid[get_index(s, t)].add_splat(
+                                            raster,
+                                            li * weight / self.spp as f32,
+                                            lambda,
+                                        );
                                     }
                                 }
                             } else {
                                 if self.debug {
-                                    debug_acc[get_index(s, t)] += li * weight;
+                                    debug_acc[get_index(s, t)] += lambda.cie_xyz(li * weight);
                                 }
                                 acc_li += li * weight;
                             }
@@ -103,12 +115,10 @@ impl Integrator for Bdpt {
                     }
                     light_path.clear();
                     camera_path.clear();
+                    film.add_sample(uvec2(x, y), acc_li, lambda, 1.0);
                 }
                 arena.reset();
             }
-            acc_li = acc_li / (self.spp as f32);
-
-            film.add_sample(uvec2(x, y), acc_li, 1.0);
 
             if self.debug {
                 for t in 2..=(self.max_depth + 2) as isize {
@@ -118,7 +128,7 @@ impl Integrator for Bdpt {
                             continue;
                         }
                         let idx = get_index(s, t);
-                        pyramid[idx].add_sample(
+                        pyramid[idx].add_sample_xyz(
                             uvec2(x, y),
                             debug_acc[idx] / (self.spp as f32) as f32,
                             1.0,

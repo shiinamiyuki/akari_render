@@ -232,7 +232,12 @@ impl<'a> Vertex<'a> {
             }
         }
     }
-    pub fn f(&self, next: &Vertex<'a>, _mode: TraceDir) -> SampledSpectrum {
+    pub fn f(
+        &self,
+        next: &Vertex<'a>,
+        _mode: TraceDir,
+        lambda: &SampledWavelengths,
+    ) -> SampledSpectrum {
         let v1 = self.as_surface().unwrap();
         // let v2 = next.as_surface().unwrap();
         let wi = (next.p() - self.p()).normalize();
@@ -250,11 +255,16 @@ impl<'a> Vertex<'a> {
     pub fn n(&self) -> Vec3 {
         self.base().n
     }
-    pub fn le(&self, _scene: &'a Scene, prev: &Vertex<'a>) -> SampledSpectrum {
+    pub fn le(
+        &self,
+        _scene: &'a Scene,
+        prev: &Vertex<'a>,
+        lambda: &SampledWavelengths,
+    ) -> SampledSpectrum {
         if let Some(v) = self.as_light() {
             let mut ray = Ray::spawn_to(prev.p(), self.p());
             ray.tmax *= 1.0 + 1e-3;
-            v.light.le(&ray)
+            v.light.le(&ray, lambda)
         } else {
             SampledSpectrum::zero()
         }
@@ -287,6 +297,7 @@ pub fn random_walk<'a, 'b>(
     scene: &'a Scene,
     mut ray: Ray,
     sampler: &mut dyn Sampler,
+    lambda: &mut SampledWavelengths,
     mut beta: SampledSpectrum,
     pdf: f32,
     max_depth: usize,
@@ -320,7 +331,7 @@ pub fn random_walk<'a, 'b>(
                     break;
                 }
             }
-            let opt_bsdf = si.evaluate_bsdf(arena);
+            let opt_bsdf = si.evaluate_bsdf(lambda, arena);
             if opt_bsdf.is_none() {
                 break;
             }
@@ -359,6 +370,7 @@ pub fn generate_camera_path<'a, 'b>(
     scene: &'a Scene,
     pixel: UVec2,
     sampler: &mut dyn Sampler,
+    lambda: &mut SampledWavelengths,
     max_depth: usize,
     path: &mut Path<'b>,
     arena: &'b Bump,
@@ -368,7 +380,7 @@ pub fn generate_camera_path<'a, 'b>(
     assert!(max_depth > 0);
     path.clear();
     let camera = scene.camera.as_ref();
-    let (ray, beta) = camera.generate_ray(pixel, sampler);
+    let (ray, beta) = camera.generate_ray(pixel, sampler, lambda);
     let vertex = Vertex::create_camera_vertex(camera, &ray, beta, 1.0);
     path.push(vertex);
     let (_pdf_pos, pdf_dir) = camera.pdf_we(&ray);
@@ -379,6 +391,7 @@ pub fn generate_camera_path<'a, 'b>(
         scene,
         ray,
         sampler,
+        lambda,
         beta,
         pdf_dir,
         max_depth - 1,
@@ -390,6 +403,7 @@ pub fn generate_camera_path<'a, 'b>(
 pub fn generate_light_path<'a, 'b>(
     scene: &'a Scene,
     sampler: &mut dyn Sampler,
+    lambda: &mut SampledWavelengths,
     max_depth: usize,
     path: &mut Path<'b>,
     arena: &'b Bump,
@@ -401,7 +415,7 @@ pub fn generate_light_path<'a, 'b>(
     }
     path.clear();
     let (light, light_pdf) = scene.light_distr.sample(sampler.next1d());
-    let sample = light.sample_le(sampler.next3d(), sampler.next2d());
+    let sample = light.sample_le(sampler.next3d(), sampler.next2d(), lambda);
     let le = sample.le;
     let beta =
         le / (sample.pdf_dir * sample.pdf_pos * light_pdf) * sample.ray.d.dot(sample.n).abs();
@@ -420,6 +434,7 @@ pub fn generate_light_path<'a, 'b>(
         scene,
         sample.ray,
         sampler,
+        lambda,
         beta,
         sample.pdf_dir,
         max_depth - 1,
@@ -598,6 +613,7 @@ pub fn connect_paths<'a, 'b>(
     light_path: &Path<'b>,
     eye_path: &Path<'b>,
     sampler: &mut dyn Sampler,
+    lambda: &SampledWavelengths,
     new_light_path: &mut Path<'b>,
     new_eye_path: &mut Path<'b>,
 ) -> (SampledSpectrum, f32, Option<UVec2>)
@@ -613,7 +629,7 @@ where
         return (SampledSpectrum::zero(), 0.0, None);
     } else if s == 0 {
         let pt = &eye_path[t - 1];
-        l = pt.beta() * pt.le(scene, &eye_path[t - 2]);
+        l = pt.beta() * pt.le(scene, &eye_path[t - 2], lambda);
     } else if t == 1 {
         let qs = &light_path[s - 1];
         if qs.connectible() {
@@ -621,7 +637,7 @@ where
                 p: qs.p(),
                 n: qs.n(),
             };
-            if let Some(sample) = scene.camera.sample_wi(sampler.next2d(), &p_ref) {
+            if let Some(sample) = scene.camera.sample_wi(sampler.next2d(), &p_ref, lambda) {
                 if sample.pdf > 0.0 && !sample.we.is_black() {
                     let v = Vertex::create_camera_vertex(
                         scene.camera.as_ref(),
@@ -630,7 +646,7 @@ where
                         0.0,
                     );
                     raster = Some(sample.raster);
-                    l = qs.beta() * qs.f(&v, TraceDir::LightToCamera) * v.beta();
+                    l = qs.beta() * qs.f(&v, TraceDir::LightToCamera, lambda) * v.beta();
                     if !l.is_black() && !scene.occlude(&sample.vis_ray) {
                         if qs.on_surface() {
                             l *= sample.wi.dot(qs.n()).abs();
@@ -650,7 +666,7 @@ where
                 p: pt.p(),
                 n: pt.n(),
             };
-            let light_sample = light.sample_li(sampler.next3d(), &p_ref);
+            let light_sample = light.sample_li(sampler.next3d(), &p_ref, lambda);
             if !light_sample.li.is_black() && light_sample.pdf > 0.0 {
                 {
                     let mut v = Vertex::create_light_vertex(
@@ -665,7 +681,7 @@ where
                 }
                 {
                     let sampled = sampled.as_ref().unwrap();
-                    l = pt.beta() * pt.f(sampled, TraceDir::CameraToLight) * sampled.beta();
+                    l = pt.beta() * pt.f(sampled, TraceDir::CameraToLight, lambda) * sampled.beta();
                 }
 
                 if pt.on_surface() {
@@ -689,8 +705,8 @@ where
         if pt.connectible() && qs.connectible() && !pt.as_light().is_some() {
             l = qs.beta()
                 * pt.beta()
-                * pt.f(qs, TraceDir::CameraToLight)
-                * qs.f(pt, TraceDir::LightToCamera);
+                * pt.f(qs, TraceDir::CameraToLight, lambda)
+                * qs.f(pt, TraceDir::LightToCamera, lambda);
             if !l.is_black() {
                 l *= geometry_term(scene, pt, qs);
             }

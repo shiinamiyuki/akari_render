@@ -20,7 +20,7 @@ fn mis_weight(mut pdf_a: f32, mut pdf_b: f32) -> f32 {
 impl PathTracer {
     pub fn li(
         mut ray: Ray,
-        lambda: SampledWavelengths,
+        lambda: &mut SampledWavelengths,
         sampler: &mut dyn Sampler,
         scene: &Scene,
         max_depth: usize,
@@ -172,11 +172,12 @@ impl Integrator for PathTracer {
                 {
                     let arena = &*arena;
                     sampler.start_next_sample();
-                    let lambda = SampledWavelengths::sample_visible(sampler.next1d());
-                    let (ray, _ray_weight) = scene.camera.generate_ray(pixel, &mut sampler, lambda);
+                    let mut lambda = SampledWavelengths::sample_visible(sampler.next1d());
+                    let (ray, _ray_weight) =
+                        scene.camera.generate_ray(pixel, &mut sampler, &lambda);
                     let li = Self::li(
                         ray,
-                        lambda,
+                        &mut lambda,
                         &mut sampler,
                         scene,
                         self.max_depth as usize,
