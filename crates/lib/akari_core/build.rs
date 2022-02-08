@@ -67,6 +67,9 @@ fn rgb2spec() {
     let dst = canonicalize(compile_rgb2spec_opt()).unwrap();
     println!("cargo:rustc-link-search=native={}", dst.display());
     println!("cargo:rustc-link-lib=static=rgb2spec_opt");
+    if cfg!(target_os="linux"){
+        println!("cargo:rustc-link-lib=dylib=stdc++");
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
