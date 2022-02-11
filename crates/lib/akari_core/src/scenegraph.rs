@@ -14,7 +14,7 @@ pub mod node {
     #[derive(Clone, Copy, Serialize, Deserialize)]
     pub struct LookAt {
         pub eye: [f32; 3],
-        pub target: [f32; 3],
+        pub center: [f32; 3],
         pub up: [f32; 3],
     }
     #[derive(Clone, Copy, Serialize, Deserialize)]
@@ -72,17 +72,16 @@ pub mod node {
             #[serde(default)]
             cache: Option<TextureCache>,
         },
-        Graph(ShaderGraph),
     }
     #[derive(Clone, Serialize, Deserialize)]
     #[serde(tag = "type")]
     pub enum SpectrumTexture {
         #[serde(rename = "linear")]
-        SRgbLinear([f32; 3]),
+        SRgbLinear { values: [f32; 3] },
         #[serde(rename = "srgb")]
-        SRgb([f32; 3]),
+        SRgb { values: [f32; 3] },
         #[serde(rename = "srgb8")]
-        SRgbU8([u8; 3]),
+        SRgbU8 { values: [u8; 3] },
         #[serde(rename = "image")]
         Image {
             path: String,
@@ -91,8 +90,6 @@ pub mod node {
             #[serde(default)]
             cache: Option<TextureCache>,
         },
-        #[serde(rename = "graph")]
-        Graph(ShaderGraph),
     }
     #[derive(Clone, Serialize, Deserialize)]
     #[serde(tag = "type")]
@@ -161,8 +158,8 @@ pub mod node {
         pub camera: Camera,
         pub lights: Vec<Light>,
         pub shapes: Vec<Shape>,
-        #[serde(default = "Vec::new")]
-        pub shaders: Vec<ShaderGraph>,
+        // #[serde(default = "Vec::new")]
+        // pub shaders: Vec<ShaderGraph>,
     }
 }
 

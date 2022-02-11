@@ -39,23 +39,24 @@ use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::exit;
+use std::rc::Rc;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
-struct SceneLoaderContext<'a> {
+struct ApiContext {
     parent_path: PathBuf,
-    graph: &'a node::Scene,
+    graph: Rc<node::Scene>,
     shapes: Vec<Arc<dyn Shape>>,
     camera: Option<Arc<dyn Camera>>,
     lights: Vec<Arc<dyn Light>>,
-    named_bsdfs: HashMap<String, Arc<dyn Bsdf>>,
+    bsdfs: HashMap<String, Arc<dyn Bsdf>>,
     texture_power: HashMap<usize, f32>,
     mesh_cache: HashMap<String, Arc<TriangleMesh>>,
     file_resolver: Arc<dyn FileResolver + Send + Sync>,
     gpu: bool,
     ooc: OocOptions,
 }
-impl<'a> SceneLoaderContext<'a> {
+impl ApiContext {
     fn load_float_texture(&mut self, node: &node::FloatTexture) -> Arc<dyn FloatTexture> {
         match node {
             node::FloatTexture::Float(f) => Arc::new(ConstantFloatTexture(*f)),
@@ -79,14 +80,14 @@ impl<'a> SceneLoaderContext<'a> {
     fn load_spectrum_texture(&mut self, node: &node::SpectrumTexture) -> Arc<dyn SpectrumTexture> {
         let colorspace = RgbColorSpace::new(RgbColorSpaceId::SRgb);
         match node {
-            node::SpectrumTexture::SRgbLinear(f3) => {
+            node::SpectrumTexture::SRgbLinear{values:f3} => {
                 Arc::new(ConstantRgbTexture::new(Vec3::from(*f3), colorspace))
             }
-            node::SpectrumTexture::SRgb(srgb) => Arc::new(ConstantRgbTexture::new(
+            node::SpectrumTexture::SRgb{values:srgb} => Arc::new(ConstantRgbTexture::new(
                 srgb_to_linear(Vec3::from(*srgb)),
                 colorspace,
             )),
-            node::SpectrumTexture::SRgbU8(srgb) => Arc::new(ConstantRgbTexture::new(
+            node::SpectrumTexture::SRgbU8{values:srgb} => Arc::new(ConstantRgbTexture::new(
                 srgb_to_linear(
                     UVec3::from([srgb[0] as u32, srgb[1] as u32, srgb[2] as u32]).as_vec3() / 255.0,
                 ),
@@ -94,8 +95,8 @@ impl<'a> SceneLoaderContext<'a> {
             )),
             node::SpectrumTexture::Image {
                 path,
-                colorspace,
-                cache,
+                colorspace:_,
+                cache:_,
             } => {
                 let file = self.resolve_file(path);
                 let reader = BufReader::new(file);
@@ -104,21 +105,6 @@ impl<'a> SceneLoaderContext<'a> {
                     .unwrap();
                 let img = reader.decode().unwrap().into_rgb8();
                 Arc::new(ImageSpectrumTexture::from_rgb_image(&img, true))
-            }
-            _ => todo!(),
-        }
-    }
-    fn load_named_bsdf(&mut self, name: &String) -> Arc<dyn Bsdf> {
-        if let Some(bsdf) = self.named_bsdfs.get(name) {
-            return bsdf.clone();
-        } else {
-            if let Some(node) = self.graph.bsdfs.get(name) {
-                let bsdf = self.load_bsdf(node);
-                self.named_bsdfs.insert(name.clone(), bsdf.clone());
-                return bsdf;
-            } else {
-                println!("no bsdf named {}", name);
-                std::process::exit(-1);
             }
         }
     }
@@ -142,6 +128,20 @@ impl<'a> SceneLoaderContext<'a> {
         self.texture_power.insert(addr, p);
         p
     }
+    fn load_bsdf_from_name(&mut self, name: &String) -> Arc<dyn Bsdf> {
+        if self.bsdfs.contains_key(name) {
+            self.bsdfs.get(name).unwrap().clone()
+        } else {
+            let graph = self.graph.clone();
+            let bsdf = graph.bsdfs.get(name).unwrap_or_else(|| {
+                log::error!("bsdf {} is not defined", name);
+                exit(-1);
+            });
+            let bsdf = self.load_bsdf(bsdf);
+            self.bsdfs.insert(name.clone(), bsdf.clone());
+            bsdf
+        }
+    }
     fn load_bsdf(&mut self, node: &node::Bsdf) -> Arc<dyn Bsdf> {
         match node {
             node::Bsdf::Diffuse { color } => Arc::new(DiffuseBsdf {
@@ -149,51 +149,34 @@ impl<'a> SceneLoaderContext<'a> {
             }),
             node::Bsdf::Principled {
                 color,
-                subsurface: _,
-                subsurface_color: _,
-                subsurface_radius: _,
-                sheen: _,
-                sheen_tint: _,
-                specular: _,
-                specular_tint: _,
                 metallic,
                 roughness,
-                anisotropic: _,
-                anisotropic_rotation: _,
-                clearcoat: _,
-                clearcoat_roughness: _,
-                ior: _,
-                transmission: _,
                 emission,
-                hint,
+                ..
             } => {
                 if !self.gpu {
-                    if hint == "ltc" {
-                        let color = self.load_spectrum_texture(color);
-                        let emission = self.load_spectrum_texture(emission);
+                    let color = self.load_spectrum_texture(color);
+                    let emission = self.load_spectrum_texture(emission);
 
-                        let bsdf = Arc::new(MixBsdf {
-                            frac: self.load_float_texture(metallic),
-                            bsdf_a: DiffuseBsdf {
-                                color: color.clone(),
-                            },
-                            bsdf_b: GgxLtcBsdf {
-                                roughness: self.load_float_texture(roughness),
-                                color: color.clone(),
-                            },
-                        });
-                        let bsdf: Arc<dyn Bsdf> = if emission.power() > 0.0 {
-                            Arc::new(EmissiveBsdf {
-                                base: bsdf,
-                                emission,
-                            })
-                        } else {
-                            bsdf
-                        };
-                        bsdf
+                    let bsdf = Arc::new(MixBsdf {
+                        frac: self.load_float_texture(metallic),
+                        bsdf_a: DiffuseBsdf {
+                            color: color.clone(),
+                        },
+                        bsdf_b: GgxLtcBsdf {
+                            roughness: self.load_float_texture(roughness),
+                            color: color.clone(),
+                        },
+                    });
+                    let bsdf: Arc<dyn Bsdf> = if emission.power() > 0.0 {
+                        Arc::new(EmissiveBsdf {
+                            base: bsdf,
+                            emission,
+                        })
                     } else {
-                        unimplemented!("currently only ltc bsdf is supported");
-                    }
+                        bsdf
+                    };
+                    bsdf
                 } else {
                     Arc::new(GPUBsdfProxy {
                         color: self.load_spectrum_texture(color),
@@ -203,12 +186,15 @@ impl<'a> SceneLoaderContext<'a> {
                     })
                 }
             }
-            node::Bsdf::Named(name) => self.load_named_bsdf(name),
         }
     }
     fn load_shape(&mut self, node: &node::Shape) -> Arc<dyn Shape> {
         match node {
-            node::Shape::Mesh(path, bsdf_node) => {
+            node::Shape::Mesh {
+                path,
+                bsdf,
+                transform: _,
+            } => {
                 let mesh = {
                     if let Some(cache) = self.mesh_cache.get(path) {
                         cache.clone()
@@ -224,7 +210,7 @@ impl<'a> SceneLoaderContext<'a> {
                     }
                 };
 
-                let bsdf = self.load_bsdf(bsdf_node);
+                let bsdf = self.load_bsdf_from_name(bsdf);
                 Arc::new(MeshInstanceProxy { mesh, bsdf })
             }
         }
@@ -241,59 +227,51 @@ impl<'a> SceneLoaderContext<'a> {
             }
         }
     }
-    fn load_transform(&self, trs: node::TRS) -> Transform {
-        let mut m = Mat4::IDENTITY;
-        let node::TRS {
-            translate: t,
-            rotate: r,
-            scale: s,
-        } = trs;
-        let (t, r, s) = (t.into(), r.into(), s.into());
-        let r: Vec3 = r;
-        let r = vec3(r.x.to_radians(), r.y.to_radians(), r.z.to_radians());
-        m = Mat4::from_scale(s) * m;
-        m = Mat4::from_axis_angle(vec3(1.0, 0.0, 0.0), r[0]) * m;
-        m = Mat4::from_axis_angle(vec3(0.0, 1.0, 0.0), r[1]) * m;
-        m = Mat4::from_axis_angle(vec3(0.0, 0.0, 1.0), r[2]) * m;
-        m = Mat4::from_translation(t) * m;
+    fn load_transform(&self, t: node::Transform) -> Transform {
+        match t {
+            node::Transform::TRS(trs) => {
+                let mut m = Mat4::IDENTITY;
+                let node::TRS {
+                    translate: t,
+                    rotate: r,
+                    scale: s,
+                } = trs;
+                let (t, r, s) = (t.into(), r.into(), s.into());
+                let r: Vec3 = r;
+                let r = vec3(r.x.to_radians(), r.y.to_radians(), r.z.to_radians());
+                m = Mat4::from_scale(s) * m;
+                m = Mat4::from_axis_angle(vec3(1.0, 0.0, 0.0), r[0]) * m;
+                m = Mat4::from_axis_angle(vec3(0.0, 1.0, 0.0), r[1]) * m;
+                m = Mat4::from_axis_angle(vec3(0.0, 0.0, 1.0), r[2]) * m;
+                m = Mat4::from_translation(t) * m;
 
-        Transform::from_matrix(&m)
-    }
-    fn load_transform2(&self, trs: node::TR) -> Transform {
-        let mut m = Mat4::IDENTITY;
-        let node::TR {
-            translate: t,
-            rotate: r,
-        } = trs;
-        let (t, r) = (t.into(), r.into());
-        let r: Vec3 = r;
-        let r = vec3(r.x.to_radians(), r.y.to_radians(), r.z.to_radians());
-        m = Mat4::from_axis_angle(vec3(1.0, 0.0, 0.0), r[0]) * m;
-        m = Mat4::from_axis_angle(vec3(0.0, 1.0, 0.0), r[1]) * m;
-        m = Mat4::from_axis_angle(vec3(0.0, 0.0, 1.0), r[2]) * m;
-        m = Mat4::from_translation(t) * m;
-
-        Transform::from_matrix(&m)
+                Transform::from_matrix(&m)
+            }
+            node::Transform::LookAt(node::LookAt { eye, center, up }) => {
+                Transform::from_matrix(&Mat4::look_at_rh(eye.into(), center.into(), up.into()).inverse())
+            }
+        }
     }
     fn load(&mut self) {
         self.camera = Some(match self.graph.camera {
             node::Camera::Perspective {
                 res,
                 fov,
-                lens_radius,
-                focal,
+                lens_radius: _,
+                focal: _,
                 transform,
             } => Arc::new(PerspectiveCamera::new(
                 uvec2(res.0, res.1),
-                &self.load_transform2(transform),
+                &self.load_transform(transform),
                 fov.to_radians() as f32,
             )),
         });
-        for node in self.graph.shapes.iter() {
+        let graph = self.graph.clone();
+        for node in graph.shapes.iter() {
             let shape = self.load_shape(node);
             self.shapes.push(shape);
         }
-        for light in self.graph.lights.iter() {
+        for light in graph.lights.iter() {
             let light = self.load_light(light);
             self.lights.push(light);
         }
@@ -327,15 +305,15 @@ pub fn load_scene<R: FileResolver + Send + Sync>(
         exit(-1);
     });
     let parent_path = canonical.parent().unwrap();
-    let mut ctx = SceneLoaderContext {
+    let mut ctx = ApiContext {
         parent_path: PathBuf::from(parent_path),
-        graph: &graph,
+        graph: Rc::new(graph),
         shapes: vec![],
         lights: vec![],
         camera: None,
         ooc,
         file_resolver: Arc::new(LocalFileResolver::new(vec![PathBuf::from(parent_path)])),
-        named_bsdfs: HashMap::new(),
+        bsdfs: HashMap::new(),
         texture_power: HashMap::new(),
         mesh_cache: HashMap::new(),
         gpu: gpu_mode,

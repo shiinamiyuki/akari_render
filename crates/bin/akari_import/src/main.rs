@@ -3,6 +3,7 @@ use akari::linear_to_srgb;
 // use akari::light::*;
 // use akari::shape::*;
 use akari::scenegraph::node;
+use akari::scenegraph::node::LookAt;
 use akari::util::binserde;
 use akari::*;
 use std::collections::HashMap;
@@ -22,24 +23,32 @@ fn import(path: &str, scene: &mut node::Scene, forced: bool, generate_normal: Op
     println!("# of models: {}", models.len());
     println!("# of materials: {}", materials.len());
     let default_bsdf = node::Bsdf::Principled {
-        color: node::Texture::Srgb([0.8, 0.8, 0.8]),
-        subsurface_radius: node::Texture::Float3([1.0, 0.2, 0.1]),
-        subsurface: node::Texture::Float(0.0),
-        subsurface_color: node::Texture::Float(0.0),
-        metallic: node::Texture::Float(0.0),
-        specular: node::Texture::Float(0.0),
-        specular_tint: node::Texture::Float(0.0),
-        roughness: node::Texture::Float(0.4),
-        anisotropic: node::Texture::Float(0.0),
-        anisotropic_rotation: node::Texture::Float(0.0),
-        sheen: node::Texture::Float(0.0),
-        sheen_tint: node::Texture::Float(0.5),
-        clearcoat: node::Texture::Float(0.0),
-        clearcoat_roughness: node::Texture::Float(0.03),
-        ior: node::Texture::Float(1.45),
-        transmission: node::Texture::Float(0.0),
-        emission: node::Texture::Float(0.0),
-        hint: String::from("ltc"),
+        color: node::SpectrumTexture::SRgb {
+            values: [0.8, 0.8, 0.8],
+        },
+        subsurface_radius: node::SpectrumTexture::SRgbLinear {
+            values: [1.0, 0.2, 0.1],
+        },
+        subsurface: node::FloatTexture::Float(0.0),
+        subsurface_ior: node::FloatTexture::Float(1.45),
+        subsurface_color: node::SpectrumTexture::SRgb {
+            values: [0.0, 0.0, 0.0],
+        },
+        metallic: node::FloatTexture::Float(0.0),
+        specular: node::FloatTexture::Float(0.0),
+        specular_tint: node::FloatTexture::Float(0.0),
+        roughness: node::FloatTexture::Float(0.4),
+        anisotropic: node::FloatTexture::Float(0.0),
+        anisotropic_rotation: node::FloatTexture::Float(0.0),
+        sheen: node::FloatTexture::Float(0.0),
+        sheen_tint: node::FloatTexture::Float(0.5),
+        clearcoat: node::FloatTexture::Float(0.0),
+        clearcoat_roughness: node::FloatTexture::Float(0.03),
+        ior: node::FloatTexture::Float(1.45),
+        transmission: node::FloatTexture::Float(0.0),
+        emission: node::SpectrumTexture::SRgbLinear {
+            values: [0.0, 0.0, 0.0],
+        },
     };
     for (i, m) in materials.iter().enumerate() {
         let name = if m.name.is_empty() {
@@ -79,14 +88,15 @@ fn import(path: &str, scene: &mut node::Scene, forced: bool, generate_normal: Op
                         true
                     }
                 };
-                *roughness = node::Texture::Float((2.0 / (m.shininess + 2.0)).sqrt());
+                *roughness = node::FloatTexture::Float((2.0 / (m.shininess + 2.0)).sqrt());
                 let mut max_specular = 1.0;
                 let mut max_diffuse = 1.0;
                 if has_diffuse {
                     if m.diffuse_texture.is_empty() {
-                        *color = node::Texture::Srgb(
-                            linear_to_srgb(vec3(m.diffuse[0], m.diffuse[1], m.diffuse[2])).into(),
-                        );
+                        *color = node::SpectrumTexture::SRgb {
+                            values: linear_to_srgb(vec3(m.diffuse[0], m.diffuse[1], m.diffuse[2]))
+                                .into(),
+                        };
                         max_diffuse = m
                             .diffuse
                             .iter()
@@ -94,14 +104,22 @@ fn import(path: &str, scene: &mut node::Scene, forced: bool, generate_normal: Op
                             .reduce(|a, b| a.max(b))
                             .unwrap();
                     } else {
-                        *color = node::Texture::Image(m.diffuse_texture.clone());
+                        *color = node::SpectrumTexture::Image {
+                            path: m.diffuse_texture.clone(),
+                            cache: None,
+                            colorspace: "srgb".into(),
+                        };
                     }
                 } else if has_specular {
                     if m.specular_texture.is_empty() {
-                        *color = node::Texture::Srgb(
-                            linear_to_srgb(vec3(m.specular[0], m.specular[1], m.specular[2]))
-                                .into(),
-                        );
+                        *color = node::SpectrumTexture::SRgb {
+                            values: linear_to_srgb(vec3(
+                                m.specular[0],
+                                m.specular[1],
+                                m.specular[2],
+                            ))
+                            .into(),
+                        };
                         max_specular = m
                             .specular
                             .iter()
@@ -109,14 +127,21 @@ fn import(path: &str, scene: &mut node::Scene, forced: bool, generate_normal: Op
                             .reduce(|a, b| a.max(b))
                             .unwrap();
                     } else {
-                        *color = node::Texture::Image(m.specular_texture.clone());
+                        *color = node::SpectrumTexture::Image {
+                            path: m.specular_texture.clone(),
+                            colorspace: "srgb".into(),
+                            cache: None,
+                        };
                     }
-                    *metallic = node::Texture::Float(1.0);
+                    *metallic = node::FloatTexture::Float(1.0);
                 } else {
-                    *color = node::Texture::Srgb([0.0, 0.0, 0.0])
+                    *color = node::SpectrumTexture::SRgb {
+                        values: [0.0, 0.0, 0.0],
+                    };
                 }
                 if has_diffuse && has_specular && (max_specular + max_diffuse > 0.0) {
-                    *metallic = node::Texture::Float(max_specular / (max_specular + max_diffuse));
+                    *metallic =
+                        node::FloatTexture::Float(max_specular / (max_specular + max_diffuse));
                 }
             }
             _ => unreachable!(),
@@ -144,16 +169,17 @@ fn import(path: &str, scene: &mut node::Scene, forced: bool, generate_normal: Op
             binserde::Encode::encode(&imported_models[i], &mut file).unwrap();
         }
         let j: node::Shape = if let Some(id) = mesh.material_id {
-            // serde_json::json!({
-            //     "type":"obj",
-            //     "path":model_name,
-            //     "bsdf":{
-            //         "named":cvt_names[id]
-            //     }
-            // })
-            node::Shape::Mesh(model_name, node::Bsdf::Named(cvt_names[id].clone()))
+            node::Shape::Mesh {
+                path: model_name,
+                bsdf: cvt_names[id].clone(),
+                transform: None,
+            }
         } else {
-            node::Shape::Mesh(model_name, default_bsdf.clone())
+            node::Shape::Mesh {
+                path: model_name,
+                bsdf: "".into(),
+                transform: None,
+            }
         };
         cvt_models.push(j)
     }
@@ -240,7 +266,11 @@ fn main() {
                     fov: 80.0,
                     focal: 1.0,
                     lens_radius: 0.0,
-                    transform: node::TR::default(),
+                    transform: node::Transform::LookAt(LookAt {
+                        eye: [0.0, 0.0, 0.0],
+                        center: [0.0, 0.0, -1.0],
+                        up: [0.0, 1.0, 0.0],
+                    }),
                 },
             },
         }

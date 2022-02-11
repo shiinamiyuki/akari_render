@@ -166,10 +166,10 @@ impl Frame {
 }
 #[derive(Clone, Copy)]
 pub struct Transform {
-    m4: Mat4,
-    inv_m4: Mat4,
-    m3: Mat3A,
-    inv_m3: Mat3A,
+    pub m4: Mat4,
+    pub inv_m4: Mat4,
+    pub m3: Mat3A,
+    pub inv_m3: Mat3A,
 }
 impl Transform {
     pub fn inverse(&self) -> Transform {
