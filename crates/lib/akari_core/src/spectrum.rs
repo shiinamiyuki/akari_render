@@ -13,6 +13,13 @@ pub struct SampledSpectrum {
     values: Vec4,
 }
 
+impl SampledSpectrum {
+    pub fn from_primary(s: f32) -> Self {
+        Self {
+            values: vec4(s, 0.0, 0.0, 0.0),
+        }
+    }
+}
 impl_color_like!(SampledSpectrum, Vec4);
 #[allow(dead_code)]
 fn cie_y_integral() -> f32 {
@@ -66,6 +73,9 @@ impl SampledWavelengths {
             avg(safe_div((s * y.sample(&self.clone())).values(), self.pdf)),
             avg(safe_div((s * z.sample(&self.clone())).values(), self.pdf)),
         )) * INV_CIE_Y_INTEGRAL
+    }
+    pub fn cie_y(&self, s: SampledSpectrum) -> f32 {
+        self.cie_xyz(s).values().y
     }
     pub fn sample_visible(u: f32) -> Self {
         let mut w = Self {

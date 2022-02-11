@@ -2,6 +2,7 @@ use crate::accel::bvh::BvhAccel;
 use crate::accel::bvh::SweepSAHBuilder;
 use crate::accel::qbvh::QBvhAccel;
 use crate::bsdf::BsdfClosure;
+use crate::bsdf::TransportMode;
 use crate::distribution::Distribution1D;
 use crate::texture::ShadingPoint;
 use crate::util::binserde::Decode;
@@ -32,6 +33,7 @@ impl<'a> SurfaceInteraction<'a> {
     pub fn evaluate_bsdf<'b>(
         &self,
         lambda: &mut SampledWavelengths,
+        mode:TransportMode,
         arena: &'b Bump,
     ) -> Option<BsdfClosure<'b>>
     where
@@ -41,7 +43,7 @@ impl<'a> SurfaceInteraction<'a> {
             let frame = Frame::from_normal(self.ns);
             Some(BsdfClosure {
                 frame,
-                closure: bsdf.evaluate(&self.sp, lambda, arena),
+                closure: bsdf.evaluate(&self.sp, mode, lambda, arena),
             })
         } else {
             None

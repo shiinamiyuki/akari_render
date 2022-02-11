@@ -11,9 +11,7 @@ use crate::sampler::Sampler;
 use crate::util::PerThread;
 use crate::*;
 use crate::{sampler::MltSampler, scene::Scene};
-pub fn target_function(x: SampledSpectrum) -> f32 {
-    x.samples.max_element().clamp(0.0, 100.0)
-}
+
 pub struct Chain {
     pub sampler: MltSampler,
     pub cur: FRecord,
@@ -30,13 +28,28 @@ pub struct Pssmlt {
     pub direct_spp: u32,
 }
 impl Chain {
-    pub fn run_at_pixel(&mut self, pixel: UVec2, scene: &Scene, arena: &Bump) -> FRecord {
-        let (ray, _) = scene.camera.generate_ray(pixel, &mut self.sampler);
-        let l = PathTracer::li(ray, &mut self.sampler, scene, self.max_depth, true, arena);
+    pub fn run_at_pixel(
+        &mut self,
+        pixel: UVec2,
+        scene: &Scene,
+        mut lambda: SampledWavelengths,
+        arena: &Bump,
+    ) -> FRecord {
+        let (ray, _) = scene.camera.generate_ray(pixel, &mut self.sampler, &lambda);
+        let l = PathTracer::li(
+            ray,
+            &mut lambda,
+            &mut self.sampler,
+            scene,
+            self.max_depth,
+            true,
+            arena,
+        );
         FRecord {
             pixel,
-            f: target_function(l),
+            f: lambda.clone().cie_xyz(l).values().y.clamp(0.0, 100.0),
             l,
+            lambda,
         }
     }
     pub fn run(&mut self, scene: &Scene, arena: &Bump) -> FRecord {
@@ -49,7 +62,8 @@ impl Chain {
             pixel.x.min(scene.camera.resolution().x - 1),
             pixel.y.min(scene.camera.resolution().y - 1),
         );
-        self.run_at_pixel(pixel, scene, arena)
+        let lambda = SampledWavelengths::sample_visible(self.sampler.next1d());
+        self.run_at_pixel(pixel, scene, lambda, arena)
     }
 }
 impl Pssmlt {
@@ -70,6 +84,7 @@ impl Pssmlt {
                         pixel: UVec2::ZERO,
                         f: 0.0,
                         l: SampledSpectrum::zero(),
+                        lambda: SampledWavelengths::none(),
                     },
                     is_large_step: true,
                     large_step_prob: 0.3,
@@ -94,6 +109,7 @@ impl Pssmlt {
                             pixel: UVec2::ZERO,
                             f: 0.0,
                             l: SampledSpectrum::zero(),
+                            lambda: SampledWavelengths::none(),
                         },
                         is_large_step: true,
                         large_step_prob: 0.3,
@@ -114,6 +130,7 @@ impl Integrator for Pssmlt {
         let mut depth0_pt = PathTracer {
             spp: self.direct_spp,
             max_depth: 1,
+            single_wavelength: false,
         };
         let film_direct = depth0_pt.render(scene);
         let npixels = (scene.camera.resolution().x * scene.camera.resolution().y) as usize;
@@ -158,6 +175,7 @@ impl Integrator for Pssmlt {
                             indirect_film.add_sample(
                                 proposal.pixel,
                                 proposal.l * accept_prob / proposal.f,
+                                proposal.lambda.clone(),
                                 1.0,
                             );
                         }
@@ -165,6 +183,7 @@ impl Integrator for Pssmlt {
                             indirect_film.add_sample(
                                 chain.cur.pixel,
                                 chain.cur.l * (1.0 - accept_prob) / chain.cur.f,
+                                chain.cur.lambda.clone(),
                                 1.0,
                             );
                         }
@@ -185,7 +204,7 @@ impl Integrator for Pssmlt {
         let b = b.load(Ordering::Relaxed) as f64 / large_count.load(Ordering::Relaxed) as f64;
         log::info!("normalization factor: {:?}", b);
         indirect_film
-            .pixels
+            .pixels()
             .par_iter()
             .enumerate()
             .for_each(|(_, p)| {
@@ -194,14 +213,14 @@ impl Integrator for Pssmlt {
             });
         let film = Film::new(&scene.camera.resolution());
         (0..npixels).into_par_iter().for_each(|i| {
-            let mut px = film.pixels[i].write();
+            let mut px = film.pixels()[i].write();
             px.weight = RobustSum::new(1.0);
             {
-                let px_i = indirect_film.pixels[i].read();
+                let px_i = indirect_film.pixels()[i].read();
                 px.intensity.add(px_i.intensity.sum() / self.spp as f32);
             }
             {
-                let px_d = film_direct.pixels[i].read();
+                let px_d = film_direct.pixels()[i].read();
                 assert!(px_d.weight.sum() > 0.0);
                 px.intensity.add(px_d.intensity.sum() / px_d.weight.sum());
             }

@@ -276,6 +276,48 @@ impl Frame {
 pub fn reflect(w: Vec3, n: Vec3) -> Vec3 {
     -w + 2.0 * w.dot(n) * n
 }
+pub fn refract(wi: Vec3, mut n: Vec3, mut eta: f32) -> Option<Vec3> {
+    let mut cos_theta_i = n.dot(wi);
+
+    if cos_theta_i < 0.0 {
+        eta = 1.0 / eta;
+        cos_theta_i = -cos_theta_i;
+        n = -n;
+    }
+
+    let sin2_theta_i = 0.0f32.max(1.0 - cos_theta_i * cos_theta_i);
+    let sin2_theta_t = sin2_theta_i / eta * eta;
+
+    if sin2_theta_i >= 1.0 {
+        return None;
+    }
+    let cos_theta_t = (1.0 - sin2_theta_t).max(0.0).sqrt();
+
+    let wt = -wi / eta + (cos_theta_i / eta - cos_theta_t) * n;
+    Some(wt)
+}
+pub fn fr_dielectric(mut cos_theta_i: f32, mut eta_i: f32, mut eta_t: f32) -> f32 {
+    cos_theta_i = cos_theta_i.clamp(-1.0, 1.0);
+
+    let entering = cos_theta_i > 0.0;
+    if !entering {
+        std::mem::swap(&mut eta_i, &mut eta_t);
+        cos_theta_i = cos_theta_i.abs();
+    }
+
+    let sin_theta_i = (1.0 - cos_theta_i * cos_theta_i).max(0.0).sqrt();
+    let sin_theta_t = eta_i / eta_t * sin_theta_i;
+
+    if sin_theta_t >= 1.0 {
+        return 1.0;
+    }
+    let cos_theta_t = (1.0 - sin_theta_t * sin_theta_t).max(0.0).sqrt();
+    let rparl = ((eta_t * cos_theta_i) - (eta_i * cos_theta_t))
+        / ((eta_t * cos_theta_i) + (eta_i * cos_theta_t));
+    let rperp = ((eta_i * cos_theta_i) - (eta_t * cos_theta_t))
+        / ((eta_i * cos_theta_i) + (eta_t * cos_theta_t));
+    (rparl * rparl + rperp * rperp) / 2.0
+}
 #[derive(Clone, Copy, Debug)]
 pub struct RayHit {
     pub uv: Vec2,

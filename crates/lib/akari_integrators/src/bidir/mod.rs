@@ -15,6 +15,7 @@ pub struct VertexBase {
     pub wo: Vec3,
     pub p: Vec3,
     pub n: Vec3,
+    pub ns: Vec3,
 }
 #[derive(Copy, Clone)]
 pub struct SurfaceVertex<'a> {
@@ -99,6 +100,7 @@ impl<'a> Vertex<'a> {
                 beta,
                 p: ray.o,
                 n: camera.n(), // ?????
+                ns: camera.n(),
             },
         })
     }
@@ -119,6 +121,7 @@ impl<'a> Vertex<'a> {
                 beta,
                 p,
                 n,
+                ns: n,
             },
         })
     }
@@ -128,8 +131,10 @@ impl<'a> Vertex<'a> {
         bsdf: BsdfClosure<'a>,
         wo: Vec3,
         n: Vec3,
+        ns: Vec3,
         mut pdf_fwd: f32,
         prev: &Vertex<'a>,
+        delta: bool,
     ) -> Self {
         let mut v = Self::Surface(SurfaceVertex {
             bsdf,
@@ -139,9 +144,10 @@ impl<'a> Vertex<'a> {
                 wo,
                 pdf_fwd: 0.0,
                 pdf_rev: 0.0,
-                delta: false,
+                delta,
                 p,
                 n,
+                ns,
             },
         });
         pdf_fwd = prev.convert_pdf_to_area(pdf_fwd, &v);
@@ -235,7 +241,7 @@ impl<'a> Vertex<'a> {
     pub fn f(
         &self,
         next: &Vertex<'a>,
-        _mode: TraceDir,
+        _mode: TransportMode,
         lambda: &SampledWavelengths,
     ) -> SampledSpectrum {
         let v1 = self.as_surface().unwrap();
@@ -254,6 +260,9 @@ impl<'a> Vertex<'a> {
     }
     pub fn n(&self) -> Vec3 {
         self.base().n
+    }
+    pub fn ns(&self) -> Vec3 {
+        self.base().ns
     }
     pub fn le(
         &self,
@@ -281,17 +290,28 @@ impl<'a> Vertex<'a> {
         match self {
             Vertex::Light(v) => {
                 let flags = v.light.flags();
-                (flags | LightFlags::DELTA_DIRECTION) == LightFlags::NONE
+                // (flags | LightFlags::DELTA_DIRECTION) == LightFlags::NONE
+                !flags.intersects(LightFlags::DELTA_DIRECTION)
             }
             Vertex::Camera(_) => true,
-            Vertex::Surface(_v) => true,
+            Vertex::Surface(v) => !v.bsdf.flags().is_delta_only(), // FIXME
         }
     }
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum TraceDir {
-    LightToCamera,
-    CameraToLight,
+
+#[inline]
+pub fn correct_shading_normal(ng: Vec3, ns: Vec3, wo: Vec3, wi: Vec3, mode: TransportMode) -> f32 {
+    if mode == TransportMode::LightToCamera {
+        let num = wo.dot(ns).abs() * wi.dot(ng).abs();
+        let denom = wo.dot(ng).abs() * wi.dot(ns).abs();
+        if denom == 0.0 {
+            0.0
+        } else {
+            num / denom
+        }
+    } else {
+        1.0
+    }
 }
 pub fn random_walk<'a, 'b>(
     scene: &'a Scene,
@@ -301,7 +321,7 @@ pub fn random_walk<'a, 'b>(
     mut beta: SampledSpectrum,
     pdf: f32,
     max_depth: usize,
-    mode: TraceDir,
+    mode: TransportMode,
     path: &mut Path<'b>,
     arena: &'b Bump,
 ) where
@@ -313,8 +333,7 @@ pub fn random_walk<'a, 'b>(
         return;
     }
     let mut pdf_fwd = pdf;
-    #[allow(unused_assignments)]
-    let mut pdf_rev = 0.0;
+    let mut pdf_rev;
     let mut depth = 0usize;
     loop {
         if let Some(si) = scene.intersect(&ray) {
@@ -322,7 +341,7 @@ pub fn random_walk<'a, 'b>(
             let shape = si.shape;
             let prev_index = depth;
             let prev = &mut path[prev_index];
-            if mode == TraceDir::CameraToLight {
+            if mode == TransportMode::CameraToLight {
                 if let Some(light) = scene.get_light_of_shape(shape) {
                     let mut vertex =
                         Vertex::create_light_vertex(light, ray.at(si.t), si.ng, beta, pdf_fwd);
@@ -331,7 +350,7 @@ pub fn random_walk<'a, 'b>(
                     break;
                 }
             }
-            let opt_bsdf = si.evaluate_bsdf(lambda, arena);
+            let opt_bsdf = si.evaluate_bsdf(lambda, mode, arena);
             if opt_bsdf.is_none() {
                 break;
             }
@@ -339,8 +358,17 @@ pub fn random_walk<'a, 'b>(
             let bsdf = opt_bsdf.unwrap();
             let wo = -ray.d;
 
-            let vertex =
-                Vertex::create_surface_vertex(beta, p, bsdf.clone(), wo, ng, pdf_fwd, prev);
+            let mut vertex = Vertex::create_surface_vertex(
+                beta,
+                p,
+                bsdf.clone(),
+                wo,
+                ng,
+                si.ns,
+                pdf_fwd,
+                prev,
+                false,
+            );
             // pdf_rev = vertex.pdf(scene, prev, next)
             std::mem::drop(prev);
             path.push(vertex);
@@ -349,6 +377,10 @@ pub fn random_walk<'a, 'b>(
                 break;
             }
             if let Some(bsdf_sample) = bsdf.sample(sampler.next2d(), wo) {
+                let delta = bsdf_sample.flag.contains(BsdfFlags::SPECULAR);
+                {
+                    path.last_mut().unwrap().base_mut().delta = delta;
+                }
                 pdf_fwd = bsdf_sample.pdf;
                 let wi = bsdf_sample.wi;
                 let prev = &mut path[prev_index];
@@ -358,6 +390,7 @@ pub fn random_walk<'a, 'b>(
                 }
                 ray = Ray::spawn(p, wi).offset_along_normal(ng);
                 beta *= bsdf_sample.f * wi.dot(ng).abs() / bsdf_sample.pdf;
+                beta *= correct_shading_normal(ng, si.ns, wo, wi, mode);
             } else {
                 break;
             }
@@ -395,7 +428,7 @@ pub fn generate_camera_path<'a, 'b>(
         beta,
         pdf_dir,
         max_depth - 1,
-        TraceDir::CameraToLight,
+        TransportMode::CameraToLight,
         path,
         arena,
     );
@@ -438,7 +471,7 @@ pub fn generate_light_path<'a, 'b>(
         beta,
         sample.pdf_dir,
         max_depth - 1,
-        TraceDir::LightToCamera,
+        TransportMode::LightToCamera,
         path,
         arena,
     );
@@ -452,7 +485,7 @@ pub fn geometry_term(scene: &Scene, v1: &Vertex, v2: &Vertex) -> f32 {
     if scene.occlude(&ray) {
         0.0
     } else {
-        (wi.dot(v1.n()) * wi.dot(v2.n()) / dist2).abs()
+        (wi.dot(v1.ns()) * wi.dot(v2.ns()) / dist2).abs()
     }
 }
 #[derive(Debug, Clone, Copy)]
@@ -646,10 +679,10 @@ where
                         0.0,
                     );
                     raster = Some(sample.raster);
-                    l = qs.beta() * qs.f(&v, TraceDir::LightToCamera, lambda) * v.beta();
+                    l = qs.beta() * qs.f(&v, TransportMode::LightToCamera, lambda) * v.beta();
                     if !l.is_black() && !scene.occlude(&sample.vis_ray) {
                         if qs.on_surface() {
-                            l *= sample.wi.dot(qs.n()).abs();
+                            l *= sample.wi.dot(qs.ns()).abs();
                         }
                     } else {
                         l = SampledSpectrum::zero();
@@ -681,7 +714,9 @@ where
                 }
                 {
                     let sampled = sampled.as_ref().unwrap();
-                    l = pt.beta() * pt.f(sampled, TraceDir::CameraToLight, lambda) * sampled.beta();
+                    l = pt.beta()
+                        * pt.f(sampled, TransportMode::CameraToLight, lambda)
+                        * sampled.beta();
                 }
 
                 if pt.on_surface() {
@@ -705,8 +740,8 @@ where
         if pt.connectible() && qs.connectible() && !pt.as_light().is_some() {
             l = qs.beta()
                 * pt.beta()
-                * pt.f(qs, TraceDir::CameraToLight, lambda)
-                * qs.f(pt, TraceDir::LightToCamera, lambda);
+                * pt.f(qs, TransportMode::CameraToLight, lambda)
+                * qs.f(pt, TransportMode::LightToCamera, lambda);
             if !l.is_black() {
                 l *= geometry_term(scene, pt, qs);
             }

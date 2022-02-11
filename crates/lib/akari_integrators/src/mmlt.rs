@@ -184,13 +184,14 @@ impl Chain {
     pub fn run(&mut self, scene: &Scene, arena: &Bump) -> FRecord {
         self.sampler.start_next_sample();
         self.sampler.use_stream(Stream::Camera);
-        let lambda = SampledWavelengths::sample_visible(self.sampler.next1d());
+
         let pixel = self.sampler.next2d() * scene.camera.resolution().as_vec2();
         let pixel = uvec2(pixel.x as u32, pixel.y as u32);
         let pixel = uvec2(
             pixel.x.min(scene.camera.resolution().x - 1),
             pixel.y.min(scene.camera.resolution().y - 1),
         );
+        let lambda = SampledWavelengths::sample_visible(self.sampler.next1d());
         self.run_at_pixel(pixel, scene, lambda, arena)
     }
 }
@@ -255,6 +256,7 @@ impl Integrator for Mmlt {
         let mut depth0_pt = PathTracer {
             spp: self.direct_spp,
             max_depth: 1,
+            single_wavelength:false,
         };
         let film_direct = depth0_pt.render(scene);
         let npixels = (scene.camera.resolution().x * scene.camera.resolution().y) as usize;

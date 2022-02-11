@@ -74,7 +74,7 @@ impl PCGSampler {
 }
 impl Sampler for PCGSampler {
     fn next1d(&mut self) -> f32 {
-        self.rng.pcg32() as f32 / (std::u32::MAX as f32)
+        (self.rng.pcg32() as f64 / (std::u32::MAX as f64)) as f32
     }
     // fn start_pixel(&mut self, px: &IVec2, res: &IVec2) {}
     fn start_next_sample(&mut self) {}
@@ -106,7 +106,7 @@ fn sobol(dim: u32, mut i: u32, rng: u32) -> f32 {
     }
     let r = res as f32 * (1.0 / 0xffffffffu32 as f32);
     let tmp_rng = cmj_hash_simple(dim, rng);
-    let shift = tmp_rng as f32 * (1.0 / 0xffffffffu32 as f32);
+    let shift = tmp_rng as f32 * (1.0 / 0xffffffffu32 as f64) as f32;
     r + shift - (r + shift).floor()
 }
 impl SobolSampler {
@@ -210,6 +210,7 @@ impl PrimarySample {
     }
 }
 
+#[repr(align(64))]
 pub struct MltSampler {
     pub samples: Vec<PrimarySample>,
     pub rng: PCGSampler,

@@ -12,9 +12,16 @@ pub mod node {
         pub scale: [f32; 3],
     }
     #[derive(Clone, Copy, Serialize, Deserialize)]
-    pub struct TR {
-        pub translate: [f32; 3],
-        pub rotate: [f32; 3],
+    pub struct LookAt {
+        pub eye: [f32; 3],
+        pub target: [f32; 3],
+        pub up: [f32; 3],
+    }
+    #[derive(Clone, Copy, Serialize, Deserialize)]
+    #[serde(untagged)]
+    pub enum Transform {
+        LookAt(LookAt),
+        TRS(TRS),
     }
     impl Default for TRS {
         fn default() -> Self {
@@ -25,78 +32,137 @@ pub mod node {
             }
         }
     }
-    impl Default for TR {
-        fn default() -> Self {
-            Self {
-                translate: [0.0; 3],
-                rotate: [0.0; 3],
-            }
-        }
+    fn default_colorspace() -> String {
+        "srgb".into()
     }
     #[derive(Clone, Serialize, Deserialize)]
-    pub enum Texture {
-        Float3([f32; 3]),
+    #[serde(tag = "type")]
+    pub enum ShaderGraphNode {
+        #[serde(rename = "float")]
+        Float(FloatTexture),
+        #[serde(rename = "spectrum")]
+        Spectrum(SpectrumTexture),
+        #[serde(rename = "mix")]
+        Mix {
+            frac: String,
+            tex_a: String,
+            tex_b: String,
+        },
+        #[serde(rename = "noise")]
+        Noise { pattern: String, dimension: u8 },
+    }
+    #[derive(Clone, Serialize, Deserialize)]
+    pub struct ShaderGraph {
+        pub nodes: HashMap<String, ShaderGraphNode>,
+        pub resolution: usize,
+        pub precompute: bool,
+        pub cache: Option<String>,
+    }
+    #[derive(Clone, Serialize, Deserialize)]
+    pub struct TextureCache {
+        pub path: String,
+    }
+    #[derive(Clone, Serialize, Deserialize)]
+    #[serde(untagged)]
+    pub enum FloatTexture {
         Float(f32),
-        Srgb([f32; 3]),
-        SrgbU8([u8; 3]),
-        Hsv([f32; 3]),
-        Hex([f32; 3]),
         Image(String),
+        CachedImage {
+            path: String,
+            #[serde(default)]
+            cache: Option<TextureCache>,
+        },
+        Graph(ShaderGraph),
     }
-
     #[derive(Clone, Serialize, Deserialize)]
+    #[serde(tag = "type")]
+    pub enum SpectrumTexture {
+        #[serde(rename = "linear")]
+        SRgbLinear([f32; 3]),
+        #[serde(rename = "srgb")]
+        SRgb([f32; 3]),
+        #[serde(rename = "srgb8")]
+        SRgbU8([u8; 3]),
+        #[serde(rename = "image")]
+        Image {
+            path: String,
+            #[serde(default = "default_colorspace")]
+            colorspace: String,
+            #[serde(default)]
+            cache: Option<TextureCache>,
+        },
+        #[serde(rename = "graph")]
+        Graph(ShaderGraph),
+    }
+    #[derive(Clone, Serialize, Deserialize)]
+    #[serde(tag = "type")]
     pub enum Bsdf {
-        Diffuse {
-            color: Texture,
-        },
+        #[serde(rename = "diffuse")]
+        Diffuse { color: SpectrumTexture },
+        #[serde(rename = "principled")]
         Principled {
-            color: Texture,
-            subsurface: Texture,
-            subsurface_radius: Texture,
-            subsurface_color: Texture,
-            metallic: Texture,
-            specular: Texture,
-            specular_tint: Texture,
-            roughness: Texture,
-            anisotropic: Texture,
-            anisotropic_rotation: Texture,
-            sheen: Texture,
-            sheen_tint: Texture,
-            clearcoat: Texture,
-            clearcoat_roughness: Texture,
-            ior: Texture,
-            transmission: Texture,
-            emission: Texture,
-            hint: String,
+            color: SpectrumTexture,
+            subsurface: FloatTexture,
+            subsurface_radius: SpectrumTexture,
+            subsurface_color: SpectrumTexture,
+            subsurface_ior: FloatTexture,
+            metallic: FloatTexture,
+            specular: FloatTexture,
+            specular_tint: FloatTexture,
+            roughness: FloatTexture,
+            anisotropic: FloatTexture,
+            anisotropic_rotation: FloatTexture,
+            sheen: FloatTexture,
+            sheen_tint: FloatTexture,
+            clearcoat: FloatTexture,
+            clearcoat_roughness: FloatTexture,
+            ior: FloatTexture,
+            transmission: FloatTexture,
+            emission: SpectrumTexture,
         },
-        Named(String),
     }
 
     #[derive(Clone, Serialize, Deserialize)]
+    #[serde(tag = "type")]
     pub enum Shape {
-        Mesh(String, Bsdf),
+        #[serde(rename = "mesh")]
+        Mesh {
+            path: String,
+            bsdf: String,
+            #[serde(default)]
+            transform: Option<Transform>,
+        },
     }
     #[derive(Clone, Serialize, Deserialize)]
+    #[serde(tag = "type")]
     pub enum Light {
-        Point { pos: [f32; 3], emission: Texture },
+        #[serde(rename = "point")]
+        Point {
+            pos: [f32; 3],
+            emission: SpectrumTexture,
+        },
     }
     #[derive(Clone, Serialize, Deserialize)]
+    #[serde(tag = "type")]
     pub enum Camera {
+        #[serde(rename = "perspective")]
         Perspective {
             res: (u32, u32),
             fov: f32, // in degress
             lens_radius: f32,
             focal: f32,
-            transform: TR,
+            transform: Transform,
         },
     }
 
     #[derive(Clone, Serialize, Deserialize)]
     pub struct Scene {
-        pub named_bsdfs: HashMap<String, Bsdf>,
+        pub bsdfs: HashMap<String, Bsdf>,
         pub camera: Camera,
         pub lights: Vec<Light>,
         pub shapes: Vec<Shape>,
+        #[serde(default = "Vec::new")]
+        pub shaders: Vec<ShaderGraph>,
     }
 }
 

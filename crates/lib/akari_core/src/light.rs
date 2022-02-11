@@ -33,6 +33,7 @@ bitflags! {
         const DELTA = Self::DELTA_POSITION.bits | Self::DELTA_DIRECTION.bits;
     }
 }
+
 pub trait Light: Sync + Send + Base {
     fn sample_le(&self, u0: Vec3, u1: Vec2, lambda: &SampledWavelengths) -> LightRaySample;
     fn sample_li(&self, u: Vec3, p: &ReferencePoint, lambda: &SampledWavelengths) -> LightSample;
@@ -43,7 +44,6 @@ pub trait Light: Sync + Send + Base {
     fn le(&self, ray: &Ray, lambda: &SampledWavelengths) -> SampledSpectrum;
     fn flags(&self) -> LightFlags;
     fn power(&self) -> f32;
-    fn address(&self) -> usize; // ????
     fn is_delta(&self) -> bool {
         self.flags().intersects(LightFlags::DELTA)
     }
@@ -104,7 +104,8 @@ impl UniformLightDistribution {
         let mut pdf_map = HashMap::new();
         let pdf = 1.0 / lights.len() as f32;
         for i in &lights {
-            pdf_map.insert(i.address(), pdf);
+            let addr = Arc::as_ptr(i).cast::<()>() as usize;
+            pdf_map.insert(addr, pdf);
         }
         Self { lights, pdf_map }
     }
@@ -116,7 +117,8 @@ impl LightDistribution for UniformLightDistribution {
         (self.lights[idx].as_ref(), pdf)
     }
     fn pdf<'a>(&self, light: &'a dyn Light) -> f32 {
-        if let Some(pdf) = self.pdf_map.get(&light.address()) {
+        let addr = (light as *const dyn Light).cast::<()>() as usize;
+        if let Some(pdf) = self.pdf_map.get(&addr) {
             *pdf
         } else {
             0.0
@@ -161,7 +163,12 @@ impl Light for AreaLight {
         }
     }
 
-    fn sample_li(&self, u: Vec3, ref_: &ReferencePoint, lambda: &SampledWavelengths) -> LightSample {
+    fn sample_li(
+        &self,
+        u: Vec3,
+        ref_: &ReferencePoint,
+        lambda: &SampledWavelengths,
+    ) -> LightSample {
         let surface_sample = self.shape.sample_surface(u);
         let li = self.evaluate(
             &ShadingPoint {
@@ -225,9 +232,6 @@ impl Light for AreaLight {
         LightFlags::NONE
     }
 
-    fn address(&self) -> usize {
-        self as *const Self as usize
-    }
     fn power(&self) -> f32 {
         self.emission.power() * self.shape.area()
     }
@@ -299,9 +303,7 @@ impl Light for PointLight {
     fn flags(&self) -> LightFlags {
         LightFlags::DELTA_POSITION
     }
-    fn address(&self) -> usize {
-        self as *const PointLight as usize
-    }
+
     fn power(&self) -> f32 {
         self.emission.power()
     }

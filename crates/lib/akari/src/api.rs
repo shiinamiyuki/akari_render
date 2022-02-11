@@ -26,11 +26,10 @@ use crate::*;
 use akari_core::texture::ImageSpectrumTexture;
 use core::panic;
 use glam::*;
-use std::process::exit;
 use integrator::bdpt;
-// use integrator::erpt;
+use integrator::erpt;
 use integrator::mmlt;
-// use integrator::pssmlt;
+use integrator::pssmlt;
 use integrator::Integrator;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -39,6 +38,7 @@ use std::io::BufReader;
 use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
+use std::process::exit;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
@@ -56,32 +56,10 @@ struct SceneLoaderContext<'a> {
     ooc: OocOptions,
 }
 impl<'a> SceneLoaderContext<'a> {
-    fn load_float_texture(&mut self, node: &node::Texture) -> Arc<dyn FloatTexture> {
+    fn load_float_texture(&mut self, node: &node::FloatTexture) -> Arc<dyn FloatTexture> {
         match node {
-            node::Texture::Float(f) => Arc::new(ConstantFloatTexture(*f)),
-            node::Texture::Float3(f3) => {
-                log::warn!("float texture expecte but found {:?}", f3);
-                Arc::new(ConstantFloatTexture(f3[0]))
-            }
-            node::Texture::Srgb(srgb) => {
-                log::warn!("float texture expecte but found {:?}", srgb);
-                Arc::new(ConstantFloatTexture(srgb_to_linear(Vec3::from(*srgb))[0]))
-            }
-            node::Texture::SrgbU8(srgb) => {
-                log::warn!("float texture expecte but found {:?}", srgb);
-                Arc::new(ConstantFloatTexture(
-                    srgb_to_linear(
-                        UVec3::from([srgb[0] as u32, srgb[1] as u32, srgb[2] as u32]).as_vec3()
-                            / 255.0,
-                    )[0],
-                ))
-            }
-            node::Texture::Hsv(hsv) => {
-                log::error!("float texture expecte but found {:?}", hsv);
-                exit(-1);
-            }
-            node::Texture::Hex(_) => todo!(),
-            node::Texture::Image(path) => {
+            node::FloatTexture::Float(f) => Arc::new(ConstantFloatTexture(*f)),
+            node::FloatTexture::Image(path) => {
                 todo!()
                 // let file = self.resolve_file(path);
                 // let reader = BufReader::new(file);
@@ -95,33 +73,30 @@ impl<'a> SceneLoaderContext<'a> {
                 //     Arc::new(ImageTexture::<Spectrum>::from_rgb_image(&img, true))
                 // }
             }
+            _ => todo!(),
         }
     }
-    fn load_spectrum_texture(&mut self, node: &node::Texture) -> Arc<dyn SpectrumTexture> {
+    fn load_spectrum_texture(&mut self, node: &node::SpectrumTexture) -> Arc<dyn SpectrumTexture> {
         let colorspace = RgbColorSpace::new(RgbColorSpaceId::SRgb);
         match node {
-            node::Texture::Float(f) => {
-                Arc::new(ConstantRgbTexture::new(Vec3::splat(*f), colorspace))
-            }
-            node::Texture::Float3(f3) => {
+            node::SpectrumTexture::SRgbLinear(f3) => {
                 Arc::new(ConstantRgbTexture::new(Vec3::from(*f3), colorspace))
             }
-            node::Texture::Srgb(srgb) => Arc::new(ConstantRgbTexture::new(
+            node::SpectrumTexture::SRgb(srgb) => Arc::new(ConstantRgbTexture::new(
                 srgb_to_linear(Vec3::from(*srgb)),
                 colorspace,
             )),
-            node::Texture::SrgbU8(srgb) => Arc::new(ConstantRgbTexture::new(
+            node::SpectrumTexture::SRgbU8(srgb) => Arc::new(ConstantRgbTexture::new(
                 srgb_to_linear(
                     UVec3::from([srgb[0] as u32, srgb[1] as u32, srgb[2] as u32]).as_vec3() / 255.0,
                 ),
                 colorspace,
             )),
-            node::Texture::Hsv(hsv) => {
-                let rgb = hsv_to_rgb(Vec3::from(*hsv));
-                Arc::new(ConstantRgbTexture::new(srgb_to_linear(rgb), colorspace))
-            }
-            node::Texture::Hex(_) => todo!(),
-            node::Texture::Image(path) => {
+            node::SpectrumTexture::Image {
+                path,
+                colorspace,
+                cache,
+            } => {
                 let file = self.resolve_file(path);
                 let reader = BufReader::new(file);
                 let reader = image::io::Reader::new(reader)
@@ -130,13 +105,14 @@ impl<'a> SceneLoaderContext<'a> {
                 let img = reader.decode().unwrap().into_rgb8();
                 Arc::new(ImageSpectrumTexture::from_rgb_image(&img, true))
             }
+            _ => todo!(),
         }
     }
     fn load_named_bsdf(&mut self, name: &String) -> Arc<dyn Bsdf> {
         if let Some(bsdf) = self.named_bsdfs.get(name) {
             return bsdf.clone();
         } else {
-            if let Some(node) = self.graph.named_bsdfs.get(name) {
+            if let Some(node) = self.graph.bsdfs.get(name) {
                 let bsdf = self.load_bsdf(node);
                 self.named_bsdfs.insert(name.clone(), bsdf.clone());
                 return bsdf;
@@ -429,7 +405,13 @@ pub fn load_integrator(path: &Path) -> Box<dyn Integrator> {
         "pt" | "path" => {
             let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
             let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as u32;
-            Box::new(PathTracer { spp, max_depth })
+            let single_wavelength =
+                (|| json.get("single_wavelength")?.as_bool())().unwrap_or(false);
+            Box::new(PathTracer {
+                spp,
+                max_depth,
+                single_wavelength,
+            })
         }
         // "spath" => {
         //     let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
@@ -453,35 +435,35 @@ pub fn load_integrator(path: &Path) -> Box<dyn Integrator> {
                 debug,
             })
         }
-        // "pssmlt" => {
-        //     let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
-        //     let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as usize;
-        //     let n_bootstrap = (|| json.get("n_bootstrap")?.as_u64())().unwrap_or(100000) as usize;
-        //     let n_chains = (|| json.get("n_chains")?.as_u64())().unwrap_or(1024) as usize;
-        //     let direct_spp = (|| json.get("direct_spp")?.as_u64())().unwrap_or(16) as u32;
-        //     Box::new(pssmlt::Pssmlt {
-        //         spp,
-        //         max_depth: max_depth as u32,
-        //         n_bootstrap,
-        //         n_chains,
-        //         direct_spp,
-        //     })
-        // }
-        // "erpt" => {
-        //     let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
-        //     let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as usize;
-        //     let n_bootstrap = (|| json.get("n_bootstrap")?.as_u64())().unwrap_or(100000) as usize;
-        //     let mutations_per_chain =
-        //         (|| json.get("mutations_per_chain")?.as_u64())().unwrap_or(100) as usize;
-        //     let direct_spp = (|| json.get("direct_spp")?.as_u64())().unwrap_or(16) as u32;
-        //     Box::new(erpt::Erpt {
-        //         spp,
-        //         max_depth: max_depth as u32,
-        //         n_bootstrap,
-        //         mutations_per_chain,
-        //         direct_spp,
-        //     })
-        // }
+        "pssmlt" => {
+            let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
+            let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as usize;
+            let n_bootstrap = (|| json.get("n_bootstrap")?.as_u64())().unwrap_or(100000) as usize;
+            let n_chains = (|| json.get("n_chains")?.as_u64())().unwrap_or(1024) as usize;
+            let direct_spp = (|| json.get("direct_spp")?.as_u64())().unwrap_or(16) as u32;
+            Box::new(pssmlt::Pssmlt {
+                spp,
+                max_depth: max_depth as u32,
+                n_bootstrap,
+                n_chains,
+                direct_spp,
+            })
+        }
+        "erpt" => {
+            let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
+            let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as usize;
+            let n_bootstrap = (|| json.get("n_bootstrap")?.as_u64())().unwrap_or(100000) as usize;
+            let mutations_per_chain =
+                (|| json.get("mutations_per_chain")?.as_u64())().unwrap_or(100) as usize;
+            let direct_spp = (|| json.get("direct_spp")?.as_u64())().unwrap_or(16) as u32;
+            Box::new(erpt::Erpt {
+                spp,
+                max_depth: max_depth as u32,
+                n_bootstrap,
+                mutations_per_chain,
+                direct_spp,
+            })
+        }
         "mmlt" => {
             let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
             let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as usize;

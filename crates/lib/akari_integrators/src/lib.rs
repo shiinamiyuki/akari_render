@@ -1,12 +1,12 @@
 // pub mod ao;
 pub mod bdpt;
 pub mod bidir;
-// pub mod erpt;
+pub mod erpt;
 pub mod mmlt;
 // pub mod nrc;
 pub mod path;
 // pub mod ppg;
-// pub mod pssmlt;
+pub mod pssmlt;
 // pub mod sppm;
 // pub mod spath;
 // pub mod normalvis;

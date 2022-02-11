@@ -11,6 +11,7 @@ use bumpalo::Bump;
 pub struct PathTracer {
     pub spp: u32,
     pub max_depth: u32,
+    pub single_wavelength: bool,
 }
 fn mis_weight(mut pdf_a: f32, mut pdf_b: f32) -> f32 {
     pdf_a *= pdf_a;
@@ -39,7 +40,7 @@ impl PathTracer {
                     let ng = si.ng;
                     let ns = si.ns;
                     let shape = si.shape;
-                    let opt_bsdf = si.evaluate_bsdf(lambda, arena);
+                    let opt_bsdf = si.evaluate_bsdf(lambda, TransportMode::CameraToLight, arena);
                     if opt_bsdf.is_none() {
                         break;
                     }
@@ -173,6 +174,9 @@ impl Integrator for PathTracer {
                     let arena = &*arena;
                     sampler.start_next_sample();
                     let mut lambda = SampledWavelengths::sample_visible(sampler.next1d());
+                    if self.single_wavelength {
+                        lambda.terminate_secondary();
+                    }
                     let (ray, _ray_weight) =
                         scene.camera.generate_ray(pixel, &mut sampler, &lambda);
                     let li = Self::li(

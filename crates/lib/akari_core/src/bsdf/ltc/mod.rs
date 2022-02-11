@@ -9,6 +9,8 @@ use akari_const::GGX_LTC_FIT;
 use bumpalo::Bump;
 use glam::DMat3;
 
+use super::TransportMode;
+
 pub struct GgxLtcBsdf {
     pub color: Arc<dyn SpectrumTexture>,
     pub roughness: Arc<dyn FloatTexture>,
@@ -74,6 +76,9 @@ fn frame_from_wo(wo: Vec3) -> Frame {
 }
 impl_base!(GgxLtcBsdf);
 impl LocalBsdfClosure for GgxLtcBsdfClosure {
+    fn flags(&self)->BsdfFlags{
+        BsdfFlags::GLOSSY_REFLECTION
+    }
     fn evaluate(&self, wo: Vec3, wi: Vec3) -> SampledSpectrum {
         if !Frame::same_hemisphere(wo, wi) {
             return SampledSpectrum::zero();
@@ -133,22 +138,15 @@ impl LocalBsdfClosure for GgxLtcBsdfClosure {
             wi,
             f: color * f,
             pdf,
-            flag: BsdfFlags::GLOSSY_REFLECTION,
+            flag: self.flags(),
         })
-    }
-
-    fn info(&self) -> bsdf::BsdfInfo {
-        bsdf::BsdfInfo {
-            albedo: self.color,
-            roughness: self.roughness,
-            metallic: 1.0,
-        }
     }
 }
 impl Bsdf for GgxLtcBsdf {
     fn evaluate<'a, 'b: 'a>(
         &'b self,
         sp: &ShadingPoint,
+        _mode:TransportMode,
         lambda: &mut SampledWavelengths,
         arena: &'a Bump,
     ) -> &'a dyn LocalBsdfClosure {

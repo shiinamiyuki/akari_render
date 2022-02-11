@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use bumpalo::Bump;
 
-use crate::sampler::SobolSampler;
 use crate::texture::{FloatTexture, ShadingPoint, SpectrumTexture};
 use crate::*;
 pub mod ltc;
@@ -23,23 +22,39 @@ bitflags! {
         const SPECULAR_REFRACTION = Self::SPECULAR.bits | Self::REFRACTION.bits;
     }
 }
+impl BsdfFlags {
+    pub fn is_delta_only(&self) -> bool {
+        self.intersects(Self::SPECULAR) && !self.intersects(Self::DIFFUSE | Self::GLOSSY)
+    }
+}
+
 pub struct BsdfSample {
     pub wi: Vec3,
     pub f: SampledSpectrum,
     pub pdf: f32,
     pub flag: BsdfFlags,
 }
+
+/*
+serve as a hint for some algorithms (NRC/denoising/etc..)
+*/
 #[derive(Clone, Copy)]
 pub struct BsdfInfo {
-    pub albedo: SampledSpectrum,
+    pub albedo: XYZ,
     pub roughness: f32,
     pub metallic: f32,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TransportMode {
+    LightToCamera, // path from light to camera, (not the other way around)
+    CameraToLight,
 }
 
 pub trait Bsdf: Sync + Send + Base {
     fn evaluate<'a, 'b: 'a>(
         &'b self,
         sp: &ShadingPoint,
+        mode: TransportMode,
         lambda: &mut SampledWavelengths,
         arena: &'a Bump,
     ) -> &'a dyn LocalBsdfClosure;
@@ -51,10 +66,10 @@ pub trait LocalBsdfClosure: Sync + Send {
     fn evaluate(&self, wo: Vec3, wi: Vec3) -> SampledSpectrum;
     fn evaluate_pdf(&self, wo: Vec3, wi: Vec3) -> f32;
     fn sample(&self, u: Vec2, wo: Vec3) -> Option<BsdfSample>;
-    fn info(&self) -> BsdfInfo;
     fn emission(&self) -> Option<&dyn SpectrumTexture> {
         None
     }
+    fn flags(&self) -> BsdfFlags;
 }
 #[derive(Copy, Clone)]
 pub struct BsdfClosure<'a> {
@@ -76,11 +91,11 @@ impl<'a> BsdfClosure<'a> {
         sample.wi = self.frame.to_world(sample.wi);
         Some(sample)
     }
-    pub fn info(&self) -> BsdfInfo {
-        self.closure.info()
-    }
     pub fn emission(&self) -> Option<Arc<dyn SpectrumTexture>> {
         None
+    }
+    pub fn flags(&self) -> BsdfFlags {
+        self.closure.flags()
     }
 }
 pub struct EmissiveBsdf {
@@ -102,11 +117,11 @@ impl<'a> LocalBsdfClosure for EmissiveBsdfClosure<'a> {
     fn sample(&self, u: Vec2, wo: Vec3) -> Option<BsdfSample> {
         self.base.sample(u, wo)
     }
-    fn info(&self) -> BsdfInfo {
-        self.base.info()
-    }
     fn emission(&self) -> Option<&dyn SpectrumTexture> {
         Some(self.emission)
+    }
+    fn flags(&self) -> BsdfFlags {
+        BsdfFlags::NONE
     }
 }
 
@@ -114,11 +129,12 @@ impl Bsdf for EmissiveBsdf {
     fn evaluate<'a, 'b: 'a>(
         &'b self,
         sp: &ShadingPoint,
+        mode: TransportMode,
         lambda: &mut SampledWavelengths,
         arena: &'a Bump,
     ) -> &'a dyn LocalBsdfClosure {
         arena.alloc(EmissiveBsdfClosure {
-            base: self.base.evaluate(sp, lambda, arena),
+            base: self.base.evaluate(sp, mode, lambda, arena),
             emission: self.emission.as_ref(),
         })
     }
@@ -155,12 +171,13 @@ where
     fn evaluate<'a, 'b: 'a>(
         &'b self,
         sp: &ShadingPoint,
+        mode: TransportMode,
         lambda: &mut SampledWavelengths,
         arena: &'a Bump,
     ) -> &'a dyn LocalBsdfClosure {
         arena.alloc(MixBsdfClosure {
-            bsdf_a: self.bsdf_a.evaluate(sp, lambda, arena),
-            bsdf_b: self.bsdf_b.evaluate(sp, lambda, arena),
+            bsdf_a: self.bsdf_a.evaluate(sp, mode, lambda, arena),
+            bsdf_b: self.bsdf_b.evaluate(sp, mode, lambda, arena),
             frac: self.frac.evaluate(sp),
         })
     }
@@ -171,6 +188,9 @@ pub struct MixBsdfClosure<'a> {
     pub frac: f32,
 }
 impl<'a> LocalBsdfClosure for MixBsdfClosure<'a> {
+    fn flags(&self) -> BsdfFlags {
+        self.bsdf_a.flags() | self.bsdf_b.flags()
+    }
     fn evaluate(&self, wo: Vec3, wi: Vec3) -> SampledSpectrum {
         SampledSpectrum::lerp(
             self.bsdf_a.evaluate(wo, wi),
@@ -191,7 +211,7 @@ impl<'a> LocalBsdfClosure for MixBsdfClosure<'a> {
         if u[0] < prob {
             let remapped_u = vec2(u[0] / prob, u[1]);
             if let Some(sample) = self.bsdf_a.sample(remapped_u, wo) {
-                if sample.flag.intersects(BsdfFlags::SPECULAR) {
+                if sample.flag.contains(BsdfFlags::SPECULAR) {
                     Some(BsdfSample {
                         pdf: sample.pdf * prob,
                         ..sample
@@ -210,7 +230,7 @@ impl<'a> LocalBsdfClosure for MixBsdfClosure<'a> {
         } else {
             let remapped_u = vec2((u[0] - prob) / (1.0 - prob), u[1]);
             if let Some(sample) = self.bsdf_b.sample(remapped_u, wo) {
-                if sample.flag.intersects(BsdfFlags::SPECULAR) {
+                if sample.flag.contains(BsdfFlags::SPECULAR) {
                     Some(BsdfSample {
                         pdf: sample.pdf * (1.0 - prob),
                         ..sample
@@ -226,16 +246,6 @@ impl<'a> LocalBsdfClosure for MixBsdfClosure<'a> {
             } else {
                 None
             }
-        }
-    }
-    fn info(&self) -> BsdfInfo {
-        let info_a = self.bsdf_a.info();
-        let info_b = self.bsdf_b.info();
-        let frac = self.frac;
-        BsdfInfo {
-            roughness: lerp(info_a.roughness, info_b.roughness, frac),
-            albedo: SampledSpectrum::lerp(info_a.albedo, info_b.albedo, frac),
-            metallic: lerp(info_a.metallic, info_b.metallic, frac),
         }
     }
 }
@@ -339,6 +349,7 @@ impl Bsdf for DiffuseBsdf {
     fn evaluate<'a, 'b: 'a>(
         &'b self,
         sp: &ShadingPoint,
+        _mode: TransportMode,
         lambda: &mut SampledWavelengths,
         arena: &'a Bump,
     ) -> &'a dyn LocalBsdfClosure {
@@ -351,12 +362,8 @@ pub struct DiffuseBsdfClosure {
     pub color: SampledSpectrum,
 }
 impl LocalBsdfClosure for DiffuseBsdfClosure {
-    fn info(&self) -> BsdfInfo {
-        BsdfInfo {
-            roughness: 1.0,
-            albedo: self.color,
-            metallic: 0.0,
-        }
+    fn flags(&self) -> BsdfFlags {
+        BsdfFlags::DIFFUSE_REFLECTION
     }
     fn evaluate(&self, wo: Vec3, wi: Vec3) -> SampledSpectrum {
         let r = self.color;
@@ -388,7 +395,7 @@ impl LocalBsdfClosure for DiffuseBsdfClosure {
             f: r * FRAC_1_PI,
             wi,
             pdf: Frame::abs_cos_theta(wi) * FRAC_1_PI,
-            flag: BsdfFlags::DIFFUSE_REFLECTION,
+            flag: self.flags(),
         })
     }
 }
@@ -401,12 +408,8 @@ pub struct SpecularBsdfClosure {
     pub color: SampledSpectrum,
 }
 impl LocalBsdfClosure for SpecularBsdfClosure {
-    fn info(&self) -> BsdfInfo {
-        BsdfInfo {
-            roughness: 0.0,
-            albedo: self.color,
-            metallic: 1.0,
-        }
+    fn flags(&self) -> BsdfFlags {
+        BsdfFlags::SPECULAR_REFLECTION
     }
     fn evaluate(&self, _wo: Vec3, _wi: Vec3) -> SampledSpectrum {
         SampledSpectrum::zero()
@@ -422,8 +425,61 @@ impl LocalBsdfClosure for SpecularBsdfClosure {
             f: r / Frame::abs_cos_theta(wi),
             wi,
             pdf: 1.0,
-            flag: BsdfFlags::SPECULAR_REFLECTION,
+            flag: self.flags(),
         })
+    }
+}
+pub struct FresnelSpecularBsdf {
+    pub color: Arc<dyn SpectrumTexture>,
+    pub ior: Arc<dyn SpectrumTexture>,
+}
+pub struct FresnelSpecularBsdfClosure {
+    reflectance: f32,
+    eta_a: f32,
+    eta_b: f32,
+    mode: TransportMode,
+}
+impl LocalBsdfClosure for FresnelSpecularBsdfClosure {
+    fn flags(&self) -> BsdfFlags {
+        BsdfFlags::SPECULAR_REFLECTION | BsdfFlags::SPECULAR_REFRACTION
+    }
+    fn evaluate(&self, _wo: Vec3, _wi: Vec3) -> SampledSpectrum {
+        SampledSpectrum::zero()
+    }
+
+    fn evaluate_pdf(&self, _wo: Vec3, _wi: Vec3) -> f32 {
+        0.0
+    }
+
+    fn sample(&self, u: Vec2, wo: Vec3) -> Option<BsdfSample> {
+        let f = fr_dielectric(Frame::cos_theta(wo), self.eta_a, self.eta_b);
+        if u[0] < f {
+            let wi = vec3(-wo.x, wo.y, -wo.z);
+            Some(BsdfSample {
+                flag: BsdfFlags::SPECULAR_REFLECTION,
+                wi,
+                pdf: f,
+                f: SampledSpectrum::from_primary(f * self.reflectance / Frame::abs_cos_theta(wi)),
+            })
+        } else {
+            let entering = Frame::cos_theta(wo) > 0.0;
+            let (eta_i, eta_t) = if entering {
+                (self.eta_a, self.eta_b)
+            } else {
+                (self.eta_b, self.eta_a)
+            };
+            let wi = refract(wo, Vec3::Y, eta_i / eta_t)?;
+            let mut ft = self.reflectance * (1.0 - f);
+            if self.mode == TransportMode::CameraToLight {
+                ft *= (eta_i * eta_i) / (eta_t * eta_t);
+            }
+            Some(BsdfSample {
+                wi,
+                pdf: 1.0 - f,
+                f: SampledSpectrum::from_primary(ft / Frame::abs_cos_theta(wi)),
+                flag: BsdfFlags::SPECULAR_REFRACTION,
+            })
+        }
     }
 }
 
@@ -441,6 +497,7 @@ impl Bsdf for GPUBsdfProxy {
     fn evaluate<'a, 'b: 'a>(
         &'b self,
         _sp: &ShadingPoint,
+        _mode: TransportMode,
         _lambda: &mut SampledWavelengths,
         _arena: &'a Bump,
     ) -> &'a dyn LocalBsdfClosure {

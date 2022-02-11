@@ -24,6 +24,8 @@ pub mod image;
 pub mod lrucache;
 pub mod rcu;
 pub mod texcache;
+// #[must_use]
+// pub mod vecn;
 pub fn log2(mut x: u32) -> u32 {
     let mut l = 0;
     while x > 0 {

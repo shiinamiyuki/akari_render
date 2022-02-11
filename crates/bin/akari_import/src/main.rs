@@ -158,7 +158,7 @@ fn import(path: &str, scene: &mut node::Scene, forced: bool, generate_normal: Op
         cvt_models.push(j)
     }
     {
-        let named = &mut scene.named_bsdfs;
+        let named = &mut scene.bsdfs;
         for (k, v) in cvt_mat.iter() {
             if let Some(_) = named.insert(k.clone(), v.clone()) {
                 println!("warning! overrided previous material");
@@ -232,7 +232,7 @@ fn main() {
                 serde_json::from_value(json).unwrap()
             }
             Err(_) => node::Scene {
-                named_bsdfs: HashMap::new(),
+                bsdfs: HashMap::new(),
                 lights: vec![],
                 shapes: vec![],
                 camera: node::Camera::Perspective {
