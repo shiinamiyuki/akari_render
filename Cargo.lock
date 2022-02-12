@@ -127,6 +127,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "akari_net"
+version = "0.1.0"
+dependencies = [
+ "akari",
+ "serde",
+ "uuid",
+]
+
+[[package]]
 name = "akari_utils"
 version = "0.1.0"
 dependencies = [
@@ -1410,6 +1419,16 @@ name = "unicode-xid"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ccb82d61f80a663efe1f787a51b16b5a51e3314d6ac365b08639f52387b33f3"
+
+[[package]]
+name = "uuid"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
+dependencies = [
+ "getrandom",
+ "serde",
+]
 
 [[package]]
 name = "vec_map"
