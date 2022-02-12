@@ -74,7 +74,7 @@ fn frame_from_wo(wo: Vec3) -> Frame {
     // println!("{:?} {:?} {:?}",T, N, B);
     Frame { T, B, N }
 }
-impl_base!(GgxLtcBsdf);
+
 impl LocalBsdfClosure for GgxLtcBsdfClosure {
     fn flags(&self)->BsdfFlags{
         BsdfFlags::GLOSSY_REFLECTION

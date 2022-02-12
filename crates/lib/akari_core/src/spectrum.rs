@@ -14,6 +14,9 @@ pub struct SampledSpectrum {
 }
 
 impl SampledSpectrum {
+    pub fn primary(&self) -> f32 {
+        self.values()[0]
+    }
     pub fn from_primary(s: f32) -> Self {
         Self {
             values: vec4(s, 0.0, 0.0, 0.0),
@@ -48,6 +51,7 @@ pub const INV_CIE_Y_INTEGRAL: f32 = 1.0 / CIE_Y_INTEGRAL;
 pub struct SampledWavelengths {
     lambda: Vec4,
     pdf: Vec4,
+    secondary_terminated: bool,
 }
 
 impl SampledWavelengths {
@@ -58,6 +62,7 @@ impl SampledWavelengths {
         Self {
             lambda: Vec4::ZERO,
             pdf: Vec4::ZERO,
+            secondary_terminated: false,
         }
     }
     pub fn cie_xyz(&self, s: SampledSpectrum) -> XYZ {
@@ -81,6 +86,7 @@ impl SampledWavelengths {
         let mut w = Self {
             lambda: Vec4::ZERO,
             pdf: Vec4::ZERO,
+            secondary_terminated: false,
         };
         for i in 0..SPECTRUM_SAMPLES {
             let up = (u + i as f32 / SPECTRUM_SAMPLES as f32).fract();
@@ -93,6 +99,7 @@ impl SampledWavelengths {
         let mut w = Self {
             lambda: Vec4::ZERO,
             pdf: Vec4::ZERO,
+            secondary_terminated: false,
         };
         for i in 0..SPECTRUM_SAMPLES {
             let up = (u + i as f32 / SPECTRUM_SAMPLES as f32).fract();
@@ -102,6 +109,10 @@ impl SampledWavelengths {
         w
     }
     pub fn terminate_secondary(&mut self) {
+        if self.secondary_terminated {
+            return;
+        }
+        self.secondary_terminated = true;
         for i in 1..SPECTRUM_SAMPLES {
             self.pdf[i] = 0.0;
         }
@@ -211,7 +222,7 @@ impl PiecewiseLinearSpectrum {
         self.f.scale(k);
     }
 }
-pub trait Spectrum: Base + Send + Sync {
+pub trait Spectrum: AsAny + Send + Sync {
     fn sample(&self, lambda: &SampledWavelengths) -> SampledSpectrum;
 }
 pub fn inner_product<F1: Function1D, F2: Function1D>(

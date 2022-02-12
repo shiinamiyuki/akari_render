@@ -75,12 +75,12 @@ where
     let z1 = bilinear(|x, y| f(x, y, 1), vec2(weights.x, weights.y));
     lerp(z0, z1, weights.z)
 }
-pub trait Base: Any {
+pub trait AsAny: Any {
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
     fn type_name(&self) -> &'static str;
 }
-impl<T: Any> Base for T {
+impl<T: Any> AsAny for T {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -94,32 +94,16 @@ impl<T: Any> Base for T {
     }
 }
 
-pub fn downcast_ref<U: 'static, T: Base + ?Sized>(obj: &T) -> Option<&U> {
+pub fn downcast_ref<U: 'static, T: AsAny + ?Sized>(obj: &T) -> Option<&U> {
     obj.as_any().downcast_ref::<U>()
 }
 
-pub fn downcast_mut<U: 'static, T: Base + ?Sized>(obj: &mut T) -> Option<&mut U> {
+pub fn downcast_mut<U: 'static, T: AsAny + ?Sized>(obj: &mut T) -> Option<&mut U> {
     obj.as_any_mut().downcast_mut::<U>()
 }
 pub fn find_largest<T, P: FnMut(&T) -> bool>(slice: &[T], pred: P) -> usize {
     let i = slice.partition_point(pred);
     (i - 1).clamp(0, slice.len() - 2)
-}
-#[macro_export]
-macro_rules! impl_base {
-    ($t:ty) => {
-        // impl Base for $t {
-        //     fn as_any(&self) -> &dyn Any {
-        //         self
-        //     }
-        //     fn as_any_mut(&mut self) -> &mut dyn Any {
-        //         self
-        //     }
-        //     fn type_name(&self) -> &'static str {
-        //         std::any::type_name::<Self>()
-        //     }
-        // }
-    };
 }
 
 #[macro_export]

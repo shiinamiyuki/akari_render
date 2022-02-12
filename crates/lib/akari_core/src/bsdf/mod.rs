@@ -50,7 +50,7 @@ pub enum TransportMode {
     CameraToLight,
 }
 
-pub trait Bsdf: Sync + Send + Base {
+pub trait Bsdf: Sync + Send + AsAny {
     fn evaluate<'a, 'b: 'a>(
         &'b self,
         sp: &ShadingPoint,
@@ -102,7 +102,7 @@ pub struct EmissiveBsdf {
     pub base: Arc<dyn Bsdf>,
     pub emission: Arc<dyn SpectrumTexture>,
 }
-impl_base!(EmissiveBsdf);
+
 pub struct EmissiveBsdfClosure<'a> {
     pub base: &'a dyn LocalBsdfClosure,
     pub emission: &'a dyn SpectrumTexture,
@@ -344,7 +344,7 @@ impl<'a> LocalBsdfClosure for MixBsdfClosure<'a> {
 pub struct DiffuseBsdf {
     pub color: Arc<dyn SpectrumTexture>,
 }
-impl_base!(DiffuseBsdf);
+
 impl Bsdf for DiffuseBsdf {
     fn evaluate<'a, 'b: 'a>(
         &'b self,
@@ -403,7 +403,7 @@ impl LocalBsdfClosure for DiffuseBsdfClosure {
 pub struct SpecularBsdf {
     pub color: Arc<dyn SpectrumTexture>,
 }
-impl_base!(SpecularBsdf);
+
 pub struct SpecularBsdfClosure {
     pub color: SampledSpectrum,
 }
@@ -430,14 +430,34 @@ impl LocalBsdfClosure for SpecularBsdfClosure {
     }
 }
 pub struct FresnelSpecularBsdf {
-    pub color: Arc<dyn SpectrumTexture>,
-    pub ior: Arc<dyn SpectrumTexture>,
+    pub kr: Arc<dyn SpectrumTexture>,
+    pub kt: Arc<dyn SpectrumTexture>,
+    // pub ior: Arc<dyn SpectrumTexture>,
 }
 pub struct FresnelSpecularBsdfClosure {
-    reflectance: f32,
+    kt: SampledSpectrum,
+    kr: SampledSpectrum,
     eta_a: f32,
     eta_b: f32,
     mode: TransportMode,
+}
+impl Bsdf for FresnelSpecularBsdf {
+    fn evaluate<'a, 'b: 'a>(
+        &'b self,
+        sp: &ShadingPoint,
+        mode: TransportMode,
+        lambda: &mut SampledWavelengths,
+        arena: &'a Bump,
+    ) -> &'a dyn LocalBsdfClosure {
+        // lambda.terminate_secondary();
+        arena.alloc(FresnelSpecularBsdfClosure {
+            kt: self.kt.evaluate(sp, lambda),
+            kr: self.kr.evaluate(sp, lambda),
+            eta_a: 1.0,
+            eta_b: 1.333,
+            mode,
+        })
+    }
 }
 impl LocalBsdfClosure for FresnelSpecularBsdfClosure {
     fn flags(&self) -> BsdfFlags {
@@ -459,7 +479,7 @@ impl LocalBsdfClosure for FresnelSpecularBsdfClosure {
                 flag: BsdfFlags::SPECULAR_REFLECTION,
                 wi,
                 pdf: f,
-                f: SampledSpectrum::from_primary(f * self.reflectance / Frame::abs_cos_theta(wi)),
+                f: self.kr * f / Frame::abs_cos_theta(wi),
             })
         } else {
             let entering = Frame::cos_theta(wo) > 0.0;
@@ -469,14 +489,14 @@ impl LocalBsdfClosure for FresnelSpecularBsdfClosure {
                 (self.eta_b, self.eta_a)
             };
             let wi = refract(wo, Vec3::Y, eta_i / eta_t)?;
-            let mut ft = self.reflectance * (1.0 - f);
+            let mut ft = self.kt * (1.0 - f);
             if self.mode == TransportMode::CameraToLight {
                 ft *= (eta_i * eta_i) / (eta_t * eta_t);
             }
             Some(BsdfSample {
                 wi,
                 pdf: 1.0 - f,
-                f: SampledSpectrum::from_primary(ft / Frame::abs_cos_theta(wi)),
+                f: ft / Frame::abs_cos_theta(wi),
                 flag: BsdfFlags::SPECULAR_REFRACTION,
             })
         }
@@ -489,7 +509,7 @@ pub struct GPUBsdfProxy {
     pub roughness: Arc<dyn FloatTexture>,
     pub emission: Arc<dyn SpectrumTexture>,
 }
-impl_base!(GPUBsdfProxy);
+
 impl Bsdf for GPUBsdfProxy {
     fn emission(&self) -> Option<Arc<dyn SpectrumTexture>> {
         Some(self.emission.clone())

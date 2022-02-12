@@ -1,7 +1,7 @@
 use crate::texture::ShadingPoint;
 use crate::util::profile::scope;
 use crate::*;
-use crate::{shape::SurfaceInteraction, Base};
+use crate::{shape::SurfaceInteraction, AsAny};
 use embree_sys as sys;
 use lazy_static::lazy_static;
 use parking_lot::Mutex;
@@ -13,7 +13,6 @@ use sys::RTCIntersectContext;
 use crate::{
     bsdf::Bsdf,
     distribution::Distribution1D,
-    impl_base,
     shape::{MeshInstanceProxy, Shape, SurfaceSample, TriangleMesh},
     Bounds3f, Ray, Vec3,
 };
@@ -149,7 +148,7 @@ impl Drop for EmbreeInstance {
         }
     }
 }
-impl_base!(EmbreeInstance);
+
 impl Shape for EmbreeInstance {
     fn intersect(&self, ray: &Ray, _: Option<Vec3A>) -> Option<RayHit> {
         let _profiler = scope("EmbreeInstance::intersect");
@@ -278,7 +277,7 @@ impl EmbreeTopLevelAccel {
     }
 }
 
-impl_base!(EmbreeTopLevelAccel);
+
 impl accel::Accel for EmbreeTopLevelAccel {
     fn shapes(&self) -> Vec<Arc<dyn Shape>> {
         self.instances

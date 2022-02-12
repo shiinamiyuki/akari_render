@@ -104,7 +104,7 @@ fn compile_shader_imp(path: &String, shader_kind: ShaderKind, output: &String, o
     let spirv = match artifact {
         Ok(spirv) => spirv,
         Err(err) => {
-            eprintln!("Shader Compilation Failure:\nFile:{}\n{}", path, err);
+            log::error!("Shader Compilation Failure:\nFile:{}\n{}", path, err);
             exit(1);
         }
     };

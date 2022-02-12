@@ -11,7 +11,7 @@ pub struct CameraSample {
     pub vis_ray: Ray,
     pub we: SampledSpectrum,
 }
-pub trait Camera: Sync + Send + Base {
+pub trait Camera: Sync + Send + AsAny {
     fn generate_ray(
         &self,
         pixel: UVec2,
@@ -39,7 +39,7 @@ pub struct PerspectiveCamera {
     pub c2r: Transform,
     pub a: f32,
 }
-impl_base!(PerspectiveCamera);
+
 impl PerspectiveCamera {
     pub fn new(resolution: UVec2, transform: &Transform, fov: f32) -> Self {
         {

@@ -80,14 +80,14 @@ impl ApiContext {
     fn load_spectrum_texture(&mut self, node: &node::SpectrumTexture) -> Arc<dyn SpectrumTexture> {
         let colorspace = RgbColorSpace::new(RgbColorSpaceId::SRgb);
         match node {
-            node::SpectrumTexture::SRgbLinear{values:f3} => {
+            node::SpectrumTexture::SRgbLinear { values: f3 } => {
                 Arc::new(ConstantRgbTexture::new(Vec3::from(*f3), colorspace))
             }
-            node::SpectrumTexture::SRgb{values:srgb} => Arc::new(ConstantRgbTexture::new(
+            node::SpectrumTexture::SRgb { values: srgb } => Arc::new(ConstantRgbTexture::new(
                 srgb_to_linear(Vec3::from(*srgb)),
                 colorspace,
             )),
-            node::SpectrumTexture::SRgbU8{values:srgb} => Arc::new(ConstantRgbTexture::new(
+            node::SpectrumTexture::SRgbU8 { values: srgb } => Arc::new(ConstantRgbTexture::new(
                 srgb_to_linear(
                     UVec3::from([srgb[0] as u32, srgb[1] as u32, srgb[2] as u32]).as_vec3() / 255.0,
                 ),
@@ -95,8 +95,8 @@ impl ApiContext {
             )),
             node::SpectrumTexture::Image {
                 path,
-                colorspace:_,
-                cache:_,
+                colorspace: _,
+                cache: _,
             } => {
                 let file = self.resolve_file(path);
                 let reader = BufReader::new(file);
@@ -146,6 +146,10 @@ impl ApiContext {
         match node {
             node::Bsdf::Diffuse { color } => Arc::new(DiffuseBsdf {
                 color: self.load_spectrum_texture(color),
+            }),
+            node::Bsdf::Glass { kt, kr } => Arc::new(FresnelSpecularBsdf {
+                kt: self.load_spectrum_texture(kt),
+                kr: self.load_spectrum_texture(kr),
             }),
             node::Bsdf::Principled {
                 color,
@@ -247,9 +251,9 @@ impl ApiContext {
 
                 Transform::from_matrix(&m)
             }
-            node::Transform::LookAt(node::LookAt { eye, center, up }) => {
-                Transform::from_matrix(&Mat4::look_at_rh(eye.into(), center.into(), up.into()).inverse())
-            }
+            node::Transform::LookAt(node::LookAt { eye, center, up }) => Transform::from_matrix(
+                &Mat4::look_at_rh(eye.into(), center.into(), up.into()).inverse(),
+            ),
         }
     }
     fn load(&mut self) {
@@ -301,7 +305,7 @@ pub fn load_scene<R: FileResolver + Send + Sync>(
     let serialized = std::fs::read_to_string(path).unwrap();
     let canonical = std::fs::canonicalize(path).unwrap();
     let graph: node::Scene = serde_json::from_str(&serialized).unwrap_or_else(|e| {
-        eprintln!("error during scene loading:{:?}", e);
+        log::error!("error during scene loading:{:?}", e);
         exit(-1);
     });
     let parent_path = canonical.parent().unwrap();
@@ -369,7 +373,7 @@ pub fn load_gpu_integrator(path: &Path) -> WavefrontPathTracer {
             // }
         }
         _ => {
-            eprintln!("integrator {} is not supported on gpu", ty);
+            log::error!("integrator {} is not supported on gpu", ty);
             std::process::exit(1);
         }
     }

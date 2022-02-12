@@ -96,6 +96,11 @@ pub mod node {
     pub enum Bsdf {
         #[serde(rename = "diffuse")]
         Diffuse { color: SpectrumTexture },
+        #[serde(rename = "glass")]
+        Glass {
+            kr: SpectrumTexture,
+            kt: SpectrumTexture,
+        },
         #[serde(rename = "principled")]
         Principled {
             color: SpectrumTexture,

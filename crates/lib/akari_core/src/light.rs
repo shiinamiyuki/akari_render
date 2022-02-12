@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::process::exit;
 use std::sync::Arc;
 
 use crate::distribution::Distribution1D;
@@ -34,7 +35,7 @@ bitflags! {
     }
 }
 
-pub trait Light: Sync + Send + Base {
+pub trait Light: Sync + Send + AsAny {
     fn sample_le(&self, u0: Vec3, u1: Vec2, lambda: &SampledWavelengths) -> LightRaySample;
     fn sample_li(&self, u: Vec3, p: &ReferencePoint, lambda: &SampledWavelengths) -> LightSample;
     // (pdf_pos,pdf_dir)
@@ -48,7 +49,7 @@ pub trait Light: Sync + Send + Base {
         self.flags().intersects(LightFlags::DELTA)
     }
 }
-pub trait LightDistribution: Sync + Send + Base {
+pub trait LightDistribution: Sync + Send + AsAny {
     fn sample<'a>(&'a self, u: f32) -> (&'a dyn Light, f32);
     fn pdf<'a>(&self, light: &'a dyn Light) -> f32;
 }
@@ -63,7 +64,10 @@ impl PowerLightDistribution {
     }
     pub fn new(lights: Vec<Arc<dyn Light>>) -> Self {
         let power: Vec<_> = lights.iter().map(|light| light.power()).collect();
-        let dist = Distribution1D::new(power.as_slice()).unwrap();
+        let dist = Distribution1D::new(power.as_slice()).unwrap_or_else(||->Distribution1D {
+            log::error!("no lights defined in scene");
+            exit(-1);
+        });
         let mut pdf_map = HashMap::new();
 
         for (i, light) in lights.iter().enumerate() {
@@ -93,12 +97,12 @@ impl LightDistribution for PowerLightDistribution {
         }
     }
 }
-impl_base!(PowerLightDistribution);
+
 pub struct UniformLightDistribution {
     lights: Vec<Arc<dyn Light>>,
     pdf_map: HashMap<usize, f32>,
 }
-impl_base!(UniformLightDistribution);
+
 impl UniformLightDistribution {
     pub fn new(lights: Vec<Arc<dyn Light>>) -> Self {
         let mut pdf_map = HashMap::new();
@@ -131,7 +135,7 @@ pub struct AreaLight {
     pub emission: Arc<dyn SpectrumTexture>,
     pub colorspace: Option<RgbColorSpace>,
 }
-impl_base!(AreaLight);
+
 impl AreaLight {
     fn evaluate(&self, sp: &ShadingPoint, lambda: &SampledWavelengths) -> SampledSpectrum {
         let s = self.emission.evaluate(sp, lambda);
@@ -242,7 +246,7 @@ pub struct PointLight {
     pub emission: Arc<dyn SpectrumTexture>,
     pub colorspace: Option<RgbColorSpace>,
 }
-impl_base!(PointLight);
+
 impl PointLight {
     fn evaluate(&self, w: Vec3, lambda: &SampledWavelengths) -> SampledSpectrum {
         let uv = spherical_to_uv(dir_to_spherical(w));

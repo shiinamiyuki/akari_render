@@ -212,7 +212,7 @@ where
                 if mid == begin || mid == end {
                     // println!("{:?} {:?}", costs, buckets);
                     if end - begin > 12 {
-                        eprintln!(
+                        log::error!(
                             "cannot split at depth {} with {} references",
                             depth,
                             end - begin

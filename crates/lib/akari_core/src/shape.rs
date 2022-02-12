@@ -58,7 +58,7 @@ pub struct SurfaceSample {
     pub ng: Vec3,
     pub ns: Vec3,
 }
-pub trait Shape: Sync + Send + Base {
+pub trait Shape: Sync + Send + AsAny {
     fn intersect(&self, ray: &Ray, invd: Option<Vec3A>) -> Option<RayHit>;
     fn occlude(&self, ray: &Ray, invd: Option<Vec3A>) -> bool;
     fn bsdf<'a>(&'a self) -> Option<&'a dyn Bsdf>;
@@ -256,12 +256,12 @@ pub struct TriangleMeshInstance {
     pub area: f32,
     pub dist: Distribution1D,
 }
-impl_base!(TriangleMeshInstance);
+
 pub struct MeshInstanceProxy {
     pub mesh: Arc<TriangleMesh>,
     pub bsdf: Arc<dyn Bsdf>,
 }
-impl_base!(MeshInstanceProxy);
+
 
 impl Shape for MeshInstanceProxy {
     fn intersect(&self, _ray: &Ray, _: Option<Vec3A>) -> Option<RayHit> {

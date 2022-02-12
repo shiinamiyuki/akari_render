@@ -15,11 +15,25 @@ use crate::{film::Film, scene::Scene};
 use akari_common::*;
 use akari_core::*;
 use akari_utils as util;
-
+use bitflags::bitflags;
+use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use util::{parallel_for, profile_fn, UnsafePointer};
 use util::{AtomicFloat, RobustSum};
+
+bitflags! {
+    pub struct PartitionFlags: u8{
+        const NONE = 0;
+        const SPP = 1;
+        const BLOCK = 2;
+    }
+}
+#[derive(Clone, Copy, Serialize, Deserialize)]
+pub enum Partition {
+    Spp(usize),
+    Block(Bounds2u),
+}
 pub trait Integrator {
     fn render(&mut self, scene: &Scene) -> Film;
     fn support_block_rendering(&self) -> bool {

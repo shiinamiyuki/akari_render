@@ -20,11 +20,11 @@ impl ShadingPoint {
     }
 }
 
-pub trait FloatTexture: Sync + Send + Base {
+pub trait FloatTexture: Sync + Send + AsAny {
     fn evaluate(&self, sp: &ShadingPoint) -> f32;
     fn power(&self) -> f32;
 }
-pub trait SpectrumTexture: Sync + Send + Base {
+pub trait SpectrumTexture: Sync + Send + AsAny {
     fn evaluate(&self, sp: &ShadingPoint, lambda: &SampledWavelengths) -> SampledSpectrum;
     fn power(&self) -> f32;
     fn colorspace(&self) -> Option<RgbColorSpace>;
@@ -38,7 +38,7 @@ impl FloatTexture for ConstantFloatTexture {
         self.0 as f32
     }
 }
-impl_base!(ConstantFloatTexture);
+
 pub struct ConstantRgbTexture {
     rgb: Vec3,
     rep: RgbSigmoidPolynomial,
@@ -73,7 +73,7 @@ impl SpectrumTexture for ConstantRgbTexture {
         Some(self.colorspace)
     }
 }
-impl_base!(ConstantRgbTexture);
+
 
 pub struct ImageSpectrumTexture {
     image: TiledImage,
