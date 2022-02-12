@@ -1,7 +1,8 @@
 use crate::*;
 use color::XYZ;
+use serde::{Serialize, Deserialize};
 use util::RobustSum;
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Serialize, Deserialize)]
 #[repr(align(64))]
 pub struct Pixel {
     pub intensity: RobustSum<XYZ>,

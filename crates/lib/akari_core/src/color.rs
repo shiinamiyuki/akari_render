@@ -3,9 +3,10 @@ use crate::{
     *,
 };
 use akari_common::glam::mat3;
+use serde::{Deserialize, Serialize};
 pub use util::{hsv_to_rgb, linear_to_srgb, rgb_to_hsl, rgb_to_hsv, srgb_to_linear};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct XYZ {
     values: Vec3,
 }

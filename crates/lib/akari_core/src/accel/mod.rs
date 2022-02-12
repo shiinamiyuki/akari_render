@@ -15,11 +15,11 @@ pub mod embree;
 pub mod qbvh;
 impl_base!(Arc<dyn Shape>);
 impl Shape for Arc<dyn Shape> {
-    fn intersect<'a>(&'a self, ray: &Ray) -> Option<RayHit> {
-        self.as_ref().intersect(ray)
+    fn intersect<'a>(&'a self, ray: &Ray,inv_d:Option<Vec3A>) -> Option<RayHit> {
+        self.as_ref().intersect(ray,inv_d)
     }
-    fn occlude(&self, ray: &Ray) -> bool {
-        self.as_ref().occlude(ray)
+    fn occlude(&self, ray: &Ray,inv_d:Option<Vec3A>) -> bool {
+        self.as_ref().occlude(ray,inv_d)
     }
     fn aabb(&self) -> Bounds3f {
         self.as_ref().aabb()

@@ -312,17 +312,18 @@ where
 
         (mask, tmin)
     }
-    fn traverse_leaf<F: FnMut(&mut Ray, u32) -> bool>(
+    fn traverse_leaf<F: FnMut(&mut Ray, Vec3A, u32) -> bool>(
         &self,
         node: &BvhNode,
         ray: &mut Ray,
+        inv_d: Vec3A,
         f: &mut F,
     ) -> bool {
         unsafe {
             let first = node.left_or_first_primitive;
             let last = node.left_or_first_primitive + node.count as u32;
             for i in first..last {
-                if !f(ray, *self.references.get_unchecked(i as usize)) {
+                if !f(ray, inv_d, *self.references.get_unchecked(i as usize)) {
                     return false;
                 }
             }
@@ -458,16 +459,21 @@ where
         }
     }
     // break when f returns false
-    pub fn traverse<F: FnMut(&mut Ray, u32) -> bool>(&self, mut ray: Ray, mut f: F) {
+    pub fn traverse<F: FnMut(&mut Ray, Vec3A, u32) -> bool>(
+        &self,
+        mut ray: Ray,
+        inv_d: Option<Vec3A>,
+        mut f: F,
+    ) {
         unsafe {
-            let inv_d = Vec3A::ONE / Vec3A::from(ray.d);
+            let inv_d = inv_d.unwrap_or_else(|| Vec3A::ONE / Vec3A::from(ray.d));
             let mut stack: [u32; 32] = [0; 32];
             let mut sp = 0;
             let mut p = Some(&self.nodes[0]);
             let o = ray.o.into();
             while let Some(node) = p {
                 if node.is_leaf() {
-                    if !self.traverse_leaf(node, &mut ray, &mut f) {
+                    if !self.traverse_leaf(node, &mut ray, inv_d, &mut f) {
                         break;
                     }
                     if sp > 0 {
@@ -569,8 +575,10 @@ macro_rules! impl_bvh_accel {
             }
             fn intersect(&self, ray: &Ray) -> Option<RayHit> {
                 let mut hit = None;
-                self.traverse(*ray, |ray, geom_id| {
-                    if let Some(hit_) = self.data.shapes[geom_id as usize].intersect(ray) {
+                self.traverse(*ray, None, |ray, inv_d, geom_id| {
+                    if let Some(hit_) =
+                        self.data.shapes[geom_id as usize].intersect(ray, Some(inv_d))
+                    {
                         hit = Some(RayHit { geom_id, ..hit_ });
                         ray.tmax = hit_.t;
                     }
@@ -617,8 +625,8 @@ macro_rules! impl_bvh_accel {
 
             fn occlude(&self, ray: &Ray) -> bool {
                 let mut occluded = false;
-                self.traverse(*ray, |ray, geom_id| {
-                    if self.data.shapes[geom_id as usize].occlude(ray) {
+                self.traverse(*ray, None, |ray, inv_d, geom_id| {
+                    if self.data.shapes[geom_id as usize].occlude(ray, Some(inv_d)) {
                         occluded = true;
                         return false;
                     }

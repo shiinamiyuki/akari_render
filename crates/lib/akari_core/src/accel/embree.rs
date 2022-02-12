@@ -151,7 +151,7 @@ impl Drop for EmbreeInstance {
 }
 impl_base!(EmbreeInstance);
 impl Shape for EmbreeInstance {
-    fn intersect(&self, ray: &Ray) -> Option<RayHit> {
+    fn intersect(&self, ray: &Ray, _: Option<Vec3A>) -> Option<RayHit> {
         let _profiler = scope("EmbreeInstance::intersect");
         unsafe {
             let mut rayhit = sys::RTCRayHit {
@@ -192,7 +192,7 @@ impl Shape for EmbreeInstance {
             }
         }
     }
-    fn occlude(&self, ray: &Ray) -> bool {
+    fn occlude(&self, ray: &Ray, _: Option<Vec3A>) -> bool {
         let _profiler = scope("EmbreeInstance::occlude");
         unsafe {
             let mut ray = to_rtc_ray(ray);

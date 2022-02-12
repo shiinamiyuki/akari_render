@@ -33,7 +33,7 @@ impl<'a> SurfaceInteraction<'a> {
     pub fn evaluate_bsdf<'b>(
         &self,
         lambda: &mut SampledWavelengths,
-        mode:TransportMode,
+        mode: TransportMode,
         arena: &'b Bump,
     ) -> Option<BsdfClosure<'b>>
     where
@@ -59,8 +59,8 @@ pub struct SurfaceSample {
     pub ns: Vec3,
 }
 pub trait Shape: Sync + Send + Base {
-    fn intersect(&self, ray: &Ray) -> Option<RayHit>;
-    fn occlude(&self, ray: &Ray) -> bool;
+    fn intersect(&self, ray: &Ray, invd: Option<Vec3A>) -> Option<RayHit>;
+    fn occlude(&self, ray: &Ray, invd: Option<Vec3A>) -> bool;
     fn bsdf<'a>(&'a self) -> Option<&'a dyn Bsdf>;
     fn shading_triangle<'a>(&'a self, prim_id: u32) -> ShadingTriangle<'a>;
     fn triangle(&self, prim_id: u32) -> Triangle;
@@ -147,11 +147,17 @@ impl Triangle {
         let f = 1.0 / a;
         let s = ray.o - v0;
         let u = f * s.dot(h);
+        if !(u >= 0.0 && u <= 1.0){
+            return None;
+        }
         let q = s.cross(edge1);
         let v = f * ray.d.dot(q);
+        if !(v >= 0.0 && u + v <= 1.0){
+            return None;
+        }
         let t = f * edge2.dot(q);
-        let hit = t >= ray.tmin && t < ray.tmax && u >= 0.0 && u <= 1.0 && v >= 0.0 && u + v <= 1.0;
-
+        // let hit = t >= ray.tmin && t < ray.tmax && u >= 0.0 && u <= 1.0 && v >= 0.0 && u + v <= 1.0;
+        let hit = t >= ray.tmin && t < ray.tmax;
         if hit {
             Some((t, vec2(u, v)))
         } else {
@@ -215,10 +221,15 @@ impl MeshBvh {
             MeshBvh::QBvh(x) => &x.data,
         }
     }
-    pub fn traverse<F: FnMut(&mut Ray, u32) -> bool>(&self, ray: Ray, f: F) {
+    pub fn traverse<F: FnMut(&mut Ray, Vec3A, u32) -> bool>(
+        &self,
+        ray: Ray,
+        inv_d: Option<Vec3A>,
+        f: F,
+    ) {
         match self {
-            MeshBvh::Bvh(x) => x.traverse(ray, f),
-            MeshBvh::QBvh(x) => x.traverse(ray, f),
+            MeshBvh::Bvh(x) => x.traverse(ray, inv_d, f),
+            MeshBvh::QBvh(x) => x.traverse(ray, inv_d, f),
         }
     }
 }
@@ -253,11 +264,11 @@ pub struct MeshInstanceProxy {
 impl_base!(MeshInstanceProxy);
 
 impl Shape for MeshInstanceProxy {
-    fn intersect(&self, _ray: &Ray) -> Option<RayHit> {
+    fn intersect(&self, _ray: &Ray, _: Option<Vec3A>) -> Option<RayHit> {
         panic!("shouldn't be called")
     }
 
-    fn occlude(&self, _ray: &Ray) -> bool {
+    fn occlude(&self, _ray: &Ray, _: Option<Vec3A>) -> bool {
         panic!("shouldn't be called")
     }
 
@@ -293,9 +304,9 @@ impl Shape for TriangleMeshInstance {
     fn aabb(&self) -> Bounds3f {
         self.accel.aabb()
     }
-    fn intersect(&self, ray: &Ray) -> Option<RayHit> {
+    fn intersect(&self, ray: &Ray, inv_d: Option<Vec3A>) -> Option<RayHit> {
         let mut hit = None;
-        self.accel.traverse(*ray, |ray, prim_id| {
+        self.accel.traverse(*ray, inv_d, |ray, inv_d, prim_id| {
             let triangle = self.triangle(prim_id);
             if let Some((t, uv)) = triangle.intersect(ray) {
                 ray.tmax = t;
@@ -314,9 +325,9 @@ impl Shape for TriangleMeshInstance {
             }
         })
     }
-    fn occlude(&self, ray: &Ray) -> bool {
+    fn occlude(&self, ray: &Ray, inv_d: Option<Vec3A>) -> bool {
         let mut occluded = false;
-        self.accel.traverse(*ray, |ray, prim_id| {
+        self.accel.traverse(*ray, inv_d, |ray, inv_d, prim_id| {
             let triangle = self.triangle(prim_id);
             if triangle.intersect(ray).is_some() {
                 occluded = true;

@@ -72,13 +72,14 @@ impl QBvhNode {
             self.count[3] == 0,
         ])
     }
+    #[inline]
     fn intersect(
         &self,
         ray: &Ray,
-        o: [Vec4; 3],
-        invd: [Vec4; 3],
+        o: &[Vec4; 3],
+        invd: &[Vec4; 3],
         // sign: [BVec4A; 3],
-    ) -> (BVec4A, UVec4) {
+    ) -> (BVec4A, [u32; 4]) {
         let t10 = (self.min[0] - o[0]) * invd[0];
         let t11 = (self.min[1] - o[1]) * invd[1];
         let t12 = (self.min[2] - o[2]) * invd[2];
@@ -92,6 +93,9 @@ impl QBvhNode {
         let tmax1 = t11.max(t01);
         let tmin2 = t12.min(t02);
         let tmax2 = t12.max(t02);
+
+        // let tmin = tmin0.max(tmin1).max(tmin2).max(Vec4::splat(ray.tmin));
+        // let tmax = tmax0.min(tmax1).min(tmax2).min(Vec4::splat(ray.tmax));
 
         let tmin = tmin0.max(tmin1).max(tmin2).max(Vec4::splat(ray.tmin));
         let tmax = tmax0.min(tmax1).min(tmax2).min(Vec4::splat(ray.tmax));
@@ -114,19 +118,7 @@ impl QBvhNode {
         cmp_swap!(0, 2);
         cmp_swap!(1, 3);
         cmp_swap!(2, 3);
-        (mask, UVec4::from(indices))
-        // let  = tmin0.min(tmax0);
-        // let t0 = (aabb.min - o) * invd;
-        // let t1 = (aabb.max - o) * invd;
-        // let min = t0.min(t1);
-        // let max = t0.max(t1);
-        // let tmin = min.max_element().max(ray.tmin);
-        // let tmax = max.min_element().min(ray.tmax);
-        // if tmin <= tmax {
-        //     tmin
-        // } else {
-        //     -1.0
-        // }
+        (mask, indices)
     }
 }
 
@@ -148,13 +140,18 @@ impl<T: BvhData> QBvhAccel<T> {
         todo!()
     }
 
-    pub fn traverse<F: FnMut(&mut Ray, u32) -> bool>(&self, mut ray: Ray, mut f: F) {
+    pub fn traverse<F: FnMut(&mut Ray, Vec3A, u32) -> bool>(
+        &self,
+        mut ray: Ray,
+        inv_d: Option<Vec3A>,
+        mut f: F,
+    ) {
         unsafe {
-            let inv_d = Vec3::ONE / ray.d;
+            let inv_d0 = inv_d.unwrap_or_else(|| Vec3A::ONE / Vec3A::from(ray.d));
             let inv_d = [
-                Vec4::splat(inv_d.x),
-                Vec4::splat(inv_d.y),
-                Vec4::splat(inv_d.z),
+                Vec4::splat(inv_d0.x),
+                Vec4::splat(inv_d0.y),
+                Vec4::splat(inv_d0.z),
             ];
             let o = [
                 Vec4::splat(ray.o.x),
@@ -167,11 +164,11 @@ impl<T: BvhData> QBvhAccel<T> {
                 sp -= 1;
                 let node = self.nodes.get_unchecked(stack[sp] as usize);
 
-                let (mask, indices) = node.intersect(&ray, o, inv_d);
+                let (mask, indices) = node.intersect(&ray, &o, &inv_d);
                 let leaf_mask = node.leaf_mask();
                 let children = node.children;
-                if mask.any() {
-                    let mask = mask.bitmask();
+                let mask = mask.bitmask();
+                if mask != 0 {
                     let hit_leaves = leaf_mask & mask;
                     let hit_children = node.children_mask() & mask;
                     for j in 0..4 {
@@ -180,7 +177,7 @@ impl<T: BvhData> QBvhAccel<T> {
                             let start = children[i as usize] as usize;
                             let count = node.count[i as usize] as usize;
                             for p in start..(start + count) {
-                                if !f(&mut ray, *self.references.get_unchecked(p)) {
+                                if !f(&mut ray, inv_d0, *self.references.get_unchecked(p)) {
                                     return;
                                 }
                             }

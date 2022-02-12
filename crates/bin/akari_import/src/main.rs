@@ -105,7 +105,7 @@ fn import(path: &str, scene: &mut node::Scene, forced: bool, generate_normal: Op
                             .unwrap();
                     } else {
                         *color = node::SpectrumTexture::Image {
-                            path: m.diffuse_texture.clone(),
+                            path: m.diffuse_texture.clone().replace("\\", "/"),
                             cache: None,
                             colorspace: "srgb".into(),
                         };
@@ -128,7 +128,7 @@ fn import(path: &str, scene: &mut node::Scene, forced: bool, generate_normal: Op
                             .unwrap();
                     } else {
                         *color = node::SpectrumTexture::Image {
-                            path: m.specular_texture.clone(),
+                            path: m.specular_texture.clone().replace("\\", "/"),
                             colorspace: "srgb".into(),
                             cache: None,
                         };

@@ -1,6 +1,7 @@
 use std::ops::Mul;
 
 use akari_utils::{float_bits_to_int, int_bits_to_float};
+use serde::{Deserialize, Serialize};
 
 use crate::*;
 #[derive(Clone, Copy, Debug)]
@@ -342,6 +343,13 @@ impl Default for RayHit {
         }
     }
 }
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct Bounds2u {
+    pub min: UVec2,
+    pub max: UVec2,
+}
+
 
 #[derive(Clone, Copy, Debug)]
 pub struct Aabb {
