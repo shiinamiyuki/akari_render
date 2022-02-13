@@ -2,7 +2,8 @@ use std::{cell::RefCell, collections::HashMap, marker::PhantomData, rc::Rc, sync
 
 use smallvec::{smallvec, SmallVec};
 pub(crate) struct Program {
-    nodes: HashMap<usize, Node>,
+    pub(crate) nodes: HashMap<usize, Node>,
+    pub(crate) outputs: Vec<usize>,
 }
 
 pub(crate) struct Recorder {
@@ -35,7 +36,7 @@ impl Recorder {
         self.nodes.push(node);
         i
     }
-    fn collect(&self, outputs: &[usize]) -> Rc<Program> {
+    pub(crate) fn collect(&self, outputs: &[usize]) -> Rc<Program> {
         let mut prog = ProgramBuilder {
             recorder: self,
             nodes: HashMap::new(),
@@ -43,7 +44,10 @@ impl Recorder {
         for o in outputs {
             prog.collect(*o);
         }
-        Rc::new(Program { nodes: prog.nodes })
+        Rc::new(Program {
+            nodes: prog.nodes,
+            outputs: outputs.to_vec(),
+        })
     }
 }
 thread_local! {
@@ -76,6 +80,11 @@ pub(crate) enum Node {
         op: &'static str,
         val: usize,
     },
+    Func {
+        ty: String,
+        f: &'static str,
+        args: SmallVec<[usize; 3]>,
+    },
     Select {
         ty: String,
         cond: usize,
@@ -84,14 +93,35 @@ pub(crate) enum Node {
     },
 }
 impl Node {
-    fn depends(&self) -> SmallVec<[usize; 3]> {
+    pub(crate) fn ty(&self) -> &str {
         match self {
-            Node::Arg { ty, idx } => smallvec![],
-            Node::Const { ty, val } => smallvec![],
-            Node::Cast { from, to, val } => smallvec![*val],
-            Node::Binary { ty, op, lhs, rhs } => smallvec![*lhs, *rhs],
-            Node::Unary { ty, op, val } => smallvec![*val],
-            Node::Select { ty, cond, x, y } => smallvec![*cond, *x, *y],
+            Node::Arg { ty, .. } => ty,
+            Node::Const { ty, .. } => ty,
+            Node::Cast { to, .. } => to,
+            Node::Binary { ty, .. } => ty,
+            Node::Unary { ty, .. } => ty,
+            Node::Select { ty, .. } => ty,
+            Node::Func { ty, .. } => ty,
+        }
+    }
+    pub(crate) fn depends(&self) -> SmallVec<[usize; 3]> {
+        match self {
+            Node::Arg { ty: _, idx: _ } => smallvec![],
+            Node::Const { ty: _, val: _ } => smallvec![],
+            Node::Cast {
+                from: _,
+                to: _,
+                val,
+            } => smallvec![*val],
+            Node::Binary {
+                ty: _,
+                op: _,
+                lhs,
+                rhs,
+            } => smallvec![*lhs, *rhs],
+            Node::Unary { ty: _, op: _, val } => smallvec![*val],
+            Node::Select { ty: _, cond, x, y } => smallvec![*cond, *x, *y],
+            Node::Func { args, .. } => args.clone(),
         }
     }
 }
@@ -99,6 +129,21 @@ impl Node {
 pub struct Var<T> {
     pub(crate) node: usize,
     phantom: PhantomData<T>,
+}
+impl Var<f32> {
+    pub fn arg(i: usize) -> Self {
+        let node = Node::Arg {
+            ty: "f32".into(),
+            idx: i,
+        };
+        RECORDER.with(|r| {
+            let mut r = r.borrow_mut();
+            Self {
+                node: r.add_node(node),
+                phantom: PhantomData {},
+            }
+        })
+    }
 }
 macro_rules! impl_from {
     ($t:ty) => {

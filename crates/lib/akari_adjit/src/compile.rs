@@ -6,26 +6,26 @@ use std::{
     process::Command,
 };
 
-const CMAKE_TEMPLATE: &'static str = r#"
-cmake_minimum_required (VERSION 3.12)
-project ({{TARGET}} LANGUAGES CXX C)
+// const CMAKE_TEMPLATE: &'static str = r#"
+// cmake_minimum_required (VERSION 3.12)
+// project ({{TARGET}} LANGUAGES CXX C)
 
-set (CMAKE_CXX_STANDARD 17)
-set (CMAKE_CXX_STANDARD_REQUIRED ON)
+// set (CMAKE_CXX_STANDARD 17)
+// set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
-if(MSVC)
-	#set(CMAKE_CXX_FLAGS /std:c++17 /MP /arch:AVX2 /WX)
-else()
-    set(CMAKE_CXX_FLAGS -lstdc++ ${CMAKE_CXX_FLAGS})
-endif()
+// if(MSVC)
+// 	#set(CMAKE_CXX_FLAGS /std:c++17 /MP /arch:AVX2 /WX)
+// else()
+//     set(CMAKE_CXX_FLAGS -lstdc++ ${CMAKE_CXX_FLAGS})
+// endif()
 
-add_library({{TARGET}} SHARED source.cpp)
-"#;
-fn cmake_source(target: &str) -> String {
-    let s = String::from(CMAKE_TEMPLATE);
-    let s = s.replace("{{TARGET}}", target.into());
-    s
-}
+// add_library({{TARGET}} SHARED source.cpp)
+// "#;
+// fn cmake_source(target: &str) -> String {
+//     let s = String::from(CMAKE_TEMPLATE);
+//     let s = s.replace("{{TARGET}}", target.into());
+//     s
+// }
 fn canonicalize_and_fix_windows_path(path: PathBuf) -> Result<PathBuf> {
     let path = canonicalize(path)?;
     let mut s: String = path.to_str().unwrap().into();
@@ -49,29 +49,31 @@ fn write_if_changed(path: &String, content: &str) -> Result<bool> {
         let mut file = fs::OpenOptions::new()
             .create(true)
             .write(true)
+            .truncate(true)
             .open(&path)
             .map_err(|e| {
                 eprintln!("create {} failed", path.display());
                 e
             })?;
+
         write!(&mut file, "{}", content)?;
         Ok(true)
     } else {
         Ok(false)
     }
 }
-pub fn compile(source: &str, target: &str) -> Result<PathBuf> {
-    let mut source = String::from(source);
+pub fn compile(mut source: String, target: &str) -> Result<PathBuf> {
+    dbg!(&source);
     let header = r#"
-    #include <stdint.h>
-    typedef uint32_t u32;
-    typedef uint64_t u64;
-    typedef float f32;
-    typedef double f64;
-    typedef int32_t i32;
-    typedef uint32_t u32;
-    typedef size_t usize;
-    typedef ptrdiff_t isize;
+#include <stdint.h>
+typedef uint32_t u32;
+typedef uint64_t u64;
+typedef float f32;
+typedef double f64;
+typedef int32_t i32;
+typedef uint32_t u32;
+typedef size_t usize;
+typedef ptrdiff_t isize;
     "#;
     source = format!("{}{}", header, source);
     if cfg!(target_os = "windows") {
@@ -105,6 +107,7 @@ pub fn compile(source: &str, target: &str) -> Result<PathBuf> {
     } else {
         format!("{}.so", target)
     };
+    dbg!(&source_file);
     match Command::new("clang")
         .args(["-shared", "-O3", "-o", &target_lib, &source_file])
         .current_dir(&build_dir)
@@ -138,7 +141,7 @@ mod test {
         use super::*;
         let src = r#"extern AKR_JIT_DLL_EXPORT int add(int x, int y){return x+y;}
         extern AKR_JIT_DLL_EXPORT int mul(int x, int y){return x*y;}"#;
-        let path = compile(src, "add").unwrap();
+        let path = compile(src.into(), "add").unwrap();
         unsafe {
             let lib = libloading::Library::new(dbg!(path)).unwrap();
             let add: libloading::Symbol<unsafe extern "C" fn(i32, i32) -> i32> =
