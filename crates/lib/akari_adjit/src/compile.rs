@@ -62,6 +62,18 @@ fn write_if_changed(path: &String, content: &str) -> Result<bool> {
 }
 pub fn compile(source: &str, target: &str) -> Result<PathBuf> {
     let mut source = String::from(source);
+    let header = r#"
+    #include <stdint.h>
+    typedef uint32_t u32;
+    typedef uint64_t u64;
+    typedef float f32;
+    typedef double f64;
+    typedef int32_t i32;
+    typedef uint32_t u32;
+    typedef size_t usize;
+    typedef ptrdiff_t isize;
+    "#;
+    source = format!("{}{}", header, source);
     if cfg!(target_os = "windows") {
         source = source.replace("AKR_JIT_DLL_EXPORT", "__declspec( dllexport )");
     } else {
@@ -78,70 +90,45 @@ pub fn compile(source: &str, target: &str) -> Result<PathBuf> {
     let mut cmake_path = self_path.clone();
     cmake_path.push(".jit/");
     cmake_path.push(format!("{}/", target));
-    let mut build_dir = cmake_path.clone();
-    build_dir.push("build/");
+    let build_dir = cmake_path.clone();
+    // build_dir.push("build/");
     if !build_dir.exists() {
         fs::create_dir_all(&build_dir).map_err(|e| {
             eprintln!("fs::create_dir_all({}) failed", build_dir.display());
             e
         })?;
     }
-
-    write_if_changed(
-        &format!("{}/CMakeLists.txt", cmake_path.display()),
-        &cmake_source(target),
-    )?;
-    write_if_changed(&format!("{}/source.cpp", cmake_path.display()), &source)?;
-    match Command::new("cmake")
-        .args([".."])
+    let source_file = format!("{}/source.c", cmake_path.display());
+    write_if_changed(&source_file, &source)?;
+    let target_lib = if cfg!(target_os = "windows") {
+        format!("{}.dll", target)
+    } else {
+        format!("{}.so", target)
+    };
+    match Command::new("clang")
+        .args(["-shared", "-O3", "-o", &target_lib, &source_file])
         .current_dir(&build_dir)
         .spawn()
-        .expect("cmake failed to start")
+        .expect("clang failed to start")
         .wait_with_output()
-        .expect("cmake config failed")
+        .expect("clang failed")
     {
         output @ _ => match output.status.success() {
             true => {}
             false => {
                 eprintln!(
-                    "cmake output: {}",
+                    "clang output: {}",
                     String::from_utf8(output.stdout).unwrap()
                 );
-                panic!("cmake failed")
+                panic!("compile failed")
             }
         },
     }
-
-    {
-        let mut cmd = Command::new("cmake");
-        cmd.args(["--build", "."]);
-        if cfg!(target_os = "windows") {
-            cmd.args(["--config", "Release"]);
-        }
-        match cmd
-            .current_dir(&build_dir)
-            .spawn()
-            .expect("cmake failed to start")
-            .wait_with_output()
-            .expect("cmake build failed")
-        {
-            output @ _ => match output.status.success() {
-                true => {}
-                false => {
-                    eprintln!(
-                        "cmake output: {}",
-                        String::from_utf8(output.stdout).unwrap()
-                    );
-                    panic!("cmake failed")
-                }
-            },
-        }
-    }
-    Ok(if cfg!(target_os = "windows") {
-        PathBuf::from(format!("{}/Release/{}.dll", build_dir.display(), target))
-    } else {
-        PathBuf::from(format!("{}/{}.so", build_dir.display(), target))
-    })
+    Ok(PathBuf::from(format!(
+        "{}/{}",
+        build_dir.display(),
+        target_lib
+    )))
 }
 
 mod test {
@@ -149,8 +136,8 @@ mod test {
     #[test]
     fn test_compile() {
         use super::*;
-        let src = r#"extern "C" AKR_JIT_DLL_EXPORT int add(int x, int y){return x+y;}
-        extern "C" AKR_JIT_DLL_EXPORT int mul(int x, int y){return x*y;}"#;
+        let src = r#"extern AKR_JIT_DLL_EXPORT int add(int x, int y){return x+y;}
+        extern AKR_JIT_DLL_EXPORT int mul(int x, int y){return x*y;}"#;
         let path = compile(src, "add").unwrap();
         unsafe {
             let lib = libloading::Library::new(dbg!(path)).unwrap();

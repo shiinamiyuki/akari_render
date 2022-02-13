@@ -7,4 +7,5 @@ edition = "2021"
 
 [dependencies]
 libloading = "0.7.3"
-
+smallvec = "1.8.0"
+# llvm-sys = "130"
