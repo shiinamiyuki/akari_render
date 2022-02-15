@@ -22,6 +22,9 @@ impl CodeGen {
         }
     }
     fn g(&mut self, node: usize, bb: &BasicBlock) {
+        if self.visited.contains(&node) {
+            return;
+        }
         self.visited.insert(node);
         let out = node;
         let node = self.program.nodes.get(&node).unwrap().clone();
@@ -56,7 +59,7 @@ impl CodeGen {
                         .per_bb
                         .get_mut(&(bb1.as_ref() as *const BasicBlock))
                         .unwrap();
-                    writeln!(s, "\tv{} = v{};", out, n0).unwrap();
+                    writeln!(s, "\tv{} = v{};", out, n1).unwrap();
                 }
             }
             Node::Arg { ty: _, idx } => {
@@ -134,24 +137,28 @@ impl CodeGen {
         let mut s = String::new();
         loop {
             write!(&mut s, "{}", self.per_bb.get(&(Rc::as_ptr(&bb))).unwrap()).unwrap();
-            let terminator_ = *bb.nodes.last().unwrap();
-            let terminator = self.program.nodes.get(&terminator_).unwrap();
-            match terminator {
-                Node::Cond { .. } => {
-                    write!(&mut s, "if(v{}){{", terminator_).unwrap();
-                    assert!(bb.succs.len() == 2);
-                    write!(&mut s, "{}", self.assemble_bbs(bb.succs[0].upgrade().unwrap())).unwrap();
-                    write!(&mut s, "}}else{{").unwrap();
-                    write!(&mut s, "{}", self.assemble_bbs(bb.succs[1].upgrade().unwrap())).unwrap();
-                    write!(&mut s, "}}").unwrap();
-                    let then = bb.succs[0].upgrade().unwrap();
-                    let merge = then.succs[0].upgrade().unwrap();
-                    bb = merge;
+            if let Some(terminator_) = bb.nodes.last() {
+                let terminator = self.program.nodes.get(terminator_).unwrap();
+                match terminator {
+                    Node::Cond { x, y,cond, .. } => {
+                        let x = x.clone();
+                        let y = y.clone();
+                        write!(&mut s, "if(v{}){{", cond).unwrap();
+                        assert!(bb.succs.len() == 2);
+                        write!(&mut s, "{}", self.assemble_bbs(x.upgrade().unwrap())).unwrap();
+                        write!(&mut s, "}}else{{").unwrap();
+                        write!(&mut s, "{}", self.assemble_bbs(y.upgrade().unwrap())).unwrap();
+                        write!(&mut s, "}}").unwrap();
+                        let merge = bb.merge.clone().unwrap().upgrade().unwrap();
+                        bb = merge;
+                    }
+                    _ => {
+                        assert!(bb.succs.len() <= 1, "{};s={}", bb.succs.len(), s);
+                        break;
+                    }
                 }
-                _ => {
-                    assert!(bb.succs.len() <= 1);
-                    break;
-                }
+            } else {
+                break;
             }
         }
         s

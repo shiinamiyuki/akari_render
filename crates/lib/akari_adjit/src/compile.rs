@@ -66,6 +66,8 @@ pub fn compile(mut source: String, target: &str) -> Result<PathBuf> {
     dbg!(&source);
     let header = r#"
 #include <stdint.h>
+#include <stdbool.h>
+#include <math.h>
 typedef uint32_t u32;
 typedef uint64_t u64;
 typedef float f32;

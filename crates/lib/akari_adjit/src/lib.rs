@@ -1,7 +1,7 @@
 pub mod compile;
 use codegen::CodeGen;
 pub use libloading;
-use var::{CondStmt, Var, RECORDER};
+use var::{Var, RECORDER};
 pub mod codegen;
 pub mod var;
 pub mod vec;
@@ -42,12 +42,8 @@ impl DFunc {
         }
     }
 }
-pub fn jit<F: FnOnce(Vec<Var<f32>>) -> Vec<Var<f32>>>(
-    func_name: &str,
-    ninputs: usize,
-    f: F,
-) -> Func {
-    let inputs = (0..ninputs).map(|i| Var::arg(i)).collect();
+pub fn jit<F: FnOnce(Vec<Var>) -> Vec<Var>>(func_name: &str, ninputs: usize, f: F) -> Func {
+    let inputs = (0..ninputs).map(|i| Var::arg(i, "f32")).collect();
     let outputs = f(inputs);
     RECORDER.with(|r| {
         let r = r.borrow();
@@ -74,12 +70,7 @@ pub fn grad(f: &Func, vars: &[usize]) -> DFunc {
 // pub fn hessian(f: &Func, df: &DFunc, vars: &[usize]) -> DFunc {
 //     todo!()
 // }
-pub fn if_<F: FnOnce() -> T, T>(cond: Var<bool>, then: F, else_: F)
-where
-    Var<bool>: CondStmt<T>,
-{
-    cond.cond(then, else_);
-}
+
 mod test {
     #[test]
     fn test_jit() {
@@ -88,5 +79,24 @@ mod test {
         let mut out = [0.0f32];
         f.call(&[2.0, 3.0], &mut out);
         assert!((out[0] - 5.0).abs() < 1e-4);
+    }
+    #[test]
+    fn test_cond() {
+        use super::*;
+        let f = jit("max", 2, |args| {
+            let out = args[0].cmpgt(args[1]).cond(
+                || {
+                    let x = args[0] * args[0];
+                    vec![x]
+                },
+                || vec![args[1]],
+            );
+            out
+        });
+        let mut out = [0.0f32];
+        f.call(&[2.0, 3.0], &mut out);
+        assert!((out[0] - 3.0).abs() < 1e-4);
+        f.call(&[4.0, 3.0], &mut out);
+        assert!((out[0] - 16.0).abs() < 1e-4);
     }
 }
