@@ -358,6 +358,7 @@ impl Var {
         then: F1,
         else_: F2,
     ) -> Vec<Var> {
+        assert_eq!(self.ty, "bool");
         let (pred, b0, b1) = RECORDER.with(|r| {
             let mut r = r.borrow_mut();
             let mut b0 = BasicBlock::new();
