@@ -1,36 +1,14 @@
 pub mod compile;
 use codegen::CodeGen;
 pub use libloading;
-use var::{Program, Var, RECORDER};
+use var::{CondStmt, Var, RECORDER};
 pub mod codegen;
 pub mod var;
-// use std::ops::Add;
-// trait Bool {
+pub mod vec;
 
-// }
-// trait Num {
-//     fn cmplt(&self, rhs: Self) -> impl Bool;
-//     fn cmpgt(&self, rhs: Self) -> impl Bool;
-//     fn cmple(&self, rhs: Self) -> impl Bool;
-//     fn cmpge(&self, rhs: Self) -> impl Bool;
-//     fn cmpeq(&self, rhs: Self) -> impl Bool;
-//     fn cmpne(&self, rhs: Self) -> impl Bool;
-// }
-
-// trait Int : Num +  {
-
-// }
-
-// pub struct KernelInput<'a> {
-//     pub vi64: &'a [i64],
-//     pub vf32: &'a [f32],
-// }
-// pub struct KernelOutput<'a> {
-//     pub vf32: &'a mut [f32],
-// }
-// pub type KernelFn = unsafe extern "C" fn(*const i64, usize, *const f32, usize, *mut f32, usize);
 pub type FuncCFnPtr = unsafe extern "C" fn(*const f32, *mut f32);
 pub type DFuncCFnPtr = unsafe extern "C" fn(*const f32, *const f32, *const usize, *mut f32);
+// pub type D2FuncCFnPtr = unsafe extern "C" fn(*const f32, *const f32, *const usize, *mut f32);
 pub struct Func {
     size: (usize, usize),
     _lib: libloading::Library,
@@ -93,9 +71,15 @@ pub fn jit<F: FnOnce(Vec<Var<f32>>) -> Vec<Var<f32>>>(
 pub fn grad(f: &Func, vars: &[usize]) -> DFunc {
     todo!()
 }
-// pub fn hessian(f: &Func, vars: &[usize]) -> DFunc {
+// pub fn hessian(f: &Func, df: &DFunc, vars: &[usize]) -> DFunc {
 //     todo!()
 // }
+pub fn if_<F: FnOnce() -> T, T>(cond: Var<bool>, then: F, else_: F)
+where
+    Var<bool>: CondStmt<T>,
+{
+    cond.cond(then, else_);
+}
 mod test {
     #[test]
     fn test_jit() {

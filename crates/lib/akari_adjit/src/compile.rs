@@ -3,7 +3,7 @@ use std::{
     fs::{self, canonicalize},
     io::{Result, Write},
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, Stdio},
 };
 
 // const CMAKE_TEMPLATE: &'static str = r#"
@@ -111,6 +111,7 @@ typedef ptrdiff_t isize;
     match Command::new("clang")
         .args(["-shared", "-O3", "-o", &target_lib, &source_file])
         .current_dir(&build_dir)
+        .stdout(Stdio::piped())
         .spawn()
         .expect("clang failed to start")
         .wait_with_output()
@@ -121,7 +122,7 @@ typedef ptrdiff_t isize;
             false => {
                 eprintln!(
                     "clang output: {}",
-                    String::from_utf8(output.stdout).unwrap()
+                    String::from_utf8(output.stdout).unwrap(),
                 );
                 panic!("compile failed")
             }
