@@ -63,7 +63,6 @@ fn write_if_changed(path: &String, content: &str) -> Result<bool> {
     }
 }
 pub fn compile(mut source: String, target: &str) -> Result<PathBuf> {
-    dbg!(&source);
     let header = r#"
 #include <stdint.h>
 #include <stdbool.h>
@@ -74,8 +73,8 @@ typedef float f32;
 typedef double f64;
 typedef int32_t i32;
 typedef uint32_t u32;
-typedef size_t usize;
-typedef ptrdiff_t isize;
+// typedef size_t usize;
+// typedef ptrdiff_t isize;
     "#;
     source = format!("{}{}", header, source);
     if cfg!(target_os = "windows") {
