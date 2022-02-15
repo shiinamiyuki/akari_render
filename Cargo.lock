@@ -127,6 +127,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "akari_jit"
+version = "0.1.0"
+dependencies = [
+ "libloading",
+ "smallvec",
+]
+
+[[package]]
 name = "akari_net"
 version = "0.1.0"
 dependencies = [
