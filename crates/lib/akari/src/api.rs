@@ -148,9 +148,16 @@ impl ApiContext {
             node::Bsdf::Diffuse { color } => Arc::new(DiffuseBsdf {
                 color: self.load_spectrum_texture(color),
             }),
-            node::Bsdf::Glass { kt, kr } => Arc::new(FresnelSpecularBsdf {
+            node::Bsdf::Glass {
+                kt,
+                kr,
+                ior,
+                dispersion,
+            } => Arc::new(FresnelSpecularBsdf {
                 kt: self.load_spectrum_texture(kt),
                 kr: self.load_spectrum_texture(kr),
+                a: *ior,
+                b: *dispersion,
             }),
             node::Bsdf::Principled {
                 color,
@@ -280,7 +287,7 @@ impl ApiContext {
                     m = Mat4::from_axis_angle(vec3(1.0, 0.0, 0.0), r[0]) * m;
                     m = Mat4::from_axis_angle(vec3(0.0, 0.0, 1.0), -r[1]) * m;
                     m = Mat4::from_axis_angle(vec3(0.0, 1.0, 0.0), r[2]) * m;
-                    m = Mat4::from_translation(vec3(t.x, t.z,-t.y)) * m;
+                    m = Mat4::from_translation(vec3(t.x, t.z, -t.y)) * m;
                 } else {
                     unreachable!()
                 }

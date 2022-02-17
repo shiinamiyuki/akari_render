@@ -1,0 +1,213 @@
+{
+    "bsdfs": {
+        "Material.001": {
+            "kr": {
+                "type": "linear",
+                "values": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "kt": {
+                "type": "linear",
+                "values": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "dispersion": 0.01342,
+            "type": "glass"
+        },
+        "Material.003": {
+            "anisotropic": 0.0,
+            "anisotropic_rotation": 0.0,
+            "clearcoat": 0.0,
+            "clearcoat_roughness": 0.029999999329447746,
+            "color": {
+                "type": "srgb",
+                "values": [
+                    0.026020878925919533,
+                    0.026020878925919533,
+                    0.026020878925919533
+                ]
+            },
+            "emission": {
+                "type": "linear",
+                "values": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            "ior": 1.4500000476837158,
+            "metallic": 0.9979900121688843,
+            "roughness": 0.07832604646682739,
+            "sheen": 0.0,
+            "sheen_tint": 0.5,
+            "specular": 0.0,
+            "specular_tint": 0.0,
+            "subsurface": 0.0,
+            "subsurface_color": {
+                "type": "srgb",
+                "values": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            "subsurface_ior": 1.4500000476837158,
+            "subsurface_radius": {
+                "type": "linear",
+                "values": [
+                    1.0,
+                    0.20000000298023224,
+                    0.10000000149011612
+                ]
+            },
+            "transmission": 0.0,
+            "type": "principled"
+        },
+        "None": {
+            "anisotropic": 0.0,
+            "anisotropic_rotation": 0.0,
+            "clearcoat": 0.0,
+            "clearcoat_roughness": 0.029999999329447746,
+            "color": {
+                "type": "srgb",
+                "values": [
+                    0.9063317179679871,
+                    0.9063317179679871,
+                    0.9063317179679871
+                ]
+            },
+            "emission": {
+                "type": "linear",
+                "values": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            "ior": 1.4500000476837158,
+            "metallic": 0.5555555820465088,
+            "roughness": 0.06311944127082825,
+            "sheen": 0.0,
+            "sheen_tint": 0.5,
+            "specular": 0.0,
+            "specular_tint": 0.0,
+            "subsurface": 0.0,
+            "subsurface_color": {
+                "type": "srgb",
+                "values": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            "subsurface_ior": 1.4500000476837158,
+            "subsurface_radius": {
+                "type": "linear",
+                "values": [
+                    1.0,
+                    0.20000000298023224,
+                    0.10000000149011612
+                ]
+            },
+            "transmission": 0.0,
+            "type": "principled"
+        }
+    },
+    "camera": {
+        "focal": 1.0,
+        "fov": 42.0,
+        "lens_radius": 0.0,
+        "res": [
+            512,
+            512
+        ],
+        "transform": {
+            "translate": [
+                7.941,
+                6.1164,
+                17.395
+            ],
+            "rotate": [
+                9.78,
+                1.05,
+                109
+            ],
+            "scale": [
+                1,
+                1,
+                1
+            ],
+            "coord_sys": "blender"
+        },
+        "type": "perspective"
+    },
+    "lights": [
+        {
+            "type": "point",
+            "pos": [
+                7.0,
+                4.0,
+                6.0
+            ],
+            "emission": {
+                "type": "linear",
+                "values": [
+                    60.0,
+                    60.0,
+                    60.0
+                ]
+            }
+        },
+        {
+            "type": "spot",
+            "transform": {
+                "translate": [
+                    8.505,
+                    -1.7695,
+                    0.043819
+                ],
+                "rotate": [
+                    19.1,
+                    -62,
+                    124
+                ],
+                "scale": [
+                    1,
+                    1,
+                    1
+                ],
+                "coord_sys": "blender"
+            },
+            "max_angle": 26.0,
+            "falloff": 24.0,
+            "emission": {
+                "type": "linear",
+                "values": [
+                    150.0,
+                    150.0,
+                    150.0
+                ]
+            }
+        }
+    ],
+    "shapes": [
+        {
+            "bsdf": "None",
+            "path": "psor_Plane_Plane.001_0.mesh",
+            "transform": null,
+            "type": "mesh"
+        },
+        {
+            "bsdf": "Material.001",
+            "path": "psor_Cubo_Prism_01_1.mesh",
+            "transform": null,
+            "type": "mesh"
+        }
+    ]
+}

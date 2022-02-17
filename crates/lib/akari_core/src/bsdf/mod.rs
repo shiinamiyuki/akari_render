@@ -432,6 +432,8 @@ impl LocalBsdfClosure for SpecularBsdfClosure {
 pub struct FresnelSpecularBsdf {
     pub kr: Arc<dyn SpectrumTexture>,
     pub kt: Arc<dyn SpectrumTexture>,
+    pub a: f32,
+    pub b: f32,
     // pub ior: Arc<dyn SpectrumTexture>,
 }
 pub struct FresnelSpecularBsdfClosure {
@@ -449,12 +451,16 @@ impl Bsdf for FresnelSpecularBsdf {
         lambda: &mut SampledWavelengths,
         arena: &'a Bump,
     ) -> &'a dyn LocalBsdfClosure {
-        // lambda.terminate_secondary();
+        if self.b > 0.0 {
+            lambda.terminate_secondary();
+        }
+        let primary = lambda[0];
+        let ior = self.a + self.b / (primary * 1e-3).powi(2);
         arena.alloc(FresnelSpecularBsdfClosure {
             kt: self.kt.evaluate(sp, lambda),
             kr: self.kr.evaluate(sp, lambda),
             eta_a: 1.0,
-            eta_b: 1.5,
+            eta_b: ior,
             mode,
         })
     }

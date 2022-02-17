@@ -5,7 +5,7 @@ pub mod node {
     use std::collections::HashMap;
 
     use akari_common::ordered_float::Float;
-    
+
     use super::*;
     #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
     #[serde(rename_all = "snake_case")]
@@ -109,6 +109,12 @@ pub mod node {
             cache: Option<TextureCache>,
         },
     }
+    fn default_ior() -> f32 {
+        1.502
+    }
+    fn default_dispersion() -> f32 {
+        0.0
+    }
     #[derive(Clone, Serialize, Deserialize)]
     #[serde(tag = "type")]
     pub enum Bsdf {
@@ -116,6 +122,10 @@ pub mod node {
         Diffuse { color: SpectrumTexture },
         #[serde(rename = "glass")]
         Glass {
+            #[serde(default = "default_ior")]
+            ior: f32,
+            #[serde(default = "default_dispersion")]
+            dispersion: f32,
             kr: SpectrumTexture,
             kt: SpectrumTexture,
         },
@@ -199,7 +209,7 @@ pub mod node {
         pub fn foreach_texture<F: FnMut(GenericTextureRefMut<'_>)>(&mut self, mut f: F) {
             match self {
                 Bsdf::Diffuse { color } => f(GenericTextureRefMut::Spectrum(color)),
-                Bsdf::Glass { kr, kt } => {
+                Bsdf::Glass { kr, kt,.. } => {
                     f(GenericTextureRefMut::Spectrum(kr));
                     f(GenericTextureRefMut::Spectrum(kt));
                 }

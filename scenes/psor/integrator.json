@@ -1,0 +1,13 @@
+{
+    "type":"mmlt",
+    "spp":32,
+    "batch_size":1024,
+    "max_depth":7,
+    "direct_spp":32,
+    "training_iters":256,
+    "learning_rate":0.001,
+    "n_bootstrap":100000,
+    "visualize_cache":false,
+    "initial_radius":0.03,
+    "single_wavelength":false
+}
