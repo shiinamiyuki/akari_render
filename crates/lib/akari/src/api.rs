@@ -28,6 +28,7 @@ use akari_core::texture::ImageSpectrumTexture;
 use core::panic;
 use glam::*;
 use integrator::bdpt;
+use integrator::bdpt::DebugOption;
 use integrator::erpt;
 use integrator::mmlt;
 use integrator::pssmlt;
@@ -453,7 +454,15 @@ pub fn load_integrator(path: &Path) -> Box<dyn Integrator> {
         "bdpt" => {
             let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
             let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as usize;
-            let debug = (|| json.get("bdpt_debug")?.as_bool())().unwrap_or(false);
+            let debug = match (|| json.get("bdpt_debug")?.as_str())().unwrap_or("") {
+                "" => DebugOption::None,
+                "w" | "weighted" => DebugOption::Weighted,
+                "u" | "unweighted" => DebugOption::Unweighted,
+                o @ _ => {
+                    log::error!("invalid bdpt debug option {}", o);
+                    DebugOption::None
+                }
+            };
             Box::new(bdpt::Bdpt {
                 spp,
                 max_depth,

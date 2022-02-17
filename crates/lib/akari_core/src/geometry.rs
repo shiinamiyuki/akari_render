@@ -118,13 +118,18 @@ impl Ray {
         ray.tmax = len;
         ray
     }
-    pub fn spawn_to_offseted(p1: Vec3, p2: Vec3, n1: Vec3, n2: Vec3) -> Self {
+    pub fn spawn_to_offseted1(p1: Vec3, p2: Vec3, n1: Vec3) -> Self {
+        let d = (p2 - p1).normalize();
+        let p1 = offset_ray(p1, if d.dot(n1) > 0.0 { n1 } else { -n1 });
+        let ray = Self::spawn_to(p1, p2);
+
+        ray
+    }
+    pub fn spawn_to_offseted2(p1: Vec3, p2: Vec3, n1: Vec3, n2: Vec3) -> Self {
         let d = (p2 - p1).normalize();
         let p1 = offset_ray(p1, if d.dot(n1) > 0.0 { n1 } else { -n1 });
         let p2 = offset_ray(p2, if d.dot(n2) > 0.0 { -n2 } else { n2 });
-        let mut ray = Self::spawn(p1, p1);
-        let len = (p1 - p2).length();
-        ray.tmax = len;
+        let ray = Self::spawn_to(p1, p2);
         ray
     }
     pub fn at(&self, t: f32) -> Vec3 {
@@ -349,7 +354,6 @@ pub struct Bounds2u {
     pub min: UVec2,
     pub max: UVec2,
 }
-
 
 #[derive(Clone, Copy, Debug)]
 pub struct Aabb {

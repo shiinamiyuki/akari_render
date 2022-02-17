@@ -62,7 +62,7 @@ impl Chain {
             pixel.x.min(scene.camera.resolution().x - 1),
             pixel.y.min(scene.camera.resolution().y - 1),
         );
-        let lambda = SampledWavelengths::sample_visible(self.sampler.next1d());
+        let lambda = SampledWavelengths::sample_visible(self.sampler.rng.next1d());
         self.run_at_pixel(pixel, scene, lambda, arena)
     }
 }

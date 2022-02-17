@@ -75,6 +75,7 @@ where
     let z1 = bilinear(|x, y| f(x, y, 1), vec2(weights.x, weights.y));
     lerp(z0, z1, weights.z)
 }
+
 pub trait AsAny: Any {
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;

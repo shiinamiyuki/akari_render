@@ -145,6 +145,7 @@ impl Camera for PerspectiveCamera {
         if cos_theta <= 0.0 {
             return (None, SampledSpectrum::zero());
         }
+        // assert!(cos_theta <= 1.0 + 1e-3);
         let p_focus = ray.at(1.0 / cos_theta);
         let p_raster = self.c2r.transform_point(self.w2c.transform_point(p_focus));
         // assert!(p_raster.z.abs() < 1e-3);

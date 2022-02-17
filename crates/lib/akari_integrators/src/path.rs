@@ -51,13 +51,13 @@ impl PathTracer {
                         // li += beta * light.le(&ray);
                         if depth == 0 {
                             if !indirect_only {
-                                li += beta * light.le(&ray, lambda);
+                                li += beta * light.emission(&ray, lambda);
                             }
                         } else {
                             if !indirect_only || depth > 1 {
                                 let light_pdf = scene.light_distr.pdf(light)
                                     * light
-                                        .pdf_li(
+                                        .pdf_direct(
                                             ray.d,
                                             &ReferencePoint {
                                                 p: ray.o,
@@ -74,7 +74,7 @@ impl PathTracer {
                                     mis_weight(bsdf_pdf, light_pdf)
                                 };
 
-                                li += beta * light.le(&ray, lambda) * weight;
+                                li += beta * light.emission(&ray, lambda) * weight;
                             }
                         }
                     }
@@ -100,7 +100,7 @@ impl PathTracer {
                         };
                         if !sample_self {
                             let p_ref = ReferencePoint { p, n: ng };
-                            let light_sample = light.sample_li(sampler.next3d(), &p_ref, lambda);
+                            let light_sample = light.sample_direct(sampler.next3d(), &p_ref, lambda);
                             let light_pdf = light_sample.pdf * light_pdf;
                             if (!indirect_only || depth > 1)
                                 && light_pdf > 0.0

@@ -7,10 +7,16 @@ use crate::sampler::Pcg;
 use crate::sampler::Sampler;
 use crate::util::PerThread;
 use crate::*;
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum DebugOption {
+    None,
+    Unweighted,
+    Weighted,
+}
 pub struct Bdpt {
     pub spp: u32,
     pub max_depth: usize,
-    pub debug: bool,
+    pub debug: DebugOption,
 }
 
 impl Integrator for Bdpt {
@@ -36,7 +42,7 @@ impl Integrator for Bdpt {
             let pixel = uvec2(x, y);
 
             let mut debug_acc = vec![];
-            if self.debug {
+            if self.debug != DebugOption::None {
                 for _t in 1..=self.max_depth + 2 {
                     for _s in 0..=self.max_depth + 2 {
                         debug_acc.push(XYZ::zero());
@@ -97,17 +103,25 @@ impl Integrator for Bdpt {
                                         li * weight / self.spp as f32,
                                         lambda.clone(),
                                     );
-                                    if self.debug {
+                                    if self.debug == DebugOption::Weighted {
                                         pyramid[get_index(s, t)].add_splat(
                                             raster,
                                             li * weight / self.spp as f32,
                                             lambda,
                                         );
+                                    } else if self.debug == DebugOption::Unweighted {
+                                        pyramid[get_index(s, t)].add_splat(
+                                            raster,
+                                            li / self.spp as f32,
+                                            lambda,
+                                        );
                                     }
                                 }
                             } else {
-                                if self.debug {
+                                if self.debug == DebugOption::Weighted {
                                     debug_acc[get_index(s, t)] += lambda.cie_xyz(li * weight);
+                                } else if self.debug == DebugOption::Unweighted {
+                                    debug_acc[get_index(s, t)] += lambda.cie_xyz(li);
                                 }
                                 acc_li += li * weight;
                             }
@@ -120,7 +134,7 @@ impl Integrator for Bdpt {
                 arena.reset();
             }
 
-            if self.debug {
+            if self.debug != DebugOption::None {
                 for t in 2..=(self.max_depth + 2) as isize {
                     for s in 0..=(self.max_depth + 2) as isize {
                         let depth = s + t - 2;
@@ -141,7 +155,7 @@ impl Integrator for Bdpt {
             }
         });
         progress.finish();
-        if self.debug {
+        if self.debug != DebugOption::None {
             for t in 1..=(self.max_depth + 2) as isize {
                 for s in 0..=(self.max_depth + 2) as isize {
                     let depth = s + t - 2;

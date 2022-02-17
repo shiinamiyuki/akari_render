@@ -199,11 +199,29 @@ impl<'a> Vertex<'a> {
             Self::Camera(v) => &mut v.base,
         }
     }
-    pub fn pdf_light_origin(&self, scene: &Scene, next: &Vertex) -> f32 {
+    pub fn pdf_emission_origin(&self, scene: &Scene, next: &Vertex) -> f32 {
         match self {
             Vertex::Light(v) => {
                 let light_pdf = scene.light_distr.pdf(v.light);
-                let (pdf_pos, _) = v.light.pdf_le(&Ray::spawn_to(self.p(), next.p()), self.n());
+                let (pdf_pos, _) = v
+                    .light
+                    .pdf_emission(&Ray::spawn_to(self.p(), next.p()), self.n());
+                light_pdf * pdf_pos
+            }
+            _ => unreachable!(),
+        }
+    }
+    pub fn pdf_direct_origin(&self, scene: &Scene, next: &Vertex) -> f32 {
+        match self {
+            Vertex::Light(v) => {
+                let light_pdf = scene.light_distr.pdf(v.light);
+                let (pdf_pos, _) = v.light.pdf_direct(
+                    (self.p() - next.p()).normalize(),
+                    &ReferencePoint {
+                        p: next.p(),
+                        n: self.n(),
+                    },
+                );
                 light_pdf * pdf_pos
             }
             _ => unreachable!(),
@@ -213,7 +231,7 @@ impl<'a> Vertex<'a> {
         match self {
             Vertex::Light(v) => {
                 let ray = Ray::spawn_to(self.p(), next.p());
-                let (_pdf_pos, pdf_dir) = v.light.pdf_le(&ray, self.n());
+                let (_pdf_pos, pdf_dir) = v.light.pdf_emission(&ray, self.n());
                 self.convert_pdf_to_area(pdf_dir, next)
             }
             _ => unreachable!(),
@@ -242,7 +260,7 @@ impl<'a> Vertex<'a> {
         &self,
         next: &Vertex<'a>,
         _mode: TransportMode,
-        lambda: &SampledWavelengths,
+        _lambda: &SampledWavelengths,
     ) -> SampledSpectrum {
         let v1 = self.as_surface().unwrap();
         // let v2 = next.as_surface().unwrap();
@@ -273,7 +291,7 @@ impl<'a> Vertex<'a> {
         if let Some(v) = self.as_light() {
             let mut ray = Ray::spawn_to(prev.p(), self.p());
             ray.tmax *= 1.0 + 1e-3;
-            v.light.le(&ray, lambda)
+            v.light.emission(&ray, lambda)
         } else {
             SampledSpectrum::zero()
         }
@@ -448,7 +466,7 @@ pub fn generate_light_path<'a, 'b>(
     }
     path.clear();
     let (light, light_pdf) = scene.light_distr.sample(sampler.next1d());
-    let sample = light.sample_le(sampler.next3d(), sampler.next2d(), lambda);
+    let sample = light.sample_emission(sampler.next3d(), sampler.next2d(), lambda);
     let le = sample.le;
     let beta =
         le / (sample.pdf_dir * sample.pdf_pos * light_pdf) * sample.ray.d.dot(sample.n).abs();
@@ -564,7 +582,7 @@ where
             pt.base_mut().pdf_rev = if s > 0 {
                 qs.unwrap().pdf(scene, qs_minus, pt)
             } else {
-                pt.pdf_light_origin(scene, pt_minus)
+                pt.pdf_emission_origin(scene, pt_minus)
             };
         }
 
@@ -699,7 +717,7 @@ where
                 p: pt.p(),
                 n: pt.n(),
             };
-            let light_sample = light.sample_li(sampler.next3d(), &p_ref, lambda);
+            let light_sample = light.sample_direct(sampler.next3d(), &p_ref, lambda);
             if !light_sample.li.is_black() && light_sample.pdf > 0.0 {
                 {
                     let mut v = Vertex::create_light_vertex(
@@ -709,7 +727,7 @@ where
                         light_sample.li / (light_sample.pdf * light_pdf),
                         0.0,
                     );
-                    v.base_mut().pdf_fwd = v.pdf_light_origin(scene, pt);
+                    v.base_mut().pdf_fwd = v.pdf_direct_origin(scene, pt);
                     sampled = Some(v);
                 }
                 {
