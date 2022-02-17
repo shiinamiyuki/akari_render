@@ -9,6 +9,7 @@ Previous version with PPG and SMCMC is in [legacy-cpp](https://github.com/shiina
 
 
 ## Features
+- Spectral Rendering
 - Out of Core Rendering
 - Unidirectional Path Tracing
 - Wavefront Path Tracing
