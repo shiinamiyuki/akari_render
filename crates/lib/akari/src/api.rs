@@ -23,6 +23,7 @@ use crate::util::binserde::Decode;
 use crate::util::FileResolver;
 use crate::util::LocalFileResolver;
 use crate::*;
+use akari_core::scenegraph::node::CoordinateSystem;
 use akari_core::texture::ImageSpectrumTexture;
 use core::panic;
 use glam::*;
@@ -229,9 +230,28 @@ impl ApiContext {
                     colorspace: emission.colorspace(),
                 })
             }
+            node::Light::Spot {
+                transform,
+                emission,
+                max_angle,
+                falloff,
+            } => {
+                let emission = self.load_spectrum_texture(emission);
+                let transform = self.load_transform(*transform, true);
+                let pos = transform.transform_point(Vec3::ZERO);
+                let dir = transform.transform_vector(vec3(0.0, 0.0, -1.0));
+                Arc::new(SpotLight {
+                    position: pos,
+                    direction: dir,
+                    max_angle: max_angle.to_radians().cos(),
+                    falloff: falloff.to_radians().cos(),
+                    emission: emission.clone(),
+                    colorspace: emission.colorspace(),
+                })
+            }
         }
     }
-    fn load_transform(&self, t: node::Transform) -> Transform {
+    fn load_transform(&self, t: node::Transform, is_camera: bool) -> Transform {
         match t {
             node::Transform::TRS(trs) => {
                 let mut m = Mat4::IDENTITY;
@@ -239,15 +259,31 @@ impl ApiContext {
                     translate: t,
                     rotate: r,
                     scale: s,
+                    coord_sys,
                 } = trs;
                 let (t, r, s) = (t.into(), r.into(), s.into());
                 let r: Vec3 = r;
                 let r = vec3(r.x.to_radians(), r.y.to_radians(), r.z.to_radians());
-                m = Mat4::from_scale(s) * m;
-                m = Mat4::from_axis_angle(vec3(1.0, 0.0, 0.0), r[0]) * m;
-                m = Mat4::from_axis_angle(vec3(0.0, 1.0, 0.0), r[1]) * m;
-                m = Mat4::from_axis_angle(vec3(0.0, 0.0, 1.0), r[2]) * m;
-                m = Mat4::from_translation(t) * m;
+                if !is_camera {
+                    m = Mat4::from_scale(s) * m;
+                }
+                if coord_sys == CoordinateSystem::Akari {
+                    m = Mat4::from_axis_angle(vec3(0.0, 0.0, 1.0), r[2]) * m;
+                    m = Mat4::from_axis_angle(vec3(1.0, 0.0, 0.0), r[0]) * m;
+                    m = Mat4::from_axis_angle(vec3(0.0, 1.0, 0.0), r[1]) * m;
+                    m = Mat4::from_translation(t) * m;
+                } else if coord_sys == CoordinateSystem::Blender {
+                    if is_camera {
+                        // blender camera starts pointing at (0,0,-1) a.k.a down
+                        m = Mat4::from_axis_angle(vec3(1.0, 0.0, 0.0), -PI / 2.0) * m;
+                    }
+                    m = Mat4::from_axis_angle(vec3(1.0, 0.0, 0.0), r[0]) * m;
+                    m = Mat4::from_axis_angle(vec3(0.0, 0.0, 1.0), -r[1]) * m;
+                    m = Mat4::from_axis_angle(vec3(0.0, 1.0, 0.0), r[2]) * m;
+                    m = Mat4::from_translation(vec3(t.x, t.z,-t.y)) * m;
+                } else {
+                    unreachable!()
+                }
 
                 Transform::from_matrix(&m)
             }
@@ -266,7 +302,7 @@ impl ApiContext {
                 transform,
             } => Arc::new(PerspectiveCamera::new(
                 uvec2(res.0, res.1),
-                &self.load_transform(transform),
+                &self.load_transform(transform, true),
                 fov.to_radians() as f32,
             )),
         });

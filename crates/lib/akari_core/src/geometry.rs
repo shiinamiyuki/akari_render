@@ -287,7 +287,7 @@ pub fn refract(wi: Vec3, mut n: Vec3, mut eta: f32) -> Option<Vec3> {
     }
 
     let sin2_theta_i = 0.0f32.max(1.0 - cos_theta_i * cos_theta_i);
-    let sin2_theta_t = sin2_theta_i / eta * eta;
+    let sin2_theta_t = sin2_theta_i / (eta * eta);
 
     if sin2_theta_i >= 1.0 {
         return None;

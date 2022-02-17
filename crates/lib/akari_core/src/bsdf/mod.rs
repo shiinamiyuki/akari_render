@@ -454,7 +454,7 @@ impl Bsdf for FresnelSpecularBsdf {
             kt: self.kt.evaluate(sp, lambda),
             kr: self.kr.evaluate(sp, lambda),
             eta_a: 1.0,
-            eta_b: 1.333,
+            eta_b: 1.5,
             mode,
         })
     }
@@ -488,7 +488,7 @@ impl LocalBsdfClosure for FresnelSpecularBsdfClosure {
             } else {
                 (self.eta_b, self.eta_a)
             };
-            let wi = refract(wo, Vec3::Y, eta_i / eta_t)?;
+            let wi = refract(wo, Vec3::Y, self.eta_b / self.eta_a)?;
             let mut ft = self.kt * (1.0 - f);
             if self.mode == TransportMode::CameraToLight {
                 ft *= (eta_i * eta_i) / (eta_t * eta_t);

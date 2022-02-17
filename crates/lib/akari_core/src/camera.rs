@@ -44,7 +44,11 @@ impl PerspectiveCamera {
     pub fn new(resolution: UVec2, transform: &Transform, fov: f32) -> Self {
         {
             let det = transform.m3.determinant();
-            assert!((det - 1.0).abs() < 0.01, "transform has det != 1.0");
+            assert!(
+                (det - 1.0).abs() < 0.01,
+                "transform has det = {} != 1.0",
+                det
+            );
         }
         let mut m = Mat4::IDENTITY;
         let fres = vec2(resolution.x as f32, resolution.y as f32);

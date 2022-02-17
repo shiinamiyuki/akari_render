@@ -1,17 +1,32 @@
 use crate::*;
 use serde::{Deserialize, Serialize};
+
 pub mod node {
     use std::collections::HashMap;
 
     use akari_common::ordered_float::Float;
-
+    
     use super::*;
-
+    #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+    #[serde(rename_all = "snake_case")]
+    pub enum CoordinateSystem {
+        // RightHandYUp,
+        // RightHandZUp,
+        Akari,   //RightHandYUp
+        Blender, //RightHandZUp
+    }
+    impl Default for CoordinateSystem {
+        fn default() -> Self {
+            Self::Akari
+        }
+    }
     #[derive(Clone, Copy, Serialize, Deserialize)]
     pub struct TRS {
         pub translate: [f32; 3],
         pub rotate: [f32; 3],
         pub scale: [f32; 3],
+        #[serde(default)]
+        pub coord_sys: CoordinateSystem,
     }
     #[derive(Clone, Copy, Serialize, Deserialize)]
     pub struct LookAt {
@@ -31,6 +46,7 @@ pub mod node {
                 translate: [0.0; 3],
                 rotate: [0.0; 3],
                 scale: [1.0, 1.0, 1.0],
+                coord_sys: Default::default(),
             }
         }
     }
@@ -144,6 +160,13 @@ pub mod node {
         Point {
             pos: [f32; 3],
             emission: SpectrumTexture,
+        },
+        #[serde(rename = "spot")]
+        Spot {
+            transform: Transform,
+            emission: SpectrumTexture,
+            falloff: f32,
+            max_angle: f32,
         },
     }
     #[derive(Clone, Serialize, Deserialize)]

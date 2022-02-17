@@ -358,7 +358,7 @@ pub fn random_walk<'a, 'b>(
             let bsdf = opt_bsdf.unwrap();
             let wo = -ray.d;
 
-            let mut vertex = Vertex::create_surface_vertex(
+            let vertex = Vertex::create_surface_vertex(
                 beta,
                 p,
                 bsdf.clone(),

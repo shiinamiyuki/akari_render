@@ -64,7 +64,7 @@ impl PowerLightDistribution {
     }
     pub fn new(lights: Vec<Arc<dyn Light>>) -> Self {
         let power: Vec<_> = lights.iter().map(|light| light.power()).collect();
-        let dist = Distribution1D::new(power.as_slice()).unwrap_or_else(||->Distribution1D {
+        let dist = Distribution1D::new(power.as_slice()).unwrap_or_else(|| -> Distribution1D {
             log::error!("no lights defined in scene");
             exit(-1);
         });
@@ -240,7 +240,97 @@ impl Light for AreaLight {
         self.emission.power() * self.shape.area()
     }
 }
+pub struct SpotLight {
+    pub position: Vec3,
+    pub direction: Vec3,
+    pub max_angle: f32,
+    pub falloff: f32,
+    pub emission: Arc<dyn SpectrumTexture>,
+    pub colorspace: Option<RgbColorSpace>,
+}
+impl SpotLight {
+    fn falloff(&self, w: Vec3) -> f32 {
+        let cos = self.direction.dot(w);
+        if cos < self.max_angle {
+            return 0.0;
+        }
+        if cos > self.falloff {
+            return 1.0;
+        }
+        let d = (cos - self.max_angle) / (self.falloff - self.max_angle);
+        d.powi(4)
+    }
+    fn evaluate(&self, w: Vec3, lambda: &SampledWavelengths) -> SampledSpectrum {
+        let uv = spherical_to_uv(dir_to_spherical(w));
+        let sp = ShadingPoint { texcoord: uv };
+        let s = self.emission.evaluate(&sp, lambda);
+        let falloff = self.falloff(w);
+        if let Some(colorspace) = self.colorspace {
+            let illuminant = colorspace.illuminant();
+            let i = illuminant.sample(lambda);
+            s * i * falloff
+        } else {
+            s * falloff
+        }
+    }
+}
+impl Light for SpotLight {
+    fn sample_le(&self, _u0: Vec3, u1: Vec2, lambda: &SampledWavelengths) -> LightRaySample {
+        let w = uniform_sample_cone(u1, self.max_angle);
+        let frame = Frame::from_normal(self.direction);
+        let w = frame.to_world(w);
+        LightRaySample {
+            le: self.evaluate(w, lambda),
+            pdf_pos: 1.0,
+            pdf_dir: uniform_cone_pdf(self.max_angle),
+            ray: Ray::spawn(self.position, w),
+            n: w,
+        }
+    }
 
+    fn sample_li(
+        &self,
+        _u: Vec3,
+        ref_: &ReferencePoint,
+        lambda: &SampledWavelengths,
+    ) -> LightSample {
+        let mut ray = Ray::spawn_to(self.position, ref_.p);
+        let len2 = {
+            let v = self.position - ref_.p;
+            v.length_squared()
+        };
+        let wi = (self.position - ref_.p).normalize();
+        ray.tmax *= 0.997;
+        LightSample {
+            li: self.evaluate(-wi, lambda) / len2,
+            pdf: 1.0,
+            shadow_ray: ray,
+            wi,
+            p: self.position,
+            n: ray.d.normalize(),
+        }
+    }
+
+    fn pdf_le(&self, _ray: &Ray, _n: Vec3) -> (f32, f32) {
+        (0.0, uniform_cone_pdf(self.max_angle))
+    }
+
+    fn pdf_li(&self, _wi: Vec3, _p: &ReferencePoint) -> (f32, f32) {
+        (0.0, 0.0)
+    }
+
+    fn le(&self, _ray: &Ray, _lambda: &SampledWavelengths) -> SampledSpectrum {
+        SampledSpectrum::zero()
+    }
+
+    fn flags(&self) -> LightFlags {
+        LightFlags::DELTA_POSITION
+    }
+
+    fn power(&self) -> f32 {
+        self.emission.power() * 2.0 * PI * (1.0 - 0.5 * (self.max_angle + self.falloff))
+    }
+}
 pub struct PointLight {
     pub position: Vec3,
     pub emission: Arc<dyn SpectrumTexture>,
@@ -263,7 +353,7 @@ impl PointLight {
 }
 impl Light for PointLight {
     fn sample_le(&self, _: Vec3, u1: Vec2, lambda: &SampledWavelengths) -> LightRaySample {
-        let w = uniform_sphere_sampling(u1);
+        let w = uniform_sample_sphere(u1);
         LightRaySample {
             le: self.evaluate(w, lambda),
             pdf_pos: 1.0,
@@ -309,6 +399,6 @@ impl Light for PointLight {
     }
 
     fn power(&self) -> f32 {
-        self.emission.power()
+        self.emission.power() * 4.0 * PI
     }
 }
