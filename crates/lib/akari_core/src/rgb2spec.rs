@@ -14,10 +14,6 @@ impl Rgb2SpectrumData {
         table: [[[[[0.0f32; 3]; SPECTRUM_TABLE_RES]; SPECTRUM_TABLE_RES]; SPECTRUM_TABLE_RES]; 3],
     };
 }
-extern "C" {
-    pub fn gen_rgb2spec_table(res: u32, gamut_s: *const c_char, scale: *mut f32, table: *mut f32);
-}
-
 pub fn load_rgb2spec_data(gamut: &str, file: String) -> Arc<Rgb2SpectrumData> {
     let exe_path = std::env::current_exe().unwrap();
     let parent = exe_path.parent().unwrap();
@@ -26,30 +22,46 @@ pub fn load_rgb2spec_data(gamut: &str, file: String) -> Arc<Rgb2SpectrumData> {
     let data_file = data_file.into_boxed_path();
 
     if !data_file.exists() {
-        unsafe {
+        {
             log::info!("{} does not exist, generating...", data_file.display());
-            let mut scale = Box::new([0.0f32; SPECTRUM_TABLE_RES]);
-            let mut table = Box::new(
-                [[[[[0.0f32; 3]; SPECTRUM_TABLE_RES]; SPECTRUM_TABLE_RES]; SPECTRUM_TABLE_RES]; 3],
-            );
-            let gamut = CString::new(gamut).unwrap();
-            gen_rgb2spec_table(
-                SPECTRUM_TABLE_RES as u32,
-                gamut.as_ptr(),
-                scale.as_mut_ptr(),
-                table.as_mut_ptr() as *mut f32,
-            );
-            let mut file = std::fs::File::create(&data_file).unwrap();
-            file.write_all(std::slice::from_raw_parts(
-                scale.as_ptr() as *const u8,
-                size_of::<Rgb2SpectrumScale>(),
-            ))
-            .unwrap();
-            file.write_all(std::slice::from_raw_parts(
-                table.as_ptr() as *const u8,
-                size_of::<Rgb2SpectrumTable>(),
-            ))
-            .unwrap();
+            // let mut scale = Box::new([0.0f32; SPECTRUM_TABLE_RES]);
+            // let mut table = Box::new(
+            //     [[[[[0.0f32; 3]; SPECTRUM_TABLE_RES]; SPECTRUM_TABLE_RES]; SPECTRUM_TABLE_RES]; 3],
+            // );
+            // let gamut = CString::new(gamut).unwrap();
+            // gen_rgb2spec_table(
+            //     SPECTRUM_TABLE_RES as u32,
+            //     gamut.as_ptr(),
+            //     scale.as_mut_ptr(),
+            //     table.as_mut_ptr() as *mut f32,
+            // );
+            // let mut file = std::fs::File::create(&data_file).unwrap();
+            // file.write_all(std::slice::from_raw_parts(
+            //     scale.as_ptr() as *const u8,
+            //     size_of::<Rgb2SpectrumScale>(),
+            // ))
+            // .unwrap();
+            // file.write_all(std::slice::from_raw_parts(
+            //     table.as_ptr() as *const u8,
+            //     size_of::<Rgb2SpectrumTable>(),
+            // ))
+            // .unwrap();
+            let path = current_exe().unwrap();
+            let mut path = PathBuf::from(path.parent().unwrap());
+            path.push("rgb2spec_opt");
+            // dbg!(path.display());
+            let data_file = data_file.as_os_str().to_str().unwrap();
+            if !Command::new(path)
+                .args(["64", data_file, gamut])
+                .spawn()
+                .expect("failed to launch rgb2spec_opt")
+                .wait()
+                .unwrap()
+                .success()
+            {
+                eprintln!("failed to generate rgb2spec data");
+                exit(-1);
+            }
         }
         load_rgb2spec_data(gamut, file)
     } else {
@@ -76,11 +88,13 @@ pub fn load_rgb2spec_data(gamut: &str, file: String) -> Arc<Rgb2SpectrumData> {
 }
 
 use std::{
+    env::current_exe,
     ffi::CString,
     io::{Read, Write},
     mem::size_of,
     os::raw::c_char,
     path::PathBuf,
+    process::{exit, Command},
     sync::Arc,
 };
 

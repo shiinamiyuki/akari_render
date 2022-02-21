@@ -10,4 +10,4 @@ else()
     set(CMAKE_CXX_FLAGS -lstdc++ ${CMAKE_CXX_FLAGS})
 endif()
 
-add_library(rgb2spec_opt STATIC rgb2spec_opt.cpp)
+add_executable(rgb2spec_opt rgb2spec_opt.cpp)
