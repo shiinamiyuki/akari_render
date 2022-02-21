@@ -7,7 +7,7 @@ set (CMAKE_CXX_STANDARD_REQUIRED ON)
 if(MSVC)
 	#set(CMAKE_CXX_FLAGS /std:c++17 /MP /arch:AVX2 /WX)
 else()
-    set(CMAKE_CXX_FLAGS -lstdc++ ${CMAKE_CXX_FLAGS})
+    set(CMAKE_CXX_FLAGS -lstdc++ -lpthread ${CMAKE_CXX_FLAGS})
 endif()
 
 add_executable(rgb2spec_opt rgb2spec_opt.cpp)
