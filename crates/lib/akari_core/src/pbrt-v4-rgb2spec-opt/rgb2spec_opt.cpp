@@ -108,18 +108,18 @@ const double cie_z[CIE_SAMPLES] = {
 
 const double cie_d65[CIE_SAMPLES] = {
     N(46.6383), N(49.3637), N(52.0891), N(51.0323), N(49.9755), N(52.3118), N(54.6482),
-    N(68.7015), N(82.7549), N(87.1204), N(91.486),  N(92.4589), N(93.4318), N(90.057),
-    N(86.6823), N(95.7736), N(104.865), N(110.936), N(117.008), N(117.41),  N(117.812),
+    N(68.7015), N(82.7549), N(87.1204), N(91.486), N(92.4589), N(93.4318), N(90.057),
+    N(86.6823), N(95.7736), N(104.865), N(110.936), N(117.008), N(117.41), N(117.812),
     N(116.336), N(114.861), N(115.392), N(115.923), N(112.367), N(108.811), N(109.082),
-    N(109.354), N(108.578), N(107.802), N(106.296), N(104.79),  N(106.239), N(107.689),
-    N(106.047), N(104.405), N(104.225), N(104.046), N(102.023), N(100.0),   N(98.1671),
-    N(96.3342), N(96.0611), N(95.788),  N(92.2368), N(88.6856), N(89.3459), N(90.0062),
+    N(109.354), N(108.578), N(107.802), N(106.296), N(104.79), N(106.239), N(107.689),
+    N(106.047), N(104.405), N(104.225), N(104.046), N(102.023), N(100.0), N(98.1671),
+    N(96.3342), N(96.0611), N(95.788), N(92.2368), N(88.6856), N(89.3459), N(90.0062),
     N(89.8026), N(89.5991), N(88.6489), N(87.6987), N(85.4936), N(83.2886), N(83.4939),
-    N(83.6992), N(81.863),  N(80.0268), N(80.1207), N(80.2146), N(81.2462), N(82.2778),
-    N(80.281),  N(78.2842), N(74.0027), N(69.7213), N(70.6652), N(71.6091), N(72.979),
-    N(74.349),  N(67.9765), N(61.604),  N(65.7448), N(69.8856), N(72.4863), N(75.087),
+    N(83.6992), N(81.863), N(80.0268), N(80.1207), N(80.2146), N(81.2462), N(82.2778),
+    N(80.281), N(78.2842), N(74.0027), N(69.7213), N(70.6652), N(71.6091), N(72.979),
+    N(74.349), N(67.9765), N(61.604), N(65.7448), N(69.8856), N(72.4863), N(75.087),
     N(69.3398), N(63.5927), N(55.0054), N(46.4182), N(56.6118), N(66.8054), N(65.0941),
-    N(63.3828), N(63.8434), N(64.304),  N(61.8779), N(59.4519), N(55.7054), N(51.959),
+    N(63.3828), N(63.8434), N(64.304), N(61.8779), N(59.4519), N(55.7054), N(51.959),
     N(54.6998), N(57.4406), N(58.8765), N(60.3125)};
 
 #undef N
@@ -141,50 +141,50 @@ const double cie_e[CIE_SAMPLES] = {
 #define N(x) (x / 10503.2)
 
 const double cie_d50[CIE_SAMPLES] = {
-    N(23.942000),  N(25.451000),  N(26.961000),  N(25.724000),  N(24.488000),
-    N(27.179000),  N(29.871000),  N(39.589000),  N(49.308000),  N(52.910000),
-    N(56.513000),  N(58.273000),  N(60.034000),  N(58.926000),  N(57.818000),
-    N(66.321000),  N(74.825000),  N(81.036000),  N(87.247000),  N(88.930000),
-    N(90.612000),  N(90.990000),  N(91.368000),  N(93.238000),  N(95.109000),
-    N(93.536000),  N(91.963000),  N(93.843000),  N(95.724000),  N(96.169000),
-    N(96.613000),  N(96.871000),  N(97.129000),  N(99.614000),  N(102.099000),
+    N(23.942000), N(25.451000), N(26.961000), N(25.724000), N(24.488000),
+    N(27.179000), N(29.871000), N(39.589000), N(49.308000), N(52.910000),
+    N(56.513000), N(58.273000), N(60.034000), N(58.926000), N(57.818000),
+    N(66.321000), N(74.825000), N(81.036000), N(87.247000), N(88.930000),
+    N(90.612000), N(90.990000), N(91.368000), N(93.238000), N(95.109000),
+    N(93.536000), N(91.963000), N(93.843000), N(95.724000), N(96.169000),
+    N(96.613000), N(96.871000), N(97.129000), N(99.614000), N(102.099000),
     N(101.427000), N(100.755000), N(101.536000), N(102.317000), N(101.159000),
-    N(100.000000), N(98.868000),  N(97.735000),  N(98.327000),  N(98.918000),
-    N(96.208000),  N(93.499000),  N(95.593000),  N(97.688000),  N(98.478000),
-    N(99.269000),  N(99.155000),  N(99.042000),  N(97.382000),  N(95.722000),
-    N(97.290000),  N(98.857000),  N(97.262000),  N(95.667000),  N(96.929000),
-    N(98.190000),  N(100.597000), N(103.003000), N(101.068000), N(99.133000),
-    N(93.257000),  N(87.381000),  N(89.492000),  N(91.604000),  N(92.246000),
-    N(92.889000),  N(84.872000),  N(76.854000),  N(81.683000),  N(86.511000),
-    N(89.546000),  N(92.580000),  N(85.405000),  N(78.230000),  N(67.961000),
-    N(57.692000),  N(70.307000),  N(82.923000),  N(80.599000),  N(78.274000),
-    N(0),          N(0),          N(0),          N(0),          N(0),
-    N(0),          N(0),          N(0),          N(0)};
+    N(100.000000), N(98.868000), N(97.735000), N(98.327000), N(98.918000),
+    N(96.208000), N(93.499000), N(95.593000), N(97.688000), N(98.478000),
+    N(99.269000), N(99.155000), N(99.042000), N(97.382000), N(95.722000),
+    N(97.290000), N(98.857000), N(97.262000), N(95.667000), N(96.929000),
+    N(98.190000), N(100.597000), N(103.003000), N(101.068000), N(99.133000),
+    N(93.257000), N(87.381000), N(89.492000), N(91.604000), N(92.246000),
+    N(92.889000), N(84.872000), N(76.854000), N(81.683000), N(86.511000),
+    N(89.546000), N(92.580000), N(85.405000), N(78.230000), N(67.961000),
+    N(57.692000), N(70.307000), N(82.923000), N(80.599000), N(78.274000),
+    N(0), N(0), N(0), N(0), N(0),
+    N(0), N(0), N(0), N(0)};
 
 #undef N
 
 #define N(x) (x / 10536.3)
 
 const double cie_d60[CIE_SAMPLES] = {
-    N(38.683115),  N(41.014457),  N(42.717548),  N(42.264182),  N(41.454941),
-    N(41.763698),  N(46.605319),  N(59.226938),  N(72.278594),  N(78.231500),
-    N(80.440600),  N(82.739580),  N(82.915027),  N(79.009168),  N(77.676264),
-    N(85.163609),  N(95.681274),  N(103.267764), N(107.954821), N(109.777964),
+    N(38.683115), N(41.014457), N(42.717548), N(42.264182), N(41.454941),
+    N(41.763698), N(46.605319), N(59.226938), N(72.278594), N(78.231500),
+    N(80.440600), N(82.739580), N(82.915027), N(79.009168), N(77.676264),
+    N(85.163609), N(95.681274), N(103.267764), N(107.954821), N(109.777964),
     N(109.559187), N(108.418402), N(107.758141), N(109.071548), N(109.671404),
     N(106.734741), N(103.707873), N(103.981942), N(105.232199), N(105.235867),
     N(104.427667), N(103.052881), N(102.522934), N(104.371416), N(106.052671),
     N(104.948900), N(103.315154), N(103.416286), N(103.538599), N(102.099304),
-    N(100.000000), N(97.992725),  N(96.751421),  N(97.102402),  N(96.712823),
-    N(93.174457),  N(89.921479),  N(90.351933),  N(91.999793),  N(92.384009),
-    N(92.098710),  N(91.722859),  N(90.646003),  N(88.327552),  N(86.526483),
-    N(87.034239),  N(87.579186),  N(85.884584),  N(83.976140),  N(83.743140),
-    N(84.724074),  N(86.450818),  N(87.493491),  N(86.546330),  N(83.483070),
-    N(78.268785),  N(74.172451),  N(74.275184),  N(76.620385),  N(79.423856),
-    N(79.051849),  N(71.763360),  N(65.471371),  N(67.984085),  N(74.106079),
-    N(78.556612),  N(79.527120),  N(75.584935),  N(67.307163),  N(55.275106),
-    N(49.273538),  N(59.008629),  N(70.892412),  N(70.950115),  N(67.163996),
-    N(67.445480),  N(68.171371),  N(66.466636),  N(62.989809),  N(58.067786),
-    N(54.990892),  N(56.915942),  N(60.825601),  N(62.987850)};
+    N(100.000000), N(97.992725), N(96.751421), N(97.102402), N(96.712823),
+    N(93.174457), N(89.921479), N(90.351933), N(91.999793), N(92.384009),
+    N(92.098710), N(91.722859), N(90.646003), N(88.327552), N(86.526483),
+    N(87.034239), N(87.579186), N(85.884584), N(83.976140), N(83.743140),
+    N(84.724074), N(86.450818), N(87.493491), N(86.546330), N(83.483070),
+    N(78.268785), N(74.172451), N(74.275184), N(76.620385), N(79.423856),
+    N(79.051849), N(71.763360), N(65.471371), N(67.984085), N(74.106079),
+    N(78.556612), N(79.527120), N(75.584935), N(67.307163), N(55.275106),
+    N(49.273538), N(59.008629), N(70.892412), N(70.950115), N(67.163996),
+    N(67.445480), N(68.171371), N(66.466636), N(62.989809), N(58.067786),
+    N(54.990892), N(56.915942), N(60.825601), N(62.987850)};
 
 #undef N
 
@@ -245,7 +245,8 @@ const double dcip3_to_xyz[3][3] = {{0.48663378, 0.26566276, 0.19817366},
                                    {0.22900413, 0.69172573, 0.079269454},
                                    {0., 0.04511256, 1.0437145}};
 
-double cie_interp(const double *data, double x) {
+double cie_interp(const double *data, double x)
+{
     x -= CIE_LAMBDA_MIN;
     x *= (CIE_SAMPLES - 1) / (CIE_LAMBDA_MAX - CIE_LAMBDA_MIN);
     int offset = (int)x;
@@ -267,27 +268,31 @@ double cie_interp(const double *data, double x) {
  * where the permutation matrix has "1". The last element P[N]=S+N, where S is
  * the number of row exchanges needed for determinant computation, det(P)=(-1)^S
  */
-int LUPDecompose(double **A, int N, double Tol, int *P) {
+int LUPDecompose(double **A, int N, double Tol, int *P)
+{
     int i, j, k, imax;
     double maxA, *ptr, absA;
 
     for (i = 0; i <= N; i++)
-        P[i] = i;  // Unit permutation matrix, P[N] initialized with N
+        P[i] = i; // Unit permutation matrix, P[N] initialized with N
 
-    for (i = 0; i < N; i++) {
+    for (i = 0; i < N; i++)
+    {
         maxA = 0.0;
         imax = i;
 
         for (k = i; k < N; k++)
-            if ((absA = fabs(A[k][i])) > maxA) {
+            if ((absA = fabs(A[k][i])) > maxA)
+            {
                 maxA = absA;
                 imax = k;
             }
 
         if (maxA < Tol)
-            return 0;  // failure, matrix is degenerate
+            return 0; // failure, matrix is degenerate
 
-        if (imax != i) {
+        if (imax != i)
+        {
             // pivoting P
             j = P[i];
             P[i] = P[imax];
@@ -302,7 +307,8 @@ int LUPDecompose(double **A, int N, double Tol, int *P) {
             P[N]++;
         }
 
-        for (j = i + 1; j < N; j++) {
+        for (j = i + 1; j < N; j++)
+        {
             A[j][i] /= A[i][i];
 
             for (k = i + 1; k < N; k++)
@@ -310,21 +316,24 @@ int LUPDecompose(double **A, int N, double Tol, int *P) {
         }
     }
 
-    return 1;  // decomposition done
+    return 1; // decomposition done
 }
 
 /* INPUT: A,P filled in LUPDecompose; b - rhs vector; N - dimension
  * OUTPUT: x - solution vector of A*x=b
  */
-void LUPSolve(double **A, int *P, double *b, int N, double *x) {
-    for (int i = 0; i < N; i++) {
+void LUPSolve(double **A, int *P, double *b, int N, double *x)
+{
+    for (int i = 0; i < N; i++)
+    {
         x[i] = b[P[i]];
 
         for (int k = 0; k < i; k++)
             x[i] -= A[i][k] * x[k];
     }
 
-    for (int i = N - 1; i >= 0; i--) {
+    for (int i = N - 1; i >= 0; i--)
+    {
         for (int k = i + 1; k < N; k++)
             x[i] -= A[i][k] * x[k];
 
@@ -348,7 +357,8 @@ double lambda_tbl[CIE_FINE_SAMPLES], rgb_tbl[3][CIE_FINE_SAMPLES], rgb_to_xyz[3]
     xyz_to_rgb[3][3], xyz_whitepoint[3];
 
 /// Currently supported gamuts
-enum Gamut {
+enum Gamut
+{
     SRGB,
     ProPhotoRGB,
     ACES2065_1,
@@ -359,29 +369,35 @@ enum Gamut {
     NO_GAMUT,
 };
 
-double sigmoid(double x) {
+double sigmoid(double x)
+{
     return 0.5 * x / std::sqrt(1.0 + x * x) + 0.5;
 }
 
-double smoothstep(double x) {
+double smoothstep(double x)
+{
     return x * x * (3.0 - 2.0 * x);
 }
 
-double sqr(double x) {
+double sqr(double x)
+{
     return x * x;
 }
 
-void cie_lab(double *p) {
+void cie_lab(double *p)
+{
     double X = 0.0, Y = 0.0, Z = 0.0, Xw = xyz_whitepoint[0], Yw = xyz_whitepoint[1],
            Zw = xyz_whitepoint[2];
 
-    for (int j = 0; j < 3; ++j) {
+    for (int j = 0; j < 3; ++j)
+    {
         X += p[j] * rgb_to_xyz[0][j];
         Y += p[j] * rgb_to_xyz[1][j];
         Z += p[j] * rgb_to_xyz[2][j];
     }
 
-    auto f = [](double t) -> double {
+    auto f = [](double t) -> double
+    {
         double delta = 6.0 / 29.0;
         if (t > delta * delta * delta)
             return cbrt(t);
@@ -405,7 +421,8 @@ void cie_lab(double *p) {
  * linear over the segment, the reflectance could have arbitrary behavior,
  * hence the extra precations.
  */
-void init_tables(Gamut gamut) {
+void init_tables(Gamut gamut)
+{
     memset(rgb_tbl, 0, sizeof(rgb_tbl));
     memset(xyz_whitepoint, 0, sizeof(xyz_whitepoint));
 
@@ -413,7 +430,8 @@ void init_tables(Gamut gamut) {
 
     const double *illuminant = nullptr;
 
-    switch (gamut) {
+    switch (gamut)
+    {
     case SRGB:
         illuminant = cie_d65;
         memcpy(xyz_to_rgb, xyz_to_srgb, sizeof(double) * 9);
@@ -460,7 +478,8 @@ void init_tables(Gamut gamut) {
         throw std::runtime_error("init_gamut(): invalid/unsupported gamut.");
     }
 
-    for (int i = 0; i < CIE_FINE_SAMPLES; ++i) {
+    for (int i = 0; i < CIE_FINE_SAMPLES; ++i)
+    {
         double lambda = CIE_LAMBDA_MIN + i * h;
 
         double xyz[3] = {cie_interp(cie_x, lambda), cie_interp(cie_y, lambda),
@@ -485,10 +504,12 @@ void init_tables(Gamut gamut) {
     }
 }
 
-void eval_residual(const double *coeffs, const double *rgb, double *residual) {
+void eval_residual(const double *coeffs, const double *rgb, double *residual)
+{
     double out[3] = {0.0, 0.0, 0.0};
 
-    for (int i = 0; i < CIE_FINE_SAMPLES; ++i) {
+    for (int i = 0; i < CIE_FINE_SAMPLES; ++i)
+    {
         /* Scale lambda to 0..1 range */
         double lambda =
             (lambda_tbl[i] - CIE_LAMBDA_MIN) / (CIE_LAMBDA_MAX - CIE_LAMBDA_MIN);
@@ -513,10 +534,12 @@ void eval_residual(const double *coeffs, const double *rgb, double *residual) {
         residual[j] -= out[j];
 }
 
-void eval_jacobian(const double *coeffs, const double *rgb, double **jac) {
+void eval_jacobian(const double *coeffs, const double *rgb, double **jac)
+{
     double r0[3], r1[3], tmp[3];
 
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < 3; ++i)
+    {
         memcpy(tmp, coeffs, sizeof(double) * 3);
         tmp[i] -= RGB2SPEC_EPSILON;
         eval_residual(tmp, rgb, r0);
@@ -530,9 +553,11 @@ void eval_jacobian(const double *coeffs, const double *rgb, double **jac) {
     }
 }
 
-double gauss_newton(const double rgb[3], double coeffs[3], int it = 15) {
+double gauss_newton(const double rgb[3], double coeffs[3], int it = 15)
+{
     double r = 0;
-    for (int i = 0; i < it; ++i) {
+    for (int i = 0; i < it; ++i)
+    {
         double J0[3], J1[3], J2[3], *J[3] = {J0, J1, J2};
 
         double residual[3];
@@ -542,7 +567,8 @@ double gauss_newton(const double rgb[3], double coeffs[3], int it = 15) {
 
         int P[4];
         int rv = LUPDecompose(J, 3, 1e-15, P);
-        if (rv != 1) {
+        if (rv != 1)
+        {
             std::cout << "RGB " << rgb[0] << " " << rgb[1] << " " << rgb[2] << std::endl;
             std::cout << "-> " << coeffs[0] << " " << coeffs[1] << " " << coeffs[2]
                       << std::endl;
@@ -553,13 +579,15 @@ double gauss_newton(const double rgb[3], double coeffs[3], int it = 15) {
         LUPSolve(J, P, residual, 3, x);
 
         r = 0.0;
-        for (int j = 0; j < 3; ++j) {
+        for (int j = 0; j < 3; ++j)
+        {
             coeffs[j] -= x[j];
             r += residual[j] * residual[j];
         }
         double max = std::max(std::max(coeffs[0], coeffs[1]), coeffs[2]);
 
-        if (max > 200) {
+        if (max > 200)
+        {
             for (int j = 0; j < 3; ++j)
                 coeffs[j] *= 200 / max;
         }
@@ -570,7 +598,8 @@ double gauss_newton(const double rgb[3], double coeffs[3], int it = 15) {
     return std::sqrt(r);
 }
 
-static Gamut parse_gamut(const char *str) {
+static Gamut parse_gamut(const char *str)
+{
     if (!strcasecmp(str, "srgb"))
         return SRGB;
     if (!strcasecmp(str, "ergb"))
@@ -598,18 +627,21 @@ void ParallelFor(int64_t start, int64_t end, std::function<void(int64_t, int64_t
                  const char *progressName = nullptr);
 
 inline void ParallelFor(int64_t start, int64_t end, std::function<void(int64_t)> func,
-                        const char *progressName = nullptr) {
+                        const char *progressName = nullptr)
+{
     ParallelFor(
         start, end,
-        [&func](int64_t start, int64_t end) {
+        [&func](int64_t start, int64_t end)
+        {
             for (int64_t i = start; i < end; ++i)
                 func(i);
         },
         progressName);
 }
 
-class ParallelJob {
-  public:
+class ParallelJob
+{
+public:
     virtual ~ParallelJob() { assert(removed); }
 
     // *lock should be locked going in and and unlocked coming out.
@@ -618,7 +650,7 @@ class ParallelJob {
 
     bool Finished() const { return !HaveWork() && activeWorkers == 0; }
 
-  private:
+private:
     friend class ThreadPool;
 
     ParallelJob *prev = nullptr, *next = nullptr;
@@ -626,8 +658,9 @@ class ParallelJob {
     bool removed = false;
 };
 
-class ThreadPool {
-  public:
+class ThreadPool
+{
+public:
     explicit ThreadPool(int nThreads);
     ~ThreadPool();
 
@@ -638,7 +671,7 @@ class ThreadPool {
 
     void WorkOrWait(std::unique_lock<std::mutex> *lock);
 
-  private:
+private:
     void workerFunc(int tIndex);
 
     ParallelJob *jobList = nullptr;
@@ -654,22 +687,26 @@ class ThreadPool {
 
 static std::unique_ptr<ThreadPool> threadPool;
 
-int AvailableCores() {
+int AvailableCores()
+{
     return std::max<int>(1, std::thread::hardware_concurrency());
 }
 
-int RunningThreads() {
+int RunningThreads()
+{
     return threadPool ? (1 + threadPool->size()) : 1;
 }
 
-ThreadPool::ThreadPool(int nThreads) {
+ThreadPool::ThreadPool(int nThreads)
+{
     // Launch one fewer worker thread than the total number we want doing
     // work, since the main thread helps out, too.
     for (int i = 0; i < nThreads - 1; ++i)
         threads.push_back(std::thread(&ThreadPool::workerFunc, this, i + 1));
 }
 
-ThreadPool::~ThreadPool() {
+ThreadPool::~ThreadPool()
+{
     if (threads.empty())
         return;
 
@@ -683,7 +720,8 @@ ThreadPool::~ThreadPool() {
         thread.join();
 }
 
-std::unique_lock<std::mutex> ThreadPool::AddToJobList(ParallelJob *job) {
+std::unique_lock<std::mutex> ThreadPool::AddToJobList(ParallelJob *job)
+{
     std::unique_lock<std::mutex> lock(jobListMutex);
     if (jobList != nullptr)
         jobList->prev = job;
@@ -693,12 +731,16 @@ std::unique_lock<std::mutex> ThreadPool::AddToJobList(ParallelJob *job) {
     return lock;
 }
 
-void ThreadPool::RemoveFromJobList(ParallelJob *job) {
+void ThreadPool::RemoveFromJobList(ParallelJob *job)
+{
     assert(!job->removed);
 
-    if (job->prev != nullptr) {
+    if (job->prev != nullptr)
+    {
         job->prev->next = job->next;
-    } else {
+    }
+    else
+    {
         assert(jobList == job);
         jobList = job->next;
     }
@@ -708,19 +750,22 @@ void ThreadPool::RemoveFromJobList(ParallelJob *job) {
     job->removed = true;
 }
 
-void ThreadPool::workerFunc(int tIndex) {
+void ThreadPool::workerFunc(int tIndex)
+{
     std::unique_lock<std::mutex> lock(jobListMutex);
     while (!shutdownThreads)
         WorkOrWait(&lock);
 }
 
-void ThreadPool::WorkOrWait(std::unique_lock<std::mutex> *lock) {
+void ThreadPool::WorkOrWait(std::unique_lock<std::mutex> *lock)
+{
     assert(lock->owns_lock());
 
     ParallelJob *job = jobList;
     while ((job != nullptr) && !job->HaveWork())
         job = job->next;
-    if (job != nullptr) {
+    if (job != nullptr)
+    {
         // Run a chunk of loop iterations for _loop_
         job->activeWorkers++;
 
@@ -734,14 +779,16 @@ void ThreadPool::WorkOrWait(std::unique_lock<std::mutex> *lock) {
 
         if (job->Finished())
             jobListCondition.notify_all();
-    } else
+    }
+    else
         // Wait for something to change (new work, or this loop being
         // finished).
         jobListCondition.wait(*lock);
 }
 
-class ParallelForLoop1D : public ParallelJob {
-  public:
+class ParallelForLoop1D : public ParallelJob
+{
+public:
     ParallelForLoop1D(int64_t start, int64_t end, int chunkSize,
                       std::function<void(int64_t, int64_t)> func)
         : func(std::move(func)), nextIndex(start), maxIndex(end), chunkSize(chunkSize) {}
@@ -749,14 +796,15 @@ class ParallelForLoop1D : public ParallelJob {
     bool HaveWork() const { return nextIndex < maxIndex; }
     void RunStep(std::unique_lock<std::mutex> *lock);
 
-  private:
+private:
     std::function<void(int64_t, int64_t)> func;
     int64_t nextIndex;
     int64_t maxIndex;
     int chunkSize;
 };
 
-void ParallelForLoop1D::RunStep(std::unique_lock<std::mutex> *lock) {
+void ParallelForLoop1D::RunStep(std::unique_lock<std::mutex> *lock)
+{
     // Find the set of loop iterations to run next
     int64_t indexStart = nextIndex;
     int64_t indexEnd = std::min(indexStart + chunkSize, maxIndex);
@@ -774,7 +822,8 @@ void ParallelForLoop1D::RunStep(std::unique_lock<std::mutex> *lock) {
 }
 
 void ParallelFor(int64_t start, int64_t end, std::function<void(int64_t, int64_t)> func,
-                 const char *progressName) {
+                 const char *progressName)
+{
     assert(threadPool);
 
     int64_t chunkSize = std::max<int64_t>(1, (end - start) / (8 * RunningThreads()));
@@ -787,38 +836,49 @@ void ParallelFor(int64_t start, int64_t end, std::function<void(int64_t, int64_t
     while (!loop.Finished())
         threadPool->WorkOrWait(&lock);
 }
-
-extern "C"
-void gen_rgb2spec_table(const uint32_t res, const char *gamut_s, float * scale, float * out){
+int main(int argc, char **argv)
+{
+    if (argc < 3)
+    {
+        printf("Syntax: rgb2spec_opt <resolution> <output> [<gamut>]\n"
+               "where <gamut> is one of "
+               "sRGB,eRGB,XYZ,ProPhotoRGB,ACES2065_1,REC2020\n");
+        exit(-1);
+    }
     Gamut gamut = SRGB;
-
-    gamut = parse_gamut(gamut_s);
-    if (gamut == NO_GAMUT) {
-        fprintf(stderr, "Could not parse gamut `%s'!\n", gamut_s);
-        abort();
+    if (argc > 3)
+        gamut = parse_gamut(argv[3]);
+    if (gamut == NO_GAMUT)
+    {
+        fprintf(stderr, "Could not parse gamut `%s'!\n", argv[3]);
+        exit(-1);
     }
     init_tables(gamut);
 
-    if (res == 0) {
+    const int res = atoi(argv[1]);
+    if (res == 0)
+    {
         printf("Invalid resolution!\n");
-        abort();
+        exit(-1);
     }
 
     int nThreads = AvailableCores();
     threadPool = std::make_unique<ThreadPool>(nThreads);
 
-    printf("Optimizing %s spectra...\n", gamut_s);
+    printf("Optimizing %s spectra...\n", argv[3]);
     fflush(stdout);
 
-    // float *scale = new float[res];
+    float *scale = new float[res];
     for (int k = 0; k < res; ++k)
         scale[k] = (float)smoothstep(smoothstep(k / double(res - 1)));
 
     size_t bufsize = 3 * 3 * res * res * res;
-    // float *out = new float[bufsize];
+    float *out = new float[bufsize];
 
-    for (int l = 0; l < 3; ++l) {
-        ParallelFor(0, res, [&](size_t j) {
+    for (int l = 0; l < 3; ++l)
+    {
+        ParallelFor(0, res, [&](size_t j)
+                    {
             const double y = j / double(res - 1);
             fflush(stdout);
             for (int i = 0; i < res; ++i) {
@@ -870,8 +930,11 @@ void gen_rgb2spec_table(const uint32_t res, const char *gamut_s, float * scale, 
                     out[3 * idx + 2] = float(C - B * c0 * c1 + A * (sqr(c0 * c1)));
                     // out[3*idx + 2] = resid;
                 }
-            }
-        });
+            } });
     }
+
+    FILE *f = fopen(argv[2], "wb");
+    fwrite(scale, sizeof(float), res, f);
+    fwrite(out, sizeof(float), res * res * res * 3 * 3, f);
     threadPool.reset();
 }
