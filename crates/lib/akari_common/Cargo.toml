@@ -20,7 +20,7 @@ log = "*"
 nalgebra = {version = "*", features = ["serde-serialize"]}
 ordered-float = "2.1.1"
 parking_lot = "*"
-rand = "0.8.3"
+rand = "0.8.*"
 rayon = "*"
 region = "3"
 serde = {version = "1.*", features = ["derive"]}
@@ -31,3 +31,4 @@ tobj = "3.2.0"
 flate2 = "1.0.22"
 num_cpus = "1.13.1"
 half = "1.8.2"
+os_pipe = "*"

@@ -379,7 +379,7 @@ pub fn load_scene<R: FileResolver + Send + Sync>(
         gpu_mode,
     );
 
-    println!("{} lights", scene.lights.len());
+    log::info!("{} lights", scene.lights.len());
 
     scene
 }

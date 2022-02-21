@@ -155,7 +155,7 @@ impl PathTracer {
     }
 }
 impl Integrator for PathTracer {
-    fn render(&mut self, scene: &Scene) -> Film {
+    fn render(&self, scene: &Scene) -> Film {
         log::info!("rendering {}spp ...", self.spp);
         let npixels = (scene.camera.resolution().x * scene.camera.resolution().y) as usize;
         let film = Film::new(&scene.camera.resolution());

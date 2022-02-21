@@ -22,7 +22,7 @@ pub use flate2;
 pub use half;
 pub use num_cpus;
 pub use statrs;
-
+pub use os_pipe;
 mod test {
     #[test]
     fn test_endianess() {

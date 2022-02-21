@@ -562,7 +562,7 @@ struct PerThreadData {
     path_tmp: Vec<VertexTemp>,
 }
 impl Integrator for CachedPathTracer {
-    fn render(&mut self, scene: &Scene) -> Film {
+    fn render(&self, scene: &Scene) -> Film {
         let npixels = (scene.camera.resolution().x * scene.camera.resolution().y) as usize;
         let film = Film::new(&scene.camera.resolution());
         let opt_params = AdamParams {
@@ -688,7 +688,7 @@ impl Integrator for CachedPathTracer {
                 // );
                 let loss = cache.train();
                 if iter % 20 == 0 {
-                    println!(
+                    log::info!(
                         "training pass {} finished in {}s, loss = {}",
                         iter,
                         now.elapsed().as_secs_f32(),
@@ -795,7 +795,7 @@ impl Integrator for CachedPathTracer {
 
                 chunk_offset += chunk_size;
             }
-            println!(
+            log::info!(
                 "rendering pass {} finished in {}s: ray trace {}s, infer {}s",
                 iter,
                 now.elapsed().as_secs_f64(),

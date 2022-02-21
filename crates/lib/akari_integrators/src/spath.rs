@@ -411,7 +411,7 @@ impl<'a> StreamPathTracerSession<'a> {
 }
 
 impl Integrator for StreamPathTracer {
-    fn render(&mut self, scene: &Scene) -> film::Film {
+    fn render(&self, scene: &Scene) -> film::Film {
         log::info!("rendering {}spp ... with StreamPathTracer", self.spp);
         let npixels = (scene.camera.resolution().x * scene.camera.resolution().y) as usize;
         let mut film = Film::new(&scene.camera.resolution());

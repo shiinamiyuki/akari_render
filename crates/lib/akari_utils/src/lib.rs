@@ -25,6 +25,7 @@ pub mod lrucache;
 pub mod rcu;
 pub mod texcache;
 pub mod filecache;
+pub mod cli;
 // #[must_use]
 // pub mod vecn;
 pub fn log2(mut x: u32) -> u32 {

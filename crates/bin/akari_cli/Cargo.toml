@@ -2,12 +2,13 @@
 edition = "2021"
 name = "akari_cli"
 version = "0.1.0"
+license = "GPL-3.0-or-later"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 akari = {path = "../../lib/akari"}
-clap = "2.33.3"
+# clap = "3.*"
 
 [features]
 default = ["embree"]

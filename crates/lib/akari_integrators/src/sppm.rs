@@ -159,7 +159,7 @@ pub struct Sppm {
 }
 
 impl Integrator for Sppm {
-    fn render(&mut self, scene: &Scene) -> Film {
+    fn render(&self, scene: &Scene) -> Film {
         let npixels = (scene.camera.resolution().x * scene.camera.resolution().y) as usize;
         let film = Film::new(&scene.camera.resolution());
         let mut pixels: Vec<SppmPixel> = vec![
@@ -239,7 +239,7 @@ impl Integrator for Sppm {
                         max_radius = max_radius.max(pixel.radius as f64);
                     }
                 }
-                println!("{:?} {}", bound, max_radius);
+                log::info!("{:?} {}", bound, max_radius);
                 let diag = bound.diagonal();
                 let max_diag = diag.max_element() as f64;
                 let base_grid_res = (max_diag / max_radius) as u32;

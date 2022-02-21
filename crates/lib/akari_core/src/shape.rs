@@ -596,7 +596,7 @@ pub fn load_model(
     for (_i, m) in models.iter().enumerate() {
         let mesh = &m.mesh;
         if m.name.is_empty() {
-            println!(
+            log::error!(
                 "{} has model with empty name! all model must have a name",
                 obj_file
             );

@@ -12,6 +12,8 @@ akari_const = {path = "../akari_const"}
 akari_utils = {path = "../akari_utils"}
 embree-sys = {git = "https://github.com/shiinamiyuki/embree-sys", optional = true}
 serde = {version = "1.*", features = ["derive"]}
+os_pipe = "1.*"
+bson = "2.1.0"
 [features]
 default = ["embree"]
 embree = ["embree-sys"]

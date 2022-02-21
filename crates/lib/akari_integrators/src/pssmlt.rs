@@ -125,9 +125,9 @@ impl Pssmlt {
     }
 }
 impl Integrator for Pssmlt {
-    fn render(&mut self, scene: &crate::scene::Scene) -> Film {
+    fn render(&self, scene: &crate::scene::Scene) -> Film {
         log::info!("rendering direct lighting...");
-        let mut depth0_pt = PathTracer {
+        let depth0_pt = PathTracer {
             spp: self.direct_spp,
             max_depth: 1,
             single_wavelength: false,

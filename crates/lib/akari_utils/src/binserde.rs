@@ -3,8 +3,12 @@ use std::{
     mem::MaybeUninit,
 };
 
-// minimal binary ser/de
-// we cannot use bincode 2.0 as it is unstable as of 01-31-2022
+/* minimal binary ser/de
+ * we cannot use bincode 2.0 as it is unstable as of 01-31-2022
+ * we dont want to use bson because we want faster read/write
+ * 
+ */
+
 
 pub trait Decode {
     fn decode<R: Read>(reader: &mut R) -> std::io::Result<Self>

@@ -10,7 +10,6 @@ pub mod pssmlt;
 // pub mod sppm;
 // pub mod spath;
 // pub mod normalvis;
-use crate::parking_lot::RwLock;
 use crate::{film::Film, scene::Scene};
 use akari_common::*;
 use akari_core::*;
@@ -18,7 +17,6 @@ use akari_utils as util;
 use bitflags::bitflags;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
 use util::{parallel_for, profile_fn, UnsafePointer};
 use util::{AtomicFloat, RobustSum};
 
@@ -35,7 +33,7 @@ pub enum Partition {
     Block(Bounds2u),
 }
 pub trait Integrator {
-    fn render(&mut self, scene: &Scene) -> Film;
+    fn render(&self, scene: &Scene) -> Film;
     fn support_block_rendering(&self) -> bool {
         false
     }

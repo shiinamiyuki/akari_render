@@ -21,7 +21,7 @@ fn target_function(s: SampledSpectrum, lambda: &SampledWavelengths) -> f32 {
     lambda.cie_xyz(s).values().y.clamp(0.0, 100.0)
 }
 impl Integrator for Erpt {
-    fn render(&mut self, scene: &Scene) -> Film {
+    fn render(&self, scene: &Scene) -> Film {
         log::info!("rendering direct lighting...");
         let mut depth0_pt = PathTracer {
             spp: self.direct_spp,

@@ -8,10 +8,10 @@ members = [
   "crates/lib/akari_adjit",
   "crates/lib/akari",
   "crates/lib/akari_gpu",
-  "crates/lib/akari_net",
   "crates/bin/akari_cli",
   "crates/bin/akari_import",
   "crates/bin/akari_verify",
+  "crates/bin/akari_sync"
 ]
 
 [profile.dev]

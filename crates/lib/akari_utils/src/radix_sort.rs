@@ -171,6 +171,5 @@ mod test {
         })
         .1;
         assert_eq!(v1, v2);
-        println!("{} {}", t1, t2);
     }
 }

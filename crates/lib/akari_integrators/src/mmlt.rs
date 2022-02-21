@@ -251,7 +251,7 @@ impl Mmlt {
     }
 }
 impl Integrator for Mmlt {
-    fn render(&mut self, scene: &scene::Scene) -> Film {
+    fn render(&self, scene: &scene::Scene) -> Film {
         log::info!("rendering direct lighting...");
         let mut depth0_pt = PathTracer {
             spp: self.direct_spp,

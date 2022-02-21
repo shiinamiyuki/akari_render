@@ -9,7 +9,7 @@ pub struct RTAO {
     pub spp: u32,
 }
 impl Integrator for RTAO {
-    fn render(&mut self, scene: &Scene) -> Film {
+    fn render(&self, scene: &Scene) -> Film {
         let npixels = (scene.camera.resolution().x * scene.camera.resolution().y) as usize;
         let film = RwLock::new(Film::new(&scene.camera.resolution()));
         parallel_for(npixels, 256, |id| {

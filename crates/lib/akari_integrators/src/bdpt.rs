@@ -20,7 +20,7 @@ pub struct Bdpt {
 }
 
 impl Integrator for Bdpt {
-    fn render(&mut self, scene: &Scene) -> Film {
+    fn render(&self, scene: &Scene) -> Film {
         let npixels = (scene.camera.resolution().x * scene.camera.resolution().y) as usize;
         let film = Film::new(&scene.camera.resolution());
         let mut pyramid = Vec::new();
