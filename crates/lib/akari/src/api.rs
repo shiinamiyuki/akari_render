@@ -3,7 +3,7 @@ use crate::camera::*;
 #[cfg(feature = "gpu")]
 use crate::gpu::pt::WavefrontPathTracer;
 // use crate::film::*;
-// use crate::integrator::ao::RTAO;
+use crate::integrator::ao::RTAO;
 // use crate::integrator::normalvis::NormalVis;
 // use crate::integrator::nrc::CachedPathTracer;
 use crate::integrator::path::PathTracer;
@@ -524,10 +524,10 @@ pub fn load_integrator(path: &Path) -> Box<dyn Integrator> {
         //         initial_radius,
         //     })
         // }
-        // "ao" | "rtao" => {
-        //     let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
-        //     Box::new(RTAO { spp })
-        // }
+        "ao" | "rtao" => {
+            let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
+            Box::new(RTAO { spp })
+        }
         // "normal" => Box::new(NormalVis {}),
         // "cached" | "nrc" => {
         //     let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
