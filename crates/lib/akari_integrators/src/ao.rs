@@ -5,6 +5,7 @@ use crate::film::*;
 use crate::sampler::*;
 use crate::scene::*;
 use crate::*;
+use crate::parking_lot::RwLock;
 pub struct RTAO {
     pub spp: u32,
 }
