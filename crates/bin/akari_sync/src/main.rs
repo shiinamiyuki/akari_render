@@ -4,6 +4,7 @@ use std::{
     env::args,
     fs,
     io::Read,
+    path::PathBuf,
     process::{exit, Command},
     time::{Duration, SystemTime},
 };
@@ -34,9 +35,11 @@ fn send(local: &str, remote: (&str, &str), remote_sync: &str) -> bool {
     }
     let remote_f = serde_json::from_str::<FileCmp>(&output).unwrap();
     let local_f = get_metadata(local);
-    if remote_f == local_f {
-        println!("file no change");
-        return true;
+    if let Some(local_f) = local_f {
+        if remote_f == local_f {
+            println!("file no change");
+            return true;
+        }
     }
     let mut scp = Command::new("scp");
     scp.arg("-p");
@@ -44,12 +47,15 @@ fn send(local: &str, remote: (&str, &str), remote_sync: &str) -> bool {
     scp.arg(format!("{}:{}", remote.0, remote.1));
     scp.spawn().unwrap().wait().unwrap().success()
 }
-fn get_metadata(file: &str) -> FileCmp {
+fn get_metadata(file: &str) -> Option<FileCmp> {
+    if !PathBuf::from(file).exists() {
+        return None;
+    }
     let metadata = fs::metadata(file).expect(&format!("err reading metadata of {}", file));
     let mtime = metadata.modified().unwrap();
     let mtime = mtime.duration_since(SystemTime::UNIX_EPOCH).unwrap();
     let len = metadata.len();
-    FileCmp { mtime, len }
+    Some(FileCmp { mtime, len })
 }
 fn main() {
     let args: Vec<_> = args().collect();
