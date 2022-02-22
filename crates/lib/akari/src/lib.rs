@@ -54,9 +54,9 @@ impl log::Log for SimpleLogger {
     fn flush(&self) {}
 }
 
-lazy_static! {
-    static ref LOGGER: Mutex<SimpleLogger> = Mutex::new(SimpleLogger::new());
-}
+// lazy_static! {
+//     static ref LOGGER: Mutex<SimpleLogger> = Mutex::new(SimpleLogger::new());
+// }
 
 // fn init_logger() -> Result<(), SetLoggerError> {
 //     log::set_logger(&LOGGER).map(|()| log::set_max_level(LevelFilter::Info))
@@ -68,7 +68,8 @@ pub fn init(config: Config) {
         .build_global()
         .unwrap();
     {
-        let mut logger = LOGGER.lock();
+        // let mut logger = LOGGER.lock();
+        let mut logger = SimpleLogger::new();
         match config.log_output {
             _x if _x == "stdout" => {
                 logger.output = Some(LogOutput::Stdout(stdout()));
@@ -79,5 +80,7 @@ pub fn init(config: Config) {
                 ));
             }
         }
+        // log::set_logger(logger)
+        log::set_boxed_logger(Box::new(logger)).map(|()| log::set_max_level(LevelFilter::Info)).unwrap();
     }
 }

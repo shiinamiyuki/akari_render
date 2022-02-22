@@ -40,7 +40,7 @@ fn send(local: &str, remote: (&str, &str), remote_sync: &str) -> bool {
     if !handle.wait().unwrap().success() {
         return false;
     }
-    println!("wait metadata");
+    // println!("wait metadata");
     let remote_f = serde_json::from_str::<Option<FileCmp>>(&output).unwrap();
     let local_f = get_metadata(local).unwrap();
     if let Some(remote_f) = remote_f {

@@ -7,7 +7,7 @@ use akari::cli::{parse_arg, parse_str_to_args};
 // use akari::light::*;
 use akari::util::LocalFileResolver;
 use akari::*;
-use std::env::args;
+use std::env::{args, current_exe};
 use std::fmt::Display;
 #[cfg(feature = "gpu")]
 use vkc::Context;
@@ -27,14 +27,11 @@ use akari::{api, rayon};
 struct AppOptions {
     pub num_threads: Option<usize>,
     pub log_output: Option<String>,
+    pub output: Option<String>,
     pub scene: Option<String>,
     pub algorithm: Option<String>,
     pub accel: Option<String>,
-    pub launch_as_remote:bool,
-}
-
-fn render_main(app_options:AppOptions){
-
+    pub launch_as_remote: bool,
 }
 
 fn usage() -> String {
@@ -81,11 +78,65 @@ Options:
     );
     s
 }
-// fn on_err(e: String) {
-//     eprintln!("{}", e);
-//     println!("{}", usage());
-//     exit(-1);
-// }
+fn render_main(options: AppOptions) {
+    let mut config = Config::default();
+    if let Some(t) = options.num_threads {
+        config.num_threads = t;
+    }
+    if options.launch_as_remote {
+        let mut path = current_exe().unwrap();
+        path.push("log.txt");
+        let s = path.as_os_str().to_string_lossy().into_owned();
+        config.log_output = s;
+    }
+    akari::init(config);
+    let accel = options
+        .accel
+        .clone()
+        .unwrap_or(if cfg!(feature = "embree") {
+            "embree".into()
+        } else {
+            "bvh".into()
+        });
+    let ooc = OocOptions { enable_ooc: false };
+    let scene = if let Some(scene) = &options.scene {
+        let path = Path::new(scene);
+        api::load_scene::<LocalFileResolver>(path, false, accel.as_str(), ooc)
+    } else {
+        log::error!("no filed provided");
+        exit(1);
+    };
+    if scene.lights.is_empty() {
+        log::error!("scene has no light!");
+        exit(1);
+    }
+    let output = options.output.clone().unwrap_or("out.png".into());
+    let mut integrator = if let Some(algorithm) = &options.algorithm {
+        let path = Path::new(algorithm);
+        api::load_integrator(path)
+    } else {
+        log::error!("no filed provided");
+        exit(1);
+    };
+    log::info!("acceleration structure: {}", accel);
+    log::info!("rendering with {} threads", rayon::current_num_threads());
+    let (film, time) = profile_fn(|| -> Film { integrator.as_mut().render(&scene) });
+    log::info!("took {}s", time);
+    log::info!(
+        "traced {} rays, average {}M rays/s",
+        scene.ray_counter.load(std::sync::atomic::Ordering::Relaxed),
+        scene.ray_counter.load(std::sync::atomic::Ordering::Relaxed) as f64 / 1e6 / time,
+    );
+    // if profiling {
+    //     akari::util::profile::print_stats();
+    // }
+    if output.ends_with(".exr") {
+        film.write_exr(&output);
+    } else {
+        let image = film.to_rgb_image();
+        image.save(output).unwrap();
+    }
+}
 fn real_main(args: Vec<String>) {
     macro_rules! on_err {
         () => {
@@ -96,7 +147,7 @@ fn real_main(args: Vec<String>) {
             }
         };
     }
-    let mut pos = 1;
+    let mut pos = 0;
     macro_rules! parse_str {
         ($long:literal) => {
             parse_arg::<String>(&args, &mut pos, $long, None).unwrap_or_else(on_err!())
@@ -126,8 +177,12 @@ fn real_main(args: Vec<String>) {
             options.algorithm = Some(render);
         } else if let Some(threads) = parse_int!("--threads", "-t") {
             options.num_threads = Some(threads);
+        } else {
+            eprintln!("unrecognized option {}", args[pos]);
+            exit(-1);
         }
     }
+    render_main(options);
     // if let Some(scene_path) =
     //     parse_arg::<String>(&args, &mut pos, "--scene", Some("-s")).unwrap_or_else(on_err)
     // {
@@ -135,7 +190,7 @@ fn real_main(args: Vec<String>) {
     // }
 }
 fn main() {
-    let args: Vec<String> = args().collect();
+    let args: Vec<String> = args().skip(1).collect();
     real_main(args);
 }
 // #[cfg(feature = "gpu")]

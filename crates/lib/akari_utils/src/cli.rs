@@ -51,9 +51,12 @@ pub fn parse_arg<T: FromStr>(
     assert!(short.is_none() || short.unwrap().starts_with("-"));
     let opt = &args[*pos];
     if !opt.starts_with("-") {
-        return Err(format!("expect `--options or --o` but found {}", opt));
+        return Err(format!(
+            "expect form of `--options or --o` but found {}",
+            opt
+        ));
     }
-    if opt == name {
+    if opt == name || (short.is_some() && short.unwrap() == opt) {
         if *pos + 1 >= args.len() {
             return Err(format!("unexpected end of arguments when parsing {}", name));
         }
@@ -63,7 +66,10 @@ pub fn parse_arg<T: FromStr>(
                 "error when parsing values of {}: val={}",
                 name, val
             )),
-            Ok(val) => Ok(Some(val)),
+            Ok(val) => {
+                *pos += 2;
+                Ok(Some(val))
+            }
         };
     }
     Ok(None)
