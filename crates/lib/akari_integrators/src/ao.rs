@@ -19,9 +19,12 @@ impl Integrator for RTAO {
             let x = (id as u32) % scene.camera.resolution().x;
             let y = (id as u32) / scene.camera.resolution().x;
             let pixel = uvec2(x, y);
-            let mut acc_li = SampledSpectrum::zero();
+            let mut acc_li = XYZ::zero();
             for _ in 0..self.spp {
-                let (mut ray, _ray_weight) = scene.camera.generate_ray(pixel, &mut sampler);
+                sampler.start_next_sample();
+                let lambda = SampledWavelengths::sample_visible(sampler.next1d());
+                let (mut ray, _ray_weight) =
+                    scene.camera.generate_ray(pixel, &mut sampler, &lambda);
                 let mut li = SampledSpectrum::zero();
                 {
                     if let Some(si) = scene.intersect(&ray) {
@@ -41,12 +44,12 @@ impl Integrator for RTAO {
                         }
                     }
                 }
-                acc_li = acc_li + li;
+                acc_li = acc_li + lambda.cie_xyz(li);
             }
             acc_li = acc_li / (self.spp as f32);
             {
                 let film = &mut film.write();
-                film.add_sample(uvec2(x, y), acc_li, 1.0);
+                film.add_sample_xyz(uvec2(x, y), acc_li, 1.0);
             }
         });
         film.into_inner()

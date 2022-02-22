@@ -156,7 +156,7 @@ impl Integrator for Pssmlt {
         log::info!("rendering {} spp", self.spp);
         let indirect_film = Film::new(&scene.camera.resolution());
         for _ in 0..self.spp {
-            (0..npixels).into_par_iter().for_each(|_| {
+            parallel_for(npixels, 1024, |_| {
                 let mut rng = thread_rng();
                 let arena = arenas.get_mut();
                 loop {
@@ -212,7 +212,7 @@ impl Integrator for Pssmlt {
                 px.intensity = RobustSum::new(px.intensity.sum() * b as f32);
             });
         let film = Film::new(&scene.camera.resolution());
-        (0..npixels).into_par_iter().for_each(|i| {
+        parallel_for(npixels, 1024, |i| {
             let mut px = film.pixels()[i].write();
             px.weight = RobustSum::new(1.0);
             {

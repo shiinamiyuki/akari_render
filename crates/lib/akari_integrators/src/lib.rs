@@ -1,4 +1,4 @@
-// pub mod ao;
+pub mod ao;
 pub mod bdpt;
 pub mod bidir;
 pub mod erpt;
@@ -18,7 +18,6 @@ use akari_utils as util;
 use bitflags::bitflags;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
 use util::{parallel_for, profile_fn, UnsafePointer};
 use util::{AtomicFloat, RobustSum};
 
