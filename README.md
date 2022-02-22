@@ -20,6 +20,11 @@ Previous version with PPG and SMCMC is in [legacy-cpp](https://github.com/shiina
 - Quad-BVH
 - Ray Packet Traversal
 
+## Build Requirements
+If you are using < Windows 10, please upgrade to Windows 10 or above.
+- CMake >3.12
+- clang++ in PATH
+
 ## Build & Run
 ```
 cargo build --relase
