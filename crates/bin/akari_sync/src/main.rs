@@ -18,6 +18,13 @@ fn usage() {
     println!(r"usage(recv): akari-sync -r");
 }
 use akari::util::binserde::{Decode, Encode};
+fn diff_ms(t1: Duration, t2: Duration) -> u128 {
+    if t1 > t2 {
+        (t1 - t2).as_millis()
+    } else {
+        (t2 - t1).as_millis()
+    }
+}
 fn send(local: &str, remote: (&str, &str), remote_sync: &str) -> bool {
     let mut ssh = Command::new("ssh");
     ssh.arg(remote.0);
@@ -26,23 +33,18 @@ fn send(local: &str, remote: (&str, &str), remote_sync: &str) -> bool {
     ssh.arg(remote.1);
     let (mut reader, writer) = os_pipe::pipe().unwrap();
     ssh.stdout(writer.try_clone().unwrap());
-    println!("aa");
     let mut handle = ssh.spawn().unwrap();
     std::mem::drop(ssh);
-    println!("bb");
-    // let mut output = String::new();
-    // reader.read_to_string(&mut output).unwrap();
     let output = String::decode(&mut reader).unwrap();
     // println!("wait metadata");
-    dbg!(&output);
     if !handle.wait().unwrap().success() {
         return false;
     }
     println!("wait metadata");
-    let remote_f = serde_json::from_str::<FileCmp>(&output).unwrap();
-    let local_f = get_metadata(local);
-    if let Some(local_f) = local_f {
-        if remote_f == local_f {
+    let remote_f = serde_json::from_str::<Option<FileCmp>>(&output).unwrap();
+    let local_f = get_metadata(local).unwrap();
+    if let Some(remote_f) = remote_f {
+        if remote_f.len == local_f.len && diff_ms(remote_f.mtime, local_f.mtime) < 800 {
             println!("file no change");
             return true;
         }
