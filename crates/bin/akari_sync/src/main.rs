@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     env::args,
     fs,
-    io::Read,
+    io::{stdout, Read},
     path::PathBuf,
     process::{exit, Command},
     time::{Duration, SystemTime},
@@ -17,6 +17,7 @@ fn usage() {
     println!(r"usage(send): akari-sync -s <file> username@host:<file> <remote akari-sync-path>");
     println!(r"usage(recv): akari-sync -r");
 }
+use akari::util::binserde::{Decode, Encode};
 fn send(local: &str, remote: (&str, &str), remote_sync: &str) -> bool {
     let mut ssh = Command::new("ssh");
     ssh.arg(remote.0);
@@ -25,14 +26,19 @@ fn send(local: &str, remote: (&str, &str), remote_sync: &str) -> bool {
     ssh.arg(remote.1);
     let (mut reader, writer) = os_pipe::pipe().unwrap();
     ssh.stdout(writer.try_clone().unwrap());
+    println!("aa");
     let mut handle = ssh.spawn().unwrap();
     std::mem::drop(ssh);
-
-    let mut output = String::new();
-    reader.read_to_string(&mut output).unwrap();
+    println!("bb");
+    // let mut output = String::new();
+    // reader.read_to_string(&mut output).unwrap();
+    let output = String::decode(&mut reader).unwrap();
+    // println!("wait metadata");
+    dbg!(&output);
     if !handle.wait().unwrap().success() {
         return false;
     }
+    println!("wait metadata");
     let remote_f = serde_json::from_str::<FileCmp>(&output).unwrap();
     let local_f = get_metadata(local);
     if let Some(local_f) = local_f {
@@ -75,7 +81,8 @@ fn main() {
             let file = &args[2];
             let cmp = get_metadata(file);
             let s = serde_json::to_string(&cmp).unwrap();
-            print!("{}", s);
+            // print!("{}", s);
+            String::encode(&s, &mut stdout()).unwrap();
         }
         _ => {
             eprintln!("unrecognized mode {}", mode);
