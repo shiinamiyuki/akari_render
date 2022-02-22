@@ -45,7 +45,7 @@ fn send(local: &str, remote: (&str, &str), remote_sync: &str) -> bool {
     scp.spawn().unwrap().wait().unwrap().success()
 }
 fn get_metadata(file: &str) -> FileCmp {
-    let metadata = fs::metadata(file).unwrap();
+    let metadata = fs::metadata(file).expect(&format!("err reading metadata of {}", file));
     let mtime = metadata.modified().unwrap();
     let mtime = mtime.duration_since(SystemTime::UNIX_EPOCH).unwrap();
     let len = metadata.len();
