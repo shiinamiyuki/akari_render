@@ -53,20 +53,20 @@ fn get_metadata(file: &str) -> FileCmp {
 }
 fn main() {
     let args: Vec<_> = args().collect();
-    let mode = &args[0];
+    let mode = &args[1];
     match mode.as_str() {
         "-s" => {
-            let file = &args[1];
-            let target = &args[2];
-            let remote_sync = &args[3];
+            let file = &args[2];
+            let target = &args[3];
+            let remote_sync = &args[4];
             let target: Vec<_> = target.split(":").collect();
             if !send(&file, (&target[0], &target[1]), &remote_sync) {
-                eprintln!("failed sent {} to {}", args[0], args[1]);
+                eprintln!("failed sent {} to {}", args[2], args[3]);
                 exit(-1);
             }
         }
         "-r" => {
-            let file = &args[1];
+            let file = &args[2];
             let cmp = get_metadata(file);
             let s = serde_json::to_string(&cmp).unwrap();
             print!("{}", s);
