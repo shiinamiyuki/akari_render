@@ -28,11 +28,11 @@ If you are using < Windows 10, please upgrade to Windows 10 or above.
 ## Build & Run
 ```
 cargo build --relase
-cargo run --release --bin akr-cli -- -s ./scenes/cbox/cbox.json -a ./scenes/cbox/integrator.json
+cargo run --release --bin akr-cli -- -s ./scenes/cbox/cbox.json -r ./scenes/cbox/integrator.json
 
 # On Mac:
-cargo run --release --bin akr-cli -- -s ./scenes/cbox/cbox.json -a ./scenes/cbox/integrator.json --as qbvh
+cargo run --release --bin akr-cli -- -s ./scenes/cbox/cbox.json -r ./scenes/cbox/integrator.json --as qbvh
 
 # GPU Rendering is broken now
-# cargo run --release --features gpu --bin akr-cli -- -s ./scenes/cbox.json -a ./scenes/integrator.json --gpu
+# cargo run --release --features gpu --bin akr-cli -- -s ./scenes/cbox.json -r ./scenes/integrator.json --gpu
 ```
