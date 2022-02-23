@@ -23,6 +23,10 @@ use akari::profile_fn;
 use akari::{api, rayon};
 // use clap::{App, Arg};
 
+// #[derive(Clone, Debug)]
+// struct RemoteOptions {
+
+// }
 #[derive(Debug, Default)]
 struct AppOptions {
     pub num_threads: Option<usize>,
@@ -66,14 +70,16 @@ Options:
                             or session is inconsistent with previous settings
 
     Network rendering:
-    -n, --net host,config   connect to remote host with arguments in config file.
-                            host is of form username@hostname[:port]
+    -n, --net config        connect to remote host(s) with arguments in config file.
+                            config file consists of lines of the form:
+                                username@hostname[:port] args
                             ssh must be present in PATH
                             password less authentication must be enabled
 
     Advanced:
     --launch-as-remote      launch this instance as a remote host
                             typically used by primary node in network rendering
+    
 ",
     );
     s
@@ -83,13 +89,18 @@ fn render_main(options: AppOptions) {
     if let Some(t) = options.num_threads {
         config.num_threads = t;
     }
-    if options.launch_as_remote {
+    if options.launch_as_remote || options.log_output.is_some() {
         let mut path = current_exe().unwrap();
-        path.push("log.txt");
+        path.push(options.log_output.clone().unwrap_or("log.txt".into()));
         let s = path.as_os_str().to_string_lossy().into_owned();
         config.log_output = s;
     }
+
     akari::init(config);
+    if options.launch_as_remote {
+        // we dont want anything to write to stdout
+        akari::util::enable_progress_bar(false);
+    }
     let accel = options
         .accel
         .clone()
@@ -137,7 +148,7 @@ fn render_main(options: AppOptions) {
         image.save(output).unwrap();
     }
 }
-fn real_main(args: Vec<String>) {
+fn parse_options(args: Vec<String>) -> AppOptions {
     macro_rules! on_err {
         () => {
             |e| {
@@ -182,12 +193,11 @@ fn real_main(args: Vec<String>) {
             exit(-1);
         }
     }
+    options
+}
+fn real_main(args: Vec<String>) {
+    let options = parse_options(args);
     render_main(options);
-    // if let Some(scene_path) =
-    //     parse_arg::<String>(&args, &mut pos, "--scene", Some("-s")).unwrap_or_else(on_err)
-    // {
-
-    // }
 }
 fn main() {
     let args: Vec<String> = args().skip(1).collect();

@@ -9,7 +9,7 @@ use std::{
     cell::UnsafeCell,
     marker::PhantomData,
     path::PathBuf,
-    sync::atomic::{AtomicU32, AtomicUsize, Ordering},
+    sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering},
 };
 pub mod arrayvec;
 pub mod radix_sort;
@@ -19,13 +19,13 @@ pub mod nn_v2;
 pub mod profile;
 #[macro_use]
 pub mod binserde;
+pub mod cli;
 pub mod fastdiv;
+pub mod filecache;
 pub mod image;
 pub mod lrucache;
 pub mod rcu;
 pub mod texcache;
-pub mod filecache;
-pub mod cli;
 // #[must_use]
 // pub mod vecn;
 pub fn log2(mut x: u32) -> u32 {
@@ -58,20 +58,45 @@ impl Drop for CurrentDirGuard {
         std::env::set_current_dir(&self.current_dir).unwrap();
     }
 }
+pub struct ProgressBarWrapper {
+    inner: Option<ProgressBar>,
+}
 
-pub fn create_progess_bar(count: usize, what: &str) -> ProgressBar {
-    let template = String::from(
-        "[{elapsed_precise} - {eta_precise}] [{bar:40.cyan/blue}] {pos:>7}/{len:7}WHAT {msg}",
-    );
-    let template = template.replace("WHAT", what);
-    let progress = ProgressBar::new(count as u64);
-    progress.set_draw_target(ProgressDrawTarget::stdout_with_hz(2));
-    progress.set_style(
-        ProgressStyle::default_bar()
-            .template(&template)
-            .progress_chars("=>-"),
-    );
-    progress
+impl ProgressBarWrapper {
+    pub fn inc(&self, delta: u64) {
+        if let Some(pb) = &self.inner {
+            pb.inc(delta);
+        }
+    }
+    pub fn finish(&self) {
+        if let Some(pb) = &self.inner {
+            pb.finish();
+        }
+    }
+}
+static PB_ENABLE: AtomicBool = AtomicBool::new(true);
+pub fn enable_progress_bar(enable: bool) {
+    PB_ENABLE.store(enable, Ordering::Relaxed);
+}
+pub fn create_progess_bar(count: usize, what: &str) -> ProgressBarWrapper {
+    if PB_ENABLE.load(Ordering::Relaxed) {
+        let template = String::from(
+            "[{elapsed_precise} - {eta_precise}] [{bar:40.cyan/blue}] {pos:>7}/{len:7}WHAT {msg}",
+        );
+        let template = template.replace("WHAT", what);
+        let progress = ProgressBar::new(count as u64);
+        progress.set_draw_target(ProgressDrawTarget::stdout_with_hz(2));
+        progress.set_style(
+            ProgressStyle::default_bar()
+                .template(&template)
+                .progress_chars("=>-"),
+        );
+        ProgressBarWrapper {
+            inner: Some(progress),
+        }
+    } else {
+        ProgressBarWrapper { inner: None }
+    }
 }
 
 pub struct PerThread<T> {
@@ -487,7 +512,7 @@ pub fn srgb_to_linear1_u8(s: u8) -> f32 {
     akari_const::SRGB_TO_LINEAR[s as usize]
 }
 
-pub fn srgb_to_linear_u8(rgb: [u8;3]) -> Vec3 {
+pub fn srgb_to_linear_u8(rgb: [u8; 3]) -> Vec3 {
     vec3(
         srgb_to_linear1_u8(rgb[0]),
         srgb_to_linear1_u8(rgb[1]),

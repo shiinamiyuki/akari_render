@@ -209,7 +209,7 @@ pub mod node {
         pub fn foreach_texture<F: FnMut(GenericTextureRefMut<'_>)>(&mut self, mut f: F) {
             match self {
                 Bsdf::Diffuse { color } => f(GenericTextureRefMut::Spectrum(color)),
-                Bsdf::Glass { kr, kt,.. } => {
+                Bsdf::Glass { kr, kt, .. } => {
                     f(GenericTextureRefMut::Spectrum(kr));
                     f(GenericTextureRefMut::Spectrum(kt));
                 }
@@ -257,6 +257,11 @@ pub mod node {
     }
     impl Scene {
         pub fn foreach_ext_files<F: FnMut(&mut String)>(&mut self, mut f: F) {
+            for shape in &mut self.shapes {
+                match shape {
+                    Shape::Mesh { path, .. } => f(path),
+                }
+            }
             for (_, bsdf) in &mut self.bsdfs {
                 bsdf.foreach_texture(|tex| match tex {
                     GenericTextureRefMut::Float(tex) => match tex {
