@@ -178,7 +178,7 @@ fn parse_options(args: Vec<String>) -> AppOptions {
     if let Some(config) = parse_str!("--config", "-c") {
         let config = std::fs::read_to_string(config).unwrap();
         let args = parse_str_to_args(&config);
-        return real_main(args);
+        return parse_options(args);
     }
     let mut options = AppOptions::default();
     while pos < args.len() {
