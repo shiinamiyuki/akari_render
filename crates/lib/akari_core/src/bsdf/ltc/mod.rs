@@ -61,7 +61,7 @@ impl LTC {
     // pub fn pdf(&self, w)
     pub fn sample(&self, u1: f32, u2: f32) -> Vec3 {
         use glam::Vec3Swizzles;
-        let w = consine_hemisphere_sampling(vec2(u1, u2)).xzy().as_dvec3();
+        let w = CosineHemisphere{}.warp(vec2(u1, u2)).xzy().as_dvec3();
         (self.mat * w).normalize().xzy().as_vec3()
     }
 }

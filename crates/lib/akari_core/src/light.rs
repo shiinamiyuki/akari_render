@@ -37,7 +37,12 @@ bitflags! {
 
 pub trait Light: Sync + Send + AsAny {
     fn sample_emission(&self, u0: Vec3, u1: Vec2, lambda: &SampledWavelengths) -> LightRaySample;
-    fn sample_direct(&self, u: Vec3, p: &ReferencePoint, lambda: &SampledWavelengths) -> LightSample;
+    fn sample_direct(
+        &self,
+        u: Vec3,
+        p: &ReferencePoint,
+        lambda: &SampledWavelengths,
+    ) -> LightSample;
     // (pdf_pos,pdf_dir)
     fn pdf_emission(&self, ray: &Ray, n: Vec3) -> (f32, f32);
     // (pdf_pos,pdf_dir)
@@ -151,7 +156,7 @@ impl AreaLight {
 impl Light for AreaLight {
     fn sample_emission(&self, u0: Vec3, u1: Vec2, lambda: &SampledWavelengths) -> LightRaySample {
         let p = self.shape.sample_surface(u0);
-        let dir = consine_hemisphere_sampling(u1);
+        let dir = CosineHemisphere {}.warp(u1);
         let frame = Frame::from_normal(p.ng);
         LightRaySample {
             le: self.evaluate(
@@ -276,13 +281,17 @@ impl SpotLight {
 }
 impl Light for SpotLight {
     fn sample_emission(&self, _u0: Vec3, u1: Vec2, lambda: &SampledWavelengths) -> LightRaySample {
-        let w = uniform_sample_cone(u1, self.max_angle);
+        let uniform_cone = UniformCone {
+            cos_theta_max: self.max_angle,
+        };
+        let w = uniform_cone.warp(u1);
+        let w_local = w;
         let frame = Frame::from_normal(self.direction);
         let w = frame.to_world(w);
         LightRaySample {
             le: self.evaluate(w, lambda),
             pdf_pos: 1.0,
-            pdf_dir: uniform_cone_pdf(self.max_angle),
+            pdf_dir: uniform_cone.pdf(w_local),
             ray: Ray::spawn(self.position, w),
             n: w,
         }
@@ -311,8 +320,13 @@ impl Light for SpotLight {
         }
     }
 
-    fn pdf_emission(&self, _ray: &Ray, _n: Vec3) -> (f32, f32) {
-        (0.0, uniform_cone_pdf(self.max_angle))
+    fn pdf_emission(&self, ray: &Ray, _n: Vec3) -> (f32, f32) {
+        let uniform_cone = UniformCone {
+            cos_theta_max: self.max_angle,
+        };
+        let frame = Frame::from_normal(self.direction);
+        let w = frame.to_local(ray.d);
+        (0.0, uniform_cone.pdf(w))
     }
 
     fn pdf_direct(&self, _wi: Vec3, _p: &ReferencePoint) -> (f32, f32) {
@@ -353,11 +367,11 @@ impl PointLight {
 }
 impl Light for PointLight {
     fn sample_emission(&self, _: Vec3, u1: Vec2, lambda: &SampledWavelengths) -> LightRaySample {
-        let w = uniform_sample_sphere(u1);
+        let w = UniformSphere {}.warp(u1);
         LightRaySample {
             le: self.evaluate(w, lambda),
             pdf_pos: 1.0,
-            pdf_dir: uniform_sphere_pdf(),
+            pdf_dir: UniformSphere {}.pdf(w),
             ray: Ray::spawn(self.position, w),
             n: w,
         }
@@ -385,7 +399,7 @@ impl Light for PointLight {
         }
     }
     fn pdf_emission(&self, _ray: &Ray, n: Vec3) -> (f32, f32) {
-        (0.0, uniform_sphere_pdf())
+        (0.0, UniformSphere {}.pdf(Vec3::ZERO))
     }
     fn pdf_direct(&self, _wi: Vec3, _p: &ReferencePoint) -> (f32, f32) {
         (0.0, 0.0)

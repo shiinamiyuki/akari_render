@@ -384,7 +384,7 @@ impl LocalBsdfClosure for DiffuseBsdfClosure {
         let r = self.color;
 
         let wi = {
-            let w = consine_hemisphere_sampling(u);
+            let w = CosineHemisphere{}.warp(u);
             if Frame::same_hemisphere(w, wo) {
                 w
             } else {
