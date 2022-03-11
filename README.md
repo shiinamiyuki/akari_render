@@ -7,8 +7,6 @@
 AkariRender is a CPU/GPU physically based renderer written in Rust and Vulkan RTX.
 Previous version with PPG and SMCMC is in [legacy-cpp](https://github.com/shiinamiyuki/akari_render/tree/legacy-cpp) branch.
 
-
-
 ## Features
 - Spectral Rendering
 - Out of Core Rendering

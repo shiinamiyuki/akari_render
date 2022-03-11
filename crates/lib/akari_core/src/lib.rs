@@ -19,7 +19,6 @@ pub mod sampling;
 pub mod scene;
 pub mod shape;
 pub mod net;
-pub mod spmd;
 pub use bson;
 pub use sampling::*;
 #[macro_use]

@@ -10,7 +10,7 @@ use crate::util::binserde::Encode;
 use crate::*;
 use crate::{accel::bvh, bsdf::Bsdf};
 
-use akari_common::lazy_static::lazy_static;
+
 use bumpalo::Bump;
 use glam::BVec4A;
 use serde::{Deserialize, Serialize};

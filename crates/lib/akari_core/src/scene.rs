@@ -4,7 +4,7 @@ use crate::camera::*;
 use crate::light::*;
 use crate::shape::*;
 use crate::Ray;
-use std::any::Any;
+
 use std::collections::HashMap;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;

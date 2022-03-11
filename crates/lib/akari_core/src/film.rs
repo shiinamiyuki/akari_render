@@ -1,6 +1,6 @@
 use crate::*;
 use color::XYZ;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use util::RobustSum;
 #[derive(Copy, Clone, Serialize, Deserialize)]
 #[repr(align(64))]
@@ -16,6 +16,34 @@ impl Pixel {
         self.intensity.sum() / weight + self.splat.sum()
     }
 }
+#[derive(Clone, Serialize, Deserialize)]
+pub struct FilmTile {
+    pub pixels: Vec<Pixel>,
+    pub resolution: UVec2,
+    pub bounds: Bounds2u,
+}
+impl FilmTile {
+    pub fn from_film(bounds: Bounds2u, film: &Film) -> Self {
+        let pixels = bounds.iter().map(|px| film.get_pixel(px)).collect();
+        Self {
+            bounds,
+            pixels,
+            resolution: film.resolution,
+        }
+    }
+    pub fn pixel(&self, p: UVec2) -> Pixel {
+        let o = self.bounds.offset(p);
+        self.pixels[(o.x + self.bounds.extent().x * o.y) as usize]
+    }
+}
+impl std::fmt::Debug for FilmTile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FilmTile")
+            .field("resolution", &self.resolution)
+            .field("bounds", &self.bounds)
+            .finish()
+    }
+}
 pub struct Film {
     pixels: Vec<RwLock<Pixel>>,
     resolution: UVec2,
@@ -26,6 +54,13 @@ impl Film {
     }
     pub fn resolution(&self) -> UVec2 {
         self.resolution
+    }
+    pub fn merge_tile(&self, tile: &FilmTile) {
+        for px in tile.bounds.iter() {
+            let p = tile.pixel(px);
+            self.add_splat_xyz(px, p.splat.sum());
+            self.add_sample_xyz(px, p.intensity.sum(), p.weight.sum());
+        }
     }
     pub fn new(resolution: &UVec2) -> Self {
         Self {

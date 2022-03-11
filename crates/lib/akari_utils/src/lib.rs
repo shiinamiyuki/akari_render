@@ -1,5 +1,6 @@
 use akari_common::{
-    glam::{vec3, Vec3},
+    exr::block,
+    glam::{uvec2, vec3, UVec2, Vec3},
     *,
 };
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
@@ -381,6 +382,47 @@ impl Clone for AtomicFloat {
     }
 }
 
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct Bounds2u {
+    pub min: UVec2,
+    pub max: UVec2,
+}
+
+pub struct Bounds2uIter {
+    parent: Bounds2u,
+    cur: UVec2,
+}
+impl Bounds2u {
+    pub fn iter(&self) -> Bounds2uIter {
+        Bounds2uIter {
+            parent: *self,
+            cur: self.min,
+        }
+    }
+    pub fn extent(&self) -> UVec2 {
+        self.max - self.min
+    }
+    pub fn offset(&self, p: UVec2) -> UVec2 {
+        p - self.min
+    }
+}
+impl Iterator for Bounds2uIter {
+    type Item = UVec2;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.cur.cmpge(self.parent.max).all() {
+            return None;
+        }
+        let r = self.cur;
+        if self.cur.y >= self.parent.max.y {
+            self.cur.y += 1;
+            self.cur.x = 0;
+        } else {
+            self.cur.y += 1;
+        }
+        Some(r)
+    }
+}
+
 pub fn parallel_for<F: Fn(usize) -> () + Sync>(count: usize, chunk_size: usize, f: F) {
     let nthreads = rayon::current_num_threads();
     let work_counter = AtomicUsize::new(0);
@@ -396,6 +438,20 @@ pub fn parallel_for<F: Fn(usize) -> () + Sync>(count: usize, chunk_size: usize, 
                 }
             });
         }
+    });
+}
+pub fn parallel_for_2d<F: Fn(Bounds2u) -> () + Sync>(bound: Bounds2u, block_size: UVec2, f: F) {
+    let bx = (bound.extent().x + block_size.x - 1) / block_size.x;
+    let by = (bound.extent().y + block_size.y - 1) / block_size.y;
+    assert!((bx as usize) * (by as usize) <= u32::MAX as usize);
+    parallel_for((bx * by) as usize, 1, |i| {
+        let bx = (i as u32) % bx;
+        let by = (i as u32) / bx;
+        let block = Bounds2u {
+            min: uvec2(bx, by) * block_size,
+            max: ((uvec2(bx, by) + 1) * block_size).min(bound.max),
+        };
+        f(block);
     });
 }
 #[allow(dead_code)]

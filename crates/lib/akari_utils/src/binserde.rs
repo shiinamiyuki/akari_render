@@ -88,7 +88,7 @@ impl_binserde!(u32);
 impl_binserde!([u32; 2]);
 impl_binserde!([u32; 3]);
 impl_binserde!(u8);
-
+impl_binserde!(u64);
 impl Encode for String {
     fn encode<W: Write>(&self, writer: &mut W) -> std::io::Result<()> {
         self.as_bytes().encode(writer)
