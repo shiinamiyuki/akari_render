@@ -43,7 +43,7 @@ impl Default for Ray {
         Self {
             o: Vec3::ZERO,
             d: Vec3::ZERO,
-            tmin: 0.0,
+            tmin: RAY_EPSILON,
             tmax: -f32::INFINITY,
         }
     }
@@ -95,7 +95,7 @@ impl Ray {
         Self {
             o,
             d,
-            tmin: 0.0,
+            tmin: RAY_EPSILON,
             tmax: f32::INFINITY,
         }
     }
