@@ -21,6 +21,17 @@ impl From<XYZ> for SRgb {
         Self::new(xyz_to_srgb(xyz.values()))
     }
 }
+impl SRgb {
+    pub fn remove_invalid(&self) -> Self {
+        let mut v = self.values;
+        for i in 0..3 {
+            if v[i].is_infinite() || v[i].is_nan() {
+                v[i] = 0.0;
+            }
+        }
+        SRgb { values: v }
+    }
+}
 
 pub fn xyz_to_srgb(xyz: Vec3) -> Vec3 {
     let m = mat3(

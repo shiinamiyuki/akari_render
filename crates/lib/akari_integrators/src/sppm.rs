@@ -200,6 +200,7 @@ impl Integrator for Sppm {
         let p_pixels = &UnsafePointer::new(pixels.as_mut_ptr());
         let p_photon_samplers = &UnsafePointer::new(photon_samplers.as_mut_ptr());
         let mut arenas = PerThread::new(|| Bump::new());
+        let progress = crate::util::create_progess_bar(self.iterations, "passes");
         for _iteration in 0..self.iterations {
             lambda_sampler.start_next_sample();
             let pass_lambda = SampledWavelengths::sample_visible(lambda_sampler.next1d());
@@ -215,25 +216,48 @@ impl Integrator for Sppm {
                 let sampler = unsafe { p_samplers.offset(id as isize).as_mut().unwrap().as_mut() };
                 sampler.start_next_sample();
                 let mut lambda = pass_lambda.clone();
-                let (ray, _ray_weight) = scene.camera.generate_ray(pixel, sampler, &lambda);
+                let (mut ray, _ray_weight) = scene.camera.generate_ray(pixel, sampler, &lambda);
+                let mut beta = SampledSpectrum::one();
                 let arena = arenas.get_mut();
-                if let Some(si) = scene.intersect(&ray) {
-                    let opt_bsdf =
-                        si.evaluate_bsdf(&mut lambda, TransportMode::CameraToLight, arena);
-                    if opt_bsdf.is_none() {
-                        return;
+                let mut depth = 0;
+                loop {
+                    if let Some(si) = scene.intersect(&ray) {
+                        let opt_bsdf =
+                            si.evaluate_bsdf(&mut lambda, TransportMode::CameraToLight, arena);
+                        if opt_bsdf.is_none() {
+                            return;
+                        }
+                        let p = ray.at(si.t);
+                        let bsdf = opt_bsdf.unwrap();
+                        let wo = -ray.d;
+                        let sample = bsdf.sample(sampler.next2d(), wo);
+                        if sample.is_none() {
+                            break;
+                        }
+                        if depth >= self.max_depth {
+                            break;
+                        }
+                        depth += 1;
+                        let sample = sample.unwrap();
+                        if sample.flag.contains(BsdfFlags::DIFFUSE)
+                            || (sample.flag.contains(BsdfFlags::GLOSSY)
+                                && depth == self.max_depth - 1)
+                        {
+                            sppm_pixel.vp = Some(VisiblePoint {
+                                p,
+                                beta,
+                                bsdf,
+                                wo,
+                                secondary_terminated: lambda.secondary_terminated(),
+                            });
+                            break;
+                        }
+                        let wi = sample.wi;
+                        ray = Ray::spawn(p, wi).offset_along_normal(si.ng);
+                        beta *= sample.f * wi.dot(si.ng).abs() / sample.pdf;
+                    } else {
+                        break;
                     }
-                    let p = ray.at(si.t);
-                    let bsdf = opt_bsdf.unwrap();
-                    let wo = -ray.d;
-                    sppm_pixel.vp = Some(VisiblePoint {
-                        p,
-                        beta: SampledSpectrum::one(),
-                        bsdf,
-                        wo,
-                        secondary_terminated: lambda.secondary_terminated(),
-                        // lambda: lambda.clone(),
-                    });
                 }
             });
             {
@@ -249,7 +273,7 @@ impl Integrator for Sppm {
                         max_radius = max_radius.max(pixel.radius as f64);
                     }
                 }
-                log::info!("{:?} {}", bound, max_radius);
+                // log::info!("{:?} {}", bound, max_radius);
                 let diag = bound.diagonal();
                 let max_diag = diag.max_element() as f64;
                 let base_grid_res = (max_diag / max_radius) as u32;
@@ -318,7 +342,8 @@ impl Integrator for Sppm {
                                     if vp.secondary_terminated {
                                         lambda.terminate_secondary();
                                     }
-                                    let phi = lambda.cie_xyz(beta * vp.bsdf.evaluate(vp.wo, wi));
+                                    let phi = lambda
+                                        .cie_xyz(vp.beta * beta * vp.bsdf.evaluate(vp.wo, wi));
                                     for i in 0..3 {
                                         pixel.phi[i].fetch_add(phi[i] as f32, Ordering::SeqCst);
                                     }
@@ -354,14 +379,17 @@ impl Integrator for Sppm {
                         p.phi[i].store(0.0, Ordering::SeqCst);
                     }
                     let vp = p.vp.as_ref().unwrap();
-                    p.tau = (p.tau + pass_lambda.cie_xyz(vp.beta) * phi)
-                        * (R_new * R_new)
-                        / (p.radius * p.radius);
+                    let mut lambda = pass_lambda.clone();
+                    if vp.secondary_terminated {
+                        lambda.terminate_secondary();
+                    }
+                    p.tau = (p.tau + phi) * (R_new * R_new) / (p.radius * p.radius);
                     p.N = N_new;
                     p.radius = R_new;
                 }
             });
             arenas.inner_mut().iter_mut().for_each(|a| a.reset());
+            progress.inc(1);
         }
         parallel_for(npixels, 256, |id| {
             let x = (id as u32) % scene.camera.resolution().x;
