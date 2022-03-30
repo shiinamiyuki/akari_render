@@ -1,3 +1,6 @@
+use std::sync::atomic::AtomicPtr;
+use std::sync::atomic::AtomicU32;
+
 use bumpalo::Bump;
 
 use crate::bsdf::*;
@@ -17,16 +20,18 @@ struct VisiblePoint<'a> {
     pub p: Vec3,
     pub wo: Vec3,
     pub beta: SampledSpectrum,
+    pub secondary_terminated: bool,
+    // pub lambda: SampledWavelengths,
 }
 
 #[allow(non_snake_case)]
 struct SppmPixel<'a> {
     radius: f32,
-    ld: SampledSpectrum,
+    ld: XYZ,
     M: AtomicU32,
     N: f32,
-    phi: [AtomicFloat; SampledSpectrum::N_SAMPLES],
-    tau: SampledSpectrum,
+    phi: [AtomicFloat; 3],
+    tau: XYZ,
     vp: Option<VisiblePoint<'a>>,
 }
 
@@ -159,16 +164,17 @@ pub struct Sppm {
 }
 
 impl Integrator for Sppm {
+    #[allow(non_snake_case)]
     fn render(&self, scene: &Scene) -> Film {
         let npixels = (scene.camera.resolution().x * scene.camera.resolution().y) as usize;
         let film = Film::new(&scene.camera.resolution());
         let mut pixels: Vec<SppmPixel> = vec![
             SppmPixel {
                 radius: self.initial_radius,
-                ld: SampledSpectrum::zero(),
+                ld: XYZ::zero(),
                 N: 0.0,
                 M: AtomicU32::new(0),
-                tau: SampledSpectrum::zero(),
+                tau: XYZ::zero(),
                 vp: None,
                 phi: Default::default(),
             };
@@ -186,6 +192,7 @@ impl Integrator for Sppm {
                 rng: Pcg::new(i as u64),
             }));
         }
+        let mut lambda_sampler = PCGSampler { rng: Pcg::new(0) };
         #[allow(unused_assignments)]
         let mut grid: Option<VisiblePointGrid> = None;
 
@@ -194,6 +201,8 @@ impl Integrator for Sppm {
         let p_photon_samplers = &UnsafePointer::new(photon_samplers.as_mut_ptr());
         let mut arenas = PerThread::new(|| Bump::new());
         for _iteration in 0..self.iterations {
+            lambda_sampler.start_next_sample();
+            let pass_lambda = SampledWavelengths::sample_visible(lambda_sampler.next1d());
             parallel_for(npixels, 256, |id| {
                 let sppm_pixel = unsafe { p_pixels.offset(id as isize).as_mut().unwrap() };
                 sppm_pixel.vp = None;
@@ -204,13 +213,13 @@ impl Integrator for Sppm {
                 let pixel = uvec2(x, y);
 
                 let sampler = unsafe { p_samplers.offset(id as isize).as_mut().unwrap().as_mut() };
-                let (ray, _ray_weight) = scene.camera.generate_ray(pixel, sampler);
+                sampler.start_next_sample();
+                let mut lambda = pass_lambda.clone();
+                let (ray, _ray_weight) = scene.camera.generate_ray(pixel, sampler, &lambda);
                 let arena = arenas.get_mut();
                 if let Some(si) = scene.intersect(&ray) {
-                    let ng = si.ng;
-                    let frame = Frame::from_normal(ng);
-                    let shape = si.shape;
-                    let opt_bsdf = si.evaluate_bsdf(arena);
+                    let opt_bsdf =
+                        si.evaluate_bsdf(&mut lambda, TransportMode::CameraToLight, arena);
                     if opt_bsdf.is_none() {
                         return;
                     }
@@ -222,10 +231,11 @@ impl Integrator for Sppm {
                         beta: SampledSpectrum::one(),
                         bsdf,
                         wo,
+                        secondary_terminated: lambda.secondary_terminated(),
+                        // lambda: lambda.clone(),
                     });
                 }
             });
-            arenas.inner().iter().for_each(|a| a.reset());
             {
                 let mut bound = Bounds3f::default();
                 let mut max_radius = 0.0 as f64;
@@ -263,27 +273,26 @@ impl Integrator for Sppm {
                         .unwrap()
                         .as_mut()
                 };
+                sampler.start_next_sample();
+                let mut lambda = pass_lambda.clone();
                 let (light, light_pdf) = scene.light_distr.sample(sampler.next1d());
-                let sample = light.sample_le(sampler.next3d(), sampler.next2d());
+                let sample = light.sample_emission(sampler.next3d(), sampler.next2d(), &lambda);
                 let mut depth = 0;
                 let mut ray = sample.ray;
                 let mut beta = sample.le / (sample.pdf_dir * sample.pdf_pos * light_pdf)
                     * sample.n.dot(ray.d).abs();
+                let arena = arenas.get_mut();
+
                 loop {
                     if let Some(si) = scene.intersect(&ray) {
                         let ng = si.ng;
-                        let frame = Frame::from_normal(ng);
-                        let shape = si.shape;
-                        let opt_bsdf = si.bsdf;
+                        let p = ray.at(si.t);
+                        let opt_bsdf =
+                            si.evaluate_bsdf(&mut lambda, TransportMode::LightToCamera, arena);
                         if opt_bsdf.is_none() {
                             break;
                         }
-                        let p = ray.at(si.t);
-                        let bsdf = BsdfClosure {
-                            sp: si.sp,
-                            frame,
-                            bsdf: opt_bsdf.unwrap(),
-                        };
+                        let bsdf = opt_bsdf.unwrap();
                         let wo = -ray.d;
                         // println!("{} {} {}", p, depth, self.max_depth);
                         depth += 1;
@@ -306,8 +315,11 @@ impl Integrator for Sppm {
                                     v.length_squared()
                                 };
                                 if dist2 <= pixel.radius * pixel.radius {
-                                    let phi = beta * vp.bsdf.evaluate(vp.wo, wi);
-                                    for i in 0..SampledSpectrum::N_SAMPLES {
+                                    if vp.secondary_terminated {
+                                        lambda.terminate_secondary();
+                                    }
+                                    let phi = lambda.cie_xyz(beta * vp.bsdf.evaluate(vp.wo, wi));
+                                    for i in 0..3 {
                                         pixel.phi[i].fetch_add(phi[i] as f32, Ordering::SeqCst);
                                     }
                                     pixel.M.fetch_add(1, Ordering::Relaxed);
@@ -331,22 +343,25 @@ impl Integrator for Sppm {
             parallel_for(npixels, 256, |id| {
                 let p = unsafe { p_pixels.offset(id as isize).as_mut().unwrap() };
                 let gamma = 2.0 / 3.0;
-                #[allow(non_snake_case)]
+
                 if p.M.load(Ordering::Relaxed) > 0 {
                     let N_new = p.N + (gamma * p.M.load(Ordering::Relaxed) as f32);
                     let R_new =
                         p.radius * (N_new / (p.N + p.M.load(Ordering::Relaxed) as f32)).sqrt();
-                    let mut phi = SampledSpectrum::zero();
-                    for i in 0..SampledSpectrum::N_SAMPLES {
+                    let mut phi = XYZ::zero();
+                    for i in 0..3 {
                         phi[i] = p.phi[i].load(Ordering::Relaxed) as f32;
                         p.phi[i].store(0.0, Ordering::SeqCst);
                     }
-                    p.tau = (p.tau + p.vp.as_ref().unwrap().beta * phi) * (R_new * R_new)
+                    let vp = p.vp.as_ref().unwrap();
+                    p.tau = (p.tau + pass_lambda.cie_xyz(vp.beta) * phi)
+                        * (R_new * R_new)
                         / (p.radius * p.radius);
                     p.N = N_new;
                     p.radius = R_new;
                 }
             });
+            arenas.inner_mut().iter_mut().for_each(|a| a.reset());
         }
         parallel_for(npixels, 256, |id| {
             let x = (id as u32) % scene.camera.resolution().x;
@@ -355,7 +370,7 @@ impl Integrator for Sppm {
             let p = unsafe { p_pixels.offset(id as isize).as_ref().unwrap() };
             let l = p.tau / ((self.iterations * self.n_photons) as f32 * PI * p.radius * p.radius);
 
-            film.add_sample(pixel, &l, 1.0);
+            film.add_sample_xyz(pixel, l, 1.0);
         });
         film
     }

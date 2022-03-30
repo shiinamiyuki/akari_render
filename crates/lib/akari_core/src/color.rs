@@ -10,7 +10,7 @@ pub use util::{hsv_to_rgb, linear_to_srgb, rgb_to_hsl, rgb_to_hsv, srgb_to_linea
 pub struct XYZ {
     values: Vec3,
 }
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct SRgb {
     values: Vec3,
 }

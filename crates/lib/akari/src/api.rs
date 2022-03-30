@@ -32,6 +32,7 @@ use integrator::bdpt::DebugOption;
 use integrator::erpt;
 use integrator::mmlt;
 use integrator::pssmlt;
+use integrator::sppm;
 use integrator::Integrator;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -512,18 +513,18 @@ pub fn load_integrator(path: &Path) -> Box<dyn Integrator> {
                 direct_spp,
             })
         }
-        // "sppm" => {
-        //     let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as usize;
-        //     let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as usize;
-        //     let n_photons = (|| json.get("n_photons")?.as_u64())().unwrap_or(100000) as usize;
-        //     let initial_radius = (|| json.get("initial_radius")?.as_f64())().unwrap_or(0.1) as f32;
-        //     Box::new(sppm::Sppm {
-        //         iterations: spp,
-        //         max_depth,
-        //         n_photons,
-        //         initial_radius,
-        //     })
-        // }
+        "sppm" => {
+            let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as usize;
+            let max_depth = (|| json.get("max_depth")?.as_u64())().unwrap_or(3) as usize;
+            let n_photons = (|| json.get("n_photons")?.as_u64())().unwrap_or(100000) as usize;
+            let initial_radius = (|| json.get("initial_radius")?.as_f64())().unwrap_or(0.1) as f32;
+            Box::new(sppm::Sppm {
+                iterations: spp,
+                max_depth,
+                n_photons,
+                initial_radius,
+            })
+        }
         "ao" | "rtao" => {
             let spp = (|| json.get("spp")?.as_u64())().unwrap_or(16) as u32;
             Box::new(RTAO { spp })

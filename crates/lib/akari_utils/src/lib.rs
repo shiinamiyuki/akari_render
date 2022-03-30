@@ -114,6 +114,9 @@ impl<T> PerThread<T> {
     pub fn inner(&mut self) -> &[T] {
         self.data.get_mut().as_slice()
     }
+    pub fn inner_mut(&mut self) -> &mut [T] {
+        self.data.get_mut().as_mut_slice()
+    }
     pub fn get(&self) -> &T {
         unsafe { &self.data.get().as_ref().unwrap()[rayon::current_thread_index().unwrap()] }
     }

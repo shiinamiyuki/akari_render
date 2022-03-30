@@ -108,6 +108,9 @@ impl SampledWavelengths {
         }
         w
     }
+    pub fn secondary_terminated(&self) -> bool {
+        self.secondary_terminated
+    }
     pub fn terminate_secondary(&mut self) {
         if self.secondary_terminated {
             return;

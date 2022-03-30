@@ -7,7 +7,7 @@ pub mod mmlt;
 pub mod path;
 // pub mod ppg;
 pub mod pssmlt;
-// pub mod sppm;
+pub mod sppm;
 // pub mod spath;
 // pub mod normalvis;
 use crate::{film::Film, scene::Scene};
