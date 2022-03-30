@@ -40,6 +40,7 @@ pub const PI: f32 = std::f32::consts::PI;
 pub const FRAC_1_PI: f32 = std::f32::consts::FRAC_1_PI;
 pub const FRAC_PI_2: f32 = std::f32::consts::FRAC_PI_2;
 pub const FRAC_PI_4: f32 = std::f32::consts::FRAC_PI_4;
+pub const RAY_EPSILON: f32 = 0.0001;
 
 #[inline]
 pub fn lerp3<T>(v0: T, v1: T, v2: T, uv: Vec2) -> T
