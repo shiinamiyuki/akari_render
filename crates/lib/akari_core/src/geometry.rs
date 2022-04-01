@@ -178,6 +178,7 @@ pub struct Transform {
     pub inv_m3: Mat3A,
 }
 impl Transform {
+    #[inline]
     pub fn inverse(&self) -> Transform {
         Self {
             m4: self.inv_m4,
@@ -186,6 +187,7 @@ impl Transform {
             inv_m3: self.m3,
         }
     }
+    #[inline]
     pub fn identity() -> Self {
         Self {
             m4: Mat4::IDENTITY,
@@ -194,6 +196,7 @@ impl Transform {
             inv_m3: Mat3A::IDENTITY,
         }
     }
+    #[inline]
     pub fn from_matrix(m: &Mat4) -> Self {
         let m3 = Mat3A::from_mat4(*m);
         Self {
@@ -203,13 +206,16 @@ impl Transform {
             inv_m3: m3.inverse(),
         }
     }
+    #[inline]
     pub fn transform_point(self, p: Vec3) -> Vec3 {
         let q = self.m4 * vec4(p.x, p.y, p.z, 1.0);
         vec3(q.x, q.y, q.z) / q.w
     }
+    #[inline]
     pub fn transform_vector(self, v: Vec3) -> Vec3 {
         self.m3 * v
     }
+    #[inline]
     pub fn transform_normal(&self, n: Vec3) -> Vec3 {
         self.inv_m3.transpose() * n
     }
@@ -226,6 +232,7 @@ pub fn dir_to_spherical(v: Vec3) -> Vec2 {
     let phi = f32::atan2(v.z, v.x) + PI;
     vec2(theta, phi)
 }
+#[inline]
 pub fn spherical_to_uv(v: Vec2) -> Vec2 {
     vec2(v.x / PI, v.y / (2.0 * PI))
 }
@@ -238,24 +245,31 @@ impl Frame {
     pub fn same_hemisphere(u: Vec3, v: Vec3) -> bool {
         u.y * v.y > 0.0
     }
+    #[inline]
     pub fn cos_theta(u: Vec3) -> f32 {
         u.y
     }
+    #[inline]
     pub fn cos2_theta(u: Vec3) -> f32 {
         u.y * u.y
     }
+    #[inline]
     pub fn sin2_theta(u: Vec3) -> f32 {
         (1.0 - Self::cos2_theta(u)).clamp(0.0, 1.0)
     }
+    #[inline]
     pub fn sin_theta(u: Vec3) -> f32 {
         Self::sin2_theta(u).sqrt()
     }
+    #[inline]
     pub fn tan_theta(u: Vec3) -> f32 {
         Self::sin_theta(u) / Self::cos_theta(u)
     }
+    #[inline]
     pub fn abs_cos_theta(u: Vec3) -> f32 {
         u.y.abs()
     }
+    #[inline]
     pub fn cos_phi(u: Vec3) -> f32 {
         let sin = Self::sin_theta(u);
         if sin == 0.0 {
@@ -264,6 +278,7 @@ impl Frame {
             (u.x / sin).clamp(-1.0, 1.0)
         }
     }
+    #[inline]
     pub fn sin_phi(u: Vec3) -> f32 {
         let sin = Self::sin_theta(u);
         if sin == 0.0 {
@@ -272,13 +287,16 @@ impl Frame {
             (u.z / sin).clamp(-1.0, 1.0)
         }
     }
+    #[inline]
     pub fn cos2_phi(u: Vec3) -> f32 {
         Self::cos_phi(u).powi(2)
     }
+    #[inline]
     pub fn sin2_phi(u: Vec3) -> f32 {
         Self::sin_phi(u).powi(2)
     }
 }
+#[inline]
 pub fn reflect(w: Vec3, n: Vec3) -> Vec3 {
     -w + 2.0 * w.dot(n) * n
 }
@@ -333,6 +351,7 @@ pub struct RayHit {
     pub geom_id: u32,
 }
 impl RayHit {
+    #[inline]
     pub fn is_invalid(&self) -> bool {
         self.prim_id == u32::MAX || self.geom_id == u32::MAX
     }
@@ -362,15 +381,17 @@ pub struct Aabb {
 }
 
 impl Aabb {
+    #[inline]
     pub fn size(&self) -> Vec3 {
         (self.max - self.min).into()
     }
-
+    #[inline]
     pub fn insert_point(&mut self, p: Vec3) -> Self {
         self.min = self.min.min(p.into());
         self.max = self.max.max(p.into());
         *self
     }
+    #[inline]
     pub fn insert_box(&mut self, aabb: Self) -> Self {
         self.min = self.min.min(aabb.min);
         self.max = self.max.max(aabb.max);
@@ -380,19 +401,24 @@ impl Aabb {
 
 pub type Bounds3f = Aabb;
 impl Aabb {
+    #[inline]
     pub fn surface_area(&self) -> f32 {
         let s = self.size();
         (s[0] * s[1] + s[1] * s[2] + s[0] * s[2]) * 2.0
     }
+    #[inline]
     pub fn centroid(&self) -> Vec3 {
         Vec3::from(self.min) + 0.5 * self.size()
     }
+    #[inline]
     pub fn diagonal(&self) -> Vec3 {
         (self.max - self.min).into()
     }
+    #[inline]
     pub fn contains(&self, p: Vec3) -> bool {
         p.cmple(self.max.into()).all() && p.cmpge(self.min.into()).all()
     }
+    #[inline]
     pub fn offset(&self, p: Vec3) -> Vec3 {
         (p - Vec3::from(self.min)) / self.size()
     }

@@ -14,13 +14,14 @@ pub mod bsdf;
 pub mod function;
 pub mod interaction;
 pub mod light;
+pub mod net;
 pub mod rgb2spec;
 pub mod sampling;
 pub mod scene;
 pub mod shape;
-pub mod net;
 pub mod spmd;
 pub use bson;
+use hexf::hexf32;
 pub use sampling::*;
 #[macro_use]
 pub mod color;
@@ -41,6 +42,8 @@ pub const FRAC_1_PI: f32 = std::f32::consts::FRAC_1_PI;
 pub const FRAC_PI_2: f32 = std::f32::consts::FRAC_PI_2;
 pub const FRAC_PI_4: f32 = std::f32::consts::FRAC_PI_4;
 pub const RAY_EPSILON: f32 = 0.0001;
+pub const MACHINE_EPS: f32 = f32::EPSILON * 0.5;
+pub const ONE_MINUS_EPS: f32 = hexf32!("0x1.fffffep-1");
 
 #[inline]
 pub fn lerp3<T>(v0: T, v1: T, v2: T, uv: Vec2) -> T

@@ -12,6 +12,7 @@ pub struct ShadingPoint {
     pub texcoord: Vec2,
 }
 impl ShadingPoint {
+    #[inline]
     pub fn from_rayhit(shape: &dyn Shape, ray_hit: RayHit) -> Self {
         let triangle = shape.shading_triangle(ray_hit.prim_id);
         Self {

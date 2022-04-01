@@ -192,7 +192,6 @@ impl Integrator for Sppm {
                 rng: Pcg::new(i as u64),
             }));
         }
-        let mut lambda_sampler = PCGSampler { rng: Pcg::new(0) };
         #[allow(unused_assignments)]
         let mut grid: Option<VisiblePointGrid> = None;
 
@@ -201,9 +200,8 @@ impl Integrator for Sppm {
         let p_photon_samplers = &UnsafePointer::new(photon_samplers.as_mut_ptr());
         let mut arenas = PerThread::new(|| Bump::new());
         let progress = crate::util::create_progess_bar(self.iterations, "passes");
-        for _iteration in 0..self.iterations {
-            lambda_sampler.start_next_sample();
-            let pass_lambda = SampledWavelengths::sample_visible(lambda_sampler.next1d());
+        for iter in 0..self.iterations {
+            let pass_lambda = SampledWavelengths::sample_visible(radical_inverse(1, iter as u64));
             parallel_for(npixels, 256, |id| {
                 let sppm_pixel = unsafe { p_pixels.offset(id as isize).as_mut().unwrap() };
                 sppm_pixel.vp = None;
@@ -377,11 +375,6 @@ impl Integrator for Sppm {
                     for i in 0..3 {
                         phi[i] = p.phi[i].load(Ordering::Relaxed) as f32;
                         p.phi[i].store(0.0, Ordering::SeqCst);
-                    }
-                    let vp = p.vp.as_ref().unwrap();
-                    let mut lambda = pass_lambda.clone();
-                    if vp.secondary_terminated {
-                        lambda.terminate_secondary();
                     }
                     p.tau = (p.tau + phi) * (R_new * R_new) / (p.radius * p.radius);
                     p.N = N_new;

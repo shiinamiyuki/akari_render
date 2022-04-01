@@ -2,7 +2,7 @@ use std::convert::TryInto;
 
 use crate::*;
 
-use akari_const::SOBOL_MATRIX;
+use akari_const::{PRIMES_1000, SOBOL_MATRIX};
 use util::erf_inv;
 pub trait Sampler: Sync + Send {
     // fn start_pixel(&mut self, px: &IVec2, res: &IVec2);
@@ -62,6 +62,24 @@ impl Pcg {
         r
     }
 }
+
+// from pbrt-v4
+#[inline]
+pub fn radical_inverse(base_index: usize, mut a: u64) -> f32 {
+    let base = PRIMES_1000[base_index];
+    let inv_base = 1.0f32 / base as f32;
+    let mut inv_base_n = 1.0;
+    let mut rev = 0;
+    while a > 0 {
+        let next = a / base;
+        let digit = a - next * base;
+        rev = rev * base + digit;
+        inv_base_n *= inv_base;
+        a = next;
+    }
+    (rev as f32 * inv_base_n).min(ONE_MINUS_EPS)
+}
+
 pub struct PCGSampler {
     pub rng: Pcg,
 }

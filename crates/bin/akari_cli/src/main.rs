@@ -188,7 +188,9 @@ fn parse_options(args: Vec<String>) -> AppOptions {
             options.algorithm = Some(render);
         } else if let Some(threads) = parse_int!("--threads", "-t") {
             options.num_threads = Some(threads);
-        } else {
+        } else if let Some(output) = parse_str!("--output", "-o") {
+            options.output = Some(output);
+        }else {
             eprintln!("unrecognized option {}", args[pos]);
             exit(-1);
         }

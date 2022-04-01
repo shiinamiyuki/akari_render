@@ -55,9 +55,11 @@ pub struct SampledWavelengths {
 }
 
 impl SampledWavelengths {
+    #[inline]
     pub fn pdf(&self) -> SampledSpectrum {
         SampledSpectrum::new(self.pdf)
     }
+    #[inline]
     pub fn none() -> Self {
         Self {
             lambda: Vec4::ZERO,
@@ -108,9 +110,11 @@ impl SampledWavelengths {
         }
         w
     }
+    #[inline]
     pub fn secondary_terminated(&self) -> bool {
         self.secondary_terminated
     }
+    #[inline]
     pub fn terminate_secondary(&mut self) {
         if self.secondary_terminated {
             return;
@@ -154,6 +158,7 @@ pub struct RgbIlluminantSpectrum {
     illuminant: &'static dyn Spectrum,
 }
 impl RgbIlluminantSpectrum {
+    #[inline]
     pub fn new(rep: RgbSigmoidPolynomial, scale: f32, illuminant: &'static dyn Spectrum) -> Self {
         Self {
             spd: rep,
@@ -161,6 +166,7 @@ impl RgbIlluminantSpectrum {
             illuminant,
         }
     }
+    #[inline]
     pub fn sample(&self, swl: &SampledWavelengths) -> SampledSpectrum {
         self.spd.sample(swl) * self.scale * self.illuminant.sample(swl)
     }
