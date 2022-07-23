@@ -1,5 +1,5 @@
 use akari_common::{
-    glam::{vec3, Vec3},
+    glam::{vec3a, Vec3A},
     *,
 };
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
@@ -515,15 +515,15 @@ pub fn srgb_to_linear1_u8(s: u8) -> f32 {
     akari_const::SRGB_TO_LINEAR[s as usize]
 }
 
-pub fn srgb_to_linear_u8(rgb: [u8; 3]) -> Vec3 {
-    vec3(
+pub fn srgb_to_linear_u8(rgb: [u8; 3]) -> Vec3A {
+    vec3a(
         srgb_to_linear1_u8(rgb[0]),
         srgb_to_linear1_u8(rgb[1]),
         srgb_to_linear1_u8(rgb[2]),
     )
 }
-pub fn srgb_to_linear(rgb: Vec3) -> Vec3 {
-    vec3(
+pub fn srgb_to_linear(rgb: Vec3A) -> Vec3A {
+    vec3a(
         srgb_to_linear1(rgb.x),
         srgb_to_linear1(rgb.y),
         srgb_to_linear1(rgb.z),
@@ -536,14 +536,14 @@ pub fn linear_to_srgb1(l: f32) -> f32 {
         l.powf(1.0 / 2.4) * 1.055 - 0.055
     }
 }
-pub fn linear_to_srgb(linear: Vec3) -> Vec3 {
-    vec3(
+pub fn linear_to_srgb(linear: Vec3A) -> Vec3A {
+    vec3a(
         linear_to_srgb1(linear.x),
         linear_to_srgb1(linear.y),
         linear_to_srgb1(linear.z),
     )
 }
-pub fn rgb_to_hsv(rgb: Vec3) -> Vec3 {
+pub fn rgb_to_hsv(rgb: Vec3A) -> Vec3A {
     let max = rgb.max_element();
     let min = rgb.min_element();
     let (r, g, b) = (rgb[0], rgb[1], rgb[2]);
@@ -570,10 +570,10 @@ pub fn rgb_to_hsv(rgb: Vec3) -> Vec3 {
             (max - min) / max
         }
     };
-    vec3(h, s, v)
+    vec3a(h, s, v)
 }
 
-pub fn hsv_to_rgb(hsv: Vec3) -> Vec3 {
+pub fn hsv_to_rgb(hsv: Vec3A) -> Vec3A {
     let h = (hsv[0] / 60.0).floor() as u32;
     let f = hsv[0] / 60.0 - h as f32;
     let p = hsv[2] * (1.0 - hsv[1]);
@@ -589,9 +589,9 @@ pub fn hsv_to_rgb(hsv: Vec3) -> Vec3 {
         5 => (v, p, q),
         _ => unreachable!(),
     };
-    vec3(r, g, b)
+    vec3a(r, g, b)
 }
-pub fn rgb_to_hsl(rgb: Vec3) -> Vec3 {
+pub fn rgb_to_hsl(rgb: Vec3A) -> Vec3A {
     let max = rgb.max_element();
     let min = rgb.min_element();
     let (r, g, b) = (rgb[0], rgb[1], rgb[2]);
@@ -622,5 +622,5 @@ pub fn rgb_to_hsl(rgb: Vec3) -> Vec3 {
             unreachable!()
         }
     };
-    vec3(h, s, l)
+    vec3a(h, s, l)
 }

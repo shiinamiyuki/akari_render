@@ -30,7 +30,7 @@ impl PathTracer {
     ) -> SampledSpectrum {
         let mut li = SampledSpectrum::zero();
         let mut beta = SampledSpectrum::one();
-        let mut prev_n: Option<Vec3> = None;
+        let mut prev_n: Option<Vec3A> = None;
         let mut prev_bsdf_pdf: Option<f32> = None;
         let mut is_delta = false;
         {

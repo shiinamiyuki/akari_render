@@ -1,6 +1,7 @@
 use std::sync::atomic::AtomicPtr;
 use std::sync::atomic::AtomicU32;
 
+use akari_common::glam::vec3a;
 use bumpalo::Bump;
 
 use crate::bsdf::*;
@@ -17,8 +18,8 @@ use crate::*;
 #[derive(Clone)]
 struct VisiblePoint<'a> {
     pub bsdf: BsdfClosure<'a>,
-    pub p: Vec3,
-    pub wo: Vec3,
+    pub p: Vec3A,
+    pub wo: Vec3A,
     pub beta: SampledSpectrum,
     pub secondary_terminated: bool,
     // pub lambda: SampledWavelengths,
@@ -88,11 +89,11 @@ impl<'a> VisiblePointGrid<'a> {
             grid_res,
         }
     }
-    pub fn to_grid(&self, mut p: Vec3) -> UVec3 {
+    pub fn to_grid(&self, mut p: Vec3A) -> UVec3 {
         p = self.bound.max.min(p.into()).into();
         p = self.bound.min.max(p.into()).into();
         let mut q = self.bound.offset(p);
-        q = q * vec3(
+        q = q * vec3a(
             self.grid_res[0] as f32,
             self.grid_res[1] as f32,
             self.grid_res[2] as f32,
@@ -105,8 +106,8 @@ impl<'a> VisiblePointGrid<'a> {
         }
         let p = pixel.vp.as_ref().unwrap().p;
         let radius = pixel.radius;
-        let pmin = self.to_grid(p - vec3(radius, radius, radius));
-        let pmax = self.to_grid(p + vec3(radius, radius, radius));
+        let pmin = self.to_grid(p - vec3a(radius, radius, radius));
+        let pmax = self.to_grid(p + vec3a(radius, radius, radius));
         // println!("{:?} {:?}", pmin,pmax);
         for z in pmin.z..=pmax.z {
             for y in pmin.y..=pmax.y {
@@ -264,8 +265,8 @@ impl Integrator for Sppm {
                 for pixel in &pixels {
                     if let Some(vp) = &pixel.vp {
                         let p_bound = Bounds3f {
-                            min: (vp.p - vec3(pixel.radius, pixel.radius, pixel.radius)).into(),
-                            max: (vp.p + vec3(pixel.radius, pixel.radius, pixel.radius)).into(),
+                            min: (vp.p - vec3a(pixel.radius, pixel.radius, pixel.radius)).into(),
+                            max: (vp.p + vec3a(pixel.radius, pixel.radius, pixel.radius)).into(),
                         };
                         bound.insert_box(p_bound);
                         max_radius = max_radius.max(pixel.radius as f64);

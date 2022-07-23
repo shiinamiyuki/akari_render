@@ -1,3 +1,4 @@
+use akari::glam::vec3a;
 use akari::linear_to_srgb;
 // use akari::bsdf::*;
 // use akari::light::*;
@@ -94,7 +95,7 @@ fn import(path: &str, scene: &mut node::Scene, forced: bool, generate_normal: Op
                 if has_diffuse {
                     if m.diffuse_texture.is_empty() {
                         *color = node::SpectrumTexture::SRgb {
-                            values: linear_to_srgb(vec3(m.diffuse[0], m.diffuse[1], m.diffuse[2]))
+                            values: linear_to_srgb(vec3a(m.diffuse[0], m.diffuse[1], m.diffuse[2]))
                                 .into(),
                         };
                         max_diffuse = m
@@ -113,7 +114,7 @@ fn import(path: &str, scene: &mut node::Scene, forced: bool, generate_normal: Op
                 } else if has_specular {
                     if m.specular_texture.is_empty() {
                         *color = node::SpectrumTexture::SRgb {
-                            values: linear_to_srgb(vec3(
+                            values: linear_to_srgb(vec3a(
                                 m.specular[0],
                                 m.specular[1],
                                 m.specular[2],

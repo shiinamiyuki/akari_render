@@ -1,3 +1,5 @@
+use akari_common::glam::vec3a;
+
 use crate::*;
 
 pub fn concentric_sample_disk(u: Vec2) -> Vec2 {
@@ -19,26 +21,26 @@ pub fn concentric_sample_disk(u: Vec2) -> Vec2 {
     };
     r * vec2(theta.cos(), theta.sin())
 }
-pub fn consine_hemisphere_sampling(u: Vec2) -> Vec3 {
+pub fn consine_hemisphere_sampling(u: Vec2) -> Vec3A {
     let uv = concentric_sample_disk(u);
     let r = uv.length_squared();
     let h = (1.0 - r).sqrt();
-    vec3(uv.x, h, uv.y)
+    vec3a(uv.x, h, uv.y)
 }
 pub fn uniform_cone_pdf(cos_theta: f32) -> f32 {
     1.0 / (2.0 * PI * (1.0 - cos_theta))
 }
-pub fn uniform_sample_cone(u: Vec2, cos_theta_max: f32) -> Vec3 {
+pub fn uniform_sample_cone(u: Vec2, cos_theta_max: f32) -> Vec3A {
     let cos_theta = (1.0f32 - u[0]) + u[0] * cos_theta_max;
     let sin_theta = (1.0 - cos_theta * cos_theta).sqrt();
     let phi = u[1] * 2.0 * PI;
-    return vec3(phi.cos() * sin_theta, cos_theta, phi.sin() * sin_theta);
+    return vec3a(phi.cos() * sin_theta, cos_theta, phi.sin() * sin_theta);
 }
-pub fn uniform_sample_sphere(u: Vec2) -> Vec3 {
+pub fn uniform_sample_sphere(u: Vec2) -> Vec3A {
     let z = 1.0 - 2.0 * u[0];
     let r = (1.0 - z * z).max(0.0).sqrt();
     let phi = 2.0 * PI * u[1];
-    vec3(r * phi.cos(), z, r * phi.sin())
+    vec3a(r * phi.cos(), z, r * phi.sin())
 }
 pub fn uniform_sphere_pdf() -> f32 {
     1.0 / (4.0 * PI)

@@ -1,11 +1,12 @@
 use crate::*;
+use akari_common::glam::vec3a;
 use sampler::*;
 #[derive(Clone, Copy)]
 pub struct CameraSample {
-    pub p: Vec3,
-    pub wi: Vec3,
+    pub p: Vec3A,
+    pub wi: Vec3A,
     pub pdf: f32,
-    pub n: Vec3,
+    pub n: Vec3A,
     pub raster: UVec2,
     pub ray: Ray,
     pub vis_ray: Ray,
@@ -27,7 +28,7 @@ pub trait Camera: Sync + Send + AsAny {
         p: &ReferencePoint,
         lambda: &SampledWavelengths,
     ) -> Option<CameraSample>;
-    fn n(&self) -> Vec3;
+    fn n(&self) -> Vec3A;
 }
 
 pub struct PerspectiveCamera {
@@ -65,8 +66,8 @@ impl PerspectiveCamera {
         m = Mat4::from_translation(vec3(0.0, 0.0, -1.0)) * m;
         let r2c = Transform::from_matrix(&m);
         let a = {
-            let p_min = r2c.transform_point(vec3(0.0, 0.0, 0.0));
-            let p_max = r2c.transform_point(vec3(resolution.x as f32, resolution.y as f32, 0.0));
+            let p_min = r2c.transform_point(vec3a(0.0, 0.0, 0.0));
+            let p_max = r2c.transform_point(vec3a(resolution.x as f32, resolution.y as f32, 0.0));
             let p_min = p_min / p_min.z;
             let p_max = p_max / p_max.z;
             ((p_max.x - p_min.x) * (p_max.y - p_min.y)).abs()
@@ -95,9 +96,9 @@ impl Camera for PerspectiveCamera {
         let p_film = sampler.next2d() + fpixel;
 
         let mut ray = Ray::spawn(
-            Vec3::ZERO,
+            Vec3A::ZERO,
             self.r2c
-                .transform_point(vec3(p_film.x, p_film.y, 0.0))
+                .transform_point(vec3a(p_film.x, p_film.y, 0.0))
                 .normalize(),
         );
 
@@ -117,7 +118,7 @@ impl Camera for PerspectiveCamera {
     ) -> Option<CameraSample> {
         // TODO: area lens
         let p_lens = Vec2::ZERO;
-        let p_lens_world = self.c2w.transform_point(p_lens.extend(0.0));
+        let p_lens_world = self.c2w.transform_point(p_lens.extend(0.0).into());
 
         let wi = p_lens_world - ref_.p;
         let dist = wi.length();
@@ -141,7 +142,7 @@ impl Camera for PerspectiveCamera {
         })
     }
     fn we(&self, ray: &Ray, _lambda: &SampledWavelengths) -> (Option<UVec2>, SampledSpectrum) {
-        let cos_theta = ray.d.dot(self.c2w.transform_vector(vec3(0.0, 0.0, -1.0)));
+        let cos_theta = ray.d.dot(self.c2w.transform_vector(vec3a(0.0, 0.0, -1.0)));
         if cos_theta <= 0.0 {
             return (None, SampledSpectrum::zero());
         }
@@ -163,7 +164,7 @@ impl Camera for PerspectiveCamera {
         )
     }
     fn pdf_we(&self, ray: &Ray) -> (f32, f32) {
-        let cos_theta = ray.d.dot(self.c2w.transform_vector(vec3(0.0, 0.0, -1.0)));
+        let cos_theta = ray.d.dot(self.c2w.transform_vector(vec3a(0.0, 0.0, -1.0)));
         if cos_theta <= 0.0 {
             return (0.0, 0.0);
         }
@@ -179,7 +180,7 @@ impl Camera for PerspectiveCamera {
         let lens_area = 1.0;
         (1.0 / lens_area, 1.0 / (self.a * cos_theta.powi(3)))
     }
-    fn n(&self) -> Vec3 {
-        self.c2w.transform_normal(vec3(0.0, 0.0, -1.0))
+    fn n(&self) -> Vec3A {
+        self.c2w.transform_normal(vec3a(0.0, 0.0, -1.0))
     }
 }

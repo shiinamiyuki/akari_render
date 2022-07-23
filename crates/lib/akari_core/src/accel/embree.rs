@@ -2,6 +2,7 @@ use crate::texture::ShadingPoint;
 use crate::util::profile::scope;
 use crate::*;
 use crate::{shape::SurfaceInteraction, AsAny};
+use akari_common::glam::vec3a;
 use embree_sys as sys;
 use lazy_static::lazy_static;
 use parking_lot::Mutex;
@@ -14,7 +15,7 @@ use crate::{
     bsdf::Bsdf,
     distribution::Distribution1D,
     shape::{MeshInstanceProxy, Shape, SurfaceSample, TriangleMesh},
-    Bounds3f, Ray, Vec3,
+    Bounds3f, Ray, Vec3A,
 };
 struct Device(sys::RTCDevice);
 unsafe impl Send for Device {}
@@ -178,7 +179,7 @@ impl Shape for EmbreeInstance {
             );
             if rayhit.hit.geomID != u32::MAX {
                 let uv = vec2(rayhit.hit.u, rayhit.hit.v);
-                let ng = vec3(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z).normalize();
+                let ng = vec3a(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z).normalize();
                 Some(RayHit {
                     uv,
                     t: rayhit.ray.tfar,
@@ -210,7 +211,7 @@ impl Shape for EmbreeInstance {
     fn aabb(&self) -> Bounds3f {
         todo!()
     }
-    fn sample_surface(&self, u: Vec3) -> SurfaceSample {
+    fn sample_surface(&self, u: Vec3A) -> SurfaceSample {
         self.mesh_ref.mesh.sample_surface(u, &self.dist)
     }
     fn area(&self) -> f32 {
@@ -339,7 +340,7 @@ impl accel::Accel for EmbreeTopLevelAccel {
             let mut hits = [None; 4];
             for i in 0..4 {
                 hits[i] = if rayhit4.hit.geomID[i] != u32::MAX {
-                    let ng = vec3(
+                    let ng = vec3a(
                         rayhit4.hit.Ng_x[i],
                         rayhit4.hit.Ng_y[i],
                         rayhit4.hit.Ng_z[i],
@@ -383,7 +384,7 @@ impl accel::Accel for EmbreeTopLevelAccel {
             };
             sys::rtcIntersect1(self.scene, &mut ctx as *mut _, &mut rayhit as *mut _);
             if rayhit.hit.geomID != u32::MAX {
-                let ng = vec3(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z).normalize();
+                let ng = vec3a(rayhit.hit.Ng_x, rayhit.hit.Ng_y, rayhit.hit.Ng_z).normalize();
                 let uv = vec2(rayhit.hit.u, rayhit.hit.v);
                 Some(RayHit {
                     uv,

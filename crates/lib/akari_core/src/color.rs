@@ -2,20 +2,20 @@ use crate::{
     rgb2spec::{Rgb2SpectrumData, SPECTRUM_TABLE_RES},
     *,
 };
-use akari_common::glam::mat3;
+use akari_common::glam::{mat3, mat3a, vec3a};
 use serde::{Deserialize, Serialize};
 pub use util::{hsv_to_rgb, linear_to_srgb, rgb_to_hsl, rgb_to_hsv, srgb_to_linear};
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct XYZ {
-    values: Vec3,
+    values: Vec3A,
 }
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct SRgb {
-    values: Vec3,
+    values: Vec3A,
 }
-impl_color_like!(XYZ, Vec3);
-impl_color_like!(SRgb, Vec3);
+impl_color_like!(XYZ, Vec3A);
+impl_color_like!(SRgb, Vec3A);
 impl From<XYZ> for SRgb {
     fn from(xyz: XYZ) -> Self {
         Self::new(xyz_to_srgb(xyz.values()))
@@ -33,15 +33,15 @@ impl SRgb {
     }
 }
 
-pub fn xyz_to_srgb(xyz: Vec3) -> Vec3 {
-    let m = mat3(
-        vec3(3.240479f32, -0.969256f32, 0.055648f32),
-        vec3(-1.537150f32, 1.875991f32, -0.204043f32),
-        vec3(-0.498535f32, 0.041556f32, 1.057311f32),
+pub fn xyz_to_srgb(xyz: Vec3A) -> Vec3A {
+    let m = mat3a(
+        vec3a(3.240479f32, -0.969256f32, 0.055648f32),
+        vec3a(-1.537150f32, 1.875991f32, -0.204043f32),
+        vec3a(-0.498535f32, 0.041556f32, 1.057311f32),
     );
     m * xyz
 }
-pub fn srgb_to_xyz(srgb: Vec3) -> Vec3 {
+pub fn srgb_to_xyz(srgb: Vec3A) -> Vec3A {
     // let m = [
     //     [0.412453, 0.357580, 0.180423],
     //     [0.212671, 0.715160, 0.072169],
@@ -52,7 +52,7 @@ pub fn srgb_to_xyz(srgb: Vec3) -> Vec3 {
         0.357580, 0.715160, 0.119193, //.
         0.180423, 0.072169, 0.950227,
     ];
-    let m = Mat3::from_cols_array(&m);
+    let m = Mat3A::from_cols_array(&m);
     m * srgb
 }
 
@@ -256,7 +256,7 @@ impl RgbColorSpace {
     pub fn illuminant(&self) -> &'static dyn Spectrum {
         self.illuminant
     }
-    pub fn rgb2spec(&self, rgb: Vec3) -> RgbSigmoidPolynomial {
+    pub fn rgb2spec(&self, rgb: Vec3A) -> RgbSigmoidPolynomial {
         debug_assert!(rgb.max_element() <= 1.0);
         debug_assert!(rgb.min_element() >= 0.0);
         if rgb[0] == rgb[1] && rgb[1] == rgb[2] {
@@ -298,7 +298,7 @@ impl RgbColorSpace {
             let co = |dx: usize, dy: usize, dz: usize| -> f32 {
                 self.rgb2spec_data.table[maxc][zi + dz][yi + dy][xi + dx][i]
             };
-            c[i] = trilinear(co, vec3(dx, dy, dz));
+            c[i] = trilinear(co, vec3a(dx, dy, dz));
         }
         RgbSigmoidPolynomial::new(c[0], c[1], c[2])
     }

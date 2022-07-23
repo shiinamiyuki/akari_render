@@ -84,15 +84,15 @@ impl ApiContext {
         let colorspace = RgbColorSpace::new(RgbColorSpaceId::SRgb);
         match node {
             node::SpectrumTexture::SRgbLinear { values: f3 } => {
-                Arc::new(ConstantRgbTexture::new(Vec3::from(*f3), colorspace))
+                Arc::new(ConstantRgbTexture::new(Vec3A::from(*f3), colorspace))
             }
             node::SpectrumTexture::SRgb { values: srgb } => Arc::new(ConstantRgbTexture::new(
-                srgb_to_linear(Vec3::from(*srgb)),
+                srgb_to_linear(Vec3A::from(*srgb)),
                 colorspace,
             )),
             node::SpectrumTexture::SRgbU8 { values: srgb } => Arc::new(ConstantRgbTexture::new(
                 srgb_to_linear(
-                    UVec3::from([srgb[0] as u32, srgb[1] as u32, srgb[2] as u32]).as_vec3() / 255.0,
+                    UVec3::from([srgb[0] as u32, srgb[1] as u32, srgb[2] as u32]).as_vec3a() / 255.0,
                 ),
                 colorspace,
             )),
@@ -234,7 +234,7 @@ impl ApiContext {
             node::Light::Point { pos, emission } => {
                 let emission = self.load_spectrum_texture(emission);
                 Arc::new(PointLight {
-                    position: Vec3::from(*pos),
+                    position: Vec3A::from(*pos),
                     emission: emission.clone(),
                     colorspace: emission.colorspace(),
                 })
@@ -247,8 +247,8 @@ impl ApiContext {
             } => {
                 let emission = self.load_spectrum_texture(emission);
                 let transform = self.load_transform(*transform, true);
-                let pos = transform.transform_point(Vec3::ZERO);
-                let dir = transform.transform_vector(vec3(0.0, 0.0, -1.0));
+                let pos = transform.transform_point(Vec3A::ZERO);
+                let dir = transform.transform_vector(vec3a(0.0, 0.0, -1.0));
                 Arc::new(SpotLight {
                     position: pos,
                     direction: dir,
@@ -271,8 +271,8 @@ impl ApiContext {
                     coord_sys,
                 } = trs;
                 let (t, r, s) = (t.into(), r.into(), s.into());
-                let r: Vec3 = r;
-                let r = vec3(r.x.to_radians(), r.y.to_radians(), r.z.to_radians());
+                let r: Vec3A = r;
+                let r = vec3a(r.x.to_radians(), r.y.to_radians(), r.z.to_radians());
                 if !is_camera {
                     m = Mat4::from_scale(s) * m;
                 }

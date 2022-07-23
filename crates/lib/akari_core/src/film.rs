@@ -75,7 +75,7 @@ impl Film {
             let pixel = self.get_pixel(uvec2(x, y));
             let value = pixel.color();
             let srgb: SRgb = value.into();
-            let srgb = linear_to_srgb(srgb.values().clamp(Vec3::ZERO, Vec3::ONE)) * 255.0;
+            let srgb = linear_to_srgb(srgb.values().clamp(Vec3A::ZERO, Vec3A::ONE)) * 255.0;
             // let srgb = value.to_srgb() * 255.0;
             image::Rgb([srgb.x as u8, srgb.y as u8, srgb.z as u8])
         });

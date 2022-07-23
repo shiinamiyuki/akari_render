@@ -4,7 +4,7 @@ use crate::{
     fastdiv::FastDiv32,
 };
 use crate::{linear_to_srgb, linear_to_srgb1, srgb_to_linear1_u8, srgb_to_linear_u8};
-use akari_common::glam::{uvec2, vec3, vec4, IVec2, UVec2, Vec2, Vec3, Vec4, Vec4Swizzles};
+use akari_common::glam::{uvec2, vec3a, vec4, IVec2, UVec2, Vec2, Vec3A, Vec4, Vec4Swizzles};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(u8)]
@@ -115,9 +115,9 @@ fn load4(bytes_: &[u8], format: PixelFormat) -> Vec4 {
         std::ptr::copy_nonoverlapping(bytes_.as_ptr(), bytes.as_mut_ptr(), format.size());
     }
     match format {
-        PixelFormat::R8 => Vec3::splat(bytes[0] as f32 / 255.0).extend(1.0),
-        PixelFormat::SR8 => Vec3::splat(srgb_to_linear1_u8(bytes[0])).extend(1.0),
-        PixelFormat::Rgb8 => vec3(
+        PixelFormat::R8 => Vec3A::splat(bytes[0] as f32 / 255.0).extend(1.0),
+        PixelFormat::SR8 => Vec3A::splat(srgb_to_linear1_u8(bytes[0])).extend(1.0),
+        PixelFormat::Rgb8 => vec3a(
             bytes[0] as f32 / 255.0,
             bytes[1] as f32 / 255.0,
             bytes[2] as f32 / 255.0,
@@ -156,7 +156,7 @@ fn load4(bytes_: &[u8], format: PixelFormat) -> Vec4 {
             )
         }
         PixelFormat::Rgb32f => {
-            let rgb32 = vec3(
+            let rgb32 = vec3a(
                 f32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
                 f32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]),
                 f32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]),
@@ -190,7 +190,7 @@ fn store4(bytes_: &mut [u8], value: Vec4, format: PixelFormat) {
             bytes[2] = (rgb.z * 255.0).clamp(0.0, 255.0) as u8;
         }
         PixelFormat::SRgba8 => {
-            let rgb = linear_to_srgb(value.xyz().clamp(Vec3::ZERO, Vec3::ONE));
+            let rgb = linear_to_srgb(Vec3A::from(value.xyz()).clamp(Vec3A::ZERO, Vec3A::ONE));
             bytes[0] = (rgb.x * 255.0).clamp(0.0, 255.0) as u8;
             bytes[1] = (rgb.y * 255.0).clamp(0.0, 255.0) as u8;
             bytes[2] = (rgb.z * 255.0).clamp(0.0, 255.0) as u8;
@@ -203,7 +203,7 @@ fn store4(bytes_: &mut [u8], value: Vec4, format: PixelFormat) {
             bytes[3] = (value.w * 255.0).clamp(0.0, 255.0) as u8;
         }
         PixelFormat::SRgb8 => {
-            let rgba = linear_to_srgb(value.xyz().clamp(Vec3::ZERO, Vec3::ONE)).extend(value.w);
+            let rgba = linear_to_srgb(Vec3A::from(value.xyz()).clamp(Vec3A::ZERO, Vec3A::ONE)).extend(value.w);
             bytes[0] = (rgba.x * 255.0).clamp(0.0, 255.0) as u8;
             bytes[1] = (rgba.y * 255.0).clamp(0.0, 255.0) as u8;
             bytes[2] = (rgba.z * 255.0).clamp(0.0, 255.0) as u8;

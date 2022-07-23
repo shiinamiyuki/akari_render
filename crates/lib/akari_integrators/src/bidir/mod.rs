@@ -12,15 +12,15 @@ pub struct VertexBase {
     pub pdf_rev: f32,
     pub delta: bool,
     pub beta: SampledSpectrum,
-    pub wo: Vec3,
-    pub p: Vec3,
-    pub n: Vec3,
-    pub ns: Vec3,
+    pub wo: Vec3A,
+    pub p: Vec3A,
+    pub n: Vec3A,
+    pub ns: Vec3A,
 }
 #[derive(Copy, Clone)]
 pub struct SurfaceVertex<'a> {
     pub bsdf: BsdfClosure<'a>,
-    pub n: Vec3,
+    pub n: Vec3A,
     pub base: VertexBase,
 }
 #[derive(Copy, Clone)]
@@ -93,7 +93,7 @@ impl<'a> Vertex<'a> {
         Self::Camera(CameraVertex {
             camera,
             base: VertexBase {
-                wo: Vec3::ZERO,
+                wo: Vec3A::ZERO,
                 pdf_fwd,
                 pdf_rev: 0.0,
                 delta: false,
@@ -106,15 +106,15 @@ impl<'a> Vertex<'a> {
     }
     pub fn create_light_vertex(
         light: &'a dyn Light,
-        p: Vec3,
-        n: Vec3,
+        p: Vec3A,
+        n: Vec3A,
         beta: SampledSpectrum,
         pdf_fwd: f32,
     ) -> Self {
         Self::Light(LightVertex {
             light,
             base: VertexBase {
-                wo: Vec3::ZERO,
+                wo: Vec3A::ZERO,
                 pdf_fwd,
                 pdf_rev: 0.0,
                 delta: false,
@@ -127,11 +127,11 @@ impl<'a> Vertex<'a> {
     }
     pub fn create_surface_vertex(
         beta: SampledSpectrum,
-        p: Vec3,
+        p: Vec3A,
         bsdf: BsdfClosure<'a>,
-        wo: Vec3,
-        n: Vec3,
-        ns: Vec3,
+        wo: Vec3A,
+        n: Vec3A,
+        ns: Vec3A,
         mut pdf_fwd: f32,
         prev: &Vertex<'a>,
         delta: bool,
@@ -273,13 +273,13 @@ impl<'a> Vertex<'a> {
     pub fn pdf_fwd(&self) -> f32 {
         self.base().pdf_fwd
     }
-    pub fn p(&self) -> Vec3 {
+    pub fn p(&self) -> Vec3A {
         self.base().p
     }
-    pub fn n(&self) -> Vec3 {
+    pub fn n(&self) -> Vec3A {
         self.base().n
     }
-    pub fn ns(&self) -> Vec3 {
+    pub fn ns(&self) -> Vec3A {
         self.base().ns
     }
     pub fn le(
@@ -318,7 +318,7 @@ impl<'a> Vertex<'a> {
 }
 
 #[inline]
-pub fn correct_shading_normal(ng: Vec3, ns: Vec3, wo: Vec3, wi: Vec3, mode: TransportMode) -> f32 {
+pub fn correct_shading_normal(ng: Vec3A, ns: Vec3A, wo: Vec3A, wi: Vec3A, mode: TransportMode) -> f32 {
     if mode == TransportMode::LightToCamera {
         let num = wo.dot(ns).abs() * wi.dot(ng).abs();
         let denom = wo.dot(ng).abs() * wi.dot(ns).abs();

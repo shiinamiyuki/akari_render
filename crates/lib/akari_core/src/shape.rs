@@ -24,8 +24,8 @@ pub struct SurfaceInteraction<'a> {
     pub triangle: ShadingTriangle<'a>,
     pub uv: Vec2,
     pub sp: ShadingPoint,
-    pub ng: Vec3,
-    pub ns: Vec3,
+    pub ng: Vec3A,
+    pub ns: Vec3A,
     pub t: f32,
     pub texcoord: Vec2,
 }
@@ -52,11 +52,11 @@ impl<'a> SurfaceInteraction<'a> {
 }
 #[derive(Clone, Copy)]
 pub struct SurfaceSample {
-    pub p: Vec3,
+    pub p: Vec3A,
     pub texcoords: Vec2,
     pub pdf: f32,
-    pub ng: Vec3,
-    pub ns: Vec3,
+    pub ng: Vec3A,
+    pub ns: Vec3A,
 }
 pub trait Shape: Sync + Send + AsAny {
     fn intersect(&self, ray: &Ray, invd: Option<Vec3A>) -> Option<RayHit>;
@@ -65,14 +65,14 @@ pub trait Shape: Sync + Send + AsAny {
     fn shading_triangle<'a>(&'a self, prim_id: u32) -> ShadingTriangle<'a>;
     fn triangle(&self, prim_id: u32) -> Triangle;
     fn aabb(&self) -> Bounds3f;
-    fn sample_surface(&self, u: Vec3) -> SurfaceSample;
+    fn sample_surface(&self, u: Vec3A) -> SurfaceSample;
     fn area(&self) -> f32;
 }
 
 #[derive(Copy, Clone, Debug)]
 #[repr(transparent)]
 pub struct Triangle {
-    pub vertices: [Vec3; 3],
+    pub vertices: [Vec3A; 3],
 }
 
 impl Triangle {
@@ -81,7 +81,7 @@ impl Triangle {
         let e1 = self.vertices[2] - self.vertices[0];
         0.5 * e0.cross(e1).length()
     }
-    fn ng(&self) -> Vec3 {
+    fn ng(&self) -> Vec3A {
         let e0 = self.vertices[1] - self.vertices[0];
         let e1 = self.vertices[2] - self.vertices[0];
         e0.cross(e1).normalize()
@@ -174,22 +174,22 @@ impl Triangle {
 }
 #[derive(Copy, Clone)]
 pub struct ShadingTriangle<'a> {
-    pub vertices: [Vec3; 3],
+    pub vertices: [Vec3A; 3],
     pub texcoords: [Vec2; 3],
-    pub normals: [Vec3; 3],
+    pub normals: [Vec3A; 3],
     pub bsdf: Option<&'a dyn Bsdf>,
 }
 impl<'a> ShadingTriangle<'a> {
     pub fn texcoord(&self, uv: Vec2) -> Vec2 {
         lerp3(self.texcoords[0], self.texcoords[1], self.texcoords[2], uv)
     }
-    pub fn ns(&self, uv: Vec2) -> Vec3 {
+    pub fn ns(&self, uv: Vec2) -> Vec3A {
         lerp3(self.normals[0], self.normals[1], self.normals[2], uv).normalize()
     }
-    pub fn p(&self, uv: Vec2) -> Vec3 {
+    pub fn p(&self, uv: Vec2) -> Vec3A {
         lerp3(self.vertices[0], self.vertices[1], self.vertices[2], uv)
     }
-    pub fn ng(&self) -> Vec3 {
+    pub fn ng(&self) -> Vec3A {
         Triangle {
             vertices: self.vertices,
         }
@@ -240,9 +240,9 @@ pub struct TriangleMeshAccelData {
 impl bvh::BvhData for TriangleMeshAccelData {
     fn aabb(&self, idx: u32) -> Bounds3f {
         let face = self.mesh.indices[idx as usize];
-        let v0: Vec3 = self.mesh.vertices[face[0] as usize].into();
-        let v1: Vec3 = self.mesh.vertices[face[1] as usize].into();
-        let v2: Vec3 = self.mesh.vertices[face[2] as usize].into();
+        let v0: Vec3A = self.mesh.vertices[face[0] as usize].into();
+        let v1: Vec3A = self.mesh.vertices[face[1] as usize].into();
+        let v2: Vec3A = self.mesh.vertices[face[2] as usize].into();
         Bounds3f::default()
             .insert_point(v0)
             .insert_point(v1)
@@ -290,7 +290,7 @@ impl Shape for MeshInstanceProxy {
         panic!("shouldn't be called")
     }
 
-    fn sample_surface(&self, _u: Vec3) -> SurfaceSample {
+    fn sample_surface(&self, _u: Vec3A) -> SurfaceSample {
         panic!("shouldn't be called")
     }
 
@@ -343,7 +343,7 @@ impl Shape for TriangleMeshInstance {
     fn area(&self) -> f32 {
         self.area
     }
-    fn sample_surface(&self, u: Vec3) -> SurfaceSample {
+    fn sample_surface(&self, u: Vec3A) -> SurfaceSample {
         self.accel.data().mesh.sample_surface(u, &self.dist)
     }
 
@@ -410,7 +410,7 @@ impl Decode for TriangleMesh {
     }
 }
 impl TriangleMesh {
-    pub fn sample_surface(&self, u: Vec3, dist: &Distribution1D) -> SurfaceSample {
+    pub fn sample_surface(&self, u: Vec3A, dist: &Distribution1D) -> SurfaceSample {
         let (idx, pdf_idx) = dist.sample_discrete(u[2]);
         // let face: UVec3 = self.indices[idx as usize].into();
         // let v0 = self.vertices[face[0] as usize].into();
@@ -432,18 +432,18 @@ impl TriangleMesh {
     }
     pub fn triangle(&self, i: usize) -> Triangle {
         let face = self.indices[i];
-        let v0: Vec3 = unsafe { (*self.vertices.get(face[0] as usize).unwrap_unchecked()).into() };
-        let v1: Vec3 = unsafe { (*self.vertices.get(face[1] as usize).unwrap_unchecked()).into() };
-        let v2: Vec3 = unsafe { (*self.vertices.get(face[2] as usize).unwrap_unchecked()).into() };
+        let v0: Vec3A = unsafe { (*self.vertices.get(face[0] as usize).unwrap_unchecked()).into() };
+        let v1: Vec3A = unsafe { (*self.vertices.get(face[1] as usize).unwrap_unchecked()).into() };
+        let v2: Vec3A = unsafe { (*self.vertices.get(face[2] as usize).unwrap_unchecked()).into() };
         Triangle {
             vertices: [v0, v1, v2],
         }
     }
     pub fn shading_triangle<'a>(&self, i: usize) -> ShadingTriangle<'a> {
         let face: UVec3 = self.indices[i].into();
-        let v0: Vec3 = unsafe { (*self.vertices.get(face[0] as usize).unwrap_unchecked()).into() };
-        let v1: Vec3 = unsafe { (*self.vertices.get(face[1] as usize).unwrap_unchecked()).into() };
-        let v2: Vec3 = unsafe { (*self.vertices.get(face[2] as usize).unwrap_unchecked()).into() };
+        let v0: Vec3A = unsafe { (*self.vertices.get(face[0] as usize).unwrap_unchecked()).into() };
+        let v1: Vec3A = unsafe { (*self.vertices.get(face[1] as usize).unwrap_unchecked()).into() };
+        let v2: Vec3A = unsafe { (*self.vertices.get(face[2] as usize).unwrap_unchecked()).into() };
 
         let ng = (v1 - v0).cross(v2 - v0).normalize();
         ShadingTriangle {
@@ -483,7 +483,7 @@ impl TriangleMesh {
             [tc0, tc1, tc2]
         }
     }
-    pub fn normals(&self, i: usize, ng: Vec3) -> [Vec3; 3] {
+    pub fn normals(&self, i: usize, ng: Vec3A) -> [Vec3A; 3] {
         if self.normals.is_empty() {
             [ng; 3]
         } else {
@@ -533,12 +533,12 @@ pub fn compute_normals(model: &mut TriangleMesh, angle: f32) {
                 vertex_neighbors.get_mut(idx).unwrap().push(f as u32);
             }
         }
-        let triangle: Vec<Vec3> = face
+        let triangle: Vec<Vec3A> = face
             .iter()
             .map(|idx| model.vertices[*idx as usize].into())
             .collect();
-        let edge0: Vec3 = triangle[1] - triangle[0];
-        let edge1: Vec3 = triangle[2] - triangle[0];
+        let edge0: Vec3A = triangle[1] - triangle[0];
+        let edge1: Vec3A = triangle[2] - triangle[0];
         let ng = edge0.cross(edge1).normalize();
         let area = edge0.cross(edge1).length();
         face_normal_areas.push((ng, area));

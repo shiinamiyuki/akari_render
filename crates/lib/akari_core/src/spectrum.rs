@@ -5,6 +5,7 @@ use crate::{
     function::{Dense1D, DenseSlice1D, Function1D, PiecewiseLinear1D},
     *,
 };
+use akari_common::glam::vec3a;
 use akari_const::{CIE_LAMBDA_MAX, CIE_LAMBDA_MIN, CIE_SAMPLES, CIE_Y};
 use lazy_static::lazy_static;
 pub const SPECTRUM_SAMPLES: usize = 4;
@@ -75,7 +76,7 @@ impl SampledWavelengths {
         // let pdf = Vec4::select(self.pdf.cmple(Vec4::ZERO), Vec4::ONE, self.pdf);
         let safe_div =
             |x, pdf: Vec4| -> Vec4 { Vec4::select(pdf.cmple(Vec4::ZERO), Vec4::ZERO, x / pdf) };
-        XYZ::new(vec3(
+        XYZ::new(vec3a(
             avg(safe_div((s * x.sample(&self.clone())).values(), self.pdf)),
             avg(safe_div((s * y.sample(&self.clone())).values(), self.pdf)),
             avg(safe_div((s * z.sample(&self.clone())).values(), self.pdf)),

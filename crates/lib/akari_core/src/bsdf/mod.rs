@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use akari_common::glam::vec3a;
 use bumpalo::Bump;
 
 use crate::texture::{FloatTexture, ShadingPoint, SpectrumTexture};
@@ -29,7 +30,7 @@ impl BsdfFlags {
 }
 
 pub struct BsdfSample {
-    pub wi: Vec3,
+    pub wi: Vec3A,
     pub f: SampledSpectrum,
     pub pdf: f32,
     pub flag: BsdfFlags,
@@ -63,9 +64,9 @@ pub trait Bsdf: Sync + Send + AsAny {
     }
 }
 pub trait LocalBsdfClosure: Sync + Send {
-    fn evaluate(&self, wo: Vec3, wi: Vec3) -> SampledSpectrum;
-    fn evaluate_pdf(&self, wo: Vec3, wi: Vec3) -> f32;
-    fn sample(&self, u: Vec2, wo: Vec3) -> Option<BsdfSample>;
+    fn evaluate(&self, wo: Vec3A, wi: Vec3A) -> SampledSpectrum;
+    fn evaluate_pdf(&self, wo: Vec3A, wi: Vec3A) -> f32;
+    fn sample(&self, u: Vec2, wo: Vec3A) -> Option<BsdfSample>;
     fn emission(&self) -> Option<&dyn SpectrumTexture> {
         None
     }
@@ -78,15 +79,15 @@ pub struct BsdfClosure<'a> {
 }
 
 impl<'a> BsdfClosure<'a> {
-    pub fn evaluate(&self, wo: Vec3, wi: Vec3) -> SampledSpectrum {
+    pub fn evaluate(&self, wo: Vec3A, wi: Vec3A) -> SampledSpectrum {
         self.closure
             .evaluate(self.frame.to_local(wo), self.frame.to_local(wi))
     }
-    pub fn evaluate_pdf(&self, wo: Vec3, wi: Vec3) -> f32 {
+    pub fn evaluate_pdf(&self, wo: Vec3A, wi: Vec3A) -> f32 {
         self.closure
             .evaluate_pdf(self.frame.to_local(wo), self.frame.to_local(wi))
     }
-    pub fn sample(&self, u: Vec2, wo: Vec3) -> Option<BsdfSample> {
+    pub fn sample(&self, u: Vec2, wo: Vec3A) -> Option<BsdfSample> {
         let mut sample = self.closure.sample(u, self.frame.to_local(wo))?;
         sample.wi = self.frame.to_world(sample.wi);
         Some(sample)
@@ -108,13 +109,13 @@ pub struct EmissiveBsdfClosure<'a> {
     pub emission: &'a dyn SpectrumTexture,
 }
 impl<'a> LocalBsdfClosure for EmissiveBsdfClosure<'a> {
-    fn evaluate(&self, wo: Vec3, wi: Vec3) -> SampledSpectrum {
+    fn evaluate(&self, wo: Vec3A, wi: Vec3A) -> SampledSpectrum {
         self.base.evaluate(wo, wi)
     }
-    fn evaluate_pdf(&self, wo: Vec3, wi: Vec3) -> f32 {
+    fn evaluate_pdf(&self, wo: Vec3A, wi: Vec3A) -> f32 {
         self.base.evaluate_pdf(wo, wi)
     }
-    fn sample(&self, u: Vec2, wo: Vec3) -> Option<BsdfSample> {
+    fn sample(&self, u: Vec2, wo: Vec3A) -> Option<BsdfSample> {
         self.base.sample(u, wo)
     }
     fn emission(&self) -> Option<&dyn SpectrumTexture> {
@@ -191,21 +192,21 @@ impl<'a> LocalBsdfClosure for MixBsdfClosure<'a> {
     fn flags(&self) -> BsdfFlags {
         self.bsdf_a.flags() | self.bsdf_b.flags()
     }
-    fn evaluate(&self, wo: Vec3, wi: Vec3) -> SampledSpectrum {
+    fn evaluate(&self, wo: Vec3A, wi: Vec3A) -> SampledSpectrum {
         SampledSpectrum::lerp(
             self.bsdf_a.evaluate(wo, wi),
             self.bsdf_b.evaluate(wo, wi),
             self.frac,
         )
     }
-    fn evaluate_pdf(&self, wo: Vec3, wi: Vec3) -> f32 {
+    fn evaluate_pdf(&self, wo: Vec3A, wi: Vec3A) -> f32 {
         lerp(
             self.bsdf_a.evaluate_pdf(wo, wi),
             self.bsdf_b.evaluate_pdf(wo, wi),
             self.frac,
         )
     }
-    fn sample(&self, u: Vec2, wo: Vec3) -> Option<BsdfSample> {
+    fn sample(&self, u: Vec2, wo: Vec3A) -> Option<BsdfSample> {
         let frac = self.frac;
         let prob = (1.0 - frac).clamp(0.0000001, 0.9999999);
         if u[0] < prob {
@@ -279,12 +280,12 @@ impl<'a> LocalBsdfClosure for MixBsdfClosure<'a> {
 //             (a2 - 1.0) / (PI * a2.ln() * (1.0 + (a2 - 1.0) * dot_hl * dot_hl))
 //         }
 //     }
-//     fn separable_ggx_g1(w: Vec3, a: f32) -> f32 {
+//     fn separable_ggx_g1(w: Vec3A, a: f32) -> f32 {
 //         let a2 = a * a;
 //         let cos_theta = Frame::abs_cos_theta(w);
 //         1.0 / (cos_theta + (a2 + cos_theta - a2 * cos_theta * cos_theta).sqrt())
 //     }
-//     fn evaluate_clearcoat(clearcoat: f32, alpha: f32, wo: Vec3, wi: Vec3, wh: Vec3) -> f32 {
+//     fn evaluate_clearcoat(clearcoat: f32, alpha: f32, wo: Vec3A, wi: Vec3A, wh: Vec3A) -> f32 {
 //         if clearcoat <= 0.0 {
 //             return 0.0;
 //         }
@@ -301,14 +302,14 @@ impl<'a> LocalBsdfClosure for MixBsdfClosure<'a> {
 //     }
 //     fn evaluate_tint(color: SampledSpectrum) -> SampledSpectrum {
 //         let rgb = color.to_rgb_linear();
-//         let luminance = vec3(0.3, 0.6, 0.1).dot(rgb);
+//         let luminance = vec3a(0.3, 0.6, 0.1).dot(rgb);
 //         if luminance > 0.0 {
 //             color * (1.0 / luminance)
 //         } else {
-//             SampledSpectrum::from_rgb_linear(vec3(1.0, 1.0, 1.0))
+//             SampledSpectrum::from_rgb_linear(vec3a(1.0, 1.0, 1.0))
 //         }
 //     }
-//     fn evaluateheen(&self, sp: &ShadingPoint, wo: Vec3, wi: Vec3, wm: Vec3) -> SampledSpectrum {
+//     fn evaluateheen(&self, sp: &ShadingPoint, wo: Vec3A, wi: Vec3A, wm: Vec3A) -> SampledSpectrum {
 //         let sheen = self.sheen;
 //         if sheen <= 0.0 {
 //             return SampledSpectrum::zero();
@@ -317,7 +318,7 @@ impl<'a> LocalBsdfClosure for MixBsdfClosure<'a> {
 //         let tint = Self::evaluate_tint(self.color);
 //         SampledSpectrum::lerp(SampledSpectrum::one(), tint, self.sheen_tint) * self.sheen * schlick_weight(dot_hl)
 //     }
-//     fn ggx_aniso_d(wh: Vec3, ax: f32, ay: f32) -> f32 {
+//     fn ggx_aniso_d(wh: Vec3A, ax: f32, ay: f32) -> f32 {
 //         let dot_hx2 = wh.x * wh.x;
 //         let dot_hy2 = wh.y * wh.y;
 //         let cos2 = Frame::cos2_theta(wh);
@@ -325,7 +326,7 @@ impl<'a> LocalBsdfClosure for MixBsdfClosure<'a> {
 //         let ay2 = ay * ay;
 //         1.0 / (PI * ax * ay * (dot_hx2 / ax2 + dot_hy2 / ay2 + cos2).powi(2))
 //     }
-//     fn separable_smith_ggx_g1(w: Vec3, wh: Vec3, ax: f32, ay: f32) -> f32 {
+//     fn separable_smith_ggx_g1(w: Vec3A, wh: Vec3A, ax: f32, ay: f32) -> f32 {
 //         let dot_hw = wh.dot(w);
 //         if dot_hw <= 0.0 {
 //             return 0.0;
@@ -365,7 +366,7 @@ impl LocalBsdfClosure for DiffuseBsdfClosure {
     fn flags(&self) -> BsdfFlags {
         BsdfFlags::DIFFUSE_REFLECTION
     }
-    fn evaluate(&self, wo: Vec3, wi: Vec3) -> SampledSpectrum {
+    fn evaluate(&self, wo: Vec3A, wi: Vec3A) -> SampledSpectrum {
         let r = self.color;
         if Frame::same_hemisphere(wo, wi) {
             r * FRAC_1_PI
@@ -373,14 +374,14 @@ impl LocalBsdfClosure for DiffuseBsdfClosure {
             SampledSpectrum::zero()
         }
     }
-    fn evaluate_pdf(&self, wo: Vec3, wi: Vec3) -> f32 {
+    fn evaluate_pdf(&self, wo: Vec3A, wi: Vec3A) -> f32 {
         if Frame::same_hemisphere(wo, wi) {
             Frame::abs_cos_theta(wi) * FRAC_1_PI
         } else {
             0.0
         }
     }
-    fn sample(&self, u: Vec2, wo: Vec3) -> Option<BsdfSample> {
+    fn sample(&self, u: Vec2, wo: Vec3A) -> Option<BsdfSample> {
         let r = self.color;
 
         let wi = {
@@ -388,7 +389,7 @@ impl LocalBsdfClosure for DiffuseBsdfClosure {
             if Frame::same_hemisphere(w, wo) {
                 w
             } else {
-                vec3(w.x, -w.y, w.z)
+                vec3a(w.x, -w.y, w.z)
             }
         };
         Some(BsdfSample {
@@ -411,16 +412,16 @@ impl LocalBsdfClosure for SpecularBsdfClosure {
     fn flags(&self) -> BsdfFlags {
         BsdfFlags::SPECULAR_REFLECTION
     }
-    fn evaluate(&self, _wo: Vec3, _wi: Vec3) -> SampledSpectrum {
+    fn evaluate(&self, _wo: Vec3A, _wi: Vec3A) -> SampledSpectrum {
         SampledSpectrum::zero()
     }
-    fn evaluate_pdf(&self, _wo: Vec3, _wi: Vec3) -> f32 {
+    fn evaluate_pdf(&self, _wo: Vec3A, _wi: Vec3A) -> f32 {
         0.0
     }
-    fn sample(&self, _u: Vec2, wo: Vec3) -> Option<BsdfSample> {
+    fn sample(&self, _u: Vec2, wo: Vec3A) -> Option<BsdfSample> {
         let r = self.color;
 
-        let wi = reflect(wo, vec3(0.0, 1.0, 0.0));
+        let wi = reflect(wo, vec3a(0.0, 1.0, 0.0));
         Some(BsdfSample {
             f: r / Frame::abs_cos_theta(wi),
             wi,
@@ -469,18 +470,18 @@ impl LocalBsdfClosure for FresnelSpecularBsdfClosure {
     fn flags(&self) -> BsdfFlags {
         BsdfFlags::SPECULAR_REFLECTION | BsdfFlags::SPECULAR_REFRACTION
     }
-    fn evaluate(&self, _wo: Vec3, _wi: Vec3) -> SampledSpectrum {
+    fn evaluate(&self, _wo: Vec3A, _wi: Vec3A) -> SampledSpectrum {
         SampledSpectrum::zero()
     }
 
-    fn evaluate_pdf(&self, _wo: Vec3, _wi: Vec3) -> f32 {
+    fn evaluate_pdf(&self, _wo: Vec3A, _wi: Vec3A) -> f32 {
         0.0
     }
 
-    fn sample(&self, u: Vec2, wo: Vec3) -> Option<BsdfSample> {
+    fn sample(&self, u: Vec2, wo: Vec3A) -> Option<BsdfSample> {
         let f = fr_dielectric(Frame::cos_theta(wo), self.eta_a, self.eta_b);
         if u[0] < f {
-            let wi = vec3(-wo.x, wo.y, -wo.z);
+            let wi = vec3a(-wo.x, wo.y, -wo.z);
             Some(BsdfSample {
                 flag: BsdfFlags::SPECULAR_REFLECTION,
                 wi,
@@ -494,7 +495,7 @@ impl LocalBsdfClosure for FresnelSpecularBsdfClosure {
             } else {
                 (self.eta_b, self.eta_a)
             };
-            let wi = refract(wo, Vec3::Y, self.eta_b / self.eta_a)?;
+            let wi = refract(wo, Vec3A::Y, self.eta_b / self.eta_a)?;
             let mut ft = self.kt * (1.0 - f);
             if self.mode == TransportMode::CameraToLight {
                 ft *= (eta_i * eta_i) / (eta_t * eta_t);

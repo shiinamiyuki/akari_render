@@ -5,6 +5,7 @@ use crate::{
     texture::{FloatTexture, ShadingPoint, SpectrumTexture},
     *,
 };
+use akari_common::glam::vec3a;
 use akari_const::GGX_LTC_FIT;
 use bumpalo::Bump;
 use glam::DMat3;
@@ -41,7 +42,7 @@ impl LTC {
         }
     }
     #[allow(non_snake_case)]
-    pub fn eval_f_pdf(&self, w: Vec3) -> (f32, f32) {
+    pub fn eval_f_pdf(&self, w: Vec3A) -> (f32, f32) {
         use glam::Vec3Swizzles;
         let w = w.xzy().as_dvec3();
         let inv_m = self.mat.inverse();
@@ -59,16 +60,16 @@ impl LTC {
         ((f / w.z.abs()) as f32, (D / jacobian) as f32)
     }
     // pub fn pdf(&self, w)
-    pub fn sample(&self, u1: f32, u2: f32) -> Vec3 {
+    pub fn sample(&self, u1: f32, u2: f32) -> Vec3A {
         use glam::Vec3Swizzles;
         let w = consine_hemisphere_sampling(vec2(u1, u2)).xzy().as_dvec3();
-        (self.mat * w).normalize().xzy().as_vec3()
+        (self.mat * w).normalize().xzy().as_vec3().into()
     }
 }
 
 #[allow(non_snake_case)]
-fn frame_from_wo(wo: Vec3) -> Frame {
-    let N = vec3(0.0, 1.0, 0.0);
+fn frame_from_wo(wo: Vec3A) -> Frame {
+    let N = vec3a(0.0, 1.0, 0.0);
     let T = (wo - N * wo.dot(N)).normalize();
     let B = N.cross(T).normalize();
     // println!("{:?} {:?} {:?}",T, N, B);
@@ -79,7 +80,7 @@ impl LocalBsdfClosure for GgxLtcBsdfClosure {
     fn flags(&self)->BsdfFlags{
         BsdfFlags::GLOSSY_REFLECTION
     }
-    fn evaluate(&self, wo: Vec3, wi: Vec3) -> SampledSpectrum {
+    fn evaluate(&self, wo: Vec3A, wi: Vec3A) -> SampledSpectrum {
         if !Frame::same_hemisphere(wo, wi) {
             return SampledSpectrum::zero();
         }
@@ -89,7 +90,7 @@ impl LocalBsdfClosure for GgxLtcBsdfClosure {
         let ltc = LTC::from_theta_alpha(theta, alpha);
         let frame = frame_from_wo(wo);
         let f = ltc
-            .eval_f_pdf(frame.to_local(vec3(wi.x, wi.y.abs(), wi.z)))
+            .eval_f_pdf(frame.to_local(vec3a(wi.x, wi.y.abs(), wi.z)))
             .0;
         if f.is_nan() {
             SampledSpectrum::zero()
@@ -98,7 +99,7 @@ impl LocalBsdfClosure for GgxLtcBsdfClosure {
         }
     }
 
-    fn evaluate_pdf(&self, wo: Vec3, wi: Vec3) -> f32 {
+    fn evaluate_pdf(&self, wo: Vec3A, wi: Vec3A) -> f32 {
         if !Frame::same_hemisphere(wo, wi) {
             return 0.0;
         }
@@ -107,7 +108,7 @@ impl LocalBsdfClosure for GgxLtcBsdfClosure {
         let ltc = LTC::from_theta_alpha(theta, alpha);
         let frame = frame_from_wo(wo);
         let pdf = ltc
-            .eval_f_pdf(frame.to_local(vec3(wi.x, wi.y.abs(), wi.z)))
+            .eval_f_pdf(frame.to_local(vec3a(wi.x, wi.y.abs(), wi.z)))
             .1;
         if !pdf.is_nan() {
             pdf
@@ -116,7 +117,7 @@ impl LocalBsdfClosure for GgxLtcBsdfClosure {
         }
     }
 
-    fn sample(&self, u: Vec2, wo: Vec3) -> Option<BsdfSample> {
+    fn sample(&self, u: Vec2, wo: Vec3A) -> Option<BsdfSample> {
         let theta = Frame::abs_cos_theta(wo);
         let alpha = self.roughness.powi(2);
         let ltc = LTC::from_theta_alpha(theta, alpha);

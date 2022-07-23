@@ -27,7 +27,7 @@ struct PathState {
     sampler: SobolSampler,
     l: SampledSpectrum,
     beta: SampledSpectrum,
-    prev_n: Vec3,
+    prev_n: Vec3A,
     prev_bsdf_pdf: f32,
     pixel: u32,
     is_delta: bool,
@@ -77,9 +77,9 @@ impl ClosestHit {
 #[derive(Clone, Copy)]
 struct BsdfSampleContext<'a> {
     bsdf: BsdfClosure<'a>,
-    wo: Vec3,
+    wo: Vec3A,
     si: SurfaceInteraction<'a>,
-    p: Vec3,
+    p: Vec3A,
 }
 struct StreamPathTracerSession<'a> {
     spp: u32,
@@ -375,7 +375,7 @@ impl<'a> StreamPathTracerSession<'a> {
                     depth: 0,
                     l: SampledSpectrum::zero(),
                     beta: SampledSpectrum::one(),
-                    prev_n: Vec3::ZERO,
+                    prev_n: Vec3A::ZERO,
                     prev_bsdf_pdf: 0.0,
                     is_delta: false,
                     pixel: pixel_id as u32,

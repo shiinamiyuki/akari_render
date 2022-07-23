@@ -15,7 +15,7 @@ impl<B: LocalBsdfClosure> BsdfTester<B> {
         Self { bsdf }
     }
     #[allow(dead_code)]
-    pub fn test_2pi(&self, wo: Vec3) -> f32 {
+    pub fn test_2pi(&self, wo: Vec3A) -> f32 {
         let n = 1u64 << 20;
         let mut local_sum = PerThread::new(|| 0.0f64);
         rayon::scope(|s| {
@@ -75,7 +75,7 @@ fn test_ggx() {
         roughness += 0.05;
     }
 }
-fn test_rgb2spec_(rgb: Vec3) {
+fn test_rgb2spec_(rgb: Vec3A) {
     // println!("{} {}", rgb, xyz_to_srgb(srgb_to_xyz(rgb)));
     let mut sampler = PCGSampler::new(0);
     let colorspace = RgbColorSpace::new(RgbColorSpaceId::SRgb);
@@ -95,11 +95,11 @@ fn test_rgb2spec_(rgb: Vec3) {
 fn main() {
     test_diffuse();
     test_ggx();
-    test_rgb2spec_(Vec3::ONE);
-    test_rgb2spec_(Vec3::X * 0.5);
-    test_rgb2spec_(Vec3::Y * 0.5);
-    test_rgb2spec_(Vec3::Z * 0.5);
-    test_rgb2spec_(Vec3::X);
-    test_rgb2spec_(Vec3::Y);
-    test_rgb2spec_(Vec3::Z);
+    test_rgb2spec_(Vec3A::ONE);
+    test_rgb2spec_(Vec3A::X * 0.5);
+    test_rgb2spec_(Vec3A::Y * 0.5);
+    test_rgb2spec_(Vec3A::Z * 0.5);
+    test_rgb2spec_(Vec3A::X);
+    test_rgb2spec_(Vec3A::Y);
+    test_rgb2spec_(Vec3A::Z);
 }

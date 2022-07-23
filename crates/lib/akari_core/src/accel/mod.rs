@@ -24,7 +24,7 @@ impl Shape for Arc<dyn Shape> {
     fn aabb(&self) -> Bounds3f {
         self.as_ref().aabb()
     }
-    fn sample_surface(&self, u: Vec3) -> SurfaceSample {
+    fn sample_surface(&self, u: Vec3A) -> SurfaceSample {
         self.as_ref().sample_surface(u)
     }
     fn area(&self) -> f32 {

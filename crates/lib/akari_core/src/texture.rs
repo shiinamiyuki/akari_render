@@ -1,4 +1,4 @@
-use akari_common::glam::Vec4Swizzles;
+use akari_common::glam::{Vec4Swizzles, vec3a};
 use util::RobustSum;
 
 use crate::{
@@ -41,13 +41,13 @@ impl FloatTexture for ConstantFloatTexture {
 }
 
 pub struct ConstantRgbTexture {
-    rgb: Vec3,
+    rgb: Vec3A,
     rep: RgbSigmoidPolynomial,
     scale: f32,
     colorspace: RgbColorSpace,
 }
 impl ConstantRgbTexture {
-    pub fn new(mut rgb: Vec3, colorspace: RgbColorSpace) -> Self {
+    pub fn new(mut rgb: Vec3A, colorspace: RgbColorSpace) -> Self {
         let mut scale = rgb.max_element();
         if scale < 1.0 {
             scale = 1.0;
@@ -92,7 +92,7 @@ impl ImageSpectrumTexture {
                 util::image::PixelFormat::SRgb8,
                 |x, y| {
                     let px = image.get_pixel(x, y);
-                    let rgb = vec3(px[0] as f32, px[1] as f32, px[2] as f32) / 255.0;
+                    let rgb = vec3a(px[0] as f32, px[1] as f32, px[2] as f32) / 255.0;
                     srgb_to_linear(rgb).extend(1.0)
                 },
             ),
@@ -107,7 +107,7 @@ impl SpectrumTexture for ImageSpectrumTexture {
             tc.y = 1.0 - tc.y;
         }
         let rgba = self.image.loadf(tc, util::image::WrappingMode::Repeat);
-        let rep = self.colorspace.rgb2spec(rgba.xyz());
+        let rep = self.colorspace.rgb2spec(rgba.xyz().into());
         rep.sample(lambda)
     }
 
@@ -118,7 +118,7 @@ impl SpectrumTexture for ImageSpectrumTexture {
                 let rgb = self
                     .image
                     .load(uvec2(x, y).as_ivec2(), util::image::WrappingMode::Clamp)
-                    .xyz();
+                    .xyz().into();
                 let xyz = srgb_to_xyz(rgb);
                 sum.add(xyz.y);
             }

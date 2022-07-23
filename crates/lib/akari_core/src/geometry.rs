@@ -1,13 +1,14 @@
 use std::ops::Mul;
 
+use akari_common::glam::vec3a;
 use akari_utils::{float_bits_to_int, int_bits_to_float};
 use serde::{Deserialize, Serialize};
 
 use crate::*;
 #[derive(Clone, Copy, Debug)]
 pub struct Ray {
-    pub o: Vec3,
-    pub d: Vec3,
+    pub o: Vec3A,
+    pub d: Vec3A,
     pub tmin: f32,
     pub tmax: f32,
     // pub time: f32,
@@ -41,8 +42,8 @@ impl From<[Ray; 4]> for Ray4 {
 impl Default for Ray {
     fn default() -> Self {
         Self {
-            o: Vec3::ZERO,
-            d: Vec3::ZERO,
+            o: Vec3A::ZERO,
+            d: Vec3A::ZERO,
             tmin: RAY_EPSILON,
             tmax: -f32::INFINITY,
         }
@@ -57,18 +58,18 @@ fn float_scale() -> f32 {
 fn int_scale() -> f32 {
     256.0
 }
-fn offset_ray(p: Vec3, n: Vec3) -> Vec3 {
+fn offset_ray(p: Vec3A, n: Vec3A) -> Vec3A {
     let of_i = glam::ivec3(
         (int_scale() * n.x) as i32,
         (int_scale() * n.y) as i32,
         (int_scale() * n.z) as i32,
     );
-    let p_i = vec3(
+    let p_i = vec3a(
         int_bits_to_float(float_bits_to_int(p.x) + if p.x < 0.0 { -of_i.x } else { of_i.x }),
         int_bits_to_float(float_bits_to_int(p.y) + if p.y < 0.0 { -of_i.y } else { of_i.y }),
         int_bits_to_float(float_bits_to_int(p.z) + if p.z < 0.0 { -of_i.z } else { of_i.z }),
     );
-    vec3(
+    vec3a(
         if p.x.abs() < origin() {
             p.x + float_scale() * n.x
         } else {
@@ -91,7 +92,7 @@ impl Ray {
     pub fn is_invalid(&self) -> bool {
         self.tmax < self.tmin
     }
-    pub fn spawn(o: Vec3, d: Vec3) -> Self {
+    pub fn spawn(o: Vec3A, d: Vec3A) -> Self {
         Self {
             o,
             d,
@@ -99,7 +100,7 @@ impl Ray {
             tmax: f32::INFINITY,
         }
     }
-    pub fn offset_along_normal(&self, n: Vec3) -> Self {
+    pub fn offset_along_normal(&self, n: Vec3A) -> Self {
         let p = offset_ray(self.o, if self.d.dot(n) > 0.0 { n } else { -n });
         let diff = (p - self.o).length() / self.d.length();
         Self {
@@ -112,50 +113,50 @@ impl Ray {
             ..*self
         }
     }
-    pub fn spawn_to(p1: Vec3, p2: Vec3) -> Self {
+    pub fn spawn_to(p1: Vec3A, p2: Vec3A) -> Self {
         let len = (p1 - p2).length();
         let mut ray = Self::spawn(p1, (p2 - p1).normalize());
         ray.tmax = len;
         ray
     }
-    pub fn spawn_to_offseted1(p1: Vec3, p2: Vec3, n1: Vec3) -> Self {
+    pub fn spawn_to_offseted1(p1: Vec3A, p2: Vec3A, n1: Vec3A) -> Self {
         let d = (p2 - p1).normalize();
         let p1 = offset_ray(p1, if d.dot(n1) > 0.0 { n1 } else { -n1 });
         let ray = Self::spawn_to(p1, p2);
 
         ray
     }
-    pub fn spawn_to_offseted2(p1: Vec3, p2: Vec3, n1: Vec3, n2: Vec3) -> Self {
+    pub fn spawn_to_offseted2(p1: Vec3A, p2: Vec3A, n1: Vec3A, n2: Vec3A) -> Self {
         let d = (p2 - p1).normalize();
         let p1 = offset_ray(p1, if d.dot(n1) > 0.0 { n1 } else { -n1 });
         let p2 = offset_ray(p2, if d.dot(n2) > 0.0 { -n2 } else { n2 });
         let ray = Self::spawn_to(p1, p2);
         ray
     }
-    pub fn at(&self, t: f32) -> Vec3 {
+    pub fn at(&self, t: f32) -> Vec3A {
         self.o + t * self.d
     }
 }
 
 #[derive(Clone, Copy)]
 pub struct ReferencePoint {
-    pub p: Vec3,
-    pub n: Vec3,
+    pub p: Vec3A,
+    pub n: Vec3A,
 }
 
 #[allow(non_snake_case)]
 #[derive(Clone, Copy)]
 pub struct Frame {
-    pub N: Vec3,
-    pub B: Vec3,
-    pub T: Vec3,
+    pub N: Vec3A,
+    pub B: Vec3A,
+    pub T: Vec3A,
 }
 impl Frame {
-    pub fn from_normal(normal: Vec3) -> Self {
+    pub fn from_normal(normal: Vec3A) -> Self {
         let tangent = if normal.x.abs() > normal.y.abs() {
-            vec3(-normal.z, 0.0, normal.x).normalize()
+            vec3a(-normal.z, 0.0, normal.x).normalize()
         } else {
-            vec3(0.0, normal.z, -normal.y).normalize()
+            vec3a(0.0, normal.z, -normal.y).normalize()
         };
         Self {
             N: normal,
@@ -163,10 +164,10 @@ impl Frame {
             B: normal.cross(tangent).normalize(),
         }
     }
-    pub fn to_local(&self, v: Vec3) -> Vec3 {
-        vec3(v.dot(self.T), v.dot(self.N), v.dot(self.B))
+    pub fn to_local(&self, v: Vec3A) -> Vec3A {
+        vec3a(v.dot(self.T), v.dot(self.N), v.dot(self.B))
     }
-    pub fn to_world(&self, v: Vec3) -> Vec3 {
+    pub fn to_world(&self, v: Vec3A) -> Vec3A {
         self.T * v.x + self.N * v.y + self.B * v.z
     }
 }
@@ -207,16 +208,16 @@ impl Transform {
         }
     }
     #[inline]
-    pub fn transform_point(self, p: Vec3) -> Vec3 {
+    pub fn transform_point(self, p: Vec3A) -> Vec3A {
         let q = self.m4 * vec4(p.x, p.y, p.z, 1.0);
-        vec3(q.x, q.y, q.z) / q.w
+        vec3a(q.x, q.y, q.z) / q.w
     }
     #[inline]
-    pub fn transform_vector(self, v: Vec3) -> Vec3 {
+    pub fn transform_vector(self, v: Vec3A) -> Vec3A {
         self.m3 * v
     }
     #[inline]
-    pub fn transform_normal(&self, n: Vec3) -> Vec3 {
+    pub fn transform_normal(&self, n: Vec3A) -> Vec3A {
         self.inv_m3.transpose() * n
     }
 }
@@ -227,7 +228,7 @@ impl Mul for Transform {
     }
 }
 
-pub fn dir_to_spherical(v: Vec3) -> Vec2 {
+pub fn dir_to_spherical(v: Vec3A) -> Vec2 {
     let theta = v.y.acos();
     let phi = f32::atan2(v.z, v.x) + PI;
     vec2(theta, phi)
@@ -236,41 +237,41 @@ pub fn dir_to_spherical(v: Vec3) -> Vec2 {
 pub fn spherical_to_uv(v: Vec2) -> Vec2 {
     vec2(v.x / PI, v.y / (2.0 * PI))
 }
-pub fn dir_to_uv(v: Vec3) -> Vec2 {
+pub fn dir_to_uv(v: Vec3A) -> Vec2 {
     spherical_to_uv(dir_to_spherical(v))
 }
 
 impl Frame {
     #[inline]
-    pub fn same_hemisphere(u: Vec3, v: Vec3) -> bool {
+    pub fn same_hemisphere(u: Vec3A, v: Vec3A) -> bool {
         u.y * v.y > 0.0
     }
     #[inline]
-    pub fn cos_theta(u: Vec3) -> f32 {
+    pub fn cos_theta(u: Vec3A) -> f32 {
         u.y
     }
     #[inline]
-    pub fn cos2_theta(u: Vec3) -> f32 {
+    pub fn cos2_theta(u: Vec3A) -> f32 {
         u.y * u.y
     }
     #[inline]
-    pub fn sin2_theta(u: Vec3) -> f32 {
+    pub fn sin2_theta(u: Vec3A) -> f32 {
         (1.0 - Self::cos2_theta(u)).clamp(0.0, 1.0)
     }
     #[inline]
-    pub fn sin_theta(u: Vec3) -> f32 {
+    pub fn sin_theta(u: Vec3A) -> f32 {
         Self::sin2_theta(u).sqrt()
     }
     #[inline]
-    pub fn tan_theta(u: Vec3) -> f32 {
+    pub fn tan_theta(u: Vec3A) -> f32 {
         Self::sin_theta(u) / Self::cos_theta(u)
     }
     #[inline]
-    pub fn abs_cos_theta(u: Vec3) -> f32 {
+    pub fn abs_cos_theta(u: Vec3A) -> f32 {
         u.y.abs()
     }
     #[inline]
-    pub fn cos_phi(u: Vec3) -> f32 {
+    pub fn cos_phi(u: Vec3A) -> f32 {
         let sin = Self::sin_theta(u);
         if sin == 0.0 {
             1.0
@@ -279,7 +280,7 @@ impl Frame {
         }
     }
     #[inline]
-    pub fn sin_phi(u: Vec3) -> f32 {
+    pub fn sin_phi(u: Vec3A) -> f32 {
         let sin = Self::sin_theta(u);
         if sin == 0.0 {
             0.0
@@ -288,19 +289,19 @@ impl Frame {
         }
     }
     #[inline]
-    pub fn cos2_phi(u: Vec3) -> f32 {
+    pub fn cos2_phi(u: Vec3A) -> f32 {
         Self::cos_phi(u).powi(2)
     }
     #[inline]
-    pub fn sin2_phi(u: Vec3) -> f32 {
+    pub fn sin2_phi(u: Vec3A) -> f32 {
         Self::sin_phi(u).powi(2)
     }
 }
 #[inline]
-pub fn reflect(w: Vec3, n: Vec3) -> Vec3 {
+pub fn reflect(w: Vec3A, n: Vec3A) -> Vec3A {
     -w + 2.0 * w.dot(n) * n
 }
-pub fn refract(wi: Vec3, mut n: Vec3, mut eta: f32) -> Option<Vec3> {
+pub fn refract(wi: Vec3A, mut n: Vec3A, mut eta: f32) -> Option<Vec3A> {
     let mut cos_theta_i = n.dot(wi);
 
     if cos_theta_i < 0.0 {
@@ -346,7 +347,7 @@ pub fn fr_dielectric(mut cos_theta_i: f32, mut eta_i: f32, mut eta_t: f32) -> f3
 pub struct RayHit {
     pub uv: Vec2,
     pub t: f32,
-    pub ng: Vec3,
+    pub ng: Vec3A,
     pub prim_id: u32,
     pub geom_id: u32,
 }
@@ -361,7 +362,7 @@ impl Default for RayHit {
         Self {
             uv: Vec2::ZERO,
             t: -f32::INFINITY,
-            ng: Vec3::ZERO,
+            ng: Vec3A::ZERO,
             prim_id: u32::MAX,
             geom_id: u32::MAX,
         }
@@ -382,11 +383,11 @@ pub struct Aabb {
 
 impl Aabb {
     #[inline]
-    pub fn size(&self) -> Vec3 {
+    pub fn size(&self) -> Vec3A {
         (self.max - self.min).into()
     }
     #[inline]
-    pub fn insert_point(&mut self, p: Vec3) -> Self {
+    pub fn insert_point(&mut self, p: Vec3A) -> Self {
         self.min = self.min.min(p.into());
         self.max = self.max.max(p.into());
         *self
@@ -407,20 +408,20 @@ impl Aabb {
         (s[0] * s[1] + s[1] * s[2] + s[0] * s[2]) * 2.0
     }
     #[inline]
-    pub fn centroid(&self) -> Vec3 {
-        Vec3::from(self.min) + 0.5 * self.size()
+    pub fn centroid(&self) -> Vec3A {
+        Vec3A::from(self.min) + 0.5 * self.size()
     }
     #[inline]
-    pub fn diagonal(&self) -> Vec3 {
+    pub fn diagonal(&self) -> Vec3A {
         (self.max - self.min).into()
     }
     #[inline]
-    pub fn contains(&self, p: Vec3) -> bool {
+    pub fn contains(&self, p: Vec3A) -> bool {
         p.cmple(self.max.into()).all() && p.cmpge(self.min.into()).all()
     }
     #[inline]
-    pub fn offset(&self, p: Vec3) -> Vec3 {
-        (p - Vec3::from(self.min)) / self.size()
+    pub fn offset(&self, p: Vec3A) -> Vec3A {
+        (p - Vec3A::from(self.min)) / self.size()
     }
 }
 impl Default for Aabb {

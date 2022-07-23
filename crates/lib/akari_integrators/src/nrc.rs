@@ -96,7 +96,7 @@ fn nrc_encoding(v: &na::DMatrix<f32>) -> na::DMatrix<f32> {
 }
 // position_encoding_func_v3!(nrc_encoding, INPUT_SIZE, FEATURE_SIZE, MAX_FREQ);
 
-fn sph(v: Vec3) -> Vec2 {
+fn sph(v: Vec3A) -> Vec2 {
     let v = dir_to_spherical(v);
     vec2(v.x / PI, v.y / (2.0 * PI))
 }
@@ -138,7 +138,7 @@ impl Clone for RadianceCache {
 struct QueryRecord {
     n: Vec2,
     info: BsdfInfo,
-    x: Vec3,
+    x: Vec3A,
     dir: Vec2,
 }
 
@@ -154,8 +154,8 @@ impl RadianceCache {
         Self {
             model: Arc::new(model),
             bound: Bounds3f {
-                min: (vec3(1.0, 1.0, 1.0) * -500.0).into(),
-                max: (vec3(1.0, 1.0, 1.0) * 500.0).into(),
+                min: (vec3a(1.0, 1.0, 1.0) * -500.0).into(),
+                max: (vec3a(1.0, 1.0, 1.0) * 500.0).into(),
             },
             query_queue: RwLock::new(vec![]),
             query_result: RwLock::new(na::DMatrix::zeros(0, 0)),
@@ -308,10 +308,10 @@ pub struct CachedPathTracer {
 // }
 #[derive(Copy, Clone)]
 struct Vertex {
-    x: Vec3,
-    dir: Vec3,
+    x: Vec3A,
+    dir: Vec3A,
     info: BsdfInfo,
-    n: Vec3,
+    n: Vec3A,
     radiance: SampledSpectrum,
 }
 #[derive(Copy, Clone)]
@@ -342,7 +342,7 @@ impl CachedPathTracer {
     ) -> PathState {
         let mut li = SampledSpectrum::zero();
         let mut beta = SampledSpectrum::one();
-        let mut prev_n: Option<Vec3> = None;
+        let mut prev_n: Option<Vec3A> = None;
         let mut prev_bsdf_pdf: Option<f32> = None;
         let terminatin_coeff = 0.01;
         let mut depth = 0;
@@ -398,7 +398,7 @@ impl CachedPathTracer {
         // };
         let mut termination_a0: f32 = 0.0;
         let mut termination_a: f32 = 0.0;
-        let mut prev_x: Vec3 = ray.o;
+        let mut prev_x: Vec3A = ray.o;
         let mut prev_pdf: f32 = 0.0;
         loop {
             if let Some(si) = scene.intersect(&ray) {

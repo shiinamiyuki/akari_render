@@ -2,6 +2,7 @@ use std::convert::TryInto;
 
 use crate::*;
 
+use akari_common::glam::vec3a;
 use akari_const::{PRIMES_1000, SOBOL_MATRIX};
 use util::erf_inv;
 pub trait Sampler: Sync + Send {
@@ -11,8 +12,8 @@ pub trait Sampler: Sync + Send {
     fn next2d(&mut self) -> Vec2 {
         vec2(self.next1d(), self.next1d())
     }
-    fn next3d(&mut self) -> Vec3 {
-        vec3(self.next1d(), self.next1d(), self.next1d())
+    fn next3d(&mut self) -> Vec3A {
+        vec3a(self.next1d(), self.next1d(), self.next1d())
     }
 }
 

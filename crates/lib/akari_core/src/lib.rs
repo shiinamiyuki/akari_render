@@ -73,7 +73,7 @@ where
 }
 // f:(x,y,z )->T
 #[inline]
-pub fn trilinear<F: Fn(usize, usize, usize) -> T, T>(f: F, weights: Vec3) -> T
+pub fn trilinear<F: Fn(usize, usize, usize) -> T, T>(f: F, weights: Vec3A) -> T
 where
     T: Sub<Output = T> + Mul<f32, Output = T> + Add<Output = T> + Copy,
 {

@@ -205,11 +205,11 @@ pub struct DTree {
 }
 
 impl DTree {
-    pub fn sample(&self, u: &Vec2) -> (Vec3, f32) {
+    pub fn sample(&self, u: &Vec2) -> (Vec3A, f32) {
         let (w, pdf) = self.sampling.sample(u);
         (cylindrical_to_xyz(&w), pdf)
     }
-    pub fn pdf(&self, w: &Vec3) -> f32 {
+    pub fn pdf(&self, w: &Vec3A) -> f32 {
         self.sampling.pdf(&xyz_to_cylindrical(w))
     }
 }
@@ -220,18 +220,18 @@ pub struct STreeNode {
     pub(crate) n_samples: AtomicU64,
     pub(crate) children: [Option<usize>; 2],
 }
-fn xyz_to_cylindrical(xyz: &Vec3) -> Vec2 {
+fn xyz_to_cylindrical(xyz: &Vec3A) -> Vec2 {
     let mut phi = xyz.z.atan2(xyz.x);
     while phi < 0.0 {
         phi += 2.0 * PI;
     }
     vec2(phi, (xyz.y.clamp(-1.0, 1.0) + 1.0) / 2.0)
 }
-fn cylindrical_to_xyz(d: &Vec2) -> Vec3 {
+fn cylindrical_to_xyz(d: &Vec2) -> Vec3A {
     let phi = d.x * 2.0 * PI;
     let c = 2.0 * d.y - 1.0;
     let s = (1.0 - c * c).sqrt();
-    vec3(s * phi.cos(), c, s * phi.sin())
+    vec3a(s * phi.cos(), c, s * phi.sin())
 }
 impl STreeNode {}
 #[derive(Serialize, Deserialize)]
