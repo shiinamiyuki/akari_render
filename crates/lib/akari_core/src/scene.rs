@@ -72,15 +72,15 @@ impl Scene {
         }
     }
     pub fn intersect<'a>(&'a self, ray: &Ray) -> Option<SurfaceInteraction<'a>> {
-        self.ray_counter
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        // self.ray_counter
+        //     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         self.accel
             .intersect(ray)
             .map(|hit| self.accel.hit_to_iteraction(hit))
     }
     pub fn occlude(&self, ray: &Ray) -> bool {
-        self.ray_counter
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        // self.ray_counter
+        //     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         self.accel.occlude(ray)
     }
 }
