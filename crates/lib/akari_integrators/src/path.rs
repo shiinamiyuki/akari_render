@@ -100,7 +100,8 @@ impl PathTracer {
                         };
                         if !sample_self {
                             let p_ref = ReferencePoint { p, n: ng };
-                            let light_sample = light.sample_direct(sampler.next3d(), &p_ref, lambda);
+                            let light_sample =
+                                light.sample_direct(sampler.next3d(), &p_ref, lambda);
                             let light_pdf = light_sample.pdf * light_pdf;
                             if (!indirect_only || depth > 1)
                                 && light_pdf > 0.0
@@ -159,11 +160,12 @@ impl Integrator for PathTracer {
         log::info!("rendering {}spp ...", self.spp);
         let npixels = (scene.camera.resolution().x * scene.camera.resolution().y) as usize;
         let film = Film::new(&scene.camera.resolution());
-        let chunks = (npixels + 255) / 256;
+        let chunk_size = 256;
+        let chunks = (npixels + chunk_size - 1) / chunk_size;
         let progress = crate::util::create_progess_bar(chunks, "chunks");
         let arenas = PerThread::new(|| Bump::new());
 
-        parallel_for(npixels, 256, |id| {
+        parallel_for(npixels, chunk_size, |id| {
             let mut sampler = SobolSampler::new(id as u64);
             let x = (id as u32) % scene.camera.resolution().x;
             let y = (id as u32) / scene.camera.resolution().x;
@@ -193,7 +195,7 @@ impl Integrator for PathTracer {
                 arena.reset();
             }
 
-            if (id + 1) % 256 == 0 {
+            if (id + 1) % chunk_size == 0 {
                 progress.inc(1);
             }
         });

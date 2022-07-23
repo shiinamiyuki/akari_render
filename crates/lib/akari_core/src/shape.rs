@@ -147,12 +147,12 @@ impl Triangle {
         let f = 1.0 / a;
         let s = ray.o - v0;
         let u = f * s.dot(h);
-        if !(u >= 0.0 && u <= 1.0){
+        if !(u >= 0.0 && u <= 1.0) {
             return None;
         }
         let q = s.cross(edge1);
         let v = f * ray.d.dot(q);
-        if !(v >= 0.0 && u + v <= 1.0){
+        if !(v >= 0.0 && u + v <= 1.0) {
             return None;
         }
         let t = f * edge2.dot(q);
@@ -261,7 +261,6 @@ pub struct MeshInstanceProxy {
     pub mesh: Arc<TriangleMesh>,
     pub bsdf: Arc<dyn Bsdf>,
 }
-
 
 impl Shape for MeshInstanceProxy {
     fn intersect(&self, _ray: &Ray, _: Option<Vec3A>) -> Option<RayHit> {
@@ -433,18 +432,18 @@ impl TriangleMesh {
     }
     pub fn triangle(&self, i: usize) -> Triangle {
         let face = self.indices[i];
-        let v0 = self.vertices[face[0] as usize].into();
-        let v1 = self.vertices[face[1] as usize].into();
-        let v2 = self.vertices[face[2] as usize].into();
+        let v0: Vec3 = unsafe { (*self.vertices.get(face[0] as usize).unwrap_unchecked()).into() };
+        let v1: Vec3 = unsafe { (*self.vertices.get(face[1] as usize).unwrap_unchecked()).into() };
+        let v2: Vec3 = unsafe { (*self.vertices.get(face[2] as usize).unwrap_unchecked()).into() };
         Triangle {
             vertices: [v0, v1, v2],
         }
     }
     pub fn shading_triangle<'a>(&self, i: usize) -> ShadingTriangle<'a> {
         let face: UVec3 = self.indices[i].into();
-        let v0: Vec3 = self.vertices[face[0] as usize].into();
-        let v1: Vec3 = self.vertices[face[1] as usize].into();
-        let v2: Vec3 = self.vertices[face[2] as usize].into();
+        let v0: Vec3 = unsafe { (*self.vertices.get(face[0] as usize).unwrap_unchecked()).into() };
+        let v1: Vec3 = unsafe { (*self.vertices.get(face[1] as usize).unwrap_unchecked()).into() };
+        let v2: Vec3 = unsafe { (*self.vertices.get(face[2] as usize).unwrap_unchecked()).into() };
 
         let ng = (v1 - v0).cross(v2 - v0).normalize();
         ShadingTriangle {

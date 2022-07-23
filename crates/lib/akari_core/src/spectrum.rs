@@ -128,6 +128,7 @@ impl SampledWavelengths {
 }
 impl std::ops::Index<usize> for SampledWavelengths {
     type Output = f32;
+    #[inline]
     fn index(&self, index: usize) -> &Self::Output {
         &self.lambda[index]
     }
@@ -138,6 +139,7 @@ pub struct RgbUnboundedSpectrum {
     scale: f32,
 }
 impl Spectrum for RgbUnboundedSpectrum {
+    #[inline]
     fn sample(&self, swl: &SampledWavelengths) -> SampledSpectrum {
         self.spd.sample(swl) * self.scale
     }
@@ -148,6 +150,7 @@ pub struct RgbAlbedoSpectrum {
 }
 
 impl Spectrum for RgbAlbedoSpectrum {
+    #[inline]
     fn sample(&self, swl: &SampledWavelengths) -> SampledSpectrum {
         self.spd.sample(swl)
     }
@@ -205,6 +208,7 @@ where
     }
 }
 impl<F: Function1D + 'static> Spectrum for GenericSpectrum<F> {
+    #[inline]
     fn sample(&self, swl: &SampledWavelengths) -> SampledSpectrum {
         SampledSpectrum::new(vec4(
             self.f.evaluate(swl[0]),
@@ -218,6 +222,7 @@ pub type PiecewiseLinearSpectrum = GenericSpectrum<PiecewiseLinear1D>;
 pub type DenselySampledSpectrum = GenericSpectrum<Dense1D>;
 pub type DenselySampledSpectrum2 = GenericSpectrum<DenseSlice1D>;
 impl PiecewiseLinearSpectrum {
+    #[inline]
     pub fn from_interleaved(xy: &[f32], normalize: bool) -> Self {
         let mut s: Self = PiecewiseLinear1D::from_interleaved(xy).into();
         if !normalize {
@@ -227,6 +232,7 @@ impl PiecewiseLinearSpectrum {
         s.scale(CIE_Y_INTEGRAL / inner_product(&s, &y));
         s
     }
+    #[inline]
     pub fn scale(&mut self, k: f32) {
         self.f.scale(k);
     }
@@ -234,6 +240,7 @@ impl PiecewiseLinearSpectrum {
 pub trait Spectrum: AsAny + Send + Sync {
     fn sample(&self, lambda: &SampledWavelengths) -> SampledSpectrum;
 }
+#[inline]
 pub fn inner_product<F1: Function1D, F2: Function1D>(
     s1: &GenericSpectrum<F1>,
     s2: &GenericSpectrum<F2>,

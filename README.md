@@ -1,10 +1,10 @@
 <h1 align="center">AkariRender</h1>
-<h5 align="center">High Performance CPU/GPU Physically Based Renderer</h5>
+<h5 align="center">High Performance CPU<del>/GPU</del> Physically Based Renderer</h5>
 
 <!-- ![](gallery/beauty4k.png) -->
 ![](gallery/psor.png)
 
-AkariRender is a CPU/GPU physically based renderer written in Rust and Vulkan RTX.
+AkariRender is a CPU<del>/GPU</del> physically based renderer written in Rust and Vulkan RTX.
 Previous version with PPG and SMCMC is in [legacy-cpp](https://github.com/shiinamiyuki/akari_render/tree/legacy-cpp) branch.
 
 
@@ -33,6 +33,6 @@ cargo run --release --bin akr-cli -- -s ./scenes/cbox/cbox.json -r ./scenes/cbox
 # On Mac:
 cargo run --release --bin akr-cli -- -s ./scenes/cbox/cbox.json -r ./scenes/cbox/integrator.json --as qbvh
 
-# GPU Rendering is broken now
+# GPU Rendering is broken now, may or may not be fixed in the forseeable future.
 # cargo run --release --features gpu --bin akr-cli -- -s ./scenes/cbox.json -r ./scenes/integrator.json --gpu
 ```
