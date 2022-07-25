@@ -46,7 +46,7 @@ impl PathTracer {
                     }
                     let p = ray.at(si.t);
                     let bsdf = opt_bsdf.unwrap();
-                    let _profiler = scope("PathTracer::li::<env hit>");
+                    // let _profiler = scope("PathTracer::li::<env hit>");
                     if let Some(light) = scene.get_light_of_shape(shape) {
                         // li += beta * light.le(&ray);
                         if depth == 0 {
@@ -78,7 +78,7 @@ impl PathTracer {
                             }
                         }
                     }
-                    std::mem::drop(_profiler);
+                    // std::mem::drop(_profiler);
 
                     let wo = -ray.d;
 
@@ -87,7 +87,7 @@ impl PathTracer {
                     }
                     depth += 1;
                     {
-                        let _profiler = scope("PathTracer::li::<light sampling>");
+                        // let _profiler = scope("PathTracer::li::<light sampling>");
                         let (light, light_pdf) = scene.light_distr.sample(sampler.next1d());
                         let sample_self = if let Some(light2) = scene.get_light_of_shape(shape) {
                             if light as *const dyn Light == light2 as *const dyn Light {
@@ -131,7 +131,7 @@ impl PathTracer {
                     }
 
                     {
-                        let _profiler = scope("PathTracer::li::<bsdf sampling>");
+                        // let _profiler = scope("PathTracer::li::<bsdf sampling>");
                         if let Some(bsdf_sample) = bsdf.sample(sampler.next2d(), wo) {
                             is_delta = bsdf_sample.flag.contains(BsdfFlags::SPECULAR);
                             let wi = bsdf_sample.wi;
@@ -142,6 +142,12 @@ impl PathTracer {
                         } else {
                             break;
                         }
+                    }
+                    let continue_prob = beta.max_element() * 0.95;
+                    if sampler.next1d() < continue_prob {
+                        beta *= 1.0 / continue_prob;
+                    } else {
+                        break;
                     }
                 } else {
                     break;

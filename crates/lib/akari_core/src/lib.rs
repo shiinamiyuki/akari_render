@@ -101,14 +101,15 @@ impl<T: Any> AsAny for T {
         std::any::type_name::<Self>()
     }
 }
-
+#[inline]
 pub fn downcast_ref<U: 'static, T: AsAny + ?Sized>(obj: &T) -> Option<&U> {
     obj.as_any().downcast_ref::<U>()
 }
-
+#[inline]
 pub fn downcast_mut<U: 'static, T: AsAny + ?Sized>(obj: &mut T) -> Option<&mut U> {
     obj.as_any_mut().downcast_mut::<U>()
 }
+#[inline]
 pub fn find_largest<T, P: FnMut(&T) -> bool>(slice: &[T], pred: P) -> usize {
     let i = slice.partition_point(pred);
     (i - 1).clamp(0, slice.len() - 2)

@@ -124,6 +124,31 @@ impl<T> PerThread<T> {
         unsafe { &mut self.data.get().as_mut().unwrap()[rayon::current_thread_index().unwrap()] }
     }
 }
+pub struct PerThread2<T> {
+    data: UnsafeCell<Vec<T>>,
+}
+unsafe impl<T> Sync for PerThread2<T> {}
+unsafe impl<T> Send for PerThread2<T> {}
+impl<T> PerThread2<T> {
+    pub fn new<F: Fn() -> T>(f: F) -> Self {
+        let num_threads = rayon::current_num_threads();
+        Self {
+            data: UnsafeCell::new((0..num_threads).map(|_| f()).collect()),
+        }
+    }
+    pub fn inner(&mut self) -> &[T] {
+        self.data.get_mut().as_slice()
+    }
+    pub fn inner_mut(&mut self) -> &mut [T] {
+        self.data.get_mut().as_mut_slice()
+    }
+    pub fn get(&self, tid:usize) -> &T {
+        unsafe { &self.data.get().as_ref().unwrap()[tid] }
+    }
+    pub fn get_mut(&self, tid:usize) -> &mut T {
+        unsafe { &mut self.data.get().as_mut().unwrap()[tid] }
+    }
+}
 pub fn clamp_t<T>(val: T, low: T, high: T) -> T
 where
     T: PartialOrd,

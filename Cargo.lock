@@ -362,7 +362,7 @@ checksum = "3f107b87b6afc2a64fd13cac55fe06d6c8859f12d4b14cbcdd2c67d0976781be"
 [[package]]
 name = "embree-sys"
 version = "0.1.0"
-source = "git+https://github.com/shiinamiyuki/embree-sys#2b0c5b9d0d1cdb97934448cb434c13ae544d18e2"
+source = "git+https://github.com/shiinamiyuki/embree-sys#14863b201dd2a93d8b1a223a55c58ffe61a3d4c1"
 
 [[package]]
 name = "encode_unicode"

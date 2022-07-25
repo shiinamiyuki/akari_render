@@ -193,6 +193,12 @@ impl<'a> LocalBsdfClosure for MixBsdfClosure<'a> {
         self.bsdf_a.flags() | self.bsdf_b.flags()
     }
     fn evaluate(&self, wo: Vec3A, wi: Vec3A) -> SampledSpectrum {
+        if self.frac == 0.0 {
+            return self.bsdf_a.evaluate(wo, wi);
+        }
+        if self.frac == 1.0 {
+            return self.bsdf_b.evaluate(wo, wi);
+        }
         SampledSpectrum::lerp(
             self.bsdf_a.evaluate(wo, wi),
             self.bsdf_b.evaluate(wo, wi),
@@ -200,6 +206,12 @@ impl<'a> LocalBsdfClosure for MixBsdfClosure<'a> {
         )
     }
     fn evaluate_pdf(&self, wo: Vec3A, wi: Vec3A) -> f32 {
+        if self.frac == 0.0 {
+            return self.bsdf_a.evaluate_pdf(wo, wi);
+        }
+        if self.frac == 1.0 {
+            return self.bsdf_b.evaluate_pdf(wo, wi);
+        }
         lerp(
             self.bsdf_a.evaluate_pdf(wo, wi),
             self.bsdf_b.evaluate_pdf(wo, wi),
@@ -208,7 +220,7 @@ impl<'a> LocalBsdfClosure for MixBsdfClosure<'a> {
     }
     fn sample(&self, u: Vec2, wo: Vec3A) -> Option<BsdfSample> {
         let frac = self.frac;
-        let prob = (1.0 - frac).clamp(0.0000001, 0.9999999);
+        let prob = (1.0 - frac).clamp(0.0, 1.0);
         if u[0] < prob {
             let remapped_u = vec2(u[0] / prob, u[1]);
             if let Some(sample) = self.bsdf_a.sample(remapped_u, wo) {

@@ -14,7 +14,7 @@ members = [
 
 [profile.dev]
 opt-level = 3
-debug = false
+debug = true
 split-debuginfo = '...'  # Platform-specific.
 debug-assertions = true
 overflow-checks = true
@@ -23,6 +23,10 @@ panic = 'unwind'
 incremental = true
 codegen-units = 256
 rpath = false
+
+[profile.release-with-debuginfo]
+inherits = "release"
+debug = true
 
 [profile.release]
 lto = true

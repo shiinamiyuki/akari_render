@@ -43,16 +43,16 @@ impl EmbreeMeshAccel {
         let device = DEVICE.lock();
         let device = device.0;
         let scene = sys::rtcNewScene(device);
-        let geometry = sys::rtcNewGeometry(device, sys::RTCGeometryType_RTC_GEOMETRY_TYPE_TRIANGLE);
+        let geometry = sys::rtcNewGeometry(device, sys::RTC_GEOMETRY_TYPE_TRIANGLE);
         assert!(std::mem::size_of::<Vec3>() == std::mem::size_of::<[f32; 3]>());
         assert!(std::mem::align_of::<Vec3>() == std::mem::align_of::<[f32; 3]>());
         assert!(std::mem::size_of::<UVec3>() == std::mem::size_of::<[u32; 3]>());
         assert!(std::mem::align_of::<UVec3>() == std::mem::align_of::<[u32; 3]>());
         sys::rtcSetSharedGeometryBuffer(
             geometry,
-            sys::RTCBufferType_RTC_BUFFER_TYPE_VERTEX,
+            sys::RTC_BUFFER_TYPE_VERTEX,
             0,
-            sys::RTCFormat_RTC_FORMAT_FLOAT3,
+            sys::RTC_FORMAT_FLOAT3,
             mesh.vertices.as_ptr() as *const c_void,
             0,
             (3 * std::mem::size_of::<f32>()).try_into().unwrap(),
@@ -60,9 +60,9 @@ impl EmbreeMeshAccel {
         );
         sys::rtcSetSharedGeometryBuffer(
             geometry,
-            sys::RTCBufferType_RTC_BUFFER_TYPE_INDEX,
+            sys::RTC_BUFFER_TYPE_INDEX,
             0,
-            sys::RTCFormat_RTC_FORMAT_UINT3,
+            sys::RTC_FORMAT_UINT3,
             mesh.indices.as_ptr() as *const c_void,
             0,
             (3 * std::mem::size_of::<u32>()).try_into().unwrap(),
@@ -117,7 +117,7 @@ impl EmbreeInstance {
         init_device();
         let device = DEVICE.lock();
         let device = device.0;
-        let geometry = sys::rtcNewGeometry(device, sys::RTCGeometryType_RTC_GEOMETRY_TYPE_INSTANCE);
+        let geometry = sys::rtcNewGeometry(device, sys::RTC_GEOMETRY_TYPE_INSTANCE);
         sys::rtcSetGeometryInstancedScene(geometry, base);
         sys::rtcCommitGeometry(geometry);
         let scene = sys::rtcNewScene(device);
@@ -168,7 +168,7 @@ impl Shape for EmbreeInstance {
                 },
             };
             let mut ctx = RTCIntersectContext {
-                flags: sys::RTCIntersectContextFlags_RTC_INTERSECT_CONTEXT_FLAG_INCOHERENT,
+                flags: sys::RTC_INTERSECT_CONTEXT_FLAG_INCOHERENT,
                 filter: None,
                 instID: [u32::MAX],
             };
@@ -197,7 +197,7 @@ impl Shape for EmbreeInstance {
         unsafe {
             let mut ray = to_rtc_ray(ray);
             let mut ctx = RTCIntersectContext {
-                flags: sys::RTCIntersectContextFlags_RTC_INTERSECT_CONTEXT_FLAG_INCOHERENT,
+                flags: sys::RTC_INTERSECT_CONTEXT_FLAG_INCOHERENT,
                 filter: None,
                 instID: [u32::MAX],
             };
@@ -320,7 +320,7 @@ impl accel::Accel for EmbreeTopLevelAccel {
             },
         };
         let mut ctx = RTCIntersectContext {
-            flags: sys::RTCIntersectContextFlags_RTC_INTERSECT_CONTEXT_FLAG_INCOHERENT,
+            flags: sys::RTC_INTERSECT_CONTEXT_FLAG_INCOHERENT,
             filter: None,
             instID: [u32::MAX],
         };
@@ -378,7 +378,7 @@ impl accel::Accel for EmbreeTopLevelAccel {
                 },
             };
             let mut ctx = RTCIntersectContext {
-                flags: sys::RTCIntersectContextFlags_RTC_INTERSECT_CONTEXT_FLAG_INCOHERENT,
+                flags: sys::RTC_INTERSECT_CONTEXT_FLAG_INCOHERENT,
                 filter: None,
                 instID: [u32::MAX],
             };
@@ -402,7 +402,7 @@ impl accel::Accel for EmbreeTopLevelAccel {
         let _profiler = scope("EmbreeTopLevelAccel::occlude4");
         let mut ray4 = to_rtc_ray4(rays);
         let mut ctx = RTCIntersectContext {
-            flags: sys::RTCIntersectContextFlags_RTC_INTERSECT_CONTEXT_FLAG_INCOHERENT,
+            flags: sys::RTC_INTERSECT_CONTEXT_FLAG_INCOHERENT,
             filter: None,
             instID: [u32::MAX],
         };
@@ -431,7 +431,7 @@ impl accel::Accel for EmbreeTopLevelAccel {
         unsafe {
             let mut ray = to_rtc_ray(ray);
             let mut ctx = RTCIntersectContext {
-                flags: sys::RTCIntersectContextFlags_RTC_INTERSECT_CONTEXT_FLAG_INCOHERENT,
+                flags: sys::RTC_INTERSECT_CONTEXT_FLAG_INCOHERENT,
                 filter: None,
                 instID: [u32::MAX],
             };
