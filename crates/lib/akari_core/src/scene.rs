@@ -1,3 +1,5 @@
+use akari_utils::StatCounter;
+
 use crate::accel;
 use crate::accel::Accel;
 use crate::camera::*;
@@ -13,9 +15,10 @@ pub struct Scene {
     pub camera: Arc<dyn Camera>,
     pub lights: Vec<Arc<dyn Light>>,
     pub light_distr: Arc<dyn LightDistribution>,
-    pub ray_counter: AtomicU64,
+    pub ray_counter: StatCounter,
     pub shape_to_light: HashMap<usize, Arc<dyn Light>>,
     pub meshes: Vec<Arc<TriangleMesh>>,
+    pub enable_ray_counter: bool,
 }
 
 impl Scene {
@@ -52,13 +55,14 @@ impl Scene {
         }
 
         Self {
-            ray_counter: AtomicU64::new(0),
+            ray_counter: StatCounter::new(),
             camera,
             lights: lights.clone(),
             shape_to_light,
             light_distr: Arc::new(PowerLightDistribution::new(lights)),
             accel: toplevel,
             meshes,
+            enable_ray_counter: false,
         }
     }
     pub fn get_light_of_shape<'a>(&'a self, shape: &dyn Shape) -> Option<&'a dyn Light> {
@@ -72,15 +76,13 @@ impl Scene {
         }
     }
     pub fn intersect<'a>(&'a self, ray: &Ray) -> Option<SurfaceInteraction<'a>> {
-        // self.ray_counter
-        //     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        if self.enable_ray_counter { self.ray_counter.inc(1); }
         self.accel
             .intersect(ray)
             .map(|hit| self.accel.hit_to_iteraction(hit))
     }
     pub fn occlude(&self, ray: &Ray) -> bool {
-        // self.ray_counter
-        //     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        if self.enable_ray_counter { self.ray_counter.inc(1); }
         self.accel.occlude(ray)
     }
 }

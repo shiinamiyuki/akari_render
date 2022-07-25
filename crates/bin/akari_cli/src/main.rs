@@ -36,6 +36,7 @@ struct AppOptions {
     pub algorithm: Option<String>,
     pub accel: Option<String>,
     pub launch_as_remote: bool,
+    pub print_stats: bool,
 }
 
 fn usage() -> String {
@@ -58,6 +59,7 @@ Options:
     -o, --output file       output file, overrides settings in <RENDEDER FILE>
     -t, --threads count     specifiy number of threads
     -q, --quiet             suppress all loggings except error
+    --stats                print statistics after rendering
     
 
     Miscellaneous:
@@ -110,7 +112,7 @@ fn render_main(options: AppOptions) {
             "bvh".into()
         });
     let ooc = OocOptions { enable_ooc: false };
-    let scene = if let Some(scene) = &options.scene {
+    let mut scene = if let Some(scene) = &options.scene {
         let path = Path::new(scene);
         api::load_scene::<LocalFileResolver>(path, false, accel.as_str(), ooc)
     } else {
@@ -121,6 +123,7 @@ fn render_main(options: AppOptions) {
         log::error!("scene has no light!");
         exit(1);
     }
+    scene.enable_ray_counter = options.print_stats;
     let output = options.output.clone().unwrap_or("out.png".into());
     let mut integrator = if let Some(algorithm) = &options.algorithm {
         let path = Path::new(algorithm);
@@ -133,11 +136,13 @@ fn render_main(options: AppOptions) {
     log::info!("rendering with {} threads", rayon::current_num_threads());
     let (film, time) = profile_fn(|| -> Film { integrator.as_mut().render(&scene) });
     log::info!("took {}s", time);
-    log::info!(
-        "traced {} rays, average {}M rays/s",
-        scene.ray_counter.load(std::sync::atomic::Ordering::Relaxed),
-        scene.ray_counter.load(std::sync::atomic::Ordering::Relaxed) as f64 / 1e6 / time,
-    );
+    if scene.enable_ray_counter {
+        log::info!(
+            "traced {} rays, average {}M rays/s",
+            scene.ray_counter.counts(),
+            scene.ray_counter.counts() as f64 / 1e6 / time,
+        );
+    }
     // if profiling {
     //     akari::util::profile::print_stats();
     // }
@@ -190,7 +195,10 @@ fn parse_options(args: Vec<String>) -> AppOptions {
             options.num_threads = Some(threads);
         } else if let Some(output) = parse_str!("--output", "-o") {
             options.output = Some(output);
-        }else {
+        } else if args[pos] == "--stats" {
+            pos += 1;
+            options.print_stats = true;
+        } else {
             eprintln!("unrecognized option {}", args[pos]);
             exit(-1);
         }
@@ -355,8 +363,8 @@ fn main() {
 //         log::info!("took {}s", time);
 //         log::info!(
 //             "traced {} rays, average {}M rays/s",
-//             scene.ray_counter.load(std::sync::atomic::Ordering::Relaxed),
-//             scene.ray_counter.load(std::sync::atomic::Ordering::Relaxed) as f64 / 1e6 / time,
+//             scene.ray_counter.counts(),
+//             scene.ray_counter.counts() as f64 / 1e6 / time,
 //         );
 //         if profiling {
 //             akari::util::profile::print_stats();

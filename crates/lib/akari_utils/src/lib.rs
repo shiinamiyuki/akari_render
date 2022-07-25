@@ -9,7 +9,7 @@ use std::{
     cell::UnsafeCell,
     marker::PhantomData,
     path::PathBuf,
-    sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering},
+    sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering},
 };
 pub mod arrayvec;
 pub mod radix_sort;
@@ -124,29 +124,27 @@ impl<T> PerThread<T> {
         unsafe { &mut self.data.get().as_mut().unwrap()[rayon::current_thread_index().unwrap()] }
     }
 }
-pub struct PerThread2<T> {
-    data: UnsafeCell<Vec<T>>,
+pub struct StatCounter {
+    counters: Vec<AtomicU64>,
 }
-unsafe impl<T> Sync for PerThread2<T> {}
-unsafe impl<T> Send for PerThread2<T> {}
-impl<T> PerThread2<T> {
-    pub fn new<F: Fn() -> T>(f: F) -> Self {
+impl StatCounter {
+    #[inline]
+    pub fn new() -> Self {
         let num_threads = rayon::current_num_threads();
         Self {
-            data: UnsafeCell::new((0..num_threads).map(|_| f()).collect()),
+            counters: (0..num_threads).map(|_| AtomicU64::new(0)).collect(),
         }
     }
-    pub fn inner(&mut self) -> &[T] {
-        self.data.get_mut().as_slice()
+    #[inline]
+    pub fn inc(&self, val: u64) {
+        self.counters[rayon::current_thread_index().unwrap()].fetch_add(val, Ordering::Relaxed);
     }
-    pub fn inner_mut(&mut self) -> &mut [T] {
-        self.data.get_mut().as_mut_slice()
-    }
-    pub fn get(&self, tid:usize) -> &T {
-        unsafe { &self.data.get().as_ref().unwrap()[tid] }
-    }
-    pub fn get_mut(&self, tid:usize) -> &mut T {
-        unsafe { &mut self.data.get().as_mut().unwrap()[tid] }
+    #[inline]
+    pub fn counts(&self) -> u64 {
+        self.counters
+            .iter()
+            .map(|c| c.load(Ordering::Relaxed))
+            .sum()
     }
 }
 pub fn clamp_t<T>(val: T, low: T, high: T) -> T
@@ -426,6 +424,7 @@ pub fn parallel_for<F: Fn(usize) -> () + Sync>(count: usize, chunk_size: usize, 
         }
     });
 }
+
 #[allow(dead_code)]
 pub fn parallel_for_slice<T, F: Fn(usize, &mut T) -> () + Sync>(
     slice: &mut [T],

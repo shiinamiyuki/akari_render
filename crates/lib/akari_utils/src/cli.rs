@@ -41,6 +41,7 @@ pub fn parse_str_to_args(s: &str) -> Vec<String> {
     }
     args
 }
+
 pub fn parse_arg<T: FromStr>(
     args: &[String],
     pos: &mut usize,
