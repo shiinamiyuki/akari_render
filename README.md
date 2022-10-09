@@ -1,5 +1,6 @@
 <h1 align="center">AkariRender</h1>
 <h5 align="center">High Performance CPU<del>/GPU</del> Physically Based Renderer</h5>
+<h5 align="center"> ⚠ A new version based on <a href=https://github.com/LuisaGroup/luisa-compute-rs>LuisaCompute</a> would be updated soon! ⚠ </h5>
 
 <!-- ![](gallery/beauty4k.png) -->
 ![](gallery/psor.png)
