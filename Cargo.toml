@@ -1,21 +1,37 @@
-[workspace]
-members = [
-  "crates/lib/akari_common",
-  "crates/lib/akari_core",
-  "crates/lib/akari_utils",
-  "crates/lib/akari_const",
-  "crates/lib/akari_integrators",
-  "crates/lib/akari",
-  "crates/bin/akari_cli",
-  "crates/bin/akari_import",
-  "crates/bin/akari_verify",
-  "crates/bin/akari_sync"
-]
+[package]
+name = "akari_render"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# luisa_compute = { git = "https://github.com/LuisaGroup/luisa-compute-rs.git", branch="next"}
+luisa_compute = { path = "../luisa-compute-rs/luisa_compute" }
+serde = {version = "1", features = ["derive"]}
+serde_json = "1"
+hexf = "0.2.1"
+indicatif = "0.16.2"
+lazy_static = "1.4"
+parking_lot = "0.12"
+image = "0.24.3"
+rand = "0.8.5"
+tobj = "3.2.3"
+exr = "1.5.0"
+
+[[bin]]
+name="akari_import"
+path="src/bin/akari_import.rs"
+
+[[bin]]
+name="akari_cli"
+path="src/bin/akari_cli.rs"
+
+
 
 [profile.dev]
 opt-level = 3
 debug = true
-split-debuginfo = '...'  # Platform-specific.
 debug-assertions = true
 overflow-checks = true
 lto = false
