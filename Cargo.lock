@@ -42,6 +42,7 @@ dependencies = [
 name = "akari_render"
 version = "0.1.0"
 dependencies = [
+ "clap",
  "exr",
  "hexf",
  "image",
