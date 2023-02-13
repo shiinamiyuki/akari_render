@@ -13,3 +13,4 @@ pub mod surface;
 pub mod texture;
 pub mod volume;
 pub mod scene;
+pub mod util;
