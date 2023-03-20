@@ -1,4 +1,10 @@
-use crate::{*, geometry::{ShadingTriangle, Frame}, scene::Scene, color::ColorRepr};
+use crate::{
+    color::ColorRepr,
+    geometry::{Frame, ShadingTriangle},
+    scene::Scene,
+    texture::{ColorTexture, ColorTextureRef, FloatTextureRef, FloatTexture},
+    *,
+};
 #[derive(Clone, Copy, Debug, Value)]
 #[repr(C)]
 pub struct SurfacePoint {
@@ -27,14 +33,28 @@ pub struct SurfaceInteraction {
     pub triangle: ShadingTriangle,
 }
 
-
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum TransportMode {
     LightToEye,
     EyeToLight,
 }
 
+#[derive(Clone)]
 pub struct ShadingContext<'a> {
     pub scene: &'a Scene,
     pub color_repr: ColorRepr,
+}
+impl<'a> ShadingContext<'a> {
+    pub fn color_texture(
+        &self,
+        tex: Expr<ColorTextureRef>,
+    ) -> PolymorphicRef<'a, dyn ColorTexture> {
+        self.scene.color_textures.get(tex.tag(), tex.index())
+    }
+    pub fn float_texture(
+        &self,
+        tex: Expr<FloatTextureRef>,
+    ) -> PolymorphicRef<'a, dyn FloatTexture> {
+        self.scene.float_textures.get(tex.tag(), tex.index())
+    }
 }
