@@ -3,8 +3,8 @@ pub trait Light {}
 
 
 pub trait LightDistribution {
-    fn sample(&self, u: Expr<Vec2>) -> (Uint32, Float32);
-    fn pdf(&self, light_index: Uint32) -> Float32;
+    fn sample(&self, u: Expr<Float2>) -> (Uint, Float);
+    fn pdf(&self, light_index: Uint) -> Float;
 }
 
 pub struct WeightedDistribution {
@@ -12,10 +12,10 @@ pub struct WeightedDistribution {
 }
 
 impl LightDistribution for WeightedDistribution {
-    fn sample(&self, u: Expr<Vec2>) -> (Uint32, Float32) {
+    fn sample(&self, u: Expr<Float2>) -> (Uint, Float) {
         self.alias_table.sample(u)
     }
-    fn pdf(&self, light_index: Uint32) -> Float32 {
+    fn pdf(&self, light_index: Uint) -> Float {
         self.alias_table.pdf(light_index)
     }
 }

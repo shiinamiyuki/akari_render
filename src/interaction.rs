@@ -2,25 +2,25 @@ use crate::{*, geometry::{ShadingTriangle, Frame}, scene::Scene, color::ColorRep
 #[derive(Clone, Copy, Debug, Value)]
 #[repr(C)]
 pub struct SurfacePoint {
-    pub p: Vec3,
-    pub n: Vec3,
+    pub p: Float3,
+    pub n: Float3,
 }
 #[derive(Clone, Copy, Debug, Value)]
 #[repr(C)]
 pub struct SurfaceLocalGeometry {
-    pub p: Vec3,
-    pub ng: Vec3,
-    pub ns: Vec3,
-    pub uv: Vec2,
-    pub dpdu: Vec3,
-    pub dpdv: Vec3,
+    pub p: Float3,
+    pub ng: Float3,
+    pub ns: Float3,
+    pub uv: Float2,
+    pub dpdu: Float3,
+    pub dpdv: Float3,
 }
 
 #[derive(Clone, Copy, Debug, Value)]
 #[repr(C)]
 pub struct SurfaceInteraction {
     pub geometry: SurfaceLocalGeometry,
-    pub uv: Vec2,
+    pub uv: Float2,
     pub prim_id: u32,
     pub inst_id: u32,
     pub frame: Frame,

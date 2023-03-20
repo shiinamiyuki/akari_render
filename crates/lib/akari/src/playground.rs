@@ -1,5 +1,0 @@
-use akari::*;
-
-fn main(){
-
-}

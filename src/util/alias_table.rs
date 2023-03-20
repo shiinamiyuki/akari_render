@@ -57,10 +57,10 @@ impl AliasTable {
                 .unwrap(),
         )
     }
-    pub fn pdf(&self, i: Uint32) -> Float32 {
+    pub fn pdf(&self, i: Uint) -> Float {
         self.1.var().read(i)
     }
-    pub fn sample(&self, u: Expr<Vec2>) -> (Uint32, Float32) {
+    pub fn sample(&self, u: Expr<Float2>) -> (Uint, Float) {
         let idx = (u.x() * self.0.len() as f32).uint();
         let idx = idx.min(self.0.len() as u32 - 1);
         let entry = self.0.var().read(idx);

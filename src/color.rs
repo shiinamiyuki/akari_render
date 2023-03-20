@@ -6,12 +6,12 @@ pub mod colorspace {
 }
 #[derive(Aggregate, Clone)]
 pub struct SampledWavelengths {
-    pub lambda: Vec<Float32>,
-    pub pdf: Vec<Cell<Float32>>,
+    pub lambda: Vec<Float>,
+    pub pdf: Vec<Cell<Float>>,
 }
 
 impl SampledWavelengths {
-    pub fn new(lambda: Vec<Float32>, pdf: Vec<Cell<Float32>>) -> Self {
+    pub fn new(lambda: Vec<Float>, pdf: Vec<Cell<Float>>) -> Self {
         Self { lambda, pdf }
     }
     pub fn is_empty(&self) -> bool {
@@ -23,7 +23,7 @@ impl SampledWavelengths {
 }
 #[derive(Aggregate, Clone)]
 pub struct SampledSpectrum {
-    pub samples:Vec<Float32>,
+    pub samples:Vec<Float>,
     pub wavelengths: SampledWavelengths,
 }
 #[derive(Aggregate, Clone)]
@@ -34,6 +34,6 @@ pub enum ColorRepr {
 
 #[derive(Aggregate, Clone)]
 pub enum Color {
-    Rgb(Expr<Vec3>),
+    Rgb(Expr<Float3>),
     Spectral(SampledSpectrum)
 }
