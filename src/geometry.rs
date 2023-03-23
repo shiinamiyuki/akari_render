@@ -1,5 +1,10 @@
 use crate::*;
-
+#[derive(Clone, Copy, Debug, Value)]
+#[repr(C)]
+pub struct PointNormal {
+    pub p:Float3,
+    pub n:Float3
+}
 #[derive(Clone, Copy, Debug, Value)]
 #[repr(C)]
 pub struct Ray {
@@ -35,6 +40,20 @@ pub struct ShadingTriangle {
     pub ns0: Float3,
     pub ns1: Float3,
     pub ns2: Float3,
+    pub ng: Float3,
+}
+
+impl ShadingTriangleExpr {
+    pub fn p(&self, bary: Expr<Float2>) -> Expr<Float3> {
+        (1.0 - bary.x() - bary.y()) * self.v0() + bary.x() * self.v1() + bary.y() * self.v2()
+    }
+    pub fn n(&self, bary: Expr<Float2>) -> Expr<Float3> {
+        ((1.0 - bary.x() - bary.y()) * self.ns0() + bary.x() * self.ns1() + bary.y() * self.ns2())
+            .normalize()
+    }
+    pub fn tc(&self, bary: Expr<Float2>) -> Expr<Float2> {
+        (1.0 - bary.x() - bary.y()) * self.tc0() + bary.x() * self.tc1() + bary.y() * self.tc2()
+    }
 }
 
 #[derive(Clone, Copy, Debug, Value)]
@@ -106,6 +125,25 @@ pub struct AffineTransform {
     pub m_inv: Mat4,
     pub m3: Mat3,
     pub m3_inv: Mat3,
+}
+impl AffineTransform {
+    pub fn from_matrix(m: &glam::Mat4) -> Self {
+        let m3 = glam::Mat3::from_mat4(*m);
+        Self {
+            m: (*m).into(),
+            m_inv: m.inverse().into(),
+            m3: m3.into(),
+            m3_inv: m3.inverse().into(),
+        }
+    }
+    pub fn inverse(&self) -> Self {
+        Self {
+            m: self.m_inv,
+            m_inv: self.m,
+            m3: self.m3_inv,
+            m3_inv: self.m3,
+        }
+    }
 }
 impl AffineTransformExpr {
     pub fn transform_point(&self, p: Expr<Float3>) -> Expr<Float3> {

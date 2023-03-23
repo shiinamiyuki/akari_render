@@ -69,3 +69,35 @@ impl AliasTable {
         (idx, pdf)
     }
 }
+
+#[cfg(test)]
+mod test {
+   
+
+    use rand::{thread_rng, Rng};
+
+    use super::*;
+
+    #[test]
+    fn alias_table() {
+        use luisa::create_cpu_device;
+        let mut rng = thread_rng();
+        let mut weights = (0..100).map(|_| rng.gen::<f32>()).collect::<Vec<_>>();
+        let sum = weights.iter().sum::<f32>();
+        weights.iter_mut().for_each(|x| *x /= sum);
+        let device = create_cpu_device().unwrap();
+        let table = AliasTable::new(device.clone(), &weights);
+        let entries = table.0.copy_to_vec();
+        let mut h = vec![0.0f32; weights.len()];
+        for (i, e) in entries.iter().enumerate() {
+            let t = e.t;
+            let j = e.j as usize;
+            h[i] += t;
+            h[j] += 1.0 - t;
+        }
+        h.iter_mut().for_each(|x| *x /= weights.len() as f32);
+        for (a, b) in h.iter().zip(weights.iter()) {
+            assert!((a - b).abs() < 1e-3);
+        }
+    }
+}

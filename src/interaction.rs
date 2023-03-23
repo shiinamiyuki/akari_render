@@ -2,7 +2,7 @@ use crate::{
     color::ColorRepr,
     geometry::{Frame, ShadingTriangle},
     scene::Scene,
-    texture::{ColorTexture, ColorTextureRef, FloatTextureRef, FloatTexture},
+    texture::Texture,
     *,
 };
 #[derive(Clone, Copy, Debug, Value)]
@@ -17,6 +17,7 @@ pub struct SurfaceLocalGeometry {
     pub p: Float3,
     pub ng: Float3,
     pub ns: Float3,
+    // uv in UV mapping
     pub uv: Float2,
     pub dpdu: Float3,
     pub dpdv: Float3,
@@ -26,13 +27,13 @@ pub struct SurfaceLocalGeometry {
 #[repr(C)]
 pub struct SurfaceInteraction {
     pub geometry: SurfaceLocalGeometry,
-    pub uv: Float2,
+    pub bary: Float2,
     pub prim_id: u32,
     pub inst_id: u32,
     pub frame: Frame,
     pub triangle: ShadingTriangle,
+    pub valid: bool,
 }
-
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum TransportMode {
     LightToEye,
@@ -47,14 +48,14 @@ pub struct ShadingContext<'a> {
 impl<'a> ShadingContext<'a> {
     pub fn color_texture(
         &self,
-        tex: Expr<ColorTextureRef>,
-    ) -> PolymorphicRef<'a, dyn ColorTexture> {
-        self.scene.color_textures.get(tex.tag(), tex.index())
+        tex: Expr<TagIndex>,
+    ) -> PolymorphicRef<'a, PolyKey, dyn ColorTexture> {
+        self.scene.color_textures.get(tex)
     }
     pub fn float_texture(
         &self,
-        tex: Expr<FloatTextureRef>,
-    ) -> PolymorphicRef<'a, dyn FloatTexture> {
-        self.scene.float_textures.get(tex.tag(), tex.index())
+        tex: Expr<TagIndex>,
+    ) -> PolymorphicRef<'a, PolyKey, dyn FloatTexture> {
+        self.scene.float_textures.get(tex)
     }
 }

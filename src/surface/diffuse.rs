@@ -1,16 +1,16 @@
 use std::f32::consts::FRAC_1_PI;
 
+use crate::color::Color;
 use crate::geometry::Frame;
 use crate::interaction::ShadingContext;
 use crate::sampling::cos_sample_hemisphere;
 use crate::*;
-use crate::{color::Color, texture::ColorTextureRef};
 
 use super::{Bsdf, BsdfSample, Surface};
 #[derive(Debug, Clone, Copy, Value)]
 #[repr(C)]
 pub struct DiffuseSurface {
-    pub reflectance: ColorTextureRef,
+    pub reflectance: TagIndex,
 }
 pub struct DiffuseBsdf {
     pub reflectance: Color,
@@ -61,7 +61,7 @@ impl Surface for DiffuseSurfaceExpr {
         ctx: &ShadingContext<'_>,
     ) -> Box<dyn Bsdf> {
         let reflectance = ctx.color_texture(self.reflectance());
-        let reflectance = reflectance.dispatch(|tex| tex.evaluate(si, ctx));
+        let reflectance = reflectance.dispatch(|_, _, tex| tex.evaluate(si, ctx));
         Box::new(DiffuseBsdf { reflectance })
     }
 }

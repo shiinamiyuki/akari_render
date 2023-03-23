@@ -7,8 +7,6 @@ pub mod node {
     #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
     #[serde(rename_all = "snake_case")]
     pub enum CoordinateSystem {
-        // RightHandYUp,
-        // RightHandZUp,
         Akari,   //RightHandYUp
         Blender, //RightHandZUp
     }
@@ -91,6 +89,7 @@ pub mod node {
     #[derive(Clone, Serialize, Deserialize)]
     #[serde(tag = "type")]
     pub enum SpectrumTexture {
+        Float(f32),
         #[serde(rename = "linear")]
         SRgbLinear { values: [f32; 3] },
         #[serde(rename = "srgb")]
@@ -201,76 +200,5 @@ pub mod node {
         pub shapes: Vec<Shape>,
         // #[serde(default = "Vec::new")]
         // pub shaders: Vec<ShaderGraph>,
-    }
-    impl Bsdf {
-        pub fn foreach_texture<F: FnMut(GenericTextureRefMut<'_>)>(&mut self, mut f: F) {
-            match self {
-                Bsdf::Diffuse { color } => f(GenericTextureRefMut::Spectrum(color)),
-                Bsdf::Glass { kr, kt, .. } => {
-                    f(GenericTextureRefMut::Spectrum(kr));
-                    f(GenericTextureRefMut::Spectrum(kt));
-                }
-                Bsdf::Principled {
-                    color,
-                    subsurface,
-                    subsurface_radius,
-                    subsurface_color,
-                    subsurface_ior,
-                    metallic,
-                    specular,
-                    specular_tint,
-                    roughness,
-                    anisotropic,
-                    anisotropic_rotation,
-                    sheen,
-                    sheen_tint,
-                    clearcoat,
-                    clearcoat_roughness,
-                    ior,
-                    transmission,
-                    emission,
-                } => {
-                    f(GenericTextureRefMut::Spectrum(color));
-                    f(GenericTextureRefMut::Float(subsurface));
-                    f(GenericTextureRefMut::Spectrum(subsurface_radius));
-                    f(GenericTextureRefMut::Spectrum(subsurface_color));
-                    f(GenericTextureRefMut::Float(subsurface_ior));
-                    f(GenericTextureRefMut::Float(metallic));
-                    f(GenericTextureRefMut::Float(specular));
-                    f(GenericTextureRefMut::Float(specular_tint));
-                    f(GenericTextureRefMut::Float(roughness));
-                    f(GenericTextureRefMut::Float(anisotropic));
-                    f(GenericTextureRefMut::Float(anisotropic_rotation));
-                    f(GenericTextureRefMut::Float(sheen));
-                    f(GenericTextureRefMut::Float(sheen_tint));
-                    f(GenericTextureRefMut::Float(clearcoat));
-                    f(GenericTextureRefMut::Float(clearcoat_roughness));
-                    f(GenericTextureRefMut::Float(ior));
-                    f(GenericTextureRefMut::Float(transmission));
-                    f(GenericTextureRefMut::Spectrum(emission));
-                }
-            }
-        }
-    }
-    impl Scene {
-        pub fn foreach_ext_files<F: FnMut(&mut String)>(&mut self, mut f: F) {
-            for shape in &mut self.shapes {
-                match shape {
-                    Shape::Mesh { path, .. } => f(path),
-                }
-            }
-            for (_, bsdf) in &mut self.bsdfs {
-                bsdf.foreach_texture(|tex| match tex {
-                    GenericTextureRefMut::Float(tex) => match tex {
-                        FloatTexture::Image(img) => f(img),
-                        _ => {}
-                    },
-                    GenericTextureRefMut::Spectrum(tex) => match tex {
-                        SpectrumTexture::Image { path, .. } => f(path),
-                        _ => {}
-                    },
-                });
-            }
-        }
     }
 }
