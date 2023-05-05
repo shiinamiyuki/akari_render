@@ -37,7 +37,7 @@ pub fn create_progess_bar(count: usize, what: &str) -> ProgressBarWrapper {
         progress.set_draw_target(ProgressDrawTarget::stdout_with_hz(2));
         progress.set_style(
             ProgressStyle::default_bar()
-                .template(&template)
+                .template(&template).unwrap()
                 .progress_chars("=>-"),
         );
         ProgressBarWrapper {

@@ -52,9 +52,9 @@ pub mod node {
     #[serde(tag = "type")]
     pub enum ShaderGraphNode {
         #[serde(rename = "float")]
-        Float(FloatTexture),
+        Float(Texture),
         #[serde(rename = "spectrum")]
-        Spectrum(SpectrumTexture),
+        Spectrum(Texture),
         #[serde(rename = "mix")]
         Mix {
             frac: String,
@@ -72,23 +72,8 @@ pub mod node {
         pub cache: Option<String>,
     }
     #[derive(Clone, Serialize, Deserialize)]
-    pub struct TextureCache {
-        pub path: String,
-    }
-    #[derive(Clone, Serialize, Deserialize)]
-    #[serde(untagged)]
-    pub enum FloatTexture {
-        Float(f32),
-        Image(String),
-        CachedImage {
-            path: String,
-            #[serde(default)]
-            cache: Option<TextureCache>,
-        },
-    }
-    #[derive(Clone, Serialize, Deserialize)]
     #[serde(tag = "type")]
-    pub enum SpectrumTexture {
+    pub enum Texture {
         Float(f32),
         #[serde(rename = "linear")]
         SRgbLinear { values: [f32; 3] },
@@ -101,8 +86,6 @@ pub mod node {
             path: String,
             #[serde(default = "default_colorspace")]
             colorspace: String,
-            #[serde(default)]
-            cache: Option<TextureCache>,
         },
     }
     fn default_ior() -> f32 {
@@ -115,36 +98,36 @@ pub mod node {
     #[serde(tag = "type")]
     pub enum Bsdf {
         #[serde(rename = "diffuse")]
-        Diffuse { color: SpectrumTexture },
+        Diffuse { color: Texture },
         #[serde(rename = "glass")]
         Glass {
             #[serde(default = "default_ior")]
             ior: f32,
             #[serde(default = "default_dispersion")]
             dispersion: f32,
-            kr: SpectrumTexture,
-            kt: SpectrumTexture,
+            kr: Texture,
+            kt: Texture,
         },
         #[serde(rename = "principled")]
         Principled {
-            color: SpectrumTexture,
-            subsurface: FloatTexture,
-            subsurface_radius: SpectrumTexture,
-            subsurface_color: SpectrumTexture,
-            subsurface_ior: FloatTexture,
-            metallic: FloatTexture,
-            specular: FloatTexture,
-            specular_tint: FloatTexture,
-            roughness: FloatTexture,
-            anisotropic: FloatTexture,
-            anisotropic_rotation: FloatTexture,
-            sheen: FloatTexture,
-            sheen_tint: FloatTexture,
-            clearcoat: FloatTexture,
-            clearcoat_roughness: FloatTexture,
-            ior: FloatTexture,
-            transmission: FloatTexture,
-            emission: SpectrumTexture,
+            color: Texture,
+            subsurface: Texture,
+            subsurface_radius: Texture,
+            subsurface_color: Texture,
+            subsurface_ior: Texture,
+            metallic: Texture,
+            specular: Texture,
+            specular_tint: Texture,
+            roughness: Texture,
+            anisotropic: Texture,
+            anisotropic_rotation: Texture,
+            sheen: Texture,
+            sheen_tint: Texture,
+            clearcoat: Texture,
+            clearcoat_roughness: Texture,
+            ior: Texture,
+            transmission: Texture,
+            emission: Texture,
         },
     }
 
@@ -165,12 +148,12 @@ pub mod node {
         #[serde(rename = "point")]
         Point {
             pos: [f32; 3],
-            emission: SpectrumTexture,
+            emission: Texture,
         },
         #[serde(rename = "spot")]
         Spot {
             transform: Transform,
-            emission: SpectrumTexture,
+            emission: Texture,
             falloff: f32,
             max_angle: f32,
         },
@@ -189,8 +172,8 @@ pub mod node {
     }
 
     pub enum GenericTextureRefMut<'a> {
-        Float(&'a mut FloatTexture),
-        Spectrum(&'a mut SpectrumTexture),
+        Float(&'a mut Texture),
+        Spectrum(&'a mut Texture),
     }
     #[derive(Clone, Serialize, Deserialize)]
     pub struct Scene {

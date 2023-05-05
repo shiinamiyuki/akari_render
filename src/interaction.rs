@@ -1,3 +1,4 @@
+use crate::color::Color;
 use crate::{
     color::ColorRepr,
     geometry::{Frame, ShadingTriangle},
@@ -5,6 +6,7 @@ use crate::{
     texture::Texture,
     *,
 };
+
 #[derive(Clone, Copy, Debug, Value)]
 #[repr(C)]
 pub struct SurfacePoint {
@@ -35,7 +37,7 @@ pub struct SurfaceInteraction {
     pub valid: bool,
 }
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum TransportMode {
+pub enum TransportDirection {
     LightToEye,
     EyeToLight,
 }
@@ -46,16 +48,13 @@ pub struct ShadingContext<'a> {
     pub color_repr: ColorRepr,
 }
 impl<'a> ShadingContext<'a> {
-    pub fn color_texture(
-        &self,
-        tex: Expr<TagIndex>,
-    ) -> PolymorphicRef<'a, PolyKey, dyn ColorTexture> {
-        self.scene.color_textures.get(tex)
+    pub fn texture(&self, tex: Expr<TagIndex>) -> PolymorphicRef<'a, PolyKey, dyn Texture> {
+        self.scene.textures.get(tex)
     }
-    pub fn float_texture(
-        &self,
-        tex: Expr<TagIndex>,
-    ) -> PolymorphicRef<'a, PolyKey, dyn FloatTexture> {
-        self.scene.float_textures.get(tex)
+    pub fn color_from_float4(&self, v: Expr<Float4>) -> Color {
+        match self.color_repr {
+            ColorRepr::Rgb => Color::Rgb(v.xyz()),
+            ColorRepr::Spectral(_) => todo!(),
+        }
     }
 }

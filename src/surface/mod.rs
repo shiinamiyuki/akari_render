@@ -25,6 +25,7 @@ pub trait Bsdf {
     ) -> BsdfSample;
     fn pdf(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &ShadingContext<'_>) -> Float;
 }
+
 pub trait Surface {
     fn closure(&self, si: Expr<SurfaceInteraction>, ctx: &ShadingContext<'_>) -> Box<dyn Bsdf>;
 }

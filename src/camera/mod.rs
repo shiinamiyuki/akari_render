@@ -30,7 +30,7 @@ impl PerspectiveCamera {
         fov: f32,
         lens_radius: f32,
         focal_length: f32,
-    ) -> Buffer<Self> {
+    ) -> luisa::Result<Buffer<Self>> {
         let fov = fov.to_radians();
         let mut m = glam::Mat4::IDENTITY;
         let fres = glam::vec2(resolution.x as f32, resolution.y as f32);
@@ -46,7 +46,7 @@ impl PerspectiveCamera {
         }
         m = glam::Mat4::from_translation(glam::vec3(0.0, 0.0, -1.0)) * m;
         let r2c = AffineTransform::from_matrix(&m);
-        let camera = device.create_buffer::<PerspectiveCamera>(1).unwrap();
+        let camera = device.create_buffer::<PerspectiveCamera>(1)?;
         camera.view(..).copy_from(&[Self {
             resolution,
             c2w: transform,
@@ -59,11 +59,9 @@ impl PerspectiveCamera {
             focal_length,
         }]);
         device
-            .create_kernel::<()>(&|| todo!())
-            .unwrap()
-            .dispatch([1, 1, 1])
-            .unwrap();
-        camera
+            .create_kernel::<()>(&|| todo!())?
+            .dispatch([1, 1, 1])?;
+        Ok(camera)
     }
 }
 

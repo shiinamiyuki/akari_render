@@ -6,11 +6,16 @@ pub use luisa::{
     lang::*,
     macros::*,
     math::*,
-    resource::{BindlessArray, Buffer, BufferView, Tex2d, Tex2dView, Tex3d, Tex3dView},
+    resource::{
+        BindlessArray, BindlessArrayVar, BindlessBufferVar, BindlessTex2dVar, BindlessTex3dVar,
+        Buffer, BufferVar, BufferView, Tex2d, Tex2dVar, Tex2dView, Tex3d, Tex3dVar, Tex3dView,
+    },
     rtx,
-    runtime::{Command, CommandBuffer, Device, Kernel, Stream, SyncHandle},
+    runtime::{Command, Device, Kernel, Stream},
 };
+pub use rayon::prelude::*;
 pub use luisa_compute as luisa;
+pub mod mesh;
 pub mod camera;
 pub mod color;
 pub mod film;

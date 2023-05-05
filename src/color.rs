@@ -176,3 +176,20 @@ impl std::ops::Add<&Color> for &Color {
         }
     }
 }
+
+
+
+pub fn glam_srgb_to_linear(rgb: glam::Vec3) -> glam::Vec3 {
+    fn f32_srgb_to_linear1(s: f32) -> f32 {
+        if s <= 0.04045 {
+            s / 12.92
+        } else {
+            (((s + 0.055) / 1.055) as f32).powf(2.4)
+        }
+    }
+    glam::vec3(
+        f32_srgb_to_linear1(rgb.x),
+        f32_srgb_to_linear1(rgb.y),
+        f32_srgb_to_linear1(rgb.z),
+    )
+}

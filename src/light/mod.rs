@@ -1,7 +1,7 @@
 use crate::{
     color::Color,
     geometry::{PointNormal, Ray},
-    interaction::ShadingContext,
+    interaction::{ShadingContext, SurfaceInteraction},
     sampler::Sampler,
     util::alias_table::AliasTable,
     *,
@@ -15,7 +15,7 @@ pub struct LightSample {
     pub n: Expr<Float3>,
 }
 pub trait Light {
-    fn le(&self, ray: Expr<Ray>, ctx: &ShadingContext<'_>) -> Color;
+    fn le(&self, ray: Expr<Ray>, si: Expr<SurfaceInteraction>, ctx: &ShadingContext<'_>) -> Color;
     fn sample_direct(
         &self,
         pn: Expr<PointNormal>,
@@ -29,11 +29,11 @@ pub trait LightDistribution {
     fn pdf(&self, light_index: Uint) -> Float;
 }
 
-pub struct WeightedDistribution {
+pub struct WeightedLightDistribution {
     pub alias_table: AliasTable,
 }
 
-impl LightDistribution for WeightedDistribution {
+impl LightDistribution for WeightedLightDistribution {
     fn sample(&self, u: Expr<Float2>) -> (Uint, Float) {
         self.alias_table.sample(u)
     }
@@ -41,3 +41,10 @@ impl LightDistribution for WeightedDistribution {
         self.alias_table.pdf(light_index)
     }
 }
+impl WeightedLightDistribution {
+    pub fn new(device: Device, weights: &[f32]) -> luisa::Result<Self> {
+        let alias_table = AliasTable::new(device, weights)?;
+        Ok(Self { alias_table })
+    }
+}
+pub mod area;

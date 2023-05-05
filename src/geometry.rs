@@ -2,8 +2,8 @@ use crate::*;
 #[derive(Clone, Copy, Debug, Value)]
 #[repr(C)]
 pub struct PointNormal {
-    pub p:Float3,
-    pub n:Float3
+    pub p: Float3,
+    pub n: Float3,
 }
 #[derive(Clone, Copy, Debug, Value)]
 #[repr(C)]

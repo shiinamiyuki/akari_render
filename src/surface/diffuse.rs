@@ -24,13 +24,6 @@ impl Bsdf for DiffuseBsdf {
             Color::zero(&ctx.color_repr)
         })
     }
-    fn pdf(&self, wo: Expr<Float3>, wi: Expr<Float3>, _ctx: &ShadingContext<'_>) -> Float {
-        select(
-            Frame::same_hemisphere(wo, wi),
-            Frame::abs_cos_theta(wi) * FRAC_1_PI,
-            Float::from(0.0),
-        )
-    }
     fn sample(
         &self,
         wo: Expr<Float3>,
@@ -53,6 +46,13 @@ impl Bsdf for DiffuseBsdf {
             valid: Bool::from(true),
         }
     }
+    fn pdf(&self, wo: Expr<Float3>, wi: Expr<Float3>, _ctx: &ShadingContext<'_>) -> Float {
+        select(
+            Frame::same_hemisphere(wo, wi),
+            Frame::abs_cos_theta(wi) * FRAC_1_PI,
+            Float::from(0.0),
+        )
+    }
 }
 impl Surface for DiffuseSurfaceExpr {
     fn closure(
@@ -60,8 +60,9 @@ impl Surface for DiffuseSurfaceExpr {
         si: Expr<interaction::SurfaceInteraction>,
         ctx: &ShadingContext<'_>,
     ) -> Box<dyn Bsdf> {
-        let reflectance = ctx.color_texture(self.reflectance());
-        let reflectance = reflectance.dispatch(|_, _, tex| tex.evaluate(si, ctx));
+        let reflectance = ctx.texture(self.reflectance());
+        let reflectance =
+            ctx.color_from_float4(reflectance.dispatch(|_, _, tex| tex.evaluate(si, ctx)));
         Box::new(DiffuseBsdf { reflectance })
     }
 }
