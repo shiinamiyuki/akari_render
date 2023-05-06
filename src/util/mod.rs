@@ -1,12 +1,13 @@
 pub mod alias_table;
 pub mod binserde;
+use crate::{color::glam_linear_to_srgb, *};
+use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
+use luisa_compute::glam::Vec4Swizzles;
 use std::{
     collections::HashMap,
     path::PathBuf,
     sync::atomic::{AtomicBool, Ordering},
 };
-
-use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 pub struct ProgressBarWrapper {
     inner: Option<ProgressBar>,
 }
@@ -37,7 +38,8 @@ pub fn create_progess_bar(count: usize, what: &str) -> ProgressBarWrapper {
         progress.set_draw_target(ProgressDrawTarget::stdout_with_hz(2));
         progress.set_style(
             ProgressStyle::default_bar()
-                .template(&template).unwrap()
+                .template(&template)
+                .unwrap()
                 .progress_chars("=>-"),
         );
         ProgressBarWrapper {
@@ -74,3 +76,15 @@ impl FileResolver for LocalFileResolver {
     }
 }
 
+pub fn write_image_ldr(color: &Tex2d<Float4>, path: &str) {
+    let color_buf = color.view(0).copy_to_vec::<Float4>();
+    let img = image::RgbImage::from_fn(color.width(), color.height(), |x, y| {
+        let i = x + y * color.width();
+        let pixel: glam::Vec4 = color_buf[i as usize].into();
+        let rgb = pixel.xyz();
+        let rgb = glam_linear_to_srgb(rgb);
+        let map = |x: f32| (x * 255.0).clamp(0.0, 255.0) as u8;
+        image::Rgb([map(rgb.x), map(rgb.y), map(rgb.z)])
+    });
+    img.save(path).unwrap();
+}

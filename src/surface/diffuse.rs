@@ -6,7 +6,7 @@ use crate::interaction::ShadingContext;
 use crate::sampling::cos_sample_hemisphere;
 use crate::*;
 
-use super::{Bsdf, BsdfSample, Surface};
+use super::{Bsdf, BsdfClosure, BsdfSample, Surface};
 #[derive(Debug, Clone, Copy, Value)]
 #[repr(C)]
 pub struct DiffuseSurface {
@@ -59,11 +59,14 @@ impl Surface for DiffuseSurfaceExpr {
         &self,
         si: Expr<interaction::SurfaceInteraction>,
         ctx: &ShadingContext<'_>,
-    ) -> Box<dyn Bsdf> {
+    ) -> BsdfClosure {
         let reflectance = ctx.texture(self.reflectance());
-        let reflectance =
-            ctx.color_from_float4(reflectance.dispatch(|_, _, tex| tex.evaluate(si, ctx)));
-        Box::new(DiffuseBsdf { reflectance })
+        let reflectance = ctx
+            .color_from_float4(reflectance.dispatch(|_, _, tex| tex.evaluate(si, ctx) * FRAC_1_PI));
+        BsdfClosure {
+            inner: Box::new(DiffuseBsdf { reflectance }),
+            frame: si.frame(),
+        }
     }
 }
 

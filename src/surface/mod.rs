@@ -27,7 +27,7 @@ pub trait Bsdf {
 }
 
 pub trait Surface {
-    fn closure(&self, si: Expr<SurfaceInteraction>, ctx: &ShadingContext<'_>) -> Box<dyn Bsdf>;
+    fn closure(&self, si: Expr<SurfaceInteraction>, ctx: &ShadingContext<'_>) -> BsdfClosure;
 }
 
 pub struct BsdfClosure {

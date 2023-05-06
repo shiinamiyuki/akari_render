@@ -12,3 +12,7 @@ pub fn cos_sample_hemisphere(u: Expr<Float2>) -> Expr<Float3> {
 pub fn cos_hemisphere_pdf(cos_theta: Float) -> Float {
     cos_theta * std::f32::consts::FRAC_1_PI
 }
+pub fn uniform_sample_triangle(u: Expr<Float2>) -> Expr<Float2> {
+    let su0 = u.x().sqrt();
+    make_float2(1.0 - su0, u.y() * su0)
+}

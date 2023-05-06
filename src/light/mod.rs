@@ -19,7 +19,7 @@ pub trait Light {
     fn sample_direct(
         &self,
         pn: Expr<PointNormal>,
-        u: Expr<Float2>,
+        u: Expr<Float4>,
         ctx: &ShadingContext<'_>,
     ) -> LightSample;
 }

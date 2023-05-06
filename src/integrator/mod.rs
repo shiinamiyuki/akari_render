@@ -1,9 +1,8 @@
-use luisa_compute::Polymorphic;
-
-use crate::{camera::*, film::*, scene::*};
+use crate::{*, camera::*, film::*, scene::*};
 
 pub trait Integrator {
-    fn render(&self, scene: &Scene, camera: &Polymorphic<(), dyn Camera>, film: &mut Film);
+    fn render(&self, scene: &Scene, film: &mut Film)->luisa::Result<()>;
 }
 
 pub mod pt;
+pub mod normal;

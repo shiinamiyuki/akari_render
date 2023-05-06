@@ -54,6 +54,9 @@ impl ShadingTriangleExpr {
     pub fn tc(&self, bary: Expr<Float2>) -> Expr<Float2> {
         (1.0 - bary.x() - bary.y()) * self.tc0() + bary.x() * self.tc1() + bary.y() * self.tc2()
     }
+    pub fn area(&self) -> Float {
+        0.5 * (self.v1() - self.v0()).cross(self.v2() - self.v0()).length()
+    }
 }
 
 #[derive(Clone, Copy, Debug, Value)]

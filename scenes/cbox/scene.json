@@ -1,0 +1,810 @@
+{
+    "bsdfs": {
+        "backWall": {
+            "anisotropic": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "anisotropic_rotation": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "clearcoat": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "clearcoat_roughness": {
+                "type": "Float",
+                "value": 0.029999999329447746
+            },
+            "color": {
+                "type": "srgb",
+                "values": [
+                    0.8676987886428833,
+                    0.8596959114074707,
+                    0.8433891534805298
+                ]
+            },
+            "emission": {
+                "type": "linear",
+                "values": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            "ior": {
+                "type": "Float",
+                "value": 1.4500000476837158
+            },
+            "metallic": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "roughness": {
+                "type": "Float",
+                "value": 0.40824830532073975
+            },
+            "sheen": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "sheen_tint": {
+                "type": "Float",
+                "value": 0.5
+            },
+            "specular": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "specular_tint": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "subsurface": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "subsurface_color": {
+                "type": "srgb",
+                "values": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            "subsurface_ior": {
+                "type": "Float",
+                "value": 1.4500000476837158
+            },
+            "subsurface_radius": {
+                "type": "linear",
+                "values": [
+                    1.0,
+                    0.20000000298023224,
+                    0.10000000149011612
+                ]
+            },
+            "transmission": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "type": "principled"
+        },
+        "ceiling": {
+            "anisotropic": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "anisotropic_rotation": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "clearcoat": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "clearcoat_roughness": {
+                "type": "Float",
+                "value": 0.029999999329447746
+            },
+            "color": {
+                "type": "srgb",
+                "values": [
+                    0.8676987886428833,
+                    0.8596959114074707,
+                    0.8433891534805298
+                ]
+            },
+            "emission": {
+                "type": "linear",
+                "values": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            "ior": {
+                "type": "Float",
+                "value": 1.4500000476837158
+            },
+            "metallic": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "roughness": {
+                "type": "Float",
+                "value": 0.40824830532073975
+            },
+            "sheen": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "sheen_tint": {
+                "type": "Float",
+                "value": 0.5
+            },
+            "specular": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "specular_tint": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "subsurface": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "subsurface_color": {
+                "type": "srgb",
+                "values": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            "subsurface_ior": {
+                "type": "Float",
+                "value": 1.4500000476837158
+            },
+            "subsurface_radius": {
+                "type": "linear",
+                "values": [
+                    1.0,
+                    0.20000000298023224,
+                    0.10000000149011612
+                ]
+            },
+            "transmission": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "type": "principled"
+        },
+        "floor": {
+            "anisotropic": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "anisotropic_rotation": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "clearcoat": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "clearcoat_roughness": {
+                "type": "Float",
+                "value": 0.029999999329447746
+            },
+            "color": {
+                "type": "srgb",
+                "values": [
+                    0.8676987886428833,
+                    0.8596959114074707,
+                    0.8433891534805298
+                ]
+            },
+            "emission": {
+                "type": "linear",
+                "values": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            "ior": {
+                "type": "Float",
+                "value": 1.4500000476837158
+            },
+            "metallic": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "roughness": {
+                "type": "Float",
+                "value": 0.40824830532073975
+            },
+            "sheen": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "sheen_tint": {
+                "type": "Float",
+                "value": 0.5
+            },
+            "specular": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "specular_tint": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "subsurface": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "subsurface_color": {
+                "type": "srgb",
+                "values": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            "subsurface_ior": {
+                "type": "Float",
+                "value": 1.4500000476837158
+            },
+            "subsurface_radius": {
+                "type": "linear",
+                "values": [
+                    1.0,
+                    0.20000000298023224,
+                    0.10000000149011612
+                ]
+            },
+            "transmission": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "type": "principled"
+        },
+        "leftWall": {
+            "anisotropic": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "anisotropic_rotation": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "clearcoat": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "clearcoat_roughness": {
+                "type": "Float",
+                "value": 0.029999999329447746
+            },
+            "color": {
+                "type": "srgb",
+                "values": [
+                    0.8152506351470947,
+                    0.2827792763710022,
+                    0.24780049920082092
+                ]
+            },
+            "emission": {
+                "type": "linear",
+                "values": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            "ior": {
+                "type": "Float",
+                "value": 1.4500000476837158
+            },
+            "metallic": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "roughness": {
+                "type": "Float",
+                "value": 0.40824830532073975
+            },
+            "sheen": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "sheen_tint": {
+                "type": "Float",
+                "value": 0.5
+            },
+            "specular": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "specular_tint": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "subsurface": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "subsurface_color": {
+                "type": "srgb",
+                "values": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            "subsurface_ior": {
+                "type": "Float",
+                "value": 1.4500000476837158
+            },
+            "subsurface_radius": {
+                "type": "linear",
+                "values": [
+                    1.0,
+                    0.20000000298023224,
+                    0.10000000149011612
+                ]
+            },
+            "transmission": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "type": "principled"
+        },
+        "light": {
+            "anisotropic": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "anisotropic_rotation": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "clearcoat": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "clearcoat_roughness": {
+                "type": "Float",
+                "value": 0.029999999329447746
+            },
+            "color": {
+                "type": "srgb",
+                "values": [
+                    0.8962438106536865,
+                    0.8962438106536865,
+                    0.8962438106536865
+                ]
+            },
+            "emission": {
+                "type": "linear",
+                "values": [
+                    17.0,
+                    12.0,
+                    4.0
+                ]
+            },
+            "ior": {
+                "type": "Float",
+                "value": 1.4500000476837158
+            },
+            "metallic": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "roughness": {
+                "type": "Float",
+                "value": 0.40824830532073975
+            },
+            "sheen": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "sheen_tint": {
+                "type": "Float",
+                "value": 0.5
+            },
+            "specular": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "specular_tint": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "subsurface": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "subsurface_color": {
+                "type": "srgb",
+                "values": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            "subsurface_ior": {
+                "type": "Float",
+                "value": 1.4500000476837158
+            },
+            "subsurface_radius": {
+                "type": "linear",
+                "values": [
+                    1.0,
+                    0.20000000298023224,
+                    0.10000000149011612
+                ]
+            },
+            "transmission": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "type": "principled"
+        },
+        "rightWall": {
+            "anisotropic": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "anisotropic_rotation": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "clearcoat": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "clearcoat_roughness": {
+                "type": "Float",
+                "value": 0.029999999329447746
+            },
+            "color": {
+                "type": "srgb",
+                "values": [
+                    0.4100208580493927,
+                    0.701410710811615,
+                    0.33361509442329407
+                ]
+            },
+            "emission": {
+                "type": "linear",
+                "values": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            "ior": {
+                "type": "Float",
+                "value": 1.4500000476837158
+            },
+            "metallic": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "roughness": {
+                "type": "Float",
+                "value": 0.40824830532073975
+            },
+            "sheen": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "sheen_tint": {
+                "type": "Float",
+                "value": 0.5
+            },
+            "specular": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "specular_tint": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "subsurface": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "subsurface_color": {
+                "type": "srgb",
+                "values": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            "subsurface_ior": {
+                "type": "Float",
+                "value": 1.4500000476837158
+            },
+            "subsurface_radius": {
+                "type": "linear",
+                "values": [
+                    1.0,
+                    0.20000000298023224,
+                    0.10000000149011612
+                ]
+            },
+            "transmission": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "type": "principled"
+        },
+        "shortBox": {
+            "anisotropic": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "anisotropic_rotation": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "clearcoat": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "clearcoat_roughness": {
+                "type": "Float",
+                "value": 0.029999999329447746
+            },
+            "color": {
+                "type": "srgb",
+                "values": [
+                    0.8676987886428833,
+                    0.8596959114074707,
+                    0.8433891534805298
+                ]
+            },
+            "emission": {
+                "type": "linear",
+                "values": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            "ior": {
+                "type": "Float",
+                "value": 1.4500000476837158
+            },
+            "metallic": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "roughness": {
+                "type": "Float",
+                "value": 0.40824830532073975
+            },
+            "sheen": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "sheen_tint": {
+                "type": "Float",
+                "value": 0.5
+            },
+            "specular": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "specular_tint": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "subsurface": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "subsurface_color": {
+                "type": "srgb",
+                "values": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            "subsurface_ior": {
+                "type": "Float",
+                "value": 1.4500000476837158
+            },
+            "subsurface_radius": {
+                "type": "linear",
+                "values": [
+                    1.0,
+                    0.20000000298023224,
+                    0.10000000149011612
+                ]
+            },
+            "transmission": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "type": "principled"
+        },
+        "tallBox": {
+            "anisotropic": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "anisotropic_rotation": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "clearcoat": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "clearcoat_roughness": {
+                "type": "Float",
+                "value": 0.029999999329447746
+            },
+            "color": {
+                "type": "srgb",
+                "values": [
+                    0.8676987886428833,
+                    0.8596959114074707,
+                    0.8433891534805298
+                ]
+            },
+            "emission": {
+                "type": "linear",
+                "values": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            "ior": {
+                "type": "Float",
+                "value": 1.4500000476837158
+            },
+            "metallic": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "roughness": {
+                "type": "Float",
+                "value": 0.40824830532073975
+            },
+            "sheen": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "sheen_tint": {
+                "type": "Float",
+                "value": 0.5
+            },
+            "specular": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "specular_tint": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "subsurface": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "subsurface_color": {
+                "type": "srgb",
+                "values": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            "subsurface_ior": {
+                "type": "Float",
+                "value": 1.4500000476837158
+            },
+            "subsurface_radius": {
+                "type": "linear",
+                "values": [
+                    1.0,
+                    0.20000000298023224,
+                    0.10000000149011612
+                ]
+            },
+            "transmission": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "type": "principled"
+        }
+    },
+    "camera": {
+        "focal": 1.0,
+        "fov": 15.0,
+        "lens_radius": 0.0,
+        "res": [
+            512,
+            512
+        ],
+        "transform": {
+            "center": [
+                0.0,
+                1.0,
+                0.0
+            ],
+            "eye": [
+                0.0,
+                1.0,
+                9.0
+            ],
+            "up": [
+                0.0,
+                1.0,
+                0.0
+            ]
+        },
+        "type": "perspective"
+    },
+    "lights": [],
+    "shapes": [
+        {
+            "bsdf": "floor",
+            "path": "CornellBox-Original_floor_0.mesh",
+            "transform": null,
+            "type": "mesh"
+        },
+        {
+            "bsdf": "ceiling",
+            "path": "CornellBox-Original_ceiling_1.mesh",
+            "transform": null,
+            "type": "mesh"
+        },
+        {
+            "bsdf": "backWall",
+            "path": "CornellBox-Original_backWall_2.mesh",
+            "transform": null,
+            "type": "mesh"
+        },
+        {
+            "bsdf": "rightWall",
+            "path": "CornellBox-Original_rightWall_3.mesh",
+            "transform": null,
+            "type": "mesh"
+        },
+        {
+            "bsdf": "leftWall",
+            "path": "CornellBox-Original_leftWall_4.mesh",
+            "transform": null,
+            "type": "mesh"
+        },
+        {
+            "bsdf": "shortBox",
+            "path": "CornellBox-Original_leftWall_5.mesh",
+            "transform": null,
+            "type": "mesh"
+        },
+        {
+            "bsdf": "tallBox",
+            "path": "CornellBox-Original_shortBox_6.mesh",
+            "transform": null,
+            "type": "mesh"
+        },
+        {
+            "bsdf": "light",
+            "path": "CornellBox-Original_light_7.mesh",
+            "transform": null,
+            "type": "mesh"
+        }
+    ]
+}

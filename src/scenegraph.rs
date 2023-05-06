@@ -74,13 +74,21 @@ pub mod node {
     #[derive(Clone, Serialize, Deserialize)]
     #[serde(tag = "type")]
     pub enum Texture {
-        Float(f32),
+        Float {
+            value: f32,
+        },
         #[serde(rename = "linear")]
-        SRgbLinear { values: [f32; 3] },
+        SRgbLinear {
+            values: [f32; 3],
+        },
         #[serde(rename = "srgb")]
-        SRgb { values: [f32; 3] },
+        SRgb {
+            values: [f32; 3],
+        },
         #[serde(rename = "srgb8")]
-        SRgbU8 { values: [u8; 3] },
+        SRgbU8 {
+            values: [u8; 3],
+        },
         #[serde(rename = "image")]
         Image {
             path: String,
@@ -146,10 +154,7 @@ pub mod node {
     #[serde(tag = "type")]
     pub enum Light {
         #[serde(rename = "point")]
-        Point {
-            pos: [f32; 3],
-            emission: Texture,
-        },
+        Point { pos: [f32; 3], emission: Texture },
         #[serde(rename = "spot")]
         Spot {
             transform: Transform,
