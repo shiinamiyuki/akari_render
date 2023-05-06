@@ -67,6 +67,7 @@ fn main() {
     //         exit(1);
     //     });
     // }
+    let tic = std::time::Instant::now();
     {
         let pt = PathTracer::new(device.clone(), spp.unwrap_or(1), 5);
         pt.render(&scene, &mut film).unwrap_or_else(|e| {
@@ -74,6 +75,8 @@ fn main() {
             exit(1);
         });
     }
+    let toc = std::time::Instant::now();
+    log::info!("Rendered in {:.1}ms", (toc - tic).as_secs_f64() * 1e3);
     film.copy_to_rgba_image(&output_image).unwrap();
     akari_render::util::write_image_ldr(&output_image, &output);
 }

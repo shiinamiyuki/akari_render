@@ -6,3 +6,4 @@ pub trait Integrator {
 
 pub mod pt;
 pub mod normal;
+pub mod mcmc;
