@@ -19,7 +19,7 @@ pub trait Sampler {
     }
     fn start(&self);
 }
-
+#[derive(Clone)]
 pub struct LcgSampler {
     pub state: Var<u32>,
 }
@@ -33,63 +33,46 @@ impl Sampler for LcgSampler {
     }
     fn start(&self) {}
 }
-
-// pub struct MetroplisSampler<S: IndependentSampler> {
-//     pub base: S,
-//     pub buffer: BufferVar<PrimarySample>,
-//     pub start: Expr<u32>,
-//     pub count: Expr<u32>,
-//     pub cur_dim: Var<u32>,
-//     pub large_step_prob: Expr<f32>,
-//     pub large_step: Var<bool>,
-// }
-// impl<S: IndependentSampler> MetroplisSampler<S> {
-//     pub fn new(
-//         base: S,
-//         buffer: BufferVar<PrimarySample>,
-//         start: Expr<u32>,
-//         count: Expr<u32>,
-//         large_step_prob: Expr<f32>,
-//     ) -> Self {
-//         Self {
-//             base,
-//             buffer,
-//             start,
-//             count,
-//             cur_dim: var!(u32, 0),
-//             large_step_prob,
-//             large_step: var!(bool, false),
-//         }
-//     }
-
-//     pub fn reject(&self) {
-//         for_range(const_(0)..self.cur_dim.load().int(), |i| {
-//             let i = i.uint();
-//             let s = self.buffer.read(self.start + i);
-//             let s = s.set_value(s.backup());
-//             self.buffer.write(self.start + i, s);
-//         });
-//     }
-// }
-// impl<S: IndependentSampler> Sampler for MetroplisSampler<S> {
-//     fn next_1d(&self) -> Float {
-//         if_!(self.cur_dim.load().cmplt(self.count), {
-//             let ret = self.buffer.read(self.start + self.cur_dim.load()).value();
-//             self.cur_dim.store(self.cur_dim.load() + 1);
-//             ret
-//         }, else {
-//             self.base.next_1d()
-//         })
-//     }
-//     fn start(&self) {
-//         self.cur_dim.store(0);
-//         self.large_step
-//             .store(self.base.next_1d().cmplt(self.large_step_prob));
-//         for_range(const_(0)..self.count.int(), |i| {
-//             let i = i.uint();
-//             let mut s = self.buffer.read(self.start + i);
-//             s = s.set_backup(s.value());
-//             self.buffer.write(self.start + i, s);
-//         });
-//     }
-// }
+#[derive(Copy, Clone, Aggregate)]
+pub struct PrimarySample {
+    pub values: VLArrayVar<f32>,
+}
+impl PrimarySample {
+    pub fn clamped(&self) -> Self {
+        let values = VLArrayVar::zero(self.values.static_len());
+        for_range(const_(0)..values.len().int(), |i| {
+            let i = i.uint();
+            let x = self.values.read(i);
+            values.write(i, x - x.floor());
+        });
+        Self { values }
+    }
+}
+pub struct IndependentReplaySampler<S: IndependentSampler> {
+    pub base: S,
+    pub sample: PrimarySample,
+    pub cur_dim: Var<u32>,
+}
+impl<S: IndependentSampler> IndependentReplaySampler<S> {
+    pub fn new(base: S, sample: PrimarySample) -> Self {
+        Self {
+            base,
+            sample,
+            cur_dim: var!(u32, 0),
+        }
+    }
+}
+impl<S: IndependentSampler> Sampler for IndependentReplaySampler<S> {
+    fn next_1d(&self) -> Float {
+        if_!(self.cur_dim.load().cmplt(self.sample.values.len()), {
+            let ret = self.sample.values.read(self.cur_dim.load());
+            self.cur_dim.store(self.cur_dim.load() + 1);
+            ret
+        }, else {
+            self.base.next_1d()
+        })
+    }
+    fn start(&self) {
+        self.cur_dim.store(0);
+    }
+}

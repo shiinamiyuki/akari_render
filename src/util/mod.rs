@@ -31,7 +31,7 @@ pub fn enable_progress_bar(enable: bool) {
 pub fn create_progess_bar(count: usize, what: &str) -> ProgressBarWrapper {
     if PB_ENABLE.load(Ordering::Relaxed) {
         let template = String::from(
-            "[{elapsed_precise} - {eta_precise}] [{bar:30.cyan/blue}] {pos:>7}/{len:7}WHAT {msg}",
+            "[{elapsed_precise} - {eta_precise}] [{bar:50.cyan/blue}] {pos:>7}/{len:7}WHAT {msg}",
         );
         let template = template.replace("WHAT", what);
         let progress = ProgressBar::new(count as u64);

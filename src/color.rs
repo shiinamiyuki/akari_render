@@ -22,6 +22,11 @@ impl SampledWavelengths {
     }
 }
 pub const N_WAVELENGTH_SAMPLES: usize = 4;
+#[derive(Clone, Copy, Debug, Value)]
+#[repr(C)]
+pub struct FlatColor {
+    pub c0: Float4,
+}
 #[derive(Aggregate, Clone)]
 pub struct SampledSpectrum {
     pub samples: Vec<Float>,
@@ -90,6 +95,25 @@ impl ColorVar {
     }
 }
 impl Color {
+    pub fn flatten(&self) -> Expr<FlatColor> {
+        match self {
+            Color::Rgb(rgb) => FlatColorExpr::new(make_float4(rgb.x(), rgb.y(), rgb.z(), 0.0)),
+            Color::Spectral(_) => {
+                todo!()
+            }
+        }
+    }
+    pub fn from_flat(flat: Expr<FlatColor>, repr: &ColorRepr) -> Self {
+        match repr {
+            ColorRepr::Rgb => {
+                let rgb = flat.c0();
+                Color::Rgb(rgb.xyz())
+            }
+            ColorRepr::Spectral(_) => {
+                todo!()
+            }
+        }
+    }
     pub fn to_rgb(&self) -> Expr<Float3> {
         match self {
             Color::Rgb(rgb) => *rgb,

@@ -1,6 +1,11 @@
 use akari_render::{
     film::{Film, FilmColorRepr},
-    integrator::{normal::NormalVis, pt::PathTracer, Integrator},
+    integrator::{
+        mcmc::{self, MCMC},
+        normal::NormalVis,
+        pt::PathTracer,
+        Integrator,
+    },
 };
 use clap::{arg, Arg, Command};
 use luisa_compute as luisa;
@@ -69,12 +74,30 @@ fn main() {
     // }
     let tic = std::time::Instant::now();
     {
-        let pt = PathTracer::new(device.clone(), spp.unwrap_or(1), 5);
+        let pt = PathTracer::new(device.clone(), spp.unwrap_or(1), 64, 5);
         pt.render(&scene, &mut film).unwrap_or_else(|e| {
             println!("Render failed: {:?}", e);
             exit(1);
         });
     }
+    // {
+    //     let mcmc = MCMC::new(
+    //         device.clone(),
+    //         spp.unwrap_or(1),
+    //         1,
+    //         5,
+    //         mcmc::Method::Kelemen {
+    //             small_sigma: 0.03,
+    //             large_step_prob: 0.3,
+    //         },
+    //         100,
+    //         100000,
+    //     );
+    //     mcmc.render(&scene, &mut film).unwrap_or_else(|e| {
+    //         println!("Render failed: {:?}", e);
+    //         exit(1);
+    //     });
+    // }
     let toc = std::time::Instant::now();
     log::info!("Rendered in {:.1}ms", (toc - tic).as_secs_f64() * 1e3);
     film.copy_to_rgba_image(&output_image).unwrap();
