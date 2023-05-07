@@ -1,4 +1,5 @@
 fn main() {
+    println!("cargo:rerun-if-changed=build.rs");
     let out = cmake::Config::new("ext/assimp")
         .no_build_target(true)
         .build();

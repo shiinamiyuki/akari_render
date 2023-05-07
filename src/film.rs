@@ -22,8 +22,10 @@ pub struct Film {
     device: Device,
     pixels: Buffer<f32>,
     weights: Buffer<f32>,
+    splat: Buffer<f32>,
     repr: FilmColorRepr,
     resolution: Uint2,
+    splat_scale: f32,
 }
 
 impl Film {
@@ -34,14 +36,21 @@ impl Film {
         let nvalues = color.nvalues();
         let pixels =
             device.create_buffer::<f32>(resolution.x as usize * resolution.y as usize * nvalues)?;
+        let splat =
+            device.create_buffer::<f32>(resolution.x as usize * resolution.y as usize * nvalues)?;
         let weights = device.create_buffer::<f32>(resolution.x as usize * resolution.y as usize)?;
         Ok(Self {
             device,
+            splat,
             pixels,
             weights,
             repr: color,
             resolution,
+            splat_scale: 1.0,
         })
+    }
+    pub fn set_splat_scale(&mut self, scale: f32) {
+        self.splat_scale = scale;
     }
     fn linear_index(&self, p: Expr<Float2>) -> Expr<u32> {
         let resolution = const_(self.resolution);
@@ -51,7 +60,24 @@ impl Film {
         let ip = ip.uint();
         ip.x() + ip.y() * resolution.x()
     }
+    pub fn add_splat(&self, p: Expr<Float2>, color: &Color) {
+        let splat = self.splat.var();
+        let i = self.linear_index(p);
+        let nvalues = self.repr.nvalues();
+        match self.repr {
+            FilmColorRepr::SRgb => {
+                let rgb: Float3Expr = color.to_rgb();
+                for c in 0..nvalues {
+                    let v = rgb.at(c);
+                    let v = select(v.is_nan(), 0.0.into(), v);
+                    splat.atomic_fetch_add(i * nvalues as u32 + c as u32, v);
+                }
+            }
+            _ => todo!(),
+        }
+    }
     pub fn add_sample(&self, p: Expr<Float2>, color: &Color, weight: Expr<f32>) {
+        let color = color * weight;
         let pixels = self.pixels.var();
         let weights = self.weights.var();
         let i = self.linear_index(p);
@@ -77,19 +103,25 @@ impl Film {
         assert_eq!(image.width(), self.resolution.x);
         assert_eq!(image.height(), self.resolution.y);
         self.device
-            .create_kernel::<()>(&|| {
+            .create_kernel::<(f32,)>(&|splat_scale: Expr<f32>| {
                 let p = dispatch_id().xy();
                 let i = p.x() + p.y() * self.resolution.x;
                 let pixels = self.pixels.var();
+                let splat = self.splat.var();
                 let weights = self.weights.var();
                 let nvalues = self.repr.nvalues();
                 match self.repr {
                     FilmColorRepr::SRgb => {
+                        let s_r = splat.read(i * nvalues as u32 + 0) * splat_scale;
+                        let s_g = splat.read(i * nvalues as u32 + 1) * splat_scale;
+                        let s_b = splat.read(i * nvalues as u32 + 2) * splat_scale;
+
                         let r = pixels.read(i * nvalues as u32 + 0);
                         let g = pixels.read(i * nvalues as u32 + 1);
                         let b = pixels.read(i * nvalues as u32 + 2);
                         let w = weights.read(i);
                         let rgb = make_float3(r, g, b) / select(w.cmpeq(0.0), const_(1.0f32), w);
+                        let rgb = rgb + make_float3(s_r, s_g, s_b);
                         image
                             .var()
                             .write(p, make_float4(rgb.x(), rgb.y(), rgb.z(), 1.0f32));
@@ -97,6 +129,6 @@ impl Film {
                     _ => todo!(),
                 }
             })?
-            .dispatch([self.resolution.x, self.resolution.y, 1])
+            .dispatch([self.resolution.x, self.resolution.y, 1], &self.splat_scale)
     }
 }

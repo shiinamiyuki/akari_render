@@ -41,7 +41,9 @@ pub struct MarkovState {
     cur_pixel: Uint2,
     cur_f: f32,
     b: f32,
-    b_cnt: u32,
+    b_cnt: u64,
+    n_accepted: u64,
+    n_mutations: u64,
 }
 struct RenderState {
     rng_states: Buffer<u32>,
@@ -57,7 +59,7 @@ impl MCMC {
     pub fn new(
         device: Device,
         spp: u32,
-        spp_per_pass:u32,
+        spp_per_pass: u32,
         max_depth: u32,
         method: Method,
         n_chains: usize,
@@ -85,6 +87,7 @@ impl MCMC {
         sample: PrimarySample,
     ) -> (Expr<Uint2>, Color, Expr<f32>) {
         let sampler = IndependentReplaySampler::new(independent, sample);
+        sampler.start();
         let res = const_(scene.camera.resolution());
         let p = sampler.next_2d() * res.float();
         let p = p.int().clamp(0, res.int() - 1);
@@ -154,7 +157,7 @@ impl MCMC {
                 let sample = PrimarySample { values: sample };
                 let (p, l, f) = self.evaluate(scene, color_repr, lcg_sampler.clone(), sample);
                 let l = l.flatten();
-                let state = MarkovStateExpr::new(i, l, p, f, f, 1);
+                let state = MarkovStateExpr::new(i, l, p, f, f, 1, 0, 0);
                 states.var().write(i, state);
             })?
             .dispatch([self.n_chains as u32, 1, 1])?;
@@ -191,7 +194,7 @@ impl MCMC {
                     let large = LargeStepMutation{};
                     large.mutate(&sample, &rng)
                 }, else {
-                    let small = IsotropicGaussianMutation{sigma:small_sigma.into()};
+                    let small = IsotropicGaussianMutation{sigma: small_sigma.into()};
                     small.mutate(&sample, &rng)
                 });
                 let clamped = proposal.sample.clamped();
@@ -210,22 +213,22 @@ impl MCMC {
                     const_(1.0f32),
                     (proposal_f / cur_f).clamp(0.0, 1.0),
                 );
-                film.add_sample(
+                film.add_splat(
                     proposal_p.float(),
                     &(proposal_color.clone() / proposal_f * accept * contribution),
-                    1.0.into(),
                 );
-                film.add_sample(
+                film.add_splat(
                     cur_p.float(),
                     &(cur_color / cur_f * (1.0 - accept * contribution)),
-                    1.0.into(),
                 );
                 if_!(rng.next_1d().cmplt(accept), {
                     state.set_cur_f(proposal_f);
                     state.set_cur_color(proposal_color.flatten());
                     state.set_cur_pixel(proposal_p);
+                    state.set_n_accepted(state.n_accepted().load() + 1);
                     sample.values.store(clamped.values.load());
                 });
+                state.set_n_mutations(state.n_mutations().load() + 1);
             }
             _ => todo!(),
         }
@@ -286,13 +289,14 @@ impl MCMC {
         scene: &Scene,
         color_repr: &ColorRepr,
         state: &RenderState,
-        film: &Film,
+        film: &mut Film,
     ) -> luisa::Result<()> {
         let resolution = scene.camera.resolution();
         let npixels = resolution.x * resolution.y;
 
         let kernel = self.device.create_kernel::<(u32, f32)>(
             &|mutations_per_chain: Expr<u32>, contribution: Expr<f32>| {
+                set_block_size([1, 1, 1]);
                 self.advance_chain(
                     scene,
                     color_repr,
@@ -329,6 +333,22 @@ impl MCMC {
             }
             progress.finish();
         }
+        let states = state.states.copy_to_vec();
+        let mut b = state.b_init as f64;
+        let mut b_cnt = state.b_init_cnt as u64;
+        let mut accepted = 0u64;
+        let mut mutations = 0u64;
+        for s in &states {
+            b += s.b as f64;
+            b_cnt += s.b_cnt;
+            accepted += s.n_accepted;
+            mutations += s.n_mutations;
+        }
+        let accept_rate = accepted as f64 / mutations as f64;
+        let b = b / b_cnt as f64;
+        log::info!("Normalization factor: {}", b);
+        log::info!("Acceptance rate: {:.2}%", accept_rate * 100.0);
+        film.set_splat_scale(b as f32 / self.pt.spp as f32);
         Ok(())
     }
 }

@@ -69,6 +69,7 @@ impl<S: IndependentSampler> Sampler for IndependentReplaySampler<S> {
             self.cur_dim.store(self.cur_dim.load() + 1);
             ret
         }, else {
+            lc_assert!(false);
             self.base.next_1d()
         })
     }
