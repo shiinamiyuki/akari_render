@@ -38,7 +38,7 @@ impl Bsdf for DiffuseBsdf {
             make_float3(wi.x(), -wi.y(), wi.x()),
         );
         let pdf = Frame::abs_cos_theta(wi) * FRAC_1_PI;
-        let color = self.reflectance.clone();
+        let color = &self.reflectance * Float::from(FRAC_1_PI) * Frame::abs_cos_theta(wi);
         BsdfSample {
             wi,
             pdf,

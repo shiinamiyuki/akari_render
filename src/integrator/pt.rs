@@ -11,23 +11,31 @@ pub struct PathTracer {
     pub spp: u32,
     pub max_depth: u32,
     pub spp_per_pass: u32,
-}
-#[derive(Clone, Copy, Debug, Value)]
-#[repr(C)]
-pub struct PathVertex {
-    pub wo: Float3,
-    pub si: SurfaceInteraction,
+    pub use_nee: bool,
 }
 
 impl PathTracer {
-    pub fn new(device: Device, spp: u32, spp_per_pass: u32, max_depth: u32) -> Self {
+    pub fn new(device: Device, spp: u32, spp_per_pass: u32, max_depth: u32, use_nee: bool) -> Self {
         Self {
             device,
             spp,
             max_depth,
             spp_per_pass,
+            use_nee,
         }
     }
+}
+pub fn mis_weight(pdf_a: Expr<f32>, pdf_b: Expr<f32>, power: u32) -> Expr<f32> {
+    let apply_power = |x: Expr<f32>| {
+        let mut p = const_(1.0f32);
+        for _ in 0..power {
+            p = p * x;
+        }
+        p
+    };
+    let pdf_a = apply_power(pdf_a);
+    let pdf_b = apply_power(pdf_b);
+    pdf_a / (pdf_a + pdf_b)
 }
 impl PathTracer {
     pub fn radiance(
@@ -45,19 +53,31 @@ impl PathTracer {
             scene,
             color_repr: color_repr.clone(),
         };
-        while_!(Bool::from(true), {
+        let prev_bsdf_pdf = var!(f32);
+        let prev_n = var!(Float3, ray.d());
+        loop_!({
             let si = scene.intersect(ray.load());
             let wo = -ray.d().load();
             if_!(si.valid(), {
+
                 let inst_id = si.inst_id();
                 let instance = scene.meshes.mesh_instances.var().read(inst_id);
                 if_!(instance.light().valid(), {
-                    let light = scene.lights.get(instance.light());
-                    let direct = light.dispatch(|_tag, _key, light|light.le(ray.load(), si, &ctx));
-                    l.store(&(l.load() + beta.load() * direct));
+                    let direct = scene.lights.le(ray.load(), si, &ctx);
+                    if_!(depth.load().cmpeq(0) | !self.use_nee, {
+                        l.store(&(l.load() + beta.load() * &direct));
+                    }, else {
+                        let pn = {
+                            let p = ray.o();
+                            let n = prev_n.load();
+                            PointNormalExpr::new(p, n)
+                        };
+                        let (light_pdf, _) = scene.lights.pdf_direct(si, pn, &ctx);
+                        let w = mis_weight(prev_bsdf_pdf.load(), light_pdf, 1);
+                        l.store(&(l.load() + beta.load() * &direct * w));
+                    });
                 });
                 let p = si.geometry().p();
-                let ns = si.geometry().ns();
                 let ng = si.geometry().ng();
                 let surface = instance.surface();
                 let surface = scene.surfaces.get(surface);
@@ -65,12 +85,33 @@ impl PathTracer {
                 if_!(depth.load().cmpge(self.max_depth), {
                     break_();
                 });
+                // Direct Lighting
+                if self.use_nee {
+                    let pn = PointNormalExpr::new(p, ng);
+                    let (sample, _) = scene.lights.sample_direct(pn, sampler.next_2d(), &ctx);
+                    let wi = sample.wi;
+                    let (bsdf_f, bsdf_pdf) = surface.dispatch(|_tag, _key, surface| {
+                        let bsdf = surface.closure(si, &ctx);
+                        let pdf = bsdf.pdf(wo, wi, &ctx);
+                        let f = bsdf.evaluate(wo, wi, &ctx);
+                        (f, pdf)
+                    });
+                    let w = mis_weight(sample.pdf, bsdf_pdf, 1);
+                    let occluded = scene.occlude(sample.shadow_ray);
+                    // cpu_dbg!(sample.pdf);
+                    if_!(!occluded, {
+                        l.store(&(l.load() + beta.load() * bsdf_f * &sample.li / sample.pdf * w));
+                    });
+                }
+
+                // BSDF sampling
                 surface.dispatch(|_tag, _key, surface| {
                     let bsdf = surface.closure(si, &ctx);
                     let sample = bsdf.sample(wo, sampler.next_1d(), sampler.next_2d(), &ctx);
                     let wi = sample.wi;
                     let f = &sample.color;
-                    beta.store(&(beta.load() * f * wi.dot(ns).abs() / sample.pdf));
+                    beta.store(&(beta.load() * f / sample.pdf));
+                    prev_bsdf_pdf.store(sample.pdf);
                     let ro = offset_ray_origin(p, ng);
                     ray.store(RayExpr::new(ro, wi, 1e-3, 1e20));
                 });
@@ -83,7 +124,7 @@ impl PathTracer {
     }
 }
 impl Integrator for PathTracer {
-    fn render(&self, scene: &Scene, film: &mut Film) -> luisa::Result<()> {
+    fn render(&self, scene: &Scene, film: &mut Film) {
         let resolution = scene.camera.resolution();
         log::info!(
             "Resolution {}x{}, spp: {}",
@@ -98,7 +139,7 @@ impl Integrator for PathTracer {
         let mut rng = thread_rng();
         let seeds = self
             .device
-            .create_buffer_from_fn(npixels, |_| rng.gen::<u32>())?;
+            .create_buffer_from_fn(npixels, |_| rng.gen::<u32>());
         let kernel = self
             .device
             .create_kernel::<(u32,)>(&|spp_per_pass: Expr<u32>| {
@@ -117,25 +158,21 @@ impl Integrator for PathTracer {
                     film.add_sample(p.float(), &l, ray_w);
                 });
                 seeds.write(i, sampler.state.load());
-            })?;
+            });
         let stream = self.device.default_stream();
         let mut cnt = 0;
         let progress = util::create_progess_bar(self.spp as usize, "spp");
-        stream.with_scope(|s| -> luisa::Result<()> {
-          
+        stream.with_scope(|s| {
             while cnt < self.spp {
                 let cur_pass = (self.spp - cnt).min(self.spp_per_pass);
                 let mut cmds = vec![];
                 cmds.push(kernel.dispatch_async([resolution.x, resolution.y, 1], &cur_pass));
-                s.submit(cmds)?;
-                s.synchronize()?;
+                s.submit(cmds);
+                s.synchronize();
                 progress.inc(cur_pass as u64);
                 cnt += cur_pass;
             }
-            
-            Ok(())
-        })?;
+        });
         progress.finish();
-        Ok(())
     }
 }

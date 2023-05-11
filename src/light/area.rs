@@ -1,7 +1,7 @@
 use crate::{
     geometry::*,
-    light::*,
     interaction::*,
+    light::*,
     sampling::uniform_sample_triangle,
     util::alias_table::{AliasTableEntry, BindlessAliasTableVar},
     *,
@@ -9,16 +9,19 @@ use crate::{
 #[derive(Clone, Copy, Value)]
 #[repr(C)]
 pub struct AreaLight {
+    pub light_id: u32,
     pub instance_id: u32,
-    pub emission:TagIndex,
+    pub emission: TagIndex,
     pub area_sampling_index: u32,
 }
 
 impl Light for AreaLightExpr {
+    fn id(&self) -> Expr<u32> {
+        self.light_id()
+    }
     fn le(&self, ray: Expr<Ray>, si: Expr<SurfaceInteraction>, ctx: &ShadingContext<'_>) -> Color {
-        let scene = ctx.scene;
         let emission = ctx.texture(self.emission());
-        let emission = emission.dispatch(|tag, _key, tex| tex.evaluate(si, ctx));
+        let emission = emission.dispatch(|_tag, _key, tex| tex.evaluate(si, ctx));
         let emission = ctx.color_from_float4(emission);
         let ns = si.geometry().ns();
         select(
@@ -31,7 +34,7 @@ impl Light for AreaLightExpr {
     fn sample_direct(
         &self,
         pn: Expr<PointNormal>,
-        u: Expr<Float4>,
+        u: Expr<Float2>,
         ctx: &ShadingContext<'_>,
     ) -> LightSample {
         let scene = ctx.scene;
@@ -40,9 +43,10 @@ impl Light for AreaLightExpr {
         let at_entries = area_samplers.buffer::<AliasTableEntry>(self.area_sampling_index());
         let at_pdf = area_samplers.buffer::<f32>(self.area_sampling_index() + 1);
         let at = BindlessAliasTableVar(at_entries, at_pdf);
-        let (prim_id, pdf) = at.sample(u.xy());
+        let (prim_id, pdf, u_x) = at.sample_and_remap(u.x());
+        let u = u.set_x(u_x);
         let shading_triangle = meshes.shading_triangle(self.instance_id(), prim_id);
-        let bary = uniform_sample_triangle(u.zw());
+        let bary = uniform_sample_triangle(u);
         let area = shading_triangle.area();
         let p = shading_triangle.p(bary);
         let n = shading_triangle.n(bary);
@@ -66,7 +70,7 @@ impl Light for AreaLightExpr {
             Bool::from(true),
         );
         let emission = ctx.texture(self.emission());
-        let emission = emission.dispatch(|tag, _key, tex| tex.evaluate(si, ctx));
+        let emission = emission.dispatch(|_tag, _key, tex| tex.evaluate(si, ctx));
         let emission = ctx.color_from_float4(emission);
         let wi = p - pn.p();
         let dist2 = wi.length_squared();
@@ -76,12 +80,39 @@ impl Light for AreaLightExpr {
         let ro = rtx::offset_ray_origin(pn.p(), pn.n());
         let dist = (p - ro).length();
         let shadow_ray = RayExpr::new(ro, wi, 1e-3, dist * 0.997);
+        // cpu_dbg!( u);
         LightSample {
             li,
             pdf,
             shadow_ray,
+            wi,
             n,
         }
+    }
+    fn pdf_direct(
+        &self,
+        si: Expr<SurfaceInteraction>,
+        pn: Expr<PointNormal>,
+        ctx: &ShadingContext<'_>,
+    ) -> Expr<f32> {
+        let prim_id = si.prim_id();
+        let scene = ctx.scene;
+        let meshes = &scene.meshes;
+        let area_samplers = meshes.mesh_area_samplers.var();
+        let at_entries = area_samplers.buffer::<AliasTableEntry>(self.area_sampling_index());
+        let at_pdf = area_samplers.buffer::<f32>(self.area_sampling_index() + 1);
+        let at = BindlessAliasTableVar(at_entries, at_pdf);
+        let shading_triangle = si.triangle();
+        let area = shading_triangle.area();
+        let prim_pdf = at.pdf(prim_id);
+        let bary = si.bary();
+        let n = shading_triangle.n(bary);
+        let p = shading_triangle.p(bary);
+        let wi = p - pn.p();
+        let dist2 = wi.length_squared();
+        let wi = wi / dist2.sqrt();
+        let pdf = prim_pdf / area * dist2 / n.dot(-wi).max(1e-6);
+        pdf
     }
 }
 impl_polymorphic!(Light, AreaLight);

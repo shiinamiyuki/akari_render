@@ -1,6 +1,8 @@
 use std::collections::VecDeque;
 
 use crate::*;
+
+use crate::sampling::{uniform_discrete_choice_and_remap, weighted_discrete_choice2_and_remap};
 #[derive(Clone, Copy, Debug, Default, Value)]
 #[repr(C)]
 pub struct AliasTableEntry {
@@ -17,17 +19,16 @@ impl BindlessAliasTableVar {
     pub fn pdf(&self, i: Uint) -> Float {
         self.1.read(i)
     }
-    pub fn sample(&self, u: Expr<Float2>) -> (Uint, Float) {
-        let idx = (u.x() * self.0.len().float()).uint();
-        let idx = idx.min(self.0.len() - 1);
+    pub fn sample_and_remap(&self, u: Expr<f32>) -> (Uint, Float, Float) {
+        let (idx, u) = uniform_discrete_choice_and_remap(self.0.len(), u);
         let entry = self.0.read(idx);
-        let idx = select(u.y().cmpge(entry.t()), entry.j(), idx);
+        let (idx, u) = weighted_discrete_choice2_and_remap(entry.t(), idx, entry.j(), u);
         let pdf = self.1.read(idx);
-        (idx, pdf)
+        (idx, pdf, u)
     }
 }
 impl AliasTable {
-    pub fn new(device: Device, weights: &[f32]) -> luisa::Result<Self> {
+    pub fn new(device: Device, weights: &[f32]) -> Self {
         assert!(weights.len() >= 1);
         let sum: f32 = weights.iter().map(|x| *x).sum::<f32>();
         let mut prob: Vec<_> = weights
@@ -66,21 +67,26 @@ impl AliasTable {
             table[l].t = 1.0;
             table[l].j = l as u32;
         }
-        Ok(Self(
-            device.create_buffer_from_slice(&table).unwrap(),
-            device.create_buffer_from_fn(prob.len(), |i| weights[i] / sum)?,
-        ))
+        Self(
+            device.create_buffer_from_slice(&table),
+            device.create_buffer_from_fn(prob.len(), |i| weights[i] / sum),
+        )
     }
     pub fn pdf(&self, i: Uint) -> Float {
         self.1.var().read(i)
     }
-    pub fn sample(&self, u: Expr<Float2>) -> (Uint, Float) {
-        let idx = (u.x() * self.0.var().len().float()).uint();
-        let idx = idx.min(self.0.var().len() - 1);
+    pub fn sample_and_remap(&self, u: Expr<f32>) -> (Uint, Float, Float) {
+        // let idx = (u.x() * self.0.var().len().float()).uint();
+        // let idx = idx.min(self.0.var().len() - 1);
+        // let entry = self.0.var().read(idx);
+        // let idx = select(u.y().cmpge(entry.t()), entry.j(), idx);
+        // let pdf = self.1.var().read(idx);
+        // (idx, pdf)
+        let (idx, u) = uniform_discrete_choice_and_remap(self.0.var().len(), u);
         let entry = self.0.var().read(idx);
-        let idx = select(u.y().cmpge(entry.t()), entry.j(), idx);
+        let (idx, u) = weighted_discrete_choice2_and_remap(entry.t(), idx, entry.j(), u);
         let pdf = self.1.var().read(idx);
-        (idx, pdf)
+        (idx, pdf, u)
     }
 }
 
@@ -100,8 +106,8 @@ mod test {
         let mut weights = (0..100).map(|_| rng.gen::<f32>()).collect::<Vec<_>>();
         let sum = weights.iter().sum::<f32>();
         weights.iter_mut().for_each(|x| *x /= sum);
-        let device = ctx.create_cpu_device().unwrap();
-        let table = AliasTable::new(device.clone(), &weights).unwrap();
+        let device = ctx.create_cpu_device();
+        let table = AliasTable::new(device.clone(), &weights);
         let entries = table.0.copy_to_vec();
         let mut h = vec![0.0f32; weights.len()];
         for (i, e) in entries.iter().enumerate() {

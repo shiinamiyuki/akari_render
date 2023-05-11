@@ -9,7 +9,7 @@ pub mod diffuse;
 pub struct BsdfSample {
     pub wi: Expr<Float3>,
     pub pdf: Expr<f32>,
-    pub color: Color, // premultiplied by cos_theta(wi) and divided by pdf
+    pub color: Color,
     pub valid: Bool,
 }
 

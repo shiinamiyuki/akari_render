@@ -1,7 +1,7 @@
 use crate::{color::*, geometry::*, sampler::*, *};
 
 pub trait Camera {
-    fn set_resolution(&mut self, resolution: Uint2) -> luisa::Result<()>;
+    fn set_resolution(&mut self, resolution: Uint2);
     fn resolution(&self) -> Uint2;
     fn generate_ray(
         &self,
@@ -27,8 +27,8 @@ impl PerspectiveCamera {
         fov: f32,
         lens_radius: f32,
         focal_length: f32,
-    ) -> luisa::Result<Self> {
-        let data = device.create_buffer(1)?;
+    ) -> Self {
+        let data = device.create_buffer(1);
         let mut camera = Self {
             data,
             resolution,
@@ -38,12 +38,12 @@ impl PerspectiveCamera {
             lens_radius,
             focal_length,
         };
-        camera.set_resolution(resolution)?;
-        Ok(camera)
+        camera.set_resolution(resolution);
+        camera
     }
 }
 impl Camera for PerspectiveCamera {
-    fn set_resolution(&mut self, resolution: Uint2) -> luisa::Result<()> {
+    fn set_resolution(&mut self, resolution: Uint2) {
         self.resolution = resolution;
         PerspectiveCameraData::new(
             self.device.clone(),
@@ -103,7 +103,7 @@ impl PerspectiveCameraData {
         lens_radius: f32,
         focal_length: f32,
         buffer: &Buffer<PerspectiveCameraData>,
-    ) -> luisa::Result<()> {
+    ) {
         let mut m = glam::Mat4::IDENTITY;
         let fres = glam::vec2(resolution.x as f32, resolution.y as f32);
         m = glam::Mat4::from_scale(glam::vec3(1.0 / fres.x, 1.0 / fres.y, 1.0)) * m;
@@ -150,8 +150,7 @@ impl PerspectiveCameraData {
                 let c = c.set_w2c(c.c2w().inverse());
                 let c = c.set_c2r(c.r2c().inverse());
                 camera.write(0, c);
-            })?
-            .dispatch([1, 1, 1])?;
-        Ok(())
+            })
+            .dispatch([1, 1, 1]);
     }
 }

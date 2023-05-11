@@ -54,7 +54,7 @@ struct RenderState {
 }
 impl MCMC {
     fn sample_dimension(&self) -> usize {
-        self.pt.max_depth as usize * 8
+        4 + self.pt.max_depth as usize * 4
     }
     pub fn new(
         device: Device,
@@ -67,7 +67,7 @@ impl MCMC {
     ) -> Self {
         Self {
             device: device.clone(),
-            pt: PathTracer::new(device.clone(), spp, spp_per_pass, max_depth),
+            pt: PathTracer::new(device.clone(), spp, spp_per_pass, max_depth, false),
             method,
             n_chains,
             n_bootstrap,
@@ -95,15 +95,15 @@ impl MCMC {
         let l = self.pt.radiance(scene, ray, &sampler, &color_repr) * ray_color * ray_w;
         (p.uint(), l.clone(), self.scalar_contribution(&l))
     }
-    fn bootstrap(&self, scene: &Scene, color_repr: &ColorRepr) -> luisa::Result<RenderState> {
+    fn bootstrap(&self, scene: &Scene, color_repr: &ColorRepr) -> RenderState {
         let mut rng = thread_rng();
         let seeds = self
             .device
-            .create_buffer_from_fn(self.n_bootstrap + self.n_chains, |_| rng.gen::<u32>())?;
+            .create_buffer_from_fn(self.n_bootstrap + self.n_chains, |_| rng.gen::<u32>());
 
         let fs = self
             .device
-            .create_buffer_from_fn(self.n_bootstrap, |_| 0.0f32)?;
+            .create_buffer_from_fn(self.n_bootstrap, |_| 0.0f32);
         self.device
             .create_kernel::<()>(&|| {
                 let i = dispatch_id().x();
@@ -119,16 +119,16 @@ impl MCMC {
                 let sample = PrimarySample { values: sample };
                 let (_p, _l, f) = self.evaluate(scene, color_repr, lcg_sampler.clone(), sample);
                 fs.var().write(i, f);
-            })?
-            .dispatch([self.n_bootstrap as u32, 1, 1])?;
+            })
+            .dispatch([self.n_bootstrap as u32, 1, 1]);
 
         let weights = fs.copy_to_vec();
         let b = weights.iter().sum::<f32>();
-        let at = AliasTable::new(self.device.clone(), &weights)?;
-        let states = self.device.create_buffer(self.n_chains)?;
+        let at = AliasTable::new(self.device.clone(), &weights);
+        let states = self.device.create_buffer(self.n_chains);
         let sample_buffer = self
             .device
-            .create_buffer(self.sample_dimension() * self.n_chains)?;
+            .create_buffer(self.sample_dimension() * self.n_chains);
         self.device
             .create_kernel::<()>(&|| {
                 let i = dispatch_id().x();
@@ -136,7 +136,7 @@ impl MCMC {
                 let lcg_sampler = LcgSampler {
                     state: var!(u32, seed),
                 };
-                let (seed_idx, _) = at.sample(lcg_sampler.next_2d());
+                let (seed_idx, _, _) = at.sample_and_remap(lcg_sampler.next_1d());
                 let seed = seeds.var().read(seed_idx);
                 let lcg_sampler = LcgSampler {
                     state: var!(u32, seed),
@@ -159,18 +159,18 @@ impl MCMC {
                 let l = l.flatten();
                 let state = MarkovStateExpr::new(i, l, p, f, f, 1, 0, 0);
                 states.var().write(i, state);
-            })?
-            .dispatch([self.n_chains as u32, 1, 1])?;
+            })
+            .dispatch([self.n_chains as u32, 1, 1]);
         let rng_states = self
             .device
-            .create_buffer_from_fn(self.n_chains, |_| rng.gen::<u32>())?;
-        Ok(RenderState {
+            .create_buffer_from_fn(self.n_chains, |_| rng.gen::<u32>());
+        RenderState {
             rng_states,
             samples: sample_buffer,
             states,
             b_init: b,
             b_init_cnt: self.n_bootstrap as u32,
-        })
+        }
     }
     fn mutate_chain<S: IndependentSampler + Clone>(
         &self,
@@ -290,7 +290,7 @@ impl MCMC {
         color_repr: &ColorRepr,
         state: &RenderState,
         film: &mut Film,
-    ) -> luisa::Result<()> {
+    ) {
         let resolution = scene.camera.resolution();
         let npixels = resolution.x * resolution.y;
 
@@ -306,7 +306,7 @@ impl MCMC {
                     contribution,
                 )
             },
-        )?;
+        );
         {
             let mut cnt = 0;
             let spp_per_pass = self.pt.spp_per_pass;
@@ -327,7 +327,7 @@ impl MCMC {
                     [self.n_chains as u32, 1, 1],
                     &mutations_per_chain,
                     &contribution,
-                )?;
+                );
                 progress.inc(cur_pass as u64);
                 cnt += cur_pass;
             }
@@ -349,11 +349,10 @@ impl MCMC {
         log::info!("Normalization factor: {}", b);
         log::info!("Acceptance rate: {:.2}%", accept_rate * 100.0);
         film.set_splat_scale(b as f32 / self.pt.spp as f32);
-        Ok(())
     }
 }
 impl Integrator for MCMC {
-    fn render(&self, scene: &Scene, film: &mut Film) -> luisa::Result<()> {
+    fn render(&self, scene: &Scene, film: &mut Film) {
         let resolution = scene.camera.resolution();
         log::info!(
             "Resolution {}x{}, spp: {}",
@@ -366,8 +365,7 @@ impl Integrator for MCMC {
         assert_eq!(resolution.y, film.resolution().y);
         film.clear();
         let color_repr = ColorRepr::Rgb;
-        let render_state = self.bootstrap(scene, &color_repr)?;
-        self.render_loop(scene, &color_repr, &render_state, film)?;
-        Ok(())
+        let render_state = self.bootstrap(scene, &color_repr);
+        self.render_loop(scene, &color_repr, &render_state, film);
     }
 }

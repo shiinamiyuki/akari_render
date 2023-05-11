@@ -47,6 +47,14 @@ impl PrimarySample {
         });
         Self { values }
     }
+    pub fn new(len: usize, sampler: &dyn Sampler) -> Self {
+        let values = VLArrayVar::zero(len);
+        for_range(const_(0)..values.len().int(), |i| {
+            let i = i.uint();
+            values.write(i, sampler.next_1d());
+        });
+        Self { values }
+    }
 }
 pub struct IndependentReplaySampler<S: IndependentSampler> {
     pub base: S,

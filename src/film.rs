@@ -32,14 +32,14 @@ impl Film {
     pub fn resolution(&self) -> Uint2 {
         self.resolution
     }
-    pub fn new(device: Device, resolution: Uint2, color: FilmColorRepr) -> luisa::Result<Self> {
+    pub fn new(device: Device, resolution: Uint2, color: FilmColorRepr) -> Self {
         let nvalues = color.nvalues();
         let pixels =
-            device.create_buffer::<f32>(resolution.x as usize * resolution.y as usize * nvalues)?;
+            device.create_buffer::<f32>(resolution.x as usize * resolution.y as usize * nvalues);
         let splat =
-            device.create_buffer::<f32>(resolution.x as usize * resolution.y as usize * nvalues)?;
-        let weights = device.create_buffer::<f32>(resolution.x as usize * resolution.y as usize)?;
-        Ok(Self {
+            device.create_buffer::<f32>(resolution.x as usize * resolution.y as usize * nvalues);
+        let weights = device.create_buffer::<f32>(resolution.x as usize * resolution.y as usize);
+        Self {
             device,
             splat,
             pixels,
@@ -47,7 +47,7 @@ impl Film {
             repr: color,
             resolution,
             splat_scale: 1.0,
-        })
+        }
     }
     pub fn set_splat_scale(&mut self, scale: f32) {
         self.splat_scale = scale;
@@ -99,7 +99,7 @@ impl Film {
         self.pixels.view(..).fill(0.0);
         self.weights.view(..).fill(0.0);
     }
-    pub fn copy_to_rgba_image(&self, image: &Tex2d<Float4>) -> luisa::Result<()> {
+    pub fn copy_to_rgba_image(&self, image: &Tex2d<Float4>) {
         assert_eq!(image.width(), self.resolution.x);
         assert_eq!(image.height(), self.resolution.y);
         self.device
@@ -128,7 +128,7 @@ impl Film {
                     }
                     _ => todo!(),
                 }
-            })?
+            })
             .dispatch([self.resolution.x, self.resolution.y, 1], &self.splat_scale)
     }
 }

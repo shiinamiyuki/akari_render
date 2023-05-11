@@ -8,7 +8,7 @@ use std::{path::PathBuf, rc::Rc};
 use crate::camera::PerspectiveCamera;
 use crate::color::glam_srgb_to_linear;
 use crate::light::area::AreaLight;
-use crate::light::WeightedLightDistribution;
+use crate::light::{LightAggregate, WeightedLightDistribution};
 use crate::scenegraph::node::CoordinateSystem;
 use crate::surface::diffuse::{DiffuseBsdf, DiffuseSurface};
 use crate::texture::{ConstFloatTexture, ConstRgbTexture};
@@ -29,20 +29,19 @@ use crate::{
 pub struct Scene {
     pub textures: Polymorphic<PolyKey, dyn Texture>,
     pub surfaces: Polymorphic<PolyKey, dyn Surface>,
-    pub lights: Polymorphic<PolyKey, dyn Light>,
-    pub light_distribution: Box<dyn LightDistribution>,
-    pub meshes: MeshAggregate,
+    pub lights: LightAggregate,
+    pub meshes: Arc<MeshAggregate>,
     pub camera: Box<dyn Camera>,
 }
 
 impl Scene {
-    pub fn load<P: AsRef<Path>>(device: Device, path: P) -> luisa::Result<Self> {
+    pub fn load<P: AsRef<Path>>(device: Device, path: P) -> Self {
         let path = PathBuf::from(path.as_ref());
         let canonical = fs::canonicalize(&path).unwrap();
         let parent_path = canonical.parent().unwrap();
         let serialized = std::fs::read_to_string(path).unwrap();
         let graph: node::Scene = serde_json::from_str(&serialized).unwrap_or_else(|e| {
-            log::error!("error during scene loading:{:?}", e);
+            log::error!("error during scene loading:{:}", e);
             std::process::exit(-1);
         });
         let loader = SceneLoader::new(
@@ -89,6 +88,7 @@ struct SceneLoader {
     surfaces: PolymorphicBuilder<PolyKey, dyn Surface>,
     textures: PolymorphicBuilder<PolyKey, dyn Texture>,
     lights: PolymorphicBuilder<PolyKey, dyn Light>,
+    light_ids_to_lights: Vec<TagIndex>,
     area_lights: Vec<TagIndex>,
     texture_cache: HashMap<String, TagIndex>,
     mesh_cache: HashMap<String, (Arc<TriangleMesh>, u32)>,
@@ -124,6 +124,7 @@ impl SceneLoader {
             light_weights: Vec::new(),
             instances: Vec::new(),
             area_lights: Vec::new(),
+            light_ids_to_lights: Vec::new(),
         }
     }
     fn resolve_file(&self, path: &String) -> File {
@@ -287,7 +288,7 @@ impl SceneLoader {
         self.emission_power.insert(tex_id, power);
         power
     }
-    fn load_shape(&mut self, node: &node::Shape) -> luisa::Result<MeshInstance> {
+    fn load_shape(&mut self, node: &node::Shape) -> MeshInstance {
         match node {
             node::Shape::Mesh {
                 path,
@@ -300,7 +301,7 @@ impl SceneLoader {
                     let mut file = self.resolve_file(path);
                     let model = Arc::new(TriangleMesh::decode(&mut file).unwrap());
                     let mesh_id = self.meshes.len() as u32;
-                    let mesh = Box::new(MeshBuffer::new(self.device.clone(), &model)?);
+                    let mesh = Box::new(MeshBuffer::new(self.device.clone(), &model));
                     self.mesh_cache
                         .insert(path.clone(), (model.clone(), mesh_id));
                     self.meshes.push(mesh);
@@ -320,20 +321,24 @@ impl SceneLoader {
                         let mesh = &mut self.meshes[id as usize];
                         let areas = model.areas();
                         if mesh.area_sampler.is_none() {
-                            mesh.build_area_sampler(self.device.clone(), &areas)?;
+                            mesh.build_area_sampler(self.device.clone(), &areas);
                         }
                         let weight = areas.par_iter().sum::<f32>() * determinant;
-                        self.light_weights.push(weight * power);
+                        let light_id = self.light_weights.len() as u32;
+
                         let i = self.lights.push(
                             PolyKey::Simple("area".into()),
                             AreaLight {
+                                light_id,
                                 instance_id: self.instances.len() as u32,
                                 area_sampling_index: u32::MAX,
                                 emission,
                             },
                         );
                         light = Some(i);
+                        self.light_ids_to_lights.push(i);
                         self.area_lights.push(i);
+                        self.light_weights.push(weight * power);
                     }
                 }
                 let mesh = &self.meshes[id as usize];
@@ -346,12 +351,12 @@ impl SceneLoader {
                     surface,
                 };
                 self.instances.push(instance);
-                Ok(instance)
+                instance
             }
             _ => unimplemented!(),
         }
     }
-    fn load(mut self) -> luisa::Result<Scene> {
+    fn load(mut self) -> Scene {
         self.camera = Some(match self.graph.camera {
             node::Camera::Perspective {
                 res,
@@ -366,11 +371,11 @@ impl SceneLoader {
                 fov.to_radians() as f32,
                 0.0,
                 1.0,
-            )?),
+            )),
         });
         let graph = self.graph.clone();
         for node in graph.shapes.iter() {
-            let _ = self.load_shape(node)?;
+            let _ = self.load_shape(node);
         }
         let SceneLoader {
             meshes,
@@ -378,33 +383,40 @@ impl SceneLoader {
             surfaces,
             mut instances,
             mut lights,
+            light_ids_to_lights,
             light_weights,
             area_lights,
             device,
             camera,
             ..
         } = self;
-        let textures = textures.build()?;
-        let surfaces = surfaces.build()?;
+        let textures = textures.build();
+        let surfaces = surfaces.build();
         let meshes = meshes.iter().map(|x| x.as_ref()).collect::<Vec<_>>();
-        let meshes = MeshAggregate::new(device.clone(), &meshes, &mut instances)?;
+        let meshes = Arc::new(MeshAggregate::new(device.clone(), &meshes, &mut instances));
         log::info!("Area light count: {}", area_lights.len());
         for i in area_lights {
             let mut area = lights.get_mut(i).downcast_mut::<AreaLight>().unwrap();
             area.area_sampling_index = meshes.mesh_id_to_area_samplers[&area.instance_id];
         }
-        let lights = lights.build()?;
+        let lights = lights.build();
         let light_distribution = Box::new(WeightedLightDistribution::new(
             device.clone(),
             &light_weights,
-        )?);
-        Ok(Scene {
+        ));
+        let light_ids_to_lights = device.create_buffer_from_slice(&light_ids_to_lights);
+        let lights = LightAggregate {
+            light_distribution,
+            lights,
+            light_ids_to_lights,
+            meshes: meshes.clone(),
+        };
+        Scene {
             textures,
             surfaces,
             lights,
-            light_distribution,
             meshes,
             camera: camera.unwrap(),
-        })
+        }
     }
 }

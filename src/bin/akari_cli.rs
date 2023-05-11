@@ -39,32 +39,19 @@ fn main() {
         .cloned()
         .unwrap_or("cpu".to_string());
     let ctx = luisa::Context::new(current_exe().unwrap());
-    let device = ctx.create_device(&device).unwrap_or_else(|e| {
-        println!("Failed to create device: {:?}", e);
-        exit(1);
-    });
-    let scene =
-        akari_render::scene::Scene::load(device.clone(), &scene.unwrap()).unwrap_or_else(|e| {
-            println!("Failed to load scene: {:?}", e);
-            exit(1);
-        });
+    let device = ctx.create_device(&device);
+    let scene = akari_render::scene::Scene::load(device.clone(), &scene.unwrap());
     let mut film = Film::new(
         device.clone(),
         scene.camera.resolution(),
         FilmColorRepr::SRgb,
-    )
-    .unwrap_or_else(|e| {
-        println!("Failed to create film: {:?}", e);
-        exit(1);
-    });
-    let output_image: luisa::Tex2d<luisa::Float4> = device
-        .create_tex2d(
-            luisa::PixelStorage::Float4,
-            scene.camera.resolution().x,
-            scene.camera.resolution().y,
-            1,
-        )
-        .unwrap();
+    );
+    let output_image: luisa::Tex2d<luisa::Float4> = device.create_tex2d(
+        luisa::PixelStorage::Float4,
+        scene.camera.resolution().x,
+        scene.camera.resolution().y,
+        1,
+    );
     // {
     //     let normal_vis = NormalVis::new(device.clone(), 1);
     //     normal_vis.render(&scene, &mut film).unwrap_or_else(|e| {
@@ -73,33 +60,26 @@ fn main() {
     //     });
     // }
     let tic = std::time::Instant::now();
-    // {
-    //     let pt = PathTracer::new(device.clone(), spp.unwrap_or(1), 64, 5);
-    //     pt.render(&scene, &mut film).unwrap_or_else(|e| {
-    //         println!("Render failed: {:?}", e);
-    //         exit(1);
-    //     });
-
-    // }
     {
-        let mcmc = MCMC::new(
-            device.clone(),
-            spp.unwrap_or(1),
-            1,
-            5,
-            mcmc::Method::Kelemen {
-                small_sigma: 0.01,
-                large_step_prob: 0.1,
-            },
-            100,
-            100000,
-        );
-        mcmc.render(&scene, &mut film).unwrap_or_else(|e| {
-            println!("Render failed: {:?}", e);
-            exit(1);
-        });
+        let pt = PathTracer::new(device.clone(), spp.unwrap_or(1), 64, 5, true);
+        pt.render(&scene, &mut film);
     }
-    film.copy_to_rgba_image(&output_image).unwrap();
+    // {
+    //     let mcmc = MCMC::new(
+    //         device.clone(),
+    //         spp.unwrap_or(1),
+    //         1,
+    //         5,
+    //         mcmc::Method::Kelemen {
+    //             small_sigma: 0.01,
+    //             large_step_prob: 0.1,
+    //         },
+    //         100,
+    //         100000,
+    //     );
+    //     mcmc.render(&scene, &mut film);
+    // }
+    film.copy_to_rgba_image(&output_image);
     let toc = std::time::Instant::now();
     log::info!("Rendered in {:.1}ms", (toc - tic).as_secs_f64() * 1e3);
 

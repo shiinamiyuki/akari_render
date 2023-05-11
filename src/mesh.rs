@@ -73,7 +73,7 @@ pub struct MeshBuffer {
     pub has_texcoords: bool,
 }
 impl MeshBuffer {
-    pub fn new(device: Device, mesh: &TriangleMesh) -> luisa::Result<Self> {
+    pub fn new(device: Device, mesh: &TriangleMesh) ->Self {
         let mut vertices = vec![];
         if !mesh.normals.is_empty() {
             assert_eq!(mesh.vertices.len(), mesh.normals.len());
@@ -100,24 +100,23 @@ impl MeshBuffer {
             };
             vertices.push(v);
         }
-        let vertices = device.create_buffer_from_slice(&vertices)?;
+        let vertices = device.create_buffer_from_slice(&vertices);
         let indices = device.create_buffer_from_slice(unsafe {
             std::slice::from_raw_parts(
                 mesh.indices.as_ptr() as *const PackedUint3,
                 mesh.indices.len(),
             )
-        })?;
-        Ok(Self {
+        });
+        Self {
             vertices,
             indices,
             area_sampler: None,
             has_normals: !mesh.normals.is_empty(),
             has_texcoords: !mesh.texcoords.is_empty(),
-        })
+        }
     }
-    pub fn build_area_sampler(&mut self, device: Device, areas: &[f32]) -> luisa::Result<()> {
-        self.area_sampler = Some(AliasTable::new(device, areas)?);
-        Ok(())
+    pub fn build_area_sampler(&mut self, device: Device, areas: &[f32]) {
+        self.area_sampler = Some(AliasTable::new(device, areas));
     }
 }
 #[repr(C)]
@@ -144,15 +143,15 @@ impl MeshAggregate {
         device: Device,
         meshes: &[&MeshBuffer],
         instances: &mut [MeshInstance],
-    ) -> luisa::Result<Self> {
+    ) -> Self {
         let count = meshes.len();
-        let mesh_vertices = device.create_bindless_array(count)?;
-        let mesh_indices = device.create_bindless_array(count)?;
-        let mesh_normals = device.create_bindless_array(count)?;
-        let mesh_texcoords = device.create_bindless_array(count)?;
-        let mesh_area_samplers = device.create_bindless_array(count * 2)?;
+        let mesh_vertices = device.create_bindless_array(count);
+        let mesh_indices = device.create_bindless_array(count);
+        let mesh_normals = device.create_bindless_array(count);
+        let mesh_texcoords = device.create_bindless_array(count);
+        let mesh_area_samplers = device.create_bindless_array(count * 2);
         let mut accel_meshes = Vec::with_capacity(meshes.len());
-        let accel = device.create_accel(AccelOption::default())?;
+        let accel = device.create_accel(AccelOption::default());
         let mut at_cnt = 0;
         let mut mesh_id_to_area_samplers = HashMap::new();
         for (i, mesh) in meshes.iter().enumerate() {
@@ -162,7 +161,7 @@ impl MeshAggregate {
                 mesh.vertices.view(..),
                 mesh.indices.view(..),
                 AccelOption::default(),
-            )?;
+            );
             accel_mesh.build(AccelBuildRequest::ForceBuild);
             accel_meshes.push(accel_mesh);
             if let Some(at) = &mesh.area_sampler {
@@ -180,13 +179,13 @@ impl MeshAggregate {
             accel.push_mesh(&accel_meshes[geom_id], inst.transform.m, u8::MAX, true);
         }
         accel.build(AccelBuildRequest::ForceBuild);
-        let mesh_instances = device.create_buffer_from_slice(instances)?;
+        let mesh_instances = device.create_buffer_from_slice(instances);
         mesh_vertices.update();
         mesh_normals.update();
         mesh_texcoords.update();
         mesh_indices.update();
         mesh_area_samplers.update();
-        Ok(Self {
+        Self {
             mesh_vertices,
             mesh_indices,
             mesh_instances,
@@ -194,7 +193,7 @@ impl MeshAggregate {
             accel,
             mesh_area_samplers,
             mesh_id_to_area_samplers,
-        })
+        }
     }
     pub fn triangle(&self, inst_id: Uint, prim_id: Uint) -> Expr<Triangle> {
         let inst = self.mesh_instances.var().read(inst_id);

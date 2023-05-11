@@ -14,7 +14,7 @@ impl NormalVis {
 }
 
 impl Integrator for NormalVis {
-    fn render(&self, scene: &Scene, film: &mut Film) -> luisa::Result<()> {
+    fn render(&self, scene: &Scene, film: &mut Film) {
         let resolution = scene.camera.resolution();
         log::info!(
             "Resolution {}x{}, spp: {}",
@@ -29,7 +29,7 @@ impl Integrator for NormalVis {
         let mut rng = thread_rng();
         let seeds = self
             .device
-            .create_buffer_from_fn(npixels, |_| rng.gen::<u32>())?;
+            .create_buffer_from_fn(npixels, |_| rng.gen::<u32>());
         let kernel = self.device.create_kernel::<(u32,)>(&|_spp: Expr<u32>| {
             let p = dispatch_id().xy();
             let i = p.x() + p.y() * resolution.x;
@@ -52,17 +52,15 @@ impl Integrator for NormalVis {
             });
             film.add_sample(p.float(), &color, ray_w);
             seeds.write(i, sampler.state.load());
-        })?;
+        });
         let stream = self.device.default_stream();
-        stream.with_scope(|s| -> luisa::Result<()> {
+        stream.with_scope(|s| {
             let mut cmds = vec![];
             for _ in 0..self.spp {
                 cmds.push(kernel.dispatch_async([resolution.x, resolution.y, 1], &self.spp));
             }
-            s.submit(cmds)?;
-            s.synchronize()?;
-            Ok(())
-        })?;
-        Ok(())
+            s.submit(cmds);
+            s.synchronize();
+        });
     }
 }
