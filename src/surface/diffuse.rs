@@ -19,7 +19,7 @@ pub struct DiffuseBsdf {
 impl Bsdf for DiffuseBsdf {
     fn evaluate(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &ShadingContext<'_>) -> Color {
         if_!(Frame::same_hemisphere(wo, wi), {
-            &self.reflectance * Float::from(FRAC_1_PI) * Frame::abs_cos_theta(wi)
+            &self.reflectance * Frame::abs_cos_theta(wi)
         }, else {
             Color::zero(&ctx.color_repr)
         })
@@ -38,7 +38,7 @@ impl Bsdf for DiffuseBsdf {
             make_float3(wi.x(), -wi.y(), wi.x()),
         );
         let pdf = Frame::abs_cos_theta(wi) * FRAC_1_PI;
-        let color = &self.reflectance * Float::from(FRAC_1_PI) * Frame::abs_cos_theta(wi);
+        let color = &self.reflectance * Frame::abs_cos_theta(wi);
         BsdfSample {
             wi,
             pdf,
