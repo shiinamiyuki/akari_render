@@ -61,13 +61,14 @@ impl MCMC {
         spp: u32,
         spp_per_pass: u32,
         max_depth: u32,
+        use_nee: bool,
         method: Method,
         n_chains: usize,
         n_bootstrap: usize,
     ) -> Self {
         Self {
             device: device.clone(),
-            pt: PathTracer::new(device.clone(), spp, spp_per_pass, max_depth, false),
+            pt: PathTracer::new(device.clone(), spp, spp_per_pass, max_depth, use_nee),
             method,
             n_chains,
             n_bootstrap,

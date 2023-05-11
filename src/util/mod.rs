@@ -75,7 +75,13 @@ impl FileResolver for LocalFileResolver {
         None
     }
 }
-
+pub fn write_image(color: &Tex2d<Float4>, path: &str) {
+    if path.ends_with(".exr") {
+        write_image_hdr(color, path)
+    } else {
+        write_image_ldr(color, path)
+    }
+}
 pub fn write_image_ldr(color: &Tex2d<Float4>, path: &str) {
     let color_buf = color.view(0).copy_to_vec::<Float4>();
     let img = image::RgbImage::from_fn(color.width(), color.height(), |x, y| {
@@ -87,6 +93,20 @@ pub fn write_image_ldr(color: &Tex2d<Float4>, path: &str) {
         image::Rgb([map(rgb.x), map(rgb.y), map(rgb.z)])
     });
     img.save(path).unwrap();
+}
+pub fn write_image_hdr(color: &Tex2d<Float4>, path: &str) {
+    let color_buf = color.view(0).copy_to_vec::<Float4>();
+    exr::prelude::write_rgb_file(
+        path,
+        color.width() as usize,
+        color.height() as usize,
+        |x, y| {
+            let i = x + y * color.width() as usize;
+            let pixel: glam::Vec4 = color_buf[i].into();
+            (pixel.x, pixel.y, pixel.z)
+        },
+    )
+    .unwrap();
 }
 
 pub fn erf_inv(x: Expr<f32>) -> Expr<f32> {

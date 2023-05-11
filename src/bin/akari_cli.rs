@@ -60,28 +60,29 @@ fn main() {
     //     });
     // }
     let tic = std::time::Instant::now();
-    {
-        let pt = PathTracer::new(device.clone(), spp.unwrap_or(1), 64, 5, true);
-        pt.render(&scene, &mut film);
-    }
     // {
-    //     let mcmc = MCMC::new(
-    //         device.clone(),
-    //         spp.unwrap_or(1),
-    //         1,
-    //         5,
-    //         mcmc::Method::Kelemen {
-    //             small_sigma: 0.01,
-    //             large_step_prob: 0.1,
-    //         },
-    //         100,
-    //         100000,
-    //     );
-    //     mcmc.render(&scene, &mut film);
+    //     let pt = PathTracer::new(device.clone(), spp.unwrap_or(1), 64, 5, true);
+    //     pt.render(&scene, &mut film);
     // }
+    {
+        let mcmc = MCMC::new(
+            device.clone(),
+            spp.unwrap_or(1),
+            1,
+            5,
+            true,
+            mcmc::Method::Kelemen {
+                small_sigma: 0.01,
+                large_step_prob: 0.1,
+            },
+            100,
+            100000,
+        );
+        mcmc.render(&scene, &mut film);
+    }
     film.copy_to_rgba_image(&output_image);
     let toc = std::time::Instant::now();
     log::info!("Rendered in {:.1}ms", (toc - tic).as_secs_f64() * 1e3);
 
-    akari_render::util::write_image_ldr(&output_image, &output);
+    akari_render::util::write_image(&output_image, &output);
 }
