@@ -3,14 +3,11 @@ use super::Integrator;
 use crate::{
     color::*,
     film::*,
-    geometry::*,
-    interaction::*,
     sampler::{
         mcmc::{IsotropicGaussianMutation, LargeStepMutation, Mutation},
         *,
     },
     scene::*,
-    surface::Bsdf,
     util::alias_table::AliasTable,
     *,
 };
@@ -83,7 +80,7 @@ pub struct MarkovState {
     n_mutations: u64,
 }
 struct RenderState {
-    rng_states: Buffer<u32>,
+    rng_states: Buffer<Pcg32>,
     samples: Buffer<f32>,
     states: Buffer<MarkovState>,
     b_init: f32,
@@ -113,11 +110,11 @@ impl Mcmc {
     fn scalar_contribution(&self, color: &Color) -> Expr<f32> {
         color.max()
     }
-    fn evaluate<S: IndependentSampler + Clone>(
+    fn evaluate(
         &self,
         scene: &Scene,
         color_repr: &ColorRepr,
-        independent: S,
+        independent: &IndependentSampler,
         sample: PrimarySample,
     ) -> (Expr<Uint2>, Color, Expr<f32>) {
         let sampler = IndependentReplaySampler::new(independent, sample);
@@ -130,10 +127,7 @@ impl Mcmc {
         (p.uint(), l.clone(), self.scalar_contribution(&l))
     }
     fn bootstrap(&self, scene: &Scene, color_repr: &ColorRepr) -> RenderState {
-        let mut rng = thread_rng();
-        let seeds = self
-            .device
-            .create_buffer_from_fn(self.n_bootstrap + self.n_chains, |_| rng.gen::<u32>());
+        let seeds = init_pcg32_buffer(self.device.clone(), self.n_bootstrap + self.n_chains);
 
         let fs = self
             .device
@@ -142,16 +136,16 @@ impl Mcmc {
             .create_kernel::<()>(&|| {
                 let i = dispatch_id().x();
                 let seed = seeds.var().read(i);
-                let lcg_sampler = LcgSampler {
-                    state: var!(u32, seed),
+                let sampler = IndependentSampler {
+                    state: var!(Pcg32, seed),
                 };
                 let sample = VLArrayVar::<f32>::zero(self.sample_dimension());
                 for_range(const_(0)..sample.len().int(), |i| {
                     let i = i.uint();
-                    sample.write(i, lcg_sampler.next_1d());
+                    sample.write(i, sampler.next_1d());
                 });
                 let sample = PrimarySample { values: sample };
-                let (_p, _l, f) = self.evaluate(scene, color_repr, lcg_sampler.clone(), sample);
+                let (_p, _l, f) = self.evaluate(scene, color_repr, &sampler, sample);
                 fs.var().write(i, f);
             })
             .dispatch([self.n_bootstrap as u32, 1, 1]);
@@ -167,18 +161,18 @@ impl Mcmc {
             .create_kernel::<()>(&|| {
                 let i = dispatch_id().x();
                 let seed = seeds.var().read(i + self.n_bootstrap as u32);
-                let lcg_sampler = LcgSampler {
-                    state: var!(u32, seed),
+                let sampler = IndependentSampler {
+                    state: var!(Pcg32, seed),
                 };
-                let (seed_idx, _, _) = at.sample_and_remap(lcg_sampler.next_1d());
+                let (seed_idx, _, _) = at.sample_and_remap(sampler.next_1d());
                 let seed = seeds.var().read(seed_idx);
-                let lcg_sampler = LcgSampler {
-                    state: var!(u32, seed),
+                let sampler = IndependentSampler {
+                    state: var!(Pcg32, seed),
                 };
                 let sample = VLArrayVar::<f32>::zero(self.sample_dimension());
                 for_range(const_(0)..sample.len().int(), |i| {
                     let i = i.uint();
-                    sample.write(i, lcg_sampler.next_1d());
+                    sample.write(i, sampler.next_1d());
                 });
 
                 for_range(const_(0)..sample.len().int(), |j| {
@@ -189,15 +183,13 @@ impl Mcmc {
                         .write(i * dim as u32 + j, sample.read(j));
                 });
                 let sample = PrimarySample { values: sample };
-                let (p, l, f) = self.evaluate(scene, color_repr, lcg_sampler.clone(), sample);
+                let (p, l, f) = self.evaluate(scene, color_repr, &sampler, sample);
                 let l = l.flatten();
                 let state = MarkovStateExpr::new(i, l, p, f, f, 1, 0, 0);
                 states.var().write(i, state);
             })
             .dispatch([self.n_chains as u32, 1, 1]);
-        let rng_states = self
-            .device
-            .create_buffer_from_fn(self.n_chains, |_| rng.gen::<u32>());
+        let rng_states = init_pcg32_buffer(self.device.clone(), self.n_chains);
         RenderState {
             rng_states,
             samples: sample_buffer,
@@ -206,7 +198,7 @@ impl Mcmc {
             b_init_cnt: self.n_bootstrap as u32,
         }
     }
-    fn mutate_chain<S: IndependentSampler + Clone>(
+    fn mutate_chain(
         &self,
         scene: &Scene,
         color_repr: &ColorRepr,
@@ -215,7 +207,7 @@ impl Mcmc {
         contribution: Expr<f32>,
         state: Var<MarkovState>,
         sample: PrimarySample,
-        rng: S,
+        rng: &IndependentSampler,
     ) {
         // select a mutation strategy
         match self.method {
@@ -233,7 +225,7 @@ impl Mcmc {
                 });
                 let clamped = proposal.sample.clamped();
                 let (proposal_p, proposal_color, f) =
-                    self.evaluate(scene, color_repr, rng.clone(), clamped);
+                    self.evaluate(scene, color_repr, &rng, clamped);
                 let proposal_f = f;
                 if_!(is_large_step, {
                     state.set_b(state.b().load() + proposal_f);
@@ -278,8 +270,8 @@ impl Mcmc {
     ) {
         let i = dispatch_id().x();
         let markov_states = render_state.states.var();
-        let sampler = LcgSampler {
-            state: var!(u32, render_state.rng_states.var().read(i)),
+        let sampler = IndependentSampler {
+            state: var!(Pcg32, render_state.rng_states.var().read(i)),
         };
         let state = var!(MarkovState, markov_states.read(i));
         let sample = {
@@ -301,7 +293,7 @@ impl Mcmc {
                 contribution,
                 state,
                 sample,
-                sampler.clone(),
+                &sampler,
             );
         });
         {

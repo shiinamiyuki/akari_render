@@ -11,7 +11,7 @@ pub struct Proposal {
 pub trait Mutation {
     // fn weight(&self) -> f32;
     fn log_pdf(&self, cur: &PrimarySample, proposal: &PrimarySample) -> Expr<f32>;
-    fn mutate(&self, s: &PrimarySample, sampler: &dyn IndependentSampler) -> Proposal;
+    fn mutate(&self, s: &PrimarySample, sampler: &IndependentSampler) -> Proposal;
 }
 // pub struct AnisotropicDiagonalGaussianMutation {
 //     pub sigma: VLArrayExpr<f32>,
@@ -63,7 +63,7 @@ impl Mutation for IsotropicGaussianMutation {
             + cur.values.len().float() * const_(0.5 * (2.0f32 * PI).ln());
         log_prob
     }
-    fn mutate(&self, s: &PrimarySample, sampler: &dyn IndependentSampler) -> Proposal {
+    fn mutate(&self, s: &PrimarySample, sampler: &IndependentSampler) -> Proposal {
         let values = VLArrayVar::<f32>::zero(s.values.static_len());
         for_range(const_(0)..values.len().int(), |i| {
             let i = i.uint();
@@ -85,7 +85,7 @@ impl Mutation for LargeStepMutation {
     fn log_pdf(&self, _cur: &PrimarySample, _proposal: &PrimarySample) -> Expr<f32> {
         const_(0.0f32)
     }
-    fn mutate(&self, s: &PrimarySample, sampler: &dyn IndependentSampler) -> Proposal {
+    fn mutate(&self, s: &PrimarySample, sampler: &IndependentSampler) -> Proposal {
         let values = VLArrayVar::<f32>::zero(s.values.static_len());
         for_range(const_(0)..values.len().int(), |i| {
             let i = i.uint();

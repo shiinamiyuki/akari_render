@@ -13,7 +13,7 @@ pub struct PathTracer {
     pub spp_per_pass: u32,
     pub use_nee: bool,
     pub rr_depth: u32,
-    config:Config,
+    config: Config,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -45,7 +45,7 @@ impl PathTracer {
             spp_per_pass: config.spp_per_pass,
             use_nee: config.use_nee,
             rr_depth: config.rr_depth,
-            config
+            config,
         }
     }
 }
@@ -168,19 +168,15 @@ impl Integrator for PathTracer {
         assert_eq!(resolution.x, film.resolution().x);
         assert_eq!(resolution.y, film.resolution().y);
         film.clear();
-        let mut rng = thread_rng();
-        let seeds = self
-            .device
-            .create_buffer_from_fn(npixels, |_| rng.gen::<u32>());
+        let rngs = init_pcg32_buffer(self.device.clone(), npixels);
         let kernel = self
             .device
             .create_kernel::<(u32,)>(&|spp_per_pass: Expr<u32>| {
                 let p = dispatch_id().xy();
                 let i = p.x() + p.y() * resolution.x;
-                let seeds = seeds.var();
-                let seed = seeds.read(i);
-                let sampler = LcgSampler {
-                    state: var!(u32, seed),
+                let rngs = rngs.var();
+                let sampler = IndependentSampler {
+                    state: var!(Pcg32, rngs.read(i)),
                 };
                 for_range(const_(0)..spp_per_pass.int(), |_| {
                     let color_repr = ColorRepr::Rgb;
@@ -189,7 +185,7 @@ impl Integrator for PathTracer {
                     let l = self.radiance(scene, ray, &sampler, &color_repr) * ray_color;
                     film.add_sample(p.float(), &l, ray_w);
                 });
-                seeds.write(i, sampler.state.load());
+                rngs.write(i, sampler.state.load());
             });
         let stream = self.device.default_stream();
         let mut cnt = 0;

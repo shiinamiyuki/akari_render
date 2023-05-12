@@ -159,3 +159,12 @@ pub fn erf(x: Expr<f32>) -> Expr<f32> {
         1.0 as f32 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * (-x * x).exp();
     sign * y
 }
+
+pub fn mix_bits(mut v: Expr<u64>) -> Expr<u64> {
+    v ^= v >> 31;
+    v *= 0x7fb5d329728ea185;
+    v ^= v >> 27;
+    v *= 0x81dadef4bc2dd44d;
+    v ^= v >> 33;
+    v
+}

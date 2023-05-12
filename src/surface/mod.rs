@@ -5,6 +5,7 @@ use crate::{
     *,
 };
 pub mod diffuse;
+pub mod principled;
 #[derive(Clone, Aggregate)]
 pub struct BsdfSample {
     pub wi: Expr<Float3>,
@@ -36,6 +37,7 @@ pub struct BsdfClosure {
 }
 
 impl Bsdf for BsdfClosure {
+     // return f(wo, wi) * cos_theta(wi)
     fn evaluate(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &ShadingContext<'_>) -> Color {
         self.inner
             .evaluate(self.frame.to_local(wo), self.frame.to_local(wi), ctx)
