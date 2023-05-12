@@ -2,26 +2,50 @@ use luisa::rtx::offset_ray_origin;
 use rand::{thread_rng, Rng};
 
 use super::Integrator;
-
 use crate::{
     color::*, film::*, geometry::*, interaction::*, sampler::*, scene::*, surface::Bsdf, *,
 };
+use serde::{Deserialize, Serialize};
 pub struct PathTracer {
     pub device: Device,
     pub spp: u32,
     pub max_depth: u32,
     pub spp_per_pass: u32,
     pub use_nee: bool,
+    pub rr_depth: u32,
+    config:Config,
 }
 
+#[derive(Clone, Serialize, Deserialize, Debug)]
+#[serde(default)]
+pub struct Config {
+    pub spp: u32,
+    pub max_depth: u32,
+    pub spp_per_pass: u32,
+    pub use_nee: bool,
+    pub rr_depth: u32,
+}
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            spp: 256,
+            max_depth: 7,
+            rr_depth: 5,
+            spp_per_pass: 64,
+            use_nee: true,
+        }
+    }
+}
 impl PathTracer {
-    pub fn new(device: Device, spp: u32, spp_per_pass: u32, max_depth: u32, use_nee: bool) -> Self {
+    pub fn new(device: Device, config: Config) -> Self {
         Self {
             device,
-            spp,
-            max_depth,
-            spp_per_pass,
-            use_nee,
+            spp: config.spp,
+            max_depth: config.max_depth,
+            spp_per_pass: config.spp_per_pass,
+            use_nee: config.use_nee,
+            rr_depth: config.rr_depth,
+            config
         }
     }
 }
@@ -103,7 +127,6 @@ impl PathTracer {
                         l.store(&(l.load() + beta.load() * bsdf_f * &sample.li / sample.pdf * w));
                     });
                 }
-
                 // BSDF sampling
                 surface.dispatch(|_tag, _key, surface| {
                     let bsdf = surface.closure(si, &ctx);
@@ -111,9 +134,18 @@ impl PathTracer {
                     let wi = sample.wi;
                     let f = &sample.color;
                     beta.store(&(beta.load() * f / sample.pdf));
+
                     prev_bsdf_pdf.store(sample.pdf);
                     let ro = offset_ray_origin(p, ng);
                     ray.store(RayExpr::new(ro, wi, 1e-3, 1e20));
+                });
+                if_!(depth.load().cmpgt(self.rr_depth), {
+                    let cont_prob = beta.load().max().clamp(0.0, 1.0) * 0.95;
+                    if_!(sampler.next_1d().cmpgt(cont_prob), {
+                        break_();
+                    }, else {
+                        beta.store(&(beta.load() / cont_prob));
+                    });
                 });
             }, else {
                 break_();
@@ -127,10 +159,10 @@ impl Integrator for PathTracer {
     fn render(&self, scene: &Scene, film: &mut Film) {
         let resolution = scene.camera.resolution();
         log::info!(
-            "Resolution {}x{}, spp: {}",
+            "Resolution {}x{}\nconfig:{:#?}",
             resolution.x,
             resolution.y,
-            self.spp
+            &self.config
         );
         let npixels = resolution.x as usize * resolution.y as usize;
         assert_eq!(resolution.x, film.resolution().x);
@@ -175,4 +207,9 @@ impl Integrator for PathTracer {
         });
         progress.finish();
     }
+}
+
+pub fn render(device: Device, scene: &Scene, film: &mut Film, config: &Config) {
+    let pt = PathTracer::new(device.clone(), config.clone());
+    pt.render(scene, film);
 }

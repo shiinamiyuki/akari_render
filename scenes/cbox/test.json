@@ -1,0 +1,22 @@
+[
+    {
+        "method":{
+            "type":"pt",
+            "use_nee":false
+        },
+        "out":"output/vanilla.exr"
+    },
+    {
+        "method":{
+            "type":"pt",
+            "use_nee":true
+        },
+        "out":"output/nee.exr"
+    },
+    {
+        "method":{
+            "type":"mcmc"
+        },
+        "out":"output/mcmc.exr"
+    }
+]

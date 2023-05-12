@@ -95,6 +95,12 @@ impl ColorVar {
     }
 }
 impl Color {
+    pub fn max(&self) -> Expr<f32> {
+        match self {
+            Color::Rgb(v) => v.reduce_max(),
+            Color::Spectral(_) => todo!(),
+        }
+    }
     pub fn flatten(&self) -> Expr<FlatColor> {
         match self {
             Color::Rgb(rgb) => FlatColorExpr::new(make_float4(rgb.x(), rgb.y(), rgb.z(), 0.0)),

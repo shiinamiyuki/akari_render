@@ -1,6 +1,4 @@
-use rand::{thread_rng, Rng};
-
-use super::pt::PathTracer;
+use super::pt::{self, PathTracer};
 use super::Integrator;
 use crate::{
     color::*,
@@ -16,8 +14,10 @@ use crate::{
     util::alias_table::AliasTable,
     *,
 };
+use rand::{thread_rng, Rng};
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum Method {
     Kelemen {
         small_sigma: f32,
@@ -26,12 +26,49 @@ pub enum Method {
     LangevinOnline,
     LangevinHybrid,
 }
-pub struct MCMC {
+impl Default for Method {
+    fn default() -> Self {
+        Method::Kelemen {
+            small_sigma: 0.01,
+            large_step_prob: 0.1,
+        }
+    }
+}
+pub struct Mcmc {
     pub device: Device,
     pub pt: PathTracer,
     pub method: Method,
     pub n_chains: usize,
     pub n_bootstrap: usize,
+    config: Config,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+#[serde(default)]
+pub struct Config {
+    pub spp: u32,
+    pub max_depth: u32,
+    pub rr_depth: u32,
+    pub spp_per_pass: u32,
+    pub use_nee: bool,
+    pub method: Method,
+    pub n_chains: usize,
+    pub n_bootstrap: usize,
+}
+impl Default for Config {
+    fn default() -> Self {
+        let default_pt = pt::Config::default();
+        Self {
+            spp: default_pt.spp,
+            spp_per_pass: default_pt.spp_per_pass,
+            use_nee: default_pt.use_nee,
+            max_depth: default_pt.max_depth,
+            rr_depth: default_pt.rr_depth,
+            method: Method::default(),
+            n_chains: 512,
+            n_bootstrap: 100000,
+        }
+    }
 }
 #[derive(Clone, Copy, Debug, Value)]
 #[repr(C)]
@@ -52,33 +89,29 @@ struct RenderState {
     b_init: f32,
     b_init_cnt: u32,
 }
-impl MCMC {
+impl Mcmc {
     fn sample_dimension(&self) -> usize {
-        4 + self.pt.max_depth as usize * 4
+        4 + self.pt.max_depth as usize * 5
     }
-    pub fn new(
-        device: Device,
-        spp: u32,
-        spp_per_pass: u32,
-        max_depth: u32,
-        use_nee: bool,
-        method: Method,
-        n_chains: usize,
-        n_bootstrap: usize,
-    ) -> Self {
+    pub fn new(device: Device, config: Config) -> Self {
+        let pt_config = pt::Config {
+            spp: config.spp,
+            max_depth: config.max_depth,
+            spp_per_pass: config.spp_per_pass,
+            use_nee: config.use_nee,
+            rr_depth: config.rr_depth,
+        };
         Self {
             device: device.clone(),
-            pt: PathTracer::new(device.clone(), spp, spp_per_pass, max_depth, use_nee),
-            method,
-            n_chains,
-            n_bootstrap,
+            pt: PathTracer::new(device.clone(), pt_config),
+            method: config.method,
+            n_chains: config.n_chains,
+            n_bootstrap: config.n_bootstrap,
+            config,
         }
     }
     fn scalar_contribution(&self, color: &Color) -> Expr<f32> {
-        match color {
-            Color::Rgb(v) => v.reduce_max(),
-            Color::Spectral(_) => todo!(),
-        }
+        color.max()
     }
     fn evaluate<S: IndependentSampler + Clone>(
         &self,
@@ -352,16 +385,15 @@ impl MCMC {
         film.set_splat_scale(b as f32 / self.pt.spp as f32);
     }
 }
-impl Integrator for MCMC {
+impl Integrator for Mcmc {
     fn render(&self, scene: &Scene, film: &mut Film) {
         let resolution = scene.camera.resolution();
         log::info!(
-            "Resolution {}x{}, spp: {}",
+            "Resolution {}x{}\nconfig: {:#?}",
             resolution.x,
             resolution.y,
-            self.pt.spp
+            &self.config
         );
-
         assert_eq!(resolution.x, film.resolution().x);
         assert_eq!(resolution.y, film.resolution().y);
         film.clear();
@@ -369,4 +401,9 @@ impl Integrator for MCMC {
         let render_state = self.bootstrap(scene, &color_repr);
         self.render_loop(scene, &color_repr, &render_state, film);
     }
+}
+
+pub fn render(device: Device, scene: &Scene, film: &mut Film, config: &Config) {
+    let mcmc = Mcmc::new(device.clone(), config.clone());
+    mcmc.render(scene, film);
 }
