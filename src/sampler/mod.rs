@@ -117,6 +117,7 @@ impl<'a> IndependentReplaySampler<'a> {
         }
     }
 }
+
 impl<'a> Sampler for IndependentReplaySampler<'a> {
     fn next_1d(&self) -> Float {
         if_!(self.cur_dim.load().cmplt(self.sample.values.len()), {
@@ -124,7 +125,6 @@ impl<'a> Sampler for IndependentReplaySampler<'a> {
             self.cur_dim.store(self.cur_dim.load() + 1);
             ret
         }, else {
-            lc_assert!(false);
             self.base.next_1d()
         })
     }

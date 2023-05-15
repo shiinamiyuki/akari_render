@@ -88,7 +88,7 @@ struct RenderState {
 }
 impl Mcmc {
     fn sample_dimension(&self) -> usize {
-        4 + self.pt.max_depth as usize * 5
+        4 + self.pt.max_depth as usize * (3 + 3 + 1)
     }
     pub fn new(device: Device, config: Config) -> Self {
         let pt_config = pt::Config {

@@ -24,7 +24,8 @@ pub trait Light {
     fn sample_direct(
         &self,
         pn: Expr<PointNormal>,
-        u: Expr<Float2>,
+        u_select:Expr<f32>,
+        u_sample: Expr<Float2>,
         ctx: &ShadingContext<'_>,
     ) -> LightSample;
     fn pdf_direct(
@@ -90,15 +91,15 @@ impl LightAggregate {
     pub fn sample_direct(
         &self,
         pn: Expr<PointNormal>,
-        u: Expr<Float2>,
+        u_select:Expr<f32>,
+        u_sample: Expr<Float2>,
         ctx: &ShadingContext<'_>,
     ) -> (LightSample, PolymorphicRef<PolyKey, dyn Light>) {
         let light_dist = &self.light_distribution;
-        let (light_idx, light_choice_pdf, remapped_u_y) = light_dist.sample_and_remap(u.y());
-        let u = u.set_y(remapped_u_y);
+        let (light_idx, light_choice_pdf, u_select) = light_dist.sample_and_remap(u_select);
         let light = self.light_ids_to_lights.var().read(light_idx);
         let light = self.lights.get(light);
-        let mut sample = light.dispatch(|_, _, light| light.sample_direct(pn, u, ctx));
+        let mut sample = light.dispatch(|_, _, light| light.sample_direct(pn, u_select, u_sample, ctx));
         sample.pdf = sample.pdf * light_choice_pdf;
         (sample, light)
     }

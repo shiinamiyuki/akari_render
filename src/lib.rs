@@ -11,11 +11,10 @@ pub use luisa::{
         Buffer, BufferVar, BufferView, Tex2d, Tex2dVar, Tex2dView, Tex3d, Tex3dVar, Tex3dView,
     },
     rtx,
-    runtime::{Command, Device, Kernel, Stream},
+    runtime::{create_static_callable, Callable, Command, Device, Kernel, Stream},
 };
-pub use rayon::prelude::*;
 pub use luisa_compute as luisa;
-pub mod mesh;
+pub use rayon::prelude::*;
 pub mod camera;
 pub mod color;
 pub mod film;
@@ -24,6 +23,8 @@ pub mod geometry;
 pub mod integrator;
 pub mod interaction;
 pub mod light;
+pub mod mesh;
+mod microfacet;
 pub mod sampler;
 pub mod sampling;
 pub mod scene;

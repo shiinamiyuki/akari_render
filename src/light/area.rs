@@ -34,7 +34,8 @@ impl Light for AreaLightExpr {
     fn sample_direct(
         &self,
         pn: Expr<PointNormal>,
-        u: Expr<Float2>,
+        u_select: Expr<f32>,
+        u_sample: Expr<Float2>,
         ctx: &ShadingContext<'_>,
     ) -> LightSample {
         let scene = ctx.scene;
@@ -43,10 +44,9 @@ impl Light for AreaLightExpr {
         let at_entries = area_samplers.buffer::<AliasTableEntry>(self.area_sampling_index());
         let at_pdf = area_samplers.buffer::<f32>(self.area_sampling_index() + 1);
         let at = BindlessAliasTableVar(at_entries, at_pdf);
-        let (prim_id, pdf, u_x) = at.sample_and_remap(u.x());
-        let u = u.set_x(u_x);
+        let (prim_id, pdf, _) = at.sample_and_remap(u_select);
         let shading_triangle = meshes.shading_triangle(self.instance_id(), prim_id);
-        let bary = uniform_sample_triangle(u);
+        let bary = uniform_sample_triangle(u_sample);
         let area = shading_triangle.area();
         let p = shading_triangle.p(bary);
         let n = shading_triangle.n(bary);

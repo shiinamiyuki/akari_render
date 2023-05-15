@@ -232,6 +232,18 @@ impl std::ops::Add<Color> for Color {
         &self + &rhs
     }
 }
+impl std::ops::Sub<&Color> for Color {
+    type Output = Self;
+    fn sub(self, rhs: &Self) -> Self::Output {
+        &self + rhs
+    }
+}
+impl std::ops::Sub<Color> for Color {
+    type Output = Self;
+    fn sub(self, rhs: Self) -> Self::Output {
+        &self + &rhs
+    }
+}
 impl std::ops::Mul<&Color> for &Color {
     type Output = Color;
 
@@ -270,7 +282,25 @@ impl std::ops::Add<&Color> for &Color {
         }
     }
 }
+impl std::ops::Sub<&Color> for &Color {
+    type Output = Color;
 
+    fn sub(self, rhs: &Color) -> Self::Output {
+        match (self, rhs) {
+            (Color::Spectral(s), Color::Spectral(t)) => Color::Spectral(SampledSpectrum {
+                samples: s
+                    .samples
+                    .iter()
+                    .zip(t.samples.iter())
+                    .map(|(x, y)| *x - *y)
+                    .collect(),
+                wavelengths: s.wavelengths.clone(),
+            }),
+            (Color::Rgb(s), Color::Rgb(t)) => Color::Rgb(*s - *t),
+            _ => panic!("cannot multiply spectral and rgb"),
+        }
+    }
+}
 #[inline]
 pub fn f32_srgb_to_linear1(s: f32) -> f32 {
     if s <= 0.04045 {

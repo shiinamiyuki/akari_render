@@ -6,6 +6,7 @@ use crate::{
     color::*, film::*, geometry::*, interaction::*, sampler::*, scene::*, surface::Bsdf, *,
 };
 use serde::{Deserialize, Serialize};
+
 pub struct PathTracer {
     pub device: Device,
     pub spp: u32,
@@ -79,6 +80,7 @@ impl PathTracer {
         };
         let prev_bsdf_pdf = var!(f32);
         let prev_n = var!(Float3, ray.d());
+
         loop_!({
             let si = scene.intersect(ray.load());
             let wo = -ray.d().load();
@@ -88,6 +90,7 @@ impl PathTracer {
                 let instance = scene.meshes.mesh_instances.var().read(inst_id);
                 if_!(instance.light().valid(), {
                     let direct = scene.lights.le(ray.load(), si, &ctx);
+
                     if_!(depth.load().cmpeq(0) | !self.use_nee, {
                         l.store(&(l.load() + beta.load() * &direct));
                     }, else {
@@ -112,25 +115,27 @@ impl PathTracer {
                 // Direct Lighting
                 if self.use_nee {
                     let pn = PointNormalExpr::new(p, ng);
-                    let (sample, _) = scene.lights.sample_direct(pn, sampler.next_2d(), &ctx);
+                    let (sample, _) = scene.lights.sample_direct(pn,sampler.next_1d(), sampler.next_2d(), &ctx);
                     let wi = sample.wi;
-                    let (bsdf_f, bsdf_pdf) = surface.dispatch(|_tag, _key, surface| {
+                    let ( bsdf_f, bsdf_pdf) = surface.dispatch(|_tag, _key, surface| {
                         let bsdf = surface.closure(si, &ctx);
                         let pdf = bsdf.pdf(wo, wi, &ctx);
                         let f = bsdf.evaluate(wo, wi, &ctx);
                         (f, pdf)
                     });
+
                     let w = mis_weight(sample.pdf, bsdf_pdf, 1);
                     let occluded = scene.occlude(sample.shadow_ray);
                     // cpu_dbg!(sample.pdf);
                     if_!(!occluded, {
                         l.store(&(l.load() + beta.load() * bsdf_f * &sample.li / sample.pdf * w));
                     });
+
                 }
                 // BSDF sampling
                 surface.dispatch(|_tag, _key, surface| {
                     let bsdf = surface.closure(si, &ctx);
-                    let sample = bsdf.sample(wo, sampler.next_1d(), sampler.next_2d(), &ctx);
+                    let sample = bsdf.sample(wo,sampler.next_1d(), sampler.next_2d(), &ctx);
                     let wi = sample.wi;
                     let f = &sample.color;
                     beta.store(&(beta.load() * f / sample.pdf));
