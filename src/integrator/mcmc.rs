@@ -15,7 +15,7 @@ use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
-#[serde(tag="type")]
+#[serde(tag = "type")]
 pub enum Method {
     #[serde(rename = "kelemen")]
     Kelemen {
@@ -154,6 +154,10 @@ impl Mcmc {
 
         let weights = fs.copy_to_vec();
         let b = weights.iter().sum::<f32>();
+        log::info!(
+            "Normalization factor initial estimate: {}",
+            b / self.n_bootstrap as f32
+        );
         let at = AliasTable::new(self.device.clone(), &weights);
         let states = self.device.create_buffer(self.n_chains);
         let sample_buffer = self
@@ -187,7 +191,7 @@ impl Mcmc {
                 let sample = PrimarySample { values: sample };
                 let (p, l, f) = self.evaluate(scene, color_repr, &sampler, sample);
                 let l = l.flatten();
-                let state = MarkovStateExpr::new(i, l, p, f, f, 1, 0, 0);
+                let state = MarkovStateExpr::new(i, l, p, f, 0.0, 0, 0, 0);
                 states.var().write(i, state);
             })
             .dispatch([self.n_chains as u32, 1, 1]);
@@ -374,6 +378,7 @@ impl Mcmc {
         }
         let accept_rate = accepted as f64 / mutations as f64;
         let b = b / b_cnt as f64;
+        log::info!("#indenpentent proposals: {}", b_cnt);
         log::info!("Normalization factor: {}", b);
         log::info!("Acceptance rate: {:.2}%", accept_rate * 100.0);
         film.set_splat_scale(b as f32 / self.pt.spp as f32);
