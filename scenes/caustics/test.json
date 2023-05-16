@@ -1,0 +1,12 @@
+[
+    {
+        "method":{
+            "type":"mcmc",
+            "direct_spp":64,
+            "max_depth":12,
+            "spp":512,
+            "spp_per_pass":16
+        },
+        "out":"output/test.exr"
+    }
+]

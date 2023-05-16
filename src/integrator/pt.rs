@@ -6,7 +6,7 @@ use crate::{
     color::*, film::*, geometry::*, interaction::*, sampler::*, scene::*, surface::Bsdf, *,
 };
 use serde::{Deserialize, Serialize};
-
+#[derive(Clone)]
 pub struct PathTracer {
     pub device: Device,
     pub spp: u32,
@@ -14,6 +14,7 @@ pub struct PathTracer {
     pub spp_per_pass: u32,
     pub use_nee: bool,
     pub rr_depth: u32,
+    pub indirect_only: bool,
     config: Config,
 }
 
@@ -25,6 +26,7 @@ pub struct Config {
     pub spp_per_pass: u32,
     pub use_nee: bool,
     pub rr_depth: u32,
+    pub indirect_only: bool,
 }
 impl Default for Config {
     fn default() -> Self {
@@ -34,6 +36,7 @@ impl Default for Config {
             rr_depth: 5,
             spp_per_pass: 64,
             use_nee: true,
+            indirect_only: false,
         }
     }
 }
@@ -46,6 +49,7 @@ impl PathTracer {
             spp_per_pass: config.spp_per_pass,
             use_nee: config.use_nee,
             rr_depth: config.rr_depth,
+            indirect_only: config.indirect_only,
             config,
         }
     }
@@ -88,7 +92,8 @@ impl PathTracer {
 
                 let inst_id = si.inst_id();
                 let instance = scene.meshes.mesh_instances.var().read(inst_id);
-                if_!(instance.light().valid(), {
+                
+                if_!(instance.light().valid() & (!self.indirect_only | depth.load().cmpgt(1)), {
                     let direct = scene.lights.le(ray.load(), si, &ctx);
 
                     if_!(depth.load().cmpeq(0) | !self.use_nee, {
@@ -114,21 +119,24 @@ impl PathTracer {
                 });
                 // Direct Lighting
                 if self.use_nee {
-                    let pn = PointNormalExpr::new(p, ng);
-                    let (sample, _) = scene.lights.sample_direct(pn,sampler.next_1d(), sampler.next_2d(), &ctx);
-                    let wi = sample.wi;
-                    let ( bsdf_f, bsdf_pdf) = surface.dispatch(|_tag, _key, surface| {
-                        let bsdf = surface.closure(si, &ctx);
-                        let pdf = bsdf.pdf(wo, wi, &ctx);
-                        let f = bsdf.evaluate(wo, wi, &ctx);
-                        (f, pdf)
-                    });
+                    if_!(!self.indirect_only | depth.load().cmpgt(1), {
+                        let pn = PointNormalExpr::new(p, ng);
+                        let (sample, _) = scene.lights.sample_direct(pn,sampler.next_1d(), sampler.next_2d(), &ctx);
+                        let wi = sample.wi;
+                        let ( bsdf_f, bsdf_pdf) = surface.dispatch(|_tag, _key, surface| {
+                            let bsdf = surface.closure(si, &ctx);
+                            let pdf = bsdf.pdf(wo, wi, &ctx);
+                            let f = bsdf.evaluate(wo, wi, &ctx);
+                            (f, pdf)
+                        });
+                        
 
-                    let w = mis_weight(sample.pdf, bsdf_pdf, 1);
-                    let occluded = scene.occlude(sample.shadow_ray);
-                    // cpu_dbg!(sample.pdf);
-                    if_!(!occluded, {
-                        l.store(&(l.load() + beta.load() * bsdf_f * &sample.li / sample.pdf * w));
+                        let w = mis_weight(sample.pdf, bsdf_pdf, 1);
+                        let occluded = scene.occlude(sample.shadow_ray);
+                        // cpu_dbg!(sample.pdf);
+                        if_!(!occluded & sample.pdf.cmpgt(0.0), {
+                            l.store(&(l.load() + beta.load() * bsdf_f * &sample.li / sample.pdf * w));
+                        });
                     });
 
                 }
@@ -157,7 +165,7 @@ impl PathTracer {
 
             });
         });
-        l.load()
+        l.load().remove_nan()
     }
 }
 impl Integrator for PathTracer {
@@ -172,7 +180,6 @@ impl Integrator for PathTracer {
         let npixels = resolution.x as usize * resolution.y as usize;
         assert_eq!(resolution.x, film.resolution().x);
         assert_eq!(resolution.y, film.resolution().y);
-        film.clear();
         let rngs = init_pcg32_buffer(self.device.clone(), npixels);
         let kernel = self
             .device

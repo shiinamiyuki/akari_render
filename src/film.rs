@@ -18,6 +18,7 @@ impl FilmColorRepr {
         }
     }
 }
+#[derive(Clone)]
 pub struct Film {
     device: Device,
     pixels: Buffer<f32>,

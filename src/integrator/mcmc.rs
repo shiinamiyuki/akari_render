@@ -53,6 +53,7 @@ pub struct Config {
     pub method: Method,
     pub n_chains: usize,
     pub n_bootstrap: usize,
+    pub direct_spp: i32,
 }
 impl Default for Config {
     fn default() -> Self {
@@ -66,6 +67,7 @@ impl Default for Config {
             method: Method::default(),
             n_chains: 512,
             n_bootstrap: 100000,
+            direct_spp: 64,
         }
     }
 }
@@ -99,6 +101,7 @@ impl Mcmc {
             spp_per_pass: config.spp_per_pass,
             use_nee: config.use_nee,
             rr_depth: config.rr_depth,
+            indirect_only: config.direct_spp >= 0,
         };
         Self {
             device: device.clone(),
@@ -154,6 +157,7 @@ impl Mcmc {
 
         let weights = fs.copy_to_vec();
         let b = weights.iter().sum::<f32>();
+        assert!(b > 0.0, "Bootstrap failed, please retry with more samples");
         log::info!(
             "Normalization factor initial estimate: {}",
             b / self.n_bootstrap as f32
@@ -395,7 +399,24 @@ impl Integrator for Mcmc {
         );
         assert_eq!(resolution.x, film.resolution().x);
         assert_eq!(resolution.y, film.resolution().y);
-        film.clear();
+        if self.config.direct_spp > 0 {
+            log::info!(
+                "Rendering direct illumination: {} spp",
+                self.config.direct_spp
+            );
+            let direct = PathTracer::new(
+                self.device.clone(),
+                pt::Config {
+                    max_depth: 2,
+                    rr_depth: 2,
+                    spp: self.config.direct_spp as u32,
+                    indirect_only: false,
+                    spp_per_pass: self.pt.spp_per_pass,
+                    use_nee: self.pt.use_nee,
+                },
+            );
+            direct.render(scene, film);
+        }
         let color_repr = ColorRepr::Rgb;
         let render_state = self.bootstrap(scene, &color_repr);
         self.render_loop(scene, &color_repr, &render_state, film);

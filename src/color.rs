@@ -93,6 +93,7 @@ impl ColorVar {
             ColorVar::Rgb(v) => v.store(color.as_rgb()),
         }
     }
+    
 }
 impl Color {
     pub fn max(&self) -> Expr<f32> {
@@ -168,6 +169,19 @@ impl Color {
                 .fold(Float::from(0.0), |acc, x| acc.max(*x)),
             Color::Rgb(s) => s.reduce_max(),
         }
+    }
+    pub fn has_nan(&self) -> Expr<bool> {
+        match self {
+            Color::Spectral(s) => todo!(),
+            Color::Rgb(v) => v.is_nan().any(),
+        }
+    }
+    pub fn remove_nan(&self) -> Self {
+        if_!(self.has_nan(), {
+            Self::zero(&self.repr())
+        }, else {
+            self.clone()
+        })
     }
 }
 impl std::ops::Mul<Float> for &Color {

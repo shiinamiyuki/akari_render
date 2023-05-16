@@ -25,7 +25,6 @@ impl Integrator for NormalVis {
         let npixels = resolution.x as usize * resolution.y as usize;
         assert_eq!(resolution.x, film.resolution().x);
         assert_eq!(resolution.y, film.resolution().y);
-        film.clear();
         let rngs = init_pcg32_buffer(self.device.clone(), npixels);
         let kernel = self.device.create_kernel::<(u32,)>(&|_spp: Expr<u32>| {
             let p = dispatch_id().xy();

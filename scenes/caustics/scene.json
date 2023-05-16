@@ -1,0 +1,180 @@
+{
+    "bsdfs": {
+        "Material.001": {
+            "kr": {
+                "type": "linear",
+                "values": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "kt": {
+                "type": "linear",
+                "values": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "dispersion": 0.01342,
+            "roughness": {
+                "type": "Float",
+                "value": 0.01
+            },
+            "ior": 1.4,
+            "type": "glass"
+        },
+        "Material.002": {
+            "anisotropic": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "anisotropic_rotation": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "clearcoat": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "clearcoat_roughness": {
+                "type": "Float",
+                "value": 0.029999999329447746
+            },
+            "color": {
+                "type": "srgb",
+                "values": [
+                    0.9063317179679871,
+                    0.9063317179679871,
+                    0.9063317179679871
+                ]
+            },
+            "emission": {
+                "type": "linear",
+                "values": [
+                    800.0,
+                    800.0,
+                    800.0
+                ]
+            },
+            "ior": {
+                "type": "Float",
+                "value": 1.4500000476837158
+            },
+            "metallic": {
+                "type": "Float",
+                "value": 0.5555555820465088
+            },
+            "roughness": {
+                "type": "Float",
+                "value": 0.07432941347360611
+            },
+            "sheen": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "sheen_tint": {
+                "type": "Float",
+                "value": 0.5
+            },
+            "specular": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "specular_tint": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "subsurface": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "subsurface_color": {
+                "type": "srgb",
+                "values": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            "subsurface_ior": {
+                "type": "Float",
+                "value": 1.4500000476837158
+            },
+            "subsurface_radius": {
+                "type": "linear",
+                "values": [
+                    1.0,
+                    0.20000000298023224,
+                    0.10000000149011612
+                ]
+            },
+            "transmission": {
+                "type": "Float",
+                "value": 0.0
+            },
+            "type": "principled"
+        },
+        "diffuse": {
+            "color": {
+                "type": "linear",
+                "values": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "type": "diffuse"
+        }
+    },
+    "camera": {
+        "focal": 1.0,
+        "fov": 55.8,
+        "lens_radius": 0.0,
+        "res": [
+            512,
+            512
+        ],
+        "transform": {
+            "translate": [
+                -6.1611,
+                3.08421,
+                5.79831
+            ],
+            "rotate": [
+                38,
+                0.0,
+                -129.0
+            ],
+            "scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "coord_sys": "blender"
+        },
+        "type": "perspective"
+    },
+    "lights": [],
+    "shapes": [
+        {
+            "bsdf": "diffuse",
+            "path": "caustics_Plane_0.mesh",
+            "transform": null,
+            "type": "mesh"
+        },
+        {
+            "bsdf": "Material.002",
+            "path": "caustics_Plane.001_1.mesh",
+            "transform": null,
+            "type": "mesh"
+        },
+        {
+            "bsdf": "Material.001",
+            "path": "caustics_mesh_00001(1)_2.mesh",
+            "transform": null,
+            "type": "mesh"
+        }
+    ]
+}
