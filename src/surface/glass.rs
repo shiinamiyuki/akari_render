@@ -35,7 +35,6 @@ impl Surface for GlassSurfaceExpr {
             eta_t: self.eta(),
         });
         let roughness = ctx.texture(self.roughness()).dispatch(|_,_,tex|tex.evaluate(si, ctx).x());
-        let fresnel = Box::new(ConstFresnel{});
         let reflection = Box::new(MicrofacetReflection {
             color: kr,
             fresnel: fresnel.clone(),
@@ -55,15 +54,15 @@ impl Surface for GlassSurfaceExpr {
             eta_b:self.eta(),
         });
         let eta = self.eta();
-        // let fresnel_blend = Box::new(BsdfMixture {
-        //     frac: Box::new(move |wo, _| -> Expr<f32> {
-        //         fr_dielectric(Frame::cos_theta(wo), const_(1.0f32), eta)
-        //     }),
-        //     bsdf_a: reflection,
-        //     bsdf_b: transmission,
-        // });
+        let fresnel_blend = Box::new(BsdfMixture {
+            frac: Box::new(move |wo, _| -> Expr<f32> {
+                fr_dielectric(Frame::cos_theta(wo), const_(1.0f32), eta)
+            }),
+            bsdf_a: reflection,
+            bsdf_b: transmission,
+        });
         BsdfClosure {
-            inner: transmission,
+            inner: fresnel_blend,
             frame: si.frame(),
         }
     }

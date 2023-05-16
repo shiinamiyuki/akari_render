@@ -130,7 +130,7 @@
     },
     "camera": {
         "focal": 1.0,
-        "fov": 55.8,
+        "fov": 30.0,
         "lens_radius": 0.0,
         "res": [
             512,

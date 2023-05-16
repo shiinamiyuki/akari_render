@@ -21,6 +21,7 @@ pub enum Method {
     Kelemen {
         small_sigma: f32,
         large_step_prob: f32,
+        adaptive: bool,
     },
     LangevinOnline,
     LangevinHybrid,
@@ -30,6 +31,7 @@ impl Default for Method {
         Method::Kelemen {
             small_sigma: 0.01,
             large_step_prob: 0.1,
+            adaptive: false,
         }
     }
 }
@@ -82,6 +84,7 @@ pub struct MarkovState {
     b_cnt: u64,
     n_accepted: u64,
     n_mutations: u64,
+    sigma: f32,
 }
 struct RenderState {
     rng_states: Buffer<Pcg32>,
@@ -113,7 +116,7 @@ impl Mcmc {
         }
     }
     fn scalar_contribution(&self, color: &Color) -> Expr<f32> {
-        color.max()
+        color.max().clamp(0.0, 1e5)
     }
     fn evaluate(
         &self,
@@ -195,7 +198,11 @@ impl Mcmc {
                 let sample = PrimarySample { values: sample };
                 let (p, l, f) = self.evaluate(scene, color_repr, &sampler, sample);
                 let l = l.flatten();
-                let state = MarkovStateExpr::new(i, l, p, f, 0.0, 0, 0, 0);
+                let sigma = match &self.method {
+                    Method::Kelemen { small_sigma, .. } => *small_sigma,
+                    _ => todo!(),
+                };
+                let state = MarkovStateExpr::new(i, l, p, f, 0.0, 0, 0, 0, sigma);
                 states.var().write(i, state);
             })
             .dispatch([self.n_chains as u32, 1, 1]);
@@ -222,15 +229,16 @@ impl Mcmc {
         // select a mutation strategy
         match self.method {
             Method::Kelemen {
-                small_sigma,
+                small_sigma: _,
                 large_step_prob,
+                adaptive,
             } => {
                 let is_large_step = rng.next_1d().cmplt(large_step_prob);
                 let proposal = if_!(is_large_step, {
                     let large = LargeStepMutation{};
                     large.mutate(&sample, &rng)
                 }, else {
-                    let small = IsotropicGaussianMutation{sigma: small_sigma.into()};
+                    let small = IsotropicGaussianMutation{sigma: state.sigma().load()};
                     small.mutate(&sample, &rng)
                 });
                 let clamped = proposal.sample.clamped();
@@ -261,10 +269,23 @@ impl Mcmc {
                     state.set_cur_f(proposal_f);
                     state.set_cur_color(proposal_color.flatten());
                     state.set_cur_pixel(proposal_p);
-                    state.set_n_accepted(state.n_accepted().load() + 1);
+                    if_!(!is_large_step, {
+                        state.set_n_accepted(state.n_accepted().load() + 1);
+                    });
                     sample.values.store(clamped.values.load());
                 });
-                state.set_n_mutations(state.n_mutations().load() + 1);
+                if_!(!is_large_step, {
+                    state.set_n_mutations(state.n_mutations().load() + 1);
+                    if adaptive {
+                        let r =
+                            state.n_accepted().load().float() / state.n_mutations().load().float();
+                        const OPTIMAL_ACCEPT_RATE: f32 = 0.234;
+                        let new_sigma = state.sigma().load()
+                            + (r - OPTIMAL_ACCEPT_RATE) / state.n_mutations().load().float();
+                        let new_sigma = new_sigma.clamp(1e-5,0.1);
+                        state.sigma().store(new_sigma);
+                    }
+                });
             }
             _ => todo!(),
         }

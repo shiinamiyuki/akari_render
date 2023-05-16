@@ -200,8 +200,8 @@ impl Bsdf for MicrofacetTransmission {
         }, else {
             let f = self.fresnel.evaluate(wo.dot(wh), ctx);
             let sqrt_denom = wo.dot(wh) + eta * wi.dot(wh);
-            // (Color::one(&ctx.color_repr) - f)
-                &self.color *(self.dist.d(wh)
+            (Color::one(&ctx.color_repr) - f)
+                * &self.color *(self.dist.d(wh)
                 * self.dist.g(wo, wi) * eta.sqr()
                 * wi.dot(wh).abs() * wo.dot(wh).abs()
                 / (cos_i * cos_o * sqrt_denom.sqr())).abs() * cos_o.abs()

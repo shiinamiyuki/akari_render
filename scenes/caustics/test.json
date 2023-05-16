@@ -1,12 +1,21 @@
 [
     {
-        "method":{
-            "type":"mcmc",
-            "direct_spp":64,
-            "max_depth":12,
-            "spp":512,
-            "spp_per_pass":16
+        "method": {
+            "type": "mcmc",
+            "method": {
+                "small_sigma": 0.01,
+                "large_step_prob": 0.1,
+                "adaptive": true,
+                "type": "kelemen"
+            },
+            "direct_spp": 16,
+            "max_depth": 12,
+            "spp": 512,
+            "spp_per_pass": 16,
+            "n_chains": 1024,
+            "n_bootstrap":1000000,
+            "use_nee":true
         },
-        "out":"output/test.exr"
+        "out": "output/test.exr"
     }
 ]
