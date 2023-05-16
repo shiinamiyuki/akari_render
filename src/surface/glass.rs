@@ -10,12 +10,13 @@ use crate::surface::{
 };
 use crate::*;
 
-use super::{Bsdf, BsdfClosure, BsdfSample, Surface};
+use super::{Bsdf, BsdfClosure, BsdfSample, Surface, MicrofacetTransmission, ConstFresnel};
 #[derive(Debug, Clone, Copy, Value)]
 #[repr(C)]
 pub struct GlassSurface {
-    pub color: TagIndex,
-    pub roughness: f32,
+    pub kr: TagIndex,
+    pub kt: TagIndex,
+    pub roughness: TagIndex,
     pub eta: f32,
 }
 
@@ -25,38 +26,44 @@ impl Surface for GlassSurfaceExpr {
         si: Expr<interaction::SurfaceInteraction>,
         ctx: &ShadingContext<'_>,
     ) -> BsdfClosure {
-        let color = ctx.texture(self.color());
-        let color = ctx.color_from_float4(color.dispatch(|_, _, tex| tex.evaluate(si, ctx)));
+        let kr = ctx.texture(self.kr());
+        let kr = ctx.color_from_float4(kr.dispatch(|_, _, tex| tex.evaluate(si, ctx)));
+        let kt = ctx.texture(self.kt());
+        let kt = ctx.color_from_float4(kt.dispatch(|_, _, tex| tex.evaluate(si, ctx)));
         let fresnel = Box::new(FresnelDielectric {
             eta_i: const_(1.0f32),
             eta_t: self.eta(),
         });
+        let roughness = ctx.texture(self.roughness()).dispatch(|_,_,tex|tex.evaluate(si, ctx).x());
+        let fresnel = Box::new(ConstFresnel{});
         let reflection = Box::new(MicrofacetReflection {
-            color: color.clone(),
+            color: kr,
             fresnel: fresnel.clone(),
             dist: Box::new(TrowbridgeReitzDistribution::from_roughness(make_float2(
-                self.roughness(),
-                self.roughness(),
-            ))),
+                roughness,
+                roughness,
+            ), false)),
         });
-        let transmission = Box::new(MicrofacetReflection {
-            color,
+        let transmission = Box::new(MicrofacetTransmission {
+            color: kt,
             fresnel: fresnel.clone(),
             dist: Box::new(TrowbridgeReitzDistribution::from_roughness(make_float2(
-                self.roughness(),
-                self.roughness(),
-            ))),
+                roughness,
+                roughness,
+            ), false)),
+            eta_a:const_(1.0f32),
+            eta_b:self.eta(),
         });
         let eta = self.eta();
-        let fresnel_blend = Box::new(BsdfMixture {
-            frac: Box::new(move |wo, _| -> Expr<f32> {
-                fr_dielectric(Frame::cos_theta(wo), const_(1.0f32), eta)
-            }),
-            bsdf_a: reflection,
-            bsdf_b: transmission,
-        });
+        // let fresnel_blend = Box::new(BsdfMixture {
+        //     frac: Box::new(move |wo, _| -> Expr<f32> {
+        //         fr_dielectric(Frame::cos_theta(wo), const_(1.0f32), eta)
+        //     }),
+        //     bsdf_a: reflection,
+        //     bsdf_b: transmission,
+        // });
         BsdfClosure {
-            inner: fresnel_blend,
+            inner: transmission,
             frame: si.frame(),
         }
     }

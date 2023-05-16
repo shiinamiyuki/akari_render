@@ -11,6 +11,7 @@ use crate::light::area::AreaLight;
 use crate::light::{LightAggregate, WeightedLightDistribution};
 use crate::scenegraph::node::CoordinateSystem;
 use crate::surface::diffuse::{DiffuseBsdf, DiffuseSurface};
+use crate::surface::glass::GlassSurface;
 use crate::texture::{ConstFloatTexture, ConstRgbTexture};
 use crate::util::binserde::Decode;
 use crate::util::{FileResolver, LocalFileResolver};
@@ -239,6 +240,22 @@ impl SceneLoader {
                 let i = self.surfaces.push(
                     PolyKey::Simple("diffuse".into()),
                     DiffuseSurface { reflectance: color },
+                );
+                (i, None)
+            }
+            node::Bsdf::Glass { ior, kr, kt, roughness,.. } => {
+                let kr = self.load_texture(kr);
+                let kt = self.load_texture(kt);
+                let roughness = self.load_texture(roughness);
+                let ior = *ior;
+                let i = self.surfaces.push(
+                    PolyKey::Simple("diffuse".into()),
+                    GlassSurface {
+                        eta: ior,
+                        kr,
+                        kt,
+                        roughness,
+                    },
                 );
                 (i, None)
             }

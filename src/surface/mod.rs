@@ -21,7 +21,7 @@ pub struct BsdfSample {
 }
 
 pub trait Bsdf {
-    // return f(wo, wi) * cos_theta(wi)
+    // return f(wo, wi) * abs_cos_theta(wi)
     fn evaluate(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &ShadingContext<'_>) -> Color;
     fn sample(
         &self,
@@ -92,7 +92,7 @@ pub struct BsdfClosure {
 }
 
 impl Bsdf for BsdfClosure {
-    // return f(wo, wi) * cos_theta(wi)
+    // return f(wo, wi) * abs_cos_theta(wi)
     fn evaluate(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &ShadingContext<'_>) -> Color {
         self.inner
             .evaluate(self.frame.to_local(wo), self.frame.to_local(wi), ctx)
@@ -131,14 +131,14 @@ pub struct MicrofacetReflection {
 impl Bsdf for MicrofacetReflection {
     fn evaluate(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &ShadingContext<'_>) -> Color {
         let wh = wo + wi;
-        if_!(Frame::same_hemisphere(wo, wi) & wh.cmpne(0.0).any(), {
+        if_!(Frame::same_hemisphere(wo, wi), {
             let wh = wh.normalize();
-            let f = self.fresnel.evaluate(wi.dot(face_forward(wi, make_float3(0.0,1.0,0.0))), ctx);
+            let f = self.fresnel.evaluate(wi.dot(face_forward(wh, make_float3(0.0,1.0,0.0))), ctx);
             let d = self.dist.d(wh);
             let g = self.dist.g(wo, wi);
             let cos_o = Frame::cos_theta(wo);
             let cos_i = Frame::cos_theta(wi);
-            &self.color * &f * (0.25 * d * g / (cos_i*cos_o)).abs()
+            &self.color * &f * (0.25 * d * g / (cos_i * cos_o)).abs() * cos_o.abs()
         }, else {
             Color::zero(&ctx.color_repr)
         })
@@ -162,7 +162,7 @@ impl Bsdf for MicrofacetReflection {
         }
     }
 
-    fn pdf(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &ShadingContext<'_>) -> Float {
+    fn pdf(&self, wo: Expr<Float3>, wi: Expr<Float3>, _ctx: &ShadingContext<'_>) -> Float {
         let wh = wo + wi;
         if_!(Frame::same_hemisphere(wo, wi) & wh.cmpne(0.0).any(), {
             let wh = wh.normalize();
@@ -192,16 +192,19 @@ impl Bsdf for MicrofacetTransmission {
         );
         let wh = (wo + wi * eta).normalize();
         let wh = select(wh.y().cmplt(0.0), -wh, wh);
-        if_!((wh.dot(wo) * wi.dot(wh)).cmplt(0.0), {
+        if_!((wh.dot(wo) * wi.dot(wh)).cmpgt(0.0)
+            | cos_i.cmpeq(0.0)
+            | cos_o.cmpeq(0.0)
+            | Frame::same_hemisphere(wo, wi), {
             Color::zero(&ctx.color_repr)
         }, else {
             let f = self.fresnel.evaluate(wo.dot(wh), ctx);
-            let sqrt_denom =wo.dot(wh) + eta * wi.dot(wh);
-            (Color::one(&ctx.color_repr) - f)
-                * &self.color *(self.dist.d(wh)
+            let sqrt_denom = wo.dot(wh) + eta * wi.dot(wh);
+            // (Color::one(&ctx.color_repr) - f)
+                &self.color *(self.dist.d(wh)
                 * self.dist.g(wo, wi) * eta.sqr()
                 * wi.dot(wh).abs() * wo.dot(wh).abs()
-                / (cos_i * cos_o * sqrt_denom.sqr())).abs()
+                / (cos_i * cos_o * sqrt_denom.sqr())).abs() * cos_o.abs()
         })
     }
 
@@ -216,8 +219,8 @@ impl Bsdf for MicrofacetTransmission {
         let cos_o = Frame::cos_theta(wo);
         let eta = select(
             cos_o.cmpgt(0.0),
-            self.eta_b / self.eta_a,
             self.eta_a / self.eta_b,
+            self.eta_b / self.eta_a,
         );
         let valid = wo.dot(wh).cmpgt(0.0);
         let (refracted, wi) = refract(wo, wh, eta);
@@ -230,7 +233,7 @@ impl Bsdf for MicrofacetTransmission {
         }
     }
 
-    fn pdf(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &ShadingContext<'_>) -> Float {
+    fn pdf(&self, wo: Expr<Float3>, wi: Expr<Float3>, _ctx: &ShadingContext<'_>) -> Float {
         let cos_o = Frame::cos_theta(wo);
         let cos_i = Frame::cos_theta(wi);
         let eta = select(
@@ -239,7 +242,10 @@ impl Bsdf for MicrofacetTransmission {
             self.eta_a / self.eta_b,
         );
         let wh = (wo + wi * eta).normalize();
-        if_!((wh.dot(wo) * wi.dot(wh)).cmplt(0.0), {
+        if_!((wh.dot(wo) * wi.dot(wh)).cmpgt(0.0)
+            | cos_i.cmpeq(0.0)
+            | cos_o.cmpeq(0.0)
+            | Frame::same_hemisphere(wo, wi), {
             const_(0.0f32)
         }, else {
             let sqrt_denom =wo.dot(wh) + eta * wi.dot(wh);
@@ -278,5 +284,12 @@ pub struct FresnelDielectric {
 impl Fresnel for FresnelDielectric {
     fn evaluate(&self, cos_theta_i: Expr<f32>, ctx: &ShadingContext<'_>) -> Color {
         Color::one(&ctx.color_repr) * fr_dielectric(cos_theta_i, self.eta_i, self.eta_t)
+    }
+}
+#[derive(Copy, Clone)]
+pub struct ConstFresnel {}
+impl Fresnel for ConstFresnel {
+    fn evaluate(&self, _: Expr<f32>, ctx: &ShadingContext<'_>) -> Color {
+        Color::one(&ctx.color_repr)
     }
 }

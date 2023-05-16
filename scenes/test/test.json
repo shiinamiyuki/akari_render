@@ -1,0 +1,15 @@
+[
+    {
+        "method":{
+            "type":"mcmc",
+            "method":{
+                "type":"kelemen",
+                "small_sigma":0.01,
+                "large_step_prob":0.1
+            },
+            "use_nee":false,
+            "spp":100
+        },
+        "out":"output/test.png"
+    }
+]

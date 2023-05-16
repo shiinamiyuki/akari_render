@@ -15,7 +15,9 @@ use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[serde(tag="type")]
 pub enum Method {
+    #[serde(rename = "kelemen")]
     Kelemen {
         small_sigma: f32,
         large_step_prob: f32,
@@ -340,7 +342,7 @@ impl Mcmc {
             while cnt < self.pt.spp {
                 let cur_pass = (self.pt.spp - cnt).min(spp_per_pass);
                 let n_mutations = npixels as u64 * cur_pass as u64;
-                let mutations_per_chain = n_mutations / self.n_chains as u64;
+                let mutations_per_chain = (n_mutations / self.n_chains as u64).max(1);
                 if mutations_per_chain > u32::MAX as u64 {
                     panic!("Number of mutations per chain exceeds u32::MAX, please reduce spp per pass or increase number of chains");
                 }

@@ -1,4 +1,4 @@
-use crate::geometry::Frame;
+use crate::geometry::{spherical_to_xyz, spherical_to_xyz2, Frame};
 use crate::*;
 use lazy_static::lazy_static;
 use std::f32::consts::PI;
@@ -18,22 +18,26 @@ pub trait MicrofacetDistribution {
 
 pub struct TrowbridgeReitzDistribution {
     pub alpha: Expr<Float2>,
+    pub sample_visible: bool,
 }
 impl TrowbridgeReitzDistribution {
-    pub const MIN_ROUGHNESS: f32 = 1e-4;
-    pub fn from_alpha(alpha: Expr<Float2>) -> Self {
-        Self { alpha }
+    pub const MIN_ALPHA: f32 = 1e-4;
+    pub fn from_alpha(alpha: Expr<Float2>, sample_visible: bool) -> Self {
+        Self {
+            alpha: alpha.max(Self::MIN_ALPHA),
+            sample_visible,
+        }
     }
-    pub fn from_roughness(roughness: Expr<Float2>) -> Self {
-        let alpha = roughness.sqr().max(Self::MIN_ROUGHNESS);
-        Self::from_alpha(alpha)
+    pub fn from_roughness(roughness: Expr<Float2>, sample_visible: bool) -> Self {
+        let alpha = roughness.sqr();
+        Self::from_alpha(alpha, sample_visible)
     }
 }
 lazy_static! {
     static ref TR_D_IMPL: Callable<(Expr<Float3>, Expr<Float2>), Expr<f32>> =
         create_static_callable::<(Expr<Float3>, Expr<Float2>), Expr<f32>>(|wh, alpha| {
             let tan2_theta = Frame::tan2_theta(wh);
-            let cos4_theta = Frame::cos2_theta(wh) * Frame::cos2_theta(wh);
+            let cos4_theta = Frame::cos2_theta(wh).sqr();
             let ax = alpha.x();
             let ay = alpha.y();
             let e =
@@ -52,10 +56,10 @@ lazy_static! {
         });
     static ref TR_SAMPLE_11: Callable<(Expr<f32>, Expr<Float2>), Expr<Float2>> =
         create_static_callable::<(Expr<f32>, Expr<Float2>), Expr<Float2>>(|cos_theta, u| {
-            if_then_else(
+            if_!(
                 cos_theta.cmplt(0.99999),
-                || {
-                    let sin_theta = (1.0 - cos_theta * cos_theta).max(0.0).sqrt();
+                 {
+                    let sin_theta = (1.0 - cos_theta.sqr()).max(0.0).sqrt();
                     let tan_theta = sin_theta / cos_theta;
                     let a = 1.0 / tan_theta;
                     let g1 = 2.0 / (1.0 + (1.0 + 1.0 / a.sqr()).sqrt());
@@ -81,11 +85,11 @@ lazy_static! {
                     let slope_y = s * z * (1.0 + slope_x.sqr()).sqrt();
                     make_float2(slope_x, slope_y)
                 },
-                || {
+                else {
                     let r = (u.x() / (1.0 - u.x())).sqrt();
                     let phi = 2.0 * PI * u.y();
                     make_float2(r * phi.cos(), r * phi.sin())
-                },
+                }
             )
         });
     static ref TR_SAMPLE: Callable<(Expr<Float3>, Expr<Float2>, Expr<Float2>), Expr<Float3>> =
@@ -116,16 +120,89 @@ impl MicrofacetDistribution for TrowbridgeReitzDistribution {
     }
 
     fn sample_wh(&self, wo: Expr<Float3>, u: Expr<Float2>) -> Expr<Float3> {
-        let s = select(
-            Frame::cos_theta(wo).cmpgt(0.0),
-            const_(1.0f32),
-            const_(-1.0f32),
-        );
-        let wh = TR_SAMPLE.call(s * wo, self.alpha, u);
-        s * wh
+        if self.sample_visible {
+            let s = select(
+                Frame::cos_theta(wo).cmpgt(0.0),
+                const_(1.0f32),
+                const_(-1.0f32),
+            );
+            let wh = TR_SAMPLE.call(s * wo, self.alpha, u);
+            s * wh
+        } else {
+            let (phi, cos_theta) = if_!(self.alpha.x().cmpeq(self.alpha.y()), {
+                let phi = 2.0 * PI * u.y();
+                let tan_theta2 = self.alpha.x().sqr() * u.x() / (1.0 - u.x());
+                let cos_theta = 1.0 / (1.0 + tan_theta2).sqrt();
+                (phi, cos_theta)
+            }, else {
+                let phi = (self.alpha.y() / self.alpha.x() * (2.0 * PI * u.y() + PI * 0.5).tan()).atan();
+                let phi = select(u.y().cmpgt(0.5), phi + PI, phi);
+                let sin_phi = phi.sin();
+                let cos_phi = phi.cos();
+                let ax2 = self.alpha.x().sqr();
+                let ay2 = self.alpha.y().sqr();
+                let a2 = 1.0 / (cos_phi.sqr() / ax2 + sin_phi.sqr() / ay2);
+                let tan_theta2 = a2 * u.x() / (1.0 - u.x());
+                let cos_theta = 1.0 / (1.0 + tan_theta2).sqrt();
+                (phi, cos_theta)
+            });
+            let sin_theta = (1.0 - cos_theta.sqr()).max(0.0).sqrt();
+            let wh = spherical_to_xyz2(cos_theta, sin_theta, phi);
+            let wh = select(Frame::cos_theta(wo).cmpgt(0.0), wh, -wh);
+            wh
+        }
     }
 
     fn pdf(&self, wo: Expr<Float3>, wh: Expr<Float3>) -> Expr<f32> {
-        self.d(wh) * self.g1(wo) * wo.dot(wh).abs() / Frame::abs_cos_theta(wo)
+        if self.sample_visible {
+            self.d(wh) * self.g1(wo) * wo.dot(wh).abs() / Frame::abs_cos_theta(wo)
+        } else {
+            self.d(wh) * Frame::abs_cos_theta(wh)
+        }
+    }
+}
+#[cfg(test)]
+mod test {
+    use std::env::current_exe;
+
+    use crate::sampler::{init_pcg32_buffer, IndependentSampler, Pcg32, Sampler};
+
+    use super::*;
+
+    #[test]
+    fn tr_sample_wh() {
+        let ctx = luisa::Context::new(current_exe().unwrap());
+        let device = ctx.create_cpu_device();
+        let seeds = init_pcg32_buffer(device.clone(), 8192);
+        let out = device.create_buffer::<f32>(seeds.len());
+        let n_iters = 4098;
+        let kernel =
+            device.create_kernel::<(Float3, Float2)>(&|wo: Expr<Float3>, alpha: Expr<Float2>| {
+                let i = dispatch_id().x();
+                let sampler = IndependentSampler {
+                    state: var!(Pcg32, seeds.var().read(i)),
+                };
+                let out = out.var();
+                let dist = TrowbridgeReitzDistribution::from_alpha(alpha, false);
+                for_range(const_(0)..const_(n_iters), |_| {
+                    let wh = dist.sample_wh(wo, sampler.next_2d());
+                    let pdf = dist.pdf(wo, wh);
+                    if_!(pdf.cmpgt(0.0), {
+                        out.write(i, out.read(i) + 1.0 / pdf);
+                    });
+                });
+            });
+        let test_alpha = |theta: f32, alpha_x: f32, alpha_y: f32| {
+            kernel.dispatch(
+                [seeds.len() as u32, 1, 1],
+                &Float3::new(theta.sin(), theta.cos(), 0.0),
+                &Float2::new(alpha_x, alpha_y),
+            );
+            let out = out.copy_to_vec();
+            let mean =
+                out.iter().map(|x| *x as f64).sum::<f64>() / out.len() as f64 / n_iters as f64;
+            println!("theta: {}, alpha: {}, mean: {}", theta, alpha_x, mean);
+        };
+        test_alpha(0.8, 0.1, 0.1);
     }
 }

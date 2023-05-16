@@ -115,6 +115,7 @@ pub mod node {
             dispersion: f32,
             kr: Texture,
             kt: Texture,
+            roughness: Texture,
         },
         #[serde(rename = "principled")]
         Principled {

@@ -85,13 +85,13 @@ impl Frame {
     }
     #[inline]
     pub fn sin_theta(w: Expr<Float3>) -> Float {
-        let c = Self::cos_theta(w);
-        (1.0 - c * c).max(0.0).sqrt()
+        let c2 = Self::cos2_theta(w);
+        (1.0 - c2).max(0.0).sqrt()
     }
     #[inline]
     pub fn sin2_theta(w: Expr<Float3>) -> Float {
-        let c = Self::cos_theta(w);
-        (1.0 - c * c).max(0.0)
+        let c2 = Self::cos2_theta(w);
+        (1.0 - c2).max(0.0)
     }
     #[inline]
     pub fn tan2_theta(w: Expr<Float3>) -> Float {
@@ -112,21 +112,11 @@ impl Frame {
     }
     #[inline]
     pub fn sin2_phi(w: Expr<Float3>) -> Float {
-        let sin_theta = Self::sin_theta(w);
-        select(
-            sin_theta.cmpeq(0.0),
-            const_(0.0f32),
-            (w.x() / sin_theta).clamp(-1.0, 1.0).sqr(),
-        )
+        Self::sin_phi(w).sqr()
     }
     #[inline]
     pub fn cos2_phi(w: Expr<Float3>) -> Float {
-        let sin_theta = Self::sin_theta(w);
-        select(
-            sin_theta.cmpeq(0.0),
-            const_(0.0f32),
-            (w.z() / sin_theta).clamp(-1.0, 1.0).sqr(),
-        )
+        Self::cos_phi(w).sqr()
     }
     #[inline]
     pub fn cos_phi(w: Expr<Float3>) -> Float {
@@ -206,25 +196,33 @@ pub fn face_forward(v: Expr<Float3>, n: Expr<Float3>) -> Expr<Float3> {
     select(v.dot(n).cmplt(0.0), -v, v)
 }
 pub fn reflect(w: Expr<Float3>, n: Expr<Float3>) -> Expr<Float3> {
-    -w + 2.0 * w.dot(n)
+    -w + 2.0 * w.dot(n) * n
 }
-pub fn refract(w: Expr<Float3>, mut n: Expr<Float3>, eta: Expr<f32>) -> (Expr<bool>, Expr<Float3>) {
-    let mut cos_theta_i = w.dot(n);
-    let entering = cos_theta_i.cmpgt(0.0);
-    let (eta, cos_theta_i, n) = if_!(entering, {
-        (eta, cos_theta_i, n)
-    }, else {
-        let eta = 1.0 / eta;
-        let cos_theta_i = -cos_theta_i;
-        let n = -n;
-        (eta, cos_theta_i, n)
-    });
-    let sin2_theta_i = (1.0 - cos_theta_i * cos_theta_i).max(0.0);
-    let sin2_theta_t = sin2_theta_i / (eta * eta);
+pub fn refract(w: Expr<Float3>, n: Expr<Float3>, eta: Expr<f32>) -> (Expr<bool>, Expr<Float3>) {
+    // cpu_dbg!(eta);
+    let cos_theta_i = w.dot(n);
+    let sin2_theta_i = (1.0 - cos_theta_i.sqr()).max(0.0);
+    let sin2_theta_t = sin2_theta_i * eta.sqr();
     let refracted = sin2_theta_t.cmplt(1.0);
-    if_!(refracted, {
-        (const_(false), Float3Expr::zero())
+    if_!(!refracted, {
+        (refracted, Float3Expr::zero())
     }, else {
-        todo!()
+        let cos2_theta_t = (1.0 - sin2_theta_t).max(0.0);
+        let cos_theta_t = cos2_theta_t.sqrt();
+        let wt = -w * eta + (cos_theta_i * eta - cos_theta_t) * n;
+        (refracted, wt)
     })
+}
+
+pub fn spherical_to_xyz2(cos_theta: Expr<f32>, sin_theta:Expr<f32>, phi: Expr<f32>) -> Expr<Float3> {
+    make_float3(sin_theta * phi.cos(), cos_theta, sin_theta * phi.sin())
+}
+pub fn spherical_to_xyz(theta: Expr<f32>, phi: Expr<f32>) -> Expr<Float3> {
+    let sin_theta = theta.sin();
+    make_float3(sin_theta * phi.cos(), theta.cos(), sin_theta * phi.sin())
+}
+pub fn xyz_to_spherical(v: Expr<Float3>) -> (Expr<f32>, Expr<f32>) {
+    let phi = v.z().atan2(v.x());
+    let theta = v.y();
+    (theta, phi)
 }
