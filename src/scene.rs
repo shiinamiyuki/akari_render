@@ -6,13 +6,20 @@ use std::sync::Arc;
 use std::{path::PathBuf, rc::Rc};
 
 use crate::camera::PerspectiveCamera;
-use crate::color::glam_srgb_to_linear;
+use crate::color::{glam_srgb_to_linear, Color, ColorRepr, FlatColor};
 use crate::light::area::AreaLight;
-use crate::light::{LightAggregate, WeightedLightDistribution};
+use crate::light::{
+    FlatLightSample, FlatLightSampleExpr, LightAggregate, LightEvalContext, LightEvaluator,
+    WeightedLightDistribution,
+};
 use crate::scenegraph::node::CoordinateSystem;
 use crate::surface::diffuse::{DiffuseBsdf, DiffuseSurface};
 use crate::surface::glass::GlassSurface;
-use crate::texture::{ConstFloatTexture, ConstRgbTexture};
+use crate::surface::{
+    BsdfEvalContext, BsdfEvalResult, BsdfEvalResultExpr, BsdfEvaluator, FlatBsdfSample,
+    FlatBsdfSampleExpr, BSDF_EVAL_COLOR, BSDF_EVAL_PDF,
+};
+use crate::texture::{ConstFloatTexture, ConstRgbTexture, TextureEvalContext, TextureEvaluator};
 use crate::util::binserde::Decode;
 use crate::util::{FileResolver, LocalFileResolver};
 use crate::{
@@ -33,9 +40,163 @@ pub struct Scene {
     pub lights: LightAggregate,
     pub meshes: Arc<MeshAggregate>,
     pub camera: Box<dyn Camera>,
+    pub device: Device,
+}
+pub struct Evaluators<'a> {
+    pub color_repr: &'a ColorRepr,
+    pub texture: TextureEvaluator<'a>,
+    pub bsdf: BsdfEvaluator<'a>,
+    pub light: LightEvaluator<'a>,
 }
 
 impl Scene {
+    pub fn evaluators<'a>(&self, color_repr: &'a ColorRepr) -> Evaluators<'a> {
+        let texture = self.texture_evaluator(color_repr);
+        let light = self.light_evaluator(color_repr, &texture);
+        let bsdf = self.bsdf_evaluator(color_repr, &texture);
+        Evaluators {
+            color_repr,
+            texture,
+            bsdf,
+            light,
+        }
+    }
+    pub fn light_evaluator<'a>(
+        &self,
+        color_repr: &'a ColorRepr,
+        texture_eval: &TextureEvaluator<'a>,
+    ) -> LightEvaluator<'a> {
+        let le = self
+            .device
+            .create_callable::<(Expr<Ray>, Expr<SurfaceInteraction>), Expr<FlatColor>>(
+                &|ray, si| {
+                    let ctx = LightEvalContext {
+                        meshes: &self.meshes,
+                        texture: texture_eval,
+                        color_repr,
+                    };
+                    self.lights.le(ray, si, &ctx).flatten()
+                },
+            );
+        let sample = self
+            .device
+            .create_callable::<(Expr<PointNormal>, Expr<Float3>), Expr<FlatLightSample>>(
+                &|pn, u| {
+                    let ctx = LightEvalContext {
+                        meshes: &self.meshes,
+                        texture: texture_eval,
+                        color_repr,
+                    };
+                    let sample = self.lights.sample_direct(pn, u.x(), u.yz(), &ctx);
+                    FlatLightSampleExpr::new(
+                        sample.li.flatten(),
+                        sample.pdf,
+                        sample.wi,
+                        sample.shadow_ray,
+                        sample.n,
+                    )
+                },
+            );
+        let pdf = self
+            .device
+            .create_callable::<(Expr<SurfaceInteraction>, Expr<PointNormal>), Expr<f32>>(
+                &|si, pn| {
+                    let ctx = LightEvalContext {
+                        meshes: &self.meshes,
+                        texture: texture_eval,
+                        color_repr,
+                    };
+                    self.lights.pdf_direct(si, pn, &ctx)
+                },
+            );
+        LightEvaluator {
+            color_repr,
+            le,
+            sample,
+            pdf,
+        }
+    }
+    pub fn texture_evaluator<'a>(&self, color_repr: &'a ColorRepr) -> TextureEvaluator<'a> {
+        let texture = self
+            .device
+            .create_callable::<(Expr<TagIndex>, Expr<SurfaceInteraction>), Expr<Float4>>(
+                &|tex: Expr<TagIndex>, si: Expr<SurfaceInteraction>| {
+                    let ctx = TextureEvalContext { scene: self };
+                    self.textures
+                        .get(tex)
+                        .dispatch(|_, _, tex| tex.evaluate(si, &ctx))
+                },
+            );
+        TextureEvaluator {
+            color_repr,
+            texture,
+        }
+    }
+    pub fn bsdf_evaluator<'a>(
+        &self,
+        color_repr: &'a ColorRepr,
+        texture_eval: &TextureEvaluator<'a>,
+    ) -> BsdfEvaluator<'a> {
+        let bsdf = self.device.create_callable::<(
+            Expr<TagIndex>,
+            Expr<SurfaceInteraction>,
+            Expr<Float3>,
+            Expr<Float3>,
+            Expr<u32>,
+        ), Expr<BsdfEvalResult>>(
+            &|surface: Expr<TagIndex>,
+              si: Expr<SurfaceInteraction>,
+              wo: Expr<Float3>,
+              wi: Expr<Float3>,
+              mode: Expr<u32>| {
+                let ctx = BsdfEvalContext {
+                    texture: texture_eval,
+                    color_repr,
+                };
+                self.surfaces.get(surface).dispatch(|_, _, surface| {
+                    let closure = surface.closure(si, &ctx);
+                    let color = if_!((mode & BSDF_EVAL_COLOR).cmpne(0), {
+                        closure.evaluate(wo, wi, &ctx)
+                    }, else {
+                        Color::zero(color_repr)
+                    })
+                    .flatten();
+                    let pdf = if_!((mode & BSDF_EVAL_PDF).cmpne(0), {
+                        closure.pdf(wo, wi, &ctx)
+                    }, else {
+                        0.0.into()
+                    });
+                    BsdfEvalResultExpr::new(color, pdf)
+                })
+            },
+        );
+        let bsdf_sample = self.device.create_callable::<(
+            Expr<TagIndex>,
+            Expr<SurfaceInteraction>,
+            Expr<Float3>,
+            Expr<Float3>,
+        ), Expr<FlatBsdfSample>>(
+            &|surface: Expr<TagIndex>,
+              si: Expr<SurfaceInteraction>,
+              wo: Expr<Float3>,
+              u: Expr<Float3>| {
+                let ctx = BsdfEvalContext {
+                    texture: texture_eval,
+                    color_repr,
+                };
+                let sample = self.surfaces.get(surface).dispatch(|_, _, surface| {
+                    let closure = surface.closure(si, &ctx);
+                    closure.sample(wo, u.x(), u.yz(), &ctx)
+                });
+                FlatBsdfSampleExpr::new(sample.wi, sample.pdf, sample.color.flatten(), sample.valid)
+            },
+        );
+        BsdfEvaluator {
+            color_repr,
+            bsdf,
+            bsdf_sample,
+        }
+    }
     pub fn load<P: AsRef<Path>>(device: Device, path: P) -> Self {
         let path = PathBuf::from(path.as_ref());
         let canonical = fs::canonicalize(&path).unwrap();
@@ -243,7 +404,13 @@ impl SceneLoader {
                 );
                 (i, None)
             }
-            node::Bsdf::Glass { ior, kr, kt, roughness,.. } => {
+            node::Bsdf::Glass {
+                ior,
+                kr,
+                kt,
+                roughness,
+                ..
+            } => {
                 let kr = self.load_texture(kr);
                 let kt = self.load_texture(kt);
                 let roughness = self.load_texture(roughness);
@@ -434,6 +601,7 @@ impl SceneLoader {
             lights,
             meshes,
             camera: camera.unwrap(),
+            device,
         }
     }
 }

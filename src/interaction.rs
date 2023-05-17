@@ -36,25 +36,4 @@ pub struct SurfaceInteraction {
     pub triangle: ShadingTriangle,
     pub valid: bool,
 }
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum TransportDirection {
-    LightToEye,
-    EyeToLight,
-}
 
-#[derive(Clone)]
-pub struct ShadingContext<'a> {
-    pub scene: &'a Scene,
-    pub color_repr: ColorRepr,
-}
-impl<'a> ShadingContext<'a> {
-    pub fn texture(&self, tex: Expr<TagIndex>) -> PolymorphicRef<'a, PolyKey, dyn Texture> {
-        self.scene.textures.get(tex)
-    }
-    pub fn color_from_float4(&self, v: Expr<Float4>) -> Color {
-        match self.color_repr {
-            ColorRepr::Rgb => Color::Rgb(v.xyz()),
-            ColorRepr::Spectral(_) => todo!(),
-        }
-    }
-}

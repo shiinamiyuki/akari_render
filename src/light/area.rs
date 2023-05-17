@@ -19,10 +19,13 @@ impl Light for AreaLightExpr {
     fn id(&self) -> Expr<u32> {
         self.light_id()
     }
-    fn le(&self, ray: Expr<Ray>, si: Expr<SurfaceInteraction>, ctx: &ShadingContext<'_>) -> Color {
-        let emission = ctx.texture(self.emission());
-        let emission = emission.dispatch(|_tag, _key, tex| tex.evaluate(si, ctx));
-        let emission = ctx.color_from_float4(emission);
+    fn le(
+        &self,
+        ray: Expr<Ray>,
+        si: Expr<SurfaceInteraction>,
+        ctx: &LightEvalContext<'_>,
+    ) -> Color {
+        let emission = ctx.texture.evaluate_color(self.emission(), si);
         let ns = si.geometry().ns();
         select(
             ns.dot(ray.d()).cmplt(0.0),
@@ -36,10 +39,9 @@ impl Light for AreaLightExpr {
         pn: Expr<PointNormal>,
         u_select: Expr<f32>,
         u_sample: Expr<Float2>,
-        ctx: &ShadingContext<'_>,
+        ctx: &LightEvalContext<'_>,
     ) -> LightSample {
-        let scene = ctx.scene;
-        let meshes = &scene.meshes;
+        let meshes = ctx.meshes;
         let area_samplers = meshes.mesh_area_samplers.var();
         let at_entries = area_samplers.buffer::<AliasTableEntry>(self.area_sampling_index());
         let at_pdf = area_samplers.buffer::<f32>(self.area_sampling_index() + 1);
@@ -69,9 +71,7 @@ impl Light for AreaLightExpr {
             shading_triangle,
             Bool::from(true),
         );
-        let emission = ctx.texture(self.emission());
-        let emission = emission.dispatch(|_tag, _key, tex| tex.evaluate(si, ctx));
-        let emission = ctx.color_from_float4(emission);
+        let emission = ctx.texture.evaluate_color(self.emission(), si);
         let wi = p - pn.p();
         let dist2 = wi.length_squared();
         let wi = wi / dist2.sqrt();
@@ -93,11 +93,10 @@ impl Light for AreaLightExpr {
         &self,
         si: Expr<SurfaceInteraction>,
         pn: Expr<PointNormal>,
-        ctx: &ShadingContext<'_>,
+        ctx: &LightEvalContext<'_>,
     ) -> Expr<f32> {
         let prim_id = si.prim_id();
-        let scene = ctx.scene;
-        let meshes = &scene.meshes;
+        let meshes = ctx.meshes;
         let area_samplers = meshes.mesh_area_samplers.var();
         let at_entries = area_samplers.buffer::<AliasTableEntry>(self.area_sampling_index());
         let at_pdf = area_samplers.buffer::<f32>(self.area_sampling_index() + 1);

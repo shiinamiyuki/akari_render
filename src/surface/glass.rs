@@ -2,15 +2,13 @@ use std::f32::consts::FRAC_1_PI;
 
 use crate::color::Color;
 use crate::geometry::Frame;
-use crate::interaction::ShadingContext;
 use crate::microfacet::TrowbridgeReitzDistribution;
-use crate::sampling::cos_sample_hemisphere;
 use crate::surface::{
     fr_dielectric, BsdfMixture, Fresnel, FresnelDielectric, MicrofacetReflection,
 };
 use crate::*;
 
-use super::{Bsdf, BsdfClosure, BsdfSample, Surface, MicrofacetTransmission, ConstFresnel};
+use super::{Bsdf, BsdfClosure, BsdfSample, Surface, MicrofacetTransmission, BsdfEvalContext};
 #[derive(Debug, Clone, Copy, Value)]
 #[repr(C)]
 pub struct GlassSurface {
@@ -24,17 +22,15 @@ impl Surface for GlassSurfaceExpr {
     fn closure(
         &self,
         si: Expr<interaction::SurfaceInteraction>,
-        ctx: &ShadingContext<'_>,
+        ctx: &BsdfEvalContext<'_>,
     ) -> BsdfClosure {
-        let kr = ctx.texture(self.kr());
-        let kr = ctx.color_from_float4(kr.dispatch(|_, _, tex| tex.evaluate(si, ctx)));
-        let kt = ctx.texture(self.kt());
-        let kt = ctx.color_from_float4(kt.dispatch(|_, _, tex| tex.evaluate(si, ctx)));
+        let kr = ctx.texture.evaluate_color(self.kr(), si);
+        let kt = ctx.texture.evaluate_color(self.kt(), si);
         let fresnel = Box::new(FresnelDielectric {
             eta_i: const_(1.0f32),
             eta_t: self.eta(),
         });
-        let roughness = ctx.texture(self.roughness()).dispatch(|_,_,tex|tex.evaluate(si, ctx).x());
+        let roughness = ctx.texture.evaluate_float(self.roughness(), si);
         let reflection = Box::new(MicrofacetReflection {
             color: kr,
             fresnel: fresnel.clone(),

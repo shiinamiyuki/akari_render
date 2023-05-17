@@ -25,7 +25,8 @@ pub const N_WAVELENGTH_SAMPLES: usize = 4;
 #[derive(Clone, Copy, Debug, Value)]
 #[repr(C)]
 pub struct FlatColor {
-    pub c0: Float4,
+    pub c04: Float4,
+    pub swl04: Float4,
 }
 #[derive(Aggregate, Clone)]
 pub struct SampledSpectrum {
@@ -40,7 +41,7 @@ pub struct SampledSpectrumVar {
 #[derive(Aggregate, Clone)]
 pub enum ColorRepr {
     Rgb,
-    Spectral(SampledWavelengths),
+    Spectral,
 }
 
 #[derive(Aggregate, Clone)]
@@ -56,34 +57,25 @@ pub enum ColorVar {
 impl ColorVar {
     pub fn zero(repr: &ColorRepr) -> Self {
         match repr {
-            ColorRepr::Spectral(s) => ColorVar::Spectral(SampledSpectrumVar {
-                wavelengths: s.clone(),
-                samples: (0..s.nsamples()).map(|_| var!(f32)).collect(),
-            }),
+            ColorRepr::Spectral => todo!(),
             ColorRepr::Rgb => ColorVar::Rgb(var!(Float3)),
         }
     }
     pub fn one(repr: &ColorRepr) -> Self {
         match repr {
-            ColorRepr::Spectral(s) => ColorVar::Spectral(SampledSpectrumVar {
-                wavelengths: s.clone(),
-                samples: (0..s.nsamples()).map(|_| var!(f32, 1.0)).collect(),
-            }),
+            ColorRepr::Spectral => todo!(),
             ColorRepr::Rgb => ColorVar::Rgb(var!(Float3, Float3Expr::one())),
         }
     }
     pub fn repr(&self) -> ColorRepr {
         match self {
-            ColorVar::Spectral(s) => ColorRepr::Spectral(s.wavelengths.clone()),
+            ColorVar::Spectral(s) => ColorRepr::Spectral,
             ColorVar::Rgb(_) => ColorRepr::Rgb,
         }
     }
     pub fn load(&self) -> Color {
         match self {
-            ColorVar::Spectral(s) => Color::Spectral(SampledSpectrum {
-                samples: todo!(),
-                wavelengths: todo!(),
-            }),
+            ColorVar::Spectral(s) => todo!(),
             ColorVar::Rgb(v) => Color::Rgb(v.load()),
         }
     }
@@ -93,7 +85,6 @@ impl ColorVar {
             ColorVar::Rgb(v) => v.store(color.as_rgb()),
         }
     }
-    
 }
 impl Color {
     pub fn max(&self) -> Expr<f32> {
@@ -104,7 +95,10 @@ impl Color {
     }
     pub fn flatten(&self) -> Expr<FlatColor> {
         match self {
-            Color::Rgb(rgb) => FlatColorExpr::new(make_float4(rgb.x(), rgb.y(), rgb.z(), 0.0)),
+            Color::Rgb(rgb) => FlatColorExpr::new(
+                make_float4(rgb.x(), rgb.y(), rgb.z(), 0.0),
+                Float4Expr::zero(),
+            ),
             Color::Spectral(_) => {
                 todo!()
             }
@@ -113,10 +107,10 @@ impl Color {
     pub fn from_flat(flat: Expr<FlatColor>, repr: &ColorRepr) -> Self {
         match repr {
             ColorRepr::Rgb => {
-                let rgb = flat.c0();
+                let rgb = flat.c04();
                 Color::Rgb(rgb.xyz())
             }
-            ColorRepr::Spectral(_) => {
+            ColorRepr::Spectral => {
                 todo!()
             }
         }
@@ -139,25 +133,19 @@ impl Color {
     }
     pub fn zero(repr: &ColorRepr) -> Color {
         match repr {
-            ColorRepr::Spectral(s) => Color::Spectral(SampledSpectrum {
-                wavelengths: s.clone(),
-                samples: vec![Float::from(0.0); s.nsamples()],
-            }),
+            ColorRepr::Spectral => todo!(),
             ColorRepr::Rgb => Color::Rgb(Float3Expr::zero()),
         }
     }
     pub fn one(repr: &ColorRepr) -> Color {
         match repr {
-            ColorRepr::Spectral(s) => Color::Spectral(SampledSpectrum {
-                wavelengths: s.clone(),
-                samples: vec![Float::from(1.0); s.nsamples()],
-            }),
+            ColorRepr::Spectral => todo!(),
             ColorRepr::Rgb => Color::Rgb(Float3Expr::one()),
         }
     }
     pub fn repr(&self) -> ColorRepr {
         match self {
-            Color::Spectral(s) => ColorRepr::Spectral(s.wavelengths.clone()),
+            Color::Spectral(_)=> ColorRepr::Spectral,
             Color::Rgb(_) => ColorRepr::Rgb,
         }
     }

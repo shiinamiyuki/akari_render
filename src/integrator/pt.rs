@@ -67,24 +67,20 @@ pub fn mis_weight(pdf_a: Expr<f32>, pdf_b: Expr<f32>, power: u32) -> Expr<f32> {
     pdf_a / (pdf_a + pdf_b)
 }
 impl PathTracer {
-    pub fn radiance(
+    pub fn radiance<'a>(
         &self,
         scene: &Scene,
         ray: Expr<Ray>,
         sampler: &dyn Sampler,
-        color_repr: &ColorRepr,
+        color_repr: &'a ColorRepr,
+        eval:&Evaluators<'a>
     ) -> Color {
         let l = ColorVar::zero(color_repr);
         let beta = ColorVar::one(color_repr);
         let ray = var!(Ray, ray);
         let depth = var!(u32, 0);
-        let ctx = ShadingContext {
-            scene,
-            color_repr: color_repr.clone(),
-        };
         let prev_bsdf_pdf = var!(f32);
         let prev_n = var!(Float3, ray.d());
-
         loop_!({
             let si = scene.intersect(ray.load());
             let wo = -ray.d().load();
@@ -92,9 +88,9 @@ impl PathTracer {
 
                 let inst_id = si.inst_id();
                 let instance = scene.meshes.mesh_instances.var().read(inst_id);
-                
+
                 if_!(instance.light().valid() & (!self.indirect_only | depth.load().cmpgt(1)), {
-                    let direct = scene.lights.le(ray.load(), si, &ctx);
+                    let direct = eval.light.le(ray.load(), si);
 
                     if_!(depth.load().cmpeq(0) | !self.use_nee, {
                         l.store(&(l.load() + beta.load() * &direct));
@@ -104,7 +100,7 @@ impl PathTracer {
                             let n = prev_n.load();
                             PointNormalExpr::new(p, n)
                         };
-                        let (light_pdf, _) = scene.lights.pdf_direct(si, pn, &ctx);
+                        let light_pdf = eval.light.pdf(si, pn);
                         let w = mis_weight(prev_bsdf_pdf.load(), light_pdf, 1);
                         l.store(&(l.load() + beta.load() * &direct * w));
                     });
@@ -112,7 +108,6 @@ impl PathTracer {
                 let p = si.geometry().p();
                 let ng = si.geometry().ng();
                 let surface = instance.surface();
-                let surface = scene.surfaces.get(surface);
                 depth.store(depth.load() + 1);
                 if_!(depth.load().cmpge(self.max_depth), {
                     break_();
@@ -121,16 +116,9 @@ impl PathTracer {
                 if self.use_nee {
                     if_!(!self.indirect_only | depth.load().cmpgt(1), {
                         let pn = PointNormalExpr::new(p, ng);
-                        let (sample, _) = scene.lights.sample_direct(pn,sampler.next_1d(), sampler.next_2d(), &ctx);
+                        let sample = eval.light.sample(pn,sampler.next_3d());
                         let wi = sample.wi;
-                        let ( bsdf_f, bsdf_pdf) = surface.dispatch(|_tag, _key, surface| {
-                            let bsdf = surface.closure(si, &ctx);
-                            let pdf = bsdf.pdf(wo, wi, &ctx);
-                            let f = bsdf.evaluate(wo, wi, &ctx);
-                            (f, pdf)
-                        });
-                        
-
+                        let (bsdf_f, bsdf_pdf) = eval.bsdf.evaluate_color_and_pdf(surface, si, wo, wi);
                         let w = mis_weight(sample.pdf, bsdf_pdf, 1);
                         let occluded = scene.occlude(sample.shadow_ray);
                         // cpu_dbg!(sample.pdf);
@@ -141,17 +129,19 @@ impl PathTracer {
 
                 }
                 // BSDF sampling
-                surface.dispatch(|_tag, _key, surface| {
-                    let bsdf = surface.closure(si, &ctx);
-                    let sample = bsdf.sample(wo,sampler.next_1d(), sampler.next_2d(), &ctx);
+                {
+                    let sample = eval.bsdf.sample(surface, si, wo,sampler.next_3d());
                     let wi = sample.wi;
                     let f = &sample.color;
+                    if_!(sample.pdf.cmple(0.0),{
+                        break_();
+                    });
                     beta.store(&(beta.load() * f / sample.pdf));
 
                     prev_bsdf_pdf.store(sample.pdf);
                     let ro = offset_ray_origin(p, ng);
                     ray.store(RayExpr::new(ro, wi, 1e-3, 1e20));
-                });
+                }
                 if_!(depth.load().cmpgt(self.rr_depth), {
                     let cont_prob = beta.load().max().clamp(0.0, 1.0) * 0.95;
                     if_!(sampler.next_1d().cmpgt(cont_prob), {

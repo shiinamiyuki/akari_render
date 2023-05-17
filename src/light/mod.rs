@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
 use crate::{
-    color::Color,
+    color::{Color, ColorRepr, FlatColor},
     geometry::{PointNormal, Ray},
-    interaction::{ShadingContext, SurfaceInteraction},
+    interaction::SurfaceInteraction,
     mesh::MeshAggregate,
     sampler::Sampler,
+    texture::TextureEvaluator,
     util::alias_table::AliasTable,
     *,
 };
@@ -18,21 +19,37 @@ pub struct LightSample {
     pub shadow_ray: Expr<Ray>,
     pub n: Expr<Float3>,
 }
+#[derive(Clone, Copy, Value)]
+#[repr(C)]
+pub struct FlatLightSample {
+    pub li: FlatColor,
+    pub pdf: f32,
+    pub wi: Float3,
+    pub shadow_ray: Ray,
+    pub n: Float3,
+}
+pub struct LightEvalContext<'a> {
+    pub texture: &'a TextureEvaluator<'a>,
+    pub color_repr: &'a ColorRepr,
+    pub meshes: &'a MeshAggregate,
+}
+
 pub trait Light {
     fn id(&self) -> Expr<u32>;
-    fn le(&self, ray: Expr<Ray>, si: Expr<SurfaceInteraction>, ctx: &ShadingContext<'_>) -> Color;
+    fn le(&self, ray: Expr<Ray>, si: Expr<SurfaceInteraction>, ctx: &LightEvalContext<'_>)
+        -> Color;
     fn sample_direct(
         &self,
         pn: Expr<PointNormal>,
-        u_select:Expr<f32>,
+        u_select: Expr<f32>,
         u_sample: Expr<Float2>,
-        ctx: &ShadingContext<'_>,
+        ctx: &LightEvalContext<'_>,
     ) -> LightSample;
     fn pdf_direct(
         &self,
         si: Expr<SurfaceInteraction>,
         pn: Expr<PointNormal>,
-        ctx: &ShadingContext<'_>,
+        ctx: &LightEvalContext<'_>,
     ) -> Expr<f32>;
 }
 
@@ -68,6 +85,30 @@ pub struct LightAggregate {
     pub light_distribution: Box<dyn LightDistribution>,
     pub meshes: Arc<MeshAggregate>,
 }
+pub struct LightEvaluator<'a> {
+    pub(crate) color_repr: &'a ColorRepr,
+    pub(crate) le: Callable<(Expr<Ray>, Expr<SurfaceInteraction>), Expr<FlatColor>>,
+    pub(crate) pdf: Callable<(Expr<SurfaceInteraction>, Expr<PointNormal>), Expr<f32>>,
+    pub(crate) sample: Callable<(Expr<PointNormal>, Expr<Float3>), Expr<FlatLightSample>>,
+}
+impl<'a> LightEvaluator<'a> {
+    pub fn le(&self, ray: Expr<Ray>, si: Expr<SurfaceInteraction>) -> Color {
+        Color::from_flat(self.le.call(ray, si), self.color_repr)
+    }
+    pub fn sample(&self, pn: Expr<PointNormal>, u: Expr<Float3>) -> LightSample {
+        let sample = self.sample.call(pn, u);
+        LightSample {
+            li: Color::from_flat(sample.li(), self.color_repr),
+            pdf: sample.pdf(),
+            wi: sample.wi(),
+            shadow_ray: sample.shadow_ray(),
+            n: sample.n(),
+        }
+    }
+    pub fn pdf(&self, si: Expr<SurfaceInteraction>, pn: Expr<PointNormal>) -> Expr<f32> {
+        self.pdf.call(si, pn)
+    }
+}
 impl LightAggregate {
     pub fn light(&self, si: Expr<SurfaceInteraction>) -> PolymorphicRef<PolyKey, dyn Light> {
         let inst_id = si.inst_id();
@@ -79,7 +120,7 @@ impl LightAggregate {
         &self,
         ray: Expr<Ray>,
         si: Expr<SurfaceInteraction>,
-        ctx: &ShadingContext<'_>,
+        ctx: &LightEvalContext<'_>,
     ) -> Color {
         let light = self.light(si);
         let light_choice_pdf = self
@@ -91,30 +132,31 @@ impl LightAggregate {
     pub fn sample_direct(
         &self,
         pn: Expr<PointNormal>,
-        u_select:Expr<f32>,
+        u_select: Expr<f32>,
         u_sample: Expr<Float2>,
-        ctx: &ShadingContext<'_>,
-    ) -> (LightSample, PolymorphicRef<PolyKey, dyn Light>) {
+        ctx: &LightEvalContext<'_>,
+    ) -> LightSample {
         let light_dist = &self.light_distribution;
         let (light_idx, light_choice_pdf, u_select) = light_dist.sample_and_remap(u_select);
         let light = self.light_ids_to_lights.var().read(light_idx);
         let light = self.lights.get(light);
-        let mut sample = light.dispatch(|_, _, light| light.sample_direct(pn, u_select, u_sample, ctx));
+        let mut sample =
+            light.dispatch(|_, _, light| light.sample_direct(pn, u_select, u_sample, ctx));
         sample.pdf = sample.pdf * light_choice_pdf;
-        (sample, light)
+        sample
     }
     pub fn pdf_direct(
         &self,
         si: Expr<SurfaceInteraction>,
         pn: Expr<PointNormal>,
-        ctx: &ShadingContext<'_>,
-    ) -> (Expr<f32>, PolymorphicRef<PolyKey, dyn Light>) {
+        ctx: &LightEvalContext<'_>,
+    ) -> Expr<f32> {
         let light = self.light(si);
         let light_choice_pdf = self
             .light_distribution
             .pdf(light.dispatch(|_tag, _key, light| light.id()));
         let light_pdf =
             light_choice_pdf * light.dispatch(|_tag, _key, light| light.pdf_direct(si, pn, ctx));
-        (light_pdf, light)
+        light_pdf
     }
 }

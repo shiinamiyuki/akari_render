@@ -1,8 +1,8 @@
 use std::f32::consts::FRAC_1_PI;
 
+use super::BsdfEvalContext;
 use crate::color::Color;
 use crate::geometry::Frame;
-use crate::interaction::ShadingContext;
 use crate::sampling::cos_sample_hemisphere;
 use crate::*;
 
@@ -17,7 +17,7 @@ pub struct DiffuseBsdf {
 }
 
 impl Bsdf for DiffuseBsdf {
-    fn evaluate(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &ShadingContext<'_>) -> Color {
+    fn evaluate(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &BsdfEvalContext<'_>) -> Color {
         if_!(Frame::same_hemisphere(wo, wi), {
             &self.reflectance * Frame::abs_cos_theta(wi)
         }, else {
@@ -29,7 +29,7 @@ impl Bsdf for DiffuseBsdf {
         wo: Expr<Float3>,
         _u_select: Float,
         u_sample: Expr<Float2>,
-        _ctx: &ShadingContext<'_>,
+        _ctx: &BsdfEvalContext<'_>,
     ) -> BsdfSample {
         let wi = cos_sample_hemisphere(u_sample);
         let wi = select(
@@ -46,7 +46,7 @@ impl Bsdf for DiffuseBsdf {
             valid: Bool::from(true),
         }
     }
-    fn pdf(&self, wo: Expr<Float3>, wi: Expr<Float3>, _ctx: &ShadingContext<'_>) -> Float {
+    fn pdf(&self, wo: Expr<Float3>, wi: Expr<Float3>, _ctx: &BsdfEvalContext<'_>) -> Float {
         select(
             Frame::same_hemisphere(wo, wi),
             Frame::abs_cos_theta(wi) * FRAC_1_PI,
@@ -58,11 +58,9 @@ impl Surface for DiffuseSurfaceExpr {
     fn closure(
         &self,
         si: Expr<interaction::SurfaceInteraction>,
-        ctx: &ShadingContext<'_>,
+        ctx: &BsdfEvalContext<'_>,
     ) -> BsdfClosure {
-        let reflectance = ctx.texture(self.reflectance());
-        let reflectance = ctx
-            .color_from_float4(reflectance.dispatch(|_, _, tex| tex.evaluate(si, ctx) * FRAC_1_PI));
+        let reflectance = ctx.texture.evaluate_color(self.reflectance(), si) * const_(FRAC_1_PI);
         BsdfClosure {
             inner: Box::new(DiffuseBsdf { reflectance }),
             frame: si.frame(),
