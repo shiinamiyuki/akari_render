@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use rand::{thread_rng, Rng};
 
 use super::Integrator;
@@ -14,7 +16,7 @@ impl NormalVis {
 }
 
 impl Integrator for NormalVis {
-    fn render(&self, scene: &Scene, film: &mut Film) {
+    fn render(&self, scene: Arc<Scene>, film: &mut Film) {
         let resolution = scene.camera.resolution();
         log::info!(
             "Resolution {}x{}, spp: {}",
@@ -34,7 +36,7 @@ impl Integrator for NormalVis {
                 state: var!(Pcg32, rngs.read(i)),
             };
             let color_repr = ColorRepr::Rgb;
-            let (ray, ray_color, ray_w) = scene.camera.generate_ray(p, &sampler, &color_repr);
+            let (ray, ray_color, ray_w) = scene.camera.generate_ray(p, &sampler, color_repr);
             let si = scene.intersect(ray);
             // cpu_dbg!(ray);
             let color = if_!(si.valid(), {
@@ -43,7 +45,7 @@ impl Integrator for NormalVis {
                 Color::Rgb(ns * 0.5 + 0.5) * ray_color
                 // Color::Rgb(make_float3(si.bary().x(),si.bary().y(), 1.0))
             }, else {
-                Color::zero(&color_repr)
+                Color::zero(color_repr)
             });
             film.add_sample(p.float(), &color, ray_w);
             rngs.write(i, sampler.state.load());

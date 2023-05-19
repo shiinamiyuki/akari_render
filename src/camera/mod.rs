@@ -7,7 +7,7 @@ pub trait Camera {
         &self,
         pixel: Expr<Uint2>,
         sampler: &dyn Sampler,
-        color_repr: &ColorRepr,
+        color_repr: ColorRepr,
     ) -> (Expr<Ray>, Color, Expr<f32>);
 }
 pub struct PerspectiveCamera {
@@ -62,7 +62,7 @@ impl Camera for PerspectiveCamera {
         &self,
         pixel: Expr<Uint2>,
         sampler: &dyn Sampler,
-        color_repr: &ColorRepr,
+        color_repr: ColorRepr,
     ) -> (Expr<Ray>, Color, Expr<f32>) {
         let camera = self.data.var().read(0);
         let fpixel = pixel.float() + make_float2(0.5, 0.5);

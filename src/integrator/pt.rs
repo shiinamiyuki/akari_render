@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use luisa::rtx::offset_ray_origin;
 use rand::{thread_rng, Rng};
 
@@ -67,14 +69,14 @@ pub fn mis_weight(pdf_a: Expr<f32>, pdf_b: Expr<f32>, power: u32) -> Expr<f32> {
     pdf_a / (pdf_a + pdf_b)
 }
 impl PathTracer {
-    pub fn radiance<'a>(
+    pub fn radiance(
         &self,
-        scene: &Scene,
+        scene: &Arc<Scene>,
         ray: Expr<Ray>,
         sampler: &dyn Sampler,
-        color_repr: &'a ColorRepr,
-        eval:&Evaluators<'a>
+        eval: &Evaluators,
     ) -> Color {
+        let color_repr = eval.color_repr;
         let l = ColorVar::zero(color_repr);
         let beta = ColorVar::one(color_repr);
         let ray = var!(Ray, ray);
@@ -93,7 +95,7 @@ impl PathTracer {
                     let direct = eval.light.le(ray.load(), si);
 
                     if_!(depth.load().cmpeq(0) | !self.use_nee, {
-                        l.store(&(l.load() + beta.load() * &direct));
+                        l.store(l.load() + beta.load() * &direct);
                     }, else {
                         let pn = {
                             let p = ray.o();
@@ -102,7 +104,7 @@ impl PathTracer {
                         };
                         let light_pdf = eval.light.pdf(si, pn);
                         let w = mis_weight(prev_bsdf_pdf.load(), light_pdf, 1);
-                        l.store(&(l.load() + beta.load() * &direct * w));
+                        l.store(l.load() + beta.load() * &direct * w);
                     });
                 });
                 let p = si.geometry().p();
@@ -123,7 +125,7 @@ impl PathTracer {
                         let occluded = scene.occlude(sample.shadow_ray);
                         // cpu_dbg!(sample.pdf);
                         if_!(!occluded & sample.pdf.cmpgt(0.0), {
-                            l.store(&(l.load() + beta.load() * bsdf_f * &sample.li / sample.pdf * w));
+                            l.store(l.load() + beta.load() * bsdf_f * &sample.li / sample.pdf * w);
                         });
                     });
 
@@ -136,7 +138,7 @@ impl PathTracer {
                     if_!(sample.pdf.cmple(0.0),{
                         break_();
                     });
-                    beta.store(&(beta.load() * f / sample.pdf));
+                    beta.store(beta.load() * f / sample.pdf);
 
                     prev_bsdf_pdf.store(sample.pdf);
                     let ro = offset_ray_origin(p, ng);
@@ -147,7 +149,7 @@ impl PathTracer {
                     if_!(sampler.next_1d().cmpgt(cont_prob), {
                         break_();
                     }, else {
-                        beta.store(&(beta.load() / cont_prob));
+                        beta.store(beta.load() / cont_prob);
                     });
                 });
             }, else {
@@ -159,7 +161,7 @@ impl PathTracer {
     }
 }
 impl Integrator for PathTracer {
-    fn render(&self, scene: &Scene, film: &mut Film) {
+    fn render(&self, scene: Arc<Scene>, film: &mut Film) {
         let resolution = scene.camera.resolution();
         log::info!(
             "Resolution {}x{}\nconfig:{:#?}",
@@ -171,6 +173,8 @@ impl Integrator for PathTracer {
         assert_eq!(resolution.x, film.resolution().x);
         assert_eq!(resolution.y, film.resolution().y);
         let rngs = init_pcg32_buffer(self.device.clone(), npixels);
+        let color_repr = ColorRepr::Rgb;
+        let evaluators = scene.evaluators(color_repr);
         let kernel = self
             .device
             .create_kernel::<(u32,)>(&|spp_per_pass: Expr<u32>| {
@@ -181,10 +185,9 @@ impl Integrator for PathTracer {
                     state: var!(Pcg32, rngs.read(i)),
                 };
                 for_range(const_(0)..spp_per_pass.int(), |_| {
-                    let color_repr = ColorRepr::Rgb;
                     let (ray, ray_color, ray_w) =
-                        scene.camera.generate_ray(p, &sampler, &color_repr);
-                    let l = self.radiance(scene, ray, &sampler, &color_repr) * ray_color;
+                        scene.camera.generate_ray(p, &sampler, color_repr);
+                    let l = self.radiance(&scene, ray, &sampler, &evaluators) * ray_color;
                     film.add_sample(p.float(), &l, ray_w);
                 });
                 rngs.write(i, sampler.state.load());
@@ -207,7 +210,7 @@ impl Integrator for PathTracer {
     }
 }
 
-pub fn render(device: Device, scene: &Scene, film: &mut Film, config: &Config) {
+pub fn render(device: Device, scene: Arc<Scene>, film: &mut Film, config: &Config) {
     let pt = PathTracer::new(device.clone(), config.clone());
     pt.render(scene, film);
 }

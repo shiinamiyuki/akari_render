@@ -22,7 +22,7 @@ impl Surface for GlassSurfaceExpr {
     fn closure(
         &self,
         si: Expr<interaction::SurfaceInteraction>,
-        ctx: &BsdfEvalContext<'_>,
+        ctx: &BsdfEvalContext,
     ) -> BsdfClosure {
         let kr = ctx.texture.evaluate_color(self.kr(), si);
         let kt = ctx.texture.evaluate_color(self.kt(), si);

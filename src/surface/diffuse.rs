@@ -17,11 +17,11 @@ pub struct DiffuseBsdf {
 }
 
 impl Bsdf for DiffuseBsdf {
-    fn evaluate(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &BsdfEvalContext<'_>) -> Color {
+    fn evaluate(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &BsdfEvalContext) -> Color {
         if_!(Frame::same_hemisphere(wo, wi), {
             &self.reflectance * Frame::abs_cos_theta(wi)
         }, else {
-            Color::zero(&ctx.color_repr)
+            Color::zero(ctx.color_repr)
         })
     }
     fn sample(
@@ -29,7 +29,7 @@ impl Bsdf for DiffuseBsdf {
         wo: Expr<Float3>,
         _u_select: Float,
         u_sample: Expr<Float2>,
-        _ctx: &BsdfEvalContext<'_>,
+        _ctx: &BsdfEvalContext,
     ) -> BsdfSample {
         let wi = cos_sample_hemisphere(u_sample);
         let wi = select(
@@ -46,7 +46,7 @@ impl Bsdf for DiffuseBsdf {
             valid: Bool::from(true),
         }
     }
-    fn pdf(&self, wo: Expr<Float3>, wi: Expr<Float3>, _ctx: &BsdfEvalContext<'_>) -> Float {
+    fn pdf(&self, wo: Expr<Float3>, wi: Expr<Float3>, _ctx: &BsdfEvalContext) -> Float {
         select(
             Frame::same_hemisphere(wo, wi),
             Frame::abs_cos_theta(wi) * FRAC_1_PI,
@@ -58,7 +58,7 @@ impl Surface for DiffuseSurfaceExpr {
     fn closure(
         &self,
         si: Expr<interaction::SurfaceInteraction>,
-        ctx: &BsdfEvalContext<'_>,
+        ctx: &BsdfEvalContext,
     ) -> BsdfClosure {
         let reflectance = ctx.texture.evaluate_color(self.reflectance(), si) * const_(FRAC_1_PI);
         BsdfClosure {

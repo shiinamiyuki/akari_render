@@ -1,9 +1,11 @@
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 
 use crate::{film::*, scene::*, *};
 
 pub trait Integrator {
-    fn render(&self, scene: &Scene, film: &mut Film);
+    fn render(&self, scene: Arc<Scene>, film: &mut Film);
 }
 
 pub mod gpt;
@@ -31,8 +33,8 @@ pub enum RenderTask {
     Multi(Vec<RenderConfig>),
 }
 
-pub fn render(device: Device, scene: &Scene, task: &RenderTask) {
-    fn render_single(device: Device, scene: &Scene, config: &RenderConfig) {
+pub fn render(device: Device, scene: Arc<Scene>, task: &RenderTask) {
+    fn render_single(device: Device, scene: &Arc<Scene>, config: &RenderConfig) {
         let mut film = Film::new(
             device.clone(),
             scene.camera.resolution(),
@@ -46,8 +48,10 @@ pub fn render(device: Device, scene: &Scene, task: &RenderTask) {
         );
         let tic = std::time::Instant::now();
         match &config.method {
-            Method::PathTracer(config) => pt::render(device.clone(), scene, &mut film, &config),
-            Method::Mcmc(config) => mcmc::render(device.clone(), scene, &mut film, &config),
+            Method::PathTracer(config) => {
+                pt::render(device.clone(), scene.clone(), &mut film, &config)
+            }
+            Method::Mcmc(config) => mcmc::render(device.clone(), scene.clone(), &mut film, &config),
         }
         let toc = std::time::Instant::now();
         log::info!("Rendered in {:.1}ms", (toc - tic).as_secs_f64() * 1e3);
@@ -55,13 +59,13 @@ pub fn render(device: Device, scene: &Scene, task: &RenderTask) {
         util::write_image(&output_image, &config.out);
     }
     match task {
-        RenderTask::Single(config) => render_single(device, scene, config),
+        RenderTask::Single(config) => render_single(device, &scene, config),
         RenderTask::Multi(configs) => {
             let tic = std::time::Instant::now();
             log::info!("Rendering with {} methods", configs.len());
             for (i, config) in configs.iter().enumerate() {
                 log::info!("Rendering {}/{}", i + 1, configs.len());
-                render_single(device.clone(), scene, config)
+                render_single(device.clone(), &scene, config)
             }
             let toc = std::time::Instant::now();
             log::info!("Rendered in {:.3}s", (toc - tic).as_secs_f64());

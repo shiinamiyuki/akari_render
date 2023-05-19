@@ -30,7 +30,7 @@ impl Light for AreaLightExpr {
         select(
             ns.dot(ray.d()).cmplt(0.0),
             emission,
-            Color::zero(&ctx.color_repr),
+            Color::zero(ctx.color_repr),
         )
     }
 
@@ -75,7 +75,7 @@ impl Light for AreaLightExpr {
         let wi = p - pn.p();
         let dist2 = wi.length_squared();
         let wi = wi / dist2.sqrt();
-        let li = select(wi.dot(n).cmplt(0.0), emission, Color::zero(&ctx.color_repr));
+        let li = select(wi.dot(n).cmplt(0.0), emission, Color::zero(ctx.color_repr));
         let pdf = pdf / area * dist2 / n.dot(-wi).max(1e-6);
         let ro = rtx::offset_ray_origin(pn.p(), pn.n());
         let dist = (p - ro).length();

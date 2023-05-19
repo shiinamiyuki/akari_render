@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use super::pt::{self, PathTracer};
 use super::Integrator;
 use crate::{
@@ -77,7 +79,6 @@ impl Default for Config {
 #[repr(C)]
 pub struct MarkovState {
     chain_id: u32,
-    cur_color: FlatColor,
     cur_pixel: Uint2,
     cur_f: f32,
     b: f32,
@@ -90,6 +91,7 @@ struct RenderState {
     rng_states: Buffer<Pcg32>,
     samples: Buffer<f32>,
     states: Buffer<MarkovState>,
+    cur_colors: ColorBuffer,
     b_init: f32,
     b_init_cnt: u32,
 }
@@ -120,8 +122,8 @@ impl Mcmc {
     }
     fn evaluate(
         &self,
-        scene: &Scene,
-        color_repr: &ColorRepr,
+        scene: &Arc<Scene>,
+        eval: &Evaluators,
         independent: &IndependentSampler,
         sample: PrimarySample,
     ) -> (Expr<Uint2>, Color, Expr<f32>) {
@@ -130,11 +132,14 @@ impl Mcmc {
         let res = const_(scene.camera.resolution());
         let p = sampler.next_2d() * res.float();
         let p = p.int().clamp(0, res.int() - 1);
-        let (ray, ray_color, ray_w) = scene.camera.generate_ray(p.uint(), &sampler, color_repr);
-        let l = self.pt.radiance(scene, ray, &sampler, &color_repr) * ray_color * ray_w;
+        let (ray, ray_color, ray_w) =
+            scene
+                .camera
+                .generate_ray(p.uint(), &sampler, eval.color_repr);
+        let l = self.pt.radiance(scene, ray, &sampler, eval) * ray_color * ray_w;
         (p.uint(), l.clone(), self.scalar_contribution(&l))
     }
-    fn bootstrap(&self, scene: &Scene, color_repr: &ColorRepr) -> RenderState {
+    fn bootstrap(&self, scene: &Arc<Scene>, eval: &Evaluators) -> RenderState {
         let seeds = init_pcg32_buffer(self.device.clone(), self.n_bootstrap + self.n_chains);
 
         let fs = self
@@ -153,7 +158,7 @@ impl Mcmc {
                     sample.write(i, sampler.next_1d());
                 });
                 let sample = PrimarySample { values: sample };
-                let (_p, _l, f) = self.evaluate(scene, color_repr, &sampler, sample);
+                let (_p, _l, f) = self.evaluate(scene, eval, &sampler, sample);
                 fs.var().write(i, f);
             })
             .dispatch([self.n_bootstrap as u32, 1, 1]);
@@ -167,6 +172,7 @@ impl Mcmc {
         );
         let at = AliasTable::new(self.device.clone(), &weights);
         let states = self.device.create_buffer(self.n_chains);
+        let cur_colors = ColorBuffer::new(self.device.clone(), self.n_chains, eval.color_repr);
         let sample_buffer = self
             .device
             .create_buffer(self.sample_dimension() * self.n_chains);
@@ -196,13 +202,13 @@ impl Mcmc {
                         .write(i * dim as u32 + j, sample.read(j));
                 });
                 let sample = PrimarySample { values: sample };
-                let (p, l, f) = self.evaluate(scene, color_repr, &sampler, sample);
-                let l = l.flatten();
+                let (p, l, f) = self.evaluate(scene, eval, &sampler, sample);
                 let sigma = match &self.method {
                     Method::Kelemen { small_sigma, .. } => *small_sigma,
                     _ => todo!(),
                 };
-                let state = MarkovStateExpr::new(i, l, p, f, 0.0, 0, 0, 0, sigma);
+                cur_colors.write(i, l);
+                let state = MarkovStateExpr::new(i, p, f, 0.0, 0, 0, 0, sigma);
                 states.var().write(i, state);
             })
             .dispatch([self.n_chains as u32, 1, 1]);
@@ -210,6 +216,7 @@ impl Mcmc {
         RenderState {
             rng_states,
             samples: sample_buffer,
+            cur_colors,
             states,
             b_init: b,
             b_init_cnt: self.n_bootstrap as u32,
@@ -217,12 +224,12 @@ impl Mcmc {
     }
     fn mutate_chain(
         &self,
-        scene: &Scene,
-        color_repr: &ColorRepr,
-        _render_state: &RenderState,
+        scene: &Arc<Scene>,
+        eval: &Evaluators,
         film: &Film,
         contribution: Expr<f32>,
         state: Var<MarkovState>,
+        cur_color_v: ColorVar,
         sample: PrimarySample,
         rng: &IndependentSampler,
     ) {
@@ -242,8 +249,7 @@ impl Mcmc {
                     small.mutate(&sample, &rng)
                 });
                 let clamped = proposal.sample.clamped();
-                let (proposal_p, proposal_color, f) =
-                    self.evaluate(scene, color_repr, &rng, clamped);
+                let (proposal_p, proposal_color, f) = self.evaluate(scene, eval, &rng, clamped);
                 let proposal_f = f;
                 if_!(is_large_step, {
                     state.set_b(state.b().load() + proposal_f);
@@ -251,7 +257,7 @@ impl Mcmc {
                 });
                 let cur_f = state.cur_f().load();
                 let cur_p = state.cur_pixel().load();
-                let cur_color = Color::from_flat(state.cur_color().load(), color_repr);
+                let cur_color = cur_color_v.load();
                 let accept = select(
                     cur_f.cmpeq(0.0),
                     const_(1.0f32),
@@ -267,7 +273,7 @@ impl Mcmc {
                 );
                 if_!(rng.next_1d().cmplt(accept), {
                     state.set_cur_f(proposal_f);
-                    state.set_cur_color(proposal_color.flatten());
+                    cur_color_v.store(proposal_color);
                     state.set_cur_pixel(proposal_p);
                     if_!(!is_large_step, {
                         state.set_n_accepted(state.n_accepted().load() + 1);
@@ -282,7 +288,7 @@ impl Mcmc {
                         const OPTIMAL_ACCEPT_RATE: f32 = 0.234;
                         let new_sigma = state.sigma().load()
                             + (r - OPTIMAL_ACCEPT_RATE) / state.n_mutations().load().float();
-                        let new_sigma = new_sigma.clamp(1e-5,0.1);
+                        let new_sigma = new_sigma.clamp(1e-5, 0.1);
                         state.sigma().store(new_sigma);
                     }
                 });
@@ -292,8 +298,8 @@ impl Mcmc {
     }
     fn advance_chain(
         &self,
-        scene: &Scene,
-        color_repr: &ColorRepr,
+        scene: &Arc<Scene>,
+        eval: &Evaluators,
         render_state: &RenderState,
         film: &Film,
         mutations_per_chain: Expr<u32>,
@@ -315,14 +321,15 @@ impl Mcmc {
             });
             PrimarySample { values: sample }
         };
+        let cur_color_v = ColorVar::new(render_state.cur_colors.read(i));
         for_range(const_(0)..mutations_per_chain.int(), |_| {
             self.mutate_chain(
                 scene,
-                color_repr,
-                render_state,
+                eval,
                 film,
                 contribution,
                 state,
+                cur_color_v,
                 sample,
                 &sampler,
             );
@@ -337,14 +344,15 @@ impl Mcmc {
                     .write(i * dim as u32 + j, sample.values.read(j));
             });
         }
+        render_state.cur_colors.write(i, cur_color_v.load());
         render_state.rng_states.var().write(i, sampler.state.load());
         markov_states.write(i, state.load());
     }
 
     fn render_loop(
         &self,
-        scene: &Scene,
-        color_repr: &ColorRepr,
+        scene: &Arc<Scene>,
+        eval: &Evaluators,
         state: &RenderState,
         film: &mut Film,
     ) {
@@ -354,14 +362,7 @@ impl Mcmc {
         let kernel = self.device.create_kernel::<(u32, f32)>(
             &|mutations_per_chain: Expr<u32>, contribution: Expr<f32>| {
                 set_block_size([1, 1, 1]);
-                self.advance_chain(
-                    scene,
-                    color_repr,
-                    state,
-                    film,
-                    mutations_per_chain,
-                    contribution,
-                )
+                self.advance_chain(scene, eval, state, film, mutations_per_chain, contribution)
             },
         );
         {
@@ -410,7 +411,7 @@ impl Mcmc {
     }
 }
 impl Integrator for Mcmc {
-    fn render(&self, scene: &Scene, film: &mut Film) {
+    fn render(&self, scene: Arc<Scene>, film: &mut Film) {
         let resolution = scene.camera.resolution();
         log::info!(
             "Resolution {}x{}\nconfig: {:#?}",
@@ -418,6 +419,8 @@ impl Integrator for Mcmc {
             resolution.y,
             &self.config
         );
+        let color_repr = ColorRepr::Rgb;
+        let evaluators = scene.evaluators(color_repr);
         assert_eq!(resolution.x, film.resolution().x);
         assert_eq!(resolution.y, film.resolution().y);
         if self.config.direct_spp > 0 {
@@ -436,15 +439,14 @@ impl Integrator for Mcmc {
                     use_nee: self.pt.use_nee,
                 },
             );
-            direct.render(scene, film);
+            direct.render(scene.clone(), film);
         }
-        let color_repr = ColorRepr::Rgb;
-        let render_state = self.bootstrap(scene, &color_repr);
-        self.render_loop(scene, &color_repr, &render_state, film);
+        let render_state = self.bootstrap(&scene, &evaluators);
+        self.render_loop(&scene, &evaluators, &render_state, film);
     }
 }
 
-pub fn render(device: Device, scene: &Scene, film: &mut Film, config: &Config) {
+pub fn render(device: Device, scene: Arc<Scene>, film: &mut Film, config: &Config) {
     let mcmc = Mcmc::new(device.clone(), config.clone());
     mcmc.render(scene, film);
 }

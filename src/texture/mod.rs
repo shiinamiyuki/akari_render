@@ -11,15 +11,15 @@ pub trait Texture {
     fn evaluate(&self, si: Expr<SurfaceInteraction>, ctx: &TextureEvalContext<'_>) -> Expr<Float4>;
 }
 
-pub struct TextureEvaluator<'a> {
-    pub(crate) color_repr: &'a ColorRepr,
+pub struct TextureEvaluator {
+    pub(crate) color_repr: ColorRepr,
     pub(crate) texture: Callable<(Expr<TagIndex>, Expr<SurfaceInteraction>), Expr<Float4>>,
 }
-impl<'a> TextureEvaluator<'a> {
+impl TextureEvaluator {
     fn color_from_float4(&self, v: Expr<Float4>) -> Color {
         match self.color_repr {
             ColorRepr::Rgb => Color::Rgb(v.xyz()),
-            ColorRepr::Spectral => todo!(),
+            ColorRepr::Spectral4 => todo!(),
         }
     }
     pub fn evaluate_color(&self, tex: Expr<TagIndex>, si: Expr<SurfaceInteraction>) -> Color {

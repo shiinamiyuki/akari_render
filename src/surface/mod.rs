@@ -1,4 +1,4 @@
-use crate::color::{ColorRepr, FlatColor};
+use crate::color::ColorRepr;
 use crate::geometry::{face_forward, reflect, refract};
 use crate::microfacet::MicrofacetDistribution;
 use crate::sampling::weighted_discrete_choice2_and_remap;
@@ -6,8 +6,8 @@ use crate::texture::TextureEvaluator;
 use crate::{color::Color, geometry::Frame, interaction::SurfaceInteraction, *};
 
 pub struct BsdfEvalContext<'a> {
-    pub texture: &'a TextureEvaluator<'a>,
-    pub color_repr: &'a ColorRepr,
+    pub texture: &'a TextureEvaluator,
+    pub color_repr: ColorRepr,
 }
 
 pub mod diffuse;
@@ -24,29 +24,29 @@ pub struct BsdfSample {
 
 pub trait Bsdf {
     // return f(wo, wi) * abs_cos_theta(wi)
-    fn evaluate(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &BsdfEvalContext<'_>) -> Color;
+    fn evaluate(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &BsdfEvalContext) -> Color;
     fn sample(
         &self,
         wo: Expr<Float3>,
         u_select: Expr<f32>,
         u_sample: Expr<Float2>,
-        ctx: &BsdfEvalContext<'_>,
+        ctx: &BsdfEvalContext,
     ) -> BsdfSample;
-    fn pdf(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &BsdfEvalContext<'_>) -> Float;
+    fn pdf(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &BsdfEvalContext) -> Float;
 }
 
 pub trait Surface {
-    fn closure(&self, si: Expr<SurfaceInteraction>, ctx: &BsdfEvalContext<'_>) -> BsdfClosure;
+    fn closure(&self, si: Expr<SurfaceInteraction>, ctx: &BsdfEvalContext) -> BsdfClosure;
 }
 
 pub struct BsdfMixture {
-    pub frac: Box<dyn Fn(Expr<Float3>, &BsdfEvalContext<'_>) -> Expr<f32>>,
+    pub frac: Box<dyn Fn(Expr<Float3>, &BsdfEvalContext) -> Expr<f32>>,
     pub bsdf_a: Box<dyn Bsdf>,
     pub bsdf_b: Box<dyn Bsdf>,
 }
 
 impl Bsdf for BsdfMixture {
-    fn evaluate(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &BsdfEvalContext<'_>) -> Color {
+    fn evaluate(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &BsdfEvalContext) -> Color {
         let f_a = self.bsdf_a.evaluate(wo, wi, ctx);
         let f_b = self.bsdf_b.evaluate(wo, wi, ctx);
         let frac: Expr<f32> = (self.frac)(wo, ctx);
@@ -58,7 +58,7 @@ impl Bsdf for BsdfMixture {
         wo: Expr<Float3>,
         u_select: Expr<f32>,
         u_sample: Expr<Float2>,
-        ctx: &BsdfEvalContext<'_>,
+        ctx: &BsdfEvalContext,
     ) -> BsdfSample {
         let frac: Expr<f32> = (self.frac)(wo, ctx);
         let (which, remapped) =
@@ -80,7 +80,7 @@ impl Bsdf for BsdfMixture {
         })
     }
 
-    fn pdf(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &BsdfEvalContext<'_>) -> Float {
+    fn pdf(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &BsdfEvalContext) -> Float {
         let pdf_a = self.bsdf_a.pdf(wo, wi, ctx);
         let pdf_b = self.bsdf_b.pdf(wo, wi, ctx);
         let frac: Expr<f32> = (self.frac)(wo, ctx);
@@ -95,7 +95,7 @@ pub struct BsdfClosure {
 
 impl Bsdf for BsdfClosure {
     // return f(wo, wi) * abs_cos_theta(wi)
-    fn evaluate(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &BsdfEvalContext<'_>) -> Color {
+    fn evaluate(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &BsdfEvalContext) -> Color {
         self.inner
             .evaluate(self.frame.to_local(wo), self.frame.to_local(wi), ctx)
     }
@@ -105,7 +105,7 @@ impl Bsdf for BsdfClosure {
         wo: Expr<Float3>,
         u_select: Expr<f32>,
         u_sample: Expr<Float2>,
-        ctx: &BsdfEvalContext<'_>,
+        ctx: &BsdfEvalContext,
     ) -> BsdfSample {
         let sample = self
             .inner
@@ -116,13 +116,13 @@ impl Bsdf for BsdfClosure {
         }
     }
 
-    fn pdf(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &BsdfEvalContext<'_>) -> Float {
+    fn pdf(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &BsdfEvalContext) -> Float {
         self.inner
             .pdf(self.frame.to_local(wo), self.frame.to_local(wi), ctx)
     }
 }
 pub trait Fresnel {
-    fn evaluate(&self, cos_theta_i: Expr<f32>, ctx: &BsdfEvalContext<'_>) -> Color;
+    fn evaluate(&self, cos_theta_i: Expr<f32>, ctx: &BsdfEvalContext) -> Color;
 }
 pub struct MicrofacetReflection {
     pub color: Color,
@@ -131,7 +131,7 @@ pub struct MicrofacetReflection {
 }
 
 impl Bsdf for MicrofacetReflection {
-    fn evaluate(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &BsdfEvalContext<'_>) -> Color {
+    fn evaluate(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &BsdfEvalContext) -> Color {
         let wh = wo + wi;
         if_!(Frame::same_hemisphere(wo, wi), {
             let wh = wh.normalize();
@@ -142,7 +142,7 @@ impl Bsdf for MicrofacetReflection {
             let cos_i = Frame::cos_theta(wi);
             &self.color * &f * (0.25 * d * g / (cos_i * cos_o)).abs() * cos_o.abs()
         }, else {
-            Color::zero(&ctx.color_repr)
+            Color::zero(ctx.color_repr)
         })
     }
 
@@ -151,7 +151,7 @@ impl Bsdf for MicrofacetReflection {
         wo: Expr<Float3>,
         _u_select: Expr<f32>,
         u_sample: Expr<Float2>,
-        ctx: &BsdfEvalContext<'_>,
+        ctx: &BsdfEvalContext,
     ) -> BsdfSample {
         let wh = self.dist.sample_wh(wo, u_sample);
         let wi = reflect(wo, wh);
@@ -164,7 +164,7 @@ impl Bsdf for MicrofacetReflection {
         }
     }
 
-    fn pdf(&self, wo: Expr<Float3>, wi: Expr<Float3>, _ctx: &BsdfEvalContext<'_>) -> Float {
+    fn pdf(&self, wo: Expr<Float3>, wi: Expr<Float3>, _ctx: &BsdfEvalContext) -> Float {
         let wh = wo + wi;
         if_!(Frame::same_hemisphere(wo, wi) & wh.cmpne(0.0).any(), {
             let wh = wh.normalize();
@@ -184,7 +184,7 @@ pub struct MicrofacetTransmission {
 }
 
 impl Bsdf for MicrofacetTransmission {
-    fn evaluate(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &BsdfEvalContext<'_>) -> Color {
+    fn evaluate(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &BsdfEvalContext) -> Color {
         let cos_o = Frame::cos_theta(wo);
         let cos_i = Frame::cos_theta(wi);
         let eta = select(
@@ -198,11 +198,11 @@ impl Bsdf for MicrofacetTransmission {
             | cos_i.cmpeq(0.0)
             | cos_o.cmpeq(0.0)
             | Frame::same_hemisphere(wo, wi), {
-            Color::zero(&ctx.color_repr)
+            Color::zero(ctx.color_repr)
         }, else {
             let f = self.fresnel.evaluate(wo.dot(wh), ctx);
             let sqrt_denom = wo.dot(wh) + eta * wi.dot(wh);
-            (Color::one(&ctx.color_repr) - f)
+            (Color::one(ctx.color_repr) - f)
                 * &self.color *(self.dist.d(wh)
                 * self.dist.g(wo, wi) * eta.sqr()
                 * wi.dot(wh).abs() * wo.dot(wh).abs()
@@ -215,7 +215,7 @@ impl Bsdf for MicrofacetTransmission {
         wo: Expr<Float3>,
         _u_select: Expr<f32>,
         u_sample: Expr<Float2>,
-        ctx: &BsdfEvalContext<'_>,
+        ctx: &BsdfEvalContext,
     ) -> BsdfSample {
         let wh = self.dist.sample_wh(wo, u_sample);
         let cos_o = Frame::cos_theta(wo);
@@ -235,7 +235,7 @@ impl Bsdf for MicrofacetTransmission {
         }
     }
 
-    fn pdf(&self, wo: Expr<Float3>, wi: Expr<Float3>, _ctx: &BsdfEvalContext<'_>) -> Float {
+    fn pdf(&self, wo: Expr<Float3>, wi: Expr<Float3>, _ctx: &BsdfEvalContext) -> Float {
         let cos_o = Frame::cos_theta(wo);
         let cos_i = Frame::cos_theta(wi);
         let eta = select(
@@ -284,37 +284,37 @@ pub struct FresnelDielectric {
     pub eta_t: Expr<f32>,
 }
 impl Fresnel for FresnelDielectric {
-    fn evaluate(&self, cos_theta_i: Expr<f32>, ctx: &BsdfEvalContext<'_>) -> Color {
-        Color::one(&ctx.color_repr) * fr_dielectric(cos_theta_i, self.eta_i, self.eta_t)
+    fn evaluate(&self, cos_theta_i: Expr<f32>, ctx: &BsdfEvalContext) -> Color {
+        Color::one(ctx.color_repr) * fr_dielectric(cos_theta_i, self.eta_i, self.eta_t)
     }
 }
 #[derive(Copy, Clone)]
 pub struct ConstFresnel {}
 impl Fresnel for ConstFresnel {
-    fn evaluate(&self, _: Expr<f32>, ctx: &BsdfEvalContext<'_>) -> Color {
-        Color::one(&ctx.color_repr)
+    fn evaluate(&self, _: Expr<f32>, ctx: &BsdfEvalContext) -> Color {
+        Color::one(ctx.color_repr)
     }
 }
 
 #[derive(Clone, Copy, Value)]
 #[repr(C)]
-pub struct FlatBsdfSample {
+pub struct TBsdfSample<T: Value> {
     pub wi: Float3,
     pub pdf: f32,
-    pub color: FlatColor,
+    pub color: T,
     pub valid: bool,
 }
 pub const BSDF_EVAL_COLOR: u32 = 1 << 0;
 pub const BSDF_EVAL_PDF: u32 = 1 << 1;
 #[derive(Clone, Copy, Value)]
 #[repr(C)]
-pub struct BsdfEvalResult {
-    pub color: FlatColor,
+pub struct BsdfEvalResult<T: Value> {
+    pub color: T,
     pub pdf: f32,
 }
-pub struct BsdfEvaluator<'a> {
-    pub(crate) color_repr: &'a ColorRepr,
-    pub(crate) bsdf: Callable<
+pub struct BsdfEvaluator {
+    pub(crate) color_repr: ColorRepr,
+    pub(crate) bsdf: DynCallable<
         (
             Expr<TagIndex>,
             Expr<SurfaceInteraction>,
@@ -322,19 +322,19 @@ pub struct BsdfEvaluator<'a> {
             Expr<Float3>,
             Expr<u32>,
         ),
-        Expr<BsdfEvalResult>,
+        DynExpr,
     >,
-    pub(crate) bsdf_sample: Callable<
+    pub(crate) bsdf_sample: DynCallable<
         (
             Expr<TagIndex>,
             Expr<SurfaceInteraction>,
             Expr<Float3>,
             Expr<Float3>,
         ),
-        Expr<FlatBsdfSample>,
+        DynExpr,
     >,
 }
-impl<'a> BsdfEvaluator<'a> {
+impl BsdfEvaluator {
     pub fn evaluate(
         &self,
         surface: Expr<TagIndex>,
@@ -342,12 +342,11 @@ impl<'a> BsdfEvaluator<'a> {
         wo: Expr<Float3>,
         wi: Expr<Float3>,
     ) -> Color {
-        Color::from_flat(
-            self.bsdf
-                .call(surface, si, wo, wi, const_(BSDF_EVAL_COLOR))
-                .color(),
-            &self.color_repr,
-        )
+        let result = self.bsdf.call(surface, si, wo, wi, const_(BSDF_EVAL_COLOR));
+        match self.color_repr {
+            ColorRepr::Rgb => Color::Rgb(result.get::<BsdfEvalResult<Float3>>().color()),
+            _ => todo!(),
+        }
     }
     pub fn pdf(
         &self,
@@ -356,9 +355,11 @@ impl<'a> BsdfEvaluator<'a> {
         wo: Expr<Float3>,
         wi: Expr<Float3>,
     ) -> Float {
-        self.bsdf
-            .call(surface, si, wo, wi, const_(BSDF_EVAL_PDF))
-            .pdf()
+        let result = self.bsdf.call(surface, si, wo, wi, const_(BSDF_EVAL_COLOR));
+        match self.color_repr {
+            ColorRepr::Rgb => result.get::<BsdfEvalResult<Float3>>().pdf(),
+            _ => todo!(),
+        }
     }
     pub fn evaluate_color_and_pdf(
         &self,
@@ -367,13 +368,14 @@ impl<'a> BsdfEvaluator<'a> {
         wo: Expr<Float3>,
         wi: Expr<Float3>,
     ) -> (Color, Float) {
-        let result = self
-            .bsdf
-            .call(surface, si, wo, wi, const_(BSDF_EVAL_COLOR | BSDF_EVAL_PDF));
-        (
-            Color::from_flat(result.color(), &self.color_repr),
-            result.pdf(),
-        )
+        let result = self.bsdf.call(surface, si, wo, wi, const_(BSDF_EVAL_COLOR));
+        match self.color_repr {
+            ColorRepr::Rgb => {
+                let result = result.get::<BsdfEvalResult<Float3>>();
+                (Color::Rgb(result.color()), result.pdf())
+            }
+            _ => todo!(),
+        }
     }
     pub fn sample(
         &self,
@@ -383,11 +385,17 @@ impl<'a> BsdfEvaluator<'a> {
         u: Expr<Float3>,
     ) -> BsdfSample {
         let sample = self.bsdf_sample.call(surface, si, wo, u);
-        BsdfSample {
-            wi: sample.wi(),
-            pdf: sample.pdf(),
-            color: Color::from_flat(sample.color(), &self.color_repr),
-            valid: sample.valid(),
+        match self.color_repr {
+            ColorRepr::Rgb => {
+                let sample = sample.get::<TBsdfSample<Float3>>();
+                BsdfSample {
+                    wi: sample.wi(),
+                    pdf: sample.pdf(),
+                    color: Color::Rgb(sample.color()),
+                    valid: sample.valid(),
+                }
+            }
+            _ => todo!(),
         }
     }
 }

@@ -42,5 +42,5 @@ fn main() {
         serde_json::from_reader(file).unwrap()
     };
     let scene = akari_render::scene::Scene::load(device.clone(), &scene.unwrap());
-    render(device, &scene, &task);
+    render(device, scene, &task);
 }

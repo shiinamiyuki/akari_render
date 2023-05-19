@@ -11,7 +11,7 @@ pub use luisa::{
         Buffer, BufferVar, BufferView, Tex2d, Tex2dVar, Tex2dView, Tex3d, Tex3dVar, Tex3dView,
     },
     rtx,
-    runtime::{create_static_callable, Callable, Command, Device, Kernel, Stream},
+    runtime::{create_static_callable, Callable,DynCallable, Command, Device, Kernel, Stream},
 };
 pub use luisa_compute as luisa;
 pub use rayon::prelude::*;
