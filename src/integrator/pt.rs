@@ -1,12 +1,10 @@
 use std::sync::Arc;
 
 use luisa::rtx::offset_ray_origin;
-use rand::{Rng};
+use rand::Rng;
 
 use super::Integrator;
-use crate::{
-    color::*, film::*, geometry::*, sampler::*, scene::*, surface::Bsdf, *,
-};
+use crate::{color::*, film::*, geometry::*, sampler::*, scene::*, surface::Bsdf, *};
 use serde::{Deserialize, Serialize};
 #[derive(Clone)]
 pub struct PathTracer {
@@ -135,7 +133,7 @@ impl PathTracer {
                     let sample = eval.bsdf.sample(surface, si, wo,sampler.next_3d());
                     let wi = sample.wi;
                     let f = &sample.color;
-                    if_!(sample.pdf.cmple(0.0),{
+                    if_!(sample.pdf.cmple(0.0) | !sample.valid,{
                         break_();
                     });
                     beta.store(beta.load() * f / sample.pdf);
@@ -157,7 +155,7 @@ impl PathTracer {
 
             });
         });
-        l.load().remove_nan()
+        l.load().remove_nan().clamp(1e6)
     }
 }
 impl Integrator for PathTracer {

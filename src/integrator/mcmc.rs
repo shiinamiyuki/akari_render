@@ -13,7 +13,7 @@ use crate::{
     util::alias_table::AliasTable,
     *,
 };
-use rand::{Rng};
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -43,6 +43,7 @@ pub struct Mcmc {
     pub method: Method,
     pub n_chains: usize,
     pub n_bootstrap: usize,
+    pub mcmc_depth: u32,
     config: Config,
 }
 
@@ -52,6 +53,7 @@ pub struct Config {
     pub spp: u32,
     pub max_depth: u32,
     pub rr_depth: u32,
+    pub mcmc_depth: u32,
     pub spp_per_pass: u32,
     pub use_nee: bool,
     pub method: Method,
@@ -67,6 +69,7 @@ impl Default for Config {
             spp_per_pass: default_pt.spp_per_pass,
             use_nee: default_pt.use_nee,
             max_depth: default_pt.max_depth,
+            mcmc_depth: default_pt.max_depth,
             rr_depth: default_pt.rr_depth,
             method: Method::default(),
             n_chains: 512,
@@ -97,7 +100,7 @@ struct RenderState {
 }
 impl Mcmc {
     fn sample_dimension(&self) -> usize {
-        4 + self.pt.max_depth as usize * (3 + 3 + 1)
+        4 + self.mcmc_depth as usize * (3 + 3 + 1)
     }
     pub fn new(device: Device, config: Config) -> Self {
         let pt_config = pt::Config {
@@ -114,6 +117,7 @@ impl Mcmc {
             method: config.method,
             n_chains: config.n_chains,
             n_bootstrap: config.n_bootstrap,
+            mcmc_depth: config.mcmc_depth,
             config,
         }
     }

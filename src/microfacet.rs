@@ -1,4 +1,4 @@
-use crate::geometry::{spherical_to_xyz2, Frame};
+use crate::geometry::{spherical_to_xyz2, Frame, face_forward};
 use crate::*;
 use lazy_static::lazy_static;
 use std::f32::consts::PI;
@@ -44,6 +44,15 @@ lazy_static! {
                 tan2_theta * ((Frame::cos_phi(wh) / ax).sqr() + (Frame::sin_phi(wh) / ay).sqr());
             let d = 1.0 / (PI * ax * ay * cos4_theta * (1.0 + e).sqr());
             select(tan2_theta.is_infinite(), const_(0.0f32), d)
+
+            // Float tan2Theta = Tan2Theta(wm);
+            // if (IsInf(tan2Theta))
+            //     return 0;
+            // Float cos4Theta = Sqr(Cos2Theta(wm));
+            // if (cos4Theta < 1e-16f)
+            //     return 0;
+            // Float e = tan2Theta * (Sqr(CosPhi(wm) / alpha_x) + Sqr(SinPhi(wm) / alpha_y));
+            // return 1 / (Pi * alpha_x * alpha_y * cos4Theta * Sqr(1 + e));
         });
     static ref TR_LAMBDA_IMPL: Callable<(Expr<Float3>, Expr<Float2>), Expr<f32>> =
         create_static_callable::<(Expr<Float3>, Expr<Float2>), Expr<f32>>(|w, alpha| {
@@ -148,7 +157,7 @@ impl MicrofacetDistribution for TrowbridgeReitzDistribution {
             });
             let sin_theta = (1.0 - cos_theta.sqr()).max(0.0).sqrt();
             let wh = spherical_to_xyz2(cos_theta, sin_theta, phi);
-            let wh = select(Frame::cos_theta(wo).cmpgt(0.0), wh, -wh);
+            let wh = face_forward(wh, make_float3(0.0,1.0,0.0));
             wh
         }
     }

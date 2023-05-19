@@ -1,5 +1,3 @@
-
-
 use crate::*;
 pub mod colorspace {
     pub const SRGB: u32 = 0;
@@ -186,6 +184,13 @@ impl Color {
         }, else {
             self.clone()
         })
+    }
+    pub fn clamp(&self, max_contrib: impl Into<Expr<f32>>) -> Self {
+        let max_contrib = max_contrib.into();
+        match self {
+            Color::Spectral4(_s) => todo!(),
+            Color::Rgb(v) => Color::Rgb(v.clamp(Float3Expr::zero(), Float3Expr::splat(max_contrib))),
+        }
     }
 }
 impl std::ops::Mul<Float> for &Color {

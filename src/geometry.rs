@@ -106,7 +106,7 @@ impl Frame {
         let sin_theta = Self::sin_theta(w);
         select(
             sin_theta.cmpeq(0.0),
-            const_(1.0f32),
+            const_(0.0f32),
             (w.x() / sin_theta).clamp(-1.0, 1.0),
         )
     }
@@ -198,20 +198,32 @@ pub fn face_forward(v: Expr<Float3>, n: Expr<Float3>) -> Expr<Float3> {
 pub fn reflect(w: Expr<Float3>, n: Expr<Float3>) -> Expr<Float3> {
     -w + 2.0 * w.dot(n) * n
 }
-pub fn refract(w: Expr<Float3>, n: Expr<Float3>, eta: Expr<f32>) -> (Expr<bool>, Expr<Float3>) {
+pub fn refract(w: Expr<Float3>, n: Expr<Float3>, eta: Expr<f32>) -> (Expr<bool>, Expr<f32>, Expr<Float3>) {
     // cpu_dbg!(eta);
     let cos_theta_i = w.dot(n);
+    let eta = select(cos_theta_i.cmpge(0.0), eta, 1.0 / eta);
+    let n = select(cos_theta_i.cmpge(0.0), n, -n);
+    let cos_theta_i = cos_theta_i.abs();
+
     let sin2_theta_i = (1.0 - cos_theta_i.sqr()).max(0.0);
-    let sin2_theta_t = sin2_theta_i * eta.sqr();
-    let refracted = sin2_theta_t.cmplt(1.0);
-    if_!(!refracted, {
-        (refracted, Float3Expr::zero())
+    let sin2_theta_t = sin2_theta_i / eta.sqr();
+    if_!(sin2_theta_t.cmpge(1.0), {
+        (const_(false),eta, Float3Expr::zero())
     }, else {
-        let cos2_theta_t = (1.0 - sin2_theta_t).max(0.0);
-        let cos_theta_t = cos2_theta_t.sqrt();
-        let wt = -w * eta + (cos_theta_i * eta - cos_theta_t) * n;
-        (refracted, wt)
+        let cos_theta_t = (1.0 - sin2_theta_t).sqrt();
+        let wt = -w / eta + (cos_theta_i / eta - cos_theta_t) * n;
+        (const_(true), eta, wt)
     })
+    //   // Compute $\cos\,\theta_\roman{t}$ using Snell's law
+    //   Float sin2Theta_i = std::max<Float>(0, 1 - Sqr(cosTheta_i));
+    //   Float sin2Theta_t = sin2Theta_i / Sqr(eta);
+    //   // Handle total internal reflection case
+    //   if (sin2Theta_t >= 1)
+    //       return false;
+  
+    //   Float cosTheta_t = std::sqrt(1 - sin2Theta_t);
+  
+    //   *wt = -wi / eta + (cosTheta_i / eta - cosTheta_t) * Vector3f(n);
 }
 
 pub fn spherical_to_xyz2(cos_theta: Expr<f32>, sin_theta:Expr<f32>, phi: Expr<f32>) -> Expr<Float3> {

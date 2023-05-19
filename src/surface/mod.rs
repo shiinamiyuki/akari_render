@@ -61,12 +61,14 @@ impl Bsdf for BsdfMixture {
         ctx: &BsdfEvalContext,
     ) -> BsdfSample {
         let frac: Expr<f32> = (self.frac)(wo, ctx);
+
         let (which, remapped) =
-            weighted_discrete_choice2_and_remap(frac, const_(0u32), const_(1u32), u_select);
+            weighted_discrete_choice2_and_remap(frac, const_(1u32), const_(0u32), u_select);
         if_!(which.cmpeq(0), {
             let mut sample = self.bsdf_a.sample(wo, remapped,u_sample, ctx);
             let f_b = self.bsdf_b.evaluate(wo, sample.wi, ctx);
             let pdf_b = self.bsdf_b.pdf(wo, sample.wi, ctx);
+            // cpu_dbg!(make_float2(sample.pdf, pdf_b));
             sample.color = sample.color * (1.0 - frac) + f_b * frac;
             sample.pdf = sample.pdf * (1.0 - frac) + pdf_b * frac;
             sample
@@ -74,6 +76,7 @@ impl Bsdf for BsdfMixture {
             let mut sample = self.bsdf_b.sample(wo, remapped, u_sample, ctx);
             let f_a = self.bsdf_a.evaluate(wo, sample.wi, ctx);
             let pdf_a = self.bsdf_a.pdf(wo, sample.wi, ctx);
+            // cpu_dbg!(make_float2(pdf_a, sample.pdf));
             sample.color = f_a * (1.0 - frac) + sample.color * frac;
             sample.pdf = pdf_a * (1.0 - frac) + sample.pdf * frac;
             sample
@@ -178,8 +181,7 @@ impl Bsdf for MicrofacetReflection {
 pub struct MicrofacetTransmission {
     pub dist: Box<dyn MicrofacetDistribution>,
     pub color: Color,
-    pub eta_a: Expr<f32>,
-    pub eta_b: Expr<f32>,
+    pub eta: Expr<f32>,
     pub fresnel: Box<dyn Fresnel>,
 }
 
@@ -187,13 +189,9 @@ impl Bsdf for MicrofacetTransmission {
     fn evaluate(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &BsdfEvalContext) -> Color {
         let cos_o = Frame::cos_theta(wo);
         let cos_i = Frame::cos_theta(wi);
-        let eta = select(
-            cos_o.cmpgt(0.0),
-            self.eta_b / self.eta_a,
-            self.eta_a / self.eta_b,
-        );
+        let eta = select(cos_o.cmpgt(0.0), self.eta, 1.0 / self.eta);
         let wh = (wo + wi * eta).normalize();
-        let wh = select(wh.y().cmplt(0.0), -wh, wh);
+        let wh = face_forward(wh, make_float3(0.0, 1.0, 0.0));
         if_!((wh.dot(wo) * wi.dot(wh)).cmpgt(0.0)
             | cos_i.cmpeq(0.0)
             | cos_o.cmpeq(0.0)
@@ -201,12 +199,21 @@ impl Bsdf for MicrofacetTransmission {
             Color::zero(ctx.color_repr)
         }, else {
             let f = self.fresnel.evaluate(wo.dot(wh), ctx);
-            let sqrt_denom = wo.dot(wh) + eta * wi.dot(wh);
+            let denom = (wo.dot(wh) / eta  + wi.dot(wh)).sqr() * cos_i * cos_o;
             (Color::one(ctx.color_repr) - f)
                 * &self.color *(self.dist.d(wh)
                 * self.dist.g(wo, wi) * eta.sqr()
                 * wi.dot(wh).abs() * wo.dot(wh).abs()
-                / (cos_i * cos_o * sqrt_denom.sqr())).abs() * cos_o.abs()
+                / denom).abs() * cos_o.abs()
+
+            // Float denom = Sqr(Dot(wi, wm) + Dot(wo, wm) / etap) * cosTheta_i * cosTheta_o;
+            // Float ft = mfDistrib.D(wm) * (1 - F) * mfDistrib.G(wo, wi) *
+            //            std::abs(Dot(wi, wm) * Dot(wo, wm) / denom);
+            // // Account for non-symmetry with transmission to different medium
+            // if (mode == TransportMode::Radiance)
+            //     ft /= Sqr(etap);
+
+            // return SampledSpectrum(ft);
         })
     }
 
@@ -218,15 +225,8 @@ impl Bsdf for MicrofacetTransmission {
         ctx: &BsdfEvalContext,
     ) -> BsdfSample {
         let wh = self.dist.sample_wh(wo, u_sample);
-        let cos_o = Frame::cos_theta(wo);
-        let eta = select(
-            cos_o.cmpgt(0.0),
-            self.eta_a / self.eta_b,
-            self.eta_b / self.eta_a,
-        );
-        let valid = wo.dot(wh).cmpgt(0.0);
-        let (refracted, wi) = refract(wo, wh, eta);
-        let valid = refracted & valid;
+        let (refracted, _eta, wi) = refract(wo, wh, self.eta);
+        let valid = refracted & !Frame::same_hemisphere(wo, wi);
         BsdfSample {
             pdf: self.pdf(wo, wi, ctx),
             color: self.evaluate(wo, wi, ctx),
@@ -238,54 +238,60 @@ impl Bsdf for MicrofacetTransmission {
     fn pdf(&self, wo: Expr<Float3>, wi: Expr<Float3>, _ctx: &BsdfEvalContext) -> Float {
         let cos_o = Frame::cos_theta(wo);
         let cos_i = Frame::cos_theta(wi);
-        let eta = select(
-            cos_o.cmpgt(0.0),
-            self.eta_b / self.eta_a,
-            self.eta_a / self.eta_b,
-        );
+        let eta = select(cos_o.cmpgt(0.0), self.eta, 1.0 / self.eta);
         let wh = (wo + wi * eta).normalize();
+        let wh = face_forward(wh, make_float3(0.0, 1.0, 0.0));
         if_!((wh.dot(wo) * wi.dot(wh)).cmpgt(0.0)
             | cos_i.cmpeq(0.0)
             | cos_o.cmpeq(0.0)
             | Frame::same_hemisphere(wo, wi), {
             const_(0.0f32)
         }, else {
-            let sqrt_denom =wo.dot(wh) + eta * wi.dot(wh);
-            let dwh_dwi = (eta * eta * wi.dot(wh) / sqrt_denom.sqr()).abs();
+            // Float denom = Sqr(Dot(wi, wm) + Dot(wo, wm) / etap);
+            // Float dwm_dwi = AbsDot(wi, wm) / denom;
+            // pdf = mfDistrib.PDF(wo, wm) * dwm_dwi * pt / (pr + pt);
+            let denom = (wi.dot(wh) + wo.dot(wh) /  eta).sqr();
+            let dwh_dwi = wi.dot(wh).abs() / denom;
             self.dist.pdf(wo, wh) * dwh_dwi
         })
     }
 }
 
-pub fn fr_dielectric(cos_theta_i: Expr<f32>, eta_i: Expr<f32>, eta_t: Expr<f32>) -> Expr<f32> {
+pub fn fr_dielectric(cos_theta_i: Expr<f32>, eta: Expr<f32>) -> Expr<f32> {
     let cos_theta_i = cos_theta_i.clamp(-1.0, 1.0);
-
-    let entering = cos_theta_i.cmpgt(0.0);
-    let (eta_i, eta_t) = if_!(!entering, {
-        (eta_t, eta_i)
-    }, else {
-        (eta_i, eta_t)
-    });
+    let eta = select(cos_theta_i.cmpgt(0.0), eta, 1.0 / eta);
     let cos_theta_i = cos_theta_i.abs();
-    let sin_theta_i = (1.0 - cos_theta_i * cos_theta_i).max(0.0).sqrt();
-    let sin_theta_t = eta_i / eta_t * sin_theta_i;
+    //
+    // Compute $\cos\,\theta_\roman{t}$ for Fresnel equations using Snell's law
+    let sin2_theta_i = 1.0 - cos_theta_i.sqr();
+    let sin2_theta_t = sin2_theta_i / eta.sqr();
+    if_!(sin2_theta_t.cmpge(1.0), {
+        const_(1.0f32)
+    }, else {
+        let cos_theta_t = (1.0 - sin2_theta_t).max(0.0).sqrt();
+        let r_parl = (eta * cos_theta_i - cos_theta_t) / (eta * cos_theta_i + cos_theta_t);
+        let r_perp = (cos_theta_i - eta * cos_theta_t) / (cos_theta_i + eta * cos_theta_t);
+        let fr = (r_parl.sqr() + r_perp.sqr()) * 0.5;
+        // cpu_dbg!(fr);
+        fr
+    })
+    //     Float sin2Theta_i = 1 - Sqr(cosTheta_i);
+    //     Float sin2Theta_t = sin2Theta_i / Sqr(eta);
+    //     if (sin2Theta_t >= 1)
+    //         return 1.f;
+    //     Float cosTheta_t = SafeSqrt(1 - sin2Theta_t);
 
-    let sin_theta_t = sin_theta_t.min(1.0);
-    let cos_theta_t = (1.0 - sin_theta_t * sin_theta_t).max(0.0).sqrt();
-    let rparl = ((eta_t * cos_theta_i) - (eta_i * cos_theta_t))
-        / ((eta_t * cos_theta_i) + (eta_i * cos_theta_t));
-    let rperp = ((eta_i * cos_theta_i) - (eta_t * cos_theta_t))
-        / ((eta_i * cos_theta_i) + (eta_t * cos_theta_t));
-    (rparl * rparl + rperp * rperp) / 2.0
+    //     Float r_parl = (eta * cosTheta_i - cosTheta_t) / (eta * cosTheta_i + cosTheta_t);
+    //     Float r_perp = (cosTheta_i - eta * cosTheta_t) / (cosTheta_i + eta * cosTheta_t);
+    //     return (Sqr(r_parl) + Sqr(r_perp)) / 2;
 }
 #[derive(Copy, Clone)]
 pub struct FresnelDielectric {
-    pub eta_i: Expr<f32>,
-    pub eta_t: Expr<f32>,
+    pub eta: Expr<f32>, //eta = eta_t / eta_i
 }
 impl Fresnel for FresnelDielectric {
     fn evaluate(&self, cos_theta_i: Expr<f32>, ctx: &BsdfEvalContext) -> Color {
-        Color::one(ctx.color_repr) * fr_dielectric(cos_theta_i, self.eta_i, self.eta_t)
+        Color::one(ctx.color_repr) * fr_dielectric(cos_theta_i, self.eta)
     }
 }
 #[derive(Copy, Clone)]
