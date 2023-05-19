@@ -273,7 +273,7 @@ impl Mcmc {
                 );
                 film.add_splat(
                     cur_p.float(),
-                    &(cur_color / cur_f * (1.0 - accept * contribution)),
+                    &(cur_color / cur_f * ((1.0 - accept) * contribution)),
                 );
                 if_!(rng.next_1d().cmplt(accept), {
                     state.set_cur_f(proposal_f);
