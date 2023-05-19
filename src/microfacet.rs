@@ -1,4 +1,4 @@
-use crate::geometry::{spherical_to_xyz, spherical_to_xyz2, Frame};
+use crate::geometry::{spherical_to_xyz2, Frame};
 use crate::*;
 use lazy_static::lazy_static;
 use std::f32::consts::PI;

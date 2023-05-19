@@ -1,5 +1,5 @@
 use crate::{
-    color::{Color, ColorRepr},
+    color::{Color},
     *,
 };
 

@@ -1,13 +1,9 @@
 use akari_render::{
-    film::{Film, FilmColorRepr},
     integrator::{
-        mcmc::{self, Mcmc},
-        normal::NormalVis,
-        pt::PathTracer,
-        render, Integrator, RenderTask,
+        render, RenderTask,
     },
 };
-use clap::{arg, Arg, Command};
+use clap::{arg, Command};
 use luisa_compute as luisa;
 use std::{env::current_exe, fs::File, process::exit};
 fn main() {

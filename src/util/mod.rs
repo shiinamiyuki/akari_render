@@ -5,7 +5,6 @@ use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use lazy_static::lazy_static;
 use luisa_compute::glam::Vec4Swizzles;
 use std::{
-    collections::HashMap,
     path::PathBuf,
     sync::atomic::{AtomicBool, Ordering},
 };

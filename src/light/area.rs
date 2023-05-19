@@ -4,7 +4,6 @@ use crate::{
     light::*,
     sampling::uniform_sample_triangle,
     util::alias_table::{AliasTableEntry, BindlessAliasTableVar},
-    *,
 };
 #[derive(Clone, Copy, Value)]
 #[repr(C)]

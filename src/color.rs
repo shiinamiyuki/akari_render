@@ -1,4 +1,4 @@
-use std::cell::Cell;
+
 
 use crate::*;
 pub mod colorspace {
@@ -84,19 +84,19 @@ impl ColorVar {
     }
     pub fn repr(&self) -> ColorRepr {
         match self {
-            ColorVar::Spectral4(s) => ColorRepr::Spectral4,
+            ColorVar::Spectral4(_s) => ColorRepr::Spectral4,
             ColorVar::Rgb(_) => ColorRepr::Rgb,
         }
     }
     pub fn load(&self) -> Color {
         match self {
-            ColorVar::Spectral4(s) => todo!(),
+            ColorVar::Spectral4(_s) => todo!(),
             ColorVar::Rgb(v) => Color::Rgb(v.load()),
         }
     }
     pub fn store(&self, color: Color) {
         match self {
-            ColorVar::Spectral4(s) => todo!(),
+            ColorVar::Spectral4(_s) => todo!(),
             ColorVar::Rgb(v) => v.store(color.as_rgb()),
         }
     }
@@ -176,7 +176,7 @@ impl Color {
     }
     pub fn has_nan(&self) -> Expr<bool> {
         match self {
-            Color::Spectral4(s) => todo!(),
+            Color::Spectral4(_s) => todo!(),
             Color::Rgb(v) => v.is_nan().any(),
         }
     }

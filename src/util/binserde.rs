@@ -1,6 +1,5 @@
 use std::{
     io::{Read, Write},
-    mem::MaybeUninit,
 };
 
 /* minimal binary ser/de

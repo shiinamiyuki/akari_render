@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use rand::{thread_rng, Rng};
+
 
 use super::Integrator;
 
-use crate::{color::*, film::*, geometry::*, interaction::*, sampler::*, scene::*, *};
+use crate::{color::*, film::*, sampler::*, scene::*, *};
 pub struct NormalVis {
     device: Device,
     pub spp: u32,

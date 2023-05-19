@@ -1,6 +1,6 @@
 use std::f32::consts::PI;
 
-use crate::{sampler::*, sampling::sample_gaussian, *};
+use crate::{sampler::*, sampling::sample_gaussian};
 
 use super::IndependentSampler;
 #[derive(Clone, Copy, Aggregate)]

@@ -251,7 +251,7 @@ impl MeshAggregate {
 
 pub fn load_model(
     obj_file: &str,
-    generate_normal: Option<f32>,
+    _generate_normal: Option<f32>,
 ) -> (Vec<TriangleMesh>, Vec<tobj::Model>, Vec<tobj::Material>) {
     let (models, materials) = tobj::load_obj(
         &obj_file,

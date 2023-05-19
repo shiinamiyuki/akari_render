@@ -1,14 +1,14 @@
-use std::f32::consts::FRAC_1_PI;
 
-use crate::color::Color;
+
+
 use crate::geometry::Frame;
 use crate::microfacet::TrowbridgeReitzDistribution;
 use crate::surface::{
-    fr_dielectric, BsdfMixture, Fresnel, FresnelDielectric, MicrofacetReflection,
+    fr_dielectric, BsdfMixture, FresnelDielectric, MicrofacetReflection,
 };
 use crate::*;
 
-use super::{Bsdf, BsdfClosure, BsdfSample, Surface, MicrofacetTransmission, BsdfEvalContext};
+use super::{BsdfClosure, Surface, MicrofacetTransmission, BsdfEvalContext};
 #[derive(Debug, Clone, Copy, Value)]
 #[repr(C)]
 pub struct GlassSurface {

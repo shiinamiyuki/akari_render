@@ -13,7 +13,7 @@ use crate::{
     util::alias_table::AliasTable,
     *,
 };
-use rand::{thread_rng, Rng};
+use rand::{Rng};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]

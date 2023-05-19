@@ -12,10 +12,10 @@ use crate::light::{
     LightAggregate, LightEvalContext, LightEvaluator, TLightSampleExpr, WeightedLightDistribution,
 };
 use crate::scenegraph::node::CoordinateSystem;
-use crate::surface::diffuse::{DiffuseBsdf, DiffuseSurface};
+use crate::surface::diffuse::{DiffuseSurface};
 use crate::surface::glass::GlassSurface;
 use crate::surface::{
-    BsdfEvalContext, BsdfEvalResult, BsdfEvalResultExpr, BsdfEvaluator, TBsdfSampleExpr,
+    BsdfEvalContext, BsdfEvalResultExpr, BsdfEvaluator, TBsdfSampleExpr,
     BSDF_EVAL_COLOR, BSDF_EVAL_PDF,
 };
 use crate::texture::{ConstFloatTexture, ConstRgbTexture, TextureEvalContext, TextureEvaluator};

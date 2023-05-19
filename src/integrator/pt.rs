@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
 use luisa::rtx::offset_ray_origin;
-use rand::{thread_rng, Rng};
+use rand::{Rng};
 
 use super::Integrator;
 use crate::{
-    color::*, film::*, geometry::*, interaction::*, sampler::*, scene::*, surface::Bsdf, *,
+    color::*, film::*, geometry::*, sampler::*, scene::*, surface::Bsdf, *,
 };
 use serde::{Deserialize, Serialize};
 #[derive(Clone)]

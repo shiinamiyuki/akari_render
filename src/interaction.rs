@@ -1,9 +1,6 @@
-use crate::color::Color;
+
 use crate::{
-    color::ColorRepr,
     geometry::{Frame, ShadingTriangle},
-    scene::Scene,
-    texture::Texture,
     *,
 };
 
