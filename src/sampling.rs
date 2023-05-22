@@ -1,3 +1,5 @@
+use std::f32::consts::PI;
+
 use crate::{util::erf_inv, *};
 pub fn uniform_sample_disk(u: Expr<Float2>) -> Expr<Float2> {
     let r = u.x().sqrt();
@@ -20,7 +22,9 @@ pub fn uniform_sample_triangle(u: Expr<Float2>) -> Expr<Float2> {
 pub fn sample_gaussian(u: Expr<f32>) -> Expr<f32> {
     2.0f32.sqrt() * erf_inv(2.0 * u - 1.0)
 }
-
+pub fn log_gaussian_pdf(x: Expr<f32>, sigma: Expr<f32>) -> Expr<f32> {
+    (1.0 / (sigma * (PI * 2.0).sqrt())).ln() + (-0.5 * x.sqr() / sigma.sqr())
+}
 pub fn uniform_discrete_choice_and_remap(n: Expr<u32>, u: Expr<f32>) -> (Expr<u32>, Expr<f32>) {
     let i = (u * n.float()).floor();
     let i = i.int().clamp(0, n.int() - 1).uint();
