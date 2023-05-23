@@ -33,6 +33,7 @@ pub mod surface;
 pub mod texture;
 pub mod util;
 pub mod volume;
+pub mod ext;
 
 #[derive(Clone, Hash, PartialEq, Eq, Debug)]
 pub enum PolyKey {
