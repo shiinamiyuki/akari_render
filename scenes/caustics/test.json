@@ -5,17 +5,19 @@
             "method": {
                 "small_sigma": 0.01,
                 "large_step_prob": 0.1,
-                "adaptive": true,
+                "adaptive": false,
                 "type": "kelemen"
             },
             "direct_spp": 16,
-            "max_depth": 12,
-            "spp": 512,
-            "spp_per_pass": 16,
+            "max_depth": 64,
+            "rr_depth":12,
+            "mcmc_depth":3,
+            "spp": 8192,
+            "spp_per_pass": 64,
             "n_chains": 1024,
             "n_bootstrap":1000000,
             "use_nee":true
         },
-        "out": "output/test.exr"
+        "out": "output/mcmc.exr"
     }
 ]

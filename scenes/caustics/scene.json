@@ -20,7 +20,7 @@
             "dispersion": 0.01342,
             "roughness": {
                 "type": "Float",
-                "value": 0.01
+                "value": 0.03
             },
             "ior": 1.4,
             "type": "glass"
@@ -130,7 +130,7 @@
     },
     "camera": {
         "focal": 1.0,
-        "fov": 30.0,
+        "fov": 55.8,
         "lens_radius": 0.0,
         "res": [
             512,

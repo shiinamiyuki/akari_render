@@ -1,9 +1,9 @@
 [
     {
         "method":{
-            "type":"mcmc",
+            "type":"pt",
             "direct_spp":64,
-            "spp":64
+            "spp":128
         },
         "out":"output/test.exr"
     }

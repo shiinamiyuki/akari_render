@@ -6,9 +6,7 @@ use crate::interaction::SurfaceInteraction;
 use crate::microfacet::TrowbridgeReitzDistribution;
 use crate::sampling::cos_sample_hemisphere;
 use crate::surface::*;
-use crate::*;
 
-use super::diffuse::DiffuseBsdf;
 use super::{BsdfClosure, BsdfEvalContext, FresnelSchlick, MicrofacetTransmission, Surface};
 
 #[derive(Debug, Clone, Copy, Value)]
@@ -113,6 +111,7 @@ impl Surface for PrincipledSurfaceExpr {
         let clearcoat_roughness = ctx.texture.evaluate_float(self.clearcoat_roughness(), si);
         let metal = {
             let f0 = ((eta - 1.0) / (eta + 1.0)).sqr();
+            let f0 = Color::one(ctx.color_repr) * f0 * (1.0 - metallic) + color * metallic;
             let fresnel = Box::new(FresnelSchlick { f0 });
             Box::new(MicrofacetReflection {
                 color,
@@ -125,7 +124,9 @@ impl Surface for PrincipledSurfaceExpr {
         };
         let clearcoat_brdf = {
             let f0 = 0.04f32;
-            let fresnel = Box::new(FresnelSchlick { f0: const_(f0) });
+            let fresnel = Box::new(FresnelSchlick {
+                f0: Color::one(ctx.color_repr) * const_(f0),
+            });
             Box::new(MicrofacetReflection {
                 color,
                 fresnel,

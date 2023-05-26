@@ -22,7 +22,7 @@
         "type": "Float",
         "value": 0.01
       },
-      "ior":1.4,
+      "ior":1.3,
       "type": "glass"
     },
     "Material.002": {

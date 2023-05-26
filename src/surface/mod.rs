@@ -64,17 +64,18 @@ impl Bsdf for BsdfMixture {
             }
             BsdfBlendMode::Mix => {
                 let frac: Expr<f32> = (self.frac)(wo, ctx);
-                if_!(frac.cmplt(Self::EPS), {
+                let zero = Color::zero(ctx.color_repr);
+                let f_a = if_!(frac.cmplt(1.0 - Self::EPS), {
                     self.bsdf_a.evaluate(wo, wi,ctx)
                 }, else {
-                    if_!(frac.cmpgt(1.0 - Self::EPS), {
-                        self.bsdf_b.evaluate(wo, wi,ctx)
-                    }, else {
-                        let f_a = self.bsdf_a.evaluate(wo, wi, ctx);
-                        let f_b = self.bsdf_b.evaluate(wo, wi, ctx);
-                        f_a * (1.0 - frac) + f_b * frac
-                    })
-                })
+                    zero
+                });
+                let f_b = if_!(frac.cmpgt(Self::EPS), {
+                    self.bsdf_b.evaluate(wo, wi,ctx)
+                }, else {
+                    zero
+                });
+                f_a * (1.0 - frac) + f_b * frac
             }
         }
     }
@@ -87,80 +88,72 @@ impl Bsdf for BsdfMixture {
         ctx: &BsdfEvalContext,
     ) -> BsdfSample {
         let frac: Expr<f32> = (self.frac)(wo, ctx);
-        if_!(frac.cmplt(Self::EPS), {
-            let mut sample = self.bsdf_a.sample(wo, u_select, u_sample, ctx);
-            let f_b = self.bsdf_b.evaluate(wo, sample.wi, ctx);
+        let (which, remapped) =
+            weighted_discrete_choice2_and_remap(frac, const_(1u32), const_(0u32), u_select);
+        let zero_f = Color::zero(ctx.color_repr);
+        let zero_pdf = const_(0.0f32);
+        if_!(which.cmpeq(0), {
+            let mut sample = self.bsdf_a.sample(wo, remapped,u_sample, ctx);
+            let (f_b, pdf_b) = {
+                if_!(frac.cmpgt(Self::EPS), {
+                    let f_b = self.bsdf_b.evaluate(wo, sample.wi, ctx);
+                    let pdf_b = self.bsdf_b.pdf(wo, sample.wi, ctx);
+                    (f_b, pdf_b)
+                }, else {
+                    (zero_f, zero_pdf)
+                })
+            };
+            // cpu_dbg!(make_float2(sample.pdf, pdf_b));
             match self.mode {
                 BsdfBlendMode::Addictive => {
                     sample.color = sample.color + f_b;
+                },
+                BsdfBlendMode::Mix => {
+                    sample.color = sample.color * (1.0 - frac) + f_b * frac;
                 }
-                _=>{}
             }
+
+            sample.pdf = sample.pdf * (1.0 - frac) + pdf_b * frac;
             sample
         }, else {
-            if_!(frac.cmpgt(1.0 - Self::EPS), {
-                let mut sample = self.bsdf_b.sample(wo, u_select, u_sample, ctx);
-                let f_a = self.bsdf_a.evaluate(wo, sample.wi, ctx);
-                match self.mode {
-                    BsdfBlendMode::Addictive => {
-                        sample.color = sample.color + f_a;
-                    }
-                    _=>{}
-                }
-                sample
-            }, else {
-                let (which, remapped) =
-                    weighted_discrete_choice2_and_remap(frac, const_(1u32), const_(0u32), u_select);
-                if_!(which.cmpeq(0), {
-                    let mut sample = self.bsdf_a.sample(wo, remapped,u_sample, ctx);
-                    let f_b = self.bsdf_b.evaluate(wo, sample.wi, ctx);
-                    let pdf_b = self.bsdf_b.pdf(wo, sample.wi, ctx);
-                    // cpu_dbg!(make_float2(sample.pdf, pdf_b));
-                    match self.mode {
-                        BsdfBlendMode::Addictive => {
-                            sample.color = sample.color + f_b;
-                        },
-                        BsdfBlendMode::Mix => {
-                            sample.color = sample.color * (1.0 - frac) + f_b * frac;
-                        }
-                    }
-
-                    sample.pdf = sample.pdf * (1.0 - frac) + pdf_b * frac;
-                    sample
-                }, else {
-                    let mut sample = self.bsdf_b.sample(wo, remapped, u_sample, ctx);
+            let mut sample = self.bsdf_b.sample(wo, remapped, u_sample, ctx);
+            let (f_a, pdf_a) = {
+                if_!(frac.cmplt(1.0 - Self::EPS), {
                     let f_a = self.bsdf_a.evaluate(wo, sample.wi, ctx);
                     let pdf_a = self.bsdf_a.pdf(wo, sample.wi, ctx);
-                    // cpu_dbg!(make_float2(pdf_a, sample.pdf));
-                    match self.mode {
-                        BsdfBlendMode::Addictive => {
-                            sample.color = sample.color + f_a;
-                        },
-                        BsdfBlendMode::Mix => {
-                            sample.color = f_a * (1.0 - frac) + sample.color * frac;
-                        }
-                    }
-                    sample.pdf = pdf_a * (1.0 - frac) + sample.pdf * frac;
-                    sample
+                    (f_a, pdf_a)
+                }, else {
+                    (zero_f, zero_pdf)
                 })
-            })
+            };
+            match self.mode {
+                BsdfBlendMode::Addictive => {
+                    sample.color = sample.color + f_a;
+                },
+                BsdfBlendMode::Mix => {
+                    sample.color = f_a * (1.0 - frac) + sample.color * frac;
+                }
+            }
+            sample.pdf = pdf_a * (1.0 - frac) + sample.pdf * frac;
+            sample
         })
+ 
     }
 
     fn pdf(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &BsdfEvalContext) -> Float {
         let frac: Expr<f32> = (self.frac)(wo, ctx);
-        if_!(frac.cmplt(Self::EPS), {
-            self.bsdf_a.pdf(wo, wi, ctx)
+        let zero = const_(0.0f32);
+        let pdf_a = if_!(frac.cmplt(1.0 - Self::EPS), {
+            self.bsdf_a.pdf(wo, wi,ctx)
         }, else {
-            if_!(frac.cmpgt(1.0 - Self::EPS), {
-                self.bsdf_b.pdf(wo, wi, ctx)
-            }, else {
-                let pdf_a = self.bsdf_a.pdf(wo, wi, ctx);
-                let pdf_b = self.bsdf_b.pdf(wo, wi, ctx);
-                let frac: Expr<f32> = (self.frac)(wo, ctx);
-                pdf_a * (1.0 - frac) + pdf_b * frac
-            })
-        })
+            zero
+        });
+        let pdf_b = if_!(frac.cmpgt(Self::EPS), {
+            self.bsdf_b.pdf(wo, wi,ctx)
+        }, else {
+            zero
+        });
+        pdf_a * (1.0 - frac) + pdf_b * frac
     }
 }
 
@@ -346,7 +339,7 @@ pub fn fr_dielectric(cos_theta_i: Expr<f32>, eta: Expr<f32>) -> Expr<f32> {
         let r_perp = (cos_theta_i - eta * cos_theta_t) / (cos_theta_i + eta * cos_theta_t);
         let fr = (r_parl.sqr() + r_perp.sqr()) * 0.5;
         // cpu_dbg!(fr);
-        fr
+        fr.clamp(0.0, 1.0)
     })
     //     Float sin2Theta_i = 1 - Sqr(cosTheta_i);
     //     Float sin2Theta_t = sin2Theta_i / Sqr(eta);
@@ -359,19 +352,18 @@ pub fn fr_dielectric(cos_theta_i: Expr<f32>, eta: Expr<f32>) -> Expr<f32> {
     //     return (Sqr(r_parl) + Sqr(r_perp)) / 2;
 }
 
-pub fn fr_schlick(f0: Expr<f32>, cos_theta_i: Expr<f32>) -> Expr<f32> {
-    let f0 = f0.clamp(0.0, 1.0);
+pub fn fr_schlick(f0: Color, cos_theta_i: Expr<f32>) -> Color {
     let cos_theta_i = cos_theta_i.clamp(-1.0, 1.0);
     let pow5 = |x: Expr<f32>| x.sqr().sqr() * x;
-    f0 + (1.0 - f0) * pow5(1.0 - cos_theta_i)
+    f0 + (Color::one(f0.repr()) - f0) * pow5(1.0 - cos_theta_i)
 }
 #[derive(Copy, Clone)]
 pub struct FresnelSchlick {
-    pub f0: Expr<f32>,
+    pub f0: Color,
 }
 impl Fresnel for FresnelSchlick {
     fn evaluate(&self, cos_theta_i: Expr<f32>, ctx: &BsdfEvalContext) -> Color {
-        Color::one(ctx.color_repr) * fr_schlick(self.f0, cos_theta_i)
+        fr_schlick(self.f0, cos_theta_i)
     }
 }
 #[derive(Copy, Clone)]
