@@ -21,6 +21,65 @@ pub trait Sampler {
     }
     fn start(&self);
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum SampleStream {
+    Pixel,
+    Camera, // (filter + lens + wavelenths)
+    Light,
+    Bsdf,
+    Roulette,
+}
+impl SampleStream {
+    pub const fn dimension(&self) -> u32 {
+        match self {
+            SampleStream::Pixel => 2,
+            SampleStream::Camera => 2 + 2 + 1,
+            SampleStream::Light => 3,
+            SampleStream::Bsdf => 3,
+            SampleStream::Roulette => 1,
+        }
+    }
+}
+
+pub struct PathSampler<S: Sampler> {
+    base: S,
+    bsdf_cnt: Var<u32>,
+    light_cnt: Var<u32>,
+    roulette_cnt: Var<u32>,
+    bounces: u32,
+    pixel: Var<Float2>,
+    camera: ArrayVar<f32, 5>,
+    light: VLArrayVar<f32>,
+    bsdf: VLArrayVar<f32>,
+    roulette: VLArrayVar<f32>,
+}
+impl<S: Sampler> PathSampler<S> {
+    pub fn new(base: S, bounces: u32) -> Self {
+        Self {
+            base,
+            bsdf_cnt: var!(u32),
+            light_cnt: var!(u32),
+            roulette_cnt: var!(u32),
+            bounces,
+            light: VLArrayVar::zero(bounces as usize * SampleStream::Light.dimension() as usize),
+            bsdf: VLArrayVar::zero(bounces as usize * SampleStream::Bsdf.dimension() as usize),
+            roulette: VLArrayVar::zero(bounces as usize),
+            pixel: var!(Float2),
+            camera: var!([f32; 5]),
+        }
+    }
+    pub fn start(&self) {
+        self.bsdf_cnt.store(0);
+        self.light_cnt.store(0);
+        self.roulette_cnt.store(0);
+        self.base.start();
+        for_range(const_(0)..const_(self.bounces as i32), |_| {
+            
+        });
+    }
+}
+
 #[derive(Clone, Copy, Debug, Value)]
 #[repr(C)]
 pub struct Pcg32 {

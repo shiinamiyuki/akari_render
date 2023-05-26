@@ -12,11 +12,12 @@ use crate::light::{
     LightAggregate, LightEvalContext, LightEvaluator, TLightSampleExpr, WeightedLightDistribution,
 };
 use crate::scenegraph::node::CoordinateSystem;
-use crate::surface::diffuse::{DiffuseSurface};
+use crate::surface::diffuse::DiffuseSurface;
 use crate::surface::glass::GlassSurface;
+use crate::surface::principled::PrincipledSurface;
 use crate::surface::{
-    BsdfEvalContext, BsdfEvalResultExpr, BsdfEvaluator, TBsdfSampleExpr,
-    BSDF_EVAL_COLOR, BSDF_EVAL_PDF,
+    BsdfEvalContext, BsdfEvalResultExpr, BsdfEvaluator, TBsdfSampleExpr, BSDF_EVAL_COLOR,
+    BSDF_EVAL_PDF,
 };
 use crate::texture::{ConstFloatTexture, ConstRgbTexture, TextureEvalContext, TextureEvaluator};
 use crate::util::binserde::Decode;
@@ -83,8 +84,7 @@ impl Scene {
         let sample = {
             let texture_eval = texture_eval.clone();
             let scene = self.clone();
-            self
-                .device
+            self.device
                 .create_dyn_callable::<(Expr<PointNormal>, Expr<Float3>), DynExpr>(Box::new(
                     move |pn, u| {
                         let ctx = LightEvalContext {
@@ -199,11 +199,11 @@ impl Scene {
                 Expr<SurfaceInteraction>,
                 Expr<Float3>,
                 Expr<Float3>,
-            ), DynExpr>(
-                Box::new(move |surface: Expr<TagIndex>,
-                       si: Expr<SurfaceInteraction>,
-                       wo: Expr<Float3>,
-                       u: Expr<Float3>| {
+            ), DynExpr>(Box::new(
+                move |surface: Expr<TagIndex>,
+                      si: Expr<SurfaceInteraction>,
+                      wo: Expr<Float3>,
+                      u: Expr<Float3>| {
                     let ctx = BsdfEvalContext {
                         texture: &texture_eval,
                         color_repr: color_repr,
@@ -222,8 +222,8 @@ impl Scene {
                         .into(),
                         _ => todo!(),
                     }
-                }),
-            )
+                },
+            ))
         };
         Arc::new(BsdfEvaluator {
             color_repr,
@@ -466,24 +466,36 @@ impl SceneLoader {
                 subsurface_radius: _,
                 subsurface_color: _,
                 subsurface_ior: _,
-                metallic: _,
-                specular: _,
+                metallic,
                 specular_tint: _,
-                roughness: _,
+                roughness,
                 anisotropic: _,
                 anisotropic_rotation: _,
                 sheen: _,
                 sheen_tint: _,
-                clearcoat: _,
-                clearcoat_roughness: _,
-                ior: _,
-                transmission: _,
+                clearcoat,
+                clearcoat_roughness,
+                ior,
+                transmission,
                 emission,
             } => {
                 let color = self.load_texture(color);
+                let metallic = self.load_texture(metallic);
+                let roughness = self.load_texture(roughness);
+                let transmission = self.load_texture(transmission);
+                let clearcoat = self.load_texture(clearcoat);
+                let clearcoat_roughness = self.load_texture(clearcoat_roughness);
                 let bsdf_id = self.surfaces.push(
-                    PolyKey::Simple("diffuse".into()),
-                    DiffuseSurface { reflectance: color },
+                    PolyKey::Simple("principled".into()),
+                    PrincipledSurface {
+                        color,
+                        metallic,
+                        roughness,
+                        clearcoat,
+                        clearcoat_roughness,
+                        eta: *ior,
+                        transmission,
+                    },
                 );
                 let emission = self.load_texture(emission);
                 (bsdf_id, Some(emission))

@@ -16,11 +16,14 @@ pub struct TextureEvaluator {
     pub(crate) texture: Callable<(Expr<TagIndex>, Expr<SurfaceInteraction>), Expr<Float4>>,
 }
 impl TextureEvaluator {
-    fn color_from_float4(&self, v: Expr<Float4>) -> Color {
+    pub fn color_from_float4(&self, v: Expr<Float4>) -> Color {
         match self.color_repr {
             ColorRepr::Rgb => Color::Rgb(v.xyz()),
             ColorRepr::Spectral4 => todo!(),
         }
+    }
+    pub fn evaluate_float4(&self, tex: Expr<TagIndex>, si: Expr<SurfaceInteraction>) -> Expr<Float4> {
+        self.texture.call(tex, si)
     }
     pub fn evaluate_color(&self, tex: Expr<TagIndex>, si: Expr<SurfaceInteraction>) -> Color {
         self.color_from_float4(self.texture.call(tex, si))

@@ -43,7 +43,6 @@ fn import(path: &str, scene: &mut node::Scene, forced: bool, generate_normal: Op
             values: [0.0, 0.0, 0.0],
         },
         metallic: node::Texture::Float { value: 0.0 },
-        specular: node::Texture::Float { value: 0.0 },
         specular_tint: node::Texture::Float { value: 0.0 },
         roughness: node::Texture::Float { value: 0.4 },
         anisotropic: node::Texture::Float { value: 0.0 },
@@ -52,7 +51,7 @@ fn import(path: &str, scene: &mut node::Scene, forced: bool, generate_normal: Op
         sheen_tint: node::Texture::Float { value: 0.5 },
         clearcoat: node::Texture::Float { value: 0.0 },
         clearcoat_roughness: node::Texture::Float { value: 0.03 },
-        ior: node::Texture::Float { value: 1.45 },
+        ior: 1.45,
         transmission: node::Texture::Float { value: 0.0 },
         emission: node::Texture::SRgbLinear {
             values: [0.0, 0.0, 0.0],
