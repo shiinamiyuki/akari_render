@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
-
-
-use super::Integrator;
+use super::{Integrator, RenderOptions};
 
 use crate::{color::*, film::*, sampler::*, scene::*, *};
 pub struct NormalVis {
@@ -16,7 +14,7 @@ impl NormalVis {
 }
 
 impl Integrator for NormalVis {
-    fn render(&self, scene: Arc<Scene>, film: &mut Film) {
+    fn render(&self, scene: Arc<Scene>, film: &mut Film, _options: &RenderOptions) {
         let resolution = scene.camera.resolution();
         log::info!(
             "Resolution {}x{}, spp: {}",

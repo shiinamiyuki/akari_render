@@ -3,7 +3,7 @@ use crate::microfacet::TrowbridgeReitzDistribution;
 use crate::surface::{fr_dielectric, BsdfMixture, FresnelDielectric, MicrofacetReflection};
 use crate::*;
 
-use super::{BsdfClosure, BsdfEvalContext, MicrofacetTransmission, Surface, BsdfBlendMode};
+use super::{BsdfBlendMode, BsdfClosure, BsdfEvalContext, MicrofacetTransmission, Surface};
 #[derive(Debug, Clone, Copy, Value)]
 #[repr(C)]
 pub struct GlassSurface {
@@ -21,9 +21,7 @@ impl Surface for GlassSurfaceExpr {
     ) -> BsdfClosure {
         let kr = ctx.texture.evaluate_color(self.kr(), si);
         let kt = ctx.texture.evaluate_color(self.kt(), si);
-        let fresnel = Box::new(FresnelDielectric {
-            eta: self.eta(),
-        });
+        let fresnel = Box::new(FresnelDielectric { eta: self.eta() });
         let roughness = ctx.texture.evaluate_float(self.roughness(), si);
         let reflection = Box::new(MicrofacetReflection {
             color: kr,
@@ -44,12 +42,10 @@ impl Surface for GlassSurfaceExpr {
         });
         let eta = self.eta();
         let fresnel_blend = Box::new(BsdfMixture {
-            frac: Box::new(move |wo, _| -> Expr<f32> {
-                fr_dielectric(Frame::cos_theta(wo), eta)
-            }),
+            frac: Box::new(move |wo, _| -> Expr<f32> { fr_dielectric(Frame::cos_theta(wo), eta) }),
             bsdf_a: transmission,
             bsdf_b: reflection,
-            mode:BsdfBlendMode::Mix,
+            mode: BsdfBlendMode::Mix,
         });
         BsdfClosure {
             inner: fresnel_blend,

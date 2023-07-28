@@ -3,9 +3,35 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 use crate::{film::*, scene::*, *};
-
+#[derive(Clone, Debug)]
+pub struct RenderOptions {
+    pub save_intermediate: bool, // save intermediate results
+    pub session: String,
+    pub save_stats: bool, // save stats to {session}.json
+}
+impl Default for RenderOptions {
+    fn default() -> Self {
+        Self {
+            save_intermediate: false,
+            session: String::from("default"),
+            save_stats: false,
+        }
+    }
+}
+#[derive(Default, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct IntermediateStats {
+    pub path: String,
+    pub time: f64,
+    pub spp: u32,
+}
+#[derive(Default, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct RenderStats {
+    pub intermediate: Vec<IntermediateStats>,
+}
 pub trait Integrator {
-    fn render(&self, scene: Arc<Scene>, film: &mut Film);
+    fn render(&self, scene: Arc<Scene>, film: &mut Film, options: &RenderOptions);
 }
 
 pub mod gpt;
@@ -21,6 +47,7 @@ pub enum Method {
     #[serde(rename = "mcmc")]
     Mcmc(mcmc::Config),
 }
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct RenderConfig {
     pub method: Method,
@@ -33,8 +60,13 @@ pub enum RenderTask {
     Multi(Vec<RenderConfig>),
 }
 
-pub fn render(device: Device, scene: Arc<Scene>, task: &RenderTask) {
-    fn render_single(device: Device, scene: &Arc<Scene>, config: &RenderConfig) {
+pub fn render(device: Device, scene: Arc<Scene>, task: &RenderTask, options: RenderOptions) {
+    fn render_single(
+        device: Device,
+        scene: &Arc<Scene>,
+        config: &RenderConfig,
+        options: &RenderOptions,
+    ) {
         let mut film = Film::new(
             device.clone(),
             scene.camera.resolution(),
@@ -49,26 +81,28 @@ pub fn render(device: Device, scene: Arc<Scene>, task: &RenderTask) {
         let tic = std::time::Instant::now();
         match &config.method {
             Method::PathTracer(config) => {
-                pt::render(device.clone(), scene.clone(), &mut film, &config)
+                pt::render(device.clone(), scene.clone(), &mut film, &config, &options)
             }
-            Method::Mcmc(config) => mcmc::render(device.clone(), scene.clone(), &mut film, &config),
+            Method::Mcmc(config) => {
+                mcmc::render(device.clone(), scene.clone(), &mut film, &config, &options)
+            }
         }
         let toc = std::time::Instant::now();
-        log::info!("Rendered in {:.1}ms", (toc - tic).as_secs_f64() * 1e3);
+        log::info!("Completed in {:.1}ms", (toc - tic).as_secs_f64() * 1e3);
         film.copy_to_rgba_image(&output_image);
         util::write_image(&output_image, &config.out);
     }
     match task {
-        RenderTask::Single(config) => render_single(device, &scene, config),
+        RenderTask::Single(config) => render_single(device, &scene, config, &options),
         RenderTask::Multi(configs) => {
             let tic = std::time::Instant::now();
             log::info!("Rendering with {} methods", configs.len());
             for (i, config) in configs.iter().enumerate() {
-                log::info!("Rendering {}/{}", i + 1, configs.len());
-                render_single(device.clone(), &scene, config)
+                log::info!("Rendering task {}/{}", i + 1, configs.len());
+                render_single(device.clone(), &scene, config, &options)
             }
             let toc = std::time::Instant::now();
-            log::info!("Rendered in {:.3}s", (toc - tic).as_secs_f64());
+            log::info!("Completed in {:.3}s", (toc - tic).as_secs_f64());
         }
     }
 }

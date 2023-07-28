@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    color::{Color, ColorRepr},
+    color::{Color, ColorRepr, FlatColor},
     geometry::{PointNormal, Ray},
     interaction::SurfaceInteraction,
     mesh::MeshAggregate,
@@ -20,8 +20,8 @@ pub struct LightSample {
 }
 #[derive(Clone, Copy, Value)]
 #[repr(C)]
-pub struct TLightSample<T: Value> {
-    pub li: T,
+pub struct FlatLightSample {
+    pub li: FlatColor,
     pub pdf: f32,
     pub wi: Float3,
     pub shadow_ray: Ray,
@@ -86,29 +86,23 @@ pub struct LightAggregate {
 }
 pub struct LightEvaluator {
     pub(crate) color_repr: ColorRepr,
-    pub(crate) le: DynCallable<(Expr<Ray>, Expr<SurfaceInteraction>), DynExpr>,
+    pub(crate) le: Callable<(Expr<Ray>, Expr<SurfaceInteraction>), Expr<FlatColor>>,
     pub(crate) pdf: Callable<(Expr<SurfaceInteraction>, Expr<PointNormal>), Expr<f32>>,
-    pub(crate) sample: DynCallable<(Expr<PointNormal>, Expr<Float3>), DynExpr>,
+    pub(crate) sample: Callable<(Expr<PointNormal>, Expr<Float3>), Expr<FlatLightSample>>,
 }
 impl LightEvaluator {
     pub fn le(&self, ray: Expr<Ray>, si: Expr<SurfaceInteraction>) -> Color {
         let color = self.le.call(ray, si);
-        Color::from_dyn(color, self.color_repr)
+        Color::from_flat(self.color_repr, color)
     }
     pub fn sample(&self, pn: Expr<PointNormal>, u: Expr<Float3>) -> LightSample {
         let sample = self.sample.call(pn, u);
-        match self.color_repr {
-            ColorRepr::Rgb => {
-                let sample = sample.get::<TLightSample<Float3>>();
-                LightSample {
-                    li: Color::Rgb(sample.li()),
-                    pdf: sample.pdf(),
-                    wi: sample.wi(),
-                    shadow_ray: sample.shadow_ray(),
-                    n: sample.n(),
-                }
-            }
-            _ => todo!(),
+        LightSample {
+            li: Color::from_flat(self.color_repr, sample.li()),
+            pdf: sample.pdf(),
+            wi: sample.wi(),
+            shadow_ray: sample.shadow_ray(),
+            n: sample.n(),
         }
     }
     pub fn pdf(&self, si: Expr<SurfaceInteraction>, pn: Expr<PointNormal>) -> Expr<f32> {

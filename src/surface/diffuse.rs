@@ -1,4 +1,4 @@
-use std::f32::consts::FRAC_1_PI;
+use std::f32::consts::{FRAC_1_PI, PI};
 
 use super::BsdfEvalContext;
 use crate::color::Color;
@@ -44,6 +44,7 @@ impl Bsdf for DiffuseBsdf {
             pdf,
             color,
             valid: Bool::from(true),
+            lobe_roughness: const_(1.0f32),
         }
     }
     fn pdf(&self, wo: Expr<Float3>, wi: Expr<Float3>, _ctx: &BsdfEvalContext) -> Float {
@@ -52,6 +53,9 @@ impl Bsdf for DiffuseBsdf {
             Frame::abs_cos_theta(wi) * FRAC_1_PI,
             Float::from(0.0),
         )
+    }
+    fn albedo(&self, _wo: Expr<Float3>, _ctx: &BsdfEvalContext) -> Color {
+        self.reflectance * const_(PI)
     }
 }
 impl Surface for DiffuseSurfaceExpr {

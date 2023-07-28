@@ -9,13 +9,14 @@ author = "Xiaochun Tong"
 [dependencies]
 clap = { version = "4.2.4", features = ["derive"] }
 exr = "1.5.0"
+gltf = "1.2.0"
 hexf = "0.2.1"
 image = "0.24.3"
 indicatif = "0.17.3"
 lazy_static = "1.4"
 log = "0.4.17"
-luisa_compute = {path = "../luisa-compute-rs/luisa_compute"}
-# luisa_compute = { git = "https://github.com/LuisaGroup/luisa-compute-rs.git"}
+# luisa_compute = {path = "../luisa-compute-rs/luisa_compute"}
+luisa_compute = { git = "https://github.com/LuisaGroup/luisa-compute-rs.git"}
 parking_lot = "0.12"
 rand = "0.8.5"
 rayon = "1.7.0"

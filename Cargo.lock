@@ -52,6 +52,7 @@ dependencies = [
  "clap 4.2.7",
  "cmake",
  "exr",
+ "gltf",
  "hexf",
  "image",
  "indicatif",
@@ -167,6 +168,12 @@ name = "autocfg"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
+
+[[package]]
+name = "base64"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
 
 [[package]]
 name = "base64ct"
@@ -722,6 +729,44 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ad83ab008a4fa3b31dfa713dd41b5a9bdea1e94e4cf1e2fc274ffbd49b0271d3"
 
 [[package]]
+name = "gltf"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f4fe8d5192923fbd783c15e74627de8e27c97e1e3dec22bf54515a407249febf"
+dependencies = [
+ "base64",
+ "byteorder",
+ "gltf-json",
+ "image",
+ "lazy_static",
+ "urlencoding",
+]
+
+[[package]]
+name = "gltf-derive"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec223c88f017861193ae128239aff8fbc4478f38a036d9d7b2ce10a52b46b1f2"
+dependencies = [
+ "inflections",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.15",
+]
+
+[[package]]
+name = "gltf-json"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3b1ba7523fcf32541f4aec96e13024c255d928eab3223f99ab945045f2a6de18"
+dependencies = [
+ "gltf-derive",
+ "serde",
+ "serde_derive",
+ "serde_json",
+]
+
+[[package]]
 name = "half"
 version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -828,6 +873,12 @@ dependencies = [
  "portable-atomic",
  "unicode-width",
 ]
+
+[[package]]
+name = "inflections"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a257582fdcde896fd96463bf2d40eefea0580021c0712a0e2b028b60b47a837a"
 
 [[package]]
 name = "instant"
@@ -969,6 +1020,7 @@ dependencies = [
 [[package]]
 name = "luisa_compute"
 version = "0.1.1-alpha.1"
+source = "git+https://github.com/LuisaGroup/luisa-compute-rs.git#4eab6160738555bf41c14b43fd89c8d669a84639"
 dependencies = [
  "base64ct",
  "bumpalo",
@@ -998,6 +1050,7 @@ dependencies = [
 [[package]]
 name = "luisa_compute_api_types"
 version = "0.1.1-alpha.1"
+source = "git+https://github.com/LuisaGroup/luisa-compute-rs.git#4eab6160738555bf41c14b43fd89c8d669a84639"
 dependencies = [
  "bitflags 2.2.1",
  "cbindgen",
@@ -1007,6 +1060,7 @@ dependencies = [
 [[package]]
 name = "luisa_compute_backend"
 version = "0.1.1-alpha.1"
+source = "git+https://github.com/LuisaGroup/luisa-compute-rs.git#4eab6160738555bf41c14b43fd89c8d669a84639"
 dependencies = [
  "lazy_static",
  "libc",
@@ -1022,6 +1076,7 @@ dependencies = [
 [[package]]
 name = "luisa_compute_derive"
 version = "0.1.1-alpha.1"
+source = "git+https://github.com/LuisaGroup/luisa-compute-rs.git#4eab6160738555bf41c14b43fd89c8d669a84639"
 dependencies = [
  "luisa_compute_derive_impl",
  "syn 2.0.15",
@@ -1030,6 +1085,7 @@ dependencies = [
 [[package]]
 name = "luisa_compute_derive_impl"
 version = "0.1.1-alpha.1"
+source = "git+https://github.com/LuisaGroup/luisa-compute-rs.git#4eab6160738555bf41c14b43fd89c8d669a84639"
 dependencies = [
  "prettyplease",
  "proc-macro2",
@@ -1040,6 +1096,7 @@ dependencies = [
 [[package]]
 name = "luisa_compute_ir"
 version = "0.1.1-alpha.1"
+source = "git+https://github.com/LuisaGroup/luisa-compute-rs.git#4eab6160738555bf41c14b43fd89c8d669a84639"
 dependencies = [
  "base64ct",
  "bincode",
@@ -1056,6 +1113,7 @@ dependencies = [
 [[package]]
 name = "luisa_compute_sys"
 version = "0.1.1-alpha.1"
+source = "git+https://github.com/LuisaGroup/luisa-compute-rs.git#4eab6160738555bf41c14b43fd89c8d669a84639"
 dependencies = [
  "cmake",
  "lazy_static",
@@ -1864,6 +1922,12 @@ name = "unicode-width"
 version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c0edd1e5b14653f783770bce4a4dabb4a5108a5370a5f5d8cfe8710c361f6c8b"
+
+[[package]]
+name = "urlencoding"
+version = "2.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "daf8dba3b7eb870caf1ddeed7bc9d2a049f3cfdfae7cb521b087cc33ae4c49da"
 
 [[package]]
 name = "utf8parse"

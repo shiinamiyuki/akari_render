@@ -1,3 +1,4 @@
+use lazy_static::lazy_static;
 use rand::{thread_rng, Rng};
 
 use crate::*;
@@ -6,18 +7,22 @@ pub mod mcmc;
 pub trait Sampler {
     fn next_1d(&self) -> Float;
     fn next_2d(&self) -> Expr<Float2> {
-        make_float2(self.next_1d(), self.next_1d())
+        let u0 = self.next_1d();
+        let u1 = self.next_1d();
+        make_float2(u0, u1)
     }
     fn next_3d(&self) -> Expr<Float3> {
-        make_float3(self.next_1d(), self.next_1d(), self.next_1d())
+        let u0 = self.next_1d();
+        let u1 = self.next_1d();
+        let u3 = self.next_1d();
+        make_float3(u0, u1, u3)
     }
     fn next_4d(&self) -> Expr<Float4> {
-        make_float4(
-            self.next_1d(),
-            self.next_1d(),
-            self.next_1d(),
-            self.next_1d(),
-        )
+        let u0 = self.next_1d();
+        let u1 = self.next_1d();
+        let u3 = self.next_1d();
+        let u4 = self.next_1d();
+        make_float4(u0, u1, u3, u4)
     }
     fn start(&self);
 }
@@ -74,9 +79,7 @@ impl<S: Sampler> PathSampler<S> {
         self.light_cnt.store(0);
         self.roulette_cnt.store(0);
         self.base.start();
-        for_range(const_(0)..const_(self.bounces as i32), |_| {
-            
-        });
+        for_range(const_(0)..const_(self.bounces as i32), |_| {});
     }
 }
 
@@ -106,12 +109,18 @@ impl Pcg32Var {
         Self::set_seq_offset(seq, util::mix_bits(seq))
     }
     pub fn gen_u32(&self) -> Expr<u32> {
-        let old_state = self.state().load();
-        self.state()
-            .store(old_state * Pcg32::PCG32_MULT + self.inc().load());
-        let xor_shifted: Expr<u32> = (((old_state >> 18) ^ old_state) >> 27).uint();
-        let rot = (old_state >> 59).uint();
-        (xor_shifted >> rot) | (xor_shifted << ((!rot + 1) & 31))
+        lazy_static! {
+            static ref PCG_GEN_U32: Callable<(Var<Pcg32>,), Expr<u32>> =
+                create_static_callable::<(Var<Pcg32>,), Expr<u32>>(|pcg: Var<Pcg32>| {
+                    let old_state = pcg.state().load();
+                    pcg.state()
+                        .store(old_state * Pcg32::PCG32_MULT + pcg.inc().load());
+                    let xor_shifted: Expr<u32> = (((old_state >> 18) ^ old_state) >> 27).uint();
+                    let rot = (old_state >> 59).uint();
+                    (xor_shifted >> rot) | (xor_shifted << ((!rot + 1) & 31))
+                });
+        }
+        PCG_GEN_U32.call(*self)
     }
 }
 pub fn init_pcg32_buffer(device: Device, count: usize) -> Buffer<Pcg32> {
@@ -184,6 +193,7 @@ impl<'a> Sampler for IndependentReplaySampler<'a> {
             self.cur_dim.store(self.cur_dim.load() + 1);
             ret
         }, else {
+            self.cur_dim.store(self.cur_dim.load() + 1);
             self.base.next_1d()
         })
     }

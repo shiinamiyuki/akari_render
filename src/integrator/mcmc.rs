@@ -1,7 +1,11 @@
+use std::fs::File;
+use std::io::BufWriter;
 use std::sync::Arc;
+use std::time::Instant;
 
 use super::pt::{self, PathTracer};
-use super::Integrator;
+use super::{Integrator, IntermediateStats, RenderOptions, RenderStats};
+use crate::sampler::mcmc::IsotropicExponentialMutation;
 use crate::{
     color::*,
     film::*,
@@ -21,18 +25,22 @@ use serde::{Deserialize, Serialize};
 pub enum Method {
     #[serde(rename = "kelemen")]
     Kelemen {
+        exponential_mutation: bool,
         small_sigma: f32,
         large_step_prob: f32,
+        image_mutation_prob: f32,
+        image_mutation_size: Option<f32>,
         adaptive: bool,
     },
-    LangevinOnline,
-    LangevinHybrid,
 }
 impl Default for Method {
     fn default() -> Self {
         Method::Kelemen {
+            exponential_mutation: true,
             small_sigma: 0.01,
             large_step_prob: 0.1,
+            image_mutation_prob: 0.0,
+            image_mutation_size: None,
             adaptive: false,
         }
     }
@@ -121,8 +129,9 @@ impl Mcmc {
             config,
         }
     }
-    fn scalar_contribution(&self, color: &Color) -> Expr<f32> {
+    pub fn scalar_contribution(color: &Color) -> Expr<f32> {
         color.max().clamp(0.0, 1e5)
+        // const_(1.0f32)
     }
     fn evaluate(
         &self,
@@ -141,7 +150,7 @@ impl Mcmc {
                 .camera
                 .generate_ray(p.uint(), &sampler, eval.color_repr);
         let l = self.pt.radiance(scene, ray, &sampler, eval) * ray_color * ray_w;
-        (p.uint(), l.clone(), self.scalar_contribution(&l))
+        (p.uint(), l.clone(), Self::scalar_contribution(&l))
     }
     fn bootstrap(&self, scene: &Arc<Scene>, eval: &Evaluators) -> RenderState {
         let seeds = init_pcg32_buffer(self.device.clone(), self.n_bootstrap + self.n_chains);
@@ -237,20 +246,30 @@ impl Mcmc {
         sample: PrimarySample,
         rng: &IndependentSampler,
     ) {
+        let res = const_(scene.camera.resolution()).float();
         // select a mutation strategy
         match self.method {
             Method::Kelemen {
                 small_sigma: _,
                 large_step_prob,
                 adaptive,
+                exponential_mutation,
+                image_mutation_size,
+                image_mutation_prob,
             } => {
                 let is_large_step = rng.next_1d().cmplt(large_step_prob);
                 let proposal = if_!(is_large_step, {
                     let large = LargeStepMutation{};
                     large.mutate(&sample, &rng)
                 }, else {
-                    let small = IsotropicGaussianMutation{sigma: state.sigma().load()};
-                    small.mutate(&sample, &rng)
+                    let lens_perturbation = rng.next_1d().cmplt(image_mutation_prob);
+                    if exponential_mutation {
+                        let small = IsotropicGaussianMutation { lens_perturbation, sigma: state.sigma().load(),compute_log_pdf:false, image_mutation_size, res};
+                        small.mutate(&sample, &rng)
+                    } else {
+                        let small = IsotropicExponentialMutation::new_default(false, lens_perturbation, image_mutation_size, res);
+                        small.mutate(&sample, &rng)
+                    }
                 });
                 let clamped = proposal.sample.clamped();
                 let (proposal_p, proposal_color, f) = self.evaluate(scene, eval, &rng, clamped);
@@ -269,11 +288,13 @@ impl Mcmc {
                 );
                 film.add_splat(
                     proposal_p.float(),
-                    &(proposal_color.clone() / proposal_f * accept * contribution),
+                    &(proposal_color.clone() / proposal_f),
+                    accept * contribution,
                 );
                 film.add_splat(
                     cur_p.float(),
-                    &(cur_color / cur_f * ((1.0 - accept) * contribution)),
+                    &(cur_color / cur_f),
+                    (1.0 - accept) * contribution,
                 );
                 if_!(rng.next_1d().cmplt(accept), {
                     state.set_cur_f(proposal_f);
@@ -290,10 +311,15 @@ impl Mcmc {
                         let r =
                             state.n_accepted().load().float() / state.n_mutations().load().float();
                         const OPTIMAL_ACCEPT_RATE: f32 = 0.234;
-                        let new_sigma = state.sigma().load()
-                            + (r - OPTIMAL_ACCEPT_RATE) / state.n_mutations().load().float();
-                        let new_sigma = new_sigma.clamp(1e-5, 0.1);
-                        state.sigma().store(new_sigma);
+                        if_!(state.n_mutations().load().cmpgt(50), {
+                            let new_sigma = state.sigma().load()
+                                + (r - OPTIMAL_ACCEPT_RATE) / state.n_mutations().load().float();
+                            let new_sigma = new_sigma.clamp(1e-5, 0.1);
+                            if_!(state.chain_id().load().cmpeq(0), {
+                                cpu_dbg!(make_float3(r, state.sigma().load(), new_sigma));
+                            });
+                            state.sigma().store(new_sigma);
+                        });
                     }
                 });
             }
@@ -359,6 +385,7 @@ impl Mcmc {
         eval: &Evaluators,
         state: &RenderState,
         film: &mut Film,
+        options: &RenderOptions,
     ) {
         let resolution = scene.camera.resolution();
         let npixels = resolution.x * resolution.y;
@@ -369,11 +396,33 @@ impl Mcmc {
                 self.advance_chain(scene, eval, state, film, mutations_per_chain, contribution)
             },
         );
+        let reconstruct = |film: &mut Film, spp: u32| {
+            let states = state.states.copy_to_vec();
+            let mut b = state.b_init as f64;
+            let mut b_cnt = state.b_init_cnt as u64;
+            let mut accepted = 0u64;
+            let mut mutations = 0u64;
+            for s in &states {
+                b += s.b as f64;
+                b_cnt += s.b_cnt;
+                accepted += s.n_accepted;
+                mutations += s.n_mutations;
+            }
+            let accept_rate = accepted as f64 / mutations as f64;
+            let b = b / b_cnt as f64;
+            log::info!("#indenpentent proposals: {}", b_cnt);
+            log::info!("Normalization factor: {}", b);
+            log::info!("Acceptance rate: {:.2}%", accept_rate * 100.0);
+            film.set_splat_scale(b as f32 / spp as f32);
+        };
+        let mut acc_time = 0.0f64;
+        let mut stats = RenderStats::default();
         {
             let mut cnt = 0;
             let spp_per_pass = self.pt.spp_per_pass;
             let progress = util::create_progess_bar(self.pt.spp as usize, "spp");
             while cnt < self.pt.spp {
+                let tic = Instant::now();
                 let cur_pass = (self.pt.spp - cnt).min(spp_per_pass);
                 let n_mutations = npixels as u64 * cur_pass as u64;
                 let mutations_per_chain = (n_mutations / self.n_chains as u64).max(1);
@@ -392,30 +441,51 @@ impl Mcmc {
                 );
                 progress.inc(cur_pass as u64);
                 cnt += cur_pass;
+                let toc = Instant::now();
+                acc_time += toc.duration_since(tic).as_secs_f64();
+                if options.save_intermediate {
+                    let output_image: luisa::Tex2d<luisa::Float4> = self.device.create_tex2d(
+                        luisa::PixelStorage::Float4,
+                        scene.camera.resolution().x,
+                        scene.camera.resolution().y,
+                        1,
+                    );
+                    reconstruct(film, cnt);
+                    film.copy_to_rgba_image(&output_image);
+                    let path = format!("{}-{}.exr", options.session, cnt);
+                    util::write_image(&output_image, &path);
+                    stats.intermediate.push(IntermediateStats {
+                        time: acc_time,
+                        spp: cnt,
+                        path,
+                    });
+                }
             }
             progress.finish();
+            if options.save_stats {
+                let file = File::create(format!("{}.json", options.session)).unwrap();
+                let json = serde_json::to_value(&stats).unwrap();
+                let writer = BufWriter::new(file);
+                serde_json::to_writer(writer, &json).unwrap();
+            }
         }
-        let states = state.states.copy_to_vec();
-        let mut b = state.b_init as f64;
-        let mut b_cnt = state.b_init_cnt as u64;
-        let mut accepted = 0u64;
-        let mut mutations = 0u64;
-        for s in &states {
-            b += s.b as f64;
-            b_cnt += s.b_cnt;
-            accepted += s.n_accepted;
-            mutations += s.n_mutations;
+
+        log::info!("Rendering finished in {:.2}s", acc_time);
+        reconstruct(film, self.pt.spp);
+        {
+            let histogram: luisa::Tex2d<luisa::Float4> = self.device.create_tex2d(
+                luisa::PixelStorage::Float4,
+                scene.camera.resolution().x,
+                scene.camera.resolution().y,
+                1,
+            );
+            film.copy_splat_histogram_to_rgba_image(&histogram);
+            util::write_image(&histogram, &"output/test_sm/mcmc.histogram.exr");
         }
-        let accept_rate = accepted as f64 / mutations as f64;
-        let b = b / b_cnt as f64;
-        log::info!("#indenpentent proposals: {}", b_cnt);
-        log::info!("Normalization factor: {}", b);
-        log::info!("Acceptance rate: {:.2}%", accept_rate * 100.0);
-        film.set_splat_scale(b as f32 / self.pt.spp as f32);
     }
 }
 impl Integrator for Mcmc {
-    fn render(&self, scene: Arc<Scene>, film: &mut Film) {
+    fn render(&self, scene: Arc<Scene>, film: &mut Film, options: &RenderOptions) {
         let resolution = scene.camera.resolution();
         log::info!(
             "Resolution {}x{}\nconfig: {:#?}",
@@ -443,14 +513,20 @@ impl Integrator for Mcmc {
                     use_nee: self.pt.use_nee,
                 },
             );
-            direct.render(scene.clone(), film);
+            direct.render(scene.clone(), film, &Default::default());
         }
         let render_state = self.bootstrap(&scene, &evaluators);
-        self.render_loop(&scene, &evaluators, &render_state, film);
+        self.render_loop(&scene, &evaluators, &render_state, film, options);
     }
 }
 
-pub fn render(device: Device, scene: Arc<Scene>, film: &mut Film, config: &Config) {
+pub fn render(
+    device: Device,
+    scene: Arc<Scene>,
+    film: &mut Film,
+    config: &Config,
+    options: &RenderOptions,
+) {
     let mcmc = Mcmc::new(device.clone(), config.clone());
-    mcmc.render(scene, film);
+    mcmc.render(scene, film, options);
 }

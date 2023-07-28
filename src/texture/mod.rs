@@ -1,5 +1,5 @@
 use crate::{
-    color::{Color, ColorRepr},
+    color::{srgb_to_linear, Color, ColorRepr},
     interaction::SurfaceInteraction,
     scene::Scene,
     *,
@@ -19,10 +19,14 @@ impl TextureEvaluator {
     pub fn color_from_float4(&self, v: Expr<Float4>) -> Color {
         match self.color_repr {
             ColorRepr::Rgb => Color::Rgb(v.xyz()),
-            ColorRepr::Spectral4 => todo!(),
+            ColorRepr::Spectral => todo!(),
         }
     }
-    pub fn evaluate_float4(&self, tex: Expr<TagIndex>, si: Expr<SurfaceInteraction>) -> Expr<Float4> {
+    pub fn evaluate_float4(
+        &self,
+        tex: Expr<TagIndex>,
+        si: Expr<SurfaceInteraction>,
+    ) -> Expr<Float4> {
         self.texture.call(tex, si)
     }
     pub fn evaluate_color(&self, tex: Expr<TagIndex>, si: Expr<SurfaceInteraction>) -> Color {
@@ -64,3 +68,21 @@ impl Texture for ConstRgbTextureExpr {
     }
 }
 impl_polymorphic!(Texture, ConstRgbTexture);
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Value)]
+pub struct ImageRgbTexture {
+    pub index: u32,
+}
+impl Texture for ImageRgbTextureExpr {
+    fn evaluate(&self, si: Expr<SurfaceInteraction>, ctx: &TextureEvalContext<'_>) -> Expr<Float4> {
+        let tc = si.geometry().uv();
+        let tex = ctx.scene.image_textures.var().tex2d(self.index());
+        // let tc = tc - tc.floor();
+        let rgba = tex.sample(tc);
+        // cpu_dbg!(rgba);
+        let rgb = rgba.xyz();
+        let rgb = srgb_to_linear(rgb);
+        make_float4(rgb.x(), rgb.y(), rgb.z(), rgba.w())
+    }
+}
+impl_polymorphic!(Texture, ImageRgbTexture);

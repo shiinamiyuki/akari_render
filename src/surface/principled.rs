@@ -80,6 +80,7 @@ impl Bsdf for DisneyDiffuseBsdf {
             pdf,
             color,
             valid: Bool::from(true),
+            lobe_roughness: const_(1.0f32),
         }
     }
     fn pdf(&self, wo: Expr<Float3>, wi: Expr<Float3>, _ctx: &BsdfEvalContext) -> Float {
@@ -89,8 +90,23 @@ impl Bsdf for DisneyDiffuseBsdf {
             Float::from(0.0),
         )
     }
+    fn albedo(&self, _wo: Expr<Float3>, _ctx: &BsdfEvalContext) -> Color {
+        self.reflectance
+    }
 }
 
+pub struct DisneyFresnel {
+    pub f0: Color,
+    pub metallic: Expr<f32>,
+    pub eta: Expr<f32>,
+}
+impl Fresnel for DisneyFresnel {
+    fn evaluate(&self, cos_theta_i: Expr<f32>, ctx: &BsdfEvalContext) -> Color {
+        let fr = Color::one(ctx.color_repr) * fr_dielectric(cos_theta_i, self.eta);
+        let f0 = fr_schlick(self.f0, cos_theta_i);
+        fr * (1.0 - self.metallic) + f0 * self.metallic
+    }
+}
 impl Surface for PrincipledSurfaceExpr {
     fn closure(&self, si: Expr<SurfaceInteraction>, ctx: &BsdfEvalContext) -> BsdfClosure {
         let (color, transmission_color) = {
@@ -112,7 +128,7 @@ impl Surface for PrincipledSurfaceExpr {
         let metal = {
             let f0 = ((eta - 1.0) / (eta + 1.0)).sqr();
             let f0 = Color::one(ctx.color_repr) * f0 * (1.0 - metallic) + color * metallic;
-            let fresnel = Box::new(FresnelSchlick { f0 });
+            let fresnel = Box::new(DisneyFresnel { f0, metallic, eta });
             Box::new(MicrofacetReflection {
                 color,
                 fresnel,
@@ -128,7 +144,7 @@ impl Surface for PrincipledSurfaceExpr {
                 f0: Color::one(ctx.color_repr) * const_(f0),
             });
             Box::new(MicrofacetReflection {
-                color,
+                color: Color::one(ctx.color_repr) * clearcoat,
                 fresnel,
                 dist: Box::new(TrowbridgeReitzDistribution::from_roughness(
                     make_float2(clearcoat_roughness, clearcoat_roughness),

@@ -73,7 +73,7 @@ pub struct MeshBuffer {
     pub has_texcoords: bool,
 }
 impl MeshBuffer {
-    pub fn new(device: Device, mesh: &TriangleMesh) ->Self {
+    pub fn new(device: Device, mesh: &TriangleMesh) -> Self {
         let mut vertices = vec![];
         if !mesh.normals.is_empty() {
             assert_eq!(mesh.vertices.len(), mesh.normals.len());
@@ -139,11 +139,7 @@ pub struct MeshAggregate {
     pub accel: rtx::Accel,
 }
 impl MeshAggregate {
-    pub fn new(
-        device: Device,
-        meshes: &[&MeshBuffer],
-        instances: &mut [MeshInstance],
-    ) -> Self {
+    pub fn new(device: Device, meshes: &[&MeshBuffer], instances: &mut [MeshInstance]) -> Self {
         let count = meshes.len();
         let mesh_vertices = device.create_bindless_array(count);
         let mesh_indices = device.create_bindless_array(count);
@@ -227,9 +223,9 @@ impl MeshAggregate {
             .cross(v2.position().unpack() - v0.position().unpack())
             .normalize();
         let (n0, n1, n2) = if_!(inst.has_normals(), {
-            let n0 = v0.normal().unpack();
-            let n1 = v1.normal().unpack();
-            let n2 = v2.normal().unpack();
+            let n0 = v0.normal().unpack().normalize();
+            let n1 = v1.normal().unpack().normalize();
+            let n2 = v2.normal().unpack().normalize();
             (n0, n1, n2)
         }, else {
             (ng, ng, ng)

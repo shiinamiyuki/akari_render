@@ -1,5 +1,6 @@
 pub mod alias_table;
 pub mod binserde;
+pub mod convert_gltf;
 use crate::{color::glam_linear_to_srgb, *};
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use lazy_static::lazy_static;
@@ -96,6 +97,8 @@ pub fn write_image_ldr(color: &Tex2d<Float4>, path: &str) {
 }
 pub fn write_image_hdr(color: &Tex2d<Float4>, path: &str) {
     let color_buf = color.view(0).copy_to_vec::<Float4>();
+    let parent_dir = std::path::Path::new(path).parent().unwrap();
+    std::fs::create_dir_all(parent_dir).unwrap();
     exr::prelude::write_rgb_file(
         path,
         color.width() as usize,
@@ -172,11 +175,37 @@ pub fn erf(x: Expr<f32>) -> Expr<f32> {
     ERF.call(x)
 }
 
-pub fn mix_bits(mut v: Expr<u64>) -> Expr<u64> {
-    v ^= v >> 31;
-    v *= 0x7fb5d329728ea185;
-    v ^= v >> 27;
-    v *= 0x81dadef4bc2dd44d;
-    v ^= v >> 33;
-    v
+pub fn mix_bits(v: Expr<u64>) -> Expr<u64> {
+    lazy_static! {
+        static ref MIX_BITS: Callable<(Expr<u64>,), Expr<u64>> =
+            create_static_callable::<(Expr<u64>,), Expr<u64>>(|mut v: Expr<u64>| {
+                v ^= v >> 31;
+                v *= 0x7fb5d329728ea185;
+                v ^= v >> 27;
+                v *= 0x81dadef4bc2dd44d;
+                v ^= v >> 33;
+                v
+            });
+    }
+    MIX_BITS.call(v)
+}
+
+pub fn safe_div(a: Expr<f32>, b: Expr<f32>) -> Expr<f32> {
+    select(b.cmpeq(0.0), const_(0.0f32), a / b)
+}
+
+#[derive(Clone, Copy, Debug, Value)]
+#[repr(C)]
+pub struct CompensatedSum {
+    pub sum: f32,
+    pub c: f32,
+}
+impl CompensatedSumExpr {
+    pub fn update(&self, v: Expr<f32>) -> Self {
+        let y = v - self.c();
+        let t = self.sum() + y;
+        let c = (t - self.sum()) - y;
+        let sum = t;
+        Self::new(sum, c)
+    }
 }

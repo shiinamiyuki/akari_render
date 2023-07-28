@@ -1,4 +1,3 @@
-
 use crate::{
     geometry::{Frame, ShadingTriangle},
     *,
@@ -33,4 +32,3 @@ pub struct SurfaceInteraction {
     pub triangle: ShadingTriangle,
     pub valid: bool,
 }
-

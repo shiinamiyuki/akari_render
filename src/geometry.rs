@@ -12,6 +12,8 @@ pub struct Ray {
     pub d: Float3,
     pub t_min: f32,
     pub t_max: f32,
+    pub exclude0: Uint2,
+    pub exclude1: Uint2,
 }
 
 impl RayExpr {
@@ -198,7 +200,11 @@ pub fn face_forward(v: Expr<Float3>, n: Expr<Float3>) -> Expr<Float3> {
 pub fn reflect(w: Expr<Float3>, n: Expr<Float3>) -> Expr<Float3> {
     -w + 2.0 * w.dot(n) * n
 }
-pub fn refract(w: Expr<Float3>, n: Expr<Float3>, eta: Expr<f32>) -> (Expr<bool>, Expr<f32>, Expr<Float3>) {
+pub fn refract(
+    w: Expr<Float3>,
+    n: Expr<Float3>,
+    eta: Expr<f32>,
+) -> (Expr<bool>, Expr<f32>, Expr<Float3>) {
     // cpu_dbg!(eta);
     let cos_theta_i = w.dot(n);
     let eta = select(cos_theta_i.cmpge(0.0), eta, 1.0 / eta);
@@ -220,21 +226,27 @@ pub fn refract(w: Expr<Float3>, n: Expr<Float3>, eta: Expr<f32>) -> (Expr<bool>,
     //   // Handle total internal reflection case
     //   if (sin2Theta_t >= 1)
     //       return false;
-  
+
     //   Float cosTheta_t = std::sqrt(1 - sin2Theta_t);
-  
+
     //   *wt = -wi / eta + (cosTheta_i / eta - cosTheta_t) * Vector3f(n);
 }
 
-pub fn spherical_to_xyz2(cos_theta: Expr<f32>, sin_theta:Expr<f32>, phi: Expr<f32>) -> Expr<Float3> {
+pub fn spherical_to_xyz2(
+    cos_theta: Expr<f32>,
+    sin_theta: Expr<f32>,
+    phi: Expr<f32>,
+) -> Expr<Float3> {
     make_float3(sin_theta * phi.cos(), cos_theta, sin_theta * phi.sin())
 }
 pub fn spherical_to_xyz(theta: Expr<f32>, phi: Expr<f32>) -> Expr<Float3> {
     let sin_theta = theta.sin();
     make_float3(sin_theta * phi.cos(), theta.cos(), sin_theta * phi.sin())
 }
+
+// let (theta, phi) = xyz_to_spherical(v);
 pub fn xyz_to_spherical(v: Expr<Float3>) -> (Expr<f32>, Expr<f32>) {
     let phi = v.z().atan2(v.x());
-    let theta = v.y();
+    let theta = v.y().acos();
     (theta, phi)
 }

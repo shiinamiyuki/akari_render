@@ -1,4 +1,4 @@
-use crate::geometry::{spherical_to_xyz2, Frame, face_forward};
+use crate::geometry::{face_forward, spherical_to_xyz2, Frame};
 use crate::*;
 use lazy_static::lazy_static;
 use std::f32::consts::PI;
@@ -14,11 +14,13 @@ pub trait MicrofacetDistribution {
     fn lambda(&self, w: Expr<Float3>) -> Expr<f32>;
     fn sample_wh(&self, wo: Expr<Float3>, u: Expr<Float2>) -> Expr<Float3>;
     fn pdf(&self, wo: Expr<Float3>, wh: Expr<Float3>) -> Expr<f32>;
+    fn roughness(&self) -> Expr<f32>;
 }
 
 pub struct TrowbridgeReitzDistribution {
     pub alpha: Expr<Float2>,
     pub sample_visible: bool,
+    roughness: Expr<f32>,
 }
 impl TrowbridgeReitzDistribution {
     pub const MIN_ALPHA: f32 = 1e-4;
@@ -26,6 +28,7 @@ impl TrowbridgeReitzDistribution {
         Self {
             alpha: alpha.max(Self::MIN_ALPHA),
             sample_visible,
+            roughness: (alpha.max(Self::MIN_ALPHA).reduce_sum() * 0.5).sqrt(),
         }
     }
     pub fn from_roughness(roughness: Expr<Float2>, sample_visible: bool) -> Self {
@@ -61,7 +64,7 @@ lazy_static! {
                 Frame::cos2_phi(w) * alpha.x().sqr() + Frame::sin2_phi(w) * alpha.y().sqr();
             let alpha2_tan2_theta = alpha2 * abs_tan_theta.sqr();
             let l = (-1.0 + (1.0 + alpha2_tan2_theta).sqrt()) * 0.5;
-            select(abs_tan_theta.is_infinite(), const_(0.0f32), l)
+            select(!abs_tan_theta.is_finite(), const_(0.0f32), l)
         });
     static ref TR_SAMPLE_11: Callable<(Expr<f32>, Expr<Float2>), Expr<Float2>> =
         create_static_callable::<(Expr<f32>, Expr<Float2>), Expr<Float2>>(|cos_theta, u| {
@@ -138,27 +141,35 @@ impl MicrofacetDistribution for TrowbridgeReitzDistribution {
             let wh = TR_SAMPLE.call(s * wo, self.alpha, u);
             s * wh
         } else {
-            let (phi, cos_theta) = if_!(self.alpha.x().cmpeq(self.alpha.y()), {
-                let phi = 2.0 * PI * u.y();
-                let tan_theta2 = self.alpha.x().sqr() * u.x() / (1.0 - u.x());
-                let cos_theta = 1.0 / (1.0 + tan_theta2).sqrt();
-                (phi, cos_theta)
-            }, else {
-                let phi = (self.alpha.y() / self.alpha.x() * (2.0 * PI * u.y() + PI * 0.5).tan()).atan();
-                let phi = select(u.y().cmpgt(0.5), phi + PI, phi);
-                let sin_phi = phi.sin();
-                let cos_phi = phi.cos();
-                let ax2 = self.alpha.x().sqr();
-                let ay2 = self.alpha.y().sqr();
-                let a2 = 1.0 / (cos_phi.sqr() / ax2 + sin_phi.sqr() / ay2);
-                let tan_theta2 = a2 * u.x() / (1.0 - u.x());
-                let cos_theta = 1.0 / (1.0 + tan_theta2).sqrt();
-                (phi, cos_theta)
-            });
-            let sin_theta = (1.0 - cos_theta.sqr()).max(0.0).sqrt();
-            let wh = spherical_to_xyz2(cos_theta, sin_theta, phi);
-            let wh = face_forward(wh, make_float3(0.0,1.0,0.0));
-            wh
+            lazy_static! {
+                static ref SAMPLE: Callable<(Expr<Float2>, Expr<Float2>), Expr<Float3>> =
+                    create_static_callable::<(Expr<Float2>, Expr<Float2>), Expr<Float3>>(
+                        |alpha: Expr<Float2>, u: Expr<Float2>| {
+                            let (phi, cos_theta) = if_!(alpha.x().cmpeq(alpha.y()), {
+                                let phi = 2.0 * PI * u.y();
+                                let tan_theta2 = alpha.x().sqr() * u.x() / (1.0 - u.x());
+                                let cos_theta = 1.0 / (1.0 + tan_theta2).sqrt();
+                                (phi, cos_theta)
+                            }, else {
+                                let phi = (alpha.y() / alpha.x() * (2.0 * PI * u.y() + PI * 0.5).tan()).atan();
+                                let phi = select(u.y().cmpgt(0.5), phi + PI, phi);
+                                let sin_phi = phi.sin();
+                                let cos_phi = phi.cos();
+                                let ax2 = alpha.x().sqr();
+                                let ay2 = alpha.y().sqr();
+                                let a2 = 1.0 / (cos_phi.sqr() / ax2 + sin_phi.sqr() / ay2);
+                                let tan_theta2 = a2 * u.x() / (1.0 - u.x());
+                                let cos_theta = 1.0 / (1.0 + tan_theta2).sqrt();
+                                (phi, cos_theta)
+                            });
+                            let sin_theta = (1.0 - cos_theta.sqr()).max(0.0).sqrt();
+                            let wh = spherical_to_xyz2(cos_theta, sin_theta, phi);
+                            let wh = face_forward(wh, make_float3(0.0, 1.0, 0.0));
+                            wh
+                        }
+                    );
+            }
+            SAMPLE.call(self.alpha, u)
         }
     }
 
@@ -168,6 +179,9 @@ impl MicrofacetDistribution for TrowbridgeReitzDistribution {
         } else {
             self.d(wh) * Frame::abs_cos_theta(wh)
         }
+    }
+    fn roughness(&self) -> Expr<f32> {
+        self.roughness
     }
 }
 #[cfg(test)]

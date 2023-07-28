@@ -75,6 +75,8 @@ impl Camera for PerspectiveCamera {
                 .normalize(),
             Float::from(0.0),
             Float::from(1e20),
+            make_uint2(u32::MAX, u32::MAX),
+            make_uint2(u32::MAX, u32::MAX),
         );
         ray = ray.set_o(camera.c2w().transform_point(ray.o()));
         ray = ray.set_d(camera.c2w().transform_vector(ray.d()));

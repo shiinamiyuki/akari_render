@@ -1,25 +1,32 @@
 use std::collections::HashMap;
 use std::f32::consts::PI;
 use std::fs::{self, File};
+use std::io::{Cursor, Read};
 use std::path::Path;
 use std::sync::Arc;
 use std::{path::PathBuf, rc::Rc};
 
+use luisa::PixelStorage;
+
 use crate::camera::PerspectiveCamera;
-use crate::color::{glam_srgb_to_linear, Color, ColorRepr};
+use crate::color::{glam_srgb_to_linear, Color, ColorRepr, FlatColor};
 use crate::light::area::AreaLight;
 use crate::light::{
-    LightAggregate, LightEvalContext, LightEvaluator, TLightSampleExpr, WeightedLightDistribution,
+    FlatLightSample, FlatLightSampleExpr, LightAggregate, LightEvalContext, LightEvaluator,
+    WeightedLightDistribution,
 };
+
 use crate::scenegraph::node::CoordinateSystem;
 use crate::surface::diffuse::DiffuseSurface;
 use crate::surface::glass::GlassSurface;
 use crate::surface::principled::PrincipledSurface;
 use crate::surface::{
-    BsdfEvalContext, BsdfEvalResultExpr, BsdfEvaluator, TBsdfSampleExpr, BSDF_EVAL_COLOR,
-    BSDF_EVAL_PDF,
+    BsdfEvalContext, BsdfEvaluator, BsdfSample, FlatBsdfEvalResult, FlatBsdfSample,
+    BSDF_EVAL_COLOR, BSDF_EVAL_PDF,
 };
-use crate::texture::{ConstFloatTexture, ConstRgbTexture, TextureEvalContext, TextureEvaluator};
+use crate::texture::{
+    ConstFloatTexture, ConstRgbTexture, ImageRgbTexture, TextureEvalContext, TextureEvaluator,
+};
 use crate::util::binserde::Decode;
 use crate::util::{FileResolver, LocalFileResolver};
 use crate::{
@@ -41,6 +48,8 @@ pub struct Scene {
     pub meshes: Arc<MeshAggregate>,
     pub camera: Box<dyn Camera>,
     pub device: Device,
+    pub image_textures: BindlessArray,
+    pub env_map: Buffer<TagIndex>,
 }
 pub struct Evaluators {
     pub color_repr: ColorRepr,
@@ -69,55 +78,64 @@ impl Scene {
         let le = {
             let texture_eval = texture_eval.clone();
             let scene = self.clone();
+
             self.device
-                .create_dyn_callable::<(Expr<Ray>, Expr<SurfaceInteraction>), DynExpr>(Box::new(
-                    move |ray, si| {
-                        let ctx = LightEvalContext {
-                            meshes: &scene.meshes,
-                            texture: &texture_eval,
-                            color_repr,
-                        };
-                        scene.lights.le(ray, si, &ctx).into_dyn()
+                .create_callable::<(Expr<Ray>, Expr<SurfaceInteraction>), Expr<FlatColor>>(
+                    &|ray, si: Expr<SurfaceInteraction>| {
+                        let inst_id = si.inst_id();
+                        let instance = scene.meshes.mesh_instances.var().read(inst_id);
+                        if_!(instance.light().valid(), {
+                            let ctx = LightEvalContext {
+                                meshes: &scene.meshes,
+                                texture: &texture_eval,
+                                color_repr,
+                            };
+                            scene.lights.le(ray, si, &ctx).flatten()
+                        }, else {
+                          Color::zero(color_repr).flatten()
+                        })
                     },
-                ))
+                )
         };
         let sample = {
             let texture_eval = texture_eval.clone();
             let scene = self.clone();
             self.device
-                .create_dyn_callable::<(Expr<PointNormal>, Expr<Float3>), DynExpr>(Box::new(
-                    move |pn, u| {
+                .create_callable::<(Expr<PointNormal>, Expr<Float3>), Expr<FlatLightSample>>(
+                    &|pn, u| {
                         let ctx = LightEvalContext {
                             meshes: &scene.meshes,
                             texture: &texture_eval,
                             color_repr,
                         };
                         let sample = scene.lights.sample_direct(pn, u.x(), u.yz(), &ctx);
-                        match color_repr {
-                            ColorRepr::Rgb => TLightSampleExpr::<Float3>::new(
-                                sample.li.as_rgb(),
-                                sample.pdf,
-                                sample.wi,
-                                sample.shadow_ray,
-                                sample.n,
-                            )
-                            .into(),
-                            _ => todo!(),
-                        }
+                        FlatLightSampleExpr::new(
+                            sample.li.flatten(),
+                            sample.pdf,
+                            sample.wi,
+                            sample.shadow_ray,
+                            sample.n,
+                        )
                     },
-                ))
+                )
         };
         let pdf = {
             let scene = self.clone();
             self.device
                 .create_callable::<(Expr<SurfaceInteraction>, Expr<PointNormal>), Expr<f32>>(
                     &|si, pn| {
-                        let ctx = LightEvalContext {
-                            meshes: &scene.meshes,
-                            texture: &texture_eval,
-                            color_repr: color_repr,
-                        };
-                        scene.lights.pdf_direct(si, pn, &ctx)
+                        let inst_id = si.inst_id();
+                        let instance = scene.meshes.mesh_instances.var().read(inst_id);
+                        if_!(instance.light().valid(), {
+                            let ctx = LightEvalContext {
+                                meshes: &scene.meshes,
+                                texture: &texture_eval,
+                                color_repr: color_repr,
+                            };
+                            scene.lights.pdf_direct(si, pn, &ctx)
+                        }, else {
+                            const_(0.0f32)
+                        })
                     },
                 )
         };
@@ -152,18 +170,20 @@ impl Scene {
         let scene = self.clone();
         let bsdf = {
             let texture_eval = texture_eval.clone();
-            self.device.create_dyn_callable::<(
+            self.device.create_callable::<(
                 Expr<TagIndex>,
                 Expr<SurfaceInteraction>,
                 Expr<Float3>,
                 Expr<Float3>,
+                Expr<f32>,
                 Expr<u32>,
-            ), DynExpr>(Box::new(
-                move |surface: Expr<TagIndex>,
-                      si: Expr<SurfaceInteraction>,
-                      wo: Expr<Float3>,
-                      wi: Expr<Float3>,
-                      mode: Expr<u32>| {
+            ), Expr<FlatBsdfEvalResult>>(
+                &|surface: Expr<TagIndex>,
+                  si: Expr<SurfaceInteraction>,
+                  wo: Expr<Float3>,
+                  wi: Expr<Float3>,
+                  u_select: Expr<f32>,
+                  mode: Expr<u32>| {
                     let ctx = BsdfEvalContext {
                         texture: &texture_eval,
                         color_repr: color_repr,
@@ -182,28 +202,49 @@ impl Scene {
                         });
                         (color, pdf)
                     });
-                    match color_repr {
-                        ColorRepr::Rgb => {
-                            BsdfEvalResultExpr::<Float3>::new(color.as_rgb(), pdf).into()
-                        }
-                        _ => todo!(),
-                    }
+                    struct_!(FlatBsdfEvalResult {
+                        color: color.flatten(),
+                        pdf: pdf,
+                        lobe_roughness: const_(0.0f32) //TODO
+                    })
                 },
-            ))
+            )
+        };
+        let albedo = {
+            let scene = self.clone();
+            let texture_eval = texture_eval.clone();
+            self.device.create_callable::<(
+                Expr<TagIndex>,
+                Expr<SurfaceInteraction>,
+                Expr<Float3>,
+            ), Expr<FlatColor>>(&|surface: Expr<TagIndex>,
+                      si: Expr<SurfaceInteraction>,
+                      wo: Expr<Float3>| {
+                    let ctx = BsdfEvalContext {
+                        texture: &texture_eval,
+                        color_repr: color_repr,
+                    };
+                    let color = scene.surfaces.get(surface).dispatch(|_, _, surface| {
+                        let closure = surface.closure(si, &ctx);
+                        closure.albedo(wo, &ctx)
+                    });
+                    color.flatten()
+                },
+            )
         };
         let scene = self.clone();
         let bsdf_sample = {
             let texture_eval = texture_eval.clone();
-            self.device.create_dyn_callable::<(
+            self.device.create_callable::<(
                 Expr<TagIndex>,
                 Expr<SurfaceInteraction>,
                 Expr<Float3>,
                 Expr<Float3>,
-            ), DynExpr>(Box::new(
-                move |surface: Expr<TagIndex>,
-                      si: Expr<SurfaceInteraction>,
-                      wo: Expr<Float3>,
-                      u: Expr<Float3>| {
+            ), Expr<FlatBsdfSample>>(
+                &|surface: Expr<TagIndex>,
+                  si: Expr<SurfaceInteraction>,
+                  wo: Expr<Float3>,
+                  u: Expr<Float3>| {
                     let ctx = BsdfEvalContext {
                         texture: &texture_eval,
                         color_repr: color_repr,
@@ -212,52 +253,85 @@ impl Scene {
                         let closure = surface.closure(si, &ctx);
                         closure.sample(wo, u.x(), u.yz(), &ctx)
                     });
-                    match color_repr {
-                        ColorRepr::Rgb => TBsdfSampleExpr::<Float3>::new(
-                            sample.wi,
-                            sample.pdf,
-                            sample.color.as_rgb(),
-                            sample.valid,
-                        )
-                        .into(),
-                        _ => todo!(),
-                    }
+                    struct_!(FlatBsdfSample {
+                        wi: sample.wi,
+                        pdf: sample.pdf,
+                        valid: sample.valid,
+                        color: sample.color.flatten(),
+                        lobe_roughness: sample.lobe_roughness
+                    })
                 },
-            ))
+            )
         };
         Arc::new(BsdfEvaluator {
             color_repr,
             bsdf,
             bsdf_sample,
+            albedo,
         })
     }
-    pub fn load<P: AsRef<Path>>(device: Device, path: P) -> Arc<Self> {
+    pub fn load_from_path<P: AsRef<Path>>(device: Device, path: P) -> Arc<Self> {
         let path = PathBuf::from(path.as_ref());
         let canonical = fs::canonicalize(&path).unwrap();
         let parent_path = canonical.parent().unwrap();
         let serialized = std::fs::read_to_string(path).unwrap();
-        let graph: node::Scene = serde_json::from_str(&serialized).unwrap_or_else(|e| {
+        Self::load_from_str(
+            device,
+            &serialized,
+            Arc::new(LocalFileResolver::new(vec![PathBuf::from(parent_path)])),
+        )
+    }
+    pub fn load_from_str(
+        device: Device,
+        desc: &str,
+        file_resolver: Arc<dyn FileResolver + Send + Sync>,
+    ) -> Arc<Self> {
+        let graph: node::Scene = serde_json::from_str(desc).unwrap_or_else(|e| {
             log::error!("error during scene loading:{:}", e);
             std::process::exit(-1);
         });
-        let loader = SceneLoader::new(
-            device,
-            PathBuf::from(parent_path),
-            Rc::new(graph),
-            Arc::new(LocalFileResolver::new(vec![PathBuf::from(parent_path)])),
-        );
+        let loader = SceneLoader::new(device, Rc::new(graph), file_resolver);
         loader.load()
+    }
+    pub fn env_map(&self, w: Expr<Float3>, evals: &Evaluators) -> Color {
+        // TODO: fix this
+        let (theta, phi) = xyz_to_spherical(w);
+        let u = phi / (2.0 * PI);
+        let v = theta / PI;
+        let si = var!(SurfaceInteraction);
+        si.set_geometry(zeroed::<SurfaceLocalGeometry>().set_uv(make_float2(u, v)));
+        evals
+            .texture
+            .evaluate_color(self.env_map.var().read(0), si.load())
     }
     pub fn intersect(&self, ray: Expr<Ray>) -> Expr<SurfaceInteraction> {
         let ro = ray.o();
         let rd = ray.d();
         let rtx_ray = rtx::RayExpr::new(ro, ray.t_min(), rd, ray.t_max());
-        let hit = self.meshes.accel.var().trace_closest(rtx_ray);
+
+        let hit = self.meshes.accel.var().query_all(
+            rtx_ray,
+            255,
+            rtx::RayQuery {
+                on_triangle_hit: |candidate: rtx::TriangleCandidate| {
+                    if_!(
+                        (candidate.inst().cmpne(ray.exclude0().x())
+                            | candidate.prim().cmpne(ray.exclude0().y()))
+                            & (candidate.inst().cmpne(ray.exclude1().x())
+                                | candidate.prim().cmpne(ray.exclude1().y())),
+                        {
+                            candidate.commit();
+                        }
+                    );
+                },
+                on_procedural_hit: |_| {},
+            },
+        );
         // cpu_dbg!(hit);
-        if_!(hit.valid(), {
+        if_!(hit.triangle_hit(), {
             let inst_id = hit.inst_id();
             let prim_id = hit.prim_id();
-            let bary = make_float2(hit.u(), hit.v());
+            let bary = hit.bary();
             let shading_triangle = self.meshes.shading_triangle(inst_id, prim_id);
             let p = shading_triangle.p(bary);
             let n = shading_triangle.n(bary);
@@ -272,13 +346,33 @@ impl Scene {
         let ro = ray.o();
         let rd = ray.d();
         let rtx_ray = rtx::RayExpr::new(ro, ray.t_min(), rd, ray.t_max());
-        self.meshes.accel.var().trace_any(rtx_ray)
+
+        let hit = self.meshes.accel.var().query_any(
+            rtx_ray,
+            255,
+            rtx::RayQuery {
+                on_triangle_hit: |candidate: rtx::TriangleCandidate| {
+                    if_!(
+                        (candidate.inst().cmpne(ray.exclude0().x())
+                            | candidate.prim().cmpne(ray.exclude0().y()))
+                            & (candidate.inst().cmpne(ray.exclude1().x())
+                                | candidate.prim().cmpne(ray.exclude1().y())),
+                        {
+                            candidate.commit();
+                        }
+                    );
+                },
+                on_procedural_hit: |_| {},
+            },
+        );
+        // cpu_dbg!(ray);
+        // cpu_dbg!(hit);
+        !hit.miss()
     }
 }
 
 struct SceneLoader {
     device: Device,
-    parent_path: PathBuf,
     graph: Rc<node::Scene>,
     named_surfaces: HashMap<String, (TagIndex, Option<TagIndex>)>,
     surfaces: PolymorphicBuilder<PolyKey, dyn Surface>,
@@ -286,7 +380,8 @@ struct SceneLoader {
     lights: PolymorphicBuilder<PolyKey, dyn Light>,
     light_ids_to_lights: Vec<TagIndex>,
     area_lights: Vec<TagIndex>,
-    texture_cache: HashMap<String, TagIndex>,
+    texture_cache: HashMap<String, u32>,
+    bindless_texture: BindlessArray,
     mesh_cache: HashMap<String, (Arc<TriangleMesh>, u32)>,
     file_resolver: Arc<dyn FileResolver + Send + Sync>,
     meshes: Vec<Box<MeshBuffer>>,
@@ -299,14 +394,12 @@ struct SceneLoader {
 impl SceneLoader {
     fn new(
         device: Device,
-        parent_path: PathBuf,
         graph: Rc<node::Scene>,
         file_resolver: Arc<dyn FileResolver + Send + Sync>,
     ) -> Self {
         Self {
             camera: None,
             device: device.clone(),
-            parent_path,
             graph,
             surfaces: PolymorphicBuilder::new(device.clone()),
             textures: PolymorphicBuilder::new(device.clone()),
@@ -314,6 +407,7 @@ impl SceneLoader {
             file_resolver,
             mesh_cache: HashMap::new(),
             texture_cache: HashMap::new(),
+            bindless_texture: device.create_bindless_array(65536),
             named_surfaces: HashMap::new(),
             meshes: Vec::new(),
             emission_power: HashMap::new(),
@@ -409,8 +503,40 @@ impl SceneLoader {
                 let tex = ConstRgbTexture { rgb: linear.into() };
                 self.textures.push(PolyKey::Simple("srgb".into()), tex)
             }
-            node::Texture::Image { .. } => {
-                todo!()
+            node::Texture::Image { path, colorspace } => {
+                assert_eq!(colorspace, "srgb");
+                let mut file = self
+                    .file_resolver
+                    .resolve(&PathBuf::from(path))
+                    .unwrap_or_else(|| panic!("cannot resolve path {}", path));
+                let mut bytes = Vec::new();
+                file.read_to_end(&mut bytes).unwrap();
+                let img = image::io::Reader::new(Cursor::new(bytes))
+                    .with_guessed_format()
+                    .unwrap()
+                    .decode()
+                    .unwrap()
+                    .to_rgba8();
+                let pixels = img.pixels().map(|p| p.0).collect::<Vec<_>>();
+                let tex = self.device.create_tex2d::<Float4>(
+                    PixelStorage::Byte4,
+                    img.width(),
+                    img.height(),
+                    1,
+                );
+                tex.view(0).copy_from(&pixels);
+                let index = self.texture_cache.len() as u32;
+                self.bindless_texture.set_tex2d(
+                    index as usize,
+                    &tex,
+                    luisa::Sampler {
+                        filter: luisa::SamplerFilter::Point,
+                        address: luisa::SamplerAddress::Repeat,
+                    },
+                );
+                self.texture_cache.insert(path.clone(), index);
+                self.textures
+                    .push(PolyKey::Simple("image".into()), ImageRgbTexture { index })
             }
         }
     }
@@ -607,6 +733,11 @@ impl SceneLoader {
         for node in graph.shapes.iter() {
             let _ = self.load_shape(node);
         }
+        let env_map = if let Some(tex) = self.graph.environment.clone() {
+            self.load_texture(&tex)
+        } else {
+            self.load_texture(&node::Texture::Float { value: 0.0 })
+        };
         let SceneLoader {
             meshes,
             textures,
@@ -618,8 +749,10 @@ impl SceneLoader {
             area_lights,
             device,
             camera,
+            bindless_texture: image_textures,
             ..
         } = self;
+        let env_map = device.create_buffer_from_slice(&[env_map]);
         let textures = textures.build();
         let surfaces = surfaces.build();
         let meshes = meshes.iter().map(|x| x.as_ref()).collect::<Vec<_>>();
@@ -648,6 +781,8 @@ impl SceneLoader {
             meshes,
             camera: camera.unwrap(),
             device,
+            image_textures,
+            env_map,
         })
     }
 }

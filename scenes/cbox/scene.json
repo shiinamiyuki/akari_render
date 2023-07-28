@@ -33,17 +33,14 @@
                     0.0
                 ]
             },
-            "ior": {
-                "type": "Float",
-                "value": 1.4500000476837158
-            },
+            "ior": 1.4500000476837158,
             "metallic": {
                 "type": "Float",
                 "value": 0.0
             },
             "roughness": {
                 "type": "Float",
-                "value": 0.40824830532073975
+                "value": 0.0
             },
             "sheen": {
                 "type": "Float",
@@ -52,10 +49,6 @@
             "sheen_tint": {
                 "type": "Float",
                 "value": 0.5
-            },
-            "specular": {
-                "type": "Float",
-                "value": 0.0
             },
             "specular_tint": {
                 "type": "Float",
@@ -124,10 +117,7 @@
                     0.0
                 ]
             },
-            "ior": {
-                "type": "Float",
-                "value": 1.4500000476837158
-            },
+            "ior": 1.4500000476837158,
             "metallic": {
                 "type": "Float",
                 "value": 0.0
@@ -215,10 +205,7 @@
                     0.0
                 ]
             },
-            "ior": {
-                "type": "Float",
-                "value": 1.4500000476837158
-            },
+            "ior": 1.4500000476837158,
             "metallic": {
                 "type": "Float",
                 "value": 0.0
@@ -306,10 +293,7 @@
                     0.0
                 ]
             },
-            "ior": {
-                "type": "Float",
-                "value": 1.4500000476837158
-            },
+            "ior": 1.4500000476837158,
             "metallic": {
                 "type": "Float",
                 "value": 0.0
@@ -397,10 +381,7 @@
                     4.0
                 ]
             },
-            "ior": {
-                "type": "Float",
-                "value": 1.4500000476837158
-            },
+            "ior":1.4500000476837158,
             "metallic": {
                 "type": "Float",
                 "value": 0.0
@@ -488,10 +469,7 @@
                     0.0
                 ]
             },
-            "ior": {
-                "type": "Float",
-                "value": 1.4500000476837158
-            },
+            "ior": 1.4500000476837158,
             "metallic": {
                 "type": "Float",
                 "value": 0.0
@@ -579,10 +557,7 @@
                     0.0
                 ]
             },
-            "ior": {
-                "type": "Float",
-                "value": 1.4500000476837158
-            },
+            "ior": 1.4500000476837158,
             "metallic": {
                 "type": "Float",
                 "value": 0.0
@@ -657,9 +632,9 @@
             "color": {
                 "type": "srgb",
                 "values": [
-                    0.8676987886428833,
-                    0.8596959114074707,
-                    0.8433891534805298
+                    0.99,
+                    0.99,
+                    0.99
                 ]
             },
             "emission": {
@@ -670,17 +645,14 @@
                     0.0
                 ]
             },
-            "ior": {
-                "type": "Float",
-                "value": 1.4500000476837158
-            },
+            "ior": 1.4500000476837158,
             "metallic": {
                 "type": "Float",
-                "value": 0.0
+                "value": 1.0
             },
             "roughness": {
                 "type": "Float",
-                "value": 0.40824830532073975
+                "value": 0.01
             },
             "sheen": {
                 "type": "Float",
@@ -734,8 +706,8 @@
         "fov": 15.0,
         "lens_radius": 0.0,
         "res": [
-            512,
-            512
+            1024,
+            1024
         ],
         "transform": {
             "center": [

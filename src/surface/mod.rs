@@ -1,4 +1,4 @@
-use crate::color::ColorRepr;
+use crate::color::{ColorRepr, FlatColor};
 use crate::geometry::{face_forward, reflect, refract};
 use crate::microfacet::MicrofacetDistribution;
 use crate::sampling::weighted_discrete_choice2_and_remap;
@@ -20,6 +20,7 @@ pub struct BsdfSample {
     pub pdf: Expr<f32>,
     pub color: Color,
     pub valid: Bool,
+    pub lobe_roughness: Expr<f32>,
 }
 
 pub trait Bsdf {
@@ -33,6 +34,7 @@ pub trait Bsdf {
         ctx: &BsdfEvalContext,
     ) -> BsdfSample;
     fn pdf(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &BsdfEvalContext) -> Float;
+    fn albedo(&self, wo: Expr<Float3>, ctx: &BsdfEvalContext) -> Color;
 }
 
 pub trait Surface {
@@ -137,7 +139,6 @@ impl Bsdf for BsdfMixture {
             sample.pdf = pdf_a * (1.0 - frac) + sample.pdf * frac;
             sample
         })
- 
     }
 
     fn pdf(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &BsdfEvalContext) -> Float {
@@ -154,6 +155,15 @@ impl Bsdf for BsdfMixture {
             zero
         });
         pdf_a * (1.0 - frac) + pdf_b * frac
+    }
+    fn albedo(&self, wo: Expr<Float3>, ctx: &BsdfEvalContext) -> Color {
+        let frac: Expr<f32> = (self.frac)(wo, ctx);
+        match self.mode {
+            BsdfBlendMode::Addictive => self.bsdf_a.albedo(wo, ctx) + self.bsdf_b.albedo(wo, ctx),
+            BsdfBlendMode::Mix => {
+                self.bsdf_a.albedo(wo, ctx) * (1.0 - frac) + self.bsdf_b.albedo(wo, ctx) * frac
+            }
+        }
     }
 }
 
@@ -189,6 +199,9 @@ impl Bsdf for BsdfClosure {
         self.inner
             .pdf(self.frame.to_local(wo), self.frame.to_local(wi), ctx)
     }
+    fn albedo(&self, wo: Expr<Float3>, ctx: &BsdfEvalContext) -> Color {
+        self.inner.albedo(self.frame.to_local(wo), ctx)
+    }
 }
 pub trait Fresnel {
     fn evaluate(&self, cos_theta_i: Expr<f32>, ctx: &BsdfEvalContext) -> Color;
@@ -202,16 +215,20 @@ pub struct MicrofacetReflection {
 impl Bsdf for MicrofacetReflection {
     fn evaluate(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &BsdfEvalContext) -> Color {
         let wh = wo + wi;
-        if_!(Frame::same_hemisphere(wo, wi), {
+        let cos_o = Frame::cos_theta(wo);
+        let cos_i = Frame::cos_theta(wi);
+        if_!((wh.dot(wo) * wi.dot(wh)).cmplt(0.0)
+            | wh.cmpeq(0.0).all()
+            | cos_i.cmpeq(0.0)
+            | cos_o.cmpeq(0.0)
+            | !Frame::same_hemisphere(wo, wi), {
+                Color::zero(ctx.color_repr)
+        }, else {
             let wh = wh.normalize();
             let f = self.fresnel.evaluate(wi.dot(face_forward(wh, make_float3(0.0,1.0,0.0))), ctx);
             let d = self.dist.d(wh);
             let g = self.dist.g(wo, wi);
-            let cos_o = Frame::cos_theta(wo);
-            let cos_i = Frame::cos_theta(wi);
             &self.color * &f * (0.25 * d * g / (cos_i * cos_o)).abs() * cos_o.abs()
-        }, else {
-            Color::zero(ctx.color_repr)
         })
     }
 
@@ -230,17 +247,27 @@ impl Bsdf for MicrofacetReflection {
             pdf: self.pdf(wo, wi, ctx),
             valid,
             wi,
+            lobe_roughness: self.dist.roughness(),
         }
     }
 
     fn pdf(&self, wo: Expr<Float3>, wi: Expr<Float3>, _ctx: &BsdfEvalContext) -> Float {
         let wh = wo + wi;
-        if_!(Frame::same_hemisphere(wo, wi) & wh.cmpne(0.0).any(), {
+        let cos_o = Frame::cos_theta(wo);
+        let cos_i = Frame::cos_theta(wi);
+        if_!((wh.dot(wo) * wi.dot(wh)).cmplt(0.0)
+            | wh.cmpeq(0.0).all()
+            | cos_i.cmpeq(0.0)
+            | cos_o.cmpeq(0.0)
+            | !Frame::same_hemisphere(wo, wi), {
+                const_(0.0f32)
+        }, else {
             let wh = wh.normalize();
             self.dist.pdf(wo, wh) / (4.0 * wo.dot(wh))
-        }, else {
-            const_(0.0f32)
         })
+    }
+    fn albedo(&self, _wo: Expr<Float3>, _ctx: &BsdfEvalContext) -> Color {
+        self.color
     }
 }
 
@@ -265,7 +292,7 @@ impl Bsdf for MicrofacetTransmission {
             Color::zero(ctx.color_repr)
         }, else {
             let f = self.fresnel.evaluate(wo.dot(wh), ctx);
-            let denom = (wo.dot(wh) / eta  + wi.dot(wh)).sqr() * cos_i * cos_o;
+            let denom = (wi.dot(wh)  + wo.dot(wh) / eta).sqr() * cos_i * cos_o;
             (Color::one(ctx.color_repr) - f)
                 * &self.color *(self.dist.d(wh)
                 * self.dist.g(wo, wi) * eta.sqr()
@@ -293,11 +320,14 @@ impl Bsdf for MicrofacetTransmission {
         let wh = self.dist.sample_wh(wo, u_sample);
         let (refracted, _eta, wi) = refract(wo, wh, self.eta);
         let valid = refracted & !Frame::same_hemisphere(wo, wi);
+        let pdf = self.pdf(wo, wi, ctx);
+        // lc_assert!(pdf.cmpgt(0.0) | !valid);
         BsdfSample {
-            pdf: self.pdf(wo, wi, ctx),
+            pdf,
             color: self.evaluate(wo, wi, ctx),
             wi,
             valid,
+            lobe_roughness: self.dist.roughness(),
         }
     }
 
@@ -320,6 +350,9 @@ impl Bsdf for MicrofacetTransmission {
             let dwh_dwi = wi.dot(wh).abs() / denom;
             self.dist.pdf(wo, wh) * dwh_dwi
         })
+    }
+    fn albedo(&self, _wo: Expr<Float3>, _ctx: &BsdfEvalContext) -> Color {
+        self.color
     }
 }
 
@@ -353,16 +386,17 @@ pub fn fr_dielectric(cos_theta_i: Expr<f32>, eta: Expr<f32>) -> Expr<f32> {
 }
 
 pub fn fr_schlick(f0: Color, cos_theta_i: Expr<f32>) -> Color {
-    let cos_theta_i = cos_theta_i.clamp(-1.0, 1.0);
+    let cos_theta_i = cos_theta_i.clamp(-1.0, 1.0).abs();
     let pow5 = |x: Expr<f32>| x.sqr().sqr() * x;
-    f0 + (Color::one(f0.repr()) - f0) * pow5(1.0 - cos_theta_i)
+    let fr = f0 + (Color::one(f0.repr()) - f0) * pow5(1.0 - cos_theta_i).abs();
+    fr
 }
 #[derive(Copy, Clone)]
 pub struct FresnelSchlick {
     pub f0: Color,
 }
 impl Fresnel for FresnelSchlick {
-    fn evaluate(&self, cos_theta_i: Expr<f32>, ctx: &BsdfEvalContext) -> Color {
+    fn evaluate(&self, cos_theta_i: Expr<f32>, _ctx: &BsdfEvalContext) -> Color {
         fr_schlick(self.f0, cos_theta_i)
     }
 }
@@ -385,41 +419,50 @@ impl Fresnel for ConstFresnel {
 
 #[derive(Clone, Copy, Value)]
 #[repr(C)]
-pub struct TBsdfSample<T: Value> {
+pub struct FlatBsdfSample {
     pub wi: Float3,
     pub pdf: f32,
-    pub color: T,
+    pub color: FlatColor,
     pub valid: bool,
+    pub lobe_roughness: f32,
 }
 pub const BSDF_EVAL_COLOR: u32 = 1 << 0;
 pub const BSDF_EVAL_PDF: u32 = 1 << 1;
+pub const BSDF_EVAL_LOBE_ROUGHNESS: u32 = 1 << 2;
+
 #[derive(Clone, Copy, Value)]
 #[repr(C)]
-pub struct BsdfEvalResult<T: Value> {
-    pub color: T,
+pub struct FlatBsdfEvalResult {
+    pub color: FlatColor,
     pub pdf: f32,
+    pub lobe_roughness: f32,
 }
 pub struct BsdfEvaluator {
     pub(crate) color_repr: ColorRepr,
-    pub(crate) bsdf: DynCallable<
+    // bsdf(surface, si, wo, wi, u_select, flags)
+    pub(crate) bsdf: Callable<
         (
             Expr<TagIndex>,
             Expr<SurfaceInteraction>,
             Expr<Float3>,
             Expr<Float3>,
+            Expr<f32>,
             Expr<u32>,
         ),
-        DynExpr,
+        Expr<FlatBsdfEvalResult>,
     >,
-    pub(crate) bsdf_sample: DynCallable<
+    // bsdf_sample(surface, si, wo, (u_select, u_sample))
+    pub(crate) bsdf_sample: Callable<
         (
             Expr<TagIndex>,
             Expr<SurfaceInteraction>,
             Expr<Float3>,
             Expr<Float3>,
         ),
-        DynExpr,
+        Expr<FlatBsdfSample>,
     >,
+    pub(crate) albedo:
+        Callable<(Expr<TagIndex>, Expr<SurfaceInteraction>, Expr<Float3>), Expr<FlatColor>>,
 }
 impl BsdfEvaluator {
     pub fn evaluate(
@@ -429,11 +472,10 @@ impl BsdfEvaluator {
         wo: Expr<Float3>,
         wi: Expr<Float3>,
     ) -> Color {
-        let result = self.bsdf.call(surface, si, wo, wi, const_(BSDF_EVAL_COLOR));
-        match self.color_repr {
-            ColorRepr::Rgb => Color::Rgb(result.get::<BsdfEvalResult<Float3>>().color()),
-            _ => todo!(),
-        }
+        let result = self
+            .bsdf
+            .call(surface, si, wo, wi, const_(0.0f32), const_(BSDF_EVAL_COLOR));
+        Color::from_flat(self.color_repr, result.color())
     }
     pub fn pdf(
         &self,
@@ -442,11 +484,10 @@ impl BsdfEvaluator {
         wo: Expr<Float3>,
         wi: Expr<Float3>,
     ) -> Float {
-        let result = self.bsdf.call(surface, si, wo, wi, const_(BSDF_EVAL_PDF));
-        match self.color_repr {
-            ColorRepr::Rgb => result.get::<BsdfEvalResult<Float3>>().pdf(),
-            _ => todo!(),
-        }
+        let result = self
+            .bsdf
+            .call(surface, si, wo, wi, const_(0.0f32), const_(BSDF_EVAL_PDF));
+        result.pdf()
     }
     pub fn evaluate_color_and_pdf(
         &self,
@@ -455,16 +496,27 @@ impl BsdfEvaluator {
         wo: Expr<Float3>,
         wi: Expr<Float3>,
     ) -> (Color, Float) {
-        let result = self
-            .bsdf
-            .call(surface, si, wo, wi, const_(BSDF_EVAL_COLOR | BSDF_EVAL_PDF));
-        match self.color_repr {
-            ColorRepr::Rgb => {
-                let result = result.get::<BsdfEvalResult<Float3>>();
-                (Color::Rgb(result.color()), result.pdf())
-            }
-            _ => todo!(),
-        }
+        let result = self.bsdf.call(
+            surface,
+            si,
+            wo,
+            wi,
+            const_(0.0f32),
+            const_(BSDF_EVAL_COLOR | BSDF_EVAL_PDF),
+        );
+        (
+            Color::from_flat(self.color_repr, result.color()),
+            result.pdf(),
+        )
+    }
+    pub fn albedo(
+        &self,
+        surface: Expr<TagIndex>,
+        si: Expr<SurfaceInteraction>,
+        wo: Expr<Float3>,
+    ) -> Color {
+        let result = self.albedo.call(surface, si, wo);
+        Color::from_flat(self.color_repr, result)
     }
     pub fn sample(
         &self,
@@ -474,17 +526,12 @@ impl BsdfEvaluator {
         u: Expr<Float3>,
     ) -> BsdfSample {
         let sample = self.bsdf_sample.call(surface, si, wo, u);
-        match self.color_repr {
-            ColorRepr::Rgb => {
-                let sample = sample.get::<TBsdfSample<Float3>>();
-                BsdfSample {
-                    wi: sample.wi(),
-                    pdf: sample.pdf(),
-                    color: Color::Rgb(sample.color()),
-                    valid: sample.valid(),
-                }
-            }
-            _ => todo!(),
+        BsdfSample {
+            wi: sample.wi(),
+            pdf: sample.pdf(),
+            color: Color::from_flat(self.color_repr, sample.color()),
+            valid: sample.valid(),
+            lobe_roughness: sample.lobe_roughness(),
         }
     }
 }

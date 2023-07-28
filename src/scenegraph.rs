@@ -186,6 +186,7 @@ pub mod node {
         pub camera: Camera,
         pub lights: Vec<Light>,
         pub shapes: Vec<Shape>,
+        pub environment: Option<Texture>,
         // #[serde(default = "Vec::new")]
         // pub shaders: Vec<ShaderGraph>,
     }
