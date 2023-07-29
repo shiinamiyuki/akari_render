@@ -27,6 +27,9 @@ tobj = "3.2.3"
 [profile.dev]
 incremental = true
 
+[profile.release]
+incremental = true
+
 [build-dependencies]
 cmake = "0.1.50"
 

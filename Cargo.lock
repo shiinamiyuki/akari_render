@@ -768,11 +768,15 @@ dependencies = [
 
 [[package]]
 name = "half"
-version = "2.2.1"
+version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02b4af3693f1b705df946e9fe5631932443781d0aabb423b62fcd4d73f6d2fd0"
+checksum = "bc52e53916c08643f1b56ec082790d1e86a32e58dc5268f897f313fbae7b4872"
 dependencies = [
+ "cfg-if",
  "crunchy",
+ "num-traits",
+ "serde",
+ "zerocopy",
 ]
 
 [[package]]
@@ -993,6 +997,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "libm"
+version = "0.2.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f7012b1bbb0719e1097c47611d3898568c546d597c2e74d66f6087edd5233ff4"
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1020,7 +1030,6 @@ dependencies = [
 [[package]]
 name = "luisa_compute"
 version = "0.1.1-alpha.1"
-source = "git+https://github.com/LuisaGroup/luisa-compute-rs.git#4eab6160738555bf41c14b43fd89c8d669a84639"
 dependencies = [
  "base64ct",
  "bumpalo",
@@ -1050,7 +1059,6 @@ dependencies = [
 [[package]]
 name = "luisa_compute_api_types"
 version = "0.1.1-alpha.1"
-source = "git+https://github.com/LuisaGroup/luisa-compute-rs.git#4eab6160738555bf41c14b43fd89c8d669a84639"
 dependencies = [
  "bitflags 2.2.1",
  "cbindgen",
@@ -1060,7 +1068,6 @@ dependencies = [
 [[package]]
 name = "luisa_compute_backend"
 version = "0.1.1-alpha.1"
-source = "git+https://github.com/LuisaGroup/luisa-compute-rs.git#4eab6160738555bf41c14b43fd89c8d669a84639"
 dependencies = [
  "lazy_static",
  "libc",
@@ -1076,7 +1083,6 @@ dependencies = [
 [[package]]
 name = "luisa_compute_derive"
 version = "0.1.1-alpha.1"
-source = "git+https://github.com/LuisaGroup/luisa-compute-rs.git#4eab6160738555bf41c14b43fd89c8d669a84639"
 dependencies = [
  "luisa_compute_derive_impl",
  "syn 2.0.15",
@@ -1085,7 +1091,6 @@ dependencies = [
 [[package]]
 name = "luisa_compute_derive_impl"
 version = "0.1.1-alpha.1"
-source = "git+https://github.com/LuisaGroup/luisa-compute-rs.git#4eab6160738555bf41c14b43fd89c8d669a84639"
 dependencies = [
  "prettyplease",
  "proc-macro2",
@@ -1096,11 +1101,11 @@ dependencies = [
 [[package]]
 name = "luisa_compute_ir"
 version = "0.1.1-alpha.1"
-source = "git+https://github.com/LuisaGroup/luisa-compute-rs.git#4eab6160738555bf41c14b43fd89c8d669a84639"
 dependencies = [
  "base64ct",
  "bincode",
  "cbindgen",
+ "half",
  "indexmap",
  "lazy_static",
  "luisa_compute_api_types",
@@ -1113,7 +1118,6 @@ dependencies = [
 [[package]]
 name = "luisa_compute_sys"
 version = "0.1.1-alpha.1"
-source = "git+https://github.com/LuisaGroup/luisa-compute-rs.git#4eab6160738555bf41c14b43fd89c8d669a84639"
 dependencies = [
  "cmake",
  "lazy_static",
@@ -1295,6 +1299,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "578ede34cf02f8924ab9447f50c28075b4d3e5b269972345e7e0372b38c6cdcd"
 dependencies = [
  "autocfg",
+ "libm",
 ]
 
 [[package]]
@@ -2343,6 +2348,27 @@ name = "xml-rs"
 version = "0.8.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc95a04ea24f543cd9be5aab44f963fa35589c99e18415c38fb2b17e133bf8d2"
+
+[[package]]
+name = "zerocopy"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "332f188cc1bcf1fe1064b8c58d150f497e697f49774aa846f2dc949d9a25f236"
+dependencies = [
+ "byteorder",
+ "zerocopy-derive",
+]
+
+[[package]]
+name = "zerocopy-derive"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6505e6815af7de1746a08f69c69606bb45695a17149517680f3b2149713b19a3"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
 
 [[package]]
 name = "zune-inflate"
