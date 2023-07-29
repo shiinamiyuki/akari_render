@@ -36,6 +36,7 @@ pub trait Integrator {
 
 pub mod gpt;
 pub mod mcmc;
+pub mod mcmc_opt;
 pub mod normal;
 pub mod pt;
 
@@ -46,6 +47,8 @@ pub enum Method {
     PathTracer(pt::Config),
     #[serde(rename = "mcmc")]
     Mcmc(mcmc::Config),
+    #[serde(rename = "mcmc_opt")]
+    McmcOpt(mcmc::Config),
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -85,6 +88,9 @@ pub fn render(device: Device, scene: Arc<Scene>, task: &RenderTask, options: Ren
             }
             Method::Mcmc(config) => {
                 mcmc::render(device.clone(), scene.clone(), &mut film, &config, &options)
+            }
+            Method::McmcOpt(config) => {
+                mcmc_opt::render(device.clone(), scene.clone(), &mut film, &config, &options)
             }
         }
         let toc = std::time::Instant::now();

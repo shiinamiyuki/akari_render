@@ -563,6 +563,9 @@ impl Integrator for PathTracer {
         let kernel = self
             .device
             .create_kernel::<(u32,)>(&|spp_per_pass: Expr<u32>| {
+                if !is_cpu_backend() {
+                    set_block_size([8, 8, 1]);
+                }
                 let p = dispatch_id().xy();
                 let i = p.x() + p.y() * resolution.x;
                 let rngs = rngs.var();

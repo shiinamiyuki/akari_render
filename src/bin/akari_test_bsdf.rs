@@ -1,4 +1,4 @@
-use std::env::{current_exe, args_os, args};
+use std::env::{args, args_os, current_exe};
 use std::f32::consts::PI;
 use std::process::exit;
 use std::sync::Arc;
@@ -130,7 +130,6 @@ fn main() {
             reflectance: Color::Rgb(make_float3(1.0, 1.0, 1.0)),
         })
     });
-   
 
     for roughness in [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8] {
         test_bsdf(

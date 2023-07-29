@@ -56,12 +56,12 @@ pub struct IsotropicExponentialMutation {
     compute_log_pdf: bool,
     image_mutation_size: Option<f32>,
     res: Expr<Float2>,
-    lens_perturbation: Expr<bool>,
+    image_mutation: Expr<bool>,
 }
 impl IsotropicExponentialMutation {
     pub fn new_default(
         compute_log_pdf: bool,
-        lens_perturbation: Expr<bool>,
+        image_mutation: Expr<bool>,
         image_mutation_size: Option<f32>,
         res: Expr<Float2>,
     ) -> Self {
@@ -69,7 +69,7 @@ impl IsotropicExponentialMutation {
             const_(1.0 / 1024.0f32),
             const_(1.0 / 64.0f32),
             compute_log_pdf,
-            lens_perturbation,
+            image_mutation,
             image_mutation_size,
             res,
         )
@@ -78,7 +78,7 @@ impl IsotropicExponentialMutation {
         mutation_size_low: Expr<f32>,
         mutation_size_high: Expr<f32>,
         compute_log_pdf: bool,
-        lens_perturbation: Expr<bool>,
+        image_mutation: Expr<bool>,
         image_mutation_size: Option<f32>,
         res: Expr<Float2>,
     ) -> Self {
@@ -90,19 +90,42 @@ impl IsotropicExponentialMutation {
             compute_log_pdf,
             image_mutation_size,
             res,
-            lens_perturbation,
+            image_mutation,
         }
     }
 }
-#[derive(Clone, Copy, Value)]
+#[derive(Clone, Copy, Value, Debug)]
 #[repr(C)]
-struct KelemenMutationRecord {
-    cur: f32,
-    u: f32,
-    mutation_size_low: f32,
-    mutation_size_high: f32,
-    log_ratio: f32,
-    mutated: f32,
+pub struct KelemenMutationRecord {
+    pub cur: f32,
+    pub u: f32,
+    pub mutation_size_low: f32,
+    pub mutation_size_high: f32,
+    pub log_ratio: f32,
+    pub mutated: f32,
+}
+lazy_static! {
+    pub static ref KELEMEN_MUTATE: Callable<(Var<KelemenMutationRecord>,), ()> =
+        create_static_callable::<(Var<KelemenMutationRecord>,), ()>(
+            |record: Var<KelemenMutationRecord>| {
+                let cur = record.cur().load();
+                let u = record.u().load();
+                let (u, add) = if_!(u.cmplt(0.5), {
+                    (u * 2.0, const_(true))
+                }, else {
+                    ((u - 0.5) * 2.0, const_(false))
+                });
+                let dv = record.mutation_size_high().load() * (record.log_ratio().load() * u).exp();
+                let new = if_!(add, {
+                    let new = cur + dv;
+                    select(new.cmpgt(1.0), new - 1.0, new)
+                }, else {
+                    let new = cur - dv;
+                    select(new.cmplt(0.0), new + 1.0, new)
+                });
+                record.set_mutated(new);
+            }
+        );
 }
 impl Mutation for IsotropicExponentialMutation {
     fn log_pdf(&self, _cur: &PrimarySample, _proposal: &PrimarySample) -> Expr<f32> {
@@ -110,30 +133,7 @@ impl Mutation for IsotropicExponentialMutation {
     }
     fn mutate(&self, s: &PrimarySample, sampler: &IndependentSampler) -> Proposal {
         let values = VLArrayVar::<f32>::zero(s.values.static_len());
-        lazy_static! {
-            static ref MUTATE: Callable<(Var<KelemenMutationRecord>,), ()> =
-                create_static_callable::<(Var<KelemenMutationRecord>,), ()>(
-                    |record: Var<KelemenMutationRecord>| {
-                        let cur = record.cur().load();
-                        let u = record.u().load();
-                        let (u, add) = if_!(u.cmplt(0.5), {
-                            (u * 2.0, const_(true))
-                        }, else {
-                            ((u - 0.5) * 2.0, const_(false))
-                        });
-                        let dv = record.mutation_size_high().load()
-                            * (record.log_ratio().load() * u).exp();
-                        let new = if_!(add, {
-                            let new = cur + dv;
-                            select(new.cmpgt(1.0), new - 1.0, new)
-                        }, else {
-                            let new = cur - dv;
-                            select(new.cmplt(0.0), new + 1.0, new)
-                        });
-                        record.set_mutated(new);
-                    }
-                );
-        }
+
         let begin = if self.image_mutation_size.is_some() {
             let image_mutation_size = self.image_mutation_size.unwrap();
             mutate_image_space(s, &values, sampler, const_(image_mutation_size), self.res);
@@ -144,7 +144,7 @@ impl Mutation for IsotropicExponentialMutation {
         for_range(const_(begin)..values.len().int(), |i| {
             let i = i.uint();
             let cur = s.values.read(i);
-            let new = if_!(!self.lens_perturbation | i.cmplt(2), {
+            let new = if_!(!self.image_mutation | i.cmplt(2), {
                 let u = sampler.next_1d();
                 let record = var!(
                     KelemenMutationRecord,
@@ -157,7 +157,7 @@ impl Mutation for IsotropicExponentialMutation {
                         0.0
                     )
                 );
-                MUTATE.call(record);
+                KELEMEN_MUTATE.call(record);
                 record.mutated().load()
             }, else {
                 cur
@@ -181,7 +181,7 @@ pub struct IsotropicGaussianMutation {
     pub compute_log_pdf: bool,
     pub image_mutation_size: Option<f32>,
     pub res: Expr<Float2>,
-    pub lens_perturbation: Expr<bool>,
+    pub image_mutation: Expr<bool>,
 }
 
 // mutates the image space coordinate within range [0, mutation_size]
@@ -233,7 +233,7 @@ impl Mutation for IsotropicGaussianMutation {
         for_range(const_(begin)..s.values.len().int(), |i| {
             let i = i.uint();
             let cur = s.values.read(i);
-            let new = if_!(!self.lens_perturbation | i.cmplt(2), {
+            let new = if_!(!self.image_mutation | i.cmplt(2), {
                 let x = sample_gaussian(sampler.next_1d());
                 cur + x * self.sigma
             }, else {

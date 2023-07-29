@@ -1,3 +1,4 @@
+use std::f32::consts::PI;
 use std::fs::File;
 use std::io::BufWriter;
 use std::sync::Arc;
@@ -5,7 +6,9 @@ use std::time::Instant;
 
 use super::pt::{self, PathTracer};
 use super::{Integrator, IntermediateStats, RenderOptions, RenderStats};
-use crate::sampler::mcmc::IsotropicExponentialMutation;
+use crate::sampler::mcmc::{
+    IsotropicExponentialMutation, KelemenMutationRecord, KelemenMutationRecordExpr, KELEMEN_MUTATE,
+};
 use crate::{
     color::*,
     film::*,
@@ -20,32 +23,14 @@ use crate::{
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
-#[serde(tag = "type")]
-pub enum Method {
-    #[serde(rename = "kelemen")]
-    Kelemen {
-        exponential_mutation: bool,
-        small_sigma: f32,
-        large_step_prob: f32,
-        image_mutation_prob: f32,
-        image_mutation_size: Option<f32>,
-        adaptive: bool,
-    },
+use super::mcmc::{Config, Mcmc, Method};
+#[derive(Clone, Copy, Value, Debug)]
+#[repr(C)]
+pub struct PssSample {
+    pub cur: f32,
+    pub backup: f32,
 }
-impl Default for Method {
-    fn default() -> Self {
-        Method::Kelemen {
-            exponential_mutation: true,
-            small_sigma: 0.01,
-            large_step_prob: 0.1,
-            image_mutation_prob: 0.0,
-            image_mutation_size: None,
-            adaptive: false,
-        }
-    }
-}
-pub struct Mcmc {
+pub struct McmcOpt {
     pub device: Device,
     pub pt: PathTracer,
     pub method: Method,
@@ -55,37 +40,6 @@ pub struct Mcmc {
     config: Config,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
-#[serde(default)]
-pub struct Config {
-    pub spp: u32,
-    pub max_depth: u32,
-    pub rr_depth: u32,
-    pub mcmc_depth: u32,
-    pub spp_per_pass: u32,
-    pub use_nee: bool,
-    pub method: Method,
-    pub n_chains: usize,
-    pub n_bootstrap: usize,
-    pub direct_spp: i32,
-}
-impl Default for Config {
-    fn default() -> Self {
-        let default_pt = pt::Config::default();
-        Self {
-            spp: default_pt.spp,
-            spp_per_pass: default_pt.spp_per_pass,
-            use_nee: default_pt.use_nee,
-            max_depth: default_pt.max_depth,
-            mcmc_depth: default_pt.max_depth,
-            rr_depth: default_pt.rr_depth,
-            method: Method::default(),
-            n_chains: 512,
-            n_bootstrap: 100000,
-            direct_spp: 64,
-        }
-    }
-}
 #[derive(Clone, Copy, Debug, Value)]
 #[repr(C)]
 pub struct MarkovState {
@@ -100,13 +54,113 @@ pub struct MarkovState {
 }
 struct RenderState {
     rng_states: Buffer<Pcg32>,
-    samples: Buffer<f32>,
+    samples: Buffer<PssSample>,
     states: Buffer<MarkovState>,
     cur_colors: ColorBuffer,
     b_init: f32,
     b_init_cnt: u32,
 }
-impl Mcmc {
+
+pub struct LazyMcmcSampler<'a> {
+    pub base: &'a IndependentSampler,
+    pub samples: BufferVar<PssSample>,
+    pub offset: Expr<u32>,
+    pub cur_dim: Var<u32>,
+    pub mcmc_dim: Expr<u32>,
+}
+impl<'a> LazyMcmcSampler<'a> {
+    pub fn new(
+        base: &'a IndependentSampler,
+        samples: BufferVar<PssSample>,
+        offset: Expr<u32>,
+        mcmc_dim: Expr<u32>,
+    ) -> Self {
+        Self {
+            base,
+            samples,
+            offset,
+            cur_dim: var!(u32, 0),
+            mcmc_dim,
+        }
+    }
+}
+
+impl<'a> Sampler for LazyMcmcSampler<'a> {
+    fn next_1d(&self) -> Float {
+        if_!(self.cur_dim.load().cmplt(self.mcmc_dim), {
+            let ret = self.samples.read(self.offset + self.cur_dim.load()).cur();
+            self.cur_dim.store(self.cur_dim.load() + 1);
+            ret
+        }, else {
+            self.cur_dim.store(self.cur_dim.load() + 1);
+            self.base.next_1d()
+        })
+    }
+    fn start(&self) {
+        self.cur_dim.store(0);
+    }
+}
+pub struct Mutator {
+    pub method: Method,
+    pub is_large_step: Expr<bool>,
+}
+impl Mutator {
+    pub fn mutate(
+        &self,
+        samples: &Buffer<PssSample>,
+        offset: Expr<u32>,
+        dims: Expr<u32>,
+        rng: &IndependentSampler,
+    ) {
+        match self.method {
+            Method::Kelemen {
+                exponential_mutation,
+                small_sigma,
+                large_step_prob: _,
+                ..
+            } => {
+                let kelemen_mutate_size_low = const_(1.0 / 1024.0f32);
+                let kelemen_mutate_size_high = const_(1.0 / 64.0f32);
+                let kelemen_log_ratio = -(kelemen_mutate_size_high / kelemen_mutate_size_low).ln();
+                for_range(const_(0i32)..dims.int(), |i| {
+                    let i = i.uint();
+                    let u = rng.next_1d();
+                    let sample = var!(PssSample, samples.var().read(offset + i));
+                    sample.set_backup(*sample.cur());
+                    if_!(self.is_large_step, {
+                        sample.set_cur(u);
+                    }, else {
+                        if exponential_mutation {
+                            let record = var!(
+                                KelemenMutationRecord,
+                                KelemenMutationRecordExpr::new(
+                                    *sample.cur(),
+                                    u,
+                                    kelemen_mutate_size_low,
+                                    kelemen_mutate_size_high,
+                                    kelemen_log_ratio,
+                                    0.0
+                                )
+                            );
+                            KELEMEN_MUTATE.call(record);
+                            // cpu_dbg!(*record);
+                            sample.set_cur(*record.mutated());
+                        } else {
+                            let tmp1 = (-2.0 * (1.0 - rng.next_1d()).ln()).sqrt();
+                            let dv = tmp1 * (2.0 * PI * rng.next_1d()).cos();
+                            let new = *sample.cur() + dv * small_sigma;
+                            let new = new - new.floor();
+                            let new = select(new.is_finite(), new, const_(0.0f32));
+                            sample.set_cur(new);
+                        }
+                    });
+                    samples.var().write(offset + i, *sample);
+                });
+            }
+        }
+    }
+}
+impl McmcOpt {
     fn sample_dimension(&self) -> usize {
         4 + self.mcmc_depth as usize * (3 + 3 + 1)
     }
@@ -129,18 +183,20 @@ impl Mcmc {
             config,
         }
     }
-    pub fn scalar_contribution(color: &Color) -> Expr<f32> {
-        color.max().clamp(0.0, 1e5)
-        // // const_(1.0f32)
-    }
     fn evaluate(
         &self,
         scene: &Arc<Scene>,
         eval: &Evaluators,
+        samples: &Buffer<PssSample>,
         independent: &IndependentSampler,
-        sample: PrimarySample,
+        chain_id: Expr<u32>,
     ) -> (Expr<Uint2>, Color, Expr<f32>) {
-        let sampler = IndependentReplaySampler::new(independent, sample);
+        let sampler = LazyMcmcSampler::new(
+            independent,
+            samples.var(),
+            chain_id * const_(self.sample_dimension() as u32),
+            const_(self.sample_dimension() as u32),
+        );
         sampler.start();
         let res = const_(scene.camera.resolution());
         let p = sampler.next_2d() * res.float();
@@ -150,11 +206,13 @@ impl Mcmc {
                 .camera
                 .generate_ray(p.uint(), &sampler, eval.color_repr);
         let l = self.pt.radiance(scene, ray, &sampler, eval) * ray_color * ray_w;
-        (p.uint(), l.clone(), Self::scalar_contribution(&l))
+        (p.uint(), l.clone(), Mcmc::scalar_contribution(&l))
     }
     fn bootstrap(&self, scene: &Arc<Scene>, eval: &Evaluators) -> RenderState {
         let seeds = init_pcg32_buffer(self.device.clone(), self.n_bootstrap + self.n_chains);
-
+        let samples = self
+            .device
+            .create_buffer::<PssSample>(self.sample_dimension() * self.n_bootstrap);
         let fs = self
             .device
             .create_buffer_from_fn(self.n_bootstrap, |_| 0.0f32);
@@ -165,13 +223,14 @@ impl Mcmc {
                 let sampler = IndependentSampler {
                     state: var!(Pcg32, seed),
                 };
-                let sample = VLArrayVar::<f32>::zero(self.sample_dimension());
-                for_range(const_(0)..sample.len().int(), |i| {
-                    let i = i.uint();
-                    sample.write(i, sampler.next_1d());
+                let dim = const_(self.sample_dimension() as u32);
+                for_range(const_(0)..dim.int(), |j| {
+                    let j = j.uint();
+                    samples
+                        .var()
+                        .write(i * dim + j, PssSampleExpr::new(sampler.next_1d(), 0.0));
                 });
-                let sample = PrimarySample { values: sample };
-                let (_p, _l, f) = self.evaluate(scene, eval, &sampler, sample);
+                let (_p, _l, f) = self.evaluate(scene, eval, &samples, &sampler, i);
                 fs.var().write(i, f);
             })
             .dispatch([self.n_bootstrap as u32, 1, 1]);
@@ -201,24 +260,17 @@ impl Mcmc {
                 let sampler = IndependentSampler {
                     state: var!(Pcg32, seed),
                 };
-                let sample = VLArrayVar::<f32>::zero(self.sample_dimension());
-                for_range(const_(0)..sample.len().int(), |i| {
-                    let i = i.uint();
-                    sample.write(i, sampler.next_1d());
-                });
-
-                for_range(const_(0)..sample.len().int(), |j| {
-                    let dim = self.sample_dimension();
+                let dim = const_(self.sample_dimension() as u32);
+                for_range(const_(0)..dim.int(), |j| {
                     let j = j.uint();
                     sample_buffer
                         .var()
-                        .write(i * dim as u32 + j, sample.read(j));
+                        .write(i * dim + j, PssSampleExpr::new(sampler.next_1d(), 0.0));
                 });
-                let sample = PrimarySample { values: sample };
-                let (p, l, f) = self.evaluate(scene, eval, &sampler, sample);
+
+                let (p, l, f) = self.evaluate(scene, eval, &samples, &sampler, i);
                 let sigma = match &self.method {
                     Method::Kelemen { small_sigma, .. } => *small_sigma,
-                    _ => todo!(),
                 };
                 cur_colors.write(i, l);
                 let state = MarkovStateExpr::new(i, p, f, 0.0, 0, 0, 0, sigma);
@@ -239,40 +291,32 @@ impl Mcmc {
         &self,
         scene: &Arc<Scene>,
         eval: &Evaluators,
+        render_state: &RenderState,
         film: &Film,
         contribution: Expr<f32>,
         state: Var<MarkovState>,
         cur_color_v: ColorVar,
-        sample: PrimarySample,
         rng: &IndependentSampler,
     ) {
-        let res = const_(scene.camera.resolution()).float();
+        let offset = *state.chain_id() * const_(self.sample_dimension() as u32);
         // select a mutation strategy
         match self.method {
             Method::Kelemen {
-                small_sigma: _,
-                large_step_prob,
-                adaptive,
-                exponential_mutation,
-                image_mutation_size,
-                image_mutation_prob,
+                large_step_prob, ..
             } => {
                 let is_large_step = rng.next_1d().cmplt(large_step_prob);
-                let proposal = if_!(is_large_step, {
-                    let large = LargeStepMutation{};
-                    large.mutate(&sample, &rng)
-                }, else {
-                    let image_mutation = rng.next_1d().cmplt(image_mutation_prob);
-                    if exponential_mutation {
-                        let small = IsotropicGaussianMutation { image_mutation, sigma: state.sigma().load(),compute_log_pdf:false, image_mutation_size, res};
-                        small.mutate(&sample, &rng)
-                    } else {
-                        let small = IsotropicExponentialMutation::new_default(false, image_mutation, image_mutation_size, res);
-                        small.mutate(&sample, &rng)
-                    }
-                });
-                let clamped = proposal.sample.clamped();
-                let (proposal_p, proposal_color, f) = self.evaluate(scene, eval, &rng, clamped);
+                let mutator = Mutator {
+                    is_large_step,
+                    method: self.method,
+                };
+                mutator.mutate(
+                    &render_state.samples,
+                    offset,
+                    const_(self.sample_dimension() as u32),
+                    rng,
+                );
+                let (proposal_p, proposal_color, f) =
+                    self.evaluate(scene, eval, &render_state.samples, &rng, *state.chain_id());
                 let proposal_f = f;
                 if_!(is_large_step, {
                     state.set_b(state.b().load() + proposal_f);
@@ -296,31 +340,32 @@ impl Mcmc {
                     &(cur_color / cur_f),
                     (1.0 - accept) * contribution,
                 );
-                if_!(rng.next_1d().cmplt(accept), {
-                    state.set_cur_f(proposal_f);
-                    cur_color_v.store(proposal_color);
-                    state.set_cur_pixel(proposal_p);
-                    if_!(!is_large_step, {
-                        state.set_n_accepted(state.n_accepted().load() + 1);
-                    });
-                    sample.values.store(clamped.values.load());
-                });
+                if_!(
+                    rng.next_1d().cmplt(accept),
+                    {
+                        state.set_cur_f(proposal_f);
+                        cur_color_v.store(proposal_color);
+                        state.set_cur_pixel(proposal_p);
+                        if_!(!is_large_step, {
+                            state.set_n_accepted(state.n_accepted().load() + 1);
+                        });
+                    },
+                    else, // reject
+                    {
+                        for_range(
+                            const_(0)..const_(self.sample_dimension() as u32).int(),
+                            |i| {
+                                let i = i.uint();
+                                let sample =
+                                    var!(PssSample, render_state.samples.var().read(offset + i));
+                                sample.set_cur(*sample.backup());
+                                render_state.samples.var().write(offset + i, *sample);
+                            },
+                        );
+                    }
+                );
                 if_!(!is_large_step, {
                     state.set_n_mutations(state.n_mutations().load() + 1);
-                    if adaptive {
-                        let r =
-                            state.n_accepted().load().float() / state.n_mutations().load().float();
-                        const OPTIMAL_ACCEPT_RATE: f32 = 0.234;
-                        if_!(state.n_mutations().load().cmpgt(50), {
-                            let new_sigma = state.sigma().load()
-                                + (r - OPTIMAL_ACCEPT_RATE) / state.n_mutations().load().float();
-                            let new_sigma = new_sigma.clamp(1e-5, 0.1);
-                            if_!(state.chain_id().load().cmpeq(0), {
-                                cpu_dbg!(make_float3(r, state.sigma().load(), new_sigma));
-                            });
-                            state.sigma().store(new_sigma);
-                        });
-                    }
                 });
             }
             _ => todo!(),
@@ -341,39 +386,19 @@ impl Mcmc {
             state: var!(Pcg32, render_state.rng_states.var().read(i)),
         };
         let state = var!(MarkovState, markov_states.read(i));
-        let sample = {
-            let dim = self.sample_dimension();
-            let sample = VLArrayVar::<f32>::zero(dim);
-            lc_assert!(i.cmpeq(state.chain_id().load()));
-            for_range(const_(0)..const_(dim as i32), |j| {
-                let j = j.uint();
-                sample.write(j, render_state.samples.var().read(i * dim as u32 + j));
-            });
-            PrimarySample { values: sample }
-        };
         let cur_color_v = ColorVar::new(render_state.cur_colors.read(i));
         for_range(const_(0)..mutations_per_chain.int(), |_| {
             self.mutate_chain(
                 scene,
                 eval,
+                render_state,
                 film,
                 contribution,
                 state,
                 cur_color_v,
-                sample,
                 &sampler,
             );
         });
-        {
-            let dim = self.sample_dimension();
-            for_range(const_(0)..const_(dim as i32), |j| {
-                let j = j.uint();
-                render_state
-                    .samples
-                    .var()
-                    .write(i * dim as u32 + j, sample.values.read(j));
-            });
-        }
         render_state.cur_colors.write(i, cur_color_v.load());
         render_state.rng_states.var().write(i, sampler.state.load());
         markov_states.write(i, state.load());
@@ -393,7 +418,12 @@ impl Mcmc {
         let kernel = self.device.create_kernel::<(u32, f32)>(
             &|mutations_per_chain: Expr<u32>, contribution: Expr<f32>| {
                 if is_cpu_backend() {
-                    set_block_size([1, 1, 1]);
+                    let num_threads = std::thread::available_parallelism().unwrap().get();
+                    if self.n_chains <= num_threads * 20 {
+                        set_block_size([1, 1, 1]);
+                    } else {
+                        set_block_size([256, 1, 1]);
+                    }
                 } else {
                     set_block_size([256, 1, 1]);
                 }
@@ -478,7 +508,7 @@ impl Mcmc {
         reconstruct(film, self.pt.spp);
     }
 }
-impl Integrator for Mcmc {
+impl Integrator for McmcOpt {
     fn render(&self, scene: Arc<Scene>, film: &mut Film, options: &RenderOptions) {
         let resolution = scene.camera.resolution();
         log::info!(
@@ -521,6 +551,6 @@ pub fn render(
     config: &Config,
     options: &RenderOptions,
 ) {
-    let mcmc = Mcmc::new(device.clone(), config.clone());
+    let mcmc = McmcOpt::new(device.clone(), config.clone());
     mcmc.render(scene, film, options);
 }
