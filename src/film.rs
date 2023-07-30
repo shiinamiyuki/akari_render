@@ -40,7 +40,7 @@ impl Film {
         let splat =
             device.create_buffer::<f32>(resolution.x as usize * resolution.y as usize * nvalues);
         let weights = device.create_buffer::<f32>(resolution.x as usize * resolution.y as usize);
-        Self {
+        let film = Self {
             device,
             splat,
             pixels,
@@ -48,7 +48,9 @@ impl Film {
             repr: color,
             resolution,
             splat_scale: 1.0,
-        }
+        };
+        film.clear();
+        film
     }
     pub fn set_splat_scale(&mut self, scale: f32) {
         self.splat_scale = scale;

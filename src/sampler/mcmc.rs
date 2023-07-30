@@ -184,6 +184,24 @@ pub struct IsotropicGaussianMutation {
     pub image_mutation: Expr<bool>,
 }
 
+pub fn mutate_image_space_single(
+    cur: Expr<f32>,
+    sampler: &IndependentSampler,
+    mutation_size: Expr<f32>,
+    res: Expr<Float2>,
+    dim: Expr<u32>,
+) -> Expr<f32> {
+    let u = sampler.next_1d();
+    let (u, add) = if_!(u.cmplt(0.5), {
+        (u * 2.0, const_(true))
+    }, else {
+        ((u - 0.5) * 2.0, const_(false))
+    });
+    let offset = u * mutation_size;
+    let offset = select(add, offset, -offset);
+    let new = cur + offset / select(dim.cmpeq(0), res.x(), res.y());
+    new - new.floor()
+}
 // mutates the image space coordinate within range [0, mutation_size]
 fn mutate_image_space(
     s: &PrimarySample,
@@ -194,16 +212,10 @@ fn mutate_image_space(
 ) {
     for i in 0..2 {
         let cur = s.values.read(i);
-        let u = sampler.next_1d();
-        let (u, add) = if_!(u.cmplt(0.5), {
-            (u * 2.0, const_(true))
-        }, else {
-            ((u - 0.5) * 2.0, const_(false))
-        });
-        let offset = u * mutation_size;
-        let offset = select(add, offset, -offset);
-        let new = cur + offset / res.at(i as usize);
-        values.write(i, new - new.floor());
+        values.write(
+            i,
+            mutate_image_space_single(cur, sampler, mutation_size, res, const_(i as u32)),
+        );
     }
 }
 impl Mutation for IsotropicGaussianMutation {

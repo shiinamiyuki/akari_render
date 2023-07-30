@@ -27,7 +27,7 @@ pub struct PathTracer {
     config: Config,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct Config {
     pub spp: u32,

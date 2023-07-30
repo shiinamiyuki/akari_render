@@ -29,6 +29,7 @@ fn test_bsdf_pdf(device: Device, sample_fn: impl Fn(Expr<Float3>) -> Expr<PdfSam
     let n_iters: i32 = 4096 * 4;
 
     let final_bins = device.create_buffer::<f32>(100);
+    final_bins.fill(0.0);
     let kernel = device.create_kernel::<()>(&|| {
         let i = dispatch_id().x();
         let bins = var!([f32; 100]);

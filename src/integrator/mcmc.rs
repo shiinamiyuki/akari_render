@@ -61,13 +61,14 @@ pub struct Config {
     pub spp: u32,
     pub max_depth: u32,
     pub rr_depth: u32,
-    pub mcmc_depth: u32,
+    pub mcmc_depth: Option<u32>,
     pub spp_per_pass: u32,
     pub use_nee: bool,
     pub method: Method,
     pub n_chains: usize,
     pub n_bootstrap: usize,
     pub direct_spp: i32,
+    pub lazy: bool,
 }
 impl Default for Config {
     fn default() -> Self {
@@ -77,12 +78,13 @@ impl Default for Config {
             spp_per_pass: default_pt.spp_per_pass,
             use_nee: default_pt.use_nee,
             max_depth: default_pt.max_depth,
-            mcmc_depth: default_pt.max_depth,
+            mcmc_depth: None,
             rr_depth: default_pt.rr_depth,
             method: Method::default(),
             n_chains: 512,
             n_bootstrap: 100000,
             direct_spp: 64,
+            lazy: false,
         }
     }
 }
@@ -125,7 +127,7 @@ impl Mcmc {
             method: config.method,
             n_chains: config.n_chains,
             n_bootstrap: config.n_bootstrap,
-            mcmc_depth: config.mcmc_depth,
+            mcmc_depth: config.mcmc_depth.unwrap_or(pt_config.max_depth),
             config,
         }
     }
@@ -214,8 +216,10 @@ impl Mcmc {
                         .var()
                         .write(i * dim as u32 + j, sample.read(j));
                 });
+
                 let sample = PrimarySample { values: sample };
                 let (p, l, f) = self.evaluate(scene, eval, &sampler, sample);
+                // cpu_dbg!(make_float2(f, fs.var().read(seed_idx)));
                 let sigma = match &self.method {
                     Method::Kelemen { small_sigma, .. } => *small_sigma,
                     _ => todo!(),
@@ -264,10 +268,10 @@ impl Mcmc {
                 }, else {
                     let image_mutation = rng.next_1d().cmplt(image_mutation_prob);
                     if exponential_mutation {
-                        let small = IsotropicGaussianMutation { image_mutation, sigma: state.sigma().load(),compute_log_pdf:false, image_mutation_size, res};
+                        let small = IsotropicExponentialMutation::new_default(false, image_mutation, image_mutation_size, res);
                         small.mutate(&sample, &rng)
                     } else {
-                        let small = IsotropicExponentialMutation::new_default(false, image_mutation, image_mutation_size, res);
+                        let small = IsotropicGaussianMutation { image_mutation, sigma: state.sigma().load(),compute_log_pdf:false, image_mutation_size, res};
                         small.mutate(&sample, &rng)
                     }
                 });
@@ -393,7 +397,12 @@ impl Mcmc {
         let kernel = self.device.create_kernel::<(u32, f32)>(
             &|mutations_per_chain: Expr<u32>, contribution: Expr<f32>| {
                 if is_cpu_backend() {
-                    set_block_size([1, 1, 1]);
+                    let num_threads = std::thread::available_parallelism().unwrap().get();
+                    if self.n_chains <= num_threads * 20 {
+                        set_block_size([1, 1, 1]);
+                    } else {
+                        set_block_size([256, 1, 1]);
+                    }
                 } else {
                     set_block_size([256, 1, 1]);
                 }
