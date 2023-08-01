@@ -45,6 +45,8 @@ pub mod pt;
 pub enum Method {
     #[serde(rename = "pt")]
     PathTracer(pt::Config),
+    #[serde(rename = "gpt")]
+    GradientPathTracer(gpt::Config),
     #[serde(rename = "mcmc")]
     Mcmc(mcmc::Config),
     #[serde(rename = "mcmc_opt")]
@@ -85,6 +87,9 @@ pub fn render(device: Device, scene: Arc<Scene>, task: &RenderTask, options: Ren
         match &config.method {
             Method::PathTracer(config) => {
                 pt::render(device.clone(), scene.clone(), &mut film, &config, &options)
+            }
+            Method::GradientPathTracer(config) => {
+                gpt::render(device.clone(), scene.clone(), &mut film, &config, &options)
             }
             Method::Mcmc(config) => {
                 mcmc::render(device.clone(), scene.clone(), &mut film, &config, &options)

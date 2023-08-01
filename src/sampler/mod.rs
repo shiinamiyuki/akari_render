@@ -1,5 +1,5 @@
 use lazy_static::lazy_static;
-use rand::{thread_rng, Rng};
+use rand::{rngs::StdRng, thread_rng, Rng, SeedableRng};
 
 use crate::*;
 pub mod mcmc;
@@ -24,6 +24,19 @@ pub trait Sampler {
         let u4 = self.next_1d();
         make_float4(u0, u1, u3, u4)
     }
+    fn is_metropolis(&self) -> bool {
+        false
+    }
+    fn uniform(&self) -> Expr<f32> {
+        self.next_1d()
+    }
+    fn uniform2(&self) -> Expr<Float2> {
+        make_float2(self.next_1d(), self.next_1d())
+    }
+    fn uniform3(&self) -> Expr<Float3> {
+        make_float3(self.next_1d(), self.next_1d(), self.next_1d())
+    }
+
     fn start(&self);
 }
 
@@ -126,6 +139,20 @@ impl Pcg32Var {
 pub fn init_pcg32_buffer(device: Device, count: usize) -> Buffer<Pcg32> {
     let buffer = device.create_buffer(count);
     let mut rng = thread_rng();
+    let seeds = device.create_buffer_from_fn(count, |_| rng.gen::<u64>());
+    device
+        .create_kernel::<()>(&|| {
+            let i = dispatch_id().x();
+            let seed = seeds.var().read(i);
+            let pcg = Pcg32Var::new_seq_offset(i.ulong(), seed);
+            buffer.var().write(i, pcg.load());
+        })
+        .dispatch([count.try_into().unwrap(), 1, 1]);
+    buffer
+}
+pub fn init_pcg32_buffer_with_seed(device: Device, count: usize, seed: u64) -> Buffer<Pcg32> {
+    let buffer = device.create_buffer(count);
+    let mut rng = StdRng::seed_from_u64(seed);
     let seeds = device.create_buffer_from_fn(count, |_| rng.gen::<u64>());
     device
         .create_kernel::<()>(&|| {

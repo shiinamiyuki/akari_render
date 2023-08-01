@@ -24,6 +24,8 @@ pub struct PathTracer {
     pub use_nee: bool,
     pub rr_depth: u32,
     pub indirect_only: bool,
+    pub pixel_offset: Int2,
+    pub seed: u64,
     config: Config,
 }
 
@@ -36,6 +38,8 @@ pub struct Config {
     pub use_nee: bool,
     pub rr_depth: u32,
     pub indirect_only: bool,
+    pub pixel_offset: [i32; 2],
+    pub seed: u64,
 }
 impl Default for Config {
     fn default() -> Self {
@@ -46,6 +50,8 @@ impl Default for Config {
             spp_per_pass: 64,
             use_nee: true,
             indirect_only: false,
+            pixel_offset: [0, 0],
+            seed: 0,
         }
     }
 }
@@ -59,6 +65,8 @@ impl PathTracer {
             use_nee: config.use_nee,
             rr_depth: config.rr_depth,
             indirect_only: config.indirect_only,
+            pixel_offset: Int2::new(config.pixel_offset[0], config.pixel_offset[1]),
+            seed: config.seed,
             config,
         }
     }
@@ -269,7 +277,12 @@ impl PathTracer {
                 let (direct, direct_wi, direct_light_pdf) = if self.use_nee {
                     let (direct, direct_wi, direct_light_pdf) = if_!(!self.indirect_only | depth.load().cmpgt(1), {
                         let pn = PointNormalExpr::new(p, ng);
-                        let sample = eval.light.sample(pn,sampler.next_3d());
+                        let u = if sampler.is_metropolis() {
+                            sampler.uniform3()
+                        } else {
+                            sampler.next_3d()
+                        };
+                        let sample = eval.light.sample(pn, u);
                         let wi = sample.wi;
                         let (bsdf_f, bsdf_pdf) = eval.bsdf.evaluate_color_and_pdf(surface, si, wo, wi);
                         lc_assert!(bsdf_pdf.cmpge(0.0));
@@ -493,7 +506,8 @@ impl PathTracer {
                 }
                 if_!(depth.load().cmpgt(self.rr_depth), {
                     let cont_prob = beta.load().max().clamp(0.0, 1.0) * 0.95;
-                    if_!(sampler.next_1d().cmpgt(cont_prob), {
+                    let u = sampler.next_1d();
+                    if_!(u.cmpgt(cont_prob), {
                         break_();
                     }, else {
                         acc_beta(Color::one(eval.color_repr) / cont_prob);
@@ -557,12 +571,11 @@ impl Integrator for PathTracer {
         let npixels = resolution.x as usize * resolution.y as usize;
         assert_eq!(resolution.x, film.resolution().x);
         assert_eq!(resolution.y, film.resolution().y);
-        let rngs = init_pcg32_buffer(self.device.clone(), npixels);
+        let rngs = init_pcg32_buffer_with_seed(self.device.clone(), npixels, self.seed);
         let color_repr = ColorRepr::Rgb;
         let evaluators = scene.evaluators(color_repr);
-        let kernel = self
-            .device
-            .create_kernel::<(u32,)>(&|spp_per_pass: Expr<u32>| {
+        let kernel = self.device.create_kernel::<(u32, Int2)>(
+            &|spp_per_pass: Expr<u32>, pixel_offset: Expr<Int2>| {
                 if !is_cpu_backend() {
                     set_block_size([8, 8, 1]);
                 }
@@ -573,13 +586,17 @@ impl Integrator for PathTracer {
                     state: var!(Pcg32, rngs.read(i)),
                 };
                 for_range(const_(0)..spp_per_pass.int(), |_| {
+                    let ip = p.int();
+                    let shifted = ip + pixel_offset;
+                    let shifted = shifted.clamp(0, const_(resolution).int() - 1).uint();
                     let (ray, ray_color, ray_w) =
-                        scene.camera.generate_ray(p, &sampler, color_repr);
+                        scene.camera.generate_ray(shifted, &sampler, color_repr);
                     let l = self.radiance(&scene, ray, &sampler, &evaluators) * ray_color;
                     film.add_sample(p.float(), &l, ray_w);
                 });
                 rngs.write(i, sampler.state.load());
-            });
+            },
+        );
         let stream = self.device.default_stream();
         let mut cnt = 0;
         let progress = util::create_progess_bar(self.spp as usize, "spp");
@@ -589,7 +606,11 @@ impl Integrator for PathTracer {
                 let cur_pass = (self.spp - cnt).min(self.spp_per_pass);
                 let mut cmds = vec![];
                 let tic = Instant::now();
-                cmds.push(kernel.dispatch_async([resolution.x, resolution.y, 1], &cur_pass));
+                cmds.push(kernel.dispatch_async(
+                    [resolution.x, resolution.y, 1],
+                    &cur_pass,
+                    &self.pixel_offset,
+                ));
                 s.submit(cmds);
                 s.synchronize();
                 let toc = Instant::now();

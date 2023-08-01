@@ -68,7 +68,6 @@ pub struct Config {
     pub n_chains: usize,
     pub n_bootstrap: usize,
     pub direct_spp: i32,
-    pub lazy: bool,
 }
 impl Default for Config {
     fn default() -> Self {
@@ -84,7 +83,6 @@ impl Default for Config {
             n_chains: 512,
             n_bootstrap: 100000,
             direct_spp: 64,
-            lazy: false,
         }
     }
 }
@@ -120,6 +118,7 @@ impl Mcmc {
             use_nee: config.use_nee,
             rr_depth: config.rr_depth,
             indirect_only: config.direct_spp >= 0,
+            ..Default::default()
         };
         Self {
             device: device.clone(),
@@ -514,6 +513,7 @@ impl Integrator for Mcmc {
                     indirect_only: false,
                     spp_per_pass: self.pt.spp_per_pass,
                     use_nee: self.pt.use_nee,
+                    ..Default::default()
                 },
             );
             direct.render(scene.clone(), film, &Default::default());

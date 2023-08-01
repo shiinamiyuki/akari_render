@@ -54,8 +54,7 @@ fn test_bsdf_pdf(device: Device, sample_fn: impl Fn(Expr<Float3>) -> Expr<PdfSam
                 bins.write(i, bins.read(i) + 1.0 / sample.pdf());
             });
         });
-        for_range(const_(0)..const_(100), |i| {
-            let i = i.uint();
+        for_range(0..100u32, |i| {
             final_bins.var().atomic_fetch_add(i, bins.read(i));
         });
     });
