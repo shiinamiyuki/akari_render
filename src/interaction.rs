@@ -24,11 +24,10 @@ pub struct SurfaceLocalGeometry {
 #[derive(Clone, Copy, Debug, Value)]
 #[repr(C)]
 pub struct SurfaceInteraction {
-    pub geometry: SurfaceLocalGeometry,
-    pub bary: Float2,
-    pub prim_id: u32,
     pub inst_id: u32,
+    pub prim_id: u32,
+    pub bary: Float2,
+    pub geometry: SurfaceLocalGeometry,
     pub frame: Frame,
-    pub triangle: ShadingTriangle,
     pub valid: bool,
 }

@@ -62,12 +62,11 @@ impl Light for AreaLightExpr {
         );
 
         let si = SurfaceInteractionExpr::new(
-            geometry,
-            bary,
-            prim_id,
             self.instance_id(),
+            prim_id,
+            bary,
+            geometry,
             FrameExpr::from_n(n),
-            shading_triangle,
             Bool::from(true),
         );
         let emission = ctx.texture.evaluate_color(self.emission(), si);
@@ -107,7 +106,8 @@ impl Light for AreaLightExpr {
         let at_entries = area_samplers.buffer::<AliasTableEntry>(self.area_sampling_index());
         let at_pdf = area_samplers.buffer::<f32>(self.area_sampling_index() + 1);
         let at = BindlessAliasTableVar(at_entries, at_pdf);
-        let shading_triangle = si.triangle();
+        lc_assert!(si.inst_id().cmpeq(self.instance_id()));
+        let shading_triangle = meshes.shading_triangle(si.inst_id(), si.prim_id());
         let area = shading_triangle.area();
         let prim_pdf = at.pdf(prim_id);
         let bary = si.bary();

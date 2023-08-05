@@ -93,15 +93,15 @@ impl VertexType {
 #[derive(Clone, Copy, Debug, Value)]
 #[repr(C)]
 pub struct ReconnectionVertex {
-    pub direct: Float3,
-    pub direct_wi: Float3,
+    pub bary: Float2,
+    pub direct: PackedFloat3,
+    pub direct_wi: PackedFloat3,
+    pub indirect: PackedFloat3,
+    pub wo: PackedFloat3,
+    pub wi: PackedFloat3,
     pub direct_light_pdf: f32,
-    pub indirect: Float3,
-    pub surface: TagIndex,
-    pub si: SurfaceInteraction,
-    pub wo: Float3,
-    pub wi: Float3,
-    pub u_bsdf: Float3,
+    pub inst_id: u32,
+    pub prim_id: u32,
     pub prev_bsdf_pdf: f32,
     pub bsdf_pdf: f32,
     pub dist: f32,
@@ -195,332 +195,397 @@ impl PathTracer {
             // }
             let si = scene.intersect(ray.load());
             let wo = -ray.d().load();
-            if_!(si.valid(), {
-
-                let inst_id = si.inst_id();
-                let instance = scene.meshes.mesh_instances.var().read(inst_id);
-                if let Some(shift_mapping) = &shift_mapping {
-                    let reconnection_vertex = reconnection_vertex.unwrap();
-                    if_!(reconnection_vertex.valid() & shift_mapping.is_base_path, {
-                        reconnection_vertex.set_type_(VertexType::INTERIOR);
-                    });
-                }
-               if_!(instance.light().valid() & (!self.indirect_only | depth.load().cmpgt(1)), {
-                    let direct = eval.light.le(ray.load(), si);
-                    if_!(depth.load().cmpeq(0) | !self.use_nee, {
-                        acc_radiance(direct);
-                    }, else {
-                        let pn = {
-                            let p = ray.o();
-                            let n = prev_n.load();
-                            PointNormalExpr::new(p, n)
-                        };
-                        let light_pdf = eval.light.pdf(si, pn);
-                        let w = mis_weight(prev_bsdf_pdf.load(), light_pdf, 1);
-                        acc_radiance(direct * w);
-                    })
-                });
-                let p = si.geometry().p();
-                let ng = si.geometry().ng();
-                let surface = instance.surface();
-                if let Some(features) = features {
-                    if_!(depth.load().cmpeq(0), {
-                        features.set_normal(si.geometry().ns());
-                        features.set_albedo(eval.bsdf.albedo(surface, si, wo).as_rgb());
-                    });
-                }
-                depth.store(depth.load() + 1);
-                if let Some(shift_mapping) = &shift_mapping {
-                    let reconnection_vertex = reconnection_vertex.unwrap();
-                    let is_last_vertex = depth.load().cmpeq(self.max_depth);
-                    let dist = (prev_p.load() - p).length();
-                    let can_connect = dist.cmpgt(shift_mapping.min_dist) & prev_roughness.load().cmpgt(shift_mapping.min_roughness);
-                    if_!(depth.load().cmpgt(MIN_RECONNECT_DEPTH + 1) & can_connect & is_last_vertex, {
-                        found_reconnectible_vertex.store(found_reconnectible_vertex.load() | can_connect);
-                        if_!(!reconnection_vertex.valid() & shift_mapping.is_base_path, {
-                            reconnection_vertex.store(ReconnectionVertexExpr::new(
-                                Float3Expr::zero(), // should re-evaluate light::le
-                                Float3Expr::zero(),
-                                0.0,
-                                Float3Expr::zero(),
-                                surface,
-                                si,
-                                wo,
-                                Float3Expr::zero(),
-                                Float3Expr::zero(),
-                                prev_bsdf_pdf.load(),
-                                const_(0.0f32),
-                                dist,
-                                depth.load() - 1,
-                                VertexType::LAST_HIT_LIGHT
-                            ));
-                        }, else {
-                            if_!(!reconnection_vertex.valid() & !shift_mapping.is_base_path, {
-                                // the base path does not have a valid reconnection vertex
-                                // if a connectable vertex is found for shift path, it must be rejected
-                                if_!(can_connect, {
-                                    debug_sm_failed_line.store(line!());
-                                    break_();
-                                });
-                            });
-                        });
-                    });
-                }
-
-                if_!(depth.load().cmpge(self.max_depth), {
-                    break_();
-                });
-                let u_bsdf = sampler.next_3d();
-                let sample = eval.bsdf.sample(surface, si, wo, u_bsdf);
-
-                // Direct Lighting
-                let (direct, direct_wi, direct_light_pdf) = if self.use_nee {
-                    let (direct, direct_wi, direct_light_pdf) = if_!(!self.indirect_only | depth.load().cmpgt(1), {
-                        let pn = PointNormalExpr::new(p, ng);
-                        let u = if sampler.is_metropolis() {
-                            sampler.uniform3()
-                        } else {
-                            sampler.next_3d()
-                        };
-                        let sample = eval.light.sample(pn, u);
-                        let wi = sample.wi;
-                        let (bsdf_f, bsdf_pdf) = eval.bsdf.evaluate_color_and_pdf(surface, si, wo, wi);
-                        lc_assert!(bsdf_pdf.cmpge(0.0));
-                        lc_assert!(bsdf_f.min().cmpge(0.0));
-                        let w = mis_weight(sample.pdf, bsdf_pdf, 1);
-                        let shadow_ray = sample.shadow_ray.set_exclude0(make_uint2(si.inst_id(), si.prim_id()));
-                        let occluded = scene.occlude(shadow_ray);
-                        // cpu_dbg!(sample.pdf);
-                        let direct = sample.li / sample.pdf;
-                        if_!(!occluded & sample.pdf.cmpgt(0.0), {
-                            acc_radiance(bsdf_f * direct * w);
-                            (direct, wi, sample.pdf)
-                        }, else {
-                            (Color::zero(eval.color_repr), wi, const_(0.0f32))
-                        })
-                    }, else {
-                        (Color::zero(eval.color_repr), Float3Expr::zero(), const_(0.0f32))
-                    });
-                    (Some(direct), direct_wi, direct_light_pdf)
-                } else {
-                    (None, Float3Expr::zero(), const_(0.0f32))
-                };
-                if let Some(shift_mapping) = &shift_mapping {
-                    if_!(!shift_mapping.is_base_path
-                         & shift_mapping.vertex.valid(), {
-                        if_!(depth.load().cmpgt(MIN_RECONNECT_DEPTH), {
-                            let dist = (prev_p.load() - p).length();
-                            let can_connect = dist.cmpgt(shift_mapping.min_dist)
-                                            & sample.lobe_roughness.cmpgt(shift_mapping.min_roughness)
-                                            & prev_roughness.load().cmpgt(shift_mapping.min_roughness);
-                            // cpu_dbg!(can_connect);
-                            if_!(can_connect, {
-                                debug_sm_failed_line.store(line!());
-                                break_();
-                            })
-                        });
-                        if_!(shift_mapping.vertex.depth().load().cmpeq(depth.load()), {
-                            let reconnection_vertex = shift_mapping.vertex.load();
-                            let vertex_type = reconnection_vertex.type_();
-                            let dist = (p - reconnection_vertex.si().geometry().p()).length();
-                            let wi = (reconnection_vertex.si().geometry().p() - p).normalize();
-                            // cpu_dbg!(dist);
-                            let can_connect = dist.cmpgt(shift_mapping.min_dist) & sample.lobe_roughness.cmpgt(shift_mapping.min_roughness);
-                            // cpu_dbg!(can_connect);
-                            if_!(!can_connect, {
-                                debug_sm_failed_line.store(line!());
-                                break_();
-                            });
-
-                            let vis_ray = RayExpr::new(
-                                offset_ray_origin(p, face_forward(ng, wi)),
-                                wi,
-                                0.0,
-                                dist * (1.0 - 1e-3),
-                                make_uint2(si.inst_id(), si.prim_id()),
-                                make_uint2(reconnection_vertex.si().inst_id(), reconnection_vertex.si().prim_id()));
-                            let occluded = scene.occlude(vis_ray);
-                            // cpu_dbg!(occluded);
-                            if_!(occluded, {
-                                debug_sm_failed_line.store(line!());
-                                break_();
-                            });
-                            // let cos_theta_y1 = ng.dot(wi).abs(); // should be included in bsdf
-                            let cos_theta_y2 = reconnection_vertex.si().geometry().ng().dot(wi).abs();
-                            let cos_theta_x2 = reconnection_vertex.si().geometry().ng().dot(reconnection_vertex.wo()).abs();
-                            if_!(cos_theta_y2.cmpeq(0.0), {
-                                debug_sm_failed_line.store(line!());
-                                break_();
-                            });
-                            lc_assert!(cos_theta_x2.cmpgt(0.0));
-                            // let geometry_term = cos_theta_y2 / dist.sqr();
-
-                            /*
-                            *
-                            * x_i                 x_{i+1}                               x_{i+2}
-                            *    vertex.prev_pdf          pdf(x_i -> x_{i+1}, x_{i+1} -> x_{i+2}) = pdf_x2
-                            * y_i                 y_{i+1}                               y_{i+2} =x_{i+2}
-                            *    pdf_y1                 pdf(x_i -> x_{i+1}, x_{i+1} -> x_{i+2}) = pdf_y2
-                            */
-                            let (f1, pdf_y1) = eval.bsdf.evaluate_color_and_pdf(surface, si, wo, wi);
-                            // cpu_dbg!(pdf_y1);
-                            if_!(pdf_y1.cmple(0.0), {
-                                debug_sm_failed_line.store(line!());
-                                break_();
-                            });
-                            let (f2, pdf_y2) = if_!(vertex_type.cmpeq(VertexType::LAST_HIT_LIGHT), {
-                                (Color::zero(eval.color_repr), const_(1.0f32))
-                            }, else {
-                                eval.bsdf.evaluate_color_and_pdf(reconnection_vertex.surface(), reconnection_vertex.si(), -wi, reconnection_vertex.wi())
-                            });
-                            // cpu_dbg!(f2.as_rgb());
-                            // cpu_dbg!(reconnection_vertex.wo());
-                            // cpu_dbg!(-wi);
-                            // scene.surfaces.get(reconnection_vertex.surface()).dispatch(|_, k, _|{
-                            //     match k {
-                            //         PolyKey::Simple(s)=>{
-                            //             if s == "diffuse" {
-                            //                 cpu_dbg!(const_(1u32));
-                            //             }else {
-                            //                 cpu_dbg!(const_(2u32));
-                            //             }
-                            //         }
-                            //         _=>unreachable!()
-                            //     }
-                            // });
-                            // cpu_dbg!(make_float2(
-                            //     reconnection_vertex.si().frame().to_local(-wi).y(),
-                            //     reconnection_vertex.si().frame().to_local(reconnection_vertex.wi()).y()
-                            // ));
-                            // cpu_dbg!(make_float2(
-                            //     reconnection_vertex.si().frame().to_local(reconnection_vertex.wo()).y(),
-                            //     reconnection_vertex.si().frame().to_local(reconnection_vertex.wi()).y()
-                            // ));
-                            // cpu_dbg!(eval.bsdf.evaluate(reconnection_vertex.surface(), reconnection_vertex.si(), -wi, reconnection_vertex.wi()).as_rgb());
-                            if_!(pdf_y2.cmple(0.0), {
-                                debug_sm_failed_line.store(line!());
-                                break_();
-                            });
-                            let throughput = {
-                                let le = eval.light.le(vis_ray, reconnection_vertex.si());
-                                let light_pdf = eval.light.pdf(reconnection_vertex.si(), PointNormalExpr::new(p, ng));
-                                let w = if self.use_nee {
-                                    mis_weight(pdf_y1, light_pdf, 1)
-                                } else {
-                                    const_(1.0f32)
-                                };
-                                let vertex_le = le * w;
-                                // cpu_dbg!(reconnection_vertex.direct_wi());
-                                let direct_f = if_!(reconnection_vertex.direct_wi().cmpne(0.0).any(), {
-                                    let direct_wi = reconnection_vertex.direct_wi();
-                                    let (f, bsdf_pdf) = eval.bsdf.evaluate_color_and_pdf(reconnection_vertex.surface(), reconnection_vertex.si(), -wi, direct_wi);
-                                    let w = mis_weight(reconnection_vertex.direct_light_pdf(), bsdf_pdf, 1);
-                                    f * w
-                                }, else {
-                                    Color::zero(eval.color_repr)
-                                });
-                                // cpu_dbg!(direct_f.as_rgb());
-                                // cpu_dbg!(reconnection_vertex.indirect());
-                                // cpu_dbg!(reconnection_vertex.direct());
-                                f1 / pdf_y1 * (vertex_le + direct_f * Color::Rgb(reconnection_vertex.direct())
-                                                + f2 * Color::Rgb(reconnection_vertex.indirect()) / pdf_y2) // is this correct???
-                            };
-                            let pdf_x = if_!(vertex_type.cmpeq(VertexType::LAST_HIT_LIGHT), {
-                                reconnection_vertex.prev_bsdf_pdf()
-                            }, else {
-                                reconnection_vertex.prev_bsdf_pdf() * reconnection_vertex.bsdf_pdf()
-                            });
-                            let pdf_y = pdf_y1 * pdf_y2;
-                            // cpu_dbg!(pdf_y1);
-
-                            // cpu_dbg!(throughput.as_rgb());
-                            acc_radiance(throughput);
-
-                            let jacobian = pdf_y / pdf_x * (cos_theta_y2 / cos_theta_x2).abs() * (reconnection_vertex.dist() / dist).sqr();
-                            // lc_assert!(pdf_y.cmpgt(0.0));
-                            lc_assert!(pdf_x.cmpgt(0.0));
-                            // cpu_dbg!(jacobian);
-                            let jacobian = select(jacobian.is_finite(), jacobian, const_(0.0f32));
-                            shift_mapping.success.store(jacobian.cmpgt(0.0));
-                            shift_mapping.jacobian.store(jacobian);
-                            // if_!(shift_mapping.success.load(), {
-                            //     cpu_dbg!(jacobian)
-                            // });
-                            break_();
-                        });
-                    });
-                }
+            if_!(
+                si.valid(),
                 {
-                    let f = &sample.color;
-                    lc_assert!(f.min().cmpge(0.0));
-                    if_!(sample.pdf.cmple(0.0) | !sample.valid,{
-                        break_();
-                    });
-                    acc_beta(f / sample.pdf);
-                }
-                if_!(depth.load().cmpgt(MIN_RECONNECT_DEPTH), {
+                    let inst_id = si.inst_id();
+                    let instance = scene.meshes.mesh_instances.var().read(inst_id);
                     if let Some(shift_mapping) = &shift_mapping {
                         let reconnection_vertex = reconnection_vertex.unwrap();
-                        let dist = (prev_p.load() - p).length();
-                        let can_connect = dist.cmpgt(shift_mapping.min_dist)
-                                        & sample.lobe_roughness.cmpgt(shift_mapping.min_roughness)
-                                        & prev_roughness.load().cmpgt(shift_mapping.min_roughness);
-                        found_reconnectible_vertex.store(found_reconnectible_vertex.load() | can_connect);
-
-                        if_!(!reconnection_vertex.valid() & shift_mapping.is_base_path & can_connect, {
-                            reconnection_vertex.store(ReconnectionVertexExpr::new(
-                                direct.unwrap_or(Color::zero(eval.color_repr)).as_rgb(),
-                                direct_wi,
-                                direct_light_pdf,
-                                Float3Expr::zero(),
-                                surface,
-                                si,
-                                wo,
-                                sample.wi,
-                                u_bsdf,
-                                prev_bsdf_pdf.load(),
-                                sample.pdf,
-                                dist,
-                                depth.load() - 1,
-                                VertexType::LAST_NEE
-                            ));
-                            reconnect_beta.store(Color::one(eval.color_repr));
-                            reconnect_l.store(Color::zero(eval.color_repr));
-                        });
-                        if_!(!reconnection_vertex.valid() & !shift_mapping.is_base_path & can_connect, {
-                            // the base path does not have a valid reconnection vertex
-                            // if a connectable vertex is found for shift path, it must be rejected
-                            break_();
+                        if_!(reconnection_vertex.valid() & shift_mapping.is_base_path, {
+                            reconnection_vertex.set_type_(VertexType::INTERIOR);
                         });
                     }
-                });
+                    if_!(
+                        instance.light().valid() & (!self.indirect_only | depth.load().cmpgt(1)),
+                        {
+                            let direct = eval.light.le(ray.load(), si);
+                            if_!(depth.load().cmpeq(0) | !self.use_nee, {
+                                acc_radiance(direct);
+                            }, else {
+                                let pn = {
+                                    let p = ray.o();
+                                    let n = prev_n.load();
+                                    PointNormalExpr::new(p, n)
+                                };
+                                let light_pdf = eval.light.pdf(si, pn);
+                                let w = mis_weight(prev_bsdf_pdf.load(), light_pdf, 1);
+                                acc_radiance(direct * w);
+                            })
+                        }
+                    );
+                    let p = si.geometry().p();
+                    let ng = si.geometry().ng();
+                    let surface = instance.surface();
+                    if let Some(features) = features {
+                        if_!(depth.load().cmpeq(0), {
+                            features.set_normal(si.geometry().ns());
+                            features.set_albedo(eval.bsdf.albedo(surface, si, wo).as_rgb());
+                        });
+                    }
+                    depth.store(depth.load() + 1);
+                    if let Some(shift_mapping) = &shift_mapping {
+                        let reconnection_vertex = reconnection_vertex.unwrap();
+                        let is_last_vertex = depth.load().cmpeq(self.max_depth);
+                        let dist = (prev_p.load() - p).length();
+                        let can_connect = dist.cmpgt(shift_mapping.min_dist)
+                            & prev_roughness.load().cmpgt(shift_mapping.min_roughness);
+                        if_!(
+                            depth.load().cmpgt(MIN_RECONNECT_DEPTH + 1)
+                                & can_connect
+                                & is_last_vertex,
+                            {
+                                found_reconnectible_vertex
+                                    .store(found_reconnectible_vertex.load() | can_connect);
+                                if_!(
+                                    !reconnection_vertex.valid() & shift_mapping.is_base_path,
+                                    {
+                                        reconnection_vertex.store(struct_!(ReconnectionVertex {
+                                            direct: Float3Expr::zero().pack(), // should re-evaluate light::le
+                                            direct_wi: Float3Expr::zero().pack(),
+                                            direct_light_pdf: 0.0.into(),
+                                            indirect: Float3Expr::zero().pack(),
+                                            wo: wo.pack(),
+                                            wi: Float3Expr::zero().pack(),
+                                            inst_id: si.inst_id(),
+                                            prim_id: si.prim_id(),
+                                            bary: si.bary(),
+                                            prev_bsdf_pdf: prev_bsdf_pdf.load(),
+                                            bsdf_pdf: const_(0.0f32),
+                                            dist: dist,
+                                            depth: depth.load() - 1,
+                                            type_: VertexType::LAST_HIT_LIGHT.into()
+                                        }));
+                                    },
+                                    {
+                                        if_!(
+                                            !reconnection_vertex.valid()
+                                                & !shift_mapping.is_base_path,
+                                            {
+                                                // the base path does not have a valid reconnection vertex
+                                                // if a connectable vertex is found for shift path, it must be rejected
+                                                if_!(can_connect, {
+                                                    debug_sm_failed_line.store(line!());
+                                                    break_();
+                                                });
+                                            }
+                                        );
+                                    }
+                                );
+                            }
+                        );
+                    }
 
-
-                {
-                    prev_bsdf_pdf.store(sample.pdf);
-                    prev_n.store(ng);
-                    prev_p.store(p);
-                    prev_roughness.store(sample.lobe_roughness);
-                    let ro = offset_ray_origin(p, face_forward(ng, sample.wi));
-                    ray.store(RayExpr::new(ro, sample.wi, 0.0, 1e20, make_uint2(si.inst_id(), si.prim_id()), make_uint2(u32::MAX, u32::MAX)));
-                }
-                if_!(depth.load().cmpgt(self.rr_depth), {
-                    let cont_prob = beta.load().max().clamp(0.0, 1.0) * 0.95;
-                    let u = sampler.next_1d();
-                    if_!(u.cmpgt(cont_prob), {
+                    if_!(depth.load().cmpge(self.max_depth), {
                         break_();
-                    }, else {
-                        acc_beta(Color::one(eval.color_repr) / cont_prob);
                     });
-                });
-            }, else {
+                    let u_bsdf = sampler.next_3d();
+                    let sample = eval.bsdf.sample(surface, si, wo, u_bsdf);
 
-                if_!(!self.indirect_only | depth.load().cmpgt(1), {
-                    acc_radiance(scene.env_map(ray.d().load(), eval));
-                });
-                break_();
+                    // Direct Lighting
+                    let (direct, direct_wi, direct_light_pdf) = if self.use_nee {
+                        let (direct, direct_wi, direct_light_pdf) = if_!(!self.indirect_only | depth.load().cmpgt(1), {
+                            let pn = PointNormalExpr::new(p, ng);
+                            let sample = eval.light.sample(pn,sampler.next_3d());
+                            let wi = sample.wi;
+                            let (bsdf_f, bsdf_pdf) = eval.bsdf.evaluate_color_and_pdf(surface, si, wo, wi);
+                            lc_assert!(bsdf_pdf.cmpge(0.0));
+                            lc_assert!(bsdf_f.min().cmpge(0.0));
+                            let w = mis_weight(sample.pdf, bsdf_pdf, 1);
+                            let shadow_ray = sample.shadow_ray.set_exclude0(make_uint2(si.inst_id(), si.prim_id()));
+                            let occluded = scene.occlude(shadow_ray);
+                            // cpu_dbg!(sample.pdf);
+                            let direct = sample.li / sample.pdf;
+                            if_!(!occluded & sample.pdf.cmpgt(0.0), {
+                                acc_radiance(bsdf_f * direct * w);
+                                (direct, wi, sample.pdf)
+                            }, else {
+                                (Color::zero(eval.color_repr), wi, const_(0.0f32))
+                            })
+                        }, else {
+                            (Color::zero(eval.color_repr), Float3Expr::zero(), const_(0.0f32))
+                        });
+                        (Some(direct), direct_wi, direct_light_pdf)
+                    } else {
+                        (None, Float3Expr::zero(), const_(0.0f32))
+                    };
+                    if let Some(shift_mapping) = &shift_mapping {
+                        if_!(
+                            !shift_mapping.is_base_path & shift_mapping.vertex.valid(),
+                            {
+                                if_!(depth.load().cmpgt(MIN_RECONNECT_DEPTH), {
+                                    let dist = (prev_p.load() - p).length();
+                                    let can_connect = dist.cmpgt(shift_mapping.min_dist)
+                                        & sample.lobe_roughness.cmpgt(shift_mapping.min_roughness)
+                                        & prev_roughness.load().cmpgt(shift_mapping.min_roughness);
+                                    // cpu_dbg!(can_connect);
+                                    if_!(can_connect, {
+                                        debug_sm_failed_line.store(line!());
+                                        break_();
+                                    })
+                                });
+                                if_!(shift_mapping.vertex.depth().load().cmpeq(depth.load()), {
+                                    let reconnection_vertex = shift_mapping.vertex.load();
+                                    let vertex_type = reconnection_vertex.type_();
+                                    let reconnect_si = scene.si_from_hitinfo(
+                                        reconnection_vertex.inst_id(),
+                                        reconnection_vertex.prim_id(),
+                                        reconnection_vertex.bary(),
+                                    );
+                                    let reconnect_instance = scene
+                                        .meshes
+                                        .mesh_instances
+                                        .var()
+                                        .read(reconnection_vertex.inst_id());
+                                    let reconnect_surface = reconnect_instance.surface();
+                                    let dist = (p - reconnect_si.geometry().p()).length();
+                                    let wi = (reconnect_si.geometry().p() - p).normalize();
+                                    // cpu_dbg!(dist);
+                                    let can_connect = dist.cmpgt(shift_mapping.min_dist)
+                                        & sample.lobe_roughness.cmpgt(shift_mapping.min_roughness);
+                                    // cpu_dbg!(can_connect);
+                                    if_!(!can_connect, {
+                                        debug_sm_failed_line.store(line!());
+                                        break_();
+                                    });
 
-            });
+                                    let vis_ray = RayExpr::new(
+                                        offset_ray_origin(p, face_forward(ng, wi)),
+                                        wi,
+                                        0.0,
+                                        dist * (1.0 - 1e-3),
+                                        make_uint2(si.inst_id(), si.prim_id()),
+                                        make_uint2(reconnect_si.inst_id(), reconnect_si.prim_id()),
+                                    );
+                                    let occluded = scene.occlude(vis_ray);
+                                    // cpu_dbg!(occluded);
+                                    if_!(occluded, {
+                                        debug_sm_failed_line.store(line!());
+                                        break_();
+                                    });
+                                    // let cos_theta_y1 = ng.dot(wi).abs(); // should be included in bsdf
+                                    let cos_theta_y2 = reconnect_si.geometry().ng().dot(wi).abs();
+                                    let cos_theta_x2 = reconnect_si
+                                        .geometry()
+                                        .ng()
+                                        .dot(reconnection_vertex.wo().unpack())
+                                        .abs();
+                                    if_!(cos_theta_y2.cmpeq(0.0), {
+                                        debug_sm_failed_line.store(line!());
+                                        break_();
+                                    });
+                                    lc_assert!(cos_theta_x2.cmpgt(0.0));
+                                    // let geometry_term = cos_theta_y2 / dist.sqr();
+
+                                    /*
+                                     *
+                                     * x_i                 x_{i+1}                               x_{i+2}
+                                     *    vertex.prev_pdf          pdf(x_i -> x_{i+1}, x_{i+1} -> x_{i+2}) = pdf_x2
+                                     * y_i                 y_{i+1}                               y_{i+2} =x_{i+2}
+                                     *    pdf_y1                 pdf(x_i -> x_{i+1}, x_{i+1} -> x_{i+2}) = pdf_y2
+                                     */
+                                    let (f1, pdf_y1) =
+                                        eval.bsdf.evaluate_color_and_pdf(surface, si, wo, wi);
+                                    // cpu_dbg!(pdf_y1);
+                                    if_!(pdf_y1.cmple(0.0), {
+                                        debug_sm_failed_line.store(line!());
+                                        break_();
+                                    });
+                                    let (f2, pdf_y2) = if_!(vertex_type.cmpeq(VertexType::LAST_HIT_LIGHT), {
+                                        (Color::zero(eval.color_repr), const_(1.0f32))
+                                    }, else {
+                                        eval.bsdf.evaluate_color_and_pdf(reconnect_surface, reconnect_si, -wi, reconnection_vertex.wi().unpack())
+                                    });
+                                    // cpu_dbg!(f2.as_rgb());
+                                    // cpu_dbg!(reconnection_vertex.wo());
+                                    // cpu_dbg!(-wi);
+                                    // scene.surfaces.get(reconnect_surface).dispatch(|_, k, _|{
+                                    //     match k {
+                                    //         PolyKey::Simple(s)=>{
+                                    //             if s == "diffuse" {
+                                    //                 cpu_dbg!(const_(1u32));
+                                    //             }else {
+                                    //                 cpu_dbg!(const_(2u32));
+                                    //             }
+                                    //         }
+                                    //         _=>unreachable!()
+                                    //     }
+                                    // });
+                                    // cpu_dbg!(make_float2(
+                                    //     reconnect_si.frame().to_local(-wi).y(),
+                                    //     reconnect_si.frame().to_local(reconnection_vertex.wi()).y()
+                                    // ));
+                                    // cpu_dbg!(make_float2(
+                                    //     reconnect_si.frame().to_local(reconnection_vertex.wo()).y(),
+                                    //     reconnect_si.frame().to_local(reconnection_vertex.wi()).y()
+                                    // ));
+                                    // cpu_dbg!(eval.bsdf.evaluate(reconnect_surface, reconnect_si, -wi, reconnection_vertex.wi()).as_rgb());
+                                    if_!(pdf_y2.cmple(0.0), {
+                                        debug_sm_failed_line.store(line!());
+                                        break_();
+                                    });
+                                    let throughput = {
+                                        let le = eval.light.le(vis_ray, reconnect_si);
+                                        let light_pdf = eval
+                                            .light
+                                            .pdf(reconnect_si, PointNormalExpr::new(p, ng));
+                                        let w = if self.use_nee {
+                                            mis_weight(pdf_y1, light_pdf, 1)
+                                        } else {
+                                            const_(1.0f32)
+                                        };
+                                        let vertex_le = le * w;
+                                        // cpu_dbg!(reconnection_vertex.direct_wi());
+                                        let direct_f = if_!(reconnection_vertex.direct_wi().unpack().cmpne(0.0).any(), {
+                                            let direct_wi = reconnection_vertex.direct_wi().unpack();
+                                            let (f, bsdf_pdf) = eval.bsdf.evaluate_color_and_pdf(reconnect_surface, reconnect_si, -wi, direct_wi);
+                                            let w = mis_weight(reconnection_vertex.direct_light_pdf(), bsdf_pdf, 1);
+                                            f * w
+                                        }, else {
+                                            Color::zero(eval.color_repr)
+                                        });
+                                        // cpu_dbg!(direct_f.as_rgb());
+                                        // cpu_dbg!(reconnection_vertex.indirect());
+                                        // cpu_dbg!(reconnection_vertex.direct());
+                                        f1 / pdf_y1
+                                            * (vertex_le
+                                                + direct_f
+                                                    * Color::Rgb(
+                                                        reconnection_vertex.direct().unpack(),
+                                                    )
+                                                + f2 * Color::Rgb(
+                                                    reconnection_vertex.indirect().unpack(),
+                                                ) / pdf_y2) // is this correct???
+                                    };
+                                    let pdf_x = if_!(vertex_type.cmpeq(VertexType::LAST_HIT_LIGHT), {
+                                        reconnection_vertex.prev_bsdf_pdf()
+                                    }, else {
+                                        reconnection_vertex.prev_bsdf_pdf() * reconnection_vertex.bsdf_pdf()
+                                    });
+                                    let pdf_y = pdf_y1 * pdf_y2;
+                                    // cpu_dbg!(pdf_y1);
+
+                                    // cpu_dbg!(throughput.as_rgb());
+                                    acc_radiance(throughput);
+
+                                    let jacobian = pdf_y / pdf_x
+                                        * (cos_theta_y2 / cos_theta_x2).abs()
+                                        * (reconnection_vertex.dist() / dist).sqr();
+                                    // lc_assert!(pdf_y.cmpgt(0.0));
+                                    lc_assert!(pdf_x.cmpgt(0.0));
+                                    // cpu_dbg!(jacobian);
+                                    let jacobian =
+                                        select(jacobian.is_finite(), jacobian, const_(0.0f32));
+                                    shift_mapping.success.store(jacobian.cmpgt(0.0));
+                                    shift_mapping.jacobian.store(jacobian);
+                                    // if_!(shift_mapping.success.load(), {
+                                    //     cpu_dbg!(jacobian)
+                                    // });
+                                    break_();
+                                });
+                            }
+                        );
+                    }
+                    {
+                        let f = &sample.color;
+                        lc_assert!(f.min().cmpge(0.0));
+                        if_!(sample.pdf.cmple(0.0) | !sample.valid, {
+                            break_();
+                        });
+                        acc_beta(f / sample.pdf);
+                    }
+                    if_!(depth.load().cmpgt(MIN_RECONNECT_DEPTH), {
+                        if let Some(shift_mapping) = &shift_mapping {
+                            let reconnection_vertex = reconnection_vertex.unwrap();
+                            let dist = (prev_p.load() - p).length();
+                            let can_connect = dist.cmpgt(shift_mapping.min_dist)
+                                & sample.lobe_roughness.cmpgt(shift_mapping.min_roughness)
+                                & prev_roughness.load().cmpgt(shift_mapping.min_roughness);
+                            found_reconnectible_vertex
+                                .store(found_reconnectible_vertex.load() | can_connect);
+
+                            if_!(
+                                !reconnection_vertex.valid()
+                                    & shift_mapping.is_base_path
+                                    & can_connect,
+                                {
+                                    reconnection_vertex.store(struct_!(ReconnectionVertex {
+                                        direct: direct
+                                            .unwrap_or(Color::zero(eval.color_repr))
+                                            .as_rgb()
+                                            .pack(),
+                                        direct_wi: direct_wi.pack(),
+                                        direct_light_pdf: direct_light_pdf,
+                                        indirect: Float3Expr::zero().pack(),
+                                        inst_id: si.inst_id(),
+                                        prim_id: si.prim_id(),
+                                        bary: si.bary(),
+                                        wo: wo.pack(),
+                                        wi: sample.wi.pack(),
+                                        prev_bsdf_pdf: prev_bsdf_pdf.load(),
+                                        bsdf_pdf: sample.pdf,
+                                        dist: dist,
+                                        depth: depth.load() - 1,
+                                        type_: VertexType::LAST_NEE.into()
+                                    }));
+                                    reconnect_beta.store(Color::one(eval.color_repr));
+                                    reconnect_l.store(Color::zero(eval.color_repr));
+                                }
+                            );
+                            if_!(
+                                !reconnection_vertex.valid()
+                                    & !shift_mapping.is_base_path
+                                    & can_connect,
+                                {
+                                    // the base path does not have a valid reconnection vertex
+                                    // if a connectable vertex is found for shift path, it must be rejected
+                                    break_();
+                                }
+                            );
+                        }
+                    });
+
+                    {
+                        prev_bsdf_pdf.store(sample.pdf);
+                        prev_n.store(ng);
+                        prev_p.store(p);
+                        prev_roughness.store(sample.lobe_roughness);
+                        let ro = offset_ray_origin(p, face_forward(ng, sample.wi));
+                        ray.store(RayExpr::new(
+                            ro,
+                            sample.wi,
+                            0.0,
+                            1e20,
+                            make_uint2(si.inst_id(), si.prim_id()),
+                            make_uint2(u32::MAX, u32::MAX),
+                        ));
+                    }
+                    if_!(depth.load().cmpgt(self.rr_depth), {
+                        let cont_prob = beta.load().max().clamp(0.0, 1.0) * 0.95;
+                        if_!(sampler.next_1d().cmpgt(cont_prob), {
+                            break_();
+                        }, else {
+                            acc_beta(Color::one(eval.color_repr) / cont_prob);
+                        });
+                    });
+                },
+                {
+                    if_!(!self.indirect_only | depth.load().cmpgt(1), {
+                        acc_radiance(scene.env_map(ray.d().load(), eval));
+                    });
+                    break_();
+                }
+            );
         });
 
         if let Some(shift_mapping) = &shift_mapping {
@@ -576,9 +641,6 @@ impl Integrator for PathTracer {
         let evaluators = scene.evaluators(color_repr);
         let kernel = self.device.create_kernel::<(u32, Int2)>(
             &|spp_per_pass: Expr<u32>, pixel_offset: Expr<Int2>| {
-                if !is_cpu_backend() {
-                    set_block_size([8, 8, 1]);
-                }
                 let p = dispatch_id().xy();
                 let i = p.x() + p.y() * resolution.x;
                 let rngs = rngs.var();
@@ -595,8 +657,7 @@ impl Integrator for PathTracer {
                     film.add_sample(p.float(), &l, ray_w);
                 });
                 rngs.write(i, sampler.state.load());
-            },
-        );
+            });
         let stream = self.device.default_stream();
         let mut cnt = 0;
         let progress = util::create_progess_bar(self.spp as usize, "spp");

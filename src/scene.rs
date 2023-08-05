@@ -304,6 +304,33 @@ impl Scene {
             .texture
             .evaluate_color(self.env_map.var().read(0), si.load())
     }
+    pub fn si_from_hitinfo(
+        &self,
+        inst_id: Expr<u32>,
+        prim_id: Expr<u32>,
+        bary: Expr<Float2>,
+    ) -> SurfaceInteractionExpr {
+        let shading_triangle = self.meshes.shading_triangle(inst_id, prim_id);
+        let p = shading_triangle.p(bary);
+        let n = shading_triangle.n(bary);
+        let uv = shading_triangle.tc(bary);
+        let geometry = SurfaceLocalGeometryExpr::new(
+            p,
+            shading_triangle.ng(),
+            n,
+            uv,
+            Float3Expr::zero(),
+            Float3Expr::zero(),
+        );
+        SurfaceInteractionExpr::new(
+            inst_id,
+            prim_id,
+            bary,
+            geometry,
+            FrameExpr::from_n(n),
+            Bool::from(true),
+        )
+    }
     pub fn intersect(&self, ray: Expr<Ray>) -> Expr<SurfaceInteraction> {
         let ro = ray.o();
         let rd = ray.d();
@@ -332,12 +359,7 @@ impl Scene {
             let inst_id = hit.inst_id();
             let prim_id = hit.prim_id();
             let bary = hit.bary();
-            let shading_triangle = self.meshes.shading_triangle(inst_id, prim_id);
-            let p = shading_triangle.p(bary);
-            let n = shading_triangle.n(bary);
-            let uv = shading_triangle.tc(bary);
-            let geometry = SurfaceLocalGeometryExpr::new(p, shading_triangle.ng(), n, uv, Float3Expr::zero(), Float3Expr::zero());
-            SurfaceInteractionExpr::new(geometry, bary, prim_id, inst_id, FrameExpr::from_n(n), shading_triangle, Bool::from(true))
+            self.si_from_hitinfo(inst_id, prim_id, bary)
         }, else {
             zeroed::<SurfaceInteraction>().set_valid(Bool::from(false))
         })
