@@ -1,10 +1,48 @@
-use crate::{color::Color, util::safe_div, *};
+use std::f32::consts::PI;
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+use crate::{color::Color, util::safe_div, *};
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(tag = "type")]
 pub enum FilmColorRepr {
+    #[serde(rename = "srgb")]
     SRgb,
+    #[serde(rename = "xyz")]
     Xyz,
+    #[serde(rename = "spectral")]
     Spectral(usize),
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum PixelFilter {
+    #[serde(rename = "box")]
+    Box,
+    #[serde(rename = "gaussian")]
+    Gaussian { radius: f32 },
+}
+impl PixelFilter {
+    pub fn sample(&self, u: Expr<Float2>) -> (Expr<Float2>, Expr<f32>) {
+        match self {
+            PixelFilter::Box => (u * 0.5 - 0.5, const_(1.0f32)),
+            PixelFilter::Gaussian { radius: width } => {
+                let sigma = *width / 3.0;
+                let u1 = u.x();
+                let u2 = u.y();
+                let r = (-2.0 * u1.ln()).sqrt();
+                let theta = 2.0 * PI * u2;
+                let offset = make_float2(r * theta.cos(), r * theta.sin()) * sigma;
+                let offset = offset.clamp(-*width, *width);
+                (offset, const_(1.0f32))
+            }
+        }
+    }
+}
+impl Default for PixelFilter {
+    fn default() -> Self {
+        PixelFilter::Gaussian { radius: 1.5 }
+    }
 }
 impl FilmColorRepr {
     pub fn nvalues(&self) -> usize {
@@ -24,6 +62,7 @@ pub struct Film {
     repr: FilmColorRepr,
     resolution: Uint2,
     splat_scale: f32,
+    filter: PixelFilter,
 }
 
 impl Film {
@@ -33,7 +72,15 @@ impl Film {
     pub fn resolution(&self) -> Uint2 {
         self.resolution
     }
-    pub fn new(device: Device, resolution: Uint2, color: FilmColorRepr) -> Self {
+    pub fn filter(&self) -> PixelFilter {
+        self.filter
+    }
+    pub fn new(
+        device: Device,
+        resolution: Uint2,
+        color: FilmColorRepr,
+        filter: PixelFilter,
+    ) -> Self {
         let nvalues = color.nvalues();
         let pixels =
             device.create_buffer::<f32>(resolution.x as usize * resolution.y as usize * nvalues);
@@ -47,6 +94,7 @@ impl Film {
             weights,
             repr: color,
             resolution,
+            filter,
             splat_scale: 1.0,
         };
         film.clear();

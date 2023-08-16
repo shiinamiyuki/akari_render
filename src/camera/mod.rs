@@ -1,10 +1,11 @@
-use crate::{color::*, geometry::*, sampler::*, *};
+use crate::{color::*, film::PixelFilter, geometry::*, sampler::*, *};
 
 pub trait Camera {
     fn set_resolution(&mut self, resolution: Uint2);
     fn resolution(&self) -> Uint2;
     fn generate_ray(
         &self,
+        filter: PixelFilter,
         pixel: Expr<Uint2>,
         sampler: &dyn Sampler,
         color_repr: ColorRepr,
@@ -60,13 +61,15 @@ impl Camera for PerspectiveCamera {
     }
     fn generate_ray(
         &self,
+        filter: PixelFilter,
         pixel: Expr<Uint2>,
         sampler: &dyn Sampler,
         color_repr: ColorRepr,
     ) -> (Expr<Ray>, Color, Expr<f32>) {
         let camera = self.data.var().read(0);
         let fpixel = pixel.float() + make_float2(0.5, 0.5);
-        let p_film = fpixel + sampler.next_2d();
+        let (offset, w) = filter.sample(sampler.next_2d());
+        let p_film = fpixel + offset;
         let mut ray = RayExpr::new(
             make_float3(0.0, 0.0, 0.0),
             camera
@@ -80,7 +83,7 @@ impl Camera for PerspectiveCamera {
         );
         ray = ray.set_o(camera.c2w().transform_point(ray.o()));
         ray = ray.set_d(camera.c2w().transform_vector(ray.d()));
-        (ray, Color::one(color_repr), 1.0.into())
+        (ray, Color::one(color_repr), w)
     }
 }
 #[derive(Clone, Copy, Debug, Value)]

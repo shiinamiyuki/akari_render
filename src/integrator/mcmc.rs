@@ -137,6 +137,7 @@ impl Mcmc {
     fn evaluate(
         &self,
         scene: &Arc<Scene>,
+        filter: PixelFilter,
         eval: &Evaluators,
         independent: &IndependentSampler,
         sample: PrimarySample,
@@ -149,11 +150,11 @@ impl Mcmc {
         let (ray, ray_color, ray_w) =
             scene
                 .camera
-                .generate_ray(p.uint(), &sampler, eval.color_repr);
+                .generate_ray(filter, p.uint(), &sampler, eval.color_repr);
         let l = self.pt.radiance(scene, ray, &sampler, eval) * ray_color * ray_w;
         (p.uint(), l.clone(), Self::scalar_contribution(&l))
     }
-    fn bootstrap(&self, scene: &Arc<Scene>, eval: &Evaluators) -> RenderState {
+    fn bootstrap(&self, scene: &Arc<Scene>, filter: PixelFilter, eval: &Evaluators) -> RenderState {
         let seeds = init_pcg32_buffer(self.device.clone(), self.n_bootstrap + self.n_chains);
 
         let fs = self
@@ -172,7 +173,7 @@ impl Mcmc {
                     sample.write(i, sampler.next_1d());
                 });
                 let sample = PrimarySample { values: sample };
-                let (_p, _l, f) = self.evaluate(scene, eval, &sampler, sample);
+                let (_p, _l, f) = self.evaluate(scene, filter, eval, &sampler, sample);
                 fs.var().write(i, f);
             })
             .dispatch([self.n_bootstrap as u32, 1, 1]);
@@ -217,7 +218,7 @@ impl Mcmc {
                 });
 
                 let sample = PrimarySample { values: sample };
-                let (p, l, f) = self.evaluate(scene, eval, &sampler, sample);
+                let (p, l, f) = self.evaluate(scene, filter, eval, &sampler, sample);
                 // cpu_dbg!(make_float2(f, fs.var().read(seed_idx)));
                 let sigma = match &self.method {
                     Method::Kelemen { small_sigma, .. } => *small_sigma,
@@ -275,7 +276,8 @@ impl Mcmc {
                     }
                 });
                 let clamped = proposal.sample.clamped();
-                let (proposal_p, proposal_color, f) = self.evaluate(scene, eval, &rng, clamped);
+                let (proposal_p, proposal_color, f) =
+                    self.evaluate(scene, film.filter(), eval, &rng, clamped);
                 let proposal_f = f;
                 if_!(is_large_step, {
                     state.set_b(state.b().load() + proposal_f);
@@ -518,7 +520,7 @@ impl Integrator for Mcmc {
             );
             direct.render(scene.clone(), film, &Default::default());
         }
-        let render_state = self.bootstrap(&scene, &evaluators);
+        let render_state = self.bootstrap(&scene, film.filter(), &evaluators);
         self.render_loop(&scene, &evaluators, &render_state, film, options);
     }
 }

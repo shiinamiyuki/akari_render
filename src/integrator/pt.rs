@@ -652,12 +652,15 @@ impl Integrator for PathTracer {
                     let shifted = ip + pixel_offset;
                     let shifted = shifted.clamp(0, const_(resolution).int() - 1).uint();
                     let (ray, ray_color, ray_w) =
-                        scene.camera.generate_ray(shifted, &sampler, color_repr);
+                        scene
+                            .camera
+                            .generate_ray(film.filter(), shifted, &sampler, color_repr);
                     let l = self.radiance(&scene, ray, &sampler, &evaluators) * ray_color;
                     film.add_sample(p.float(), &l, ray_w);
                 });
                 rngs.write(i, sampler.state.load());
-            });
+            },
+        );
         let stream = self.device.default_stream();
         let mut cnt = 0;
         let progress = util::create_progess_bar(self.spp as usize, "spp");

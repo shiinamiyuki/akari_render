@@ -53,10 +53,27 @@ pub enum Method {
     McmcOpt(mcmc::Config),
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
+pub struct FilmConfig {
+    pub out: String,
+    pub filter: PixelFilter,
+    pub colorspace: FilmColorRepr,
+}
+impl Default for FilmConfig {
+    fn default() -> Self {
+        Self {
+            out: String::from("out.exr"),
+            filter: PixelFilter::default(),
+            colorspace: FilmColorRepr::SRgb,
+        }
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct RenderConfig {
     pub method: Method,
-    pub out: String,
+    pub film: FilmConfig,
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -76,6 +93,7 @@ pub fn render(device: Device, scene: Arc<Scene>, task: &RenderTask, options: Ren
             device.clone(),
             scene.camera.resolution(),
             FilmColorRepr::SRgb,
+            config.film.filter,
         );
         let output_image: luisa::Tex2d<luisa::Float4> = device.create_tex2d(
             luisa::PixelStorage::Float4,
@@ -83,6 +101,7 @@ pub fn render(device: Device, scene: Arc<Scene>, task: &RenderTask, options: Ren
             scene.camera.resolution().y,
             1,
         );
+        log::info!("Rendering to {:?}", config.film);
         let tic = std::time::Instant::now();
         match &config.method {
             Method::PathTracer(config) => {
@@ -101,7 +120,7 @@ pub fn render(device: Device, scene: Arc<Scene>, task: &RenderTask, options: Ren
         let toc = std::time::Instant::now();
         log::info!("Completed in {:.1}ms", (toc - tic).as_secs_f64() * 1e3);
         film.copy_to_rgba_image(&output_image);
-        util::write_image(&output_image, &config.out);
+        util::write_image(&output_image, &config.film.out);
     }
     match task {
         RenderTask::Single(config) => render_single(device, &scene, config, &options),

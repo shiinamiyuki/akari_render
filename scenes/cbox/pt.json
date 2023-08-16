@@ -1,0 +1,16 @@
+{
+    "method": {
+        "spp": 256,
+        "max_depth": 12,
+        "indirect_only": false,
+        "use_nee": true,
+        "type": "pt"
+    },
+    "film": {
+        "out": "output/pt.exr",
+        "filter": {
+            "type": "gaussian",
+            "radius": 1.5
+        }
+    }
+}

@@ -34,7 +34,10 @@ impl Integrator for NormalVis {
                 state: var!(Pcg32, rngs.read(i)),
             };
             let color_repr = ColorRepr::Rgb;
-            let (ray, ray_color, ray_w) = scene.camera.generate_ray(p, &sampler, color_repr);
+            let (ray, ray_color, ray_w) =
+                scene
+                    .camera
+                    .generate_ray(film.filter(), p, &sampler, color_repr);
             let si = scene.intersect(ray);
             // cpu_dbg!(ray);
             let color = if_!(si.valid(), {

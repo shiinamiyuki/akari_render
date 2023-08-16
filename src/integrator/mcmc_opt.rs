@@ -246,6 +246,7 @@ impl McmcOpt {
     fn evaluate(
         &self,
         scene: &Arc<Scene>,
+        filter: PixelFilter,
         eval: &Evaluators,
         samples: &Buffer<PssSample>,
         independent: &IndependentSampler,
@@ -271,7 +272,7 @@ impl McmcOpt {
         let (ray, ray_color, ray_w) =
             scene
                 .camera
-                .generate_ray(p.uint(), &sampler, eval.color_repr);
+                .generate_ray(filter, p.uint(), &sampler, eval.color_repr);
         let l = self.pt.radiance(scene, ray, &sampler, eval) * ray_color * ray_w;
         let last_dim = *sampler.cur_dim;
         (p.uint(), l.clone(), Self::scalar_contribution(&l), last_dim)
@@ -280,7 +281,7 @@ impl McmcOpt {
         color.max().clamp(0.0, 1e5)
         // const_(1.0f32)
     }
-    fn bootstrap(&self, scene: &Arc<Scene>, eval: &Evaluators) -> RenderState {
+    fn bootstrap(&self, scene: &Arc<Scene>, filter: PixelFilter, eval: &Evaluators) -> RenderState {
         let seeds = init_pcg32_buffer(self.device.clone(), self.n_bootstrap + self.n_chains);
         let fs = self
             .device
@@ -307,7 +308,7 @@ impl McmcOpt {
                 };
                 // DON'T WRITE INTO sample_buffer
                 let (_p, _l, f, _) =
-                    self.evaluate(scene, eval, &sample_buffer, &sampler, i, None, true);
+                    self.evaluate(scene, filter, eval, &sample_buffer, &sampler, i, None, true);
                 fs.var().write(i, f);
             })
             .dispatch([self.n_bootstrap as u32, 1, 1]);
@@ -344,8 +345,16 @@ impl McmcOpt {
                     );
                 });
 
-                let (p, l, f, _) =
-                    self.evaluate(scene, eval, &sample_buffer, &sampler, i, None, false);
+                let (p, l, f, _) = self.evaluate(
+                    scene,
+                    filter,
+                    eval,
+                    &sample_buffer,
+                    &sampler,
+                    i,
+                    None,
+                    false,
+                );
                 cur_colors.write(i, l);
                 let state = MarkovStateExpr::new(p, i, f, 0.0, 0, 0, 0, 0, 0);
                 states.var().write(i, state);
@@ -394,6 +403,7 @@ impl McmcOpt {
                 };
                 let (proposal_p, proposal_color, f, proposal_dim) = self.evaluate(
                     scene,
+                    film.filter(),
                     eval,
                     &render_state.samples,
                     &rng,
@@ -650,7 +660,7 @@ impl Integrator for McmcOpt {
             );
             direct.render(scene.clone(), film, &Default::default());
         }
-        let render_state = self.bootstrap(&scene, &evaluators);
+        let render_state = self.bootstrap(&scene, film.filter(), &evaluators);
         self.render_loop(&scene, &evaluators, &render_state, film, options);
     }
 }

@@ -92,6 +92,7 @@ impl Integrator for GradientPathTracer {
                 spp: self.spp,
             },
         );
+        let filter = film.filter();
         let primal = film;
         let Gx = primal.clone();
         let Gy = primal.clone();
@@ -131,8 +132,9 @@ impl Integrator for GradientPathTracer {
                                 | shifted.cmpge(const_(resolution).int()).any()),
                             {
                                 let shifted = shifted.uint();
-                                let (ray, ray_color, ray_w) =
-                                    scene.camera.generate_ray(shifted, &sampler, color_repr);
+                                let (ray, ray_color, ray_w) = scene
+                                    .camera
+                                    .generate_ray(filter, shifted, &sampler, color_repr);
                                 let l = pt.radiance(&scene, ray, &sampler, &evaluators) * ray_color;
                                 colors.write(i, l.flatten());
                                 weights.write(i, ray_w);

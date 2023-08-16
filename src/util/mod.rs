@@ -85,6 +85,8 @@ pub fn write_image(color: &Tex2d<Float4>, path: &str) {
 }
 pub fn write_image_ldr(color: &Tex2d<Float4>, path: &str) {
     let color_buf = color.view(0).copy_to_vec::<Float4>();
+    let parent_dir = std::path::Path::new(path).parent().unwrap();
+    std::fs::create_dir_all(parent_dir).unwrap();
     let img = image::RgbImage::from_fn(color.width(), color.height(), |x, y| {
         let i = x + y * color.width();
         let pixel: glam::Vec4 = color_buf[i as usize].into();
