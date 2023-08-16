@@ -132,7 +132,7 @@ impl Mcmc {
     }
     pub fn scalar_contribution(color: &Color) -> Expr<f32> {
         color.max().clamp(0.0, 1e5)
-        // // const_(1.0f32)
+        // const_(1.0f32)
     }
     fn evaluate(
         &self,
@@ -400,7 +400,7 @@ impl Mcmc {
                     if self.n_chains <= num_threads * 20 {
                         set_block_size([1, 1, 1]);
                     } else {
-                        set_block_size([256, 1, 1]);
+                        set_block_size([(num_threads / 20).clamp(1, 256) as u32, 1, 1]);
                     }
                 } else {
                     set_block_size([256, 1, 1]);

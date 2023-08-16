@@ -6,10 +6,19 @@ pub fn uniform_sample_disk(u: Expr<Float2>) -> Expr<Float2> {
     let phi = u.y() * 2.0 * std::f32::consts::PI;
     make_float2(r * phi.cos(), r * phi.sin())
 }
+pub fn invert_uniform_sample_disk(p: Expr<Float2>) -> Expr<Float2> {
+    let r = (p.x().sqr() + p.y().sqr()).sqrt();
+    let phi = p.y().atan2(p.x()) / (2.0 * std::f32::consts::PI);
+    make_float2(r, phi)
+}
 pub fn cos_sample_hemisphere(u: Expr<Float2>) -> Expr<Float3> {
     let d = uniform_sample_disk(u);
     let z = (1.0 - d.x() * d.x() - d.y() * d.y()).max(0.0).sqrt();
     make_float3(d.x(), z, d.y())
+}
+pub fn invert_cos_sample_hemisphere(p: Expr<Float3>) -> Expr<Float2> {
+    let d = make_float2(p.x(), p.z());
+    invert_uniform_sample_disk(d)
 }
 pub fn cos_hemisphere_pdf(cos_theta: Float) -> Float {
     cos_theta * std::f32::consts::FRAC_1_PI

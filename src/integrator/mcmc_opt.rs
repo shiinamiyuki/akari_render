@@ -11,12 +11,10 @@ use crate::sampler::mcmc::{
 };
 use crate::sampling::sample_gaussian;
 use crate::{color::*, film::*, sampler::*, scene::*, util::alias_table::AliasTable, *};
-use rand::Rng;
-use serde::{Deserialize, Serialize};
 
 use super::mcmc::{Config, Mcmc, Method};
 #[derive(Clone, Copy, Value, Debug)]
-#[repr(C)]
+#[repr(C, align(16))]
 pub struct PssSample {
     pub cur: f32,
     pub backup: f32,
@@ -276,7 +274,11 @@ impl McmcOpt {
                 .generate_ray(p.uint(), &sampler, eval.color_repr);
         let l = self.pt.radiance(scene, ray, &sampler, eval) * ray_color * ray_w;
         let last_dim = *sampler.cur_dim;
-        (p.uint(), l.clone(), Mcmc::scalar_contribution(&l), last_dim)
+        (p.uint(), l.clone(), Self::scalar_contribution(&l), last_dim)
+    }
+    pub fn scalar_contribution(color: &Color) -> Expr<f32> {
+        color.max().clamp(0.0, 1e5)
+        // const_(1.0f32)
     }
     fn bootstrap(&self, scene: &Arc<Scene>, eval: &Evaluators) -> RenderState {
         let seeds = init_pcg32_buffer(self.device.clone(), self.n_bootstrap + self.n_chains);
