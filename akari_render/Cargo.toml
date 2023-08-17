@@ -1,0 +1,45 @@
+[package]
+edition = "2021"
+name = "akari_render"
+version = "0.1.0"
+author = "Xiaochun Tong"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+clap = { version = "4.2.4", features = ["derive"] }
+exr = "1.5.0"
+gltf = "1.2.0"
+hexf = "0.2.1"
+image = "0.24.3"
+indicatif = "0.17.3"
+lazy_static = "1.4"
+log = "0.4.17"
+# luisa_compute = { path = "../../luisa-compute-rs/luisa_compute" }
+akari_data = { path = "../akari_data" }
+luisa_compute = { git = "https://github.com/LuisaGroup/luisa-compute-rs.git"}
+parking_lot = "0.12"
+rand = "0.8.5"
+rayon = "1.7.0"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tobj = "3.2.3"
+
+[profile.dev]
+incremental = true
+
+[profile.release]
+incremental = true
+
+[build-dependencies]
+cmake = "0.1.50"
+
+[[bin]]
+name = "akari_import"
+path = "src/bin/akari_import.rs"
+
+[[bin]]
+name = "akari_cli"
+path = "src/bin/akari_cli.rs"
+
+

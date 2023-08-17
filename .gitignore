@@ -20,5 +20,5 @@ crates/lib/akari_core/src/pbrt-v4-rgb2spec-opt/rgbspectrum_*
 
 /target
 /Cargo.lock
-src/data/rgb8.rs
-src/pbrt-v4-rgb2spec-opt/build
+akari_data/src/rgb8.rs
+akari_render/src/pbrt-v4-rgb2spec-opt/build
