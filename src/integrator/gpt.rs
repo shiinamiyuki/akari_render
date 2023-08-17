@@ -109,7 +109,6 @@ impl Integrator for GradientPathTracer {
                 }
 
                 let p = dispatch_id().xy();
-                let i = p.x() + p.y() * resolution.x;
                 for_range(const_(0)..spp_per_pass.int(), |_| {
 
                     let ip = p.int();
@@ -126,6 +125,7 @@ impl Integrator for GradientPathTracer {
 
                     for_range(0..5u32, |i| {
                         let sampler = sampler_creator.create(p);
+                        sampler.start();
                         let offset = offsets.read(i);
                         let shifted = ip + offset;
                         if_!(

@@ -38,6 +38,7 @@ impl Integrator for NormalVis {
             let p = dispatch_id().xy();
             let sampler = sampler_creator.create(p);
             let sampler = sampler.as_ref();
+            sampler.start();
             let (ray, ray_color, ray_w) =
                 scene
                     .camera

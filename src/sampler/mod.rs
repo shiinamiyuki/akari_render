@@ -286,7 +286,7 @@ impl SamplerCreator for IndependentSamplerCreator {
 
 pub struct Pmj02BnSamplerCreator {
     device: Device,
-    pmj02bn_samples: Arc<Buffer<f32>>,
+    pmj02bn_samples: Arc<Buffer<u32>>,
     pixel_samples: Arc<Buffer<Float2>>,
     bluenoise_textures: Arc<BindlessArray>,
     states: Arc<Buffer<Pmj02BnState>>,
@@ -307,7 +307,7 @@ pub fn pmj02bn_sample_host(mut set_index: u32, mut sample_index: u32) -> Float2 
     )
 }
 pub fn pmj02bn_sample(
-    pmj02bn_samples: &Buffer<f32>,
+    pmj02bn_samples: &Buffer<u32>,
     mut set_index: Expr<u32>,
     mut sample_index: Expr<u32>,
 ) -> Expr<Float2> {
@@ -316,8 +316,8 @@ pub fn pmj02bn_sample(
     sample_index %= pmj02bn::N_PMJ02BN_SAMPLES as u32;
     let i = pmj02bn::N_PMJ02BN_SAMPLES as u32 * set_index + sample_index;
     make_float2(
-        pmj02bn_samples.var().read(i * 2) * hexf32!("0x1p-32"),
-        pmj02bn_samples.var().read(i * 2 + 1) * hexf32!("0x1p-32"),
+        pmj02bn_samples.var().read(i * 2).float() * hexf32!("0x1p-32"),
+        pmj02bn_samples.var().read(i * 2 + 1).float() * hexf32!("0x1p-32"),
     )
 }
 impl Pmj02BnSamplerCreator {
@@ -361,8 +361,8 @@ impl Pmj02BnSamplerCreator {
         }
         let pixel_samples = Arc::new(device.create_buffer_from_slice(&pixel_samples));
         let pmj02bn_samples = Arc::new(device.create_buffer_from_slice(unsafe {
-            let ptr = pmj02bn::PMJ02BN_SAMPLES.as_ptr() as *const f32;
-            let len = std::mem::size_of_val(&pmj02bn::PMJ02BN_SAMPLES) / std::mem::size_of::<f32>();
+            let ptr = pmj02bn::PMJ02BN_SAMPLES.as_ptr() as *const u32;
+            let len = std::mem::size_of_val(&pmj02bn::PMJ02BN_SAMPLES) / std::mem::size_of::<u32>();
             assert_eq!(
                 len,
                 pmj02bn::N_PMJ02BN_SETS * pmj02bn::N_PMJ02BN_SAMPLES * 2
@@ -470,7 +470,7 @@ struct Pmj02BnState {
     w: u32,
 }
 pub struct Pmj02BnSampler {
-    pmj02bn_samples: Arc<Buffer<f32>>,
+    pmj02bn_samples: Arc<Buffer<u32>>,
     pixel_samples: Arc<Buffer<Float2>>,
     bluenoise_textures: Arc<BindlessArray>,
     i: Expr<u32>,
@@ -483,7 +483,7 @@ pub struct Pmj02BnSampler {
 impl Pmj02BnSampler {
     fn new(
         device: &Device,
-        pmj02bn_samples: Arc<Buffer<f32>>,
+        pmj02bn_samples: Arc<Buffer<u32>>,
         pixel_samples: Arc<Buffer<Float2>>,
         bluenoise_textures: Arc<BindlessArray>,
         states: Arc<Buffer<Pmj02BnState>>,
@@ -511,7 +511,7 @@ impl Pmj02BnSampler {
                     let index =
                         permute_element(*state.sample_index(), *state.spp(), *state.w(), hash);
                     let delta =
-                        bluenoise(&bluenoise_textures, *state.sample_index(), *state.pixel());
+                        bluenoise(&bluenoise_textures, *state.dim(), *state.pixel());
                     *state.dim().get_mut() += 1;
                     ((index.float() + delta) / state.spp().float()).min(ONE_MINUS_EPSILON)
                 },
@@ -535,8 +535,10 @@ impl Pmj02BnSampler {
                             permute_element(*state.sample_index(), *state.spp(), *state.w(), hash);
                     });
                     let u = pmj02bn_sample(&pmj02bn_samples, pmj_instance, *index);
-                    let u =
-                        u + bluenoise(&bluenoise_textures, *state.sample_index(), *state.pixel());
+                    let u = u + make_float2(
+                        bluenoise(&bluenoise_textures, *state.dim(), *state.pixel()),
+                        bluenoise(&bluenoise_textures, *state.dim() + 1, *state.pixel()),
+                    );
                     *state.dim().get_mut() += 2;
                     u.fract()
                 },
@@ -569,6 +571,9 @@ impl Sampler for Pmj02BnSampler {
     }
     fn next_2d(&self) -> Expr<Float2> {
         (self.next_2d).call(self.state)
+        // make_float2(
+        //     self.next_1d(),
+            // self.next_1d())
     }
     fn start(&self) {
         *self.state.dim().get_mut() = 0u32.into();
