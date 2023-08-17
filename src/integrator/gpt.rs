@@ -101,6 +101,8 @@ impl Integrator for GradientPathTracer {
         let primal = film;
         let Gx = primal.clone();
         let Gy = primal.clone();
+        let sampler_creator =
+            IndependentSamplerCreator::new(self.device.clone(), scene.camera.resolution(), 0);
         let kernel = self
             .device
             .create_kernel::<(u32,)>(&|spp_per_pass: Expr<u32>| {
@@ -126,10 +128,9 @@ impl Integrator for GradientPathTracer {
                         Int2::new(0, -1),
                     ];
                     let offsets = const_(offsets);
+
                     for_range(0..5u32, |i| {
-                        let sampler = IndependentSampler {
-                            state: var!(Pcg32, init_rng),
-                        };
+                        let sampler = sampler_creator.create(p);
                         let offset = offsets.read(i);
                         let shifted = ip + offset;
                         if_!(
@@ -137,15 +138,21 @@ impl Integrator for GradientPathTracer {
                                 | shifted.cmpge(const_(resolution).int()).any()),
                             {
                                 let shifted = shifted.uint();
-                                let (ray, ray_color, ray_w) = scene
-                                    .camera
-                                    .generate_ray(filter, shifted, &sampler, color_repr);
-                                let l = pt.radiance(&scene, ray, &sampler, &evaluators) * ray_color;
+                                let (ray, ray_color, ray_w) = scene.camera.generate_ray(
+                                    filter,
+                                    shifted,
+                                    sampler.as_ref(),
+                                    color_repr,
+                                );
+                                let l = pt.radiance(&scene, ray, sampler.as_ref(), &evaluators)
+                                    * ray_color;
                                 colors.write(i, l.flatten());
                                 weights.write(i, ray_w);
-                                final_rng.store(*sampler.state);
                             }
                         );
+                        if_!(i.cmpne(4), {
+                            sampler.forget();
+                        });
                     });
                     let base = Color::from_flat(color_repr, colors.read(0));
                     let base_w = weights.read(0);

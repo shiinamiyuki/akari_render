@@ -164,9 +164,7 @@ impl Mcmc {
             .create_kernel::<()>(&|| {
                 let i = dispatch_id().x();
                 let seed = seeds.var().read(i);
-                let sampler = IndependentSampler {
-                    state: var!(Pcg32, seed),
-                };
+                let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seed));
                 let sample = VLArrayVar::<f32>::zero(self.sample_dimension());
                 for_range(const_(0)..sample.len().int(), |i| {
                     let i = i.uint();
@@ -195,14 +193,10 @@ impl Mcmc {
             .create_kernel::<()>(&|| {
                 let i = dispatch_id().x();
                 let seed = seeds.var().read(i + self.n_bootstrap as u32);
-                let sampler = IndependentSampler {
-                    state: var!(Pcg32, seed),
-                };
+                let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seed));
                 let (seed_idx, _, _) = at.sample_and_remap(sampler.next_1d());
                 let seed = seeds.var().read(seed_idx);
-                let sampler = IndependentSampler {
-                    state: var!(Pcg32, seed),
-                };
+                let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seed));
                 let sample = VLArrayVar::<f32>::zero(self.sample_dimension());
                 for_range(const_(0)..sample.len().int(), |i| {
                     let i = i.uint();
@@ -342,9 +336,8 @@ impl Mcmc {
     ) {
         let i = dispatch_id().x();
         let markov_states = render_state.states.var();
-        let sampler = IndependentSampler {
-            state: var!(Pcg32, render_state.rng_states.var().read(i)),
-        };
+        let sampler =
+            IndependentSampler::from_pcg32(var!(Pcg32, render_state.rng_states.var().read(i)));
         let state = var!(MarkovState, markov_states.read(i));
         let sample = {
             let dim = self.sample_dimension();

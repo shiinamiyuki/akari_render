@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     color::{Color, ColorRepr, RgbColorSpace},
     film::*,
+    sampler::SamplerConfig,
     scene::*,
     *,
 };
@@ -80,11 +81,16 @@ impl Default for FilmConfig {
         }
     }
 }
-
+fn defaultcolor() -> String {
+    "srgb".to_string()
+}
 #[derive(Clone, Serialize, Deserialize)]
 pub struct RenderConfig {
     pub method: Method,
+    #[serde(default = "defaultcolor")]
     pub color: String,
+    #[serde(default = "SamplerConfig::default")]
+    pub sampler: SamplerConfig,
     pub film: FilmConfig,
 }
 #[derive(Clone, Serialize, Deserialize)]

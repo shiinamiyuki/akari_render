@@ -110,6 +110,12 @@ impl<'a> Sampler for LazyMcmcSampler<'a> {
     fn start(&self) {
         self.cur_dim.store(0);
     }
+    fn clone_box(&self) -> Box<dyn Sampler> {
+        todo!()
+    }
+    fn forget(&self) {
+        todo!()
+    }
 }
 pub struct Mutator {
     pub method: Method,
@@ -303,9 +309,7 @@ impl McmcOpt {
             .create_kernel::<()>(&|| {
                 let i = dispatch_id().x();
                 let seed = seeds.var().read(i);
-                let sampler = IndependentSampler {
-                    state: var!(Pcg32, seed),
-                };
+                let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seed));
                 // DON'T WRITE INTO sample_buffer
                 let (_p, _l, f, _) =
                     self.evaluate(scene, filter, eval, &sample_buffer, &sampler, i, None, true);
@@ -328,14 +332,10 @@ impl McmcOpt {
             .create_kernel::<()>(&|| {
                 let i = dispatch_id().x();
                 let seed = seeds.var().read(i + self.n_bootstrap as u32);
-                let sampler = IndependentSampler {
-                    state: var!(Pcg32, seed),
-                };
+                let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seed));
                 let (seed_idx, _, _) = at.sample_and_remap(sampler.next_1d());
                 let seed = seeds.var().read(seed_idx);
-                let sampler = IndependentSampler {
-                    state: var!(Pcg32, seed),
-                };
+                let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seed));
                 let dim = const_(self.sample_dimension() as u32);
                 for_range(const_(0)..dim.int(), |j| {
                     let j = j.uint();
@@ -477,9 +477,8 @@ impl McmcOpt {
     ) {
         let i = dispatch_id().x();
         let markov_states = render_state.states.var();
-        let sampler = IndependentSampler {
-            state: var!(Pcg32, render_state.rng_states.var().read(i)),
-        };
+        let sampler =
+            IndependentSampler::from_pcg32(var!(Pcg32, render_state.rng_states.var().read(i)));
         let state = var!(MarkovState, markov_states.read(i));
         let cur_color_v = ColorVar::new(render_state.cur_colors.read(i));
         for_range(const_(0)..mutations_per_chain.int(), |_| {

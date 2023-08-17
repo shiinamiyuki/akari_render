@@ -33,9 +33,7 @@ fn test_bsdf_pdf(device: Device, sample_fn: impl Fn(Expr<Float3>) -> Expr<PdfSam
     let kernel = device.create_kernel::<()>(&|| {
         let i = dispatch_id().x();
         let bins = var!([f32; 100]);
-        let sampler = IndependentSampler {
-            state: var!(Pcg32, seeds.var().read(i)),
-        };
+        let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seeds.var().read(i)));
         for_range(const_(0)..const_(n_iters), |_| {
             let sample = sample_fn(sampler.next_3d());
             lc_assert!(sample.pdf().is_finite());

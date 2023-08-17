@@ -31,19 +31,16 @@ impl Integrator for NormalVis {
         let npixels = resolution.x as usize * resolution.y as usize;
         assert_eq!(resolution.x, film.resolution().x);
         assert_eq!(resolution.y, film.resolution().y);
-        let rngs = init_pcg32_buffer(self.device.clone(), npixels);
+        let sampler_creator =
+            IndependentSamplerCreator::new(self.device.clone(), scene.camera.resolution(), 0);
         let kernel = self.device.create_kernel::<(u32,)>(&|_spp: Expr<u32>| {
             let p = dispatch_id().xy();
-            let i = p.x() + p.y() * resolution.x;
-            let rngs = rngs.var();
-            let sampler = IndependentSampler {
-                state: var!(Pcg32, rngs.read(i)),
-            };
-
+            let sampler = sampler_creator.create(p);
+            let sampler = sampler.as_ref();
             let (ray, ray_color, ray_w) =
                 scene
                     .camera
-                    .generate_ray(film.filter(), p, &sampler, color_repr);
+                    .generate_ray(film.filter(), p, sampler, color_repr);
             let si = scene.intersect(ray);
             // cpu_dbg!(ray);
             let color = if_!(si.valid(), {
@@ -55,7 +52,6 @@ impl Integrator for NormalVis {
                 Color::zero(color_repr)
             });
             film.add_sample(p.float(), &color, ray_w);
-            rngs.write(i, sampler.state.load());
         });
         let stream = self.device.default_stream();
         stream.with_scope(|s| {

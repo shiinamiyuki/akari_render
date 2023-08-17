@@ -202,9 +202,7 @@ mod test {
         let kernel =
             device.create_kernel::<(Float3, Float2)>(&|wo: Expr<Float3>, alpha: Expr<Float2>| {
                 let i = dispatch_id().x();
-                let sampler = IndependentSampler {
-                    state: var!(Pcg32, seeds.var().read(i)),
-                };
+                let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seeds.var().read(i)));
                 let out = out.var();
                 let dist = TrowbridgeReitzDistribution::from_alpha(alpha, false);
                 for_range(const_(0)..const_(n_iters), |_| {

@@ -645,16 +645,14 @@ impl Integrator for PathTracer {
         let npixels = resolution.x as usize * resolution.y as usize;
         assert_eq!(resolution.x, film.resolution().x);
         assert_eq!(resolution.y, film.resolution().y);
-        let rngs = init_pcg32_buffer_with_seed(self.device.clone(), npixels, self.seed);
+        let sampler_creator =
+            IndependentSamplerCreator::new(self.device.clone(), scene.camera.resolution(), 0);
         let evaluators = scene.evaluators(color_repr);
         let kernel = self.device.create_kernel::<(u32, Int2)>(
             &|spp_per_pass: Expr<u32>, pixel_offset: Expr<Int2>| {
                 let p = dispatch_id().xy();
-                let i = p.x() + p.y() * resolution.x;
-                let rngs = rngs.var();
-                let sampler = IndependentSampler {
-                    state: var!(Pcg32, rngs.read(i)),
-                };
+                let sampler = sampler_creator.create(p);
+                let sampler = sampler.as_ref();
                 for_range(const_(0)..spp_per_pass.int(), |_| {
                     let ip = p.int();
                     let shifted = ip + pixel_offset;
@@ -662,11 +660,10 @@ impl Integrator for PathTracer {
                     let (ray, ray_color, ray_w) =
                         scene
                             .camera
-                            .generate_ray(film.filter(), shifted, &sampler, color_repr);
-                    let l = self.radiance(&scene, ray, &sampler, &evaluators) * ray_color;
+                            .generate_ray(film.filter(), shifted, sampler, color_repr);
+                    let l = self.radiance(&scene, ray, sampler, &evaluators) * ray_color;
                     film.add_sample(p.float(), &l, ray_w);
                 });
-                rngs.write(i, sampler.state.load());
             },
         );
         let stream = self.device.default_stream();

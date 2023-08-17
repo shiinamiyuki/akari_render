@@ -1,8 +1,12 @@
+use std::sync::Arc;
+
 use lazy_static::lazy_static;
 use rand::{rngs::StdRng, thread_rng, Rng, SeedableRng};
 
 use crate::*;
 pub mod mcmc;
+use crate::data::pmj02bn;
+use serde::{Deserialize, Serialize};
 
 pub trait Sampler {
     fn next_1d(&self) -> Float;
@@ -38,6 +42,9 @@ pub trait Sampler {
     }
 
     fn start(&self);
+    fn clone_box(&self) -> Box<dyn Sampler>;
+    // Don't write state to buffer when dropped
+    fn forget(&self);
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -164,9 +171,30 @@ pub fn init_pcg32_buffer_with_seed(device: Device, count: usize, seed: u64) -> B
         .dispatch([count.try_into().unwrap(), 1, 1]);
     buffer
 }
-#[derive(Clone)]
 pub struct IndependentSampler {
     pub state: Pcg32Var,
+    index: Expr<u32>,
+    states: Option<Arc<Buffer<Pcg32>>>,
+    forget: Var<bool>,
+}
+impl Drop for IndependentSampler {
+    fn drop(&mut self) {
+        if let Some(states) = self.states.take() {
+            if_!(!*self.forget, {
+                states.var().write(self.index, *self.state);
+            });
+        }
+    }
+}
+impl IndependentSampler {
+    pub fn from_pcg32(state: Pcg32Var) -> Self {
+        Self {
+            state,
+            index: const_(0u32),
+            states: None,
+            forget: var!(bool, false),
+        }
+    }
 }
 impl Sampler for IndependentSampler {
     fn next_1d(&self) -> Float {
@@ -174,6 +202,17 @@ impl Sampler for IndependentSampler {
         n.float() * ((1.0 / u32::MAX as f64) as f32)
     }
     fn start(&self) {}
+    fn clone_box(&self) -> Box<dyn Sampler> {
+        Box::new(Self {
+            state: self.state.clone(),
+            index: self.index,
+            states: self.states.clone(),
+            forget: var!(bool, *self.forget),
+        })
+    }
+    fn forget(&self) {
+        *self.forget.get_mut() = true.into();
+    }
 }
 #[derive(Copy, Clone, Aggregate)]
 pub struct PrimarySample {
@@ -227,4 +266,62 @@ impl<'a> Sampler for IndependentReplaySampler<'a> {
     fn start(&self) {
         self.cur_dim.store(0);
     }
+    fn forget(&self) {}
+    fn clone_box(&self) -> Box<dyn Sampler> {
+        todo!()
+    }
 }
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum SamplerConfig {
+    #[serde(rename = "independent")]
+    Independent { seed: u64 },
+    #[serde(rename = "pmj02bn")]
+    Pmj02Bn { seed: u64 },
+}
+impl Default for SamplerConfig {
+    fn default() -> Self {
+        Self::Independent { seed: 0 }
+    }
+}
+pub trait SamplerCreator {
+    fn create(&self, pixel: Expr<Uint2>) -> Box<dyn Sampler>;
+}
+pub struct IndependentSamplerCreator {
+    states: Arc<Buffer<Pcg32>>,
+    resolution: Uint2,
+}
+impl IndependentSamplerCreator {
+    pub fn new(device: Device, resolution: Uint2, seed: u64) -> Self {
+        Self {
+            states: Arc::new(init_pcg32_buffer_with_seed(
+                device,
+                resolution.x as usize * resolution.y as usize,
+                seed,
+            )),
+            resolution,
+        }
+    }
+}
+impl SamplerCreator for IndependentSamplerCreator {
+    fn create(&self, pixel: Expr<Uint2>) -> Box<dyn Sampler> {
+        let i = pixel.x() + pixel.y() * self.resolution.x;
+        let state = var!(Pcg32, self.states.read(i));
+        Box::new(IndependentSampler {
+            state,
+            index: i,
+            forget: var!(bool, false),
+            states: Some(self.states.clone()),
+        })
+    }
+}
+
+pub struct Pmj02BnSamplerCreator {
+    pixel_samples: Arc<Buffer<Float2>>,
+    resolution: Uint2,
+    spp: u32,
+    seed: u32,
+    pixel_tile_size: u32,
+}
+pub struct Pmj02BnSampler {}
