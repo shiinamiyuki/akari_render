@@ -14,7 +14,13 @@ impl NormalVis {
 }
 
 impl Integrator for NormalVis {
-    fn render(&self, scene: Arc<Scene>, film: &mut Film, _options: &RenderOptions) {
+    fn render(
+        &self,
+        scene: Arc<Scene>,
+        color_repr: ColorRepr,
+        film: &mut Film,
+        _options: &RenderOptions,
+    ) {
         let resolution = scene.camera.resolution();
         log::info!(
             "Resolution {}x{}, spp: {}",
@@ -33,7 +39,7 @@ impl Integrator for NormalVis {
             let sampler = IndependentSampler {
                 state: var!(Pcg32, rngs.read(i)),
             };
-            let color_repr = ColorRepr::Rgb;
+
             let (ray, ray_color, ray_w) =
                 scene
                     .camera
@@ -43,7 +49,7 @@ impl Integrator for NormalVis {
             let color = if_!(si.valid(), {
                 let ns = si.geometry().ng();
                 // cpu_dbg!(make_uint2(si.inst_id(), si.prim_id()));
-                Color::Rgb(ns * 0.5 + 0.5) * ray_color
+                Color::Rgb(ns * 0.5 + 0.5, color_repr.rgb_colorspace().unwrap()) * ray_color
                 // Color::Rgb(make_float3(si.bary().x(),si.bary().y(), 1.0))
             }, else {
                 Color::zero(color_repr)

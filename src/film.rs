@@ -1,6 +1,10 @@
 use std::f32::consts::PI;
 
-use crate::{color::Color, util::safe_div, *};
+use crate::{
+    color::{Color, RgbColorSpace},
+    util::safe_div,
+    *,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -11,7 +15,7 @@ pub enum FilmColorRepr {
     #[serde(rename = "xyz")]
     Xyz,
     #[serde(rename = "spectral")]
-    Spectral(usize),
+    Spectral { n: usize },
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -49,7 +53,7 @@ impl FilmColorRepr {
         match self {
             FilmColorRepr::SRgb => 3,
             FilmColorRepr::Xyz => 3,
-            FilmColorRepr::Spectral(n) => *n,
+            FilmColorRepr::Spectral { n } => *n,
         }
     }
 }
@@ -118,7 +122,7 @@ impl Film {
         let color = color * weight;
         match self.repr {
             FilmColorRepr::SRgb => {
-                let rgb: Float3Expr = color.to_rgb();
+                let rgb: Float3Expr = color.to_rgb(RgbColorSpace::SRgb);
                 for c in 0..nvalues {
                     let v = rgb.at(c);
                     let v = select(v.is_nan(), 0.0.into(), v);
@@ -136,7 +140,7 @@ impl Film {
         let nvalues = self.repr.nvalues();
         match self.repr {
             FilmColorRepr::SRgb => {
-                let rgb: Float3Expr = color.to_rgb();
+                let rgb: Float3Expr = color.to_rgb(RgbColorSpace::SRgb);
                 for c in 0..nvalues {
                     let v = rgb.at(c);
                     let v = select(v.is_nan(), 0.0.into(), v);

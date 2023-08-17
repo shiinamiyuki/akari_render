@@ -2,7 +2,12 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{film::*, scene::*, *};
+use crate::{
+    color::{Color, ColorRepr, RgbColorSpace},
+    film::*,
+    scene::*,
+    *,
+};
 #[derive(Clone, Debug)]
 pub struct RenderOptions {
     pub save_intermediate: bool, // save intermediate results
@@ -31,7 +36,13 @@ pub struct RenderStats {
     pub intermediate: Vec<IntermediateStats>,
 }
 pub trait Integrator {
-    fn render(&self, scene: Arc<Scene>, film: &mut Film, options: &RenderOptions);
+    fn render(
+        &self,
+        scene: Arc<Scene>,
+        color_repr: ColorRepr,
+        film: &mut Film,
+        options: &RenderOptions,
+    );
 }
 
 pub mod gpt;
@@ -58,14 +69,14 @@ pub enum Method {
 pub struct FilmConfig {
     pub out: String,
     pub filter: PixelFilter,
-    pub colorspace: FilmColorRepr,
+    pub color: FilmColorRepr,
 }
 impl Default for FilmConfig {
     fn default() -> Self {
         Self {
             out: String::from("out.exr"),
             filter: PixelFilter::default(),
-            colorspace: FilmColorRepr::SRgb,
+            color: FilmColorRepr::SRgb,
         }
     }
 }
@@ -73,6 +84,7 @@ impl Default for FilmConfig {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct RenderConfig {
     pub method: Method,
+    pub color: String,
     pub film: FilmConfig,
 }
 #[derive(Clone, Serialize, Deserialize)]
@@ -101,21 +113,50 @@ pub fn render(device: Device, scene: Arc<Scene>, task: &RenderTask, options: Ren
             scene.camera.resolution().y,
             1,
         );
+        let color_repr = match config.color.to_lowercase().as_str() {
+            "srgb" => ColorRepr::Rgb(RgbColorSpace::SRgb),
+            "aces" | "acescg" => ColorRepr::Rgb(RgbColorSpace::ACEScg),
+            "spectral" => ColorRepr::Spectral,
+            _ => {
+                log::error!("Unknown color representation: {}", config.color);
+                std::process::exit(1);
+            }
+        };
         log::info!("Rendering to {:?}", config.film);
         let tic = std::time::Instant::now();
         match &config.method {
-            Method::PathTracer(config) => {
-                pt::render(device.clone(), scene.clone(), &mut film, &config, &options)
-            }
-            Method::GradientPathTracer(config) => {
-                gpt::render(device.clone(), scene.clone(), &mut film, &config, &options)
-            }
-            Method::Mcmc(config) => {
-                mcmc::render(device.clone(), scene.clone(), &mut film, &config, &options)
-            }
-            Method::McmcOpt(config) => {
-                mcmc_opt::render(device.clone(), scene.clone(), &mut film, &config, &options)
-            }
+            Method::PathTracer(c) => pt::render(
+                device.clone(),
+                scene.clone(),
+                color_repr,
+                &mut film,
+                &c,
+                &options,
+            ),
+            Method::GradientPathTracer(c) => gpt::render(
+                device.clone(),
+                scene.clone(),
+                color_repr,
+                &mut film,
+                &c,
+                &options,
+            ),
+            Method::Mcmc(c) => mcmc::render(
+                device.clone(),
+                scene.clone(),
+                color_repr,
+                &mut film,
+                &c,
+                &options,
+            ),
+            Method::McmcOpt(c) => mcmc_opt::render(
+                device.clone(),
+                scene.clone(),
+                color_repr,
+                &mut film,
+                &c,
+                &options,
+            ),
         }
         let toc = std::time::Instant::now();
         log::info!("Completed in {:.1}ms", (toc - tic).as_secs_f64() * 1e3);

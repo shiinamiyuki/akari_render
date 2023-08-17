@@ -489,7 +489,13 @@ impl Mcmc {
     }
 }
 impl Integrator for Mcmc {
-    fn render(&self, scene: Arc<Scene>, film: &mut Film, options: &RenderOptions) {
+    fn render(
+        &self,
+        scene: Arc<Scene>,
+        color_repr: ColorRepr,
+        film: &mut Film,
+        options: &RenderOptions,
+    ) {
         let resolution = scene.camera.resolution();
         log::info!(
             "Resolution {}x{}\nconfig: {:#?}",
@@ -497,7 +503,6 @@ impl Integrator for Mcmc {
             resolution.y,
             &self.config
         );
-        let color_repr = ColorRepr::Rgb;
         let evaluators = scene.evaluators(color_repr);
         assert_eq!(resolution.x, film.resolution().x);
         assert_eq!(resolution.y, film.resolution().y);
@@ -518,7 +523,7 @@ impl Integrator for Mcmc {
                     ..Default::default()
                 },
             );
-            direct.render(scene.clone(), film, &Default::default());
+            direct.render(scene.clone(), color_repr, film, &Default::default());
         }
         let render_state = self.bootstrap(&scene, film.filter(), &evaluators);
         self.render_loop(&scene, &evaluators, &render_state, film, options);
@@ -528,10 +533,11 @@ impl Integrator for Mcmc {
 pub fn render(
     device: Device,
     scene: Arc<Scene>,
+    color_repr: ColorRepr,
     film: &mut Film,
     config: &Config,
     options: &RenderOptions,
 ) {
     let mcmc = Mcmc::new(device.clone(), config.clone());
-    mcmc.render(scene, film, options);
+    mcmc.render(scene, color_repr, film, options);
 }

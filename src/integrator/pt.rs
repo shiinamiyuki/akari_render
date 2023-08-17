@@ -457,14 +457,17 @@ impl PathTracer {
                                         // cpu_dbg!(direct_f.as_rgb());
                                         // cpu_dbg!(reconnection_vertex.indirect());
                                         // cpu_dbg!(reconnection_vertex.direct());
+                                        let cs = color_repr.rgb_colorspace().unwrap();
                                         f1 / pdf_y1
                                             * (vertex_le
                                                 + direct_f
                                                     * Color::Rgb(
                                                         reconnection_vertex.direct().unpack(),
+                                                        cs,
                                                     )
                                                 + f2 * Color::Rgb(
                                                     reconnection_vertex.indirect().unpack(),
+                                                    cs,
                                                 ) / pdf_y2) // is this correct???
                                     };
                                     let pdf_x = if_!(vertex_type.cmpeq(VertexType::LAST_HIT_LIGHT), {
@@ -625,7 +628,13 @@ impl PathTracer {
     }
 }
 impl Integrator for PathTracer {
-    fn render(&self, scene: Arc<Scene>, film: &mut Film, _options: &RenderOptions) {
+    fn render(
+        &self,
+        scene: Arc<Scene>,
+        color_repr: ColorRepr,
+        film: &mut Film,
+        _options: &RenderOptions,
+    ) {
         let resolution = scene.camera.resolution();
         log::info!(
             "Resolution {}x{}\nconfig:{:#?}",
@@ -637,7 +646,6 @@ impl Integrator for PathTracer {
         assert_eq!(resolution.x, film.resolution().x);
         assert_eq!(resolution.y, film.resolution().y);
         let rngs = init_pcg32_buffer_with_seed(self.device.clone(), npixels, self.seed);
-        let color_repr = ColorRepr::Rgb;
         let evaluators = scene.evaluators(color_repr);
         let kernel = self.device.create_kernel::<(u32, Int2)>(
             &|spp_per_pass: Expr<u32>, pixel_offset: Expr<Int2>| {
@@ -691,10 +699,11 @@ impl Integrator for PathTracer {
 pub fn render(
     device: Device,
     scene: Arc<Scene>,
+    color_repr: ColorRepr,
     film: &mut Film,
     config: &Config,
     options: &RenderOptions,
 ) {
     let pt = PathTracer::new(device.clone(), config.clone());
-    pt.render(scene, film, options);
+    pt.render(scene, color_repr, film, options);
 }

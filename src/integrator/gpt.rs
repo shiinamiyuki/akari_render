@@ -65,7 +65,13 @@ impl GradientPathTracer {
 }
 impl Integrator for GradientPathTracer {
     #[allow(non_snake_case)]
-    fn render(&self, scene: Arc<Scene>, film: &mut Film, _options: &RenderOptions) {
+    fn render(
+        &self,
+        scene: Arc<Scene>,
+        color_repr: ColorRepr,
+        film: &mut Film,
+        _options: &RenderOptions,
+    ) {
         let resolution = scene.camera.resolution();
         log::info!(
             "Resolution {}x{}\nconfig:{:#?}",
@@ -77,7 +83,6 @@ impl Integrator for GradientPathTracer {
         assert_eq!(resolution.x, film.resolution().x);
         assert_eq!(resolution.y, film.resolution().y);
         let rngs = init_pcg32_buffer_with_seed(self.device.clone(), npixels, self.seed);
-        let color_repr = ColorRepr::Rgb;
         let evaluators = scene.evaluators(color_repr);
         let pt = PathTracer::new(
             self.device.clone(),
@@ -219,10 +224,11 @@ impl Integrator for GradientPathTracer {
 pub fn render(
     device: Device,
     scene: Arc<Scene>,
+    color_repr: ColorRepr,
     film: &mut Film,
     config: &Config,
     options: &RenderOptions,
 ) {
     let gpt = GradientPathTracer::new(device.clone(), config.clone());
-    gpt.render(scene, film, options);
+    gpt.render(scene, color_repr, film, options);
 }

@@ -106,7 +106,8 @@ fn main() {
     current_dir.push("scene.json");
     dbg!(&current_dir);
     let dummy_scene = Scene::load_from_path(device.clone(), current_dir);
-    let eval = dummy_scene.texture_evaluator(color::ColorRepr::Rgb);
+    let color_repr = color::ColorRepr::Rgb(color::RgbColorSpace::SRgb);
+    let eval = dummy_scene.texture_evaluator(color_repr);
     let test_bsdf = |name: &str, bsdf: &dyn Fn() -> Box<dyn Bsdf>| {
         println!("testing {}", name);
         test_bsdf_pdf(device.clone(), |u| {
@@ -119,7 +120,7 @@ fn main() {
                 u.yz(),
                 &BsdfEvalContext {
                     texture: &eval,
-                    color_repr: color::ColorRepr::Rgb,
+                    color_repr,
                 },
             );
             PdfSampleExpr::new(sample.pdf, sample.wi, sample.valid)
@@ -127,7 +128,7 @@ fn main() {
     };
     test_bsdf("diffuse", &|| {
         Box::new(DiffuseBsdf {
-            reflectance: Color::Rgb(make_float3(1.0, 1.0, 1.0)),
+            reflectance: Color::one(color_repr),
         })
     });
 
@@ -136,7 +137,7 @@ fn main() {
             &format!("microfacet reflection, roughess={}", roughness),
             &|| {
                 Box::new(MicrofacetReflection {
-                    color: Color::Rgb(make_float3(1.0, 1.0, 1.0)),
+                    color: Color::one(color_repr),
                     fresnel: Box::new(ConstFresnel {}),
                     dist: Box::new(TrowbridgeReitzDistribution::from_roughness(
                         make_float2(roughness, roughness),
@@ -152,7 +153,7 @@ fn main() {
             &format!("microfacet transmission, roughess={}", roughness),
             &|| {
                 Box::new(MicrofacetTransmission {
-                    color: Color::Rgb(make_float3(1.0, 1.0, 1.0)),
+                    color: Color::one(color_repr),
                     fresnel: Box::new(ConstFresnel {}),
                     dist: Box::new(TrowbridgeReitzDistribution::from_roughness(
                         make_float2(roughness, roughness),
