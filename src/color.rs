@@ -143,10 +143,10 @@ impl Color {
                 } else {
                     match (cs, colorspace) {
                         (RgbColorSpace::SRgb, RgbColorSpace::ACEScg) => {
-                            const_(Mat3::from(srgb_to_aces_mat())) * *rgb
+                            const_(Mat3::from(srgb_to_aces_with_cat_mat())) * *rgb
                         }
                         (RgbColorSpace::ACEScg, RgbColorSpace::SRgb) => {
-                            const_(Mat3::from(aces_to_srgb_mat())) * *rgb
+                            const_(Mat3::from(aces_to_srgb_with_cat_mat())) * *rgb
                         }
                         _ => unreachable!(),
                     }
@@ -405,7 +405,7 @@ pub fn srgb_to_xyz_mat() -> glam::Mat3 {
     ])
     .transpose()
 }
-pub fn srgb_to_aces_mat() -> glam::Mat3 {
+pub fn srgb_to_aces_with_cat_mat() -> glam::Mat3 {
     glam::Mat3::from_cols_array_2d(&[
         [0.612494199, 0.338737252, 0.048855526],
         [0.070594252, 0.917671484, 0.011704306],
@@ -413,7 +413,7 @@ pub fn srgb_to_aces_mat() -> glam::Mat3 {
     ])
     .transpose()
 }
-pub fn aces_to_srgb_mat() -> glam::Mat3 {
+pub fn aces_to_srgb_with_cat_mat() -> glam::Mat3 {
     glam::Mat3::from_cols_array_2d(&[
         [1.707062673, -0.619959540, -0.087259850],
         [-0.130976829, 1.139032275, -0.007956297],

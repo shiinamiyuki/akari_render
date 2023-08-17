@@ -1,5 +1,5 @@
 use crate::{
-    color::{srgb_to_aces_mat, srgb_to_linear, Color, ColorRepr, RgbColorSpace},
+    color::{srgb_to_aces_with_cat_mat, srgb_to_linear, Color, ColorRepr, RgbColorSpace},
     interaction::SurfaceInteraction,
     scene::Scene,
     *,
@@ -17,12 +17,12 @@ pub struct TextureEvaluator {
 }
 impl TextureEvaluator {
     pub fn color_from_float4(&self, v: Expr<Float4>) -> Color {
-        dbg!(srgb_to_aces_mat());
+        dbg!(srgb_to_aces_with_cat_mat());
         match self.color_repr {
             ColorRepr::Rgb(cs) => match cs {
                 RgbColorSpace::SRgb => Color::Rgb(v.xyz(), RgbColorSpace::SRgb),
                 RgbColorSpace::ACEScg => Color::Rgb(
-                    const_(Mat3::from(srgb_to_aces_mat())) * v.xyz(),
+                    const_(Mat3::from(srgb_to_aces_with_cat_mat())) * v.xyz(),
                     RgbColorSpace::ACEScg,
                 ),
             },

@@ -33,6 +33,8 @@ pub mod scenegraph;
 pub mod surface;
 pub mod texture;
 pub mod util;
+pub mod data;
+pub mod cpp_ext;
 pub mod volume;
 
 #[derive(Clone, Hash, PartialEq, Eq, Debug)]
