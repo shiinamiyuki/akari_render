@@ -68,6 +68,7 @@ impl Integrator for GradientPathTracer {
     fn render(
         &self,
         scene: Arc<Scene>,
+        sampler_config: SamplerConfig,
         color_repr: ColorRepr,
         film: &mut Film,
         _options: &RenderOptions,
@@ -82,7 +83,6 @@ impl Integrator for GradientPathTracer {
         let npixels = resolution.x as usize * resolution.y as usize;
         assert_eq!(resolution.x, film.resolution().x);
         assert_eq!(resolution.y, film.resolution().y);
-        let rngs = init_pcg32_buffer_with_seed(self.device.clone(), npixels, self.seed);
         let evaluators = scene.evaluators(color_repr);
         let pt = PathTracer::new(
             self.device.clone(),
@@ -93,7 +93,6 @@ impl Integrator for GradientPathTracer {
                 rr_depth: self.rr_depth,
                 indirect_only: self.indirect_only,
                 pixel_offset: [0, 0],
-                seed: self.seed,
                 spp: self.spp,
             },
         );
@@ -101,8 +100,7 @@ impl Integrator for GradientPathTracer {
         let primal = film;
         let Gx = primal.clone();
         let Gy = primal.clone();
-        let sampler_creator =
-            IndependentSamplerCreator::new(self.device.clone(), scene.camera.resolution(), 0);
+        let sampler_creator = sampler_config.creator(self.device.clone(), &scene, self.spp);
         let kernel = self
             .device
             .create_kernel::<(u32,)>(&|spp_per_pass: Expr<u32>| {
@@ -112,10 +110,7 @@ impl Integrator for GradientPathTracer {
 
                 let p = dispatch_id().xy();
                 let i = p.x() + p.y() * resolution.x;
-                let rngs = rngs.var();
-                let final_rng = var!(Pcg32, rngs.read(i));
                 for_range(const_(0)..spp_per_pass.int(), |_| {
-                    let init_rng = *final_rng;
 
                     let ip = p.int();
                     let colors = var!([FlatColor; 5]);
@@ -203,8 +198,6 @@ impl Integrator for GradientPathTracer {
                         );
                     });
                 });
-
-                rngs.write(i, *final_rng);
             });
         let stream = self.device.default_stream();
         let mut cnt = 0;
@@ -230,12 +223,12 @@ impl Integrator for GradientPathTracer {
 }
 pub fn render(
     device: Device,
-    scene: Arc<Scene>,
+    scene: Arc<Scene>,sampler: SamplerConfig,
     color_repr: ColorRepr,
     film: &mut Film,
     config: &Config,
     options: &RenderOptions,
 ) {
     let gpt = GradientPathTracer::new(device.clone(), config.clone());
-    gpt.render(scene, color_repr, film, options);
+    gpt.render(scene, sampler, color_repr, film, options);
 }

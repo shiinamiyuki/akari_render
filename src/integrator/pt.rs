@@ -25,7 +25,6 @@ pub struct PathTracer {
     pub rr_depth: u32,
     pub indirect_only: bool,
     pub pixel_offset: Int2,
-    pub seed: u64,
     config: Config,
 }
 
@@ -39,7 +38,6 @@ pub struct Config {
     pub rr_depth: u32,
     pub indirect_only: bool,
     pub pixel_offset: [i32; 2],
-    pub seed: u64,
 }
 impl Default for Config {
     fn default() -> Self {
@@ -51,7 +49,6 @@ impl Default for Config {
             use_nee: true,
             indirect_only: false,
             pixel_offset: [0, 0],
-            seed: 0,
         }
     }
 }
@@ -66,7 +63,6 @@ impl PathTracer {
             rr_depth: config.rr_depth,
             indirect_only: config.indirect_only,
             pixel_offset: Int2::new(config.pixel_offset[0], config.pixel_offset[1]),
-            seed: config.seed,
             config,
         }
     }
@@ -631,6 +627,7 @@ impl Integrator for PathTracer {
     fn render(
         &self,
         scene: Arc<Scene>,
+        sampler_config: SamplerConfig,
         color_repr: ColorRepr,
         film: &mut Film,
         _options: &RenderOptions,
@@ -642,11 +639,9 @@ impl Integrator for PathTracer {
             resolution.y,
             &self.config
         );
-        let npixels = resolution.x as usize * resolution.y as usize;
         assert_eq!(resolution.x, film.resolution().x);
         assert_eq!(resolution.y, film.resolution().y);
-        let sampler_creator =
-            IndependentSamplerCreator::new(self.device.clone(), scene.camera.resolution(), 0);
+        let sampler_creator = sampler_config.creator(self.device.clone(), &scene, self.spp);
         let evaluators = scene.evaluators(color_repr);
         let kernel = self.device.create_kernel::<(u32, Int2)>(
             &|spp_per_pass: Expr<u32>, pixel_offset: Expr<Int2>| {
@@ -654,6 +649,7 @@ impl Integrator for PathTracer {
                 let sampler = sampler_creator.create(p);
                 let sampler = sampler.as_ref();
                 for_range(const_(0)..spp_per_pass.int(), |_| {
+                    sampler.start();
                     let ip = p.int();
                     let shifted = ip + pixel_offset;
                     let shifted = shifted.clamp(0, const_(resolution).int() - 1).uint();
@@ -696,11 +692,12 @@ impl Integrator for PathTracer {
 pub fn render(
     device: Device,
     scene: Arc<Scene>,
+    sampler: SamplerConfig,
     color_repr: ColorRepr,
     film: &mut Film,
     config: &Config,
     options: &RenderOptions,
 ) {
     let pt = PathTracer::new(device.clone(), config.clone());
-    pt.render(scene, color_repr, film, options);
+    pt.render(scene, sampler, color_repr, film, options);
 }

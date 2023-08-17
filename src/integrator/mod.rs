@@ -40,6 +40,7 @@ pub trait Integrator {
     fn render(
         &self,
         scene: Arc<Scene>,
+        sampler: SamplerConfig,
         color_repr: ColorRepr,
         film: &mut Film,
         options: &RenderOptions,
@@ -134,6 +135,7 @@ pub fn render(device: Device, scene: Arc<Scene>, task: &RenderTask, options: Ren
             Method::PathTracer(c) => pt::render(
                 device.clone(),
                 scene.clone(),
+                config.sampler,
                 color_repr,
                 &mut film,
                 &c,
@@ -142,6 +144,7 @@ pub fn render(device: Device, scene: Arc<Scene>, task: &RenderTask, options: Ren
             Method::GradientPathTracer(c) => gpt::render(
                 device.clone(),
                 scene.clone(),
+                config.sampler,
                 color_repr,
                 &mut film,
                 &c,
@@ -150,6 +153,7 @@ pub fn render(device: Device, scene: Arc<Scene>, task: &RenderTask, options: Ren
             Method::Mcmc(c) => mcmc::render(
                 device.clone(),
                 scene.clone(),
+                config.sampler,
                 color_repr,
                 &mut film,
                 &c,
@@ -158,6 +162,7 @@ pub fn render(device: Device, scene: Arc<Scene>, task: &RenderTask, options: Ren
             Method::McmcOpt(c) => mcmc_opt::render(
                 device.clone(),
                 scene.clone(),
+                config.sampler,
                 color_repr,
                 &mut film,
                 &c,

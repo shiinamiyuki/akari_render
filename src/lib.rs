@@ -1,3 +1,4 @@
+use hexf::hexf32;
 pub use luisa::derive::{Aggregate, Value};
 pub use luisa::glam;
 pub use luisa::prelude::*;
@@ -36,6 +37,8 @@ pub mod util;
 pub mod data;
 pub mod cpp_ext;
 pub mod volume;
+
+pub const ONE_MINUS_EPSILON: f32 = hexf32!("0x1.fffffep-1");
 
 #[derive(Clone, Hash, PartialEq, Eq, Debug)]
 pub enum PolyKey {

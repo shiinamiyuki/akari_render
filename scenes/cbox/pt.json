@@ -1,10 +1,15 @@
 {
     "method": {
-        "spp": 256,
+        "spp": 16,
         "max_depth": 12,
         "indirect_only": false,
         "use_nee": true,
         "type": "pt"
+    },
+    "color":"srgb",
+    "sampler":{
+        "type":"pmj02bn",
+        "seed":0
     },
     "film": {
         "out": "output/pt.exr",

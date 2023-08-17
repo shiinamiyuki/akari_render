@@ -1,6 +1,7 @@
 pub mod alias_table;
 pub mod binserde;
 pub mod convert_gltf;
+pub mod hash;
 use crate::{color::glam_linear_to_srgb, *};
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use lazy_static::lazy_static;
@@ -209,5 +210,27 @@ impl CompensatedSumExpr {
         let c = (t - self.sum()) - y;
         let sum = t;
         Self::new(sum, c)
+    }
+}
+
+pub fn is_power_of_four(x: u32) -> bool {
+    x != 0 && (x & (x - 1)) == 0 && (x & 0xAAAAAAAA) == 0
+}
+pub fn log2u32(x: u32) -> u32 {
+    31 - x.leading_zeros()
+}
+pub fn log4u32(x: u32) -> u32 {
+    log2u32(x) / 2
+}
+#[cfg(test)]
+mod test {
+    fn test_log4u32_x(x: u32) {
+        assert_eq!(super::log4u32(x), (x as f32).log2() as u32 / 2);
+    }
+    #[test]
+    fn test_log4u32() {
+        for i in 1..100000 {
+            test_log4u32_x(i);
+        }
     }
 }

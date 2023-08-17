@@ -485,6 +485,7 @@ impl Integrator for Mcmc {
     fn render(
         &self,
         scene: Arc<Scene>,
+        sampler_config: SamplerConfig,
         color_repr: ColorRepr,
         film: &mut Film,
         options: &RenderOptions,
@@ -516,7 +517,13 @@ impl Integrator for Mcmc {
                     ..Default::default()
                 },
             );
-            direct.render(scene.clone(), color_repr, film, &Default::default());
+            direct.render(
+                scene.clone(),
+                sampler_config,
+                color_repr,
+                film,
+                &Default::default(),
+            );
         }
         let render_state = self.bootstrap(&scene, film.filter(), &evaluators);
         self.render_loop(&scene, &evaluators, &render_state, film, options);
@@ -526,11 +533,12 @@ impl Integrator for Mcmc {
 pub fn render(
     device: Device,
     scene: Arc<Scene>,
+    sampler_config: SamplerConfig,
     color_repr: ColorRepr,
     film: &mut Film,
     config: &Config,
     options: &RenderOptions,
 ) {
     let mcmc = Mcmc::new(device.clone(), config.clone());
-    mcmc.render(scene, color_repr, film, options);
+    mcmc.render(scene, sampler_config, color_repr, film, options);
 }

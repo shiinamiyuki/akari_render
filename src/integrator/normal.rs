@@ -17,6 +17,7 @@ impl Integrator for NormalVis {
     fn render(
         &self,
         scene: Arc<Scene>,
+        sampler: SamplerConfig,
         color_repr: ColorRepr,
         film: &mut Film,
         _options: &RenderOptions,

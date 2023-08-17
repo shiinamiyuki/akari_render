@@ -1,11 +1,17 @@
+use std::process::exit;
 use std::sync::Arc;
 
+use hexf::{hexf32, hexf64};
 use lazy_static::lazy_static;
 use rand::{rngs::StdRng, thread_rng, Rng, SeedableRng};
 
-use crate::*;
+use crate::data::bluenoise::{BLUE_NOISE_RESOLUTION, N_BLUE_NOISE_TEXTURES};
+use crate::data::pmj02bn::N_PMJ02BN_SETS;
+use crate::util::hash::xxhash32_4;
+use crate::util::{is_power_of_four, log4u32};
+use crate::{scene::Scene, *};
 pub mod mcmc;
-use crate::data::pmj02bn;
+use crate::data::{bluenoise, pmj02bn};
 use serde::{Deserialize, Serialize};
 
 pub trait Sampler {
@@ -17,16 +23,13 @@ pub trait Sampler {
     }
     fn next_3d(&self) -> Expr<Float3> {
         let u0 = self.next_1d();
-        let u1 = self.next_1d();
-        let u3 = self.next_1d();
-        make_float3(u0, u1, u3)
+        let u12 = self.next_2d();
+        make_float3(u0, u12.x(), u12.y())
     }
     fn next_4d(&self) -> Expr<Float4> {
-        let u0 = self.next_1d();
-        let u1 = self.next_1d();
-        let u3 = self.next_1d();
-        let u4 = self.next_1d();
-        make_float4(u0, u1, u3, u4)
+        let u01 = self.next_2d();
+        let u23 = self.next_2d();
+        make_float4(u01.x(), u01.y(), u23.x(), u23.y())
     }
     fn is_metropolis(&self) -> bool {
         false
@@ -64,42 +67,6 @@ impl SampleStream {
             SampleStream::Bsdf => 3,
             SampleStream::Roulette => 1,
         }
-    }
-}
-
-pub struct PathSampler<S: Sampler> {
-    base: S,
-    bsdf_cnt: Var<u32>,
-    light_cnt: Var<u32>,
-    roulette_cnt: Var<u32>,
-    bounces: u32,
-    pixel: Var<Float2>,
-    camera: ArrayVar<f32, 5>,
-    light: VLArrayVar<f32>,
-    bsdf: VLArrayVar<f32>,
-    roulette: VLArrayVar<f32>,
-}
-impl<S: Sampler> PathSampler<S> {
-    pub fn new(base: S, bounces: u32) -> Self {
-        Self {
-            base,
-            bsdf_cnt: var!(u32),
-            light_cnt: var!(u32),
-            roulette_cnt: var!(u32),
-            bounces,
-            light: VLArrayVar::zero(bounces as usize * SampleStream::Light.dimension() as usize),
-            bsdf: VLArrayVar::zero(bounces as usize * SampleStream::Bsdf.dimension() as usize),
-            roulette: VLArrayVar::zero(bounces as usize),
-            pixel: var!(Float2),
-            camera: var!([f32; 5]),
-        }
-    }
-    pub fn start(&self) {
-        self.bsdf_cnt.store(0);
-        self.light_cnt.store(0);
-        self.roulette_cnt.store(0);
-        self.base.start();
-        for_range(const_(0)..const_(self.bounces as i32), |_| {});
     }
 }
 
@@ -204,7 +171,7 @@ impl Sampler for IndependentSampler {
     fn start(&self) {}
     fn clone_box(&self) -> Box<dyn Sampler> {
         Box::new(Self {
-            state: self.state.clone(),
+            state: var!(Pcg32, *self.state),
             index: self.index,
             states: self.states.clone(),
             forget: var!(bool, *self.forget),
@@ -272,7 +239,7 @@ impl<'a> Sampler for IndependentReplaySampler<'a> {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum SamplerConfig {
     #[serde(rename = "independent")]
@@ -318,10 +285,347 @@ impl SamplerCreator for IndependentSamplerCreator {
 }
 
 pub struct Pmj02BnSamplerCreator {
+    device: Device,
+    pmj02bn_samples: Arc<Buffer<f32>>,
     pixel_samples: Arc<Buffer<Float2>>,
+    bluenoise_textures: Arc<BindlessArray>,
+    states: Arc<Buffer<Pmj02BnState>>,
     resolution: Uint2,
     spp: u32,
     seed: u32,
     pixel_tile_size: u32,
 }
-pub struct Pmj02BnSampler {}
+pub fn pmj02bn_sample_host(mut set_index: u32, mut sample_index: u32) -> Float2 {
+    set_index %= pmj02bn::N_PMJ02BN_SETS as u32;
+    assert!(sample_index < pmj02bn::N_PMJ02BN_SAMPLES as u32);
+    sample_index %= pmj02bn::N_PMJ02BN_SAMPLES as u32;
+    Float2::new(
+        (pmj02bn::PMJ02BN_SAMPLES[set_index as usize][sample_index as usize][0] as f64
+            * hexf64!("0x1p-32")) as f32,
+        (pmj02bn::PMJ02BN_SAMPLES[set_index as usize][sample_index as usize][1] as f64
+            * hexf64!("0x1p-32")) as f32,
+    )
+}
+pub fn pmj02bn_sample(
+    pmj02bn_samples: &Buffer<f32>,
+    mut set_index: Expr<u32>,
+    mut sample_index: Expr<u32>,
+) -> Expr<Float2> {
+    set_index %= pmj02bn::N_PMJ02BN_SETS as u32;
+    lc_assert!(sample_index.cmplt(pmj02bn::N_PMJ02BN_SAMPLES as u32));
+    sample_index %= pmj02bn::N_PMJ02BN_SAMPLES as u32;
+    let i = pmj02bn::N_PMJ02BN_SAMPLES as u32 * set_index + sample_index;
+    make_float2(
+        pmj02bn_samples.var().read(i * 2) * hexf32!("0x1p-32"),
+        pmj02bn_samples.var().read(i * 2 + 1) * hexf32!("0x1p-32"),
+    )
+}
+impl Pmj02BnSamplerCreator {
+    pub fn new(device: Device, resolution: Uint2, seed: u32, spp: u32) -> Self {
+        if !is_power_of_four(spp) {
+            log::warn!("Pmj02BnSampler results are best with power-of-4 samples per pixel (1, 4, 16, 64, ...)");
+        }
+        if spp > pmj02bn::N_PMJ02BN_SAMPLES as u32 {
+            log::error!(
+                "Pmj02BnSampler supports up to {} spp",
+                pmj02bn::N_PMJ02BN_SAMPLES
+            );
+            exit(-1);
+        }
+        let mut w = spp - 1;
+        w |= w >> 1;
+        w |= w >> 2;
+        w |= w >> 4;
+        w |= w >> 8;
+        w |= w >> 16;
+        let pixel_tile_size = 1u32 << (log4u32(pmj02bn::N_PMJ02BN_SAMPLES as u32) - log4u32(spp));
+        let n_pixel_samples = pixel_tile_size.pow(2) * spp;
+        let mut pixel_samples = vec![Float2::new(0.0, 0.0); n_pixel_samples as usize];
+        let mut n_stored = vec![0u32; pixel_tile_size.pow(2) as usize];
+        for i in 0..pmj02bn::N_PMJ02BN_SAMPLES {
+            let mut p: glam::Vec2 = pmj02bn_sample_host(0, i as u32).into();
+            p *= pixel_tile_size as f32;
+            let pixel_offset = p.x.floor() as u32 + p.y.floor() as u32 * pixel_tile_size;
+            if n_stored[pixel_offset as usize] == spp {
+                assert!(!is_power_of_four(spp));
+                continue;
+            }
+            let sample_offset = pixel_offset * spp + n_stored[pixel_offset as usize];
+            assert!(pixel_samples[sample_offset as usize].x == 0.0);
+            assert!(pixel_samples[sample_offset as usize].y == 0.0);
+            pixel_samples[sample_offset as usize] = (p - p.floor()).into();
+            n_stored[pixel_offset as usize] += 1;
+        }
+        for i in 0..n_stored.len() {
+            assert_eq!(spp, n_stored[i as usize], "i: {}", i);
+        }
+        let pixel_samples = Arc::new(device.create_buffer_from_slice(&pixel_samples));
+        let pmj02bn_samples = Arc::new(device.create_buffer_from_slice(unsafe {
+            let ptr = pmj02bn::PMJ02BN_SAMPLES.as_ptr() as *const f32;
+            let len = std::mem::size_of_val(&pmj02bn::PMJ02BN_SAMPLES) / std::mem::size_of::<f32>();
+            assert_eq!(
+                len,
+                pmj02bn::N_PMJ02BN_SETS * pmj02bn::N_PMJ02BN_SAMPLES * 2
+            );
+            std::slice::from_raw_parts(ptr, len)
+        }));
+        let bluenoise_textures = device.create_bindless_array(N_BLUE_NOISE_TEXTURES);
+        for i in 0..N_BLUE_NOISE_TEXTURES {
+            let tex = device.create_tex2d::<f32>(
+                luisa::PixelStorage::Short1,
+                BLUE_NOISE_RESOLUTION as u32,
+                BLUE_NOISE_RESOLUTION as u32,
+                1,
+            );
+            tex.view(0).copy_from(unsafe {
+                let ptr = bluenoise::BLUE_NOISE_TEXTURES[i].as_ptr() as *const u16;
+                let len = std::mem::size_of_val(&bluenoise::BLUE_NOISE_TEXTURES[i])
+                    / std::mem::size_of::<u16>();
+                assert_eq!(len, BLUE_NOISE_RESOLUTION * BLUE_NOISE_RESOLUTION);
+                std::slice::from_raw_parts(ptr, len)
+            });
+            bluenoise_textures.set_tex2d(
+                i as usize,
+                &tex,
+                luisa::Sampler {
+                    filter: luisa::SamplerFilter::Point,
+                    address: luisa::SamplerAddress::Repeat,
+                },
+            );
+        }
+        let states = Arc::new(device.create_buffer_from_fn(
+            resolution.x as usize * resolution.y as usize,
+            |i| {
+                let x = (i % resolution.x as usize) as u32;
+                let y = (i / resolution.x as usize) as u32;
+                Pmj02BnState {
+                    seed,
+                    dim: 0,
+                    pixel: Uint2::new(x, y),
+                    sample_index: u32::MAX,
+                    spp,
+                    w,
+                }
+            },
+        ));
+        Self {
+            device,
+            pmj02bn_samples,
+            pixel_samples,
+            resolution,
+            spp,
+            seed,
+            pixel_tile_size,
+            states,
+            bluenoise_textures: Arc::new(bluenoise_textures),
+        }
+    }
+}
+
+// see https://github.com/LuisaGroup/LuisaRender/blob/next/src/samplers/pmj02bn.cpp#L56
+lazy_static! {
+    static ref PERMUTE_ELEMENT: Callable<(Expr<u32>, Expr<u32>, Expr<u32>, Expr<u32>), Expr<u32>> =
+        create_static_callable::<(Expr<u32>, Expr<u32>, Expr<u32>, Expr<u32>), Expr<u32>>(
+            |i: Expr<u32>, l: Expr<u32>, w: Expr<u32>, p: Expr<u32>| {
+                let i = var!(u32, i);
+                loop_!({
+                    *i.get_mut() ^= p;
+                    *i.get_mut() *= 0xe170893du32;
+                    *i.get_mut() ^= p >> 16u32;
+                    *i.get_mut() ^= (*i & w) >> 4u32;
+                    *i.get_mut() ^= p >> 8u32;
+                    *i.get_mut() *= 0x0929eb3fu32;
+                    *i.get_mut() ^= p >> 23u32;
+                    *i.get_mut() ^= (*i & w) >> 1u32;
+                    *i.get_mut() *= 1 | p >> 27u32;
+                    *i.get_mut() *= 0x6935fa69u32;
+                    *i.get_mut() ^= (*i & w) >> 11u32;
+                    *i.get_mut() *= 0x74dcb303u32;
+                    *i.get_mut() ^= (*i & w) >> 2u32;
+                    *i.get_mut() *= 0x9e501cc3u32;
+                    *i.get_mut() ^= (*i & w) >> 2u32;
+                    *i.get_mut() *= 0xc860a3dfu32;
+                    *i.get_mut() &= w;
+                    *i.get_mut() ^= *i >> 5u32;
+                    if_!(i.cmplt(l), {
+                        break_();
+                    })
+                });
+                let i = *i;
+                (i + p) % l
+            }
+        );
+}
+fn permute_element(i: Expr<u32>, l: Expr<u32>, w: Expr<u32>, p: Expr<u32>) -> Expr<u32> {
+    PERMUTE_ELEMENT.call(i, l, w, p)
+}
+#[derive(Clone, Copy, Value, Debug)]
+#[repr(C)]
+struct Pmj02BnState {
+    seed: u32,
+    dim: u32,
+    pixel: Uint2,
+    sample_index: u32,
+    spp: u32,
+    w: u32,
+}
+pub struct Pmj02BnSampler {
+    pmj02bn_samples: Arc<Buffer<f32>>,
+    pixel_samples: Arc<Buffer<Float2>>,
+    bluenoise_textures: Arc<BindlessArray>,
+    i: Expr<u32>,
+    state: Var<Pmj02BnState>,
+    states: Arc<Buffer<Pmj02BnState>>,
+    forget: Var<bool>,
+    next_1d: Arc<DynCallable<(Var<Pmj02BnState>,), Expr<f32>>>,
+    next_2d: Arc<DynCallable<(Var<Pmj02BnState>,), Expr<Float2>>>,
+}
+impl Pmj02BnSampler {
+    fn new(
+        device: &Device,
+        pmj02bn_samples: Arc<Buffer<f32>>,
+        pixel_samples: Arc<Buffer<Float2>>,
+        bluenoise_textures: Arc<BindlessArray>,
+        states: Arc<Buffer<Pmj02BnState>>,
+        i: Expr<u32>,
+    ) -> Self {
+        let bluenoise =
+            |bluenoise_textures: &Arc<BindlessArray>, tex_index: Expr<u32>, p: Expr<Uint2>| {
+                let uv = p.yx() % BLUE_NOISE_RESOLUTION as u32;
+                bluenoise_textures
+                    .var()
+                    .tex2d(tex_index % N_BLUE_NOISE_TEXTURES as u32)
+                    .read(uv)
+                    .x()
+            };
+        let next_1d = {
+            let bluenoise_textures = bluenoise_textures.clone();
+            device.create_dyn_callable::<(Var<Pmj02BnState>,), Expr<f32>>(Box::new(
+                move |state: Var<Pmj02BnState>| {
+                    let hash = xxhash32_4(make_uint4(
+                        *state.pixel().x(),
+                        *state.pixel().y(),
+                        *state.dim(),
+                        *state.seed(),
+                    ));
+                    let index =
+                        permute_element(*state.sample_index(), *state.spp(), *state.w(), hash);
+                    let delta =
+                        bluenoise(&bluenoise_textures, *state.sample_index(), *state.pixel());
+                    *state.dim().get_mut() += 1;
+                    ((index.float() + delta) / state.spp().float()).min(ONE_MINUS_EPSILON)
+                },
+            ))
+        };
+        let next_2d = {
+            let pmj02bn_samples = pmj02bn_samples.clone();
+            let bluenoise_textures = bluenoise_textures.clone();
+            device.create_dyn_callable::<(Var<Pmj02BnState>,), Expr<Float2>>(Box::new(
+                move |state: Var<Pmj02BnState>| {
+                    let index = var!(u32, *state.sample_index());
+                    let pmj_instance = *state.dim() / 2;
+                    if_!(pmj_instance.cmpge(N_PMJ02BN_SETS as u32), {
+                        let hash = xxhash32_4(make_uint4(
+                            *state.pixel().x(),
+                            *state.pixel().y(),
+                            *state.dim(),
+                            *state.seed(),
+                        ));
+                        *index.get_mut() =
+                            permute_element(*state.sample_index(), *state.spp(), *state.w(), hash);
+                    });
+                    let u = pmj02bn_sample(&pmj02bn_samples, pmj_instance, *index);
+                    let u =
+                        u + bluenoise(&bluenoise_textures, *state.sample_index(), *state.pixel());
+                    *state.dim().get_mut() += 2;
+                    u.fract()
+                },
+            ))
+        };
+        Self {
+            pmj02bn_samples,
+            pixel_samples,
+            bluenoise_textures,
+            state: var!(Pmj02BnState, states.read(i)),
+            forget: var!(bool, false),
+            states,
+            i,
+            next_1d: Arc::new(next_1d),
+            next_2d: Arc::new(next_2d),
+        }
+    }
+}
+impl Drop for Pmj02BnSampler {
+    fn drop(&mut self) {
+        if_!(!*self.forget, {
+            let i = self.i;
+            self.states.write(i, *self.state);
+        });
+    }
+}
+impl Sampler for Pmj02BnSampler {
+    fn next_1d(&self) -> Float {
+        (self.next_1d).call(self.state)
+    }
+    fn next_2d(&self) -> Expr<Float2> {
+        (self.next_2d).call(self.state)
+    }
+    fn start(&self) {
+        *self.state.dim().get_mut() = 0u32.into();
+        if_!(
+            self.state.sample_index().cmpeq(u32::MAX),
+            {
+                *self.state.sample_index().get_mut() = 0.into();
+            },
+            {
+                *self.state.sample_index().get_mut() += 1;
+            }
+        );
+    }
+    fn clone_box(&self) -> Box<dyn Sampler> {
+        Box::new(Self {
+            pmj02bn_samples: self.pmj02bn_samples.clone(),
+            pixel_samples: self.pixel_samples.clone(),
+            bluenoise_textures: self.bluenoise_textures.clone(),
+            i: self.i,
+            state: var!(Pmj02BnState, *self.state),
+            states: self.states.clone(),
+            forget: var!(bool, *self.forget),
+            next_1d: self.next_1d.clone(),
+            next_2d: self.next_2d.clone(),
+        })
+    }
+    fn forget(&self) {
+        *self.forget.get_mut() = true.into();
+    }
+}
+impl SamplerCreator for Pmj02BnSamplerCreator {
+    fn create(&self, pixel: Expr<Uint2>) -> Box<dyn Sampler> {
+        let i = pixel.x() + pixel.y() * self.resolution.x;
+        Box::new(Pmj02BnSampler::new(
+            &self.device,
+            self.pmj02bn_samples.clone(),
+            self.pixel_samples.clone(),
+            self.bluenoise_textures.clone(),
+            self.states.clone(),
+            i,
+        ))
+    }
+}
+impl SamplerConfig {
+    pub fn creator(&self, device: Device, scene: &Scene, spp: u32) -> Box<dyn SamplerCreator> {
+        match self {
+            Self::Independent { seed } => Box::new(IndependentSamplerCreator::new(
+                device,
+                scene.camera.resolution(),
+                *seed,
+            )),
+            Self::Pmj02Bn { seed } => Box::new(Pmj02BnSamplerCreator::new(
+                device,
+                scene.camera.resolution(),
+                *seed as u32,
+                spp,
+            )),
+        }
+    }
+}

@@ -17,7 +17,6 @@ pub struct TextureEvaluator {
 }
 impl TextureEvaluator {
     pub fn color_from_float4(&self, v: Expr<Float4>) -> Color {
-        dbg!(srgb_to_aces_with_cat_mat());
         match self.color_repr {
             ColorRepr::Rgb(cs) => match cs {
                 RgbColorSpace::SRgb => Color::Rgb(v.xyz(), RgbColorSpace::SRgb),
