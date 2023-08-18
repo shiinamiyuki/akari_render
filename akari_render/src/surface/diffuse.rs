@@ -17,7 +17,13 @@ pub struct DiffuseBsdf {
 }
 
 impl Bsdf for DiffuseBsdf {
-    fn evaluate(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &BsdfEvalContext) -> Color {
+    fn evaluate(
+        &self,
+        wo: Expr<Float3>,
+        wi: Expr<Float3>,
+        _swl: Expr<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> Color {
         if_!(Frame::same_hemisphere(wo, wi), {
             &self.reflectance * Frame::abs_cos_theta(wi)
         }, else {
@@ -29,6 +35,7 @@ impl Bsdf for DiffuseBsdf {
         wo: Expr<Float3>,
         _u_select: Float,
         u_sample: Expr<Float2>,
+        _swl: Var<SampledWavelengths>,
         _ctx: &BsdfEvalContext,
     ) -> BsdfSample {
         let wi = cos_sample_hemisphere(u_sample);
@@ -44,24 +51,43 @@ impl Bsdf for DiffuseBsdf {
             pdf,
             color,
             valid: Bool::from(true),
-            lobe_roughness: const_(1.0f32),
         }
     }
-    fn pdf(&self, wo: Expr<Float3>, wi: Expr<Float3>, _ctx: &BsdfEvalContext) -> Float {
+    fn pdf(
+        &self,
+        wo: Expr<Float3>,
+        wi: Expr<Float3>,
+        _swl: Expr<SampledWavelengths>,
+        _ctx: &BsdfEvalContext,
+    ) -> Float {
         select(
             Frame::same_hemisphere(wo, wi),
             Frame::abs_cos_theta(wi) * FRAC_1_PI,
             Float::from(0.0),
         )
     }
-    fn albedo(&self, _wo: Expr<Float3>, _ctx: &BsdfEvalContext) -> Color {
+    fn albedo(
+        &self,
+        _wo: Expr<Float3>,
+        _swl: Expr<SampledWavelengths>,
+        _ctx: &BsdfEvalContext,
+    ) -> Color {
         self.reflectance * const_(PI)
+    }
+    fn roughness(
+        &self,
+        _wo: Expr<Float3>,
+        _swl: Expr<color::SampledWavelengths>,
+        _ctx: &BsdfEvalContext,
+    ) -> Expr<f32> {
+        const_(1.0f32)
     }
 }
 impl Surface for DiffuseSurfaceExpr {
     fn closure(
         &self,
         si: Expr<interaction::SurfaceInteraction>,
+        swl: Expr<color::SampledWavelengths>,
         ctx: &BsdfEvalContext,
     ) -> BsdfClosure {
         let reflectance = ctx.texture.evaluate_color(self.reflectance(), si) * const_(FRAC_1_PI);

@@ -13,6 +13,15 @@ pub struct SampledWavelengths {
     pub wavelengths: Float4,
     pub pdf: Float4,
 }
+impl SampledWavelengthsExpr {
+    pub fn rgb_wavelengths() -> Self {
+        struct_!(SampledWavelengths {
+            wavelengths: make_float4(0.0, 0.0, 0.0, 0.0),
+            pdf: make_float4(1.0, 1.0, 1.0, 1.0),
+        })
+    }
+}
+
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "type")]
 pub enum ColorRepr {
@@ -29,28 +38,32 @@ impl ColorRepr {
         }
     }
 }
+
 #[derive(Aggregate, Clone, Copy)]
 pub enum Color {
     Rgb(Expr<Float3>, RgbColorSpace),
-    Spectral(Expr<FlatColor>),
+    Spectral(Expr<Float4>),
 }
 #[derive(Aggregate, Clone, Copy)]
 pub enum ColorVar {
     Rgb(Var<Float3>, RgbColorSpace),
-    Spectral(Var<FlatColor>),
+    Spectral(Var<Float4>),
 }
 
 // flattened color values for storage
+pub type FlatColor = Float4;
+pub type FlatColorExpr = Expr<Float4>;
+
 #[derive(Copy, Clone, Value, Debug)]
 #[repr(C)]
-pub struct FlatColor {
+pub struct SampledSpectrum {
     pub samples: Float4,
     pub wavelengths: SampledWavelengths,
 }
 
 pub enum ColorBuffer {
     Rgb(Buffer<Float3>, RgbColorSpace),
-    Spectral(Buffer<FlatColor>),
+    Spectral(Buffer<SampledSpectrum>),
 }
 impl ColorBuffer {
     pub fn new(device: Device, count: usize, color_repr: ColorRepr) -> Self {
@@ -59,16 +72,22 @@ impl ColorBuffer {
             ColorRepr::Rgb(colorspace) => ColorBuffer::Rgb(device.create_buffer(count), colorspace),
         }
     }
-    pub fn read(&self, i: impl Into<Expr<u32>>) -> Color {
+    pub fn read(&self, i: impl Into<Expr<u32>>) -> (Color, Expr<SampledWavelengths>) {
         match self {
-            ColorBuffer::Rgb(b, cs) => Color::Rgb(b.var().read(i), *cs),
-            ColorBuffer::Spectral(b) => Color::Spectral(b.var().read(i)),
+            ColorBuffer::Rgb(b, cs) => (
+                Color::Rgb(b.var().read(i), *cs),
+                SampledWavelengthsExpr::rgb_wavelengths(),
+            ),
+            ColorBuffer::Spectral(b) => {
+                let c = b.var().read(i);
+                (Color::Spectral(c.samples()), c.wavelengths())
+            }
         }
     }
-    pub fn write(&self, i: impl Into<Expr<u32>>, color: Color) {
+    pub fn write(&self, i: impl Into<Expr<u32>>, color: Color, swl: Expr<SampledWavelengths>) {
         match self {
             ColorBuffer::Rgb(b, cs) => b.var().write(i, color.as_rgb()),
-            ColorBuffer::Spectral(b) => b.var().write(i, color.as_spectral()),
+            ColorBuffer::Spectral(b) => b.var().write(i, color.as_sampled_spectrum(swl)),
         }
     }
     pub fn as_rgb(&self) -> &Buffer<Float3> {
@@ -77,7 +96,7 @@ impl ColorBuffer {
             ColorBuffer::Spectral(_) => panic!("as_rgb() called on spectral buffer"),
         }
     }
-    pub fn as_spectral(&self) -> &Buffer<FlatColor> {
+    pub fn as_spectral(&self) -> &Buffer<SampledSpectrum> {
         match self {
             ColorBuffer::Rgb(_, _) => panic!("as_Spectral() called on rgb buffer"),
             ColorBuffer::Spectral(b) => b,
@@ -87,19 +106,19 @@ impl ColorBuffer {
 impl ColorVar {
     pub fn zero(repr: ColorRepr) -> Self {
         match repr {
-            ColorRepr::Spectral => todo!(),
+            ColorRepr::Spectral => ColorVar::Spectral(var!(Float4)),
             ColorRepr::Rgb(cs) => ColorVar::Rgb(var!(Float3), cs),
         }
     }
     pub fn new(value: Color) -> Self {
         match value {
             Color::Rgb(v, cs) => ColorVar::Rgb(var!(Float3, v), cs),
-            Color::Spectral(v) => ColorVar::Spectral(var!(FlatColor, v)),
+            Color::Spectral(v) => ColorVar::Spectral(var!(Float4, v)),
         }
     }
     pub fn one(repr: ColorRepr) -> Self {
         match repr {
-            ColorRepr::Spectral => todo!(),
+            ColorRepr::Spectral => ColorVar::Spectral(var!(Float4, Float4Expr::one())),
             ColorRepr::Rgb(cs) => ColorVar::Rgb(var!(Float3, Float3Expr::one()), cs),
         }
     }
@@ -111,13 +130,13 @@ impl ColorVar {
     }
     pub fn load(&self) -> Color {
         match self {
-            ColorVar::Spectral(_s) => todo!(),
+            ColorVar::Spectral(s) => Color::Spectral(**s),
             ColorVar::Rgb(v, cs) => Color::Rgb(v.load(), *cs),
         }
     }
     pub fn store(&self, color: Color) {
         match self {
-            ColorVar::Spectral(_s) => todo!(),
+            ColorVar::Spectral(s) => s.store(color.as_spectral()),
             ColorVar::Rgb(v, cs) => v.store(color.as_rgb()),
         }
     }
@@ -165,7 +184,15 @@ impl Color {
             }
         }
     }
-    pub fn as_spectral(&self) -> Expr<FlatColor> {
+    pub fn as_sampled_spectrum(&self, swl: Expr<SampledWavelengths>) -> Expr<SampledSpectrum> {
+        match self {
+            Color::Rgb(_, _) => {
+                panic!("not spectral!");
+            }
+            Color::Spectral(samples) => SampledSpectrumExpr::new(*samples, swl),
+        }
+    }
+    pub fn as_spectral(&self) -> Expr<Float4> {
         match self {
             Color::Rgb(_, _) => {
                 panic!("not spectral!");
@@ -175,16 +202,13 @@ impl Color {
     }
     pub fn flatten(&self) -> Expr<FlatColor> {
         match self {
-            Color::Rgb(rgb, _) => FlatColorExpr::new(
-                make_float4(rgb.x(), rgb.y(), rgb.z(), 0.0),
-                zeroed::<SampledWavelengths>(),
-            ),
+            Color::Rgb(rgb, _) => make_float4(rgb.x(), rgb.y(), rgb.z(), 0.0),
             Color::Spectral(samples) => *samples,
         }
     }
     pub fn from_flat(repr: ColorRepr, color: Expr<FlatColor>) -> Self {
         match repr {
-            ColorRepr::Rgb(cs) => Color::Rgb(color.samples().xyz(), cs),
+            ColorRepr::Rgb(cs) => Color::Rgb(color.xyz(), cs),
             ColorRepr::Spectral => Color::Spectral(color),
         }
     }
@@ -235,7 +259,7 @@ impl std::ops::Mul<Float> for &Color {
 
     fn mul(self, rhs: Float) -> Self::Output {
         match self {
-            Color::Spectral(s) => Color::Spectral(s.set_samples(s.samples() * rhs)),
+            Color::Spectral(s) => Color::Spectral(*s * rhs),
             Color::Rgb(s, cs) => Color::Rgb(*s * rhs, *cs),
         }
     }
@@ -245,7 +269,7 @@ impl std::ops::Div<Float> for &Color {
 
     fn div(self, rhs: Float) -> Self::Output {
         match self {
-            Color::Spectral(s) => Color::Spectral(s.set_samples(s.samples() / rhs)),
+            Color::Spectral(s) => Color::Spectral(*s / rhs),
             Color::Rgb(s, cs) => Color::Rgb(*s / rhs, *cs),
         }
     }
@@ -305,7 +329,7 @@ impl std::ops::Mul<&Color> for &Color {
         assert_eq!(self.repr(), rhs.repr());
         match (self, rhs) {
             (Color::Spectral(s), Color::Spectral(t)) => {
-                Color::Spectral(s.set_samples(s.samples() * t.samples()))
+                Color::Spectral(*s * *t)
             }
             (Color::Rgb(s, cs0), Color::Rgb(t, cs1)) => {
                 assert_eq!(cs0, cs1);
@@ -322,7 +346,7 @@ impl std::ops::Add<&Color> for &Color {
         assert_eq!(self.repr(), rhs.repr());
         match (self, rhs) {
             (Color::Spectral(s), Color::Spectral(t)) => {
-                Color::Spectral(s.set_samples(s.samples() + t.samples()))
+                Color::Spectral(*s + *t)
             }
             (Color::Rgb(s, cs0), Color::Rgb(t, cs1)) => {
                 assert_eq!(cs0, cs1);
@@ -339,7 +363,7 @@ impl std::ops::Sub<&Color> for &Color {
         assert_eq!(self.repr(), rhs.repr());
         match (self, rhs) {
             (Color::Spectral(s), Color::Spectral(t)) => {
-                Color::Spectral(s.set_samples(s.samples() - t.samples()))
+                Color::Spectral(*s - *t)
             }
             (Color::Rgb(s, cs0), Color::Rgb(t, cs1)) => {
                 assert_eq!(cs0, cs1);
