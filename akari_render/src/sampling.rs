@@ -7,9 +7,9 @@ pub fn uniform_sample_disk(u: Expr<Float2>) -> Expr<Float2> {
     make_float2(r * phi.cos(), r * phi.sin())
 }
 pub fn invert_uniform_sample_disk(p: Expr<Float2>) -> Expr<Float2> {
-    let r = (p.x().sqr() + p.y().sqr()).sqrt();
+    let r = p.x().sqr() + p.y().sqr();
     let phi = p.y().atan2(p.x()) / (2.0 * std::f32::consts::PI);
-    make_float2(r, phi)
+    make_float2(r, phi.fract())
 }
 pub fn cos_sample_hemisphere(u: Expr<Float2>) -> Expr<Float3> {
     let d = uniform_sample_disk(u);

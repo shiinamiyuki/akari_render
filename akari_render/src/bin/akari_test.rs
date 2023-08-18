@@ -1,18 +1,18 @@
 use std::env::{args, args_os, current_exe};
 use std::f32::consts::PI;
 use std::process::exit;
-use std::sync::Arc;
 
 use akari_render::color::Color;
 use akari_render::geometry::{face_forward, xyz_to_spherical};
-use akari_render::microfacet::TrowbridgeReitzDistribution;
-use akari_render::sampler::{init_pcg32_buffer, IndependentSampler, Pcg32, Sampler};
+use akari_render::microfacet::{TrowbridgeReitzDistribution, MicrofacetDistribution};
+use akari_render::sampler::{init_pcg32_buffer, IndependentSampler, Pcg32, Sampler, init_pcg32_buffer_with_seed};
+use akari_render::sampling::{cos_sample_hemisphere, invert_cos_sample_hemisphere};
 use akari_render::scene::Scene;
 use akari_render::surface::*;
 
 use akari_render::surface::diffuse::DiffuseBsdf;
-use akari_render::util::LocalFileResolver;
 use akari_render::*;
+use luisa::init_logger;
 use luisa_compute as luisa;
 
 #[derive(Clone, Copy, Value)]
@@ -82,14 +82,8 @@ fn test_bsdf_pdf(device: Device, sample_fn: impl Fn(Expr<Float3>) -> Expr<PdfSam
         exit(-1);
     }
 }
-fn main() {
-    let ctx = luisa::Context::new(current_exe().unwrap());
-    let args = args().collect::<Vec<_>>();
-    let device = if args.len() == 1 {
-        ctx.create_device("cpu")
-    } else {
-        ctx.create_device(&args[1])
-    };
+
+fn test_bsdf(device: &Device) {
     let mut current_dir = std::fs::canonicalize(std::env::current_exe().unwrap())
         .unwrap()
         .parent()
@@ -161,5 +155,99 @@ fn main() {
                 })
             },
         );
+    }
+}
+fn test_invert_helper(
+    device: &Device,
+    name: &str,
+    sample: impl Fn(Expr<Float2>) -> Expr<Float3>,
+    invert: impl Fn(Expr<Float3>) -> Expr<Float2>,
+) {
+    let count = 8192;
+    let samples = 256;
+    let rngs = init_pcg32_buffer_with_seed(device.clone(), count, 0);
+    let bads = device.create_buffer::<u32>(count);
+    bads.fill(0);
+    let printer = Printer::new(&device, 32768);
+    let kernel = device.create_kernel::<()>(&|| {
+        let i = dispatch_id().x();
+        let sampler = IndependentSampler::from_pcg32(var!(Pcg32, rngs.var().read(i)));
+        for_range(0..samples, |_| {
+            let u = sampler.next_2d();
+            let w = sample(u);
+            let u2 = invert(w);
+            let bad = (u2 - u).length().cmpgt(0.01);
+            if_!(bad, {
+                bads.var().atomic_fetch_add(i, 1);
+                lc_info!(printer, "bad: u: {:?} u2:{:?} w:{:?}", u, u2, w);
+            });
+        });
+    });
+    let stream = device.default_stream();
+    stream.with_scope(|s| {
+        s.reset_printer(&printer)
+            .submit([kernel.dispatch_async([count as u32, 1, 1])])
+            .print(&printer);
+    });
+
+    let bads = bads.copy_to_vec();
+    let bads = bads.iter().copied().sum::<u32>();
+    println!("Test invert: `{}`, bad: {}", name, bads);
+}
+fn test_invert(device: &Device) {
+    test_invert_helper(
+        device,
+        "cos_sample_hemisphere",
+        cos_sample_hemisphere,
+        invert_cos_sample_hemisphere,
+    );
+    let ax = 0.2;
+    let ay = 0.3;
+    test_invert_helper(
+        device,
+        "invert_ggx_iso",
+        |u|{
+            let dist = TrowbridgeReitzDistribution::from_alpha(make_float2(ax, ax), false);
+            dist.sample_wh(make_float3(0.0,1.0,0.0), u)
+        },
+        |w|{
+            let dist = TrowbridgeReitzDistribution::from_alpha(make_float2(ax, ax), false);
+            dist.invert_wh(make_float3(0.0,1.0,0.0), w)
+        },
+    );
+    test_invert_helper(
+        device,
+        "invert_ggx_aniso",
+        |u|{
+            let dist = TrowbridgeReitzDistribution::from_alpha(make_float2(ax, ay), false);
+            dist.sample_wh(make_float3(0.0,1.0,0.0), u)
+        },
+        |w|{
+            let dist = TrowbridgeReitzDistribution::from_alpha(make_float2(ax, ay), false);
+            dist.invert_wh(make_float3(0.0,1.0,0.0), w)
+        },
+    );
+}
+fn main() {
+    let ctx = luisa::Context::new(current_exe().unwrap());
+    let args = args().collect::<Vec<_>>();
+    if args.len() != 3 {
+        eprintln!("usage: {} <device> <test>", args[0]);
+        exit(-1);
+    }
+    let device = if args.len() == 1 {
+        ctx.create_device("cpu")
+    } else {
+        ctx.create_device(&args[1])
+    };
+    init_logger();
+    let test = &args[2];
+    match test.as_str() {
+        "bsdf" => test_bsdf(&device),
+        "invert" => test_invert(&device),
+        _ => {
+            eprintln!("unknown test {}", test);
+            exit(-1);
+        }
     }
 }

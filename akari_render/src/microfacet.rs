@@ -1,4 +1,4 @@
-use crate::geometry::{face_forward, spherical_to_xyz2, Frame};
+use crate::geometry::{face_forward, spherical_to_xyz2, xyz_to_spherical, Frame};
 use crate::*;
 use lazy_static::lazy_static;
 use std::f32::consts::PI;
@@ -13,6 +13,7 @@ pub trait MicrofacetDistribution {
     fn d(&self, wh: Expr<Float3>) -> Expr<f32>;
     fn lambda(&self, w: Expr<Float3>) -> Expr<f32>;
     fn sample_wh(&self, wo: Expr<Float3>, u: Expr<Float2>) -> Expr<Float3>;
+    fn invert_wh(&self, wo: Expr<Float3>, wh: Expr<Float3>) -> Expr<Float2>;
     fn pdf(&self, wo: Expr<Float3>, wh: Expr<Float3>) -> Expr<f32>;
     fn roughness(&self) -> Expr<f32>;
 }
@@ -172,7 +173,49 @@ impl MicrofacetDistribution for TrowbridgeReitzDistribution {
             SAMPLE.call(self.alpha, u)
         }
     }
-
+    fn invert_wh(&self, _wo: Expr<Float3>, wh: Expr<Float3>) -> Expr<Float2> {
+        if self.sample_visible {
+            unimplemented!("invert_wh is not available for visible wh sampling");
+        } else {
+            lazy_static! {
+                static ref INVERT_SAMPLE: Callable<(Expr<Float2>, Expr<Float3>), Expr<Float2>> =
+                    create_static_callable::<(Expr<Float2>, Expr<Float3>), Expr<Float2>>(
+                        |alpha: Expr<Float2>, wh: Expr<Float3>| {
+                            let (theta, phi) = xyz_to_spherical(wh);
+                            let cos_theta = theta.cos();
+                            if_!(alpha.x().cmpeq(alpha.y()), {
+                                // see https://github.com/tunabrain/tungsten/blob/master/src/core/bsdfs/Microfacet.hpp
+                                // let phi = 2.0 * PI * u.y();
+                                // let tan_theta2 = alpha.x().sqr() * u.x() / (1.0 - u.x());
+                                // let cos_theta = 1.0 / (1.0 + tan_theta2).sqrt();
+                                // (phi, cos_theta)
+                                let uy = (phi * FRAC_1_2PI).fract();
+                                let tan_theta2 = cos_theta.sqr().recip() - 1.0;
+                                let gamma = tan_theta2 / alpha.x().sqr();
+                                let ux = gamma / (1.0 + gamma);
+                                make_float2(ux, uy)
+                            }, else, {
+                                // let phi = (alpha.y() / alpha.x() * (2.0 * PI * u.y() + PI * 0.5).tan()).atan();
+                                let uy = (((phi.atan() * alpha.x() / alpha.y()).atan() - PI * 0.5) * FRAC_1_2PI).fract();
+                                // let phi = select(u.y().cmpgt(0.5), phi + PI, phi);
+                                let sin_phi = phi.sin();
+                                let cos_phi = phi.cos();
+                                let ax2 = alpha.x().sqr();
+                                let ay2 = alpha.y().sqr();
+                                let a2 = 1.0 / (cos_phi.sqr() / ax2 + sin_phi.sqr() / ay2);
+                                // let tan_theta2 = a2 * u.x() / (1.0 - u.x());
+                                // let cos_theta = 1.0 / (1.0 + tan_theta2).sqrt();
+                                let tan_theta2 = cos_theta.sqr().recip() - 1.0;
+                                let gamma = tan_theta2 / a2;
+                                let ux = gamma / (1.0 + gamma);
+                                make_float2(ux, uy)
+                            })
+                        }
+                    );
+            }
+            INVERT_SAMPLE.call(self.alpha, wh)
+        }
+    }
     fn pdf(&self, wo: Expr<Float3>, wh: Expr<Float3>) -> Expr<f32> {
         if self.sample_visible {
             self.d(wh) * self.g1(wo) * wo.dot(wh).abs() / Frame::abs_cos_theta(wo)

@@ -1,3 +1,5 @@
+use std::f32::consts::PI;
+
 use crate::*;
 #[derive(Clone, Copy, Debug, Value)]
 #[repr(C)]
@@ -249,4 +251,8 @@ pub fn xyz_to_spherical(v: Expr<Float3>) -> (Expr<f32>, Expr<f32>) {
     let phi = v.z().atan2(v.x());
     let theta = v.y().acos();
     (theta, phi)
+}
+pub fn invert_phi(v: Expr<Float3>) -> Expr<f32> {
+    let phi = v.z().atan2(v.x());
+    (phi / (2.0 * PI)).fract()
 }
