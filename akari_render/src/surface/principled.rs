@@ -1,6 +1,7 @@
 use std::f32::consts::FRAC_1_PI;
 
 use crate::color::Color;
+use crate::color::*;
 use crate::geometry::Frame;
 use crate::interaction::SurfaceInteraction;
 use crate::microfacet::TrowbridgeReitzDistribution;
@@ -31,40 +32,50 @@ pub struct DisneyDiffuseBsdf {
 }
 
 impl Bsdf for DisneyDiffuseBsdf {
-    fn evaluate(&self, wo: Expr<Float3>, wi: Expr<Float3>, ctx: &BsdfEvalContext) -> Color {
-        if_!(Frame::same_hemisphere(wo, wi), {
-            let diffuse = {
-                let fo = schlick_weight(Frame::abs_cos_theta(wo));
-                let fi = schlick_weight(Frame::abs_cos_theta(wi));
-                // Diffuse fresnel - go from 1 at normal incidence to .5 at grazing.
-                // Burley 2015, eq (4).
-                self.reflectance * (FRAC_1_PI * (1.0 - fo * 0.5) * (1.0 - fi * 0.5))
-            };
-            let retro = {
-                let wh = wo + wi;
-                let valid = wh.cmpne(0.0).any();
-                let wh = wh.normalize();
-                let cos_theta_d = wi.dot(wh);
-                let fo = schlick_weight(Frame::abs_cos_theta(wo));
-                let fi = schlick_weight(Frame::abs_cos_theta(wi));
-                let rr = 2.0 * self.roughness * cos_theta_d * cos_theta_d;
-                self.reflectance
-                    * select(
-                        valid,
-                        FRAC_1_PI * rr * (fo + fi + fo * fi * (rr - 1.0)),
-                        const_(0.0f32),
-                    )
-            };
-            (diffuse + retro) * Frame::abs_cos_theta(wi)
-        }, else {
-            Color::zero(ctx.color_repr)
-        })
+    fn evaluate(
+        &self,
+        wo: Expr<Float3>,
+        wi: Expr<Float3>,
+        swl: Expr<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> Color {
+        if_!(
+            Frame::same_hemisphere(wo, wi),
+            {
+                let diffuse = {
+                    let fo = schlick_weight(Frame::abs_cos_theta(wo));
+                    let fi = schlick_weight(Frame::abs_cos_theta(wi));
+                    // Diffuse fresnel - go from 1 at normal incidence to .5 at grazing.
+                    // Burley 2015, eq (4).
+                    self.reflectance * (FRAC_1_PI * (1.0 - fo * 0.5) * (1.0 - fi * 0.5))
+                };
+                let retro = {
+                    let wh = wo + wi;
+                    let valid = wh.cmpne(0.0).any();
+                    let wh = wh.normalize();
+                    let cos_theta_d = wi.dot(wh);
+                    let fo = schlick_weight(Frame::abs_cos_theta(wo));
+                    let fi = schlick_weight(Frame::abs_cos_theta(wi));
+                    let rr = 2.0 * self.roughness * cos_theta_d * cos_theta_d;
+                    self.reflectance
+                        * select(
+                            valid,
+                            FRAC_1_PI * rr * (fo + fi + fo * fi * (rr - 1.0)),
+                            const_(0.0f32),
+                        )
+                };
+                (diffuse + retro) * Frame::abs_cos_theta(wi)
+            },
+            else,
+            { Color::zero(ctx.color_repr) }
+        )
     }
     fn sample(
         &self,
         wo: Expr<Float3>,
         _u_select: Float,
         u_sample: Expr<Float2>,
+        swl: Var<SampledWavelengths>,
         ctx: &BsdfEvalContext,
     ) -> BsdfSample {
         let wi = cos_sample_hemisphere(u_sample);
@@ -74,24 +85,42 @@ impl Bsdf for DisneyDiffuseBsdf {
             make_float3(wi.x(), -wi.y(), wi.x()),
         );
         let pdf = Frame::abs_cos_theta(wi) * FRAC_1_PI;
-        let color = self.evaluate(wo, wi, ctx);
+        let color = self.evaluate(wo, wi, *swl, ctx);
         BsdfSample {
             wi,
             pdf,
             color,
             valid: Bool::from(true),
-            lobe_roughness: const_(1.0f32),
         }
     }
-    fn pdf(&self, wo: Expr<Float3>, wi: Expr<Float3>, _ctx: &BsdfEvalContext) -> Float {
+    fn pdf(
+        &self,
+        wo: Expr<Float3>,
+        wi: Expr<Float3>,
+        _swl: Expr<SampledWavelengths>,
+        _ctx: &BsdfEvalContext,
+    ) -> Float {
         select(
             Frame::same_hemisphere(wo, wi),
             Frame::abs_cos_theta(wi) * FRAC_1_PI,
             Float::from(0.0),
         )
     }
-    fn albedo(&self, _wo: Expr<Float3>, _ctx: &BsdfEvalContext) -> Color {
+    fn albedo(
+        &self,
+        _wo: Expr<Float3>,
+        _swl: Expr<SampledWavelengths>,
+        _ctx: &BsdfEvalContext,
+    ) -> Color {
         self.reflectance
+    }
+    fn roughness(
+        &self,
+        _wo: Expr<Float3>,
+        _swl: Expr<SampledWavelengths>,
+        _ctx: &BsdfEvalContext,
+    ) -> Expr<f32> {
+        self.roughness
     }
 }
 
@@ -108,7 +137,12 @@ impl Fresnel for DisneyFresnel {
     }
 }
 impl Surface for PrincipledSurfaceExpr {
-    fn closure(&self, si: Expr<SurfaceInteraction>, ctx: &BsdfEvalContext) -> BsdfClosure {
+    fn closure(
+        &self,
+        si: Expr<SurfaceInteraction>,
+        swl: Expr<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> BsdfClosure {
         let (color, transmission_color) = {
             let color = ctx.texture.evaluate_float4(self.color(), si);
             let transmission_color = ctx.texture.color_from_float4(color.sqrt());

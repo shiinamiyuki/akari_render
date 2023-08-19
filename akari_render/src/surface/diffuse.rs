@@ -1,12 +1,12 @@
 use std::f32::consts::{FRAC_1_PI, PI};
 
 use super::BsdfEvalContext;
+use super::{Bsdf, BsdfClosure, BsdfSample, Surface};
 use crate::color::Color;
 use crate::geometry::Frame;
 use crate::sampling::cos_sample_hemisphere;
+use crate::surface::SampledWavelengths;
 use crate::*;
-
-use super::{Bsdf, BsdfClosure, BsdfSample, Surface};
 #[derive(Debug, Clone, Copy, Value)]
 #[repr(C)]
 pub struct DiffuseSurface {

@@ -9,7 +9,7 @@ use std::{path::PathBuf, rc::Rc};
 use luisa::PixelStorage;
 
 use crate::camera::PerspectiveCamera;
-use crate::color::{glam_srgb_to_linear, Color, ColorRepr, FlatColor};
+use crate::color::{glam_srgb_to_linear, Color, ColorRepr, FlatColor, SampledWavelengths};
 use crate::light::area::AreaLight;
 use crate::light::{
     FlatLightSample, FlatLightSampleExpr, LightAggregate, LightEvalContext, LightEvaluator,
@@ -22,7 +22,7 @@ use crate::surface::glass::GlassSurface;
 use crate::surface::principled::PrincipledSurface;
 use crate::surface::{
     BsdfEvalContext, BsdfEvaluator, BsdfSample, FlatBsdfEvalResult, FlatBsdfSample,
-    BSDF_EVAL_COLOR, BSDF_EVAL_PDF,
+    BSDF_EVAL_ALBEDO, BSDF_EVAL_COLOR, BSDF_EVAL_PDF, BSDF_EVAL_ROUGHNESS,
 };
 use crate::texture::{
     ConstFloatTexture, ConstRgbTexture, ImageRgbTexture, TextureEvalContext, TextureEvaluator,
@@ -175,60 +175,54 @@ impl Scene {
                 Expr<SurfaceInteraction>,
                 Expr<Float3>,
                 Expr<Float3>,
-                Expr<f32>,
+                Expr<SampledWavelengths>,
                 Expr<u32>,
             ), Expr<FlatBsdfEvalResult>>(
                 &|surface: Expr<TagIndex>,
                   si: Expr<SurfaceInteraction>,
                   wo: Expr<Float3>,
                   wi: Expr<Float3>,
-                  u_select: Expr<f32>,
+                  swl: Expr<SampledWavelengths>,
                   mode: Expr<u32>| {
                     let ctx = BsdfEvalContext {
                         texture: &texture_eval,
                         color_repr: color_repr,
                     };
-                    let (color, pdf) = scene.surfaces.get(surface).dispatch(|_, _, surface| {
-                        let closure = surface.closure(si, &ctx);
-                        let color = if_!((mode & BSDF_EVAL_COLOR).cmpne(0), {
-                            closure.evaluate(wo, wi, &ctx)
-                        }, else {
-                            Color::zero(color_repr)
+                    let (color, pdf, albedo, roughness) =
+                        scene.surfaces.get(surface).dispatch(|_, _, surface| {
+                            let closure = surface.closure(si, swl, &ctx);
+                            let color = if_!(
+                                (mode & BSDF_EVAL_COLOR).cmpne(0),
+                                { closure.evaluate(wo, wi, swl, &ctx) },
+                                else,
+                                { Color::zero(color_repr) }
+                            );
+                            let pdf = if_!(
+                                (mode & BSDF_EVAL_PDF).cmpne(0),
+                                { closure.pdf(wo, wi, swl, &ctx) },
+                                else,
+                                { 0.0.into() }
+                            );
+                            let albedo = if_!(
+                                (mode & BSDF_EVAL_ALBEDO).cmpne(0),
+                                { closure.albedo(wo, swl, &ctx) },
+                                else,
+                                { Color::zero(color_repr) }
+                            );
+                            let roughness = if_!(
+                                (mode & BSDF_EVAL_ROUGHNESS).cmpne(0),
+                                { closure.roughness(wo, swl, &ctx) },
+                                else,
+                                { 0.0.into() }
+                            );
+                            (color, pdf, albedo, roughness)
                         });
-                        let pdf = if_!((mode & BSDF_EVAL_PDF).cmpne(0), {
-                            closure.pdf(wo, wi, &ctx)
-                        }, else {
-                            0.0.into()
-                        });
-                        (color, pdf)
-                    });
                     struct_!(FlatBsdfEvalResult {
                         color: color.flatten(),
                         pdf: pdf,
-                        lobe_roughness: const_(0.0f32) //TODO
+                        albedo: albedo.flatten(),
+                        roughness: roughness,
                     })
-                },
-            )
-        };
-        let albedo = {
-            let scene = self.clone();
-            let texture_eval = texture_eval.clone();
-            self.device.create_callable::<(
-                Expr<TagIndex>,
-                Expr<SurfaceInteraction>,
-                Expr<Float3>,
-            ), Expr<FlatColor>>(&|surface: Expr<TagIndex>,
-                      si: Expr<SurfaceInteraction>,
-                      wo: Expr<Float3>| {
-                    let ctx = BsdfEvalContext {
-                        texture: &texture_eval,
-                        color_repr: color_repr,
-                    };
-                    let color = scene.surfaces.get(surface).dispatch(|_, _, surface| {
-                        let closure = surface.closure(si, &ctx);
-                        closure.albedo(wo, &ctx)
-                    });
-                    color.flatten()
                 },
             )
         };
@@ -240,25 +234,26 @@ impl Scene {
                 Expr<SurfaceInteraction>,
                 Expr<Float3>,
                 Expr<Float3>,
+                Var<SampledWavelengths>,
             ), Expr<FlatBsdfSample>>(
                 &|surface: Expr<TagIndex>,
                   si: Expr<SurfaceInteraction>,
                   wo: Expr<Float3>,
-                  u: Expr<Float3>| {
+                  u: Expr<Float3>,
+                  swl: Var<SampledWavelengths>| {
                     let ctx = BsdfEvalContext {
                         texture: &texture_eval,
                         color_repr: color_repr,
                     };
                     let sample = scene.surfaces.get(surface).dispatch(|_, _, surface| {
-                        let closure = surface.closure(si, &ctx);
-                        closure.sample(wo, u.x(), u.yz(), &ctx)
+                        let closure = surface.closure(si, *swl, &ctx);
+                        closure.sample(wo, u.x(), u.yz(), swl, &ctx)
                     });
                     struct_!(FlatBsdfSample {
                         wi: sample.wi,
                         pdf: sample.pdf,
                         valid: sample.valid,
                         color: sample.color.flatten(),
-                        lobe_roughness: sample.lobe_roughness
                     })
                 },
             )
@@ -267,7 +262,6 @@ impl Scene {
             color_repr,
             bsdf,
             bsdf_sample,
-            albedo,
         })
     }
     pub fn load_from_path<P: AsRef<Path>>(device: Device, path: P) -> Arc<Self> {

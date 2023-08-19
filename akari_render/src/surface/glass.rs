@@ -1,9 +1,9 @@
+use super::{BsdfBlendMode, BsdfClosure, BsdfEvalContext, MicrofacetTransmission, Surface};
+use crate::color::*;
 use crate::geometry::Frame;
 use crate::microfacet::TrowbridgeReitzDistribution;
 use crate::surface::{fr_dielectric, BsdfMixture, FresnelDielectric, MicrofacetReflection};
 use crate::*;
-
-use super::{BsdfBlendMode, BsdfClosure, BsdfEvalContext, MicrofacetTransmission, Surface};
 #[derive(Debug, Clone, Copy, Value)]
 #[repr(C)]
 pub struct GlassSurface {
@@ -17,6 +17,7 @@ impl Surface for GlassSurfaceExpr {
     fn closure(
         &self,
         si: Expr<interaction::SurfaceInteraction>,
+        swl: Expr<SampledWavelengths>,
         ctx: &BsdfEvalContext,
     ) -> BsdfClosure {
         let kr = ctx.texture.evaluate_color(self.kr(), si);

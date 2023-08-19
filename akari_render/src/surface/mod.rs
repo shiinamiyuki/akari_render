@@ -229,6 +229,16 @@ impl Bsdf for BsdfMixture {
             }
         }
     }
+    fn roughness(
+        &self,
+        wo: Expr<Float3>,
+        swl: Expr<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> Expr<f32> {
+        let frac: Expr<f32> = (self.frac)(wo, ctx);
+        self.bsdf_a.roughness(wo, swl, ctx) * (1.0 - frac)
+            + self.bsdf_b.roughness(wo, swl, ctx) * frac
+    }
 }
 
 pub struct BsdfClosure {
@@ -607,6 +617,17 @@ pub struct BsdfEvaluator {
     >,
 }
 impl BsdfEvaluator {
+    pub fn evaluate_ex(
+        &self,
+        surface: Expr<TagIndex>,
+        si: Expr<SurfaceInteraction>,
+        wo: Expr<Float3>,
+        wi: Expr<Float3>,
+        swl: Expr<SampledWavelengths>,
+        flags: Expr<u32>,
+    ) -> Expr<FlatBsdfEvalResult> {
+        self.bsdf.call(surface, si, wo, wi, swl, flags)
+    }
     pub fn evaluate(
         &self,
         surface: Expr<TagIndex>,
@@ -661,10 +682,15 @@ impl BsdfEvaluator {
         wo: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
     ) -> Color {
-        let result = self
-            .bsdf
-            .call(surface, si, wo, wi, swl, const_(BSDF_EVAL_ALBEDO));
-        Color::from_flat(self.color_repr, result)
+        let result = self.bsdf.call(
+            surface,
+            si,
+            wo,
+            Float3Expr::zero(),
+            swl,
+            const_(BSDF_EVAL_ALBEDO),
+        );
+        Color::from_flat(self.color_repr, result.albedo())
     }
     pub fn sample(
         &self,
