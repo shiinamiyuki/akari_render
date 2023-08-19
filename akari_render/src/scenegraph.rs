@@ -5,6 +5,16 @@ pub mod node {
 
     use super::*;
     #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+    pub enum ColorSpace {
+        #[serde(rename = "raw")]
+        Raw, // for normal maps, bump maps, etc.
+        #[serde(rename = "srgb")]
+        SRgb,
+        #[serde(rename = "aces")]
+        ACEScg,
+    }
+
+    #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
     #[serde(rename_all = "snake_case")]
     pub enum CoordinateSystem {
         Akari,   //RightHandYUp
@@ -49,12 +59,24 @@ pub mod node {
         "srgb".into()
     }
     #[derive(Clone, Serialize, Deserialize)]
+    pub struct NodeOutput {
+        pub node: String,
+        pub channel: String,
+    }
+    #[derive(Clone, Serialize, Deserialize)]
+    pub struct NodeInputGeneric {
+
+    }
+    #[derive(Clone, Serialize, Deserialize)]
     #[serde(tag = "type")]
     pub enum ShaderGraphNode {
         #[serde(rename = "float")]
-        Float(Texture),
-        #[serde(rename = "spectrum")]
-        Spectrum(Texture),
+        Float { value: f32 },
+        #[serde(rename = "rgb")]
+        Rgb {
+            values: [f32; 3],
+            encoding: ColorSpace,
+        },
         #[serde(rename = "mix")]
         Mix {
             frac: String,

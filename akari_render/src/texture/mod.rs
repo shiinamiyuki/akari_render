@@ -68,7 +68,7 @@ impl TextureEvaluator {
     ) -> Expr<Float4> {
         self.texture.call(tex, si).value()
     }
-    pub fn evaluate_color(&self, tex: Expr<TagIndex>, si: Expr<SurfaceInteraction, swl:Expr<SampledWavelengths>) -> Color {
+    pub fn evaluate_color(&self, tex: Expr<TagIndex>, si: Expr<SurfaceInteraction>, swl:Expr<SampledWavelengths>) -> Color {
         let r = self.texture.call(tex, si);
         self.color_from_float4(r.value(), r.colorspace(), swl)
     }

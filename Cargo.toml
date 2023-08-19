@@ -1,5 +1,6 @@
 [workspace]
 members = [
     "akari_render",
-    "akari_data"
+    "akari_data",
+    "akari_nodegraph"
 ]

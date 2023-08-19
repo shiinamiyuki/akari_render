@@ -10,9 +10,9 @@ pub struct BsdfEvalContext<'a> {
     pub color_repr: ColorRepr,
 }
 
-pub mod diffuse;
-pub mod glass;
-pub mod principled;
+// pub mod diffuse;
+// pub mod glass;
+// pub mod principled;
 
 #[derive(Clone, Aggregate)]
 pub struct BsdfSample {

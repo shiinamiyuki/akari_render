@@ -144,9 +144,9 @@ impl Surface for PrincipledSurfaceExpr {
         ctx: &BsdfEvalContext,
     ) -> BsdfClosure {
         let (color, transmission_color) = {
-            let color = ctx.texture.evaluate_float4(self.color(), si);
-            let transmission_color = ctx.texture.color_from_float4(color.sqrt());
-            let color = ctx.texture.color_from_float4(color);
+            let color = ctx.texture.evaluate_color(self.color(), si);
+            let transmission_color = todo!();
+            let color = ctx.texture.evaluate_color(color, si);
             (color, transmission_color)
         };
         let metallic = ctx.texture.evaluate_float(self.metallic(), si);

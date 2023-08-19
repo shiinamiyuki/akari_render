@@ -22,9 +22,10 @@ impl Light for AreaLightExpr {
         &self,
         ray: Expr<Ray>,
         si: Expr<SurfaceInteraction>,
+        swl: Expr<SampledWavelengths>,
         ctx: &LightEvalContext<'_>,
     ) -> Color {
-        let emission = ctx.texture.evaluate_color(self.emission(), si);
+        let emission = ctx.texture.evaluate_color(self.emission(), si, swl);
         let ns = si.geometry().ns();
         select(
             ns.dot(ray.d()).cmplt(0.0),
@@ -38,6 +39,7 @@ impl Light for AreaLightExpr {
         pn: Expr<PointNormal>,
         u_select: Expr<f32>,
         u_sample: Expr<Float2>,
+        swl: Expr<SampledWavelengths>,
         ctx: &LightEvalContext<'_>,
     ) -> LightSample {
         let meshes = ctx.meshes;
@@ -69,7 +71,7 @@ impl Light for AreaLightExpr {
             FrameExpr::from_n(n),
             Bool::from(true),
         );
-        let emission = ctx.texture.evaluate_color(self.emission(), si);
+        let emission = ctx.texture.evaluate_color(self.emission(), si, swl);
         let wi = p - pn.p();
         let dist2 = wi.length_squared();
         let wi = wi / dist2.sqrt();

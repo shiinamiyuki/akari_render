@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    color::{Color, ColorRepr, FlatColor},
+    color::{Color, ColorRepr, FlatColor, SampledWavelengths},
     geometry::{PointNormal, Ray},
     interaction::SurfaceInteraction,
     mesh::MeshAggregate,
@@ -35,13 +35,19 @@ pub struct LightEvalContext<'a> {
 
 pub trait Light {
     fn id(&self) -> Expr<u32>;
-    fn le(&self, ray: Expr<Ray>, si: Expr<SurfaceInteraction>, ctx: &LightEvalContext<'_>)
-        -> Color;
+    fn le(
+        &self,
+        ray: Expr<Ray>,
+        si: Expr<SurfaceInteraction>,
+        swl: Expr<SampledWavelengths>,
+        ctx: &LightEvalContext<'_>,
+    ) -> Color;
     fn sample_direct(
         &self,
         pn: Expr<PointNormal>,
         u_select: Expr<f32>,
         u_sample: Expr<Float2>,
+        swl: Expr<SampledWavelengths>,
         ctx: &LightEvalContext<'_>,
     ) -> LightSample;
     fn pdf_direct(
@@ -120,13 +126,14 @@ impl LightAggregate {
         &self,
         ray: Expr<Ray>,
         si: Expr<SurfaceInteraction>,
+        swl: Expr<SampledWavelengths>,
         ctx: &LightEvalContext<'_>,
     ) -> Color {
         let light = self.light(si);
         let _light_choice_pdf = self
             .light_distribution
             .pdf(light.dispatch(|_tag, _key, light| light.id()));
-        let direct = light.dispatch(|_tag, _key, light| light.le(ray, si, ctx));
+        let direct = light.dispatch(|_tag, _key, light| light.le(ray, si, swl, ctx));
         direct
     }
     pub fn sample_direct(
@@ -134,6 +141,7 @@ impl LightAggregate {
         pn: Expr<PointNormal>,
         u_select: Expr<f32>,
         u_sample: Expr<Float2>,
+        swl: Expr<SampledWavelengths>,
         ctx: &LightEvalContext<'_>,
     ) -> LightSample {
         let light_dist = &self.light_distribution;
@@ -141,7 +149,7 @@ impl LightAggregate {
         let light = self.light_ids_to_lights.var().read(light_idx);
         let light = self.lights.get(light);
         let mut sample =
-            light.dispatch(|_, _, light| light.sample_direct(pn, u_select, u_sample, ctx));
+            light.dispatch(|_, _, light| light.sample_direct(pn, u_select, u_sample, swl, ctx));
         sample.pdf = sample.pdf * light_choice_pdf;
         sample
     }
