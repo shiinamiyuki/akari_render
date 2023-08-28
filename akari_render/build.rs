@@ -1,8 +1,5 @@
 use akari_nodegraph::*;
-use std::env;
-use std::fs::{self, create_dir, File};
-use std::io::Write;
-use std::path::{Path, PathBuf};
+
 use std::process::Command;
 fn gen_nodegraph_defs() {
     let coordinate_system = Enum {
@@ -21,7 +18,6 @@ fn gen_nodegraph_defs() {
             "Spectral".to_string(),
         ],
     };
-
     let texture_nodes = vec![
         NodeDesc {
             name: "RGBImageTexture".to_string(),
@@ -183,7 +179,7 @@ fn gen_nodegraph_defs() {
     }];
     let render_node = NodeDesc {
         name: "Render".to_string(),
-        category: "".to_string(),
+        category: "RenderOutput".to_string(),
         inputs: vec![
             InputSocketDesc {
                 name: "scene".to_string(),
@@ -242,7 +238,7 @@ fn gen_nodegraph_defs() {
         ],
         outputs: vec![OutputSocketDesc {
             name: "mesh".to_string(),
-            kind: SocketKind::Node("Mesh".to_string()),
+            kind: SocketKind::Node("Geometry".to_string()),
         }],
     };
     let scene_nodes = vec![
@@ -268,7 +264,7 @@ fn gen_nodegraph_defs() {
         },
         NodeDesc {
             name: "LoadScene".to_string(),
-            category: "".to_string(),
+            category: "Scene".to_string(),
             inputs: vec![create_string_input("path", "")],
             outputs: vec![OutputSocketDesc {
                 name: "scene".to_string(),
@@ -284,7 +280,10 @@ fn gen_nodegraph_defs() {
     nodes.extend(light_nodes);
     nodes.extend(scene_nodes);
     nodes.extend_from_slice(&[mesh_node, render_node]);
-    let graph = NodeGraphDesc { nodes, enums };
+    let graph = NodeGraphDesc {
+        nodes,
+        enums,
+    };
     std::fs::write("src/nodes.rs", gen::gen_rust_for_nodegraph(&graph)).unwrap();
     // format the generated code
     let output = Command::new("rustfmt")
