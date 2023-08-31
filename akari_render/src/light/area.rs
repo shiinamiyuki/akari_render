@@ -53,10 +53,10 @@ impl Light for AreaLightExpr {
         let area = shading_triangle.area();
         let p = shading_triangle.p(bary);
         let n = shading_triangle.n(bary);
-        let uv = shading_triangle.tc(bary);
+        let uv = shading_triangle.uv(bary);
         let geometry = SurfaceLocalGeometryExpr::new(
             p,
-            shading_triangle.ng(),
+            shading_triangle.ng,
             n,
             uv,
             Float3Expr::zero(),

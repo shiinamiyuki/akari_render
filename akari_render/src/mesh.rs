@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
-use crate::geometry::{ShadingTriangle, ShadingTriangleExpr, Triangle, TriangleExpr};
+use crate::geometry::{ShadingTriangle, Triangle};
 use crate::util::binserde::*;
 use crate::*;
 use crate::{geometry::AffineTransform, util::alias_table::AliasTable};
-use luisa::{AccelBuildRequest, AccelOption};
+use luisa::{AccelBuildRequest, AccelOption, BufferHeap};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -12,7 +12,9 @@ pub struct TriangleMesh {
     pub name: String,
     pub vertices: Vec<[f32; 3]>,
     pub normals: Vec<[f32; 3]>,
-    pub texcoords: Vec<[f32; 2]>,
+    pub tangents: Vec<[f32; 3]>,
+    pub bitangent_signs: Vec<u32>, // bitmasks, 0 for 1, 1 for -1
+    pub uvs: Vec<[f32; 2]>,
     pub indices: Vec<[u32; 3]>,
 }
 impl Encode for TriangleMesh {
@@ -20,7 +22,9 @@ impl Encode for TriangleMesh {
         self.name.encode(writer)?;
         self.vertices.encode(writer)?;
         self.normals.encode(writer)?;
-        self.texcoords.encode(writer)?;
+        self.tangents.encode(writer)?;
+        self.bitangent_signs.encode(writer)?;
+        self.uvs.encode(writer)?;
         self.indices.encode(writer)?;
         Ok(())
     }
@@ -33,12 +37,16 @@ impl Decode for TriangleMesh {
         let name = Decode::decode(reader)?;
         let vertices = Decode::decode(reader)?;
         let normals = Decode::decode(reader)?;
-        let texcoords = Decode::decode(reader)?;
+        let tangents = Decode::decode(reader)?;
+        let bitangent_signs = Decode::decode(reader)?;
+        let uvs = Decode::decode(reader)?;
         let indices = Decode::decode(reader)?;
         Ok(Self {
             name,
             vertices,
-            texcoords,
+            tangents,
+            bitangent_signs,
+            uvs,
             indices,
             normals,
         })
@@ -58,62 +66,94 @@ impl TriangleMesh {
             .collect()
     }
 }
-#[derive(Copy, Clone, Value, Debug)]
-#[repr(C)]
-pub struct Vertex {
-    pub position: PackedFloat3,
-    pub normal: PackedFloat3,
-    pub texcoord: Float2,
-}
 pub struct MeshBuffer {
-    pub vertices: Buffer<Vertex>,
+    pub vertices: Buffer<PackedFloat3>,
+    pub normals: Option<Buffer<PackedFloat3>>,
+    pub tangents: Option<Buffer<PackedFloat3>>,
+    pub bitangent_signs: Option<Buffer<u32>>,
+    pub uvs: Option<Buffer<Float2>>,
     pub indices: Buffer<PackedUint3>,
     pub area_sampler: Option<AliasTable>,
     pub has_normals: bool,
-    pub has_texcoords: bool,
+    pub has_uvs: bool,
+    pub has_tangents: bool,
 }
 impl MeshBuffer {
     pub fn new(device: Device, mesh: &TriangleMesh) -> Self {
-        let mut vertices = vec![];
         if !mesh.normals.is_empty() {
-            assert_eq!(mesh.vertices.len(), mesh.normals.len());
+            assert_eq!(mesh.indices.len(), mesh.normals.len());
         }
-        if !mesh.texcoords.is_empty() {
-            assert_eq!(mesh.vertices.len(), mesh.texcoords.len());
+        if !mesh.uvs.is_empty() {
+            assert_eq!(mesh.indices.len(), mesh.uvs.len());
         }
-        for i in 0..mesh.vertices.len() {
-            let position: glam::Vec3 = mesh.vertices[i].into();
-            let normal: glam::Vec3 = if mesh.normals.is_empty() {
-                glam::Vec3::ZERO
-            } else {
-                mesh.normals[i].into()
-            };
-            let texcoords: glam::Vec2 = if mesh.texcoords.is_empty() {
-                glam::Vec2::ZERO
-            } else {
-                mesh.texcoords[i].into()
-            };
-            let v = Vertex {
-                position: position.into(),
-                normal: normal.into(),
-                texcoord: texcoords.into(),
-            };
-            vertices.push(v);
+        if !mesh.tangents.is_empty() {
+            assert_eq!(mesh.indices.len(), mesh.tangents.len());
+            assert_eq!((mesh.indices.len() + 31) / 32, mesh.bitangent_signs.len());
         }
-        let vertices = device.create_buffer_from_slice(&vertices);
+        let vertices = device.create_buffer_from_slice(unsafe {
+            std::slice::from_raw_parts(
+                mesh.vertices.as_ptr() as *const PackedFloat3,
+                mesh.vertices.len(),
+            )
+        });
+        let normals = if mesh.normals.is_empty() {
+            None
+        } else {
+            Some(device.create_buffer_from_slice(unsafe {
+                std::slice::from_raw_parts(
+                    mesh.normals.as_ptr() as *const PackedFloat3,
+                    mesh.normals.len(),
+                )
+            }))
+        };
+        let tangents = if mesh.tangents.is_empty() {
+            None
+        } else {
+            Some(device.create_buffer_from_slice(unsafe {
+                std::slice::from_raw_parts(
+                    mesh.tangents.as_ptr() as *const PackedFloat3,
+                    mesh.tangents.len(),
+                )
+            }))
+        };
+        let bitangent_signs = if mesh.bitangent_signs.is_empty() {
+            None
+        } else {
+            Some(device.create_buffer_from_slice(unsafe {
+                std::slice::from_raw_parts(
+                    mesh.bitangent_signs.as_ptr() as *const u32,
+                    mesh.bitangent_signs.len(),
+                )
+            }))
+        };
         let indices = device.create_buffer_from_slice(unsafe {
             std::slice::from_raw_parts(
                 mesh.indices.as_ptr() as *const PackedUint3,
                 mesh.indices.len(),
             )
         });
-        Self {
+        let uvs = if mesh.uvs.is_empty() {
+            None
+        } else {
+            Some(device.create_buffer_from_slice(unsafe {
+                std::slice::from_raw_parts(mesh.uvs.as_ptr() as *const Float2, mesh.uvs.len())
+            }))
+        };
+
+        let m = Self {
             vertices,
+            normals,
+            tangents,
+            bitangent_signs,
+            uvs,
             indices,
             area_sampler: None,
             has_normals: !mesh.normals.is_empty(),
-            has_texcoords: !mesh.texcoords.is_empty(),
-        }
+            has_uvs: !mesh.uvs.is_empty(),
+            has_tangents: !mesh.tangents.is_empty(),
+        };
+        assert!(!m.has_uvs || m.has_tangents, "mesh has uvs but no tangents");
+        m
     }
     pub fn build_area_sampler(&mut self, device: Device, areas: &[f32]) {
         self.area_sampler = Some(AliasTable::new(device, areas));
@@ -124,14 +164,19 @@ impl MeshBuffer {
 pub struct MeshInstance {
     pub geom_id: u32,
     pub transform: AffineTransform,
-    pub has_normals: bool,
-    pub has_texcoords: bool,
     pub light: TagIndex,
     pub surface: TagIndex,
+    pub has_normals: bool,
+    pub has_uvs: bool,
+    pub has_tangents: bool,
 }
 pub struct MeshAggregate {
-    pub mesh_vertices: BindlessArray,
-    pub mesh_indices: BindlessArray,
+    pub mesh_vertices: BufferHeap<PackedFloat3>,
+    pub mesh_normals: BufferHeap<PackedFloat3>,
+    pub mesh_tangents: BufferHeap<PackedFloat3>,
+    pub mesh_bitangent_signs: BufferHeap<u32>,
+    pub mesh_uvs: BufferHeap<Float2>,
+    pub mesh_indices: BufferHeap<PackedUint3>,
     pub mesh_instances: Buffer<MeshInstance>,
     pub mesh_area_samplers: BindlessArray,
     pub mesh_id_to_area_samplers: HashMap<u32, u32>,
@@ -141,18 +186,30 @@ pub struct MeshAggregate {
 impl MeshAggregate {
     pub fn new(device: Device, meshes: &[&MeshBuffer], instances: &mut [MeshInstance]) -> Self {
         let count = meshes.len();
-        let mesh_vertices = device.create_bindless_array(count);
-        let mesh_indices = device.create_bindless_array(count);
-        let mesh_normals = device.create_bindless_array(count);
-        let mesh_texcoords = device.create_bindless_array(count);
+        let mesh_vertices = device.create_buffer_heap(count);
+        let mesh_normals = device.create_buffer_heap(count);
+        let mesh_tangents = device.create_buffer_heap(count);
+        let mesh_uvs = device.create_buffer_heap(count);
+        let mesh_bitangent_signs = device.create_buffer_heap(count);
+        let mesh_indices = device.create_buffer_heap(count);
         let mesh_area_samplers = device.create_bindless_array(count * 2);
         let mut accel_meshes = Vec::with_capacity(meshes.len());
         let accel = device.create_accel(AccelOption::default());
         let mut at_cnt = 0;
         let mut mesh_id_to_area_samplers = HashMap::new();
         for (i, mesh) in meshes.iter().enumerate() {
-            mesh_vertices.emplace_buffer_async(i, &mesh.vertices);
-            mesh_indices.emplace_buffer_async(i, &mesh.indices);
+            mesh_vertices.emplace_buffer(i, &mesh.vertices);
+            mesh_indices.emplace_buffer(i, &mesh.indices);
+            if mesh.has_normals {
+                mesh_normals.emplace_buffer(i, mesh.normals.as_ref().unwrap());
+            }
+            if mesh.has_tangents {
+                mesh_tangents.emplace_buffer(i, mesh.tangents.as_ref().unwrap());
+                mesh_bitangent_signs.emplace_buffer(i, mesh.bitangent_signs.as_ref().unwrap());
+            }
+            if mesh.has_uvs {
+                mesh_uvs.emplace_buffer(i, mesh.uvs.as_ref().unwrap());
+            }
             let accel_mesh = device.create_mesh(
                 mesh.vertices.view(..),
                 mesh.indices.view(..),
@@ -161,8 +218,8 @@ impl MeshAggregate {
             accel_mesh.build(AccelBuildRequest::ForceBuild);
             accel_meshes.push(accel_mesh);
             if let Some(at) = &mesh.area_sampler {
-                mesh_area_samplers.emplace_buffer_async(at_cnt, &at.0);
-                mesh_area_samplers.emplace_buffer_async(at_cnt + 1, &at.1);
+                mesh_area_samplers.emplace_buffer(at_cnt, &at.0);
+                mesh_area_samplers.emplace_buffer(at_cnt + 1, &at.1);
                 mesh_id_to_area_samplers.insert(i as u32, at_cnt as u32);
                 at_cnt += 2;
             }
@@ -171,18 +228,17 @@ impl MeshAggregate {
             let inst = &mut instances[i];
             let geom_id = inst.geom_id as usize;
             inst.has_normals = meshes[geom_id].has_normals;
-            inst.has_texcoords = meshes[geom_id].has_texcoords;
+            inst.has_uvs = meshes[geom_id].has_uvs;
             accel.push_mesh(&accel_meshes[geom_id], inst.transform.m, u8::MAX, true);
         }
         accel.build(AccelBuildRequest::ForceBuild);
         let mesh_instances = device.create_buffer_from_slice(instances);
-        mesh_vertices.update();
-        mesh_normals.update();
-        mesh_texcoords.update();
-        mesh_indices.update();
-        mesh_area_samplers.update();
         Self {
             mesh_vertices,
+            mesh_normals,
+            mesh_tangents,
+            mesh_bitangent_signs,
+            mesh_uvs,
             mesh_indices,
             mesh_instances,
             accel_meshes,
@@ -191,141 +247,107 @@ impl MeshAggregate {
             mesh_id_to_area_samplers,
         }
     }
-    pub fn triangle(&self, inst_id: Uint, prim_id: Uint) -> Expr<Triangle> {
-        let inst = self.mesh_instances.var().read(inst_id);
+    pub fn triangle(&self, inst_id: Uint, prim_id: Uint) -> Triangle {
+        let inst = self.mesh_instances.read(inst_id);
         let geom_id = inst.geom_id();
-        let vertices = self.mesh_vertices.var().buffer::<Vertex>(geom_id);
-        let indices = self.mesh_indices.var().buffer::<PackedUint3>(geom_id);
+        let vertices = self.mesh_vertices.buffer(geom_id);
+        let indices = self.mesh_indices.buffer(geom_id);
         let i = indices.read(prim_id);
-        let v0 = vertices.read(i.x()).position().unpack();
-        let v1 = vertices.read(i.y()).position().unpack();
-        let v2 = vertices.read(i.z()).position().unpack();
-        TriangleExpr::new(v0, v1, v2)
+        let v0 = vertices.read(i.x()).unpack();
+        let v1 = vertices.read(i.y()).unpack();
+        let v2 = vertices.read(i.z()).unpack();
+        Triangle { v0, v1, v2 }
     }
-    pub fn shading_triangle(&self, inst_id: Uint, prim_id: Uint) -> Expr<ShadingTriangle> {
-        let inst = self.mesh_instances.var().read(inst_id);
+    pub fn shading_triangle(&self, inst_id: Uint, prim_id: Uint) -> ShadingTriangle {
+        let inst = self.mesh_instances.read(inst_id);
         let geom_id = inst.geom_id();
-        let vertices = self.mesh_vertices.var().buffer::<Vertex>(geom_id);
-        let indices = self.mesh_indices.var().buffer::<PackedUint3>(geom_id);
+        let vertices = self.mesh_vertices.buffer(geom_id);
+        let indices = self.mesh_indices.buffer(geom_id);
         let i = indices.read(prim_id);
-        let v0 = vertices.read(i.x());
-        let v1 = vertices.read(i.y());
-        let v2 = vertices.read(i.z());
-        let (tc0, tc1, tc2) = if_!(inst.has_texcoords(), {
-            (v0.texcoord(), v1.texcoord(), v2.texcoord())
-        }, else {
-            let tc0 = make_float2(0.0, 0.0);
-            let tc1 = make_float2(1.0, 0.0);
-            let tc2 = make_float2(0.0, 0.1);
-            (tc0, tc1, tc2)
-        });
-        let ng = (v1.position().unpack() - v0.position().unpack())
-            .cross(v2.position().unpack() - v0.position().unpack())
-            .normalize();
-        let (n0, n1, n2) = if_!(inst.has_normals(), {
-            let n0 = v0.normal().unpack().normalize();
-            let n1 = v1.normal().unpack().normalize();
-            let n2 = v2.normal().unpack().normalize();
-            (n0, n1, n2)
-        }, else {
-            (ng, ng, ng)
-        });
-        ShadingTriangleExpr::new(
-            v0.position(),
-            v1.position(),
-            v2.position(),
-            tc0,
-            tc1,
-            tc2,
+        let v0 = vertices.read(i.x()).unpack();
+        let v1 = vertices.read(i.y()).unpack();
+        let v2 = vertices.read(i.z()).unpack();
+        let prim_id3 = prim_id * 3;
+        let (uv0, uv1, uv2) = if_!(
+            inst.has_uvs(),
+            {
+                let uvs = self.mesh_uvs.buffer(geom_id);
+                let uv0 = uvs.read(prim_id3 + 0);
+                let uv1 = uvs.read(prim_id3 + 1);
+                let uv2 = uvs.read(prim_id3 + 2);
+                (uv0, uv1, uv2)
+            },
+            else,
+            {
+                let uv0 = make_float2(0.0, 0.0);
+                let uv1 = make_float2(1.0, 0.0);
+                let uv2 = make_float2(0.0, 0.1);
+                (uv0, uv1, uv2)
+            }
+        );
+        let ng = (v1 - v0).cross(v2 - v0).normalize();
+        let (n0, n1, n2) = if_!(
+            inst.has_normals(),
+            {
+                let normals = self.mesh_normals.buffer(geom_id);
+                let n0 = normals.read(prim_id3 + 0).unpack();
+                let n1 = normals.read(prim_id3 + 1).unpack();
+                let n2 = normals.read(prim_id3 + 2).unpack();
+                (n0, n1, n2)
+            },
+            else,
+            { (ng, ng, ng) }
+        );
+        let (t0, t1, t2, b0, b1, b2) = if_!(
+            inst.has_tangents(),
+            {
+                let tangents = self.mesh_tangents.buffer(geom_id);
+                let bitangent_signs = self.mesh_bitangent_signs.buffer(geom_id);
+                let t0 = tangents.read(prim_id3 + 0).unpack();
+                let t1 = tangents.read(prim_id3 + 1).unpack();
+                let t2 = tangents.read(prim_id3 + 2).unpack();
+                let get_sign = |i: u32| {
+                    let j = prim_id3 + i;
+                    let sign = bitangent_signs.read(j / 32);
+                    let sign = (sign >> (j % 32)) & 1;
+                    select(sign.cmpeq(0), const_(1.0f32), const_(-1.0f32))
+                };
+                let s0 = get_sign(0u32);
+                let s1 = get_sign(1u32);
+                let s2 = get_sign(2u32);
+                let b0 = ng.cross(t0) * s0;
+                let b1 = ng.cross(t1) * s1;
+                let b2 = ng.cross(t2) * s2;
+                (t0, t1, t2, b0, b1, b2)
+            },
+            else,
+            {
+                let t0 = (v1 - v0).normalize();
+                let t1 = (v2 - v1).normalize();
+                let t2 = (v0 - v2).normalize();
+                let b0 = ng.cross(t0);
+                let b1 = ng.cross(t1);
+                let b2 = ng.cross(t2);
+                (t0, t1, t2, b0, b1, b2)
+            }
+        );
+        ShadingTriangle {
+            v0,
+            v1,
+            v2,
+            uv0,
+            uv1,
+            uv2,
             n0,
             n1,
             n2,
+            t0,
+            t1,
+            t2,
+            b0,
+            b1,
+            b2,
             ng,
-        )
+        }
     }
-}
-
-pub fn load_model(
-    obj_file: &str,
-    _generate_normal: Option<f32>,
-) -> (Vec<TriangleMesh>, Vec<tobj::Model>, Vec<tobj::Material>) {
-    let (models, materials) = tobj::load_obj(
-        &obj_file,
-        &tobj::LoadOptions {
-            triangulate: true,
-            single_index: true,
-            ..Default::default()
-        },
-    )
-    .expect("Failed to load file");
-    let materials = materials.unwrap();
-    let mut imported_models = vec![];
-    // println!("# of models: {}", models.len());
-    // println!("# of materials: {}", materials.len());
-    for (_i, m) in models.iter().enumerate() {
-        let mesh = &m.mesh;
-        if m.name.is_empty() {
-            panic!(
-                "{} has model with empty name! all model must have a name",
-                obj_file
-            );
-        }
-        // println!("model[{}].name = \'{}\'", i, m.name);
-        // println!("model[{}].mesh.material_id = {:?}", i, mesh.material_id);
-
-        // println!(
-        //     "Size of model[{}].num_face_indices: {}",
-        //     i,
-        //     mesh.num_face_indices.len()
-        // );
-        let mut vertices = vec![];
-        let mut normals = vec![];
-        let mut texcoords = vec![];
-        // let mut indices = vec![];
-        assert!(mesh.positions.len() % 3 == 0);
-
-        for v in 0..mesh.positions.len() / 3 {
-            vertices.push([
-                mesh.positions[3 * v],
-                mesh.positions[3 * v + 1],
-                mesh.positions[3 * v + 2],
-            ]);
-        }
-        if !mesh.normals.is_empty() {
-            assert_eq!(mesh.normals.len() % 3, 0);
-            assert_eq!(mesh.normals.len(), mesh.positions.len());
-            for v in 0..mesh.normals.len() / 3 {
-                normals.push([
-                    mesh.normals[3 * v],
-                    mesh.normals[3 * v + 1],
-                    mesh.normals[3 * v + 2],
-                ]);
-            }
-        }
-        if !mesh.texcoords.is_empty() {
-            assert_eq!(mesh.texcoords.len() % 2, 0);
-            assert_eq!(mesh.texcoords.len() / 2, mesh.positions.len() / 3);
-            for v in 0..mesh.texcoords.len() / 2 {
-                texcoords.push([mesh.texcoords[2 * v], mesh.texcoords[2 * v + 1]]);
-            }
-        }
-        let mut indices = vec![];
-        for f in 0..mesh.indices.len() / 3 {
-            indices.push([
-                mesh.indices[3 * f],
-                mesh.indices[3 * f + 1],
-                mesh.indices[3 * f + 2],
-            ]);
-        }
-        let imported = TriangleMesh {
-            name: m.name.clone(),
-            vertices,
-            normals,
-            indices,
-            texcoords,
-        };
-        imported_models.push(imported);
-    }
-
-    (imported_models, models, materials)
 }

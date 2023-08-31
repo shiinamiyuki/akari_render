@@ -50,14 +50,14 @@ pub trait Integrator {
 // pub mod gpt;
 // pub mod mcmc;
 // pub mod mcmc_opt;
-pub mod normal;
-pub mod pt;
+// pub mod normal;
+// pub mod pt;
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum Method {
-    #[serde(rename = "pt")]
-    PathTracer(pt::Config),
+    // #[serde(rename = "pt")]
+    // PathTracer(pt::Config),
     // #[serde(rename = "gpt")]
     // GradientPathTracer(gpt::Config),
     // #[serde(rename = "mcmc")]
@@ -132,15 +132,15 @@ pub fn render(device: Device, scene: Arc<Scene>, task: &RenderTask, options: Ren
         log::info!("Rendering to {:?}", config.film);
         let tic = std::time::Instant::now();
         match &config.method {
-            Method::PathTracer(c) => pt::render(
-                device.clone(),
-                scene.clone(),
-                config.sampler,
-                color_repr,
-                &mut film,
-                &c,
-                &options,
-            ),
+            // Method::PathTracer(c) => pt::render(
+            //     device.clone(),
+            //     scene.clone(),
+            //     config.sampler,
+            //     color_repr,
+            //     &mut film,
+            //     &c,
+            //     &options,
+            // ),
             // Method::GradientPathTracer(c) => gpt::render(
             //     device.clone(),
             //     scene.clone(),
@@ -168,6 +168,7 @@ pub fn render(device: Device, scene: Arc<Scene>, task: &RenderTask, options: Ren
             //     &c,
             //     &options,
             // ),
+            _ => todo!(),
         }
         let toc = std::time::Instant::now();
         log::info!("Completed in {:.1}ms", (toc - tic).as_secs_f64() * 1e3);

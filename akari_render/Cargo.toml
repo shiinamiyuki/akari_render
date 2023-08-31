@@ -26,12 +26,6 @@ serde_json = "1"
 tobj = "3.2.3"
 akari_nodegraph = { path = "../akari_nodegraph" }
 
-[profile.dev]
-incremental = true
-
-[profile.release]
-incremental = true
-
 [build-dependencies]
 cmake = "0.1.50"
 akari_nodegraph = { path = "../akari_nodegraph" }

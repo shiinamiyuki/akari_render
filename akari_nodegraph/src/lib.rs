@@ -26,6 +26,10 @@ pub enum SocketValue {
     Node(Option<NodeLink>),
     List(Vec<SocketValue>),
 }
+#[derive(Debug)]
+pub struct NodeProxyError {
+    pub msg: String,
+}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SocketIn {
     pub name: String,
@@ -36,35 +40,59 @@ fn cast<From: Any, To: Any + Clone>(v: From) -> Option<To> {
     any.downcast_ref::<To>().map(|v| v.clone())
 }
 impl SocketIn {
-    pub fn as_enum<T: EnumProxy>(&self) -> Option<T> {
+    pub fn as_enum<T: EnumProxy>(&self) -> Result<T, NodeProxyError> {
         match &self.value {
-            SocketValue::Enum(v) => Some(T::from_str(v)),
-            _ => None,
+            SocketValue::Enum(v) => Ok(T::from_str(v)),
+            _ => Err(NodeProxyError {
+                msg: format!("Invalid value for socket {}: {:?}; not enum!", self.name, self.value),
+            })
         }
     }
-    pub fn as_proxy_input<T: SocketType + 'static>(&self) -> Option<NodeProxyInput<T>> {
+    pub fn as_proxy_input<T: SocketType + 'static>(
+        &self,
+    ) -> Result<NodeProxyInput<T>, NodeProxyError> {
+        let name = &self.name;
+        let value = &self.value;
+        macro_rules! cast {
+            ($v:expr) => {
+                cast($v).map_or_else(
+                    || {
+                        Err(NodeProxyError {
+                            msg: format!("Invalid value for socket {}: {:?}; unable to cast!", name, value),
+                        })
+                    },
+                    Ok,
+                )?
+            };
+        }
         match &self.value {
-            SocketValue::Float(v) => Some(NodeProxyInput::Value(cast(*v)?)),
-            SocketValue::Int(v) => Some(NodeProxyInput::Value(cast(*v)?)),
-            SocketValue::Bool(v) => Some(NodeProxyInput::Value(cast(*v)?)),
-            SocketValue::String(v) => Some(NodeProxyInput::Value(cast(v.clone())?)),
-            SocketValue::Enum(_) => None,
+            SocketValue::Float(v) => Ok(NodeProxyInput::Value(cast!(*v))),
+            SocketValue::Int(v) => Ok(NodeProxyInput::Value(cast!(*v))),
+            SocketValue::Bool(v) => Ok(NodeProxyInput::Value(cast!(*v))),
+            SocketValue::String(v) => Ok(NodeProxyInput::Value(cast!(v.clone()))),
+            SocketValue::Enum(_) => Err(NodeProxyError {
+                msg: format!("Enum socket {} should be handled by as_enum", name),
+            }),
             SocketValue::Node(link) => {
                 if link.is_none() {
-                    return Some(NodeProxyInput::Node(None));
+                    return Ok(NodeProxyInput::Node(None));
                 } else {
                     let link = link.as_ref().unwrap();
                     let ty = T::ty();
                     if link.ty != SocketKind::Node(ty.to_string()) {
-                        return None;
+                        return Err(NodeProxyError {
+                            msg: format!("Invalid link type for socket {}: {:?}", name, link.ty),
+                        });
                     }
-                    Some(NodeProxyInput::Node(Some(link.clone())))
+                    Ok(NodeProxyInput::Node(Some(link.clone())))
                 }
             }
             SocketValue::List(_) => todo!(),
         }
     }
-    pub fn as_proxy_input_list<T: SocketType + 'static>(&self) -> Option<Vec<NodeProxyInput<T>>> {
+    pub fn as_proxy_input_list<T: SocketType + 'static>(
+        &self,
+    ) -> Result<Vec<NodeProxyInput<T>>, NodeProxyError> {
         match &self.value {
             SocketValue::List(list) => list
                 .iter()
@@ -75,8 +103,10 @@ impl SocketIn {
                     };
                     v.as_proxy_input()
                 })
-                .collect::<Option<Vec<_>>>(),
-            _ => None,
+                .collect(),
+            _ => Err(NodeProxyError {
+                msg: format!("Invalid value for socket {}: {:?}", self.name, self.value),
+            }),
         }
     }
 }
@@ -86,7 +116,7 @@ pub struct SocketOut {
     pub links: Vec<NodeLink>,
 }
 impl SocketOut {
-    pub fn as_proxy_output<T: SocketType + 'static>(&self) -> Option<NodeProxyOutput<T>> {
+    pub fn as_proxy_output<T: SocketType + 'static>(&self) -> Result<NodeProxyOutput<T>, NodeProxyError> {
         let ty = T::ty();
         let links = self
             .links
@@ -94,17 +124,13 @@ impl SocketOut {
             .filter(|l| l.ty == SocketKind::Node(ty.to_string()))
             .cloned()
             .collect::<Vec<_>>();
-        if links.is_empty() {
-            return None;
-        }
-        Some(NodeProxyOutput {
+        Ok(NodeProxyOutput {
             _marker: std::marker::PhantomData,
             link: links,
         })
     }
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(tag = "type")]
 pub enum NodeKind {
     #[serde(rename = "node")]
     Node { ty: String },
@@ -134,11 +160,25 @@ impl Node {
             _ => false,
         }
     }
-    pub fn input(&self, key: &str) -> Option<&SocketIn> {
-        self.inputs.get(key)
+    pub fn input(&self, key: &str) -> Result<&SocketIn, NodeProxyError> {
+        self.inputs.get(key).map_or_else(
+            || {
+                Err(NodeProxyError {
+                    msg: format!("Input {} not found", key),
+                })
+            },
+            Ok,
+        )
     }
-    pub fn output(&self, key: &str) -> Option<&SocketOut> {
-        self.outputs.get(key)
+    pub fn output(&self, key: &str) -> Result<&SocketOut, NodeProxyError> {
+        self.outputs.get(key).map_or_else(
+            || {
+                Err(NodeProxyError {
+                    msg: format!("Output {} not found", key),
+                })
+            },
+            Ok,
+        )
     }
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -147,9 +187,12 @@ pub struct NodeGraph {
 }
 impl NodeGraph {
     pub fn inline_groups(&mut self) {}
+    pub fn get(&self, id: &String) -> Option<&Node> {
+        self.nodes.get(&NodeId(id.clone()))
+    }
 }
 pub trait NodeProxy: Sized {
-    fn from_node(graph: &NodeGraph, node: &Node) -> Option<Self>;
+    fn from_node(graph: &NodeGraph, node: &Node) -> Result<Self, NodeProxyError>;
     // fn to_node(&self, graph: &NodeGraph) -> Node;
     fn ty() -> &'static str;
     fn category() -> &'static str;

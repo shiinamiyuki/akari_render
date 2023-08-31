@@ -30,7 +30,7 @@ fn gen_nodegraph_defs() {
                 },
                 InputSocketDesc {
                     name: "color_space".to_string(),
-                    kind: SocketKind::Enum(coordinate_system.clone()),
+                    kind: SocketKind::Enum(coordinate_system.name.clone()),
                     default: SocketValue::Enum("SRGB".to_string()),
                 },
             ],
@@ -203,7 +203,7 @@ fn gen_nodegraph_defs() {
             },
             InputSocketDesc {
                 name: "color".to_string(),
-                kind: SocketKind::Enum(color_pipeline.clone()),
+                kind: SocketKind::Enum(color_pipeline.name.clone()),
                 default: SocketValue::Enum("SRGB".to_string()),
             },
             create_float_input("max_time", 0.0),
@@ -229,7 +229,11 @@ fn gen_nodegraph_defs() {
         name: "Mesh".to_string(),
         category: "Geometry".to_string(),
         inputs: vec![
-            create_string_input("path", ""),
+            InputSocketDesc {
+                name: "buffers".to_string(),
+                kind: SocketKind::Node("Buffer".to_string()),
+                default: SocketValue::Node(None),
+            },
             InputSocketDesc {
                 name: "surface".to_string(),
                 kind: SocketKind::Node("Bsdf".to_string()),
@@ -272,6 +276,18 @@ fn gen_nodegraph_defs() {
             }],
         },
     ];
+    let misc_nodes = vec![NodeDesc {
+        name: "Buffer".to_string(),
+        category: "Misc".to_string(),
+        inputs: vec![
+            create_string_input("name", ""),
+            create_string_input("path", ""),
+        ],
+        outputs: vec![OutputSocketDesc {
+            name: "buffer".to_string(),
+            kind: SocketKind::Node("Buffer".to_string()),
+        }],
+    }];
     let enums = vec![coordinate_system, colorspace, color_pipeline];
     let mut nodes = vec![];
     nodes.extend(texture_nodes);
@@ -279,11 +295,9 @@ fn gen_nodegraph_defs() {
     nodes.extend(integrator_nodes);
     nodes.extend(light_nodes);
     nodes.extend(scene_nodes);
+    nodes.extend(misc_nodes);
     nodes.extend_from_slice(&[mesh_node, render_node]);
-    let graph = NodeGraphDesc {
-        nodes,
-        enums,
-    };
+    let graph = NodeGraphDesc { nodes, enums };
     std::fs::write("src/nodes.rs", gen::gen_rust_for_nodegraph(&graph)).unwrap();
     // format the generated code
     let output = Command::new("rustfmt")

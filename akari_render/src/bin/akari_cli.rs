@@ -43,11 +43,11 @@ fn main() {
         let file = File::open(method).unwrap();
         serde_json::from_reader(file).unwrap()
     };
-    let scene = akari_render::scene::Scene::load_from_path(device.clone(), &scene.unwrap());
-    let options = RenderOptions {
-        save_intermediate: save_intermediate.unwrap_or(false),
-        session: session.clone().unwrap_or_else(|| String::from("default")),
-        save_stats: session.is_some(),
-    };
-    render(device, scene, &task, options);
+    // let scene = akari_render::scene::Scene::load_from_path(device.clone(), &scene.unwrap());
+    // let options = RenderOptions {
+    //     save_intermediate: save_intermediate.unwrap_or(false),
+    //     session: session.clone().unwrap_or_else(|| String::from("default")),
+    //     save_stats: session.is_some(),
+    // };
+    // render(device, scene, &task, options);
 }

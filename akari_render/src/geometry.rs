@@ -24,44 +24,48 @@ impl RayExpr {
     }
 }
 
-#[derive(Clone, Copy, Debug, Value)]
+#[derive(Clone, Copy, Aggregate)]
 #[repr(C)]
 pub struct Triangle {
-    pub v0: Float3,
-    pub v1: Float3,
-    pub v2: Float3,
+    pub v0: Expr<Float3>,
+    pub v1: Expr<Float3>,
+    pub v2: Expr<Float3>,
 }
 
-#[derive(Clone, Copy, Debug, Value)]
+#[derive(Clone, Copy, Aggregate)]
 #[repr(C)]
 pub struct ShadingTriangle {
-    pub v0: Float3,
-    pub v1: Float3,
-    pub v2: Float3,
-    pub tc0: Float2,
-    pub tc1: Float2,
-    pub tc2: Float2,
-    pub ns0: Float3,
-    pub ns1: Float3,
-    pub ns2: Float3,
-    pub ng: Float3,
+    pub v0: Expr<Float3>,
+    pub v1: Expr<Float3>,
+    pub v2: Expr<Float3>,
+    pub uv0: Expr<Float2>,
+    pub uv1: Expr<Float2>,
+    pub uv2: Expr<Float2>,
+    pub n0: Expr<Float3>,
+    pub n1: Expr<Float3>,
+    pub n2: Expr<Float3>,
+    pub t0: Expr<Float3>,
+    pub t1: Expr<Float3>,
+    pub t2: Expr<Float3>,
+    pub b0: Expr<Float3>,
+    pub b1: Expr<Float3>,
+    pub b2: Expr<Float3>,
+    pub ng: Expr<Float3>,
 }
 
-impl ShadingTriangleExpr {
+impl ShadingTriangle {
     pub fn p(&self, bary: Expr<Float2>) -> Expr<Float3> {
-        (1.0 - bary.x() - bary.y()) * self.v0() + bary.x() * self.v1() + bary.y() * self.v2()
+        (1.0 - bary.x() - bary.y()) * self.v0 + bary.x() * self.v1 + bary.y() * self.v2
     }
     pub fn n(&self, bary: Expr<Float2>) -> Expr<Float3> {
-        ((1.0 - bary.x() - bary.y()) * self.ns0() + bary.x() * self.ns1() + bary.y() * self.ns2())
+        ((1.0 - bary.x() - bary.y()) * self.n2 + bary.x() * self.n1 + bary.y() * self.n2)
             .normalize()
     }
-    pub fn tc(&self, bary: Expr<Float2>) -> Expr<Float2> {
-        (1.0 - bary.x() - bary.y()) * self.tc0() + bary.x() * self.tc1() + bary.y() * self.tc2()
+    pub fn uv(&self, bary: Expr<Float2>) -> Expr<Float2> {
+        (1.0 - bary.x() - bary.y()) * self.uv0 + bary.x() * self.uv1 + bary.y() * self.uv2
     }
     pub fn area(&self) -> Float {
-        0.5 * (self.v1() - self.v0())
-            .cross(self.v2() - self.v0())
-            .length()
+        0.5 * (self.v1 - self.v0).cross(self.v2 - self.v0).length()
     }
 }
 

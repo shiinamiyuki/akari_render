@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     Node, NodeDesc, NodeGraph, NodeGraphDesc, NodeId, NodeKind, NodeLink, SocketIn, SocketKind,
-    SocketValue,
+    SocketOut, SocketValue,
 };
 
 /*
@@ -10,6 +10,7 @@ use crate::{
  *  statement = ident '=' expr
  *  expr = node_value ('.' ident)? | list
  *  node_value = float | int | bool | string | enum | ident | node_ctor
+ *  enum = ident '::' ident
  *  node_ctor = ident '[' input_list ']'
  *  input = input_name '=' expr
  *  input_list = input | input ',' input_list
@@ -54,11 +55,30 @@ struct Parser<'a> {
     tmp_cnt: usize,
 }
 impl<'a> Parser<'a> {
+    fn new(src: &str, desc: &'a NodeGraphDesc) -> Self {
+        let mut parser = Self {
+            chars: src.chars().collect(),
+            env: HashMap::new(),
+            graph: NodeGraph {
+                nodes: HashMap::new(),
+            },
+            pos: 0,
+            line: 1,
+            col: 1,
+            desc,
+            node_desc_map: HashMap::new(),
+            tmp_cnt: 0,
+        };
+        for node in &desc.nodes {
+            parser.node_desc_map.insert(node.name.clone(), node);
+        }
+        parser
+    }
     fn next_char(&mut self) -> Option<char> {
         let c = self.chars.get(self.pos).cloned();
         if c == Some('\n') {
             self.line += 1;
-            self.col = 0;
+            self.col = 1;
         } else {
             self.col += 1;
         }
@@ -197,7 +217,7 @@ impl<'a> Parser<'a> {
     fn parse_list(&mut self) -> Result<Value, ParseError> {
         if self.peek(0) != Some('[') {
             return Err(ParseError {
-                msg: "expected '['".to_string(),
+                msg: format!("expected '[' but found '{}'", self.peek(0).unwrap_or('\0')),
                 line: self.line,
                 col: self.col,
             });
@@ -210,7 +230,7 @@ impl<'a> Parser<'a> {
                 self.next_char();
                 break;
             }
-            let value = self.parse_value()?;
+            let value = self.parse_value(None)?;
             list.push(value);
             self.skip_whitespace();
             if self.peek(0) == Some(']') {
@@ -257,7 +277,6 @@ impl<'a> Parser<'a> {
         self.next_char();
         let desc = self.node_desc_map[&node];
         let mut inputs = HashMap::new();
-        let mut i = 0;
         loop {
             self.skip_whitespace();
             if self.peek(0) == Some(']') {
@@ -268,7 +287,7 @@ impl<'a> Parser<'a> {
             self.skip_whitespace();
             if self.peek(0) == Some('=') {
                 self.next_char();
-                let mut v = self.parse_value()?;
+                let mut v = self.parse_value(None)?;
                 if let Value::NodeId(id) = v {
                     let node = &self.graph.nodes[&id];
                     if node.outputs.len() != 1 {
@@ -283,7 +302,16 @@ impl<'a> Parser<'a> {
                     }
                     v = Value::NodeOutput(id, node.outputs.keys().next().unwrap().clone());
                 }
-                let expected_kind = &desc.inputs[i].kind;
+                let expected_kind = desc.inputs.iter().find(|sk| sk.name == ident).map_or_else(
+                    || {
+                        return Err(ParseError {
+                            msg: format!("invalid key: {}", ident),
+                            line: self.line,
+                            col: self.col,
+                        });
+                    },
+                    |i| Ok(&i.kind),
+                )?;
                 let get_kind = |v: &Value| -> Result<SocketKind, ParseError> {
                     Ok(match v {
                         Value::Float(_) => SocketKind::Float,
@@ -302,7 +330,12 @@ impl<'a> Parser<'a> {
                                 });
                             }
                             let from = from.unwrap();
-                            let from_desc = self.node_desc_map[&from.0];
+                            let from = &self.graph.nodes[from];
+                            let from_ty = match &from.kind {
+                                NodeKind::Node { ty } => ty,
+                                _ => unreachable!(),
+                            };
+                            let from_desc = self.node_desc_map[from_ty];
                             let socket = from_desc.outputs.iter().find(|sk| sk.name == *s);
                             if socket.is_none() {
                                 return Err(ParseError {
@@ -317,28 +350,29 @@ impl<'a> Parser<'a> {
                         Value::List(_) => unreachable!(),
                     })
                 };
-                let actual_kind = match v {
+                let actual_kind = match &v {
                     Value::List(vs) => {
                         if vs.is_empty() {
                             None
                         } else {
                             let first = vs.first().unwrap();
                             let kind = get_kind(first)?;
-                            if vs.iter().all(|v| get_kind(v) == Ok(kind.clone())) {
-                                Some(SocketKind::List(Box::new(kind)))
-                            } else {
-                                return Err(ParseError {
-                                    msg: format!("invalid list: {:?}", vs),
-                                    line: self.line,
-                                    col: self.col,
-                                });
+                            for i in 0..vs.len() {
+                                if get_kind(&vs[i])? != kind {
+                                    return Err(ParseError {
+                                        msg: format!("invalid list: {:?}", vs),
+                                        line: self.line,
+                                        col: self.col,
+                                    });
+                                }
                             }
+                            Some(SocketKind::List(Box::new(kind)))
                         }
                     }
-                    v @ _ => Some(get_kind(&v)?),
+                    v @ _ => Some(get_kind(v)?),
                 };
                 let macthed = match expected_kind {
-                    SocketKind::List(inner) => {
+                    SocketKind::List(_) => {
                         actual_kind.is_none() || actual_kind.as_ref().unwrap() == expected_kind
                     }
                     _ => actual_kind.as_ref().unwrap() == expected_kind,
@@ -353,11 +387,10 @@ impl<'a> Parser<'a> {
                         col: self.col,
                     });
                 }
-                i += 1;
                 inputs.insert(ident, v);
             } else {
                 return Err(ParseError {
-                    msg: "expected '='".to_string(),
+                    msg: format!("expected '=' but found '{}'", self.peek(0).unwrap_or('\0')),
                     line: self.line,
                     col: self.col,
                 });
@@ -369,13 +402,22 @@ impl<'a> Parser<'a> {
                 self.next_char();
             } else {
                 return Err(ParseError {
-                    msg: "expected ',' or ']'".to_string(),
+                    msg: format!(
+                        "expected ',' or ']' but found '{}'",
+                        self.peek(0).unwrap_or('\0')
+                    ),
                     line: self.line,
                     col: self.col,
                 });
             }
         }
-        fn to_socket_value(to: NodeId, k: String, v: Value) -> SocketValue {
+        fn to_socket_value(
+            parser: &mut Parser,
+            to: NodeId,
+            k: String,
+            v: Value,
+            kind: SocketKind,
+        ) -> SocketValue {
             match v {
                 Value::Float(v) => SocketValue::Float(v),
                 Value::Int(v) => SocketValue::Int(v),
@@ -383,35 +425,64 @@ impl<'a> Parser<'a> {
                 Value::String(v) => SocketValue::String(v),
                 Value::Enum(_, v) => SocketValue::Enum(v),
                 Value::NodeId(v) => unreachable!(),
-                Value::List(v) => {
-                    SocketValue::List(v.into_iter().map(|v| to_socket_value(to, k, v)).collect())
+                Value::List(v) => SocketValue::List(
+                    v.into_iter()
+                        .map(|v| to_socket_value(parser, to.clone(), k.clone(), v, kind.clone()))
+                        .collect(),
+                ),
+                Value::NodeOutput(node, socket) => {
+                    let link = NodeLink {
+                        from: node.clone(),
+                        from_socket: socket.clone(),
+                        to: to,
+                        to_socket: k,
+                        ty: kind,
+                    };
+
+                    let node = &mut parser.graph.nodes.get_mut(&node).unwrap();
+                    node.outputs.get_mut(&socket).unwrap().links.push(link.clone());
+                    SocketValue::Node(Some(link))
                 }
-                Value::NodeOutput(node, socket) => SocketValue::Node(Some(NodeLink {
-                    from: node,
-                    from_socket: socket,
-                    to: to,
-                    to_socket: k,
-                })),
             }
         }
         let node = Node {
-            name: id.clone(),
             kind: NodeKind::Node { ty: node.clone() },
             inputs: inputs
                 .into_iter()
                 .map(|(k, v)| {
+                    let kind = desc
+                        .inputs
+                        .iter()
+                        .find(|sk| sk.name == k)
+                        .unwrap()
+                        .kind
+                        .clone();
                     (
                         k.clone(),
                         SocketIn {
                             name: k.clone(),
-                            value: to_socket_value(id.clone(), k.clone(), v),
+                            value: to_socket_value(self, id.clone(), k.clone(), v, kind),
                         },
                     )
                 })
                 .collect(),
-            outputs: HashMap::new(),
+            outputs: desc
+                .outputs
+                .iter()
+                .map(|sk| {
+                    (
+                        sk.name.clone(),
+                        SocketOut {
+                            name: sk.name.clone(),
+                            links: vec![],
+                        },
+                    )
+                })
+                .collect(),
         };
-        Ok(Value::Node(node))
+        self.graph.nodes.insert(id.clone(), node);
+        self.env.insert(id.clone(), Value::NodeId(id.clone()));
+        Ok(Value::NodeId(id))
     }
     fn parse_string(&mut self, quote_ch: char) -> Result<Value, ParseError> {
         if self.peek(0) != Some(quote_ch) {
@@ -462,27 +533,69 @@ impl<'a> Parser<'a> {
             col: self.col,
         })
     }
-    fn parse_value(&mut self) -> Result<Value, ParseError> {
+    fn parse_value(&mut self, var: Option<String>) -> Result<Value, ParseError> {
+        if let Some(var) = &var {
+            if self.env.contains_key(&NodeId(var.clone())) {
+                return Err(ParseError {
+                    msg: format!("identifier '{}' already defined", var),
+                    line: self.line,
+                    col: self.col,
+                });
+            }
+        }
+
         let c = self.peek(0).ok_or(ParseError {
             msg: "unexpected end of input".to_string(),
             line: self.line,
             col: self.col,
         })?;
         if c.is_digit(10) || c == '+' || c == '-' {
-            self.parse_number()
+            let v = self.parse_number()?;
+            if let Some(var) = var {
+                self.env.insert(NodeId(var), v.clone());
+            }
+            Ok(v)
         } else if c == '"' || c == '\'' {
-            self.parse_string(c)
+            let v = self.parse_string(c)?;
+            if let Some(var) = var {
+                self.env.insert(NodeId(var), v.clone());
+            }
+            Ok(v)
         } else if c == '[' {
-            self.parse_list()
+            let v = self.parse_list()?;
+            if let Some(var) = var {
+                self.env.insert(NodeId(var), v.clone());
+            }
+            Ok(v)
         } else if c.is_alphabetic() || c == '_' {
             let ident = self.parse_identifier()?;
             self.skip_whitespace();
+
             if self.peek(0) == Some('[') {
-                self.parse_ctor(ident)
+                if self.node_desc_map.contains_key(&ident) {
+                    self.parse_ctor(var.map(|v| NodeId(v)), ident)
+                } else {
+                    return Err(ParseError {
+                        msg: format!("unknown node type: {}", ident),
+                        line: self.line,
+                        col: self.col,
+                    });
+                }
             } else if self.peek(0) == Some('.') {
                 self.next_char();
                 let ident2 = self.parse_identifier()?;
                 Ok(Value::NodeOutput(NodeId(ident), ident2))
+            } else if self.peek(0) == Some(':') {
+                self.next_char();
+                if self.peek(0) != Some(':') {
+                    return Err(ParseError {
+                        msg: "expected '::'".to_string(),
+                        line: self.line,
+                        col: self.col,
+                    });
+                }
+                let ident2 = self.parse_identifier()?;
+                Ok(Value::Enum(ident, ident2))
             } else {
                 Ok(Value::NodeId(NodeId(ident)))
             }
@@ -500,29 +613,33 @@ impl<'a> Parser<'a> {
             return Ok(());
         }
         let ident = self.parse_identifier()?;
+        dbg!(&ident);
         self.skip_whitespace();
         if self.peek(0) != Some('=') {
             return Err(ParseError {
-                msg: "expected '='".to_string(),
+                msg: format!("expected '=' but found '{}'", self.peek(0).unwrap_or('\0')),
                 line: self.line,
                 col: self.col,
             });
         }
         self.next_char();
         self.skip_whitespace();
-        let value = self.parse_value()?;
+        self.parse_value(Some(ident))?;
         self.skip_whitespace();
-        if self.env.contains_key(&NodeId(ident.clone())) {
-            return Err(ParseError {
-                msg: format!("identifier '{}' already defined", ident),
-                line: self.line,
-                col: self.col,
-            });
-        }
-        self.env.insert(NodeId(ident.clone()), value);
         Ok(())
     }
+    fn parse(mut self) -> Result<NodeGraph, ParseError> {
+        loop {
+            self.skip_whitespace();
+            if self.peek(0).is_none() {
+                break;
+            }
+            self.parse_statement()?;
+        }
+        Ok(self.graph)
+    }
 }
-pub fn parse(src: &str, desc: &NodeDesc) -> Result<NodeGraphDesc, ParseError> {
-    todo!()
+pub fn parse(src: &str, desc: &NodeGraphDesc) -> Result<NodeGraph, ParseError> {
+    let parser = Parser::new(src, desc);
+    parser.parse()
 }
