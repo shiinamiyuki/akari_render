@@ -205,7 +205,7 @@ impl<'a> Parser<'a> {
     fn parse_identifier(&mut self) -> Result<String, ParseError> {
         let mut s = String::new();
         while let Some(c) = self.peek(0) {
-            if c.is_alphanumeric() || c == '_' {
+            if c.is_alphanumeric() || c == '_' || c == '#' || c == '$' {
                 s.push(c);
                 self.next_char();
             } else {
@@ -440,7 +440,11 @@ impl<'a> Parser<'a> {
                     };
 
                     let node = &mut parser.graph.nodes.get_mut(&node).unwrap();
-                    node.outputs.get_mut(&socket).unwrap().links.push(link.clone());
+                    node.outputs
+                        .get_mut(&socket)
+                        .unwrap()
+                        .links
+                        .push(link.clone());
                     SocketValue::Node(Some(link))
                 }
             }
@@ -567,7 +571,7 @@ impl<'a> Parser<'a> {
                 self.env.insert(NodeId(var), v.clone());
             }
             Ok(v)
-        } else if c.is_alphabetic() || c == '_' {
+        } else if c.is_alphabetic() || c == '_' || c == '#' || c == '$' {
             let ident = self.parse_identifier()?;
             self.skip_whitespace();
 

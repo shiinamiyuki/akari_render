@@ -247,7 +247,7 @@ fn gen_nodegraph_defs() {
     };
     let scene_nodes = vec![
         NodeDesc {
-            name: "MakeScene".to_string(),
+            name: "Scene".to_string(),
             category: "Scene".to_string(),
             inputs: vec![
                 InputSocketDesc {
@@ -265,16 +265,7 @@ fn gen_nodegraph_defs() {
                 name: "scene".to_string(),
                 kind: SocketKind::Node("Scene".to_string()),
             }],
-        },
-        NodeDesc {
-            name: "LoadScene".to_string(),
-            category: "Scene".to_string(),
-            inputs: vec![create_string_input("path", "")],
-            outputs: vec![OutputSocketDesc {
-                name: "scene".to_string(),
-                kind: SocketKind::Node("Scene".to_string()),
-            }],
-        },
+        }
     ];
     let misc_nodes = vec![NodeDesc {
         name: "Buffer".to_string(),

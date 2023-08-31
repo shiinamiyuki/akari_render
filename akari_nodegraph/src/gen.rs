@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::*;
 use indexmap::IndexSet;
 use proc_macro2::TokenStream;
@@ -197,6 +199,7 @@ fn gen_rust_for_enums(descs: &[Enum]) -> TokenStream {
 }
 fn gen_rust_for_descs(descs: &[NodeDesc]) -> TokenStream {
     let mut tokens = TokenStream::new();
+    let node_types = descs.iter().map(|d| d.name.clone()).collect::<HashSet<_>>();
     let mut socket_types = IndexSet::new();
     for desc in descs {
         tokens.extend(gen_rust_for_desc(desc, &mut socket_types));
@@ -204,10 +207,18 @@ fn gen_rust_for_descs(descs: &[NodeDesc]) -> TokenStream {
     let socket_types = socket_types
         .iter()
         .map(|t| {
+            let def = if node_types.contains(t) {
+                quote! {}
+            } else {
+                let t = format_ident!("{}", t);
+                quote! {
+                    #[derive(Clone, Debug)]
+                    pub struct #t;
+                }
+            };
             let t = format_ident!("{}", t);
             quote! {
-                #[derive(Clone, Debug)]
-                pub struct #t;
+                #def
                 impl akari_nodegraph::SocketType for #t {
                     fn is_primitive() -> bool {
                         false
