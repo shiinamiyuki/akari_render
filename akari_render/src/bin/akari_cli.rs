@@ -39,10 +39,11 @@ fn main() {
     let ctx = luisa::Context::new(current_exe().unwrap());
     let device = ctx.create_device(&device);
     let method = method.unwrap();
-    let task: RenderTask = {
-        let file = File::open(method).unwrap();
-        serde_json::from_reader(file).unwrap()
-    };
+    // let task: RenderTask = {
+    //     let file = File::open(method).unwrap();
+    //     serde_json::from_reader(file).unwrap()
+    // };
+    akari_render::load::load_scene_graph(&scene.unwrap());
     // let scene = akari_render::scene::Scene::load_from_path(device.clone(), &scene.unwrap());
     // let options = RenderOptions {
     //     save_intermediate: save_intermediate.unwrap_or(false),

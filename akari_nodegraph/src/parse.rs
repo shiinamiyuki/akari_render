@@ -230,7 +230,21 @@ impl<'a> Parser<'a> {
                 self.next_char();
                 break;
             }
-            let value = self.parse_value(None)?;
+            let mut value = self.parse_value(None)?;
+            if let Value::NodeId(id) = value {
+                let node = &self.graph.nodes[&id];
+                if node.outputs.len() != 1 {
+                    return Err(ParseError {
+                        msg: format!(
+                            "node shorthand can only be used with single-output node only: {}",
+                            id.0
+                        ),
+                        line: self.line,
+                        col: self.col,
+                    });
+                }
+                value = Value::NodeOutput(id, node.outputs.keys().next().unwrap().clone());
+            }
             list.push(value);
             self.skip_whitespace();
             if self.peek(0) == Some(']') {
@@ -246,7 +260,7 @@ impl<'a> Parser<'a> {
                 });
             }
         }
-        todo!()
+        Ok(Value::List(list))
     }
     fn gen_id(&mut self) -> NodeId {
         loop {
@@ -321,6 +335,13 @@ impl<'a> Parser<'a> {
                         Value::Enum(e, _) => SocketKind::Enum(e.clone()),
                         Value::NodeId(_) => unreachable!(),
                         Value::NodeOutput(from_id, s) => {
+                            if !self.env.contains_key(from_id) {
+                                return Err(ParseError {
+                                    msg: format!("unknown node: {}", from_id.0),
+                                    line: self.line,
+                                    col: self.col,
+                                });
+                            }
                             let from = self.env[from_id].as_node();
                             if from.is_none() {
                                 return Err(ParseError {
@@ -395,6 +416,7 @@ impl<'a> Parser<'a> {
                     col: self.col,
                 });
             }
+            self.skip_whitespace();
             if self.peek(0) == Some(']') {
                 self.next_char();
                 break;
@@ -617,7 +639,7 @@ impl<'a> Parser<'a> {
             return Ok(());
         }
         let ident = self.parse_identifier()?;
-        dbg!(&ident);
+        // dbg!(&ident);
         self.skip_whitespace();
         if self.peek(0) != Some('=') {
             return Err(ParseError {

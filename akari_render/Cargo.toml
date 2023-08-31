@@ -29,6 +29,8 @@ akari_nodegraph = { path = "../akari_nodegraph" }
 [build-dependencies]
 cmake = "0.1.50"
 akari_nodegraph = { path = "../akari_nodegraph" }
+serde = { version = "1"}
+serde_json = "1"
 
 [[bin]]
 name = "akari_import"

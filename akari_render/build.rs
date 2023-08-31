@@ -97,7 +97,10 @@ fn gen_nodegraph_defs() {
                 kind: SocketKind::Node("RGBTexture".to_string()),
                 default: SocketValue::Node(None),
             }],
-            outputs: vec![],
+            outputs: vec![OutputSocketDesc {
+                name: "texture".to_string(),
+                kind: SocketKind::Node("SpectrumTexture".to_string()),
+            }],
         },
     ];
     let create_float_input = |name: &str, default: f64| InputSocketDesc {
@@ -125,6 +128,7 @@ fn gen_nodegraph_defs() {
                 create_float_input("metallic", 0.0),
                 create_float_input("specular", 0.5),
                 create_float_input("ior", 1.333),
+                create_spectrum_input("emission"),
             ],
             outputs: vec![OutputSocketDesc {
                 name: "bsdf".to_string(),
@@ -154,6 +158,19 @@ fn gen_nodegraph_defs() {
             outputs: vec![OutputSocketDesc {
                 name: "bsdf".to_string(),
                 kind: SocketKind::Node("Bsdf".to_string()),
+            }],
+        },
+        NodeDesc {
+            name: "MaterialOutput".to_string(),
+            category: "Material".to_string(),
+            inputs: vec![InputSocketDesc {
+                name: "surface".to_string(),
+                kind: SocketKind::Node("Bsdf".to_string()),
+                default: SocketValue::Node(None),
+            }],
+            outputs: vec![OutputSocketDesc {
+                name: "material".to_string(),
+                kind: SocketKind::Node("Material".to_string()),
             }],
         },
     ];
@@ -229,14 +246,15 @@ fn gen_nodegraph_defs() {
         name: "Mesh".to_string(),
         category: "Geometry".to_string(),
         inputs: vec![
+            create_string_input("name", ""),
             InputSocketDesc {
                 name: "buffers".to_string(),
-                kind: SocketKind::Node("Buffer".to_string()),
+                kind: SocketKind::List(Box::new(SocketKind::Node("Buffer".to_string()))),
                 default: SocketValue::Node(None),
             },
             InputSocketDesc {
-                name: "surface".to_string(),
-                kind: SocketKind::Node("Bsdf".to_string()),
+                name: "material".to_string(),
+                kind: SocketKind::Node("Material".to_string()),
                 default: SocketValue::Node(None),
             },
         ],
@@ -245,28 +263,26 @@ fn gen_nodegraph_defs() {
             kind: SocketKind::Node("Geometry".to_string()),
         }],
     };
-    let scene_nodes = vec![
-        NodeDesc {
-            name: "Scene".to_string(),
-            category: "Scene".to_string(),
-            inputs: vec![
-                InputSocketDesc {
-                    name: "geometries".to_string(),
-                    kind: SocketKind::List(Box::new(SocketKind::Node("Geometry".to_string()))),
-                    default: SocketValue::List(vec![]),
-                },
-                InputSocketDesc {
-                    name: "lights".to_string(),
-                    kind: SocketKind::List(Box::new(SocketKind::Node("Light".to_string()))),
-                    default: SocketValue::List(vec![]),
-                },
-            ],
-            outputs: vec![OutputSocketDesc {
-                name: "scene".to_string(),
-                kind: SocketKind::Node("Scene".to_string()),
-            }],
-        }
-    ];
+    let scene_nodes = vec![NodeDesc {
+        name: "Scene".to_string(),
+        category: "Scene".to_string(),
+        inputs: vec![
+            InputSocketDesc {
+                name: "geometries".to_string(),
+                kind: SocketKind::List(Box::new(SocketKind::Node("Geometry".to_string()))),
+                default: SocketValue::List(vec![]),
+            },
+            InputSocketDesc {
+                name: "lights".to_string(),
+                kind: SocketKind::List(Box::new(SocketKind::Node("Light".to_string()))),
+                default: SocketValue::List(vec![]),
+            },
+        ],
+        outputs: vec![OutputSocketDesc {
+            name: "scene".to_string(),
+            kind: SocketKind::Node("Scene".to_string()),
+        }],
+    }];
     let misc_nodes = vec![NodeDesc {
         name: "Buffer".to_string(),
         category: "Misc".to_string(),
@@ -301,6 +317,8 @@ fn gen_nodegraph_defs() {
             String::from_utf8_lossy(&output.stderr)
         );
     }
+    let graph_json = serde_json::to_string_pretty(&graph).unwrap();
+    std::fs::write("src/nodes.json", graph_json).unwrap();
 }
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
