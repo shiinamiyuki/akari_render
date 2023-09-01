@@ -137,6 +137,7 @@ fn gen_rust_for_desc(desc: &NodeDesc, socket_types: &mut IndexSet<String>) -> To
             #(#outputs)*
         }
         impl akari_nodegraph::NodeProxy for #name {
+            #[allow(unused_variables)]
             fn from_node(graph: &akari_nodegraph::NodeGraph, node: &akari_nodegraph::Node) -> Result<Self, akari_nodegraph::NodeProxyError> {
                 if !node.isa(Self::ty()) {
                     return Err(akari_nodegraph::NodeProxyError {

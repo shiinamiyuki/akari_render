@@ -58,7 +58,15 @@ impl ShadingTriangle {
         (1.0 - bary.x() - bary.y()) * self.v0 + bary.x() * self.v1 + bary.y() * self.v2
     }
     pub fn n(&self, bary: Expr<Float2>) -> Expr<Float3> {
-        ((1.0 - bary.x() - bary.y()) * self.n2 + bary.x() * self.n1 + bary.y() * self.n2)
+        ((1.0 - bary.x() - bary.y()) * self.n0 + bary.x() * self.n1 + bary.y() * self.n2)
+            .normalize()
+    }
+    pub fn tangent(&self, bary: Expr<Float2>) -> Expr<Float3> {
+        ((1.0 - bary.x() - bary.y()) * self.t0 + bary.x() * self.t1 + bary.y() * self.t2)
+            .normalize()
+    }
+    pub fn bitangent(&self, bary: Expr<Float2>) -> Expr<Float3> {
+        ((1.0 - bary.x() - bary.y()) * self.b0 + bary.x() * self.b1 + bary.y() * self.b2)
             .normalize()
     }
     pub fn uv(&self, bary: Expr<Float2>) -> Expr<Float2> {

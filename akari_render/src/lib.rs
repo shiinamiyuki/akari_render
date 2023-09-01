@@ -37,8 +37,8 @@ pub mod data;
 pub mod cpp_ext;
 pub mod volume;
 pub mod nodes;
-pub mod shadergraph;
 pub mod load;
+pub mod svm;
 
 pub const ONE_MINUS_EPSILON: f32 = hexf32!("0x1.fffffep-1");
 pub const FRAC_1_2PI: f32 = 1.0 / (2.0 * std::f32::consts::PI);

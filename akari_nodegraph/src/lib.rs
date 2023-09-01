@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::mem::transmute;
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub struct NodeId(String);
+pub struct NodeId(pub String);
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NodeLink {
@@ -44,8 +44,11 @@ impl SocketIn {
         match &self.value {
             SocketValue::Enum(v) => Ok(T::from_str(v)),
             _ => Err(NodeProxyError {
-                msg: format!("Invalid value for socket {}: {:?}; not enum!", self.name, self.value),
-            })
+                msg: format!(
+                    "Invalid value for socket {}: {:?}; not enum!",
+                    self.name, self.value
+                ),
+            }),
         }
     }
     pub fn as_proxy_input<T: SocketType + 'static>(
@@ -58,7 +61,10 @@ impl SocketIn {
                 cast($v).map_or_else(
                     || {
                         Err(NodeProxyError {
-                            msg: format!("Invalid value for socket {}: {:?}; unable to cast!", name, value),
+                            msg: format!(
+                                "Invalid value for socket {}: {:?}; unable to cast!",
+                                name, value
+                            ),
                         })
                     },
                     Ok,
@@ -116,7 +122,9 @@ pub struct SocketOut {
     pub links: Vec<NodeLink>,
 }
 impl SocketOut {
-    pub fn as_proxy_output<T: SocketType + 'static>(&self) -> Result<NodeProxyOutput<T>, NodeProxyError> {
+    pub fn as_proxy_output<T: SocketType + 'static>(
+        &self,
+    ) -> Result<NodeProxyOutput<T>, NodeProxyError> {
         let ty = T::ty();
         let links = self
             .links
@@ -180,6 +188,9 @@ impl Node {
             Ok,
         )
     }
+    pub fn proxy<T: NodeProxy>(&self, graph: &NodeGraph) -> Result<T, NodeProxyError> {
+        T::from_node(graph, self)
+    }
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NodeGraph {
@@ -221,12 +232,26 @@ impl_socket_type!(String);
 #[derive(Clone, Debug)]
 pub struct NodeProxyOutput<T: SocketType> {
     _marker: std::marker::PhantomData<T>,
-    link: Vec<NodeLink>,
+    pub(crate) link: Vec<NodeLink>,
 }
 #[derive(Clone, Debug)]
 pub enum NodeProxyInput<T: SocketType> {
     Value(T),
     Node(Option<NodeLink>),
+}
+impl<T: SocketType> NodeProxyInput<T> {
+    pub fn as_value(&self) -> Option<&T> {
+        match self {
+            NodeProxyInput::Value(v) => Some(v),
+            _ => None,
+        }
+    }
+    pub fn as_node(&self) -> Option<&NodeLink> {
+        match self {
+            NodeProxyInput::Node(v) => v.as_ref(),
+            _ => None,
+        }
+    }
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Enum {

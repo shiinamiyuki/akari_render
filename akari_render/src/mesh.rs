@@ -10,12 +10,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Clone)]
 pub struct TriangleMesh {
     pub name: String,
-    pub vertices: Vec<[f32; 3]>,
-    pub normals: Vec<[f32; 3]>,
-    pub tangents: Vec<[f32; 3]>,
+    pub vertices: Vec<PackedFloat3>,
+    pub normals: Vec<PackedFloat3>,
+    pub tangents: Vec<PackedFloat3>,
     pub bitangent_signs: Vec<u32>, // bitmasks, 0 for 1, 1 for -1
-    pub uvs: Vec<[f32; 2]>,
-    pub indices: Vec<[u32; 3]>,
+    pub uvs: Vec<Float2>,
+    pub indices: Vec<PackedUint3>,
 }
 impl Encode for TriangleMesh {
     fn encode<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
@@ -58,9 +58,9 @@ impl TriangleMesh {
         self.indices
             .par_iter()
             .map(|i| {
-                let v0 = glam::Vec3::from_array(self.vertices[i[0] as usize]);
-                let v1 = glam::Vec3::from_array(self.vertices[i[1] as usize]);
-                let v2 = glam::Vec3::from_array(self.vertices[i[2] as usize]);
+                let v0 = glam::Vec3::from(self.vertices[i.x as usize]);
+                let v1 = glam::Vec3::from(self.vertices[i.y as usize]);
+                let v2 = glam::Vec3::from(self.vertices[i.z as usize]);
                 (v1 - v0).cross(v2 - v0).length() / 2.0
             })
             .collect()
@@ -81,63 +81,39 @@ pub struct MeshBuffer {
 impl MeshBuffer {
     pub fn new(device: Device, mesh: &TriangleMesh) -> Self {
         if !mesh.normals.is_empty() {
-            assert_eq!(mesh.indices.len(), mesh.normals.len());
+            assert_eq!(mesh.indices.len() * 3, mesh.normals.len());
         }
         if !mesh.uvs.is_empty() {
-            assert_eq!(mesh.indices.len(), mesh.uvs.len());
+            assert_eq!(mesh.indices.len() * 3, mesh.uvs.len());
         }
         if !mesh.tangents.is_empty() {
-            assert_eq!(mesh.indices.len(), mesh.tangents.len());
-            assert_eq!((mesh.indices.len() + 31) / 32, mesh.bitangent_signs.len());
+            assert_eq!(mesh.indices.len() * 3, mesh.tangents.len());
+            assert_eq!(
+                (mesh.indices.len() * 3 + 31) / 32,
+                mesh.bitangent_signs.len()
+            );
         }
-        let vertices = device.create_buffer_from_slice(unsafe {
-            std::slice::from_raw_parts(
-                mesh.vertices.as_ptr() as *const PackedFloat3,
-                mesh.vertices.len(),
-            )
-        });
+        let vertices = device.create_buffer_from_slice(&mesh.vertices);
         let normals = if mesh.normals.is_empty() {
             None
         } else {
-            Some(device.create_buffer_from_slice(unsafe {
-                std::slice::from_raw_parts(
-                    mesh.normals.as_ptr() as *const PackedFloat3,
-                    mesh.normals.len(),
-                )
-            }))
+            Some(device.create_buffer_from_slice(&mesh.normals))
         };
         let tangents = if mesh.tangents.is_empty() {
             None
         } else {
-            Some(device.create_buffer_from_slice(unsafe {
-                std::slice::from_raw_parts(
-                    mesh.tangents.as_ptr() as *const PackedFloat3,
-                    mesh.tangents.len(),
-                )
-            }))
+            Some(device.create_buffer_from_slice(&mesh.tangents))
         };
         let bitangent_signs = if mesh.bitangent_signs.is_empty() {
             None
         } else {
-            Some(device.create_buffer_from_slice(unsafe {
-                std::slice::from_raw_parts(
-                    mesh.bitangent_signs.as_ptr() as *const u32,
-                    mesh.bitangent_signs.len(),
-                )
-            }))
+            Some(device.create_buffer_from_slice(&mesh.bitangent_signs))
         };
-        let indices = device.create_buffer_from_slice(unsafe {
-            std::slice::from_raw_parts(
-                mesh.indices.as_ptr() as *const PackedUint3,
-                mesh.indices.len(),
-            )
-        });
+        let indices = device.create_buffer_from_slice(&mesh.indices);
         let uvs = if mesh.uvs.is_empty() {
             None
         } else {
-            Some(device.create_buffer_from_slice(unsafe {
-                std::slice::from_raw_parts(mesh.uvs.as_ptr() as *const Float2, mesh.uvs.len())
-            }))
+            Some(device.create_buffer_from_slice(&mesh.uvs))
         };
 
         let m = Self {

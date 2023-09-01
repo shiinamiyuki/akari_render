@@ -303,14 +303,14 @@ impl Scene {
         let p = shading_triangle.p(bary);
         let n = shading_triangle.n(bary);
         let uv = shading_triangle.uv(bary);
-        let geometry = SurfaceLocalGeometryExpr::new(
-            p,
-            shading_triangle.ng,
-            n,
-            uv,
-            Float3Expr::zero(),
-            Float3Expr::zero(),
-        );
+        let geometry = struct_!(SurfaceLocalGeometry {
+            p: p,
+            ng: shading_triangle.ng,
+            ns: n,
+            uv: uv,
+            tangent: shading_triangle.tangent(bary),
+            bitangent: shading_triangle.bitangent(bary),
+        });
         SurfaceInteractionExpr::new(
             inst_id,
             prim_id,

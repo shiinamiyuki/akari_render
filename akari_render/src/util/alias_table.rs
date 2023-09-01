@@ -20,7 +20,7 @@ impl BindlessAliasTableVar {
         self.1.read(i)
     }
     pub fn sample_and_remap(&self, u: Expr<f32>) -> (Uint, Float, Float) {
-        let (idx, u) = uniform_discrete_choice_and_remap(self.0.len(), u);
+        let (idx, u) = uniform_discrete_choice_and_remap(self.0.len().uint(), u);
         let entry = self.0.read(idx);
         let (idx, u) = weighted_discrete_choice2_and_remap(entry.t(), idx, entry.j(), u);
         let pdf = self.1.read(idx);
@@ -82,7 +82,7 @@ impl AliasTable {
         // let idx = select(u.y().cmpge(entry.t()), entry.j(), idx);
         // let pdf = self.1.var().read(idx);
         // (idx, pdf)
-        let (idx, u) = uniform_discrete_choice_and_remap(self.0.var().len(), u);
+        let (idx, u) = uniform_discrete_choice_and_remap(self.0.var().len().uint(), u);
         let entry = self.0.var().read(idx);
         let (idx, u) = weighted_discrete_choice2_and_remap(entry.t(), idx, entry.j(), u);
         let pdf = self.1.var().read(idx);

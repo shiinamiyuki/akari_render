@@ -15,10 +15,9 @@ pub struct SurfaceLocalGeometry {
     pub p: Float3,
     pub ng: Float3,
     pub ns: Float3,
-    // uv in UV mapping
+    pub tangent: Float3,
+    pub bitangent: Float3,
     pub uv: Float2,
-    pub dpdu: Float3,
-    pub dpdv: Float3,
 }
 
 #[derive(Clone, Copy, Debug, Value)]

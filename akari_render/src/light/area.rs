@@ -58,9 +58,9 @@ impl Light for AreaLightExpr {
             p,
             shading_triangle.ng,
             n,
+            shading_triangle.tangent(bary),
+            shading_triangle.bitangent(bary),
             uv,
-            Float3Expr::zero(),
-            Float3Expr::zero(),
         );
 
         let si = SurfaceInteractionExpr::new(

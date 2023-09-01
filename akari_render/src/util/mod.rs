@@ -1,6 +1,5 @@
 pub mod alias_table;
 pub mod binserde;
-pub mod convert_gltf;
 pub mod hash;
 use crate::{color::glam_linear_to_srgb, *};
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};

@@ -136,6 +136,17 @@ fn gen_nodegraph_defs() {
             }],
         },
         NodeDesc {
+            name: "DiffuseBsdf".to_string(),
+            category: "Bsdf".to_string(),
+            inputs: vec![
+                create_spectrum_input("color"),
+            ],
+            outputs: vec![OutputSocketDesc {
+                name: "bsdf".to_string(),
+                kind: SocketKind::Node("Bsdf".to_string()),
+            }],
+        },
+        NodeDesc {
             name: "MixBsdf".to_string(),
             category: "Bsdf".to_string(),
             inputs: vec![

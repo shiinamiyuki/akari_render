@@ -286,6 +286,13 @@ class SceneExporter:
         normal_buffer = open(os.path.join(MESH_DIR, f"{name}.normal"), "wb")
         bit_counter = 0
         packed_bits = 0
+        vert_buffer.write(struct.pack('Q', len(V)))
+        ind_buffer.write(struct.pack('Q', len(F)))
+        normal_buffer.write(struct.pack('Q', len(F) * 3))
+        if has_uv:
+            uv_buffer.write(struct.pack('Q', len(F) * 3))
+            tangent_buffer.write(struct.pack('Q', len(F) * 3))
+            bitangent_buffer.write(struct.pack('Q', (len(F) * 3 + 31) // 32))
         for v in V:
             vert_buffer.write(struct.pack("fff", *convert_coord_sys(v.co)))
         for f in F:
@@ -320,13 +327,13 @@ class SceneExporter:
             tangent_buffer.close()
             bitangent_buffer.close()
         normal_buffer.close()
-        print(f'${name}_vert = Buffer[name="vert", path="{path_join(MESH_DIR, f"{name}.vert")}"]',file=akr_file)
-        print(f'${name}_ind = Buffer[name="ind", path="{path_join(MESH_DIR, f"{name}.ind")}"]',file=akr_file)
-        print(f'${name}_normal = Buffer[name="normal", path="{path_join(MESH_DIR, f"{name}.normal")}"]',file=akr_file)
+        print(f'${name}_vert = Buffer[name="vertices", path="{path_join(MESH_DIR, f"{name}.vert")}"]',file=akr_file)
+        print(f'${name}_ind = Buffer[name="indices", path="{path_join(MESH_DIR, f"{name}.ind")}"]',file=akr_file)
+        print(f'${name}_normal = Buffer[name="normals", path="{path_join(MESH_DIR, f"{name}.normal")}"]',file=akr_file)
         if has_uv:
-            print(f'${name}_uv = Buffer[name="uv", path="{path_join(MESH_DIR, f"{name}.uv")}"]',file=akr_file)
-            print(f'${name}_tangent = Buffer[name="tangent", path="{path_join(MESH_DIR, f"{name}.tangent")}"]',file=akr_file)
-            print(f'${name}_bitangent = Buffer[name="bitangent", path="{path_join(MESH_DIR, f"{name}.bitangent")}"]',file=akr_file)
+            print(f'${name}_uv = Buffer[name="uvs", path="{path_join(MESH_DIR, f"{name}.uv")}"]',file=akr_file)
+            print(f'${name}_tangent = Buffer[name="tangents", path="{path_join(MESH_DIR, f"{name}.tangent")}"]',file=akr_file)
+            print(f'${name}_bitangent = Buffer[name="bitangent_signs", path="{path_join(MESH_DIR, f"{name}.bitangent")}"]',file=akr_file)
         buffers = [f"{name}_vert", f"{name}_ind", f"{name}_normal"]
         if has_uv:
             buffers.extend([f"{name}_uv", f"{name}_tangent", f"{name}_bitangent"])

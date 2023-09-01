@@ -72,7 +72,7 @@ impl ColorBuffer {
             ColorRepr::Rgb(colorspace) => ColorBuffer::Rgb(device.create_buffer(count), colorspace),
         }
     }
-    pub fn read(&self, i: impl Into<Expr<u32>>) -> (Color, Expr<SampledWavelengths>) {
+    pub fn read(&self, i: impl IntoIndex) -> (Color, Expr<SampledWavelengths>) {
         match self {
             ColorBuffer::Rgb(b, cs) => (
                 Color::Rgb(b.var().read(i), *cs),
@@ -84,7 +84,7 @@ impl ColorBuffer {
             }
         }
     }
-    pub fn write(&self, i: impl Into<Expr<u32>>, color: Color, swl: Expr<SampledWavelengths>) {
+    pub fn write(&self, i: impl IntoIndex, color: Color, swl: Expr<SampledWavelengths>) {
         match self {
             ColorBuffer::Rgb(b, cs) => b.var().write(i, color.as_rgb()),
             ColorBuffer::Spectral(b) => b.var().write(i, color.as_sampled_spectrum(swl)),
