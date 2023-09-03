@@ -20,6 +20,7 @@ use crate::surface::{
     BsdfEvalContext, BsdfEvaluator, BsdfSample, FlatBsdfEvalResult, FlatBsdfSample,
     BSDF_EVAL_ALBEDO, BSDF_EVAL_COLOR, BSDF_EVAL_PDF, BSDF_EVAL_ROUGHNESS,
 };
+use crate::svm::Svm;
 use crate::texture::{
     ConstFloatTexture, ConstRgbTexture, ImageRgbTexture, TextureEvalContext, TextureEvaluator,
 };
@@ -37,8 +38,7 @@ use crate::{
 };
 
 pub struct Scene {
-    pub textures: Polymorphic<PolyKey, dyn Texture>,
-    pub surfaces: Polymorphic<PolyKey, dyn Surface>,
+    pub svm: Arc<Svm>,
     pub lights: LightAggregate,
     pub meshes: Arc<MeshAggregate>,
     pub camera: Box<dyn Camera>,

@@ -9,6 +9,14 @@ use crate::{
     scene::*,
     *,
 };
+
+#[derive(Clone,  Debug)]
+pub struct PipelineConfig {
+    pub color: ColorRepr,
+    pub sampler: SamplerConfig,
+    pub film: FilmConfig,
+}
+
 #[derive(Clone, Debug)]
 pub struct RenderOptions {
     pub save_intermediate: bool, // save intermediate results

@@ -2,17 +2,18 @@ use crate::color::{ColorRepr, FlatColor, SampledWavelengths};
 use crate::geometry::{face_forward, reflect, refract};
 use crate::microfacet::MicrofacetDistribution;
 use crate::sampling::weighted_discrete_choice2_and_remap;
+use crate::svm::eval::SvmEvaluator;
 use crate::texture::TextureEvaluator;
 use crate::{color::Color, geometry::Frame, interaction::SurfaceInteraction, *};
 
 pub struct BsdfEvalContext<'a> {
-    pub texture: &'a TextureEvaluator,
     pub color_repr: ColorRepr,
+    _marker: std::marker::PhantomData<&'a ()>,
 }
 
-// pub mod diffuse;
-// pub mod glass;
-// pub mod principled;
+pub mod diffuse;
+pub mod glass;
+pub mod principled;
 
 #[derive(Clone, Aggregate)]
 pub struct BsdfSample {
@@ -63,10 +64,8 @@ pub trait Bsdf {
 pub trait Surface {
     fn closure(
         &self,
-        si: Expr<SurfaceInteraction>,
-        swl: Expr<SampledWavelengths>,
-        ctx: &BsdfEvalContext,
-    ) -> BsdfClosure;
+        svm_eval: &SvmEvaluator<'_>,
+    ) -> Box<dyn Bsdf>;
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -361,7 +360,7 @@ impl Bsdf for MicrofacetReflection {
         &self,
         wo: Expr<Float3>,
         wi: Expr<Float3>,
-        swl: Expr<SampledWavelengths>,
+        _swl: Expr<SampledWavelengths>,
         _ctx: &BsdfEvalContext,
     ) -> Float {
         let wh = wo + wi;

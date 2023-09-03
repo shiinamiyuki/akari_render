@@ -6,12 +6,10 @@ use crate::color::Color;
 use crate::geometry::Frame;
 use crate::sampling::cos_sample_hemisphere;
 use crate::surface::SampledWavelengths;
+use crate::svm::eval::SvmEvaluator;
+use crate::svm::SvmDiffuseBsdfExpr;
 use crate::*;
-#[derive(Debug, Clone, Copy, Value)]
-#[repr(C)]
-pub struct DiffuseSurface {
-    pub reflectance: TagIndex,
-}
+
 pub struct DiffuseBsdf {
     pub reflectance: Color,
 }
@@ -83,19 +81,12 @@ impl Bsdf for DiffuseBsdf {
         const_(1.0f32)
     }
 }
-impl Surface for DiffuseSurfaceExpr {
+impl Surface for SvmDiffuseBsdfExpr {
     fn closure(
         &self,
-        si: Expr<interaction::SurfaceInteraction>,
-        swl: Expr<color::SampledWavelengths>,
-        ctx: &BsdfEvalContext,
-    ) -> BsdfClosure {
-        let reflectance = ctx.texture.evaluate_color(self.reflectance(), si) * const_(FRAC_1_PI);
-        BsdfClosure {
-            inner: Box::new(DiffuseBsdf { reflectance }),
-            frame: si.frame(),
-        }
+        svm_eval: &SvmEvaluator<'_>,
+    ) -> Box<dyn Bsdf> {
+        let reflectance = svm_eval.eval_color(self.reflectance()) * const_(FRAC_1_PI);
+        Box::new(DiffuseBsdf { reflectance })
     }
 }
-
-impl_polymorphic!(Surface, DiffuseSurface);

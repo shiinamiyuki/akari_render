@@ -3,27 +3,16 @@ use crate::color::*;
 use crate::geometry::Frame;
 use crate::microfacet::TrowbridgeReitzDistribution;
 use crate::surface::{fr_dielectric, BsdfMixture, FresnelDielectric, MicrofacetReflection};
+use crate::svm::SvmGlassBsdfExpr;
 use crate::*;
-#[derive(Debug, Clone, Copy, Value)]
-#[repr(C)]
-pub struct GlassSurface {
-    pub kr: TagIndex,
-    pub kt: TagIndex,
-    pub roughness: TagIndex,
-    pub eta: f32,
-}
 
-impl Surface for GlassSurfaceExpr {
-    fn closure(
-        &self,
-        si: Expr<interaction::SurfaceInteraction>,
-        swl: Expr<SampledWavelengths>,
-        ctx: &BsdfEvalContext,
-    ) -> BsdfClosure {
-        let kr = ctx.texture.evaluate_color(self.kr(), si);
-        let kt = ctx.texture.evaluate_color(self.kt(), si);
-        let fresnel = Box::new(FresnelDielectric { eta: self.eta() });
-        let roughness = ctx.texture.evaluate_float(self.roughness(), si);
+impl Surface for SvmGlassBsdfExpr {
+    fn closure(&self, svm_eval: &svm::eval::SvmEvaluator<'_>) -> Box<dyn surface::Bsdf> {
+        let kr = svm_eval.eval_color(self.kr());
+        let kt = svm_eval.eval_color(self.kt());
+        let eta = svm_eval.eval_float(self.eta());
+        let fresnel = Box::new(FresnelDielectric { eta });
+        let roughness = svm_eval.eval_float(self.roughness());
         let reflection = Box::new(MicrofacetReflection {
             color: kr,
             fresnel: fresnel.clone(),
@@ -39,20 +28,15 @@ impl Surface for GlassSurfaceExpr {
                 make_float2(roughness, roughness),
                 false,
             )),
-            eta: self.eta(),
+            eta,
         });
-        let eta = self.eta();
         let fresnel_blend = Box::new(BsdfMixture {
             frac: Box::new(move |wo, _| -> Expr<f32> { fr_dielectric(Frame::cos_theta(wo), eta) }),
             bsdf_a: transmission,
             bsdf_b: reflection,
             mode: BsdfBlendMode::Mix,
         });
-        BsdfClosure {
-            inner: fresnel_blend,
-            frame: si.frame(),
-        }
+        fresnel_blend
     }
 }
 
-impl_polymorphic!(Surface, GlassSurface);

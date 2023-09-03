@@ -8,7 +8,7 @@ fn gen_nodegraph_defs() {
     };
     let colorspace = Enum {
         name: "ColorSpace".to_string(),
-        variants: vec!["Linear".to_string(), "SRGB".to_string()],
+        variants: vec!["ACEScg".to_string(), "SRGB".to_string()],
     };
     let color_pipeline = Enum {
         name: "ColorPipeline".to_string(),
@@ -29,8 +29,8 @@ fn gen_nodegraph_defs() {
                     default: SocketValue::String("".to_string()),
                 },
                 InputSocketDesc {
-                    name: "color_space".to_string(),
-                    kind: SocketKind::Enum(coordinate_system.name.clone()),
+                    name: "colorspace".to_string(),
+                    kind: SocketKind::Enum(colorspace.name.clone()),
                     default: SocketValue::Enum("SRGB".to_string()),
                 },
             ],
@@ -57,6 +57,11 @@ fn gen_nodegraph_defs() {
                     name: "b".to_string(),
                     kind: SocketKind::Float,
                     default: SocketValue::Float(0.0),
+                },
+                InputSocketDesc {
+                    name: "colorspace".to_string(),
+                    kind: SocketKind::Enum(colorspace.name.clone()),
+                    default: SocketValue::Enum("SRGB".to_string()),
                 },
             ],
             outputs: vec![OutputSocketDesc {
@@ -127,6 +132,9 @@ fn gen_nodegraph_defs() {
                 create_float_input("roughness", 0.2),
                 create_float_input("metallic", 0.0),
                 create_float_input("specular", 0.5),
+                create_float_input("clearcoat", 0.0),
+                create_float_input("clearcoat_roughness", 0.0),
+                create_float_input("transmission", 0.0),
                 create_float_input("ior", 1.333),
                 create_spectrum_input("emission"),
             ],
@@ -138,9 +146,7 @@ fn gen_nodegraph_defs() {
         NodeDesc {
             name: "DiffuseBsdf".to_string(),
             category: "Bsdf".to_string(),
-            inputs: vec![
-                create_spectrum_input("color"),
-            ],
+            inputs: vec![create_spectrum_input("color")],
             outputs: vec![OutputSocketDesc {
                 name: "bsdf".to_string(),
                 kind: SocketKind::Node("Bsdf".to_string()),
@@ -294,18 +300,33 @@ fn gen_nodegraph_defs() {
             kind: SocketKind::Node("Scene".to_string()),
         }],
     }];
-    let misc_nodes = vec![NodeDesc {
-        name: "Buffer".to_string(),
-        category: "Misc".to_string(),
-        inputs: vec![
-            create_string_input("name", ""),
-            create_string_input("path", ""),
-        ],
-        outputs: vec![OutputSocketDesc {
-            name: "buffer".to_string(),
-            kind: SocketKind::Node("Buffer".to_string()),
-        }],
-    }];
+    let misc_nodes = vec![
+        NodeDesc {
+            name: "Float".to_string(),
+            category: "Math".to_string(),
+            inputs: vec![InputSocketDesc {
+                name: "value".to_string(),
+                kind: SocketKind::Float,
+                default: SocketValue::Float(0.0),
+            }],
+            outputs: vec![OutputSocketDesc {
+                name: "float".to_string(),
+                kind: SocketKind::Float,
+            }],
+        },
+        NodeDesc {
+            name: "Buffer".to_string(),
+            category: "Misc".to_string(),
+            inputs: vec![
+                create_string_input("name", ""),
+                create_string_input("path", ""),
+            ],
+            outputs: vec![OutputSocketDesc {
+                name: "buffer".to_string(),
+                kind: SocketKind::Node("Buffer".to_string()),
+            }],
+        },
+    ];
     let enums = vec![coordinate_system, colorspace, color_pipeline];
     let mut nodes = vec![];
     nodes.extend(texture_nodes);

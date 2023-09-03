@@ -1,4 +1,6 @@
+use color::ColorRepr;
 use hexf::hexf32;
+use integrator::FilmConfig;
 pub use luisa::derive::{Aggregate, Value};
 pub use luisa::glam;
 pub use luisa::prelude::*;
@@ -10,6 +12,7 @@ pub use luisa::{
     resource::{
         BindlessArray, BindlessArrayVar, BindlessBufferVar, BindlessTex2dVar, BindlessTex3dVar,
         Buffer, BufferVar, BufferView, Tex2d, Tex2dVar, Tex2dView, Tex3d, Tex3dVar, Tex3dView,
+        ByteBuffer, ByteBufferVar, ByteBufferView
     },
     rtx,
     runtime::{create_static_callable, Callable, Command, Device, DynCallable, Kernel, Stream},
@@ -48,3 +51,4 @@ pub enum PolyKey {
     Simple(String),
     Dag(String, Vec<PolyKey>),
 }
+

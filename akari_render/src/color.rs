@@ -7,6 +7,13 @@ pub enum RgbColorSpace {
     #[serde(rename = "aces")]
     ACEScg,
 }
+pub struct ColorSpaceId;
+impl ColorSpaceId {
+    pub const NONE: u32 = 0;
+    pub const SRGB: u32 = 1;
+    pub const ACES_CG: u32 = 2;
+}
+
 #[derive(Copy, Clone, Value, Debug)]
 #[repr(C)]
 pub struct SampledWavelengths {
