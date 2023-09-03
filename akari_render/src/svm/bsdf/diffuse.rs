@@ -1,14 +1,14 @@
 use std::f32::consts::{FRAC_1_PI, PI};
+use std::rc::Rc;
 
 use super::BsdfEvalContext;
-use super::{Bsdf, BsdfClosure, BsdfSample, Surface};
+use super::{Bsdf, BsdfSample, BsdfShader};
 use crate::color::Color;
 use crate::geometry::Frame;
 use crate::sampling::cos_sample_hemisphere;
-use crate::surface::SampledWavelengths;
+use crate::svm::bsdf::SampledWavelengths;
 use crate::svm::eval::SvmEvaluator;
-use crate::svm::SvmDiffuseBsdfExpr;
-use crate::*;
+use crate::svm::*;
 
 pub struct DiffuseBsdf {
     pub reflectance: Color,
@@ -81,12 +81,9 @@ impl Bsdf for DiffuseBsdf {
         const_(1.0f32)
     }
 }
-impl Surface for SvmDiffuseBsdfExpr {
-    fn closure(
-        &self,
-        svm_eval: &SvmEvaluator<'_>,
-    ) -> Box<dyn Bsdf> {
-        let reflectance = svm_eval.eval_color(self.reflectance()) * const_(FRAC_1_PI);
-        Box::new(DiffuseBsdf { reflectance })
+impl BsdfShader for SvmDiffuseBsdf {
+    fn closure(&self, svm_eval: &SvmEvaluator<'_>) -> Rc<dyn Bsdf> {
+        let reflectance = svm_eval.eval_color(self.reflectance) * const_(FRAC_1_PI);
+        Rc::new(DiffuseBsdf { reflectance })
     }
 }

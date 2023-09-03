@@ -33,12 +33,7 @@ fn shader_hash(nodes: &[NodeId]) -> ShaderHash {
     let result = hasher.finalize();
     result.into()
 }
-fn get_colorspace_id(colorspace: nodes::ColorSpace) -> u32 {
-    match colorspace {
-        nodes::ColorSpace::ACEScg => ColorSpaceId::ACES_CG,
-        nodes::ColorSpace::SRGB => ColorSpaceId::SRGB,
-    }
-}
+
 impl<'a> NodeSorter<'a> {
     pub fn sort(graph: &'a NodeGraph, root: NodeId) -> Vec<NodeId> {
         let mut sorter = Self {
@@ -155,7 +150,7 @@ impl<'a> Compiler<'a> {
             let rgb_value = compiler.push(rgb_value);
             SvmNode::RgbTex(SvmRgbTex {
                 rgb: rgb_value,
-                colorspace: get_colorspace_id(rgb.in_colorspace),
+                colorspace: ColorSpaceId::from_colorspace(rgb.in_colorspace.into()),
             })
         });
         when!(
@@ -167,7 +162,7 @@ impl<'a> Compiler<'a> {
                 let tex_idx = compiler.ctx.images[&tex.in_path.as_value().unwrap().clone()];
                 SvmNode::RgbImageTex(SvmRgbImageTex {
                     tex_idx: tex_idx as u32,
-                    colorspace: get_colorspace_id(tex.in_colorspace),
+                    colorspace: ColorSpaceId::from_colorspace(tex.in_colorspace.into()),
                 })
             }
         );

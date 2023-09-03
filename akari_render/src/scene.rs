@@ -16,14 +16,11 @@ use crate::light::{
     WeightedLightDistribution,
 };
 
-use crate::surface::{
+use crate::svm::bsdf::{
     BsdfEvalContext, BsdfEvaluator, BsdfSample, FlatBsdfEvalResult, FlatBsdfSample,
     BSDF_EVAL_ALBEDO, BSDF_EVAL_COLOR, BSDF_EVAL_PDF, BSDF_EVAL_ROUGHNESS,
 };
 use crate::svm::Svm;
-use crate::texture::{
-    ConstFloatTexture, ConstRgbTexture, ImageRgbTexture, TextureEvalContext, TextureEvaluator,
-};
 use crate::util::binserde::Decode;
 use crate::util::{FileResolver, LocalFileResolver};
 use crate::{
@@ -32,8 +29,6 @@ use crate::{
     interaction::*,
     light::{Light, LightDistribution},
     mesh::*,
-    surface::{Bsdf, Surface},
-    texture::Texture,
     *,
 };
 

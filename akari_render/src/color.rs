@@ -7,11 +7,32 @@ pub enum RgbColorSpace {
     #[serde(rename = "aces")]
     ACEScg,
 }
+impl From<nodes::ColorSpace> for RgbColorSpace {
+    fn from(value: nodes::ColorSpace) -> Self {
+        match value {
+            nodes::ColorSpace::ACEScg => RgbColorSpace::ACEScg,
+            nodes::ColorSpace::SRGB => RgbColorSpace::SRgb,
+        }
+    }
+}
 pub struct ColorSpaceId;
 impl ColorSpaceId {
     pub const NONE: u32 = 0;
     pub const SRGB: u32 = 1;
     pub const ACES_CG: u32 = 2;
+    pub fn from_colorspace(colorspace: RgbColorSpace) -> u32 {
+        match colorspace {
+            RgbColorSpace::ACEScg => ColorSpaceId::ACES_CG,
+            RgbColorSpace::SRgb => ColorSpaceId::SRGB,
+        }
+    }
+    pub fn to_colorspace(id: u32) -> RgbColorSpace {
+        match id {
+            ColorSpaceId::ACES_CG => RgbColorSpace::ACEScg,
+            ColorSpaceId::SRGB => RgbColorSpace::SRgb,
+            _ => panic!("invalid colorspace id"),
+        }
+    }
 }
 
 #[derive(Copy, Clone, Value, Debug)]
@@ -335,9 +356,7 @@ impl std::ops::Mul<&Color> for &Color {
     fn mul(self, rhs: &Color) -> Self::Output {
         assert_eq!(self.repr(), rhs.repr());
         match (self, rhs) {
-            (Color::Spectral(s), Color::Spectral(t)) => {
-                Color::Spectral(*s * *t)
-            }
+            (Color::Spectral(s), Color::Spectral(t)) => Color::Spectral(*s * *t),
             (Color::Rgb(s, cs0), Color::Rgb(t, cs1)) => {
                 assert_eq!(cs0, cs1);
                 Color::Rgb(*s * *t, *cs0)
@@ -352,9 +371,7 @@ impl std::ops::Add<&Color> for &Color {
     fn add(self, rhs: &Color) -> Self::Output {
         assert_eq!(self.repr(), rhs.repr());
         match (self, rhs) {
-            (Color::Spectral(s), Color::Spectral(t)) => {
-                Color::Spectral(*s + *t)
-            }
+            (Color::Spectral(s), Color::Spectral(t)) => Color::Spectral(*s + *t),
             (Color::Rgb(s, cs0), Color::Rgb(t, cs1)) => {
                 assert_eq!(cs0, cs1);
                 Color::Rgb(*s + *t, *cs0)
@@ -369,9 +386,7 @@ impl std::ops::Sub<&Color> for &Color {
     fn sub(self, rhs: &Color) -> Self::Output {
         assert_eq!(self.repr(), rhs.repr());
         match (self, rhs) {
-            (Color::Spectral(s), Color::Spectral(t)) => {
-                Color::Spectral(*s - *t)
-            }
+            (Color::Spectral(s), Color::Spectral(t)) => Color::Spectral(*s - *t),
             (Color::Rgb(s, cs0), Color::Rgb(t, cs1)) => {
                 assert_eq!(cs0, cs1);
                 Color::Rgb(*s - *t, *cs0)
@@ -484,4 +499,9 @@ pub fn aces_cg_to_aces_2065_1_mat() -> glam::Mat3 {
         [-0.0055258826, 0.0040252103, 1.0015006723],
     ])
     .transpose()
+}
+#[derive(Clone, Copy)]
+pub struct ColorPipeline {
+    pub color_repr: ColorRepr,
+    pub rgb_colorspace: RgbColorSpace,
 }

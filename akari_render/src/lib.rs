@@ -33,8 +33,6 @@ pub mod microfacet;
 pub mod sampler;
 pub mod sampling;
 pub mod scene;
-pub mod surface;
-pub mod texture;
 pub mod util;
 pub mod data;
 pub mod cpp_ext;

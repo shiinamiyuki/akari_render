@@ -1,19 +1,21 @@
-use super::{BsdfBlendMode, BsdfClosure, BsdfEvalContext, MicrofacetTransmission, Surface};
+use std::rc::Rc;
+
+use super::{BsdfBlendMode, BsdfClosure, BsdfEvalContext, BsdfShader, MicrofacetTransmission};
 use crate::color::*;
 use crate::geometry::Frame;
 use crate::microfacet::TrowbridgeReitzDistribution;
-use crate::surface::{fr_dielectric, BsdfMixture, FresnelDielectric, MicrofacetReflection};
-use crate::svm::SvmGlassBsdfExpr;
+use crate::svm::bsdf::{Bsdf, fr_dielectric, BsdfMixture, FresnelDielectric, MicrofacetReflection};
+use crate::svm::SvmGlassBsdf;
 use crate::*;
 
-impl Surface for SvmGlassBsdfExpr {
-    fn closure(&self, svm_eval: &svm::eval::SvmEvaluator<'_>) -> Box<dyn surface::Bsdf> {
-        let kr = svm_eval.eval_color(self.kr());
-        let kt = svm_eval.eval_color(self.kt());
-        let eta = svm_eval.eval_float(self.eta());
+impl BsdfShader for SvmGlassBsdf {
+    fn closure(&self, svm_eval: &svm::eval::SvmEvaluator<'_>) -> Rc<dyn Bsdf> {
+        let kr = svm_eval.eval_color(self.kr);
+        let kt = svm_eval.eval_color(self.kt);
+        let eta = svm_eval.eval_float(self.eta);
         let fresnel = Box::new(FresnelDielectric { eta });
-        let roughness = svm_eval.eval_float(self.roughness());
-        let reflection = Box::new(MicrofacetReflection {
+        let roughness = svm_eval.eval_float(self.roughness);
+        let reflection = Rc::new(MicrofacetReflection {
             color: kr,
             fresnel: fresnel.clone(),
             dist: Box::new(TrowbridgeReitzDistribution::from_roughness(
@@ -21,7 +23,7 @@ impl Surface for SvmGlassBsdfExpr {
                 false,
             )),
         });
-        let transmission = Box::new(MicrofacetTransmission {
+        let transmission = Rc::new(MicrofacetTransmission {
             color: kt,
             fresnel: fresnel.clone(),
             dist: Box::new(TrowbridgeReitzDistribution::from_roughness(
@@ -30,7 +32,7 @@ impl Surface for SvmGlassBsdfExpr {
             )),
             eta,
         });
-        let fresnel_blend = Box::new(BsdfMixture {
+        let fresnel_blend = Rc::new(BsdfMixture {
             frac: Box::new(move |wo, _| -> Expr<f32> { fr_dielectric(Frame::cos_theta(wo), eta) }),
             bsdf_a: transmission,
             bsdf_b: reflection,
@@ -39,4 +41,3 @@ impl Surface for SvmGlassBsdfExpr {
         fresnel_blend
     }
 }
-

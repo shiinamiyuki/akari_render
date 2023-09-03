@@ -221,6 +221,9 @@ pub fn log2u32(x: u32) -> u32 {
 pub fn log4u32(x: u32) -> u32 {
     log2u32(x) / 2
 }
+pub fn round_to(x:usize, align:usize) -> usize {
+    (x + align - 1) / align * align
+}
 #[cfg(test)]
 mod test {
     fn test_log4u32_x(x: u32) {

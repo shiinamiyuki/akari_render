@@ -1,9 +1,10 @@
+use std::rc::Rc;
+
 use crate::color::{ColorRepr, FlatColor, SampledWavelengths};
 use crate::geometry::{face_forward, reflect, refract};
 use crate::microfacet::MicrofacetDistribution;
 use crate::sampling::weighted_discrete_choice2_and_remap;
 use crate::svm::eval::SvmEvaluator;
-use crate::texture::TextureEvaluator;
 use crate::{color::Color, geometry::Frame, interaction::SurfaceInteraction, *};
 
 pub struct BsdfEvalContext<'a> {
@@ -61,11 +62,11 @@ pub trait Bsdf {
     ) -> Expr<f32>;
 }
 
-pub trait Surface {
+pub trait BsdfShader {
     fn closure(
         &self,
         svm_eval: &SvmEvaluator<'_>,
-    ) -> Box<dyn Bsdf>;
+    ) -> Rc<dyn Bsdf>;
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -75,8 +76,8 @@ pub enum BsdfBlendMode {
 }
 pub struct BsdfMixture {
     pub frac: Box<dyn Fn(Expr<Float3>, &BsdfEvalContext) -> Expr<f32>>,
-    pub bsdf_a: Box<dyn Bsdf>,
-    pub bsdf_b: Box<dyn Bsdf>,
+    pub bsdf_a: Rc<dyn Bsdf>,
+    pub bsdf_b: Rc<dyn Bsdf>,
     pub mode: BsdfBlendMode,
 }
 impl BsdfMixture {
@@ -241,7 +242,7 @@ impl Bsdf for BsdfMixture {
 }
 
 pub struct BsdfClosure {
-    inner: Box<dyn Bsdf>,
+    inner: Rc<dyn Bsdf>,
     frame: Expr<Frame>,
 }
 

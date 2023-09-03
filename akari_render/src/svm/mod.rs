@@ -1,16 +1,23 @@
 use std::{
+    alloc::Layout,
     collections::{hash_map::DefaultHasher, HashMap},
     hash::{Hash, Hasher},
 };
 
-use crate::*;
+use crate::{util::round_to, *};
+use luisa::runtime::api::Shader;
 use sha2::{Digest, Sha256};
+pub mod bsdf;
 pub mod compiler;
 pub mod eval;
-#[derive(Clone, Copy, Debug, Value)]
+pub mod texture;
+#[derive(Clone, Copy, Debug, Value, Hash, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(C)]
 pub struct SvmNodeRef {
     pub index: u32, // relative index
+}
+impl SvmNodeRef {
+    pub const INVALID: Self = Self { index: u32::MAX };
 }
 impl SvmNodeRef {
     pub fn hash<H: Digest>(&self, hasher: &mut H) {
@@ -194,29 +201,56 @@ impl SvmNode {
             SvmNode::MaterialOutput(x) => x.hash(hasher),
         }
     }
+    pub fn layout(&self) -> Layout {
+        match self {
+            SvmNode::Float(_) => Layout::new::<SvmFloat>(),
+            SvmNode::Float3(_) => Layout::new::<SvmFloat3>(),
+            SvmNode::MakeFloat3(_) => Layout::new::<SvmMakeFloat3>(),
+            SvmNode::RgbTex(_) => Layout::new::<SvmRgbTex>(),
+            SvmNode::RgbImageTex(_) => Layout::new::<SvmRgbImageTex>(),
+            SvmNode::SpectralUplift(_) => Layout::new::<SvmSpectralUplift>(),
+            SvmNode::DiffuseBsdf(_) => Layout::new::<SvmDiffuseBsdf>(),
+            SvmNode::PrincipledBsdf(_) => Layout::new::<SvmPrincipledBsdf>(),
+            SvmNode::MaterialOutput(_) => Layout::new::<SvmMaterialOutput>(),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Value)]
 #[repr(C)]
 pub struct ShaderRef {
-    pub shader_kind:u32,
+    pub shader_kind: u32,
     pub shader_id: u32, // n-th shader of this kind
-    pub offset: u32,
+    pub offset: u32,    // offset in bytes
     pub size: u32,
 }
 
 pub struct CompiledShader {
     pub nodes: Vec<SvmNode>,
+    pub node_offset: Vec<usize>,
+}
+impl CompiledShader {
+    pub fn new(nodes: Vec<SvmNode>) -> Self {
+        let mut node_offset = Vec::new();
+        let mut offset = 0;
+        for node in &nodes {
+            node_offset.push(offset);
+            offset += node.layout().size();
+            offset = round_to(offset, node.layout().align());
+        }
+        Self { nodes, node_offset }
+    }
 }
 
 pub type ShaderHash = [u8; 32];
-
-pub struct Svm {
-    device: Device,
+pub(crate) struct ShaderCollection {
     pub(crate) shader_hash_to_kind: HashMap<ShaderHash, u32>,
     pub(crate) shaders: HashMap<u32, CompiledShader>, // kind -> shader
     pub(crate) shader_data: ByteBuffer,
+}
+pub struct Svm {
+    device: Device,
+    pub(crate) bsdf_shaders: ShaderCollection,
+    pub(crate) color_shaders: ShaderCollection,
     pub(crate) image_textures: BindlessArray,
 }
-
-

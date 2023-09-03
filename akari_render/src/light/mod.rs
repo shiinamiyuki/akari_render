@@ -5,7 +5,6 @@ use crate::{
     geometry::{PointNormal, Ray},
     interaction::SurfaceInteraction,
     mesh::MeshAggregate,
-    texture::TextureEvaluator,
     util::alias_table::AliasTable,
     *,
 };
@@ -28,7 +27,6 @@ pub struct FlatLightSample {
     pub n: Float3,
 }
 pub struct LightEvalContext<'a> {
-    pub texture: &'a TextureEvaluator,
     pub color_repr: ColorRepr,
     pub meshes: &'a MeshAggregate,
 }
