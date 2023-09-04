@@ -113,6 +113,15 @@ fn gen_nodegraph_defs() {
         kind: SocketKind::Float,
         default: SocketValue::Float(default),
     };
+    let create_float3_input = |name: &str, default: [f32; 3]| InputSocketDesc {
+        name: name.to_string(),
+        kind: SocketKind::List(Box::new(SocketKind::Float), Some(3)),
+        default: SocketValue::List(vec![
+            SocketValue::Float(default[0] as f64),
+            SocketValue::Float(default[1] as f64),
+            SocketValue::Float(default[2] as f64),
+        ]),
+    };
     let create_spectrum_input = |name: &str| InputSocketDesc {
         name: name.to_string(),
         kind: SocketKind::Node("SpectrumTexture".to_string()),
@@ -123,6 +132,53 @@ fn gen_nodegraph_defs() {
         kind: SocketKind::String,
         default: SocketValue::String(default.to_string()),
     };
+    let vec_math_nodes = vec![NodeDesc {
+        name: "Vec3".to_string(),
+        category: "Bsdf".to_string(),
+        inputs: vec![
+            create_float_input("x", 0.2),
+            create_float_input("y", 0.2),
+            create_float_input("z", 0.2),
+        ],
+        outputs: vec![OutputSocketDesc {
+            name: "bsdf".to_string(),
+            kind: SocketKind::Node("Float3".to_string()),
+        }],
+    }];
+    let transform_nodes = vec![NodeDesc {
+        name: "TRS".to_string(),
+        category: "Bsdf".to_string(),
+        inputs: vec![
+            create_float3_input("translation", [0.0, 0.0, 0.0]),
+            create_float3_input("rotation", [0.0, 0.0, 0.0]),
+            create_float3_input("scale", [1.0, 1.0, 1.0]),
+            InputSocketDesc {
+                name: "coordinate_system".to_string(),
+                kind: SocketKind::Enum(coordinate_system.name.clone()),
+                default: SocketValue::Enum("Blender".to_string()),
+            },
+        ],
+        outputs: vec![OutputSocketDesc {
+            name: "transform".to_string(),
+            kind: SocketKind::Node("Transform".to_string()),
+        }],
+    }];
+    let camera_nodes = vec![NodeDesc {
+        name: "PerspectiveCamera".into(),
+        category: "Camera".into(),
+        inputs: vec![
+            InputSocketDesc {
+                name: "transform".to_string(),
+                kind: SocketKind::Node("Transform".into()),
+                default: SocketValue::Node(None),
+            },
+            create_float_input("fov", 45.0),
+        ],
+        outputs: vec![OutputSocketDesc {
+            name: "camera".to_string(),
+            kind: SocketKind::Node("Camera".into()),
+        }],
+    }];
     let bsdf_nodes = vec![
         NodeDesc {
             name: "PrincipledBsdf".to_string(),
@@ -247,18 +303,34 @@ fn gen_nodegraph_defs() {
             kind: SocketKind::Node("Image".to_string()),
         }],
     };
-    let light_nodes = vec![NodeDesc {
-        name: "AreaLight".to_string(),
-        category: "Light".to_string(),
-        inputs: vec![
-            create_spectrum_input("color"),
-            create_float_input("intensity", 1.0),
-        ],
-        outputs: vec![OutputSocketDesc {
-            name: "light".to_string(),
-            kind: SocketKind::Node("Light".to_string()),
-        }],
-    }];
+    let light_nodes = vec![
+        NodeDesc {
+            name: "LightOutput".to_string(),
+            category: "Light".to_string(),
+            inputs: vec![InputSocketDesc {
+                name: "surface".to_string(),
+                kind: SocketKind::Node("Bsdf".to_string()),
+                default: SocketValue::Node(None),
+            }],
+            outputs: vec![OutputSocketDesc {
+                name: "light".to_string(),
+                kind: SocketKind::Node("LightOutput".to_string()),
+            }],
+        },
+        NodeDesc {
+            name: "AreaLight".to_string(),
+            category: "Light".to_string(),
+            inputs: vec![InputSocketDesc {
+                name: "emission".to_string(),
+                kind: SocketKind::Node("LightOutput".to_string()),
+                default: SocketValue::Node(None),
+            }],
+            outputs: vec![OutputSocketDesc {
+                name: "light".to_string(),
+                kind: SocketKind::Node("Light".to_string()),
+            }],
+        },
+    ];
     let mesh_node = NodeDesc {
         name: "Mesh".to_string(),
         category: "Geometry".to_string(),
@@ -266,7 +338,7 @@ fn gen_nodegraph_defs() {
             create_string_input("name", ""),
             InputSocketDesc {
                 name: "buffers".to_string(),
-                kind: SocketKind::List(Box::new(SocketKind::Node("Buffer".to_string()))),
+                kind: SocketKind::List(Box::new(SocketKind::Node("Buffer".to_string())), None),
                 default: SocketValue::Node(None),
             },
             InputSocketDesc {
@@ -280,19 +352,45 @@ fn gen_nodegraph_defs() {
             kind: SocketKind::Node("Geometry".to_string()),
         }],
     };
+    let instance_node = NodeDesc {
+        name: "Instance".to_string(),
+        category: "Geometry".to_string(),
+        inputs: vec![
+            create_string_input("name", ""),
+            InputSocketDesc {
+                name: "mesh".to_string(),
+                kind: SocketKind::Node("Geometry".to_string()),
+                default: SocketValue::Node(None),
+            },
+            InputSocketDesc {
+                name: "material".to_string(),
+                kind: SocketKind::Node("Material".to_string()),
+                default: SocketValue::Node(None),
+            },
+        ],
+        outputs: vec![OutputSocketDesc {
+            name: "instance".to_string(),
+            kind: SocketKind::Node("Geometry".to_string()),
+        }],
+    };
     let scene_nodes = vec![NodeDesc {
         name: "Scene".to_string(),
         category: "Scene".to_string(),
         inputs: vec![
             InputSocketDesc {
                 name: "geometries".to_string(),
-                kind: SocketKind::List(Box::new(SocketKind::Node("Geometry".to_string()))),
+                kind: SocketKind::List(Box::new(SocketKind::Node("Geometry".to_string())), None),
                 default: SocketValue::List(vec![]),
             },
             InputSocketDesc {
                 name: "lights".to_string(),
-                kind: SocketKind::List(Box::new(SocketKind::Node("Light".to_string()))),
+                kind: SocketKind::List(Box::new(SocketKind::Node("Light".to_string())), None),
                 default: SocketValue::List(vec![]),
+            },
+            InputSocketDesc {
+                name: "camera".to_string(),
+                kind: SocketKind::Node("Camera".to_string()),
+                default: SocketValue::Node(None),
             },
         ],
         outputs: vec![OutputSocketDesc {
@@ -335,7 +433,9 @@ fn gen_nodegraph_defs() {
     nodes.extend(light_nodes);
     nodes.extend(scene_nodes);
     nodes.extend(misc_nodes);
-    nodes.extend_from_slice(&[mesh_node, render_node]);
+    nodes.extend(camera_nodes);
+    nodes.extend(transform_nodes);
+    nodes.extend_from_slice(&[mesh_node, instance_node, render_node]);
     let graph = NodeGraphDesc { nodes, enums };
     std::fs::write("src/nodes.rs", gen::gen_rust_for_nodegraph(&graph)).unwrap();
     // format the generated code

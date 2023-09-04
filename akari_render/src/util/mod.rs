@@ -6,7 +6,7 @@ use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use lazy_static::lazy_static;
 use luisa_compute::glam::Vec4Swizzles;
 use std::{
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::atomic::{AtomicBool, Ordering},
 };
 pub struct ProgressBarWrapper {
@@ -51,7 +51,7 @@ pub fn create_progess_bar(count: usize, what: &str) -> ProgressBarWrapper {
     }
 }
 pub trait FileResolver {
-    fn resolve(&self, path: &std::path::Path) -> Option<std::fs::File>;
+    fn resolve(&self, path: &Path) -> Option<std::fs::File>;
 }
 
 pub struct LocalFileResolver {
@@ -221,7 +221,7 @@ pub fn log2u32(x: u32) -> u32 {
 pub fn log4u32(x: u32) -> u32 {
     log2u32(x) / 2
 }
-pub fn round_to(x:usize, align:usize) -> usize {
+pub fn round_to(x: usize, align: usize) -> usize {
     (x + align - 1) / align * align
 }
 #[cfg(test)]

@@ -6,7 +6,8 @@ use super::texture::{rgb_gamma_correction, rgb_to_target_colorspace, spectral_up
 use super::{CompiledShader, ShaderRef, Svm, SvmNodeRef};
 use crate::color::{Color, ColorPipeline, ColorSpaceId, SampledWavelengths};
 use crate::interaction::SurfaceInteraction;
-use crate::svm::{bsdf::*, *};
+use crate::svm::{surface::*, *};
+#[derive(Clone, Copy)]
 pub enum SvmEvalInput {
     Surface {
         si: Expr<SurfaceInteraction>,
@@ -117,7 +118,7 @@ impl<'a> SvmEvaluator<'a> {
             }
         }
     }
-    fn eval(&mut self, node: SvmNodeRef) -> &dyn Any {
+    fn eval(&self, node: SvmNodeRef) -> &dyn Any {
         &self.env[&node]
     }
     pub fn eval_float(&self, node: SvmNodeRef) -> Expr<f32> {
@@ -141,9 +142,9 @@ impl<'a> SvmEvaluator<'a> {
     pub fn eval_color(&self, node: SvmNodeRef) -> Color {
         self.eval(node).downcast_ref::<Color>().copied().unwrap()
     }
-    pub fn eval_bsdf_closure(&self, node: SvmNodeRef) -> Rc<dyn Bsdf> {
+    pub fn eval_bsdf_closure(&self, node: SvmNodeRef) -> Rc<dyn Surface> {
         self.eval(node)
-            .downcast_ref::<Rc<dyn Bsdf>>()
+            .downcast_ref::<Rc<dyn Surface>>()
             .cloned()
             .unwrap()
     }
@@ -153,80 +154,51 @@ impl<'a> SvmEvaluator<'a> {
             self.do_eval(SvmNodeRef { index: i as u32 });
         }
         let last_idx = nodes.len() - 1;
-        self.env[&SvmNodeRef {
-            index: last_idx as u32,
-        }]
+        self.env
+            .remove(&SvmNodeRef {
+                index: last_idx as u32,
+            })
+            .unwrap()
     }
 }
 impl Svm {
-    pub fn dispatch_bsdf<R: Aggregate>(
+    pub fn dispatch_surface<R: Aggregate>(
         &self,
         shader_ref: Expr<ShaderRef>,
         color_pipeline: ColorPipeline,
         si: Expr<SurfaceInteraction>,
         swl: Expr<SampledWavelengths>,
-        f: impl FnOnce(&BsdfClosure) -> R,
+        f: impl Fn(&SurfaceClosure) -> R,
     ) -> R {
         let input = SvmEvalInput::Surface { si, swl };
         let mut kinds = self
-            .bsdf_shaders
+            .surface_shaders
             .shaders
             .keys()
             .copied()
             .collect::<Vec<_>>();
         kinds.sort();
-        let sw = switch::<R>(shader_ref.shader_kind().int());
+        let mut sw = switch::<R>(shader_ref.shader_kind().int());
         for k in kinds {
-            sw.case(k as i32, || {
+            sw = sw.case(k as i32, || {
                 let eval = SvmEvaluator::new(
                     self,
                     color_pipeline,
-                    &self.bsdf_shaders.shaders[&k],
+                    &self.surface_shaders.shaders[&k],
                     shader_ref,
-                    self.bsdf_shaders.shader_data.var(),
+                    self.surface_shaders.shader_data.var(),
                     input,
                 );
                 let bsdf = eval
                     .eval_shader()
-                    .downcast_ref::<Rc<dyn Bsdf>>()
+                    .downcast_ref::<Rc<dyn Surface>>()
                     .unwrap()
                     .clone();
-                let closure = BsdfClosure {
+                let closure = SurfaceClosure {
                     inner: bsdf,
                     frame: si.frame(),
                 };
                 f(&closure)
-            });
-        }
-        sw.finish()
-    }
-    pub fn eval_color_shader(
-        &self,
-        shader_ref: Expr<ShaderRef>,
-        color_pipeline: ColorPipeline,
-        si: Expr<SurfaceInteraction>,
-        swl: Expr<SampledWavelengths>,
-    ) -> Color {
-        let input = SvmEvalInput::Surface { si, swl };
-        let mut kinds = self
-            .color_shaders
-            .shaders
-            .keys()
-            .copied()
-            .collect::<Vec<_>>();
-        kinds.sort();
-        let sw = switch::<Color>(shader_ref.shader_kind().int());
-        for k in kinds {
-            sw.case(k as i32, || {
-                let eval = SvmEvaluator::new(
-                    self,
-                    color_pipeline,
-                    &self.color_shaders.shaders[&k],
-                    shader_ref,
-                    self.color_shaders.shader_data.var(),
-                    input,
-                );
-                eval.eval_shader().downcast_ref::<Color>().unwrap().clone()
             });
         }
         sw.finish()

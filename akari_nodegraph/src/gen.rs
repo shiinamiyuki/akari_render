@@ -24,7 +24,7 @@ fn gen_rust_for_desc(desc: &NodeDesc, socket_types: &mut IndexSet<String>) -> To
                 let t = format_ident!("{}", t);
                 quote!(akari_nodegraph::NodeProxyInput<#t>)
             }
-            SocketKind::List(inner) => {
+            SocketKind::List(inner, _) => {
                 let inner = gen_socket_input(inner, socket_types);
                 quote!(Vec<#inner>)
             }
@@ -44,7 +44,7 @@ fn gen_rust_for_desc(desc: &NodeDesc, socket_types: &mut IndexSet<String>) -> To
                 let t = format_ident!("{}", t);
                 quote!(akari_nodegraph::NodeProxyOutput<#t>)
             }
-            SocketKind::List(inner) => {
+            SocketKind::List(inner, _) => {
                 let inner = gen_socket_input(inner, socket_types);
                 quote!(Vec<#inner>)
             }
@@ -109,9 +109,21 @@ fn gen_rust_for_desc(desc: &NodeDesc, socket_types: &mut IndexSet<String>) -> To
                     }
                 }
 
-                SocketKind::List(_) => {
-                    quote! {
-                        let #name = node.input(#key)?.as_proxy_input_list::<#ty>()?;
+                SocketKind::List(_, len) => {
+                    if let Some(len) =  len {
+                        let len = *len;
+                        quote! {
+                            let #name = node.input(#key)?.as_proxy_input_list::<#ty>()?;
+                            if #name.len() != #len {
+                                return Err(akari_nodegraph::NodeProxyError {
+                                    msg: format!("Invalid length for socket {}: expected {}, got {}", #key, #len, #name.len()),
+                                });
+                            }
+                        }
+                    } else {
+                        quote! {
+                            let #name = node.input(#key)?.as_proxy_input_list::<#ty>()?;
+                        }
                     }
                 }
             }

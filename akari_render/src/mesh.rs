@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::geometry::{ShadingTriangle, Triangle};
+use crate::svm::ShaderRef;
 use crate::util::binserde::*;
 use crate::*;
 use crate::{geometry::AffineTransform, util::alias_table::AliasTable};
@@ -66,6 +67,7 @@ impl TriangleMesh {
             .collect()
     }
 }
+
 pub struct MeshBuffer {
     pub vertices: Buffer<PackedFloat3>,
     pub normals: Option<Buffer<PackedFloat3>>,
@@ -141,7 +143,7 @@ pub struct MeshInstance {
     pub geom_id: u32,
     pub transform: AffineTransform,
     pub light: TagIndex,
-    pub surface: TagIndex,
+    pub surface: ShaderRef,
     pub has_normals: bool,
     pub has_uvs: bool,
     pub has_tangents: bool,
@@ -160,7 +162,7 @@ pub struct MeshAggregate {
     pub accel: rtx::Accel,
 }
 impl MeshAggregate {
-    pub fn new(device: Device, meshes: &[&MeshBuffer], instances: &mut [MeshInstance]) -> Self {
+    pub fn new(device: Device, meshes: &[&MeshBuffer], instances: &[MeshInstance]) -> Self {
         let count = meshes.len();
         let mesh_vertices = device.create_buffer_heap(count);
         let mesh_normals = device.create_buffer_heap(count);
@@ -201,10 +203,10 @@ impl MeshAggregate {
             }
         }
         for i in 0..instances.len() {
-            let inst = &mut instances[i];
+            let inst = &instances[i];
             let geom_id = inst.geom_id as usize;
-            inst.has_normals = meshes[geom_id].has_normals;
-            inst.has_uvs = meshes[geom_id].has_uvs;
+            assert_eq!(inst.has_normals, meshes[geom_id].has_normals);
+            assert_eq!(inst.has_uvs, meshes[geom_id].has_uvs);
             accel.push_mesh(&accel_meshes[geom_id], inst.transform.m, u8::MAX, true);
         }
         accel.build(AccelBuildRequest::ForceBuild);

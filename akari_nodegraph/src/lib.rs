@@ -270,8 +270,8 @@ pub enum SocketKind {
     Bool,
     String,
     Enum(String),
-    Node(String), // SocketType
-    List(Box<SocketKind>),
+    Node(String),                         // SocketType
+    List(Box<SocketKind>, Option<usize>), // (inner, Optional<length>)
 }
 impl SocketKind {
     fn ty(&self) -> &str {
@@ -282,7 +282,7 @@ impl SocketKind {
             SocketKind::String => "String",
             SocketKind::Enum(e) => &e,
             SocketKind::Node(t) => t,
-            SocketKind::List(t) => t.ty(),
+            SocketKind::List(t, _) => t.ty(),
         }
     }
 }

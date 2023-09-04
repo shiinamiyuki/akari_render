@@ -3,6 +3,7 @@ use crate::{
     interaction::*,
     light::*,
     sampling::uniform_sample_triangle,
+    svm::{surface::SURFACE_EVAL_EMISSION, ShaderRef},
     util::alias_table::{AliasTableEntry, BindlessAliasTableVar},
 };
 #[derive(Clone, Copy, Value)]
@@ -10,7 +11,7 @@ use crate::{
 pub struct AreaLight {
     pub light_id: u32,
     pub instance_id: u32,
-    pub emission: TagIndex,
+    pub surface: ShaderRef,
     pub area_sampling_index: u32,
 }
 
@@ -25,12 +26,24 @@ impl Light for AreaLightExpr {
         swl: Expr<SampledWavelengths>,
         ctx: &LightEvalContext<'_>,
     ) -> Color {
-        let emission = ctx.texture.evaluate_color(self.emission(), si, swl);
+        let emission = Color::from_flat(
+            ctx.color_repr(),
+            ctx.surface_eval
+                .evaluate_ex(
+                    self.surface(),
+                    si,
+                    -ray.d(),
+                    Float3Expr::zero(),
+                    swl,
+                    const_(SURFACE_EVAL_EMISSION),
+                )
+                .emission(),
+        );
         let ns = si.geometry().ns();
         select(
             ns.dot(ray.d()).cmplt(0.0),
             emission,
-            Color::zero(ctx.color_repr),
+            Color::zero(ctx.color_repr()),
         )
     }
 
@@ -71,11 +84,28 @@ impl Light for AreaLightExpr {
             FrameExpr::from_n(n),
             Bool::from(true),
         );
-        let emission = ctx.texture.evaluate_color(self.emission(), si, swl);
         let wi = p - pn.p();
+        let emission = Color::from_flat(
+            ctx.color_repr(),
+            ctx.surface_eval
+                .evaluate_ex(
+                    self.surface(),
+                    si,
+                    -wi,
+                    Float3Expr::zero(),
+                    swl,
+                    const_(SURFACE_EVAL_EMISSION),
+                )
+                .emission(),
+        );
+
         let dist2 = wi.length_squared();
         let wi = wi / dist2.sqrt();
-        let li = select(wi.dot(n).cmplt(0.0), emission, Color::zero(ctx.color_repr));
+        let li = select(
+            wi.dot(n).cmplt(0.0),
+            emission,
+            Color::zero(ctx.color_repr()),
+        );
         let pdf = pdf / area * dist2 / n.dot(-wi).max(1e-6);
         let ro = rtx::offset_ray_origin(pn.p(), face_forward(pn.n(), wi));
         let dist = (p - ro).length();

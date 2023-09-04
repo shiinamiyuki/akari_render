@@ -7,9 +7,11 @@ use crate::sampling::weighted_discrete_choice2_and_remap;
 use crate::svm::eval::SvmEvaluator;
 use crate::{color::Color, geometry::Frame, interaction::SurfaceInteraction, *};
 
+use super::ShaderRef;
+
 pub struct BsdfEvalContext<'a> {
     pub color_repr: ColorRepr,
-    _marker: std::marker::PhantomData<&'a ()>,
+    pub _marker: std::marker::PhantomData<&'a ()>,
 }
 
 pub mod diffuse;
@@ -24,7 +26,7 @@ pub struct BsdfSample {
     pub valid: Bool,
 }
 
-pub trait Bsdf {
+pub trait Surface {
     // return f(wo, wi) * abs_cos_theta(wi)
     fn evaluate(
         &self,
@@ -60,13 +62,18 @@ pub trait Bsdf {
         swl: Expr<SampledWavelengths>,
         ctx: &BsdfEvalContext,
     ) -> Expr<f32>;
+    fn emission(
+        &self,
+        wo: Expr<Float3>,
+        swl: Expr<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> Color {
+        Color::zero(ctx.color_repr)
+    }
 }
 
-pub trait BsdfShader {
-    fn closure(
-        &self,
-        svm_eval: &SvmEvaluator<'_>,
-    ) -> Rc<dyn Bsdf>;
+pub trait SurfaceShader {
+    fn closure(&self, svm_eval: &SvmEvaluator<'_>) -> Rc<dyn Surface>;
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -76,15 +83,15 @@ pub enum BsdfBlendMode {
 }
 pub struct BsdfMixture {
     pub frac: Box<dyn Fn(Expr<Float3>, &BsdfEvalContext) -> Expr<f32>>,
-    pub bsdf_a: Rc<dyn Bsdf>,
-    pub bsdf_b: Rc<dyn Bsdf>,
+    pub bsdf_a: Rc<dyn Surface>,
+    pub bsdf_b: Rc<dyn Surface>,
     pub mode: BsdfBlendMode,
 }
 impl BsdfMixture {
     const EPS: f32 = 1e-4;
 }
 
-impl Bsdf for BsdfMixture {
+impl Surface for BsdfMixture {
     fn evaluate(
         &self,
         wo: Expr<Float3>,
@@ -241,12 +248,12 @@ impl Bsdf for BsdfMixture {
     }
 }
 
-pub struct BsdfClosure {
-    inner: Rc<dyn Bsdf>,
-    frame: Expr<Frame>,
+pub struct SurfaceClosure {
+    pub inner: Rc<dyn Surface>,
+    pub frame: Expr<Frame>,
 }
 
-impl Bsdf for BsdfClosure {
+impl Surface for SurfaceClosure {
     // return f(wo, wi) * abs_cos_theta(wi)
     fn evaluate(
         &self,
@@ -312,7 +319,7 @@ pub struct MicrofacetReflection {
     pub dist: Box<dyn MicrofacetDistribution>,
 }
 
-impl Bsdf for MicrofacetReflection {
+impl Surface for MicrofacetReflection {
     fn evaluate(
         &self,
         wo: Expr<Float3>,
@@ -403,7 +410,7 @@ pub struct MicrofacetTransmission {
     pub fresnel: Box<dyn Fresnel>,
 }
 
-impl Bsdf for MicrofacetTransmission {
+impl Surface for MicrofacetTransmission {
     fn evaluate(
         &self,
         wo: Expr<Float3>,
@@ -575,39 +582,44 @@ pub struct FlatBsdfSample {
     pub color: FlatColor,
     pub valid: bool,
 }
-pub const BSDF_EVAL_COLOR: u32 = 1 << 0;
-pub const BSDF_EVAL_PDF: u32 = 1 << 1;
-pub const BSDF_EVAL_ROUGHNESS: u32 = 1 << 2;
-pub const BSDF_EVAL_ALBEDO: u32 = 1 << 3;
-pub const BSDF_EVAL_ALL: u32 =
-    BSDF_EVAL_COLOR | BSDF_EVAL_PDF | BSDF_EVAL_ROUGHNESS | BSDF_EVAL_ALBEDO;
+pub const SURFACE_EVAL_COLOR: u32 = 1 << 0;
+pub const SURFACE_EVAL_PDF: u32 = 1 << 1;
+pub const SURFACE_EVAL_ROUGHNESS: u32 = 1 << 2;
+pub const SURFACE_EVAL_ALBEDO: u32 = 1 << 3;
+pub const SURFACE_EVAL_EMISSION: u32 = 1 << 4;
+pub const SURFACE_EVAL_ALL: u32 = SURFACE_EVAL_COLOR
+    | SURFACE_EVAL_PDF
+    | SURFACE_EVAL_ROUGHNESS
+    | SURFACE_EVAL_ALBEDO
+    | SURFACE_EVAL_EMISSION;
 
 #[derive(Clone, Copy, Value)]
 #[repr(C)]
-pub struct FlatBsdfEvalResult {
+pub struct FlatSurfaceEvalResult {
     pub color: FlatColor,
     pub pdf: f32,
     pub albedo: FlatColor,
+    pub emission: FlatColor,
     pub roughness: f32,
 }
-pub struct BsdfEvaluator {
+pub struct SurfaceEvaluator {
     pub(crate) color_repr: ColorRepr,
     // bsdf(surface, si, wo, wi, u_select, flags)
-    pub(crate) bsdf: Callable<
+    pub(crate) eval: Callable<
         (
-            Expr<TagIndex>,
+            Expr<ShaderRef>,
             Expr<SurfaceInteraction>,
             Expr<Float3>,
             Expr<Float3>,
             Expr<SampledWavelengths>,
             Expr<u32>,
         ),
-        Expr<FlatBsdfEvalResult>,
+        Expr<FlatSurfaceEvalResult>,
     >,
     // bsdf_sample(surface, si, wo, (u_select, u_sample))
-    pub(crate) bsdf_sample: Callable<
+    pub(crate) sample: Callable<
         (
-            Expr<TagIndex>,
+            Expr<ShaderRef>,
             Expr<SurfaceInteraction>,
             Expr<Float3>,
             Expr<Float3>,
@@ -616,59 +628,59 @@ pub struct BsdfEvaluator {
         Expr<FlatBsdfSample>,
     >,
 }
-impl BsdfEvaluator {
+impl SurfaceEvaluator {
     pub fn evaluate_ex(
         &self,
-        surface: Expr<TagIndex>,
+        surface: Expr<ShaderRef>,
         si: Expr<SurfaceInteraction>,
         wo: Expr<Float3>,
         wi: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
         flags: Expr<u32>,
-    ) -> Expr<FlatBsdfEvalResult> {
-        self.bsdf.call(surface, si, wo, wi, swl, flags)
+    ) -> Expr<FlatSurfaceEvalResult> {
+        self.eval.call(surface, si, wo, wi, swl, flags)
     }
     pub fn evaluate(
         &self,
-        surface: Expr<TagIndex>,
+        surface: Expr<ShaderRef>,
         si: Expr<SurfaceInteraction>,
         wo: Expr<Float3>,
         wi: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
     ) -> Color {
         let result = self
-            .bsdf
-            .call(surface, si, wo, wi, swl, const_(BSDF_EVAL_COLOR));
+            .eval
+            .call(surface, si, wo, wi, swl, const_(SURFACE_EVAL_COLOR));
         Color::from_flat(self.color_repr, result.color())
     }
     pub fn pdf(
         &self,
-        surface: Expr<TagIndex>,
+        surface: Expr<ShaderRef>,
         si: Expr<SurfaceInteraction>,
         wo: Expr<Float3>,
         wi: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
     ) -> Float {
         let result = self
-            .bsdf
-            .call(surface, si, wo, wi, swl, const_(BSDF_EVAL_PDF));
+            .eval
+            .call(surface, si, wo, wi, swl, const_(SURFACE_EVAL_PDF));
         result.pdf()
     }
     pub fn evaluate_color_and_pdf(
         &self,
-        surface: Expr<TagIndex>,
+        surface: Expr<ShaderRef>,
         si: Expr<SurfaceInteraction>,
         wo: Expr<Float3>,
         wi: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
     ) -> (Color, Float) {
-        let result = self.bsdf.call(
+        let result = self.eval.call(
             surface,
             si,
             wo,
             wi,
             swl,
-            const_(BSDF_EVAL_COLOR | BSDF_EVAL_PDF),
+            const_(SURFACE_EVAL_COLOR | SURFACE_EVAL_PDF),
         );
         (
             Color::from_flat(self.color_repr, result.color()),
@@ -677,30 +689,30 @@ impl BsdfEvaluator {
     }
     pub fn albedo(
         &self,
-        surface: Expr<TagIndex>,
+        surface: Expr<ShaderRef>,
         si: Expr<SurfaceInteraction>,
         wo: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
     ) -> Color {
-        let result = self.bsdf.call(
+        let result = self.eval.call(
             surface,
             si,
             wo,
             Float3Expr::zero(),
             swl,
-            const_(BSDF_EVAL_ALBEDO),
+            const_(SURFACE_EVAL_ALBEDO),
         );
         Color::from_flat(self.color_repr, result.albedo())
     }
     pub fn sample(
         &self,
-        surface: Expr<TagIndex>,
+        surface: Expr<ShaderRef>,
         si: Expr<SurfaceInteraction>,
         wo: Expr<Float3>,
         u: Expr<Float3>,
         swl: Var<SampledWavelengths>,
     ) -> BsdfSample {
-        let sample = self.bsdf_sample.call(surface, si, wo, u, swl);
+        let sample = self.sample.call(surface, si, wo, u, swl);
         BsdfSample {
             wi: sample.wi(),
             pdf: sample.pdf(),

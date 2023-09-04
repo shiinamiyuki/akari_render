@@ -5,14 +5,8 @@ use rand::Rng;
 
 use super::{Integrator, RenderOptions};
 use crate::{
-    color::*,
-    film::*,
-    geometry::*,
-    interaction::SurfaceInteraction,
-    sampler::*,
-    scene::*,
-    surface::{Bsdf, Surface},
-    *,
+    color::*, film::*, geometry::*, interaction::SurfaceInteraction, sampler::*, scene::*,
+    svm::surface::*, *,
 };
 use serde::{Deserialize, Serialize};
 #[derive(Clone)]
@@ -132,7 +126,7 @@ impl PathTracer {
         sampler: &dyn Sampler,
         eval: &Evaluators,
     ) -> Color {
-       todo!()
+        todo!()
     }
 }
 impl Integrator for PathTracer {
@@ -140,7 +134,7 @@ impl Integrator for PathTracer {
         &self,
         scene: Arc<Scene>,
         sampler_config: SamplerConfig,
-        color_repr: ColorRepr,
+        color_pipeline: ColorPipeline,
         film: &mut Film,
         _options: &RenderOptions,
     ) {
@@ -154,7 +148,7 @@ impl Integrator for PathTracer {
         assert_eq!(resolution.x, film.resolution().x);
         assert_eq!(resolution.y, film.resolution().y);
         let sampler_creator = sampler_config.creator(self.device.clone(), &scene, self.spp);
-        let evaluators = scene.evaluators(color_repr);
+        let evaluators = scene.evaluators(color_pipeline);
         let kernel = self.device.create_kernel::<(u32, Int2)>(
             &|spp_per_pass: Expr<u32>, pixel_offset: Expr<Int2>| {
                 let p = dispatch_id().xy();
@@ -165,10 +159,12 @@ impl Integrator for PathTracer {
                     let ip = p.int();
                     let shifted = ip + pixel_offset;
                     let shifted = shifted.clamp(0, const_(resolution).int() - 1).uint();
-                    let (ray, ray_color, ray_w) =
-                        scene
-                            .camera
-                            .generate_ray(film.filter(), shifted, sampler, color_repr);
+                    let (ray, ray_color, ray_w) = scene.camera.generate_ray(
+                        film.filter(),
+                        shifted,
+                        sampler,
+                        color_pipeline.color_repr,
+                    );
                     let l = self.radiance(&scene, ray, sampler, &evaluators) * ray_color;
                     film.add_sample(p.float(), &l, ray_w);
                 });
@@ -205,11 +201,11 @@ pub fn render(
     device: Device,
     scene: Arc<Scene>,
     sampler: SamplerConfig,
-    color_repr: ColorRepr,
+    color_pipeline: ColorPipeline,
     film: &mut Film,
     config: &Config,
     options: &RenderOptions,
 ) {
     let pt = PathTracer::new(device.clone(), config.clone());
-    pt.render(scene, sampler, color_repr, film, options);
+    pt.render(scene, sampler, color_pipeline, film, options);
 }

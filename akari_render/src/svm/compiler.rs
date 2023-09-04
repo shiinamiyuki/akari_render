@@ -10,12 +10,98 @@ pub struct SvmCompileContext<'a> {
     pub graph: &'a NodeGraph,
 }
 pub struct CompilerDriver {
+    shader_hash_to_kind: HashMap<ShaderHash, u32>,
     shaders: HashMap<ShaderHash, CompiledShader>,
+    shader_data: Vec<u8>,
 }
 
 impl CompilerDriver {
-    pub fn compile(&self, out: &NodeId, ctx: SvmCompileContext<'_>) {
-        todo!()
+    fn push_data<T: Value>(&mut self, data: T) -> usize {
+        let layout = Layout::new::<T>();
+        let size = layout.size();
+        let align = layout.align();
+        if self.shader_data.len() % align != 0 {
+            self.shader_data.resize(
+                self.shader_data.len() + align - self.shader_data.len() % align,
+                0,
+            );
+            assert_eq!(self.shader_data.len() % align, 0);
+        }
+        let offset = self.shader_data.len();
+        self.shader_data.resize(offset + size, 0);
+        unsafe {
+            let ptr = self.shader_data.as_mut_ptr().add(offset);
+            std::ptr::copy_nonoverlapping(&data as *const T as *const u8, ptr, size);
+        }
+        offset
+    }
+    fn push_shader(&mut self, shader: CompiledShader) -> ShaderRef {
+        let expected_offsets = &shader.node_offset;
+        let mut base_offset = 0;
+        assert!(shader.nodes.len() > 0);
+        for (i, node) in shader.nodes.iter().enumerate() {
+            let offset = match node {
+                SvmNode::Float(n) => self.push_data(*n),
+                SvmNode::Float3(n) => self.push_data(*n),
+                SvmNode::MakeFloat3(n) => self.push_data(*n),
+                SvmNode::RgbTex(n) => self.push_data(*n),
+                SvmNode::RgbImageTex(n) => self.push_data(*n),
+                SvmNode::SpectralUplift(n) => self.push_data(*n),
+                SvmNode::DiffuseBsdf(n) => self.push_data(*n),
+                SvmNode::PrincipledBsdf(n) => self.push_data(*n),
+                SvmNode::MaterialOutput(n) => self.push_data(*n),
+            };
+            if i != 0 {
+                assert_eq!(offset, expected_offsets[i]);
+            } else {
+                base_offset = offset;
+            }
+        }
+        let size = self.shader_data.len() - base_offset;
+        assert_eq!(size, shader.size);
+
+        let kind = if self.shaders.contains_key(&shader.hash) {
+            self.shader_hash_to_kind[&shader.hash]
+        } else {
+            let kind = self.shaders.len() as u32;
+            self.shader_hash_to_kind.insert(shader.hash, kind);
+            self.shaders.insert(shader.hash, shader);
+            kind
+        };
+        ShaderRef {
+            shader_kind: kind,
+            offset: base_offset.try_into().unwrap(),
+            size: size.try_into().unwrap(),
+        }
+    }
+    pub fn compile(&mut self, out: &NodeId, ctx: SvmCompileContext<'_>) -> ShaderRef {
+        let shader = Compiler::compile(out.clone(), ctx);
+        self.push_shader(shader)
+    }
+    pub fn new() -> Self {
+        Self {
+            shaders: HashMap::new(),
+            shader_hash_to_kind: HashMap::new(),
+            shader_data: Vec::with_capacity(65536),
+        }
+    }
+    pub fn upload(self, device: &Device) -> ShaderCollection {
+        let Self {
+            shader_data,
+            shader_hash_to_kind,
+            shaders,
+        } = self;
+        let data = device.create_byte_buffer(shader_data.len());
+        data.copy_from(&shader_data[..]);
+        let shaders = shaders
+            .into_iter()
+            .map(|(hash, shader)| (shader_hash_to_kind[&hash], shader))
+            .collect::<HashMap<_, _>>();
+        ShaderCollection {
+            shader_hash_to_kind,
+            shaders,
+            shader_data: data,
+        }
     }
 }
 
@@ -25,10 +111,10 @@ pub struct NodeSorter<'a> {
     visited: HashSet<NodeId>,
 }
 
-fn shader_hash(nodes: &[NodeId]) -> ShaderHash {
+pub(crate) fn shader_hash(nodes: &[SvmNode]) -> ShaderHash {
     let mut hasher = Sha256::new();
     for node in nodes {
-        hasher.update(node.0.as_bytes());
+        node.hash(&mut hasher);
     }
     let result = hasher.finalize();
     result.into()
@@ -229,6 +315,6 @@ impl<'a> Compiler<'a> {
         for node in sorted {
             compiler.compile_node(&node);
         }
-        todo!()
+        CompiledShader::new(compiler.program)
     }
 }

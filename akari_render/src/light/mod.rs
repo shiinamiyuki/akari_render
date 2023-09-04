@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
 use crate::{
-    color::{Color, ColorRepr, FlatColor, SampledWavelengths},
+    color::{Color, ColorPipeline, ColorRepr, FlatColor, SampledWavelengths},
     geometry::{PointNormal, Ray},
     interaction::SurfaceInteraction,
     mesh::MeshAggregate,
+    svm::{surface::SurfaceEvaluator, Svm},
     util::alias_table::AliasTable,
     *,
 };
@@ -27,8 +28,14 @@ pub struct FlatLightSample {
     pub n: Float3,
 }
 pub struct LightEvalContext<'a> {
-    pub color_repr: ColorRepr,
+    pub color_pipeline: ColorPipeline,
     pub meshes: &'a MeshAggregate,
+    pub surface_eval: &'a SurfaceEvaluator,
+}
+impl<'a> LightEvalContext<'a> {
+    pub fn color_repr(&self) -> ColorRepr {
+        self.color_pipeline.color_repr
+    }
 }
 
 pub trait Light {
@@ -80,41 +87,74 @@ impl WeightedLightDistribution {
     }
 }
 pub mod area;
+pub mod point;
 
 // represents all lights in the scene as a *single* light
 pub struct LightAggregate {
-    pub lights: Polymorphic<PolyKey, dyn Light>,
+    pub lights: Polymorphic<(), dyn Light>,
     pub light_ids_to_lights: Buffer<TagIndex>,
     pub light_distribution: Box<dyn LightDistribution>,
     pub meshes: Arc<MeshAggregate>,
 }
 pub struct LightEvaluator {
-    pub(crate) color_repr: ColorRepr,
-    pub(crate) le: Callable<(Expr<Ray>, Expr<SurfaceInteraction>), Expr<FlatColor>>,
-    pub(crate) pdf: Callable<(Expr<SurfaceInteraction>, Expr<PointNormal>), Expr<f32>>,
-    pub(crate) sample: Callable<(Expr<PointNormal>, Expr<Float3>), Expr<FlatLightSample>>,
+    pub(crate) color_pipeline: ColorPipeline,
+    pub(crate) le: Callable<
+        (
+            Expr<Ray>,
+            Expr<SurfaceInteraction>,
+            Expr<SampledWavelengths>,
+        ),
+        Expr<FlatColor>,
+    >,
+    pub(crate) pdf: Callable<
+        (
+            Expr<SurfaceInteraction>,
+            Expr<PointNormal>,
+            Expr<SampledWavelengths>,
+        ),
+        Expr<f32>,
+    >,
+    pub(crate) sample: Callable<
+        (Expr<PointNormal>, Expr<Float3>, Expr<SampledWavelengths>),
+        Expr<FlatLightSample>,
+    >,
 }
 impl LightEvaluator {
-    pub fn le(&self, ray: Expr<Ray>, si: Expr<SurfaceInteraction>) -> Color {
-        let color = self.le.call(ray, si);
-        Color::from_flat(self.color_repr, color)
+    pub fn le(
+        &self,
+        ray: Expr<Ray>,
+        si: Expr<SurfaceInteraction>,
+        swl: Expr<SampledWavelengths>,
+    ) -> Color {
+        let color = self.le.call(ray, si, swl);
+        Color::from_flat(self.color_pipeline.color_repr, color)
     }
-    pub fn sample(&self, pn: Expr<PointNormal>, u: Expr<Float3>) -> LightSample {
-        let sample = self.sample.call(pn, u);
+    pub fn sample(
+        &self,
+        pn: Expr<PointNormal>,
+        u: Expr<Float3>,
+        swl: Expr<SampledWavelengths>,
+    ) -> LightSample {
+        let sample = self.sample.call(pn, u, swl);
         LightSample {
-            li: Color::from_flat(self.color_repr, sample.li()),
+            li: Color::from_flat(self.color_pipeline.color_repr, sample.li()),
             pdf: sample.pdf(),
             wi: sample.wi(),
             shadow_ray: sample.shadow_ray(),
             n: sample.n(),
         }
     }
-    pub fn pdf(&self, si: Expr<SurfaceInteraction>, pn: Expr<PointNormal>) -> Expr<f32> {
-        self.pdf.call(si, pn)
+    pub fn pdf(
+        &self,
+        si: Expr<SurfaceInteraction>,
+        pn: Expr<PointNormal>,
+        swl: Expr<SampledWavelengths>,
+    ) -> Expr<f32> {
+        self.pdf.call(si, pn, swl)
     }
 }
 impl LightAggregate {
-    pub fn light(&self, si: Expr<SurfaceInteraction>) -> PolymorphicRef<PolyKey, dyn Light> {
+    pub fn light(&self, si: Expr<SurfaceInteraction>) -> PolymorphicRef<(), dyn Light> {
         let inst_id = si.inst_id();
         let instance = self.meshes.mesh_instances.var().read(inst_id);
         let light = self.lights.get(instance.light());

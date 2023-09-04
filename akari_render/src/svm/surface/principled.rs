@@ -2,12 +2,12 @@ use crate::color::*;
 use crate::geometry::Frame;
 use crate::microfacet::TrowbridgeReitzDistribution;
 use crate::sampling::cos_sample_hemisphere;
-use crate::svm::{bsdf::*, SvmPrincipledBsdf};
+use crate::svm::{surface::*, SvmPrincipledBsdf};
 use crate::*;
 use crate::{color::Color, svm::SvmPrincipledBsdfExpr};
 use std::f32::consts::FRAC_1_PI;
 
-use super::{BsdfEvalContext, BsdfShader, FresnelSchlick, MicrofacetTransmission};
+use super::{BsdfEvalContext, SurfaceShader, FresnelSchlick, MicrofacetTransmission};
 
 fn schlick_weight(cos_theta: Expr<f32>) -> Expr<f32> {
     let m = (1.0 - cos_theta).clamp(0.0, 1.0);
@@ -18,7 +18,7 @@ pub struct DisneyDiffuseBsdf {
     pub roughness: Float,
 }
 
-impl Bsdf for DisneyDiffuseBsdf {
+impl Surface for DisneyDiffuseBsdf {
     fn evaluate(
         &self,
         wo: Expr<Float3>,
@@ -123,8 +123,8 @@ impl Fresnel for DisneyFresnel {
         fr * (1.0 - self.metallic) + f0 * self.metallic
     }
 }
-impl BsdfShader for SvmPrincipledBsdf {
-    fn closure(&self, svm_eval: &SvmEvaluator<'_>) -> Rc<dyn Bsdf> {
+impl SurfaceShader for SvmPrincipledBsdf {
+    fn closure(&self, svm_eval: &SvmEvaluator<'_>) -> Rc<dyn Surface> {
         let (color, transmission_color) = {
             let color = svm_eval.eval_color(self.color);
             let transmission_color = color;

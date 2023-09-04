@@ -1,15 +1,15 @@
 use std::rc::Rc;
 
-use super::{BsdfBlendMode, BsdfClosure, BsdfEvalContext, BsdfShader, MicrofacetTransmission};
+use super::{BsdfBlendMode, SurfaceClosure, BsdfEvalContext, SurfaceShader, MicrofacetTransmission};
 use crate::color::*;
 use crate::geometry::Frame;
 use crate::microfacet::TrowbridgeReitzDistribution;
-use crate::svm::bsdf::{Bsdf, fr_dielectric, BsdfMixture, FresnelDielectric, MicrofacetReflection};
+use crate::svm::surface::{Surface, fr_dielectric, BsdfMixture, FresnelDielectric, MicrofacetReflection};
 use crate::svm::SvmGlassBsdf;
 use crate::*;
 
-impl BsdfShader for SvmGlassBsdf {
-    fn closure(&self, svm_eval: &svm::eval::SvmEvaluator<'_>) -> Rc<dyn Bsdf> {
+impl SurfaceShader for SvmGlassBsdf {
+    fn closure(&self, svm_eval: &svm::eval::SvmEvaluator<'_>) -> Rc<dyn Surface> {
         let kr = svm_eval.eval_color(self.kr);
         let kt = svm_eval.eval_color(self.kt);
         let eta = svm_eval.eval_float(self.eta);

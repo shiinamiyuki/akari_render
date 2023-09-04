@@ -387,14 +387,28 @@ impl<'a> Parser<'a> {
                                     });
                                 }
                             }
-                            Some(SocketKind::List(Box::new(kind)))
+                            Some(SocketKind::List(Box::new(kind), Some(vs.len())))
                         }
                     }
                     v @ _ => Some(get_kind(v)?),
                 };
                 let macthed = match expected_kind {
-                    SocketKind::List(_) => {
-                        actual_kind.is_none() || actual_kind.as_ref().unwrap() == expected_kind
+                    SocketKind::List(expected_inner, expected_len) => {
+                        actual_kind.is_none() || {
+                            let actual_kind = actual_kind.as_ref().unwrap();
+                            match actual_kind {
+                                SocketKind::List(inner, len) => {
+                                    if inner != expected_inner {
+                                        false
+                                    } else if let Some(expected_len) = expected_len {
+                                        len.unwrap() == *expected_len
+                                    } else {
+                                        true
+                                    }
+                                }
+                                _ => false,
+                            }
+                        }
                     }
                     _ => actual_kind.as_ref().unwrap() == expected_kind,
                 };

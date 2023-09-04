@@ -3,14 +3,14 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    color::{Color, ColorRepr, RgbColorSpace},
+    color::{Color, ColorPipeline, ColorRepr, RgbColorSpace},
     film::*,
     sampler::SamplerConfig,
     scene::*,
     *,
 };
 
-#[derive(Clone,  Debug)]
+#[derive(Clone, Debug)]
 pub struct PipelineConfig {
     pub color: ColorRepr,
     pub sampler: SamplerConfig,
@@ -49,7 +49,7 @@ pub trait Integrator {
         &self,
         scene: Arc<Scene>,
         sampler: SamplerConfig,
-        color_repr: ColorRepr,
+        color_pipeline: ColorPipeline,
         film: &mut Film,
         options: &RenderOptions,
     );
@@ -59,7 +59,7 @@ pub trait Integrator {
 // pub mod mcmc;
 // pub mod mcmc_opt;
 // pub mod normal;
-// pub mod pt;
+pub mod pt;
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]

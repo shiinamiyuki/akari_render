@@ -7,7 +7,7 @@ use std::{
 use crate::{util::round_to, *};
 use luisa::runtime::api::Shader;
 use sha2::{Digest, Sha256};
-pub mod bsdf;
+pub mod surface;
 pub mod compiler;
 pub mod eval;
 pub mod texture;
@@ -220,37 +220,43 @@ impl SvmNode {
 #[repr(C)]
 pub struct ShaderRef {
     pub shader_kind: u32,
-    pub shader_id: u32, // n-th shader of this kind
-    pub offset: u32,    // offset in bytes
+    pub offset: u32, // offset in bytes
     pub size: u32,
 }
 
 pub struct CompiledShader {
     pub nodes: Vec<SvmNode>,
     pub node_offset: Vec<usize>,
+    pub size: usize,
+    pub hash: ShaderHash,
 }
 impl CompiledShader {
     pub fn new(nodes: Vec<SvmNode>) -> Self {
         let mut node_offset = Vec::new();
         let mut offset = 0;
         for node in &nodes {
+            offset = round_to(offset, node.layout().align());
             node_offset.push(offset);
             offset += node.layout().size();
-            offset = round_to(offset, node.layout().align());
         }
-        Self { nodes, node_offset }
+        let hash = compiler::shader_hash(&nodes);
+        Self {
+            nodes,
+            node_offset,
+            hash,
+            size: offset,
+        }
     }
 }
 
 pub type ShaderHash = [u8; 32];
-pub(crate) struct ShaderCollection {
+pub struct ShaderCollection {
     pub(crate) shader_hash_to_kind: HashMap<ShaderHash, u32>,
     pub(crate) shaders: HashMap<u32, CompiledShader>, // kind -> shader
     pub(crate) shader_data: ByteBuffer,
 }
 pub struct Svm {
-    device: Device,
-    pub(crate) bsdf_shaders: ShaderCollection,
-    pub(crate) color_shaders: ShaderCollection,
+    pub(crate) device: Device,
+    pub(crate) surface_shaders: ShaderCollection,
     pub(crate) image_textures: BindlessArray,
 }

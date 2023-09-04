@@ -23,7 +23,43 @@ impl RayExpr {
         self.o() + self.d() * t
     }
 }
-
+#[derive(Clone, Copy, Debug, Value)]
+#[repr(C)]
+pub struct Sphere {
+    pub center: Float3,
+    pub radius: f32,
+}
+impl SphereExpr {
+    pub fn intersect(&self, ray: Expr<Ray>) -> (Expr<bool>, Expr<f32>) {
+        let a = ray.d().length_squared();
+        let oc = ray.o() - self.center();
+        let b = 2.0 * oc.dot(ray.d());
+        let c = oc.length_squared() - self.radius().sqr();
+        let delta = b.sqr() - 4.0 * a * c;
+        if_!(
+            delta.cmplt(0.0),
+            { (const_(false), const_(0.0f32)) },
+            else,
+            {
+                let t0 = (-b - delta.sqrt()) / (2.0 * a);
+                let t1 = (-b + delta.sqrt()) / (2.0 * a);
+                if_!(
+                    t0.cmplt(ray.t_max()) & t0.cmpge(ray.t_min()),
+                    { (const_(true), t0) },
+                    else,
+                    {
+                        if_!(
+                            t1.cmplt(ray.t_max()) & t1.cmpge(ray.t_min()),
+                            { (const_(true), t1) },
+                            else,
+                            { (const_(false), const_(0.0f32)) }
+                        )
+                    }
+                )
+            }
+        )
+    }
+}
 #[derive(Clone, Copy, Aggregate)]
 #[repr(C)]
 pub struct Triangle {

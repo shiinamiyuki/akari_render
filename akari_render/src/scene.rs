@@ -2,27 +2,30 @@ use std::collections::HashMap;
 use std::f32::consts::PI;
 use std::fs::{self, File};
 use std::io::{Cursor, Read};
+use std::marker::PhantomData;
 use std::path::Path;
 use std::sync::Arc;
 use std::{path::PathBuf, rc::Rc};
 
+use luisa::runtime::api::Shader;
 use luisa::PixelStorage;
 
 use crate::camera::PerspectiveCamera;
-use crate::color::{glam_srgb_to_linear, Color, ColorRepr, FlatColor, SampledWavelengths};
+use crate::color::{
+    glam_srgb_to_linear, Color, ColorPipeline, ColorRepr, FlatColor, SampledWavelengths,
+};
 use crate::light::area::AreaLight;
 use crate::light::{
     FlatLightSample, FlatLightSampleExpr, LightAggregate, LightEvalContext, LightEvaluator,
     WeightedLightDistribution,
 };
 
-use crate::svm::bsdf::{
-    BsdfEvalContext, BsdfEvaluator, BsdfSample, FlatBsdfEvalResult, FlatBsdfSample,
-    BSDF_EVAL_ALBEDO, BSDF_EVAL_COLOR, BSDF_EVAL_PDF, BSDF_EVAL_ROUGHNESS,
+use crate::svm::surface::{
+    BsdfEvalContext, BsdfSample, FlatBsdfSample, FlatSurfaceEvalResult, Surface, SurfaceEvaluator,
+    SURFACE_EVAL_ALBEDO, SURFACE_EVAL_COLOR, SURFACE_EVAL_EMISSION, SURFACE_EVAL_PDF,
+    SURFACE_EVAL_ROUGHNESS,
 };
-use crate::svm::Svm;
-use crate::util::binserde::Decode;
-use crate::util::{FileResolver, LocalFileResolver};
+use crate::svm::{ShaderRef, Svm};
 use crate::{
     camera::Camera,
     geometry::*,
@@ -38,222 +41,202 @@ pub struct Scene {
     pub meshes: Arc<MeshAggregate>,
     pub camera: Box<dyn Camera>,
     pub device: Device,
-    pub image_textures: BindlessArray,
     pub env_map: Buffer<TagIndex>,
 }
 pub struct Evaluators {
-    pub color_repr: ColorRepr,
-    pub texture: Arc<TextureEvaluator>,
-    pub bsdf: Arc<BsdfEvaluator>,
-    pub light: Arc<LightEvaluator>,
+    pub color_pipeline: ColorPipeline,
+    pub surface: SurfaceEvaluator,
+    pub light: LightEvaluator,
 }
 
 impl Scene {
-    // pub fn evaluators(self: &Arc<Self>, color_repr: ColorRepr) -> Evaluators {
-    //     let texture = self.texture_evaluator(color_repr);
-    //     let light = self.light_evaluator(color_repr, texture.clone());
-    //     let bsdf = self.bsdf_evaluator(color_repr, texture.clone());
-    //     Evaluators {
-    //         color_repr,
-    //         texture,
-    //         bsdf,
-    //         light,
-    //     }
-    // }
-    // pub fn light_evaluator(
-    //     self: &Arc<Self>,
-    //     color_repr: ColorRepr,
-    //     texture_eval: Arc<TextureEvaluator>,
-    // ) -> Arc<LightEvaluator> {
-    //     let le = {
-    //         let texture_eval = texture_eval.clone();
-    //         let scene = self.clone();
-
-    //         self.device
-    //             .create_callable::<(Expr<Ray>, Expr<SurfaceInteraction>), Expr<FlatColor>>(
-    //                 &|ray, si: Expr<SurfaceInteraction>| {
-    //                     let inst_id = si.inst_id();
-    //                     let instance = scene.meshes.mesh_instances.var().read(inst_id);
-    //                     if_!(instance.light().valid(), {
-    //                         let ctx = LightEvalContext {
-    //                             meshes: &scene.meshes,
-    //                             texture: &texture_eval,
-    //                             color_repr,
-    //                         };
-    //                         scene.lights.le(ray, si, &ctx).flatten()
-    //                     }, else {
-    //                       Color::zero(color_repr).flatten()
-    //                     })
-    //                 },
-    //             )
-    //     };
-    //     let sample = {
-    //         let texture_eval = texture_eval.clone();
-    //         let scene = self.clone();
-    //         self.device
-    //             .create_callable::<(Expr<PointNormal>, Expr<Float3>), Expr<FlatLightSample>>(
-    //                 &|pn, u| {
-    //                     let ctx = LightEvalContext {
-    //                         meshes: &scene.meshes,
-    //                         texture: &texture_eval,
-    //                         color_repr,
-    //                     };
-    //                     let sample = scene.lights.sample_direct(pn, u.x(), u.yz(), &ctx);
-    //                     FlatLightSampleExpr::new(
-    //                         sample.li.flatten(),
-    //                         sample.pdf,
-    //                         sample.wi,
-    //                         sample.shadow_ray,
-    //                         sample.n,
-    //                     )
-    //                 },
-    //             )
-    //     };
-    //     let pdf = {
-    //         let scene = self.clone();
-    //         self.device
-    //             .create_callable::<(Expr<SurfaceInteraction>, Expr<PointNormal>), Expr<f32>>(
-    //                 &|si, pn| {
-    //                     let inst_id = si.inst_id();
-    //                     let instance = scene.meshes.mesh_instances.var().read(inst_id);
-    //                     if_!(instance.light().valid(), {
-    //                         let ctx = LightEvalContext {
-    //                             meshes: &scene.meshes,
-    //                             texture: &texture_eval,
-    //                             color_repr: color_repr,
-    //                         };
-    //                         scene.lights.pdf_direct(si, pn, &ctx)
-    //                     }, else {
-    //                         const_(0.0f32)
-    //                     })
-    //                 },
-    //             )
-    //     };
-    //     Arc::new(LightEvaluator {
-    //         color_repr,
-    //         le,
-    //         sample,
-    //         pdf,
-    //     })
-    // }
-    // pub fn texture_evaluator(&self, color_repr: ColorRepr) -> Arc<TextureEvaluator> {
-    //     let texture = self
-    //         .device
-    //         .create_callable::<(Expr<TagIndex>, Expr<SurfaceInteraction>), Expr<Float4>>(
-    //             &|tex: Expr<TagIndex>, si: Expr<SurfaceInteraction>| {
-    //                 let ctx = TextureEvalContext { scene: self };
-    //                 self.textures
-    //                     .get(tex)
-    //                     .dispatch(|_, _, tex| tex.evaluate(si, &ctx))
-    //             },
-    //         );
-    //     Arc::new(TextureEvaluator {
-    //         color_repr,
-    //         texture,
-    //     })
-    // }
-    // pub fn bsdf_evaluator(
-    //     self: &Arc<Self>,
-    //     color_repr: ColorRepr,
-    //     texture_eval: Arc<TextureEvaluator>,
-    // ) -> Arc<BsdfEvaluator> {
-    //     let scene = self.clone();
-    //     let bsdf = {
-    //         let texture_eval = texture_eval.clone();
-    //         self.device.create_callable::<(
-    //             Expr<TagIndex>,
-    //             Expr<SurfaceInteraction>,
-    //             Expr<Float3>,
-    //             Expr<Float3>,
-    //             Expr<SampledWavelengths>,
-    //             Expr<u32>,
-    //         ), Expr<FlatBsdfEvalResult>>(
-    //             &|surface: Expr<TagIndex>,
-    //               si: Expr<SurfaceInteraction>,
-    //               wo: Expr<Float3>,
-    //               wi: Expr<Float3>,
-    //               swl: Expr<SampledWavelengths>,
-    //               mode: Expr<u32>| {
-    //                 let ctx = BsdfEvalContext {
-    //                     texture: &texture_eval,
-    //                     color_repr: color_repr,
-    //                 };
-    //                 let (color, pdf, albedo, roughness) =
-    //                     scene.surfaces.get(surface).dispatch(|_, _, surface| {
-    //                         let closure = surface.closure(si, swl, &ctx);
-    //                         let color = if_!(
-    //                             (mode & BSDF_EVAL_COLOR).cmpne(0),
-    //                             { closure.evaluate(wo, wi, swl, &ctx) },
-    //                             else,
-    //                             { Color::zero(color_repr) }
-    //                         );
-    //                         let pdf = if_!(
-    //                             (mode & BSDF_EVAL_PDF).cmpne(0),
-    //                             { closure.pdf(wo, wi, swl, &ctx) },
-    //                             else,
-    //                             { 0.0.into() }
-    //                         );
-    //                         let albedo = if_!(
-    //                             (mode & BSDF_EVAL_ALBEDO).cmpne(0),
-    //                             { closure.albedo(wo, swl, &ctx) },
-    //                             else,
-    //                             { Color::zero(color_repr) }
-    //                         );
-    //                         let roughness = if_!(
-    //                             (mode & BSDF_EVAL_ROUGHNESS).cmpne(0),
-    //                             { closure.roughness(wo, swl, &ctx) },
-    //                             else,
-    //                             { 0.0.into() }
-    //                         );
-    //                         (color, pdf, albedo, roughness)
-    //                     });
-    //                 struct_!(FlatBsdfEvalResult {
-    //                     color: color.flatten(),
-    //                     pdf: pdf,
-    //                     albedo: albedo.flatten(),
-    //                     roughness: roughness,
-    //                 })
-    //             },
-    //         )
-    //     };
-    //     let scene = self.clone();
-    //     let bsdf_sample = {
-    //         let texture_eval = texture_eval.clone();
-    //         self.device.create_callable::<(
-    //             Expr<TagIndex>,
-    //             Expr<SurfaceInteraction>,
-    //             Expr<Float3>,
-    //             Expr<Float3>,
-    //             Var<SampledWavelengths>,
-    //         ), Expr<FlatBsdfSample>>(
-    //             &|surface: Expr<TagIndex>,
-    //               si: Expr<SurfaceInteraction>,
-    //               wo: Expr<Float3>,
-    //               u: Expr<Float3>,
-    //               swl: Var<SampledWavelengths>| {
-    //                 let ctx = BsdfEvalContext {
-    //                     texture: &texture_eval,
-    //                     color_repr: color_repr,
-    //                 };
-    //                 let sample = scene.surfaces.get(surface).dispatch(|_, _, surface| {
-    //                     let closure = surface.closure(si, *swl, &ctx);
-    //                     closure.sample(wo, u.x(), u.yz(), swl, &ctx)
-    //                 });
-    //                 struct_!(FlatBsdfSample {
-    //                     wi: sample.wi,
-    //                     pdf: sample.pdf,
-    //                     valid: sample.valid,
-    //                     color: sample.color.flatten(),
-    //                 })
-    //             },
-    //         )
-    //     };
-    //     Arc::new(BsdfEvaluator {
-    //         color_repr,
-    //         bsdf,
-    //         bsdf_sample,
-    //     })
-    // }
+    pub fn evaluators(&self, color_pipeline: ColorPipeline) -> Evaluators {
+        let surface = self.surface_evaluator(color_pipeline);
+        let light = self.light_evaluator(color_pipeline, &surface);
+        Evaluators {
+            color_pipeline,
+            light,
+            surface,
+        }
+    }
+    pub fn light_evaluator(
+        &self,
+        color_pipeline: ColorPipeline,
+        surface_eval: &SurfaceEvaluator,
+    ) -> LightEvaluator {
+        let le = {
+            self.device.create_callable::<(
+                Expr<Ray>,
+                Expr<SurfaceInteraction>,
+                Expr<SampledWavelengths>,
+            ), Expr<FlatColor>>(&|ray, si: Expr<SurfaceInteraction>, swl| {
+                let inst_id = si.inst_id();
+                let instance = self.meshes.mesh_instances.var().read(inst_id);
+                if_!(instance.light().valid(), {
+                    let ctx = LightEvalContext {
+                        meshes: &self.meshes,
+                        color_pipeline,
+                        surface_eval
+                    };
+                    self.lights.le(ray, si,swl, &ctx).flatten()
+                }, else {
+                  Color::zero(color_pipeline.color_repr).flatten()
+                })
+            })
+        };
+        let sample = {
+            self.device
+                .create_callable::<(Expr<PointNormal>, Expr<Float3>, Expr<SampledWavelengths>), Expr<FlatLightSample>>(
+                    &|pn, u,swl| {
+                        let ctx = LightEvalContext {
+                            meshes: &self.meshes,
+                            color_pipeline,
+                            surface_eval
+                        };
+                        let sample = self.lights.sample_direct(pn, u.x(), u.yz(), swl, &ctx);
+                        FlatLightSampleExpr::new(
+                            sample.li.flatten(),
+                            sample.pdf,
+                            sample.wi,
+                            sample.shadow_ray,
+                            sample.n,
+                        )
+                    },
+                )
+        };
+        let pdf = {
+            let scene = self.clone();
+            self.device.create_callable::<(
+                Expr<SurfaceInteraction>,
+                Expr<PointNormal>,
+                Expr<SampledWavelengths>,
+            ), Expr<f32>>(&|si, pn, _swl| {
+                let inst_id = si.inst_id();
+                let instance = scene.meshes.mesh_instances.var().read(inst_id);
+                if_!(instance.light().valid(), {
+                    let ctx = LightEvalContext {
+                        meshes: &self.meshes,
+                        color_pipeline,
+                        surface_eval
+                    };
+                    scene.lights.pdf_direct(si, pn, &ctx)
+                }, else {
+                    const_(0.0f32)
+                })
+            })
+        };
+        LightEvaluator {
+            color_pipeline,
+            le,
+            sample,
+            pdf,
+        }
+    }
+    pub fn surface_evaluator(&self, color_pipeline: ColorPipeline) -> SurfaceEvaluator {
+        let eval = {
+            self.device.create_callable::<(
+                Expr<ShaderRef>,
+                Expr<SurfaceInteraction>,
+                Expr<Float3>,
+                Expr<Float3>,
+                Expr<SampledWavelengths>,
+                Expr<u32>,
+            ), Expr<FlatSurfaceEvalResult>>(
+                &|shader_ref: Expr<ShaderRef>,
+                  si: Expr<SurfaceInteraction>,
+                  wo: Expr<Float3>,
+                  wi: Expr<Float3>,
+                  swl: Expr<SampledWavelengths>,
+                  mode: Expr<u32>| {
+                    let ctx = BsdfEvalContext {
+                        color_repr: color_pipeline.color_repr,
+                        _marker: PhantomData,
+                    };
+                    let color_repr = ctx.color_repr;
+                    let (color, pdf, albedo, emission, roughness) =
+                        self.svm
+                            .dispatch_surface(shader_ref, color_pipeline, si, swl, |closure| {
+                                let color = if_!(
+                                    (mode & SURFACE_EVAL_COLOR).cmpne(0),
+                                    { closure.evaluate(wo, wi, swl, &ctx) },
+                                    else,
+                                    { Color::zero(color_repr) }
+                                );
+                                let pdf = if_!(
+                                    (mode & SURFACE_EVAL_PDF).cmpne(0),
+                                    { closure.pdf(wo, wi, swl, &ctx) },
+                                    else,
+                                    { 0.0.into() }
+                                );
+                                let albedo = if_!(
+                                    (mode & SURFACE_EVAL_ALBEDO).cmpne(0),
+                                    { closure.albedo(wo, swl, &ctx) },
+                                    else,
+                                    { Color::zero(color_repr) }
+                                );
+                                let emission = if_!(
+                                    (mode & SURFACE_EVAL_EMISSION).cmpne(0),
+                                    { closure.emission(wo, swl, &ctx) },
+                                    else,
+                                    { Color::zero(color_repr) }
+                                );
+                                let roughness = if_!(
+                                    (mode & SURFACE_EVAL_ROUGHNESS).cmpne(0),
+                                    { closure.roughness(wo, swl, &ctx) },
+                                    else,
+                                    { 0.0.into() }
+                                );
+                                (color, pdf, albedo, emission, roughness)
+                            });
+                    struct_!(FlatSurfaceEvalResult {
+                        color: color.flatten(),
+                        pdf: pdf,
+                        albedo: albedo.flatten(),
+                        emission: emission.flatten(),
+                        roughness: roughness,
+                    })
+                },
+            )
+        };
+        let sample = {
+            self.device.create_callable::<(
+                Expr<ShaderRef>,
+                Expr<SurfaceInteraction>,
+                Expr<Float3>,
+                Expr<Float3>,
+                Var<SampledWavelengths>,
+            ), Expr<FlatBsdfSample>>(
+                &|shader_ref: Expr<ShaderRef>,
+                  si: Expr<SurfaceInteraction>,
+                  wo: Expr<Float3>,
+                  u: Expr<Float3>,
+                  swl: Var<SampledWavelengths>| {
+                    let ctx = BsdfEvalContext {
+                        color_repr: color_pipeline.color_repr,
+                        _marker: PhantomData,
+                    };
+                    let sample = self.svm.dispatch_surface(
+                        shader_ref,
+                        color_pipeline,
+                        si,
+                        *swl,
+                        |closure| closure.sample(wo, u.x(), u.yz(), swl, &ctx),
+                    );
+                    struct_!(FlatBsdfSample {
+                        wi: sample.wi,
+                        pdf: sample.pdf,
+                        valid: sample.valid,
+                        color: sample.color.flatten(),
+                    })
+                },
+            )
+        };
+        SurfaceEvaluator {
+            color_repr: color_pipeline.color_repr,
+            eval,
+            sample,
+        }
+    }
     // pub fn load_from_path<P: AsRef<Path>>(device: Device, path: P) -> Arc<Self> {
     //     let path = PathBuf::from(path.as_ref());
     //     let canonical = fs::canonicalize(&path).unwrap();
