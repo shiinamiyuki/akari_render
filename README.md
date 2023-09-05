@@ -10,6 +10,8 @@ AkariRender is a CPU/GPU physically based renderer written in Rust and powered b
 
 
 ## Features
+- Loading Blender scene
+- Cycles shader graph
 - RGB/Spectral Rendering (WIP)
 - Path Tracing
 - Path Tracing with Metropolis Sampling
