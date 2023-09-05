@@ -113,6 +113,11 @@ fn gen_nodegraph_defs() {
         kind: SocketKind::Float,
         default: SocketValue::Float(default),
     };
+    let create_int_input = |name: &str, default: i64| InputSocketDesc {
+        name: name.to_string(),
+        kind: SocketKind::Int,
+        default: SocketValue::Int(default),
+    };
     let create_float3_input = |name: &str, default: [f32; 3]| InputSocketDesc {
         name: name.to_string(),
         kind: SocketKind::List(Box::new(SocketKind::Float), Some(3)),
@@ -173,6 +178,10 @@ fn gen_nodegraph_defs() {
                 default: SocketValue::Node(None),
             },
             create_float_input("fov", 45.0),
+            create_float_input("focal_distance", 0.0),
+            create_float_input("fstop", 2.8),
+            create_int_input("width", 512),
+            create_int_input("height", 512),
         ],
         outputs: vec![OutputSocketDesc {
             name: "camera".to_string(),
@@ -247,62 +256,6 @@ fn gen_nodegraph_defs() {
             }],
         },
     ];
-    let integrator_nodes = vec![NodeDesc {
-        name: "PathTracer".to_string(),
-        category: "Integrator".to_string(),
-        inputs: vec![
-            InputSocketDesc {
-                name: "min_depth".to_string(),
-                kind: SocketKind::Int,
-                default: SocketValue::Int(5),
-            },
-            InputSocketDesc {
-                name: "max_depth".to_string(),
-                kind: SocketKind::Int,
-                default: SocketValue::Int(7),
-            },
-        ],
-        outputs: vec![OutputSocketDesc {
-            name: "integrator".to_string(),
-            kind: SocketKind::Node("Integrator".to_string()),
-        }],
-    }];
-    let render_node = NodeDesc {
-        name: "Render".to_string(),
-        category: "RenderOutput".to_string(),
-        inputs: vec![
-            InputSocketDesc {
-                name: "scene".to_string(),
-                kind: SocketKind::Node("Scene".to_string()),
-                default: SocketValue::Node(None),
-            },
-            InputSocketDesc {
-                name: "integrator".to_string(),
-                kind: SocketKind::Node("Integrator".to_string()),
-                default: SocketValue::Node(None),
-            },
-            InputSocketDesc {
-                name: "width".to_string(),
-                kind: SocketKind::Int,
-                default: SocketValue::Int(800),
-            },
-            InputSocketDesc {
-                name: "height".to_string(),
-                kind: SocketKind::Int,
-                default: SocketValue::Int(600),
-            },
-            InputSocketDesc {
-                name: "color".to_string(),
-                kind: SocketKind::Enum(color_pipeline.name.clone()),
-                default: SocketValue::Enum("SRGB".to_string()),
-            },
-            create_float_input("max_time", 0.0),
-        ],
-        outputs: vec![OutputSocketDesc {
-            name: "image".to_string(),
-            kind: SocketKind::Node("Image".to_string()),
-        }],
-    };
     let light_nodes = vec![
         NodeDesc {
             name: "LightOutput".to_string(),
@@ -429,13 +382,12 @@ fn gen_nodegraph_defs() {
     let mut nodes = vec![];
     nodes.extend(texture_nodes);
     nodes.extend(bsdf_nodes);
-    nodes.extend(integrator_nodes);
     nodes.extend(light_nodes);
     nodes.extend(scene_nodes);
     nodes.extend(misc_nodes);
     nodes.extend(camera_nodes);
     nodes.extend(transform_nodes);
-    nodes.extend_from_slice(&[mesh_node, instance_node, render_node]);
+    nodes.extend_from_slice(&[mesh_node, instance_node]);
     let graph = NodeGraphDesc { nodes, enums };
     std::fs::write("src/nodes.rs", gen::gen_rust_for_nodegraph(&graph)).unwrap();
     // format the generated code

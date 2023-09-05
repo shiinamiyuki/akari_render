@@ -41,7 +41,7 @@ pub struct Scene {
     pub meshes: Arc<MeshAggregate>,
     pub camera: Box<dyn Camera>,
     pub device: Device,
-    pub env_map: Buffer<TagIndex>,
+    // pub env_map: Buffer<TagIndex>,
 }
 pub struct Evaluators {
     pub color_pipeline: ColorPipeline,

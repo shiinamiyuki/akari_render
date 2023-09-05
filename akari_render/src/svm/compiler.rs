@@ -52,7 +52,7 @@ impl CompilerDriver {
                 SvmNode::MaterialOutput(n) => self.push_data(*n),
             };
             if i != 0 {
-                assert_eq!(offset, expected_offsets[i]);
+                assert_eq!(offset - base_offset, expected_offsets[i]);
             } else {
                 base_offset = offset;
             }

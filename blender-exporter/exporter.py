@@ -1,3 +1,4 @@
+from math import degrees
 import bpy
 import bmesh
 import json
@@ -159,7 +160,7 @@ class MaterialExporter:
                 r = s.default_value[0]
                 g = s.default_value[1]
                 b = s.default_value[2]
-                return f'SpectralUplift[rgb=RGB[r={r}, g={g}, b={b}]]'
+                return f'SpectralUplift[rgb=RGB[r={r}, g={g}, b={b}, colorspace=ColorSpace::SRGB]]'
             else:
                 raise RuntimeError(f"Unsupported socket type `{s}`")
         else:
@@ -189,6 +190,9 @@ class MaterialExporter:
             input('Metallic', 'metallic')
             input('Specular', 'specular')
             input('Emission', 'emission')
+            input('Clearcoat', 'clearcoat')
+            input('Clearcoat Roughness', 'clearcoat_roughness')
+            input('Transmission', 'transmission')
             input('IOR', 'ior')
         elif isinstance(node, T.ShaderNodeOutputMaterial):
             print(f'MaterialOutput[',file=akr_file)
@@ -353,8 +357,43 @@ class SceneExporter:
         
         self.exported_meshes.append(name)
 
+    def transfrom_from_object(self, b_object):
+        translate = b_object.location
+        rotate = b_object.rotation_euler
+        scale = b_object.scale
+        return (translate, rotate, scale)
+
+    def export_camera(self):
+        camera = self.scene.camera
+        fov = degrees(camera.data.angle)
+        name = VISITED.get(camera)
+        print(f"Exporting Camera `{camera.name}`")
+        print(type(camera))
+        print(type(camera.data))
+        print(f'${name} = PerspectiveCamera[',file=akr_file)
+        trs = self.transfrom_from_object(camera)
+        dof = camera.data.dof
+        render_settings = self.scene.render
+        res_x = render_settings.resolution_x
+        res_y = render_settings.resolution_y
+        print(f'    transform = TRS[',file=akr_file)
+        print(f'        translation=[{",".join([str(x) for x in trs[0]])}],',file=akr_file)
+        print(f'        rotation=[{",".join([str(x) for x in trs[1]])}],',file=akr_file)
+        print(f'        scale=[{",".join([str(x) for x in trs[2]])}],',file=akr_file)
+        print(f'        coordinate_system=CoordinateSystem::Blender',file=akr_file)
+        print(f'    ],',file=akr_file)
+        print(f'    fov={fov},',file=akr_file)
+        if dof is not None:
+            print(f'    focal_distance={dof.focus_distance},',file=akr_file)
+            print(f'    fstop={dof.aperture_fstop},',file=akr_file)
+        print(f'    width={res_x},',file=akr_file)
+        print(f'    height={res_y},',file=akr_file)
+        print(f']',file=akr_file)
+        return name
+
     def export(self):
         name = VISITED.get(self.scene)
+        camera = self.export_camera()
         print(f"Exporting Scene `{self.scene.name}` -> {name}")
         # seperate meshes by material
         print("Seperating meshes by material")
@@ -382,6 +421,7 @@ class SceneExporter:
         print("    ],",file=akr_file)
         print('    lights=[',file=akr_file)
         print("    ],",file=akr_file)
+        print(f'    camera=${camera},',file=akr_file)
         print(']',file=akr_file)
         print("Scene exported")
 

@@ -75,6 +75,7 @@ impl<'a> Parser<'a> {
         parser
     }
     fn next_char(&mut self) -> Option<char> {
+        // dbg!((self.line, self.col));
         let c = self.chars.get(self.pos).cloned();
         if c == Some('\n') {
             self.line += 1;
@@ -175,6 +176,7 @@ impl<'a> Parser<'a> {
                                 col: self.col,
                             });
                         }
+                        break;
                     }
                 } else {
                     if c.is_digit(10) {
@@ -254,7 +256,7 @@ impl<'a> Parser<'a> {
                 self.next_char();
             } else {
                 return Err(ParseError {
-                    msg: "expected ',' or ']'".to_string(),
+                    msg: "expected ',' or ']' when parsing list".to_string(),
                     line: self.line,
                     col: self.col,
                 });
@@ -301,6 +303,7 @@ impl<'a> Parser<'a> {
             self.skip_whitespace();
             if self.peek(0) == Some('=') {
                 self.next_char();
+                self.skip_whitespace();
                 let mut v = self.parse_value(None)?;
                 if let Value::NodeId(id) = v {
                     let node = &self.graph.nodes[&id];
@@ -439,7 +442,7 @@ impl<'a> Parser<'a> {
             } else {
                 return Err(ParseError {
                     msg: format!(
-                        "expected ',' or ']' but found '{}'",
+                        "expected ',' or ']' when parsing node constructor but found '{}'",
                         self.peek(0).unwrap_or('\0')
                     ),
                     line: self.line,
@@ -461,12 +464,22 @@ impl<'a> Parser<'a> {
                 Value::String(v) => SocketValue::String(v),
                 Value::Enum(_, v) => SocketValue::Enum(v),
                 Value::NodeId(v) => unreachable!(),
-                Value::List(v) => SocketValue::List(
-                    v.into_iter()
-                        .map(|v| to_socket_value(parser, to.clone(), k.clone(), v, kind.clone()))
-                        .collect(),
-                ),
+                Value::List(v) => {
+                    // dbg!(&kind);
+                    let inner = match kind {
+                        SocketKind::List(inner, _) => *inner,
+                        _ => unreachable!(),
+                    };
+                    SocketValue::List(
+                        v.into_iter()
+                            .map(|v| {
+                                to_socket_value(parser, to.clone(), k.clone(), v, inner.clone())
+                            })
+                            .collect(),
+                    )
+                }
                 Value::NodeOutput(node, socket) => {
+                    // dbg!(&kind);
                     let link = NodeLink {
                         from: node.clone(),
                         from_socket: socket.clone(),
@@ -484,6 +497,17 @@ impl<'a> Parser<'a> {
                     SocketValue::Node(Some(link))
                 }
             }
+        }
+        if inputs.len() != desc.inputs.len() {
+            return Err(ParseError {
+                msg: format!(
+                    "invalid number of inputs: expected {}, got {}",
+                    desc.inputs.len(),
+                    inputs.len()
+                ),
+                line: self.line,
+                col: self.col,
+            });
         }
         let node = Node {
             kind: NodeKind::Node { ty: node.clone() },
@@ -634,6 +658,7 @@ impl<'a> Parser<'a> {
                         col: self.col,
                     });
                 }
+                self.next_char();
                 let ident2 = self.parse_identifier()?;
                 Ok(Value::Enum(ident, ident2))
             } else {

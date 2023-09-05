@@ -87,7 +87,7 @@ impl SocketIn {
                     let ty = T::ty();
                     if link.ty != SocketKind::Node(ty.to_string()) {
                         return Err(NodeProxyError {
-                            msg: format!("Invalid link type for socket {}: {:?}", name, link.ty),
+                            msg: format!("Invalid link type for socket `{}`: {:?}", name, link.ty),
                         });
                     }
                     Ok(NodeProxyInput::Node(Some(link.clone())))

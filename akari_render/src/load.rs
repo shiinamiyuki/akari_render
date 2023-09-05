@@ -1,5 +1,5 @@
 use crate::{
-    camera::Camera,
+    camera::{Camera, PerspectiveCamera},
     geometry::AffineTransform,
     light::{area::AreaLight, Light, LightAggregate, WeightedLightDistribution},
     mesh::{MeshAggregate, MeshBuffer, MeshInstance, TriangleMesh},
@@ -33,7 +33,6 @@ pub struct SceneLoader {
     meshes: Vec<Arc<TriangleMesh>>,
     mesh_areas: Vec<Vec<f32>>,
     mesh_buffers: Vec<MeshBuffer>,
-    instance_emission_power: Vec<f32>,
     graph: NodeGraph,
     camera: Option<Box<dyn Camera>>,
     root: NodeId,
@@ -58,12 +57,13 @@ where
 }
 impl SceneLoader {
     pub fn load_from_path<P: AsRef<Path>>(device: Device, path: P) -> Arc<Scene> {
-        let mut loader = Self::preload(device, load_scene_graph(path));
-        loader.do_load();
-        todo!()
-    }
-    fn get_image(&self, path: &String) -> &image::DynamicImage {
-        self.images.get(path).unwrap()
+        log::info!("Loading scene: {}", path.as_ref().display());
+        let graph = load_scene_graph(&path);
+        log::info!("Loaded scene graph");
+        let loader = Self::preload(device, graph);
+        let scene = Arc::new(loader.do_load());
+        log::info!("Loaded scene: {}", path.as_ref().display());
+        scene
     }
     fn estimate_emission_tex_intensity_fast(&self, emission: &NodeId) -> Option<f32> {
         let emission = &self.graph.nodes[emission];
@@ -168,6 +168,31 @@ impl SceneLoader {
             panic!("Unsupported transform type: {}", ty);
         }
     }
+    fn load_camera(&self, node_id: &NodeId) -> Box<dyn Camera> {
+        let node = &self.graph.nodes[node_id];
+        let ty = node.ty().unwrap();
+        if ty == nodes::PerspectiveCamera::ty() {
+            let cam = node.proxy::<nodes::PerspectiveCamera>(&self.graph).unwrap();
+            let transform = self.load_transform(&cam.in_transform.as_node().unwrap().from, true);
+            let fov = (*cam.in_fov.as_value().unwrap() as f32).to_radians();
+            let focal_distance = *cam.in_focal_distance.as_value().unwrap() as f32;
+            let fstop = *cam.in_fstop.as_value().unwrap() as f32;
+            let lens_radius = focal_distance / (2.0 * fstop);
+            let width = *cam.in_width.as_value().unwrap() as u32;
+            let height = *cam.in_height.as_value().unwrap() as u32;
+            let cam = Box::new(PerspectiveCamera::new(
+                self.device.clone(),
+                Uint2::new(width, height),
+                transform,
+                fov,
+                lens_radius,
+                focal_distance,
+            ));
+            cam
+        } else {
+            todo!()
+        }
+    }
     fn load_mesh(&self, node_id: &NodeId) -> (NodeId, MeshInstance) {
         let node = &self.graph.nodes[node_id];
         let ty = node.ty().unwrap();
@@ -239,6 +264,11 @@ impl SceneLoader {
         let mut instance_surfaces = vec![];
         let scene_node = &self.graph.nodes[&self.root];
         let scene = scene_node.proxy::<nodes::Scene>(&self.graph).unwrap();
+        {
+            let camera = &scene.in_camera.as_node().unwrap().from;
+            let camera = self.load_camera(camera);
+            self.camera = Some(camera);
+        }
         let mesh_nodes = scene
             .in_geometries
             .iter()
@@ -282,7 +312,7 @@ impl SceneLoader {
             }
         }
         let area_light_count = lights.len();
-
+        log::info!("{} mesh lights found", area_light_count);
         // now add other lights
         {
             // TODO: add other lights
@@ -298,7 +328,9 @@ impl SceneLoader {
                 .get_mut(light_ids_to_lights[i])
                 .downcast_mut::<AreaLight>()
                 .unwrap();
-            area.area_sampling_index = mesh_aggregate.mesh_id_to_area_samplers[&area.instance_id];
+            let instance = &instances[area.instance_id as usize];
+            area.area_sampling_index =
+                mesh_aggregate.mesh_id_to_area_samplers[&instance.geom_id];
         }
         let light_weights = lights.iter().map(|(_, power)| *power).collect::<Vec<_>>();
         let Self {
@@ -306,6 +338,7 @@ impl SceneLoader {
             lights,
             surface_shader_compiler,
             texture_heap,
+            camera,
             ..
         } = self;
         let svm = Arc::new(Svm {
@@ -328,9 +361,9 @@ impl SceneLoader {
             svm,
             lights: light_aggregate,
             meshes: mesh_aggregate.clone(),
-            camera: todo!(),
+            camera: camera.unwrap(),
             device,
-            env_map: todo!(),
+            // env_map: todo!(),
         }
     }
     fn preload(device: Device, graph: NodeGraph) -> Self {
@@ -402,6 +435,11 @@ impl SceneLoader {
             }
         }
         let root = root.unwrap_or_else(|| panic!("No scene node found"));
+        log::info!(
+            "Scene has {} meshes, {} image textures",
+            meshes.len(),
+            images_to_load.len()
+        );
         let images = images_to_load
             .into_par_iter()
             .map(|path_s| {
@@ -457,7 +495,6 @@ impl SceneLoader {
             material_nodes,
             nodes_to_surface_shader: HashMap::new(),
             light_nodes,
-            instance_emission_power: vec![],
             mesh_areas: vec![],
             lights: PolymorphicBuilder::new(device.clone()),
         }
@@ -470,8 +507,20 @@ lazy_static! {
 }
 pub fn load_scene_graph<P: AsRef<Path>>(path: P) -> NodeGraph {
     let path = path.as_ref();
-    let mut file = File::open(path).unwrap();
-    let mut buf = String::new();
-    file.read_to_string(&mut buf).unwrap();
-    parse::parse(&buf, &SCENE_DESC).unwrap()
+    let ext = path.extension().unwrap().to_str().unwrap();
+    if ext == "akr" {
+        let mut file = File::open(path).unwrap();
+        let mut buf = String::new();
+        file.read_to_string(&mut buf).unwrap();
+        parse::parse(&buf, &SCENE_DESC).unwrap()
+    } else if ext == "json" {
+        let file = File::open(path).unwrap();
+        serde_json::from_reader(file).unwrap()
+    } else {
+        panic!("Unsupported scene file format: {}", ext);
+    }
+}
+
+pub fn load_from_path<P: AsRef<Path>>(device: Device, path: P) -> Arc<Scene> {
+    SceneLoader::load_from_path(device, path)
 }
