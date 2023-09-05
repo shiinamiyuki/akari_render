@@ -3,6 +3,7 @@ import bpy
 import bmesh
 import json
 import bpy.types as T
+import mathutils
 import sys
 from typing import List, Tuple, Dict
 from enum import Enum, auto
@@ -12,11 +13,17 @@ def dbg(*args, **kwargs):
     print(f"Debug {sys._getframe().f_back.f_lineno}: ", end="")
     print(*args, **kwargs)
 
-def convert_coord_sys(v):
+def convert_coord_sys_matrix():
     # blender is z-up, right-handed
     # we are y-up, right-handed
-    return (v[0], v[2], -v[1])
-
+    m = mathutils.Matrix([
+        [1, 0, 0, 0],
+        [0, 0, 1, 0],
+        [0,-1, 0, 0],
+        [0, 0, 0, 1]
+    ])
+    return m
+CONVERT_COORD_SYS_MATRIX = convert_coord_sys_matrix()
 def path_join(a, b):
     return os.path.join(a, b).replace("\\", "/")
 
@@ -231,7 +238,7 @@ class MaterialExporter:
 class SceneExporter:
     def __init__(self, scene):
         self.scene = scene
-        self.exported_meshes = list()
+        self.exported_instances = list()
         self.mat_exporter = MaterialExporter()
 
     def visible_objects(self):
@@ -239,34 +246,8 @@ class SceneExporter:
 
     def export_material(self, m):
         return self.mat_exporter.export_material(m)
-
-    def export_mesh(self, obj): # TODO: support instancing
-        if VISITED.contains(obj):
-            return
-        name = VISITED.get(obj)
-        print(f"Exporting Mesh `{obj.name}` -> {name}")
-        print(obj.data)
-        m = obj.data
-        assert len(m.uv_layers) <= 1, f"Only one uv layer is supported but found {len(m.uv_layers)}"
-        has_uv = len(m.uv_layers) == 1
-        if has_uv:
-            if not is_uv_map_valid(obj):
-                print(f"Mesh `{obj.name}` has invalid uv map")
-                has_uv = False
-        if not has_uv:
-            print(f"Mesh `{obj.name}` has no uv map")
-            print(f'Try to compute uv map for `{obj.name}`')
-            try:
-                compute_uv_map(obj)
-                has_uv = True
-            except Exception as e:
-                print(f"Failed to compute uv map for `{obj.name}`")
-                print(f'Reason: {e}')
-                print("Continue without uv map")
-        else:
-            print(f"Mesh `{obj.name}` has uv map")
-        eval_obj = obj.evaluated_get(depsgraph)
-        m = eval_obj.to_mesh()
+    
+    def export_mesh_data(self, m, name, has_uv):
         bm = bmesh.new()
         bm.from_mesh(m)
         bmesh.ops.triangulate(bm, faces=bm.faces[:])
@@ -298,19 +279,19 @@ class SceneExporter:
             tangent_buffer.write(struct.pack('Q', len(F) * 3))
             bitangent_buffer.write(struct.pack('Q', (len(F) * 3 + 31) // 32))
         for v in V:
-            vert_buffer.write(struct.pack("fff", *convert_coord_sys(v.co)))
+            vert_buffer.write(struct.pack("fff", *v.co))
         for f in F:
             indices = f.vertices
             ind_buffer.write(struct.pack("III", indices[0], indices[1], indices[2]))
             normals = f.split_normals
             for n in normals:
-                normal_buffer.write(struct.pack("fff", *convert_coord_sys(n)))
+                normal_buffer.write(struct.pack("fff", *n))
             for loop_index in f.loops:
                 if has_uv:
                     uv = m.uv_layers[0].uv[loop_index].vector
                     uv_buffer.write(struct.pack("ff", uv[0], uv[1]))
                     tangent = m.loops[loop_index].tangent
-                    tangent_buffer.write(struct.pack("fff", *convert_coord_sys(tangent)))
+                    tangent_buffer.write(struct.pack("fff", *tangent))
                     bitangent_sign = m.loops[loop_index].bitangent_sign
                     if bitangent_sign < 0:
                         bitangent_sign = 1
@@ -341,8 +322,7 @@ class SceneExporter:
         buffers = [f"{name}_vert", f"{name}_ind", f"{name}_normal"]
         if has_uv:
             buffers.extend([f"{name}_uv", f"{name}_tangent", f"{name}_bitangent"])
-        assert len(obj.data.materials) == 1, f"Mesh `{obj.name}` has {len(obj.data.materials)} materials"
-        out = self.export_material(obj.data.materials[0])
+       
         
         print(f'${name} = Mesh[\n    name="{name}",\n    buffers=[',file=akr_file)
         for i, buffer in enumerate(buffers):
@@ -352,10 +332,57 @@ class SceneExporter:
             else:
                 print(file=akr_file)
         print("    ],",file=akr_file)
-        print('    material=$' + out,file=akr_file)
         print("]",file=akr_file)
-        
-        self.exported_meshes.append(name)
+
+    def convert_matrix_to_list(self, mat):
+        l = [[x for x in row] for row in mat.row]
+        # flatten
+        return [x for row in l for x in row]
+
+    def export_mesh(self, obj): # TODO: support instancing
+        if VISITED.contains(obj):
+            return
+        name = VISITED.get(obj)
+        print(f"Exporting Mesh `{obj.name}` -> {name}")
+        # print(obj.data)
+        # print(obj.matrix_local)
+        print(f'World matrix:')
+        print(obj.matrix_world)
+        # print(self.convert_matrix_to_list(obj.matrix_world))
+        # print(self.transfrom_from_object(obj))
+        m = obj.data
+        assert len(m.uv_layers) <= 1, f"Only one uv layer is supported but found {len(m.uv_layers)}"
+        has_uv = len(m.uv_layers) == 1
+        if has_uv:
+            if not is_uv_map_valid(obj):
+                print(f"Mesh `{obj.name}` has invalid uv map")
+                has_uv = False
+        if not has_uv:
+            print(f"Mesh `{obj.name}` has no uv map")
+            print(f'Try to compute uv map for `{obj.name}`')
+            try:
+                compute_uv_map(obj)
+                has_uv = True
+            except Exception as e:
+                print(f"Failed to compute uv map for `{obj.name}`")
+                print(f'Reason: {e}')
+                print("Continue without uv map")
+        else:
+            print(f"Mesh `{obj.name}` has uv map")
+        eval_obj = obj.evaluated_get(depsgraph)
+        m = eval_obj.to_mesh()
+        self.export_mesh_data(m, f'{name}_mesh', has_uv)
+        assert len(obj.data.materials) == 1, f"Mesh `{obj.name}` has {len(obj.data.materials)} materials"
+        mat = self.export_material(obj.data.materials[0])
+        matrix_world = CONVERT_COORD_SYS_MATRIX @ obj.matrix_world
+        print(matrix_world)
+        print(f'${name} = Instance[',file=akr_file)
+        print(f'    name="{name}",',file=akr_file)
+        print(f'    geometry=${name}_mesh,',file=akr_file)
+        print(f'    material=${mat},',file=akr_file)
+        print(f'    transform=MatrixTransform[matrix=[{",".join(["{:f}".format(x) for x in self.convert_matrix_to_list(matrix_world)])}]],',file=akr_file)
+        print(f']',file=akr_file)
+        self.exported_instances.append(name)
 
     def transfrom_from_object(self, b_object):
         translate = b_object.location
@@ -378,7 +405,7 @@ class SceneExporter:
         res_y = render_settings.resolution_y
         print(f'    transform = TRS[',file=akr_file)
         print(f'        translation=[{",".join([str(x) for x in trs[0]])}],',file=akr_file)
-        print(f'        rotation=[{",".join([str(x) for x in trs[1]])}],',file=akr_file)
+        print(f'        rotation=[{",".join([str(degrees(x)) for x in trs[1]])}],',file=akr_file)
         print(f'        scale=[{",".join([str(x) for x in trs[2]])}],',file=akr_file)
         print(f'        coordinate_system=CoordinateSystem::Blender',file=akr_file)
         print(f'    ],',file=akr_file)
@@ -411,10 +438,10 @@ class SceneExporter:
         for obj in self.visible_objects():
             if obj.type == 'MESH':
                 self.export_mesh(obj)
-        print(f'${name} = Scene[\n    geometries=[',file=akr_file)
-        for i, m in enumerate(self.exported_meshes):
+        print(f'${name} = Scene[\n    instances=[',file=akr_file)
+        for i, m in enumerate(self.exported_instances):
             print(f'    ${m}',file=akr_file, end="")
-            if i != len(self.exported_meshes) - 1:
+            if i != len(self.exported_instances) - 1:
                 print(",",file=akr_file)
             else:
                 print(file=akr_file)

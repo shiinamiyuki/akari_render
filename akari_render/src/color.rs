@@ -1,4 +1,4 @@
-use crate::*;
+use crate::{sampler::Sampler, *};
 use serde::{Deserialize, Serialize};
 #[derive(Clone, Copy, Aggregate, Serialize, Deserialize, PartialEq, Eq, Debug)]
 pub enum RgbColorSpace {
@@ -47,6 +47,18 @@ impl SampledWavelengthsExpr {
             wavelengths: make_float4(0.0, 0.0, 0.0, 0.0),
             pdf: make_float4(1.0, 1.0, 1.0, 1.0),
         })
+    }
+}
+
+pub fn sample_wavelengths(
+    color_repr: ColorRepr,
+    _sampler: &dyn Sampler,
+) -> Expr<SampledWavelengths> {
+    match color_repr {
+        ColorRepr::Spectral => {
+            todo!()
+        }
+        ColorRepr::Rgb(_) => SampledWavelengthsExpr::rgb_wavelengths(),
     }
 }
 
@@ -500,8 +512,16 @@ pub fn aces_cg_to_aces_2065_1_mat() -> glam::Mat3 {
     ])
     .transpose()
 }
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct ColorPipeline {
     pub color_repr: ColorRepr,
     pub rgb_colorspace: RgbColorSpace,
+}
+impl Default for ColorPipeline {
+    fn default() -> Self {
+        Self {
+            color_repr: ColorRepr::Rgb(RgbColorSpace::SRgb),
+            rgb_colorspace: RgbColorSpace::SRgb,
+        }
+    }
 }

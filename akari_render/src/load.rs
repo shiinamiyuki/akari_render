@@ -142,7 +142,9 @@ impl SceneLoader {
             let t = glam::vec3(translate[0], translate[1], translate[2]);
             let r = glam::vec3(rotate[0], rotate[1], rotate[2]);
             let s = glam::vec3(scale[0], scale[1], scale[2]);
+            // dbg!(t,r,s);
             let r = glam::vec3(r.x.to_radians(), r.y.to_radians(), r.z.to_radians());
+
             if !is_camera {
                 m = glam::Mat4::from_scale(s) * m;
             }
@@ -164,6 +166,15 @@ impl SceneLoader {
                 unreachable!()
             }
             AffineTransform::from_matrix(&m)
+        } else if ty == nodes::MatrixTransform::ty() {
+            let mat = node.proxy::<nodes::MatrixTransform>(&self.graph).unwrap();
+            let mat = mat
+                .in_matrix
+                .iter()
+                .map(|n| *n.as_value().unwrap() as f32)
+                .collect::<Vec<_>>();
+            let m = glam::Mat4::from_cols_slice(&mat).transpose();
+            AffineTransform::from_matrix(&m)
         } else {
             panic!("Unsupported transform type: {}", ty);
         }
@@ -175,6 +186,7 @@ impl SceneLoader {
             let cam = node.proxy::<nodes::PerspectiveCamera>(&self.graph).unwrap();
             let transform = self.load_transform(&cam.in_transform.as_node().unwrap().from, true);
             let fov = (*cam.in_fov.as_value().unwrap() as f32).to_radians();
+            dbg!(*cam.in_fov.as_value().unwrap() as f32);
             let focal_distance = *cam.in_focal_distance.as_value().unwrap() as f32;
             let fstop = *cam.in_fstop.as_value().unwrap() as f32;
             let lens_radius = focal_distance / (2.0 * fstop);
@@ -193,24 +205,26 @@ impl SceneLoader {
             todo!()
         }
     }
-    fn load_mesh(&self, node_id: &NodeId) -> (NodeId, MeshInstance) {
+    fn load_instance(&self, node_id: &NodeId) -> (NodeId, MeshInstance) {
         let node = &self.graph.nodes[node_id];
-        let ty = node.ty().unwrap();
-        if ty == nodes::Mesh::ty() {
-            let mesh = node.proxy::<nodes::Mesh>(&self.graph).unwrap();
-            let mat = mesh.in_material.as_node().unwrap();
-            let mat = self.graph.nodes[&mat.from]
-                .proxy::<nodes::MaterialOutput>(&self.graph)
-                .unwrap();
-            let surface_id = &mat.in_surface.as_node().unwrap().from;
-            let surface = self.nodes_to_surface_shader[surface_id];
-            let geom_id = self.node_to_mesh[node_id].0;
+        let instance = node.proxy::<nodes::Instance>(&self.graph).unwrap();
+        let mat = instance.in_material.as_node().unwrap();
+        let mat = self.graph.nodes[&mat.from]
+            .proxy::<nodes::MaterialOutput>(&self.graph)
+            .unwrap();
+        let surface_id = &mat.in_surface.as_node().unwrap().from;
+        let surface = self.nodes_to_surface_shader[surface_id];
+        let transform = self.load_transform(&instance.in_transform.as_node().unwrap().from, false);
+        let geometry_node_id = &instance.in_geometry.as_node().unwrap().from;
+        let geometry_node = &self.graph.nodes[geometry_node_id];
+        if geometry_node.ty().unwrap() == nodes::Mesh::ty() {
+            let geom_id = self.node_to_mesh[geometry_node_id].0;
             let mesh_buffer = &self.mesh_buffers[geom_id];
             (
                 surface_id.clone(),
                 MeshInstance {
                     geom_id: geom_id as u32,
-                    transform: AffineTransform::from_matrix(&glam::Mat4::IDENTITY),
+                    transform,
                     light: TagIndex::INVALID,
                     surface,
                     has_normals: mesh_buffer.has_normals,
@@ -269,13 +283,13 @@ impl SceneLoader {
             let camera = self.load_camera(camera);
             self.camera = Some(camera);
         }
-        let mesh_nodes = scene
-            .in_geometries
+        let instance_nodes = scene
+            .in_instances
             .iter()
             .map(|n| n.as_node().unwrap().from.clone())
             .collect::<Vec<_>>();
-        for mesh in &mesh_nodes {
-            let (surface, instance) = self.load_mesh(mesh);
+        for instance in &instance_nodes {
+            let (surface, instance) = self.load_instance(instance);
             instances.push(instance);
             instance_surfaces.push(surface);
         }
@@ -285,7 +299,11 @@ impl SceneLoader {
         for (i, inst) in instances.iter_mut().enumerate() {
             let power = self.estimate_surface_emission_power(inst, &instance_surfaces[i]);
             if 0.0 < power && power <= 1e-4 {
-                log::warn!("Light power too low: {}, power: {}", mesh_nodes[i].0, power);
+                log::warn!(
+                    "Light power too low: {}, power: {}",
+                    instance_nodes[i].0,
+                    power
+                );
             }
             if power > 1e-4 {
                 let light_id = lights.len();
@@ -317,6 +335,11 @@ impl SceneLoader {
         {
             // TODO: add other lights
         }
+        log::info!(
+            "Building accel for {} meshes, {} instances",
+            self.meshes.len(),
+            instances.len()
+        );
         let mesh_aggregate = Arc::new(MeshAggregate::new(
             self.device.clone(),
             &self.mesh_buffers.iter().collect::<Vec<_>>(),
@@ -329,8 +352,7 @@ impl SceneLoader {
                 .downcast_mut::<AreaLight>()
                 .unwrap();
             let instance = &instances[area.instance_id as usize];
-            area.area_sampling_index =
-                mesh_aggregate.mesh_id_to_area_samplers[&instance.geom_id];
+            area.area_sampling_index = mesh_aggregate.mesh_id_to_area_samplers[&instance.geom_id];
         }
         let light_weights = lights.iter().map(|(_, power)| *power).collect::<Vec<_>>();
         let Self {
@@ -397,6 +419,7 @@ impl SceneLoader {
                     .collect::<HashMap<_, _>>();
                 log::info!("Loading mesh: {}", mesh.in_name.as_value().unwrap());
                 let vertices = load_buffer::<PackedFloat3>(&file_resolver, &buffers["vertices"]);
+                dbg!(&vertices);
                 let normals = load_buffer::<PackedFloat3>(&file_resolver, &buffers["normals"]);
                 let indices = load_buffer::<PackedUint3>(&file_resolver, &buffers["indices"]);
                 let mut uvs = vec![];

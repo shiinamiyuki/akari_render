@@ -1,4 +1,4 @@
-use std::any::Any;
+use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -69,11 +69,11 @@ impl<'a> SvmEvaluator<'a> {
         let idx = node.index as usize;
         let node = &self.shader.nodes[idx];
         match node {
-            svm::SvmNode::Float(f) => {
+            svm::SvmNode::Float(_) => {
                 let value = self.get_node_expr::<SvmFloat>(idx as u32).value();
                 Box::new(value)
             }
-            svm::SvmNode::Float3(f3) => {
+            svm::SvmNode::Float3(_) => {
                 let value = self.get_node_expr::<SvmFloat3>(idx as u32).value().unpack();
                 Box::new(value)
             }
@@ -118,40 +118,45 @@ impl<'a> SvmEvaluator<'a> {
             }
         }
     }
-    fn eval(&self, node: SvmNodeRef) -> &dyn Any {
-        &self.env[&node]
+    fn eval<T: Any + Clone>(&self, node: SvmNodeRef) -> T {
+        let any = self
+            .env
+            .get(&node)
+            .unwrap_or_else(|| panic!("Node {:?} not evaluated", node));
+        let any = any.as_ref();
+        let type_id = std::any::TypeId::of::<T>();
+        if any.type_id() != type_id {
+            panic!(
+                "Node {:?} evaluated as {:?}, expected {:?}",
+                node,
+                any.type_id(),
+                type_id
+            );
+        }
+        any.downcast_ref::<T>().cloned().unwrap()
     }
     pub fn eval_float(&self, node: SvmNodeRef) -> Expr<f32> {
         self.eval(node)
-            .downcast_ref::<Expr<f32>>()
-            .copied()
-            .unwrap()
     }
     pub fn eval_float3(&self, node: SvmNodeRef) -> Expr<Float3> {
         self.eval(node)
-            .downcast_ref::<Expr<Float3>>()
-            .copied()
-            .unwrap()
     }
     pub fn eval_float4(&self, node: SvmNodeRef) -> Expr<Float4> {
         self.eval(node)
-            .downcast_ref::<Expr<Float4>>()
-            .copied()
-            .unwrap()
     }
     pub fn eval_color(&self, node: SvmNodeRef) -> Color {
-        self.eval(node).downcast_ref::<Color>().copied().unwrap()
+        self.eval(node)
     }
     pub fn eval_bsdf_closure(&self, node: SvmNodeRef) -> Rc<dyn Surface> {
         self.eval(node)
-            .downcast_ref::<Rc<dyn Surface>>()
-            .cloned()
-            .unwrap()
     }
     pub fn eval_shader(mut self) -> Box<dyn Any> {
         let nodes = &self.shader.nodes;
+        // dbg!(nodes);
         for i in 0..nodes.len() {
-            self.do_eval(SvmNodeRef { index: i as u32 });
+            let v = self.do_eval(SvmNodeRef { index: i as u32 });
+            let old = self.env.insert(SvmNodeRef { index: i as u32 }, v);
+            assert!(old.is_none());
         }
         let last_idx = nodes.len() - 1;
         self.env

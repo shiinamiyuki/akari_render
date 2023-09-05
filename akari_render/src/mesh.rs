@@ -227,13 +227,14 @@ impl MeshAggregate {
     }
     pub fn triangle(&self, inst_id: Uint, prim_id: Uint) -> Triangle {
         let inst = self.mesh_instances.read(inst_id);
+        let transform = inst.transform();
         let geom_id = inst.geom_id();
         let vertices = self.mesh_vertices.buffer(geom_id);
         let indices = self.mesh_indices.buffer(geom_id);
         let i = indices.read(prim_id);
-        let v0 = vertices.read(i.x()).unpack();
-        let v1 = vertices.read(i.y()).unpack();
-        let v2 = vertices.read(i.z()).unpack();
+        let v0 = transform.transform_point(vertices.read(i.x()).unpack());
+        let v1 = transform.transform_point(vertices.read(i.y()).unpack());
+        let v2 = transform.transform_point(vertices.read(i.z()).unpack());
         Triangle { v0, v1, v2 }
     }
     pub fn shading_triangle(&self, inst_id: Uint, prim_id: Uint) -> ShadingTriangle {
@@ -242,9 +243,10 @@ impl MeshAggregate {
         let vertices = self.mesh_vertices.buffer(geom_id);
         let indices = self.mesh_indices.buffer(geom_id);
         let i = indices.read(prim_id);
-        let v0 = vertices.read(i.x()).unpack();
-        let v1 = vertices.read(i.y()).unpack();
-        let v2 = vertices.read(i.z()).unpack();
+        let transform: geometry::AffineTransformExpr = inst.transform();
+        let v0 = transform.transform_point(vertices.read(i.x()).unpack());
+        let v1 = transform.transform_point(vertices.read(i.y()).unpack());
+        let v2 = transform.transform_point(vertices.read(i.z()).unpack());
         let prim_id3 = prim_id * 3;
         let (uv0, uv1, uv2) = if_!(
             inst.has_uvs(),
@@ -268,9 +270,9 @@ impl MeshAggregate {
             inst.has_normals(),
             {
                 let normals = self.mesh_normals.buffer(geom_id);
-                let n0 = normals.read(prim_id3 + 0).unpack();
-                let n1 = normals.read(prim_id3 + 1).unpack();
-                let n2 = normals.read(prim_id3 + 2).unpack();
+                let n0 = transform.transform_normal(normals.read(prim_id3 + 0).unpack());
+                let n1 = transform.transform_normal(normals.read(prim_id3 + 1).unpack());
+                let n2 = transform.transform_normal(normals.read(prim_id3 + 2).unpack());
                 (n0, n1, n2)
             },
             else,
@@ -281,9 +283,9 @@ impl MeshAggregate {
             {
                 let tangents = self.mesh_tangents.buffer(geom_id);
                 let bitangent_signs = self.mesh_bitangent_signs.buffer(geom_id);
-                let t0 = tangents.read(prim_id3 + 0).unpack();
-                let t1 = tangents.read(prim_id3 + 1).unpack();
-                let t2 = tangents.read(prim_id3 + 2).unpack();
+                let t0 = transform.transform_vector(tangents.read(prim_id3 + 0).unpack());
+                let t1 = transform.transform_vector(tangents.read(prim_id3 + 1).unpack());
+                let t2 = transform.transform_vector(tangents.read(prim_id3 + 2).unpack());
                 let get_sign = |i: u32| {
                     let j = prim_id3 + i;
                     let sign = bitangent_signs.read(j / 32);

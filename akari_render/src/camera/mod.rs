@@ -9,6 +9,7 @@ pub trait Camera {
         pixel: Expr<Uint2>,
         sampler: &dyn Sampler,
         color_repr: ColorRepr,
+        swl: Expr<SampledWavelengths>,
     ) -> (Expr<Ray>, Color, Expr<f32>);
 }
 pub struct PerspectiveCamera {
@@ -65,6 +66,7 @@ impl Camera for PerspectiveCamera {
         pixel: Expr<Uint2>,
         sampler: &dyn Sampler,
         color_repr: ColorRepr,
+        _swl: Expr<SampledWavelengths>,
     ) -> (Expr<Ray>, Color, Expr<f32>) {
         let camera = self.data.var().read(0);
         let fpixel = pixel.float() + make_float2(0.5, 0.5);
@@ -83,6 +85,7 @@ impl Camera for PerspectiveCamera {
         );
         ray = ray.set_o(camera.c2w().transform_point(ray.o()));
         ray = ray.set_d(camera.c2w().transform_vector(ray.d()));
+        // cpu_dbg!(ray);
         (ray, Color::one(color_repr), w)
     }
 }

@@ -39,6 +39,7 @@ impl CompilerDriver {
         let expected_offsets = &shader.node_offset;
         let mut base_offset = 0;
         assert!(shader.nodes.len() > 0);
+        // dbg!(&shader.nodes);
         for (i, node) in shader.nodes.iter().enumerate() {
             let offset = match node {
                 SvmNode::Float(n) => self.push_data(*n),

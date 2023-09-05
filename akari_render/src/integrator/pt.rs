@@ -126,7 +126,18 @@ impl PathTracer {
         sampler: &dyn Sampler,
         eval: &Evaluators,
     ) -> Color {
-        todo!()
+        let si = scene.intersect(ray);
+        if_!(
+            si.valid(),
+            {
+                let n = si.geometry().ng();
+                // cpu_dbg!(n);
+                let c = n;// * 0.5 + 0.5;
+                // cpu_dbg!(c);
+                Color::from_flat(eval.color_repr(), make_float4(c.x(), c.y(), c.z(), 0.0))
+            },
+            { Color::zero(eval.color_repr()) }
+        )
     }
 }
 impl Integrator for PathTracer {
@@ -159,11 +170,13 @@ impl Integrator for PathTracer {
                     let ip = p.int();
                     let shifted = ip + pixel_offset;
                     let shifted = shifted.clamp(0, const_(resolution).int() - 1).uint();
+                    let swl = sample_wavelengths(color_pipeline.color_repr, sampler);
                     let (ray, ray_color, ray_w) = scene.camera.generate_ray(
                         film.filter(),
                         shifted,
                         sampler,
                         color_pipeline.color_repr,
+                        swl,
                     );
                     let l = self.radiance(&scene, ray, sampler, &evaluators) * ray_color;
                     film.add_sample(p.float(), &l, ray_w);

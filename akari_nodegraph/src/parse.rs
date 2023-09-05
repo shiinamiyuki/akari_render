@@ -197,7 +197,7 @@ impl<'a> Parser<'a> {
             }
             if is_float {
                 return Ok(Value::Float(
-                    sign as f64 * ((int_part as f64 + frac_part) * 10f64.powi(frac_exp)),
+                    sign as f64 * ((int_part as f64 + frac_part * 10f64.powi(frac_exp))),
                 ));
             } else {
                 return Ok(Value::Int(int_part * sign));

@@ -48,6 +48,11 @@ pub struct Evaluators {
     pub surface: SurfaceEvaluator,
     pub light: LightEvaluator,
 }
+impl Evaluators {
+    pub fn color_repr(&self) -> ColorRepr {
+        self.color_pipeline.color_repr
+    }
+}
 
 impl Scene {
     pub fn evaluators(&self, color_pipeline: ColorPipeline) -> Evaluators {

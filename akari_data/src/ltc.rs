@@ -1,6 +1,6 @@
 use super::GgxLtcfit;
 #[allow(dead_code)]
-pub const GGX_LTC_FIT: GgxLtcfit = GgxLtcfit {
+pub static GGX_LTC_FIT: GgxLtcfit = GgxLtcfit {
     mat: [
         [
             0.000020, 0.000000, 0.000000, 0.000000, 0.000020, 0.000000, 0.000000, 0.000000,

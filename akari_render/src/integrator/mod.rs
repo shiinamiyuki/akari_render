@@ -11,13 +11,6 @@ use crate::{
 };
 
 #[derive(Clone, Debug)]
-pub struct PipelineConfig {
-    pub color: ColorRepr,
-    pub sampler: SamplerConfig,
-    pub film: FilmConfig,
-}
-
-#[derive(Clone, Debug)]
 pub struct RenderOptions {
     pub save_intermediate: bool, // save intermediate results
     pub session: String,
@@ -64,8 +57,8 @@ pub mod pt;
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum Method {
-    // #[serde(rename = "pt")]
-    // PathTracer(pt::Config),
+    #[serde(rename = "pt")]
+    PathTracer(pt::Config),
     // #[serde(rename = "gpt")]
     // GradientPathTracer(gpt::Config),
     // #[serde(rename = "mcmc")]
@@ -96,8 +89,8 @@ fn defaultcolor() -> String {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct RenderConfig {
     pub method: Method,
-    #[serde(default = "defaultcolor")]
-    pub color: String,
+    #[serde(default)]
+    pub color: ColorPipeline,
     #[serde(default = "SamplerConfig::default")]
     pub sampler: SamplerConfig,
     pub film: FilmConfig,
@@ -128,27 +121,18 @@ pub fn render(device: Device, scene: Arc<Scene>, task: &RenderTask, options: Ren
             scene.camera.resolution().y,
             1,
         );
-        let color_repr = match config.color.to_lowercase().as_str() {
-            "srgb" => ColorRepr::Rgb(RgbColorSpace::SRgb),
-            "aces" | "acescg" => ColorRepr::Rgb(RgbColorSpace::ACEScg),
-            "spectral" => ColorRepr::Spectral,
-            _ => {
-                log::error!("Unknown color representation: {}", config.color);
-                std::process::exit(1);
-            }
-        };
         log::info!("Rendering to {:?}", config.film);
         let tic = std::time::Instant::now();
         match &config.method {
-            // Method::PathTracer(c) => pt::render(
-            //     device.clone(),
-            //     scene.clone(),
-            //     config.sampler,
-            //     color_repr,
-            //     &mut film,
-            //     &c,
-            //     &options,
-            // ),
+            Method::PathTracer(c) => pt::render(
+                device.clone(),
+                scene.clone(),
+                config.sampler,
+                config.color,
+                &mut film,
+                &c,
+                &options,
+            ),
             // Method::GradientPathTracer(c) => gpt::render(
             //     device.clone(),
             //     scene.clone(),
