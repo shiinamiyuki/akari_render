@@ -2,12 +2,12 @@ use std::f32::consts::{FRAC_1_PI, PI};
 use std::rc::Rc;
 
 use super::BsdfEvalContext;
-use super::{Surface, BsdfSample, SurfaceShader};
+use super::{BsdfSample, Surface, SurfaceShader};
 use crate::color::Color;
 use crate::geometry::Frame;
 use crate::sampling::cos_sample_hemisphere;
-use crate::svm::surface::SampledWavelengths;
 use crate::svm::eval::SvmEvaluator;
+use crate::svm::surface::SampledWavelengths;
 use crate::svm::*;
 
 pub struct DiffuseBsdf {
@@ -79,6 +79,14 @@ impl Surface for DiffuseBsdf {
         _ctx: &BsdfEvalContext,
     ) -> Expr<f32> {
         const_(1.0f32)
+    }
+    fn emission(
+        &self,
+        _wo: Expr<Float3>,
+        _swl: Expr<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> Color {
+        Color::zero(ctx.color_repr)
     }
 }
 impl SurfaceShader for SvmDiffuseBsdf {

@@ -18,6 +18,23 @@ fn gen_nodegraph_defs() {
             "Spectral".to_string(),
         ],
     };
+    let texture_interp = Enum {
+        name: "TextureInterpolation".to_string(),
+        variants: vec![
+            "Linear".to_string(),
+            "Closest".to_string(),
+        ],
+    };
+    let texture_extension = Enum {
+        name: "TextureExtension".to_string(),
+        variants: vec![
+            "Repeat".to_string(),
+            "Clip".to_string(),
+            "Mirror".to_string(),
+            "Extend".to_string(),
+        ],
+    };
+
     let texture_nodes = vec![
         NodeDesc {
             name: "RGBImageTexture".to_string(),
@@ -32,6 +49,16 @@ fn gen_nodegraph_defs() {
                     name: "colorspace".to_string(),
                     kind: SocketKind::Enum(colorspace.name.clone()),
                     default: SocketValue::Enum("SRGB".to_string()),
+                },
+                InputSocketDesc {
+                    name: "extension".to_string(),
+                    kind: SocketKind::Enum(texture_extension.name.clone()),
+                    default: SocketValue::Enum("Repeat".to_string()),
+                },
+                InputSocketDesc {
+                    name: "interpolation".to_string(),
+                    kind: SocketKind::Enum(texture_interp.name.clone()),
+                    default: SocketValue::Enum("Linear".to_string()),
                 },
             ],
             outputs: vec![OutputSocketDesc {
@@ -139,7 +166,7 @@ fn gen_nodegraph_defs() {
     };
     let vec_math_nodes = vec![NodeDesc {
         name: "Vec3".to_string(),
-        category: "Bsdf".to_string(),
+        category: "Surface".to_string(),
         inputs: vec![
             create_float_input("x", 0.2),
             create_float_input("y", 0.2),
@@ -215,8 +242,20 @@ fn gen_nodegraph_defs() {
     }];
     let bsdf_nodes = vec![
         NodeDesc {
+            name: "Emission".to_string(),
+            category: "Surface".to_string(),
+            inputs: vec![
+                create_spectrum_input("color"),
+                create_float_input("strength", 1.0),
+            ],
+            outputs: vec![OutputSocketDesc {
+                name: "emission".to_string(),
+                kind: SocketKind::Node("Surface".to_string()),
+            }],
+        },
+        NodeDesc {
             name: "PrincipledBsdf".to_string(),
-            category: "Bsdf".to_string(),
+            category: "Surface".to_string(),
             inputs: vec![
                 create_spectrum_input("color"),
                 create_float_input("roughness", 0.2),
@@ -230,30 +269,43 @@ fn gen_nodegraph_defs() {
             ],
             outputs: vec![OutputSocketDesc {
                 name: "bsdf".to_string(),
-                kind: SocketKind::Node("Bsdf".to_string()),
+                kind: SocketKind::Node("Surface".to_string()),
             }],
         },
         NodeDesc {
             name: "DiffuseBsdf".to_string(),
-            category: "Bsdf".to_string(),
+            category: "Surface".to_string(),
             inputs: vec![create_spectrum_input("color")],
             outputs: vec![OutputSocketDesc {
                 name: "bsdf".to_string(),
-                kind: SocketKind::Node("Bsdf".to_string()),
+                kind: SocketKind::Node("Surface".to_string()),
+            }],
+        },
+        NodeDesc {
+            name: "GlassBsdf".to_string(),
+            category: "Surface".to_string(),
+            inputs: vec![
+                create_spectrum_input("color"),
+                create_float_input("roughness", 0.01),
+                create_float_input("ior", 1.45),
+            ],
+            outputs: vec![OutputSocketDesc {
+                name: "bsdf".to_string(),
+                kind: SocketKind::Node("Surface".to_string()),
             }],
         },
         NodeDesc {
             name: "MixBsdf".to_string(),
-            category: "Bsdf".to_string(),
+            category: "Surface".to_string(),
             inputs: vec![
                 InputSocketDesc {
                     name: "bsdf1".to_string(),
-                    kind: SocketKind::Node("Bsdf".to_string()),
+                    kind: SocketKind::Node("Surface".to_string()),
                     default: SocketValue::Node(None),
                 },
                 InputSocketDesc {
                     name: "bsdf2".to_string(),
-                    kind: SocketKind::Node("Bsdf".to_string()),
+                    kind: SocketKind::Node("Surface".to_string()),
                     default: SocketValue::Node(None),
                 },
                 InputSocketDesc {
@@ -264,7 +316,7 @@ fn gen_nodegraph_defs() {
             ],
             outputs: vec![OutputSocketDesc {
                 name: "bsdf".to_string(),
-                kind: SocketKind::Node("Bsdf".to_string()),
+                kind: SocketKind::Node("Surface".to_string()),
             }],
         },
         NodeDesc {
@@ -272,7 +324,7 @@ fn gen_nodegraph_defs() {
             category: "Material".to_string(),
             inputs: vec![InputSocketDesc {
                 name: "surface".to_string(),
-                kind: SocketKind::Node("Bsdf".to_string()),
+                kind: SocketKind::Node("Surface".to_string()),
                 default: SocketValue::Node(None),
             }],
             outputs: vec![OutputSocketDesc {
@@ -287,7 +339,7 @@ fn gen_nodegraph_defs() {
             category: "Light".to_string(),
             inputs: vec![InputSocketDesc {
                 name: "surface".to_string(),
-                kind: SocketKind::Node("Bsdf".to_string()),
+                kind: SocketKind::Node("Surface".to_string()),
                 default: SocketValue::Node(None),
             }],
             outputs: vec![OutputSocketDesc {
@@ -403,7 +455,13 @@ fn gen_nodegraph_defs() {
             }],
         },
     ];
-    let enums = vec![coordinate_system, colorspace, color_pipeline];
+    let enums = vec![
+        coordinate_system,
+        colorspace,
+        color_pipeline,
+        texture_extension,
+        texture_interp,
+    ];
     let mut nodes = vec![];
     nodes.extend(texture_nodes);
     nodes.extend(bsdf_nodes);

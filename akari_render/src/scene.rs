@@ -1,27 +1,14 @@
-use std::collections::HashMap;
-use std::f32::consts::PI;
-use std::fs::{self, File};
-use std::io::{Cursor, Read};
 use std::marker::PhantomData;
-use std::path::Path;
 use std::sync::Arc;
-use std::{path::PathBuf, rc::Rc};
 
-use luisa::runtime::api::Shader;
-use luisa::PixelStorage;
+use crate::color::{Color, ColorPipeline, ColorRepr, FlatColor, SampledWavelengths};
 
-use crate::camera::PerspectiveCamera;
-use crate::color::{
-    glam_srgb_to_linear, Color, ColorPipeline, ColorRepr, FlatColor, SampledWavelengths,
-};
-use crate::light::area::AreaLight;
 use crate::light::{
     FlatLightSample, FlatLightSampleExpr, LightAggregate, LightEvalContext, LightEvaluator,
-    WeightedLightDistribution,
 };
 
 use crate::svm::surface::{
-    BsdfEvalContext, BsdfSample, FlatBsdfSample, FlatSurfaceEvalResult, Surface, SurfaceEvaluator,
+    BsdfEvalContext, FlatBsdfSample, FlatSurfaceEvalResult, Surface, SurfaceEvaluator,
     SURFACE_EVAL_ALBEDO, SURFACE_EVAL_COLOR, SURFACE_EVAL_EMISSION, SURFACE_EVAL_PDF,
     SURFACE_EVAL_ROUGHNESS,
 };
@@ -30,7 +17,6 @@ use crate::{
     camera::Camera,
     geometry::*,
     interaction::*,
-    light::{Light, LightDistribution},
     mesh::*,
     *,
 };

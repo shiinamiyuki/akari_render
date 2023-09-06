@@ -7,9 +7,11 @@ use std::{
 use crate::{util::round_to, *};
 use luisa::runtime::api::Shader;
 use sha2::{Digest, Sha256};
-pub mod surface;
+
+use self::surface::{EmissiveSurface, SurfaceShader};
 pub mod compiler;
 pub mod eval;
+pub mod surface;
 pub mod texture;
 #[derive(Clone, Copy, Debug, Value, Hash, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(C)]
@@ -141,6 +143,29 @@ impl SvmGlassBsdf {
 }
 #[derive(Clone, Copy, Debug, Value)]
 #[repr(C)]
+pub struct SvmEmission {
+    pub color: SvmNodeRef,
+    pub strength: SvmNodeRef,
+}
+impl SvmEmission {
+    pub fn hash<H: Digest>(&self, hasher: &mut H) {
+        hasher.update(type_id_u64::<Self>().to_le_bytes());
+        self.color.hash(hasher);
+        self.strength.hash(hasher);
+    }
+}
+impl SurfaceShader for SvmEmission {
+    fn closure(&self, svm_eval: &eval::SvmEvaluator<'_>) -> std::rc::Rc<dyn surface::Surface> {
+        let color = svm_eval.eval_color(self.color);
+        let strength = svm_eval.eval_float(self.strength);
+        std::rc::Rc::new(EmissiveSurface {
+            inner: None,
+            emission: color * strength,
+        })
+    }
+}
+#[derive(Clone, Copy, Debug, Value)]
+#[repr(C)]
 pub struct SvmPrincipledBsdf {
     pub color: SvmNodeRef,
     pub metallic: SvmNodeRef,
@@ -150,6 +175,7 @@ pub struct SvmPrincipledBsdf {
     pub clearcoat_roughness: SvmNodeRef,
     pub eta: SvmNodeRef,
     pub transmission: SvmNodeRef,
+    pub emission: SvmNodeRef,
 }
 impl SvmPrincipledBsdf {
     pub fn hash<H: Digest>(&self, hasher: &mut H) {
@@ -183,7 +209,9 @@ pub enum SvmNode {
     RgbTex(SvmRgbTex),
     RgbImageTex(SvmRgbImageTex),
     SpectralUplift(SvmSpectralUplift),
+    Emission(SvmEmission),
     DiffuseBsdf(SvmDiffuseBsdf),
+    GlassBsdf(SvmGlassBsdf),
     PrincipledBsdf(SvmPrincipledBsdf),
     MaterialOutput(SvmMaterialOutput),
 }
@@ -196,7 +224,9 @@ impl SvmNode {
             SvmNode::RgbTex(x) => x.hash(hasher),
             SvmNode::RgbImageTex(x) => x.hash(hasher),
             SvmNode::SpectralUplift(x) => x.hash(hasher),
+            SvmNode::Emission(x) => x.hash(hasher),
             SvmNode::DiffuseBsdf(x) => x.hash(hasher),
+            SvmNode::GlassBsdf(x) => x.hash(hasher),
             SvmNode::PrincipledBsdf(x) => x.hash(hasher),
             SvmNode::MaterialOutput(x) => x.hash(hasher),
         }
@@ -209,7 +239,9 @@ impl SvmNode {
             SvmNode::RgbTex(_) => Layout::new::<SvmRgbTex>(),
             SvmNode::RgbImageTex(_) => Layout::new::<SvmRgbImageTex>(),
             SvmNode::SpectralUplift(_) => Layout::new::<SvmSpectralUplift>(),
+            SvmNode::Emission(_) => Layout::new::<SvmEmission>(),
             SvmNode::DiffuseBsdf(_) => Layout::new::<SvmDiffuseBsdf>(),
+            SvmNode::GlassBsdf(_) => Layout::new::<SvmGlassBsdf>(),
             SvmNode::PrincipledBsdf(_) => Layout::new::<SvmPrincipledBsdf>(),
             SvmNode::MaterialOutput(_) => Layout::new::<SvmMaterialOutput>(),
         }
@@ -240,6 +272,15 @@ impl CompiledShader {
             offset += node.layout().size();
         }
         let hash = compiler::shader_hash(&nodes);
+        // {
+        //     // debug
+        //     // convert hash to string
+        //     let mut hash_str = String::new();
+        //     for byte in &hash {
+        //         hash_str.push_str(&format!("{:02x}", byte));
+        //     }
+        //     println!("shader hash: {}", hash_str);
+        // }
         Self {
             nodes,
             node_offset,

@@ -4,12 +4,18 @@ use luisa_compute as luisa;
 use std::{env::current_exe, fs::File, process::exit};
 
 fn main() {
-    luisa::init_logger();
     let mut cmd = Command::new("akari_cli")
         .arg(arg!(-s --scene <SCENE> "Scene file to render"))
         .arg(arg!(-m --method <METHOD> "Render method config file"))
         .arg(
             arg!(-d --device <DEVICE> "Compute device. One of: cpu, cuda, dx, metal. Default: cpu"),
+        )
+        .arg(
+            Arg::new("verbose")
+                .long("verbose")
+                .short('v')
+                .action(ArgAction::SetTrue)
+                .value_parser(BoolishValueParser::new()),
         )
         .arg(
             Arg::new("save-intermediate")
@@ -36,6 +42,12 @@ fn main() {
         .get_one::<String>("device")
         .cloned()
         .unwrap_or("cpu".to_string());
+    let verbose = matches.get_one::<bool>("verbose").copied();
+    if let Some(true) = verbose {
+        luisa::init_logger_verbose();
+    } else {
+        luisa::init_logger();
+    }
     let ctx = luisa::Context::new(current_exe().unwrap());
     let device = ctx.create_device(&device);
     let method = method.unwrap();

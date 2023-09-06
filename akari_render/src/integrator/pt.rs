@@ -5,10 +5,276 @@ use rand::Rng;
 
 use super::{Integrator, RenderOptions};
 use crate::{
-    color::*, film::*, geometry::*, interaction::SurfaceInteraction, sampler::*, scene::*,
-    svm::surface::*, *,
+    color::*, film::*, geometry::*, interaction::SurfaceInteraction, mesh::MeshInstance,
+    sampler::*, scene::*, svm::surface::*, *,
 };
 use serde::{Deserialize, Serialize};
+
+pub struct PathTracerState<'a> {
+    pub max_depth: u32,
+    pub use_nee: bool,
+    pub rr_depth: u32,
+    pub indirect_only: bool,
+    pub radiance: ColorVar,
+    pub beta: ColorVar,
+    pub color_pipeline: ColorPipeline,
+    pub depth: Var<u32>,
+    pub si: Var<SurfaceInteraction>,
+    pub prev_bsdf_pdf: Var<f32>,
+    pub prev_ng: Var<Float3>,
+    pub swl: Var<SampledWavelengths>,
+    pub eval: &'a Evaluators,
+    pub scene: &'a Scene,
+
+    //
+    pub instance: Var<MeshInstance>,
+    pub p: Var<Float3>,
+    pub wo: Var<Float3>,
+    pub ns: Var<Float3>,
+    pub ng: Var<Float3>,
+}
+#[derive(Aggregate)]
+pub struct DirectLighting {
+    pub irradiance: Color,
+    pub bsdf_f: Color,
+    pub weight: Expr<f32>,
+    pub wi: Expr<Float3>,
+    pub pdf: Expr<f32>,
+    pub shadow_ray: Expr<Ray>,
+    pub valid: Expr<bool>,
+}
+impl DirectLighting {
+    pub fn invalid(color_pipeline: ColorPipeline) -> Self {
+        Self {
+            irradiance: Color::zero(color_pipeline.color_repr),
+            wi: Float3Expr::zero(),
+            pdf: const_(0.0f32),
+            weight: const_(0.0f32),
+            shadow_ray: zeroed::<Ray>(),
+            valid: const_(false),
+            bsdf_f: Color::zero(color_pipeline.color_repr),
+        }
+    }
+}
+pub trait GenericPathTracer {
+    fn add_radiance(&self, r: Color);
+    fn mul_beta(&self, r: Color);
+    fn next_intersection(&self, ray: Expr<Ray>) -> Expr<bool>;
+    fn sample_light(&self, sampler: &dyn Sampler) -> DirectLighting;
+    fn sample_surface(&self, sampler: &dyn Sampler) -> BsdfSample;
+    fn run_megakernel(&self, ray: Expr<Ray>, sampler: &dyn Sampler);
+    fn continue_prob(&self) -> (Expr<bool>, Expr<f32>);
+    fn hit_envmap(&self, ray: Expr<Ray>);
+    fn handle_surface_light(&self, ray: Expr<Ray>);
+}
+impl<'a> PathTracerState<'a> {
+    pub fn new(
+        scene: &'a Scene,
+        eval: &'a Evaluators,
+        max_depth: u32,
+        use_nee: bool,
+        rr_depth: u32,
+        indirect_only: bool,
+        swl: Var<SampledWavelengths>,
+    ) -> Self {
+        let color_pipeline = eval.color_pipeline;
+        Self {
+            max_depth,
+            use_nee,
+            rr_depth,
+            indirect_only,
+            radiance: ColorVar::zero(color_pipeline.color_repr),
+            beta: ColorVar::one(color_pipeline.color_repr),
+            color_pipeline,
+            eval,
+            scene,
+            depth: var!(u32, 0),
+            si: var!(SurfaceInteraction),
+            prev_bsdf_pdf: var!(f32),
+            prev_ng: var!(Float3),
+            swl,
+            instance: var!(MeshInstance),
+            p: var!(Float3),
+            wo: var!(Float3),
+            ns: var!(Float3),
+            ng: var!(Float3),
+        }
+    }
+}
+impl<'a> GenericPathTracer for PathTracerState<'a> {
+    fn add_radiance(&self, r: Color) {
+        self.radiance
+            .store(self.radiance.load() + self.beta.load() * r);
+    }
+    fn mul_beta(&self, r: Color) {
+        self.beta.store(self.beta.load() * r);
+    }
+
+    fn next_intersection(&self, ray: Expr<Ray>) -> Expr<bool> {
+        let si = self.scene.intersect(ray);
+        if_!(
+            si.valid(),
+            {
+                self.si.store(si);
+                let g = si.geometry();
+                *self.p.get_mut() = g.p();
+                *self.ns.get_mut() = g.ns();
+                *self.ng.get_mut() = g.ng();
+                *self.wo.get_mut() = -ray.d();
+                let inst_id = si.inst_id();
+                let instance = self.scene.meshes.mesh_instances.var().read(inst_id);
+                *self.instance.get_mut() = instance;
+                const_(true)
+            },
+            else,
+            { const_(false) }
+        )
+    }
+    fn sample_surface(&self, sampler: &dyn Sampler) -> BsdfSample {
+        let surface = *self.instance.surface();
+        let u_bsdf = sampler.next_3d();
+        let sample = self
+            .eval
+            .surface
+            .sample(surface, *self.si, *self.wo, u_bsdf, self.swl);
+        sample
+    }
+    fn sample_light(&self, sampler: &dyn Sampler) -> DirectLighting {
+        if self.use_nee {
+            if_!(
+                !self.indirect_only | self.depth.load().cmpgt(1),
+                {
+                    let p = *self.p;
+                    let ng = *self.ng;
+                    let pn = PointNormalExpr::new(p, ng);
+                    let eval = self.eval;
+                    let sample = eval.light.sample(pn, sampler.next_3d(), *self.swl);
+                    let wi = sample.wi;
+                    let surface = *self.instance.surface();
+                    let wo = *self.wo;
+                    let (bsdf_f, bsdf_pdf) = eval
+                        .surface
+                        .evaluate_color_and_pdf(surface, *self.si, wo, wi, *self.swl);
+                    lc_assert!(bsdf_pdf.cmpge(0.0));
+                    lc_assert!(bsdf_f.min().cmpge(0.0));
+                    let w = mis_weight(sample.pdf, bsdf_pdf, 1);
+                    let shadow_ray = sample
+                        .shadow_ray
+                        .set_exclude0(make_uint2(*self.si.inst_id(), *self.si.prim_id()));
+                    DirectLighting {
+                        weight: w,
+                        irradiance: sample.li,
+                        wi,
+                        pdf: sample.pdf,
+                        shadow_ray,
+                        valid: const_(true),
+                        bsdf_f,
+                    }
+                },
+                else,
+                { DirectLighting::invalid(self.color_pipeline) }
+            )
+        } else {
+            DirectLighting::invalid(self.color_pipeline)
+        }
+    }
+    fn continue_prob(&self) -> (Expr<bool>, Expr<f32>) {
+        let depth = &self.depth;
+        let beta = &self.beta;
+        if_!(
+            depth.load().cmpgt(self.rr_depth),
+            {
+                let cont_prob = beta.load().max().clamp(0.0, 1.0) * 0.95;
+                (true.into(), cont_prob)
+            },
+            { (false.into(), const_(1.0f32)) }
+        )
+    }
+    fn hit_envmap(&self, ray: Expr<Ray>) {}
+    fn handle_surface_light(&self, ray: Expr<Ray>) {
+        let instance = *self.instance;
+        let eval = self.eval;
+        let depth = &self.depth;
+
+        if_!(
+            instance.light().valid() & (!self.indirect_only | depth.cmpgt(1)),
+            {
+                let si = *self.si;
+                let direct = eval.light.le(ray, si, *self.swl);
+                // cpu_dbg!(direct.flatten());
+                if_!(depth.cmpeq(0) | !self.use_nee, {
+                    self.add_radiance(direct);
+                }, else {
+                    let pn = {
+                        let p = ray.o();
+                        let n = *self.prev_ng;
+                        PointNormalExpr::new(p, n)
+                    };
+                    let light_pdf = eval.light.pdf(si, pn, *self.swl);
+                    let w = mis_weight(*self.prev_bsdf_pdf, light_pdf, 1);
+
+                    self.add_radiance(direct * w);
+                })
+            }
+        );
+    }
+    fn run_megakernel(&self, ray: Expr<Ray>, sampler: &dyn Sampler) {
+        let ray = var!(Ray, ray);
+        loop_!({
+            let hit = self.next_intersection(*ray);
+            if_!(!hit, {
+                self.hit_envmap(*ray);
+                break_();
+            });
+            self.handle_surface_light(*ray);
+            *self.depth.get_mut() += 1;
+            if_!(self.depth.load().cmpge(self.max_depth), {
+                break_();
+            });
+            
+
+            let direct_lighting = self.sample_light(sampler);
+            if_!(direct_lighting.valid, {
+                let shadow_ray = direct_lighting.shadow_ray;
+                if_!(!self.scene.occlude(shadow_ray), {
+                    let direct = direct_lighting.irradiance
+                        * direct_lighting.bsdf_f
+                        * direct_lighting.weight
+                        / direct_lighting.pdf;
+                    self.add_radiance(direct);
+                });
+            });
+            let bsdf_sample = self.sample_surface(sampler);
+            let f = &bsdf_sample.color;
+            lc_assert!(f.min().cmpge(0.0));
+            if_!(bsdf_sample.pdf.cmple(0.0) | !bsdf_sample.valid, {
+                break_();
+            });
+            self.mul_beta(f / bsdf_sample.pdf);
+            let (rr_effective, cont_prob) = self.continue_prob();
+            if_!(rr_effective, {
+                let rr = sampler.next_1d().cmpge(cont_prob);
+                if_!(rr, {
+                    break_();
+                });
+                self.mul_beta(Color::one(self.color_pipeline.color_repr) / cont_prob);
+            });
+            {
+                *self.prev_bsdf_pdf.get_mut() = bsdf_sample.pdf;
+                *self.prev_ng.get_mut() = *self.ng;
+                let ro = offset_ray_origin(*self.p, face_forward(*self.ng, bsdf_sample.wi));
+                *ray.get_mut() = RayExpr::new(
+                    ro,
+                    bsdf_sample.wi,
+                    0.0,
+                    1e20,
+                    make_uint2(*self.si.inst_id(), *self.si.prim_id()),
+                    make_uint2(u32::MAX, u32::MAX),
+                );
+            }
+        })
+    }
+}
 #[derive(Clone)]
 pub struct PathTracer {
     pub device: Device,
@@ -122,22 +388,22 @@ impl PathTracer {
     pub fn radiance(
         &self,
         scene: &Arc<Scene>,
-        ray: Expr<Ray>,
-        sampler: &dyn Sampler,
         eval: &Evaluators,
+        ray: Expr<Ray>,
+        swl: Var<SampledWavelengths>,
+        sampler: &dyn Sampler,
     ) -> Color {
-        let si = scene.intersect(ray);
-        if_!(
-            si.valid(),
-            {
-                let n = si.geometry().ng();
-                // cpu_dbg!(n);
-                let c = n;// * 0.5 + 0.5;
-                // cpu_dbg!(c);
-                Color::from_flat(eval.color_repr(), make_float4(c.x(), c.y(), c.z(), 0.0))
-            },
-            { Color::zero(eval.color_repr()) }
-        )
+        let pt = PathTracerState::new(
+            scene,
+            eval,
+            self.max_depth,
+            self.use_nee,
+            self.rr_depth,
+            self.indirect_only,
+            swl,
+        );
+        pt.run_megakernel(ray, sampler);
+        pt.radiance.load()
     }
 }
 impl Integrator for PathTracer {
@@ -178,8 +444,10 @@ impl Integrator for PathTracer {
                         color_pipeline.color_repr,
                         swl,
                     );
-                    let l = self.radiance(&scene, ray, sampler, &evaluators) * ray_color;
-                    film.add_sample(p.float(), &l, ray_w);
+                    let swl = def(swl);
+                    let l = self.radiance(&scene, &evaluators, ray, swl, sampler)
+                        * ray_color;
+                    film.add_sample(p.float(), &l, *swl, ray_w);
                 });
             },
         );

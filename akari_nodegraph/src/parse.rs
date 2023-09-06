@@ -306,7 +306,15 @@ impl<'a> Parser<'a> {
                 self.skip_whitespace();
                 let mut v = self.parse_value(None)?;
                 if let Value::NodeId(id) = v {
-                    let node = &self.graph.nodes[&id];
+                    let node = self.graph.nodes.get(&id);
+                    if node.is_none() {
+                        return Err(ParseError {
+                            msg: format!("unknown node: {}", id.0),
+                            line: self.line,
+                            col: self.col,
+                        });
+                    }
+                    let node = node.unwrap();
                     if node.outputs.len() != 1 {
                         return Err(ParseError {
                             msg: format!(

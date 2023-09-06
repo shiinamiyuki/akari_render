@@ -7,7 +7,7 @@ use crate::*;
 use crate::{color::Color, svm::SvmPrincipledBsdfExpr};
 use std::f32::consts::FRAC_1_PI;
 
-use super::{BsdfEvalContext, SurfaceShader, FresnelSchlick, MicrofacetTransmission};
+use super::{BsdfEvalContext, FresnelSchlick, MicrofacetTransmission, SurfaceShader};
 
 fn schlick_weight(cos_theta: Expr<f32>) -> Expr<f32> {
     let m = (1.0 - cos_theta).clamp(0.0, 1.0);
@@ -109,6 +109,14 @@ impl Surface for DisneyDiffuseBsdf {
     ) -> Expr<f32> {
         self.roughness
     }
+    fn emission(
+        &self,
+        _wo: Expr<Float3>,
+        _swl: Expr<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> Color {
+        Color::zero(ctx.color_repr)
+    }
 }
 
 pub struct DisneyFresnel {
@@ -130,6 +138,7 @@ impl SurfaceShader for SvmPrincipledBsdf {
             let transmission_color = color;
             (color, transmission_color)
         };
+        let emission = svm_eval.eval_color(self.emission);
         let metallic = svm_eval.eval_float(self.metallic);
         let roughness = svm_eval.eval_float(self.roughness);
         let eta = svm_eval.eval_float(self.eta);
@@ -217,6 +226,9 @@ impl SurfaceShader for SvmPrincipledBsdf {
             bsdf_b: clearcoat_brdf,
             mode: BsdfBlendMode::Addictive,
         });
-        bsdf
+        Rc::new(EmissiveSurface {
+            inner: Some(bsdf),
+            emission,
+        })
     }
 }

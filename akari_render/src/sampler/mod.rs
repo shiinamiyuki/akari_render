@@ -427,31 +427,33 @@ lazy_static! {
     static ref PERMUTE_ELEMENT: Callable<(Expr<u32>, Expr<u32>, Expr<u32>, Expr<u32>), Expr<u32>> =
         create_static_callable::<(Expr<u32>, Expr<u32>, Expr<u32>, Expr<u32>), Expr<u32>>(
             |i: Expr<u32>, l: Expr<u32>, w: Expr<u32>, p: Expr<u32>| {
-                let i = var!(u32, i);
+                let i0 = var!(u32, i);
                 loop_!({
-                    *i.get_mut() ^= p;
-                    *i.get_mut() *= 0xe170893du32;
-                    *i.get_mut() ^= p >> 16u32;
-                    *i.get_mut() ^= (*i & w) >> 4u32;
-                    *i.get_mut() ^= p >> 8u32;
-                    *i.get_mut() *= 0x0929eb3fu32;
-                    *i.get_mut() ^= p >> 23u32;
-                    *i.get_mut() ^= (*i & w) >> 1u32;
-                    *i.get_mut() *= 1 | p >> 27u32;
-                    *i.get_mut() *= 0x6935fa69u32;
-                    *i.get_mut() ^= (*i & w) >> 11u32;
-                    *i.get_mut() *= 0x74dcb303u32;
-                    *i.get_mut() ^= (*i & w) >> 2u32;
-                    *i.get_mut() *= 0x9e501cc3u32;
-                    *i.get_mut() ^= (*i & w) >> 2u32;
-                    *i.get_mut() *= 0xc860a3dfu32;
-                    *i.get_mut() &= w;
-                    *i.get_mut() ^= *i >> 5u32;
+                    let mut i = *i0;
+                    i ^= p;
+                    i *= 0xe170893du32;
+                    i ^= p >> 16u32;
+                    i ^= (i & w) >> 4u32;
+                    i ^= p >> 8u32;
+                    i *= 0x0929eb3fu32;
+                    i ^= p >> 23u32;
+                    i ^= (i & w) >> 1u32;
+                    i *= 1 | p >> 27u32;
+                    i *= 0x6935fa69u32;
+                    i ^= (i & w) >> 11u32;
+                    i *= 0x74dcb303u32;
+                    i ^= (i & w) >> 2u32;
+                    i *= 0x9e501cc3u32;
+                    i ^= (i & w) >> 2u32;
+                    i *= 0xc860a3dfu32;
+                    i &= w;
+                    i ^= i >> 5u32;
+                    *i0.get_mut() = i;
                     if_!(i.cmplt(l), {
                         break_();
                     })
                 });
-                let i = *i;
+                let i = *i0;
                 (i + p) % l
             }
         );
@@ -510,8 +512,7 @@ impl Pmj02BnSampler {
                     ));
                     let index =
                         permute_element(*state.sample_index(), *state.spp(), *state.w(), hash);
-                    let delta =
-                        bluenoise(&bluenoise_textures, *state.dim(), *state.pixel());
+                    let delta = bluenoise(&bluenoise_textures, *state.dim(), *state.pixel());
                     *state.dim().get_mut() += 1;
                     ((index.float() + delta) / state.spp().float()).min(ONE_MINUS_EPSILON)
                 },
@@ -573,7 +574,7 @@ impl Sampler for Pmj02BnSampler {
         (self.next_2d).call(self.state)
         // make_float2(
         //     self.next_1d(),
-            // self.next_1d())
+        // self.next_1d())
     }
     fn start(&self) {
         *self.state.dim().get_mut() = 0u32.into();

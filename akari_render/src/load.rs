@@ -14,6 +14,7 @@ use crate::{
 };
 use akari_nodegraph::{parse, Node, NodeGraph, NodeGraphDesc, NodeId, NodeProxy};
 use image::io::Reader as ImageReader;
+
 use lazy_static::lazy_static;
 use luisa::PixelStorage;
 use std::{
@@ -41,6 +42,7 @@ pub struct SceneLoader {
     light_nodes: Vec<NodeId>,
     lights: PolymorphicBuilder<(), dyn Light>,
     nodes_to_surface_shader: HashMap<NodeId, ShaderRef>,
+    path_sampler_to_idx: HashMap<(String, luisa::Sampler), usize>,
 }
 fn load_buffer<T>(file_resolver: &dyn FileResolver, path: impl AsRef<Path>) -> Vec<T>
 where
@@ -103,19 +105,51 @@ impl SceneLoader {
     ) -> f32 {
         let surface = &self.graph.nodes[surface];
         let ty = surface.ty().unwrap();
-        if ty == nodes::PrincipledBsdf::ty() {
+        let (emission, strength) = if ty == nodes::PrincipledBsdf::ty() {
             let bsdf = surface.proxy::<nodes::PrincipledBsdf>(&self.graph).unwrap();
-            let emission = &bsdf.in_emission.as_node().unwrap().from;
-            if let Some(power) = self.estimate_emission_tex_intensity_fast(emission) {
-                if power == 0.0 {
-                    return 0.0;
+            (
+                Some(bsdf.in_emission.as_node().unwrap().from.clone()),
+                Some(1.0f32),
+            )
+        } else if ty == nodes::Emission::ty() {
+            let emission = Some(
+                surface
+                    .proxy::<nodes::Emission>(&self.graph)
+                    .unwrap()
+                    .in_color
+                    .as_node()
+                    .unwrap()
+                    .from
+                    .clone(),
+            );
+            let strength = surface
+                .proxy::<nodes::Emission>(&self.graph)
+                .unwrap()
+                .in_strength
+                .as_value()
+                .map(|n| *n as f32);
+            (emission, strength)
+        } else {
+            (None, None)
+        };
+        if let Some(emission) = &emission {
+            if let Some(strength) = strength {
+                if let Some(power) = self.estimate_emission_tex_intensity_fast(emission) {
+                    if power == 0.0 {
+                        return 0.0;
+                    }
+
+                    let geom_id = instance.geom_id as usize;
+                    let area = self.mesh_total_area(geom_id);
+                    let transform: glam::Mat3 = instance.transform.m3.into();
+                    let det = transform.determinant();
+                    return power * area * det.abs() * strength;
                 }
-                let geom_id = instance.geom_id as usize;
-                let area = self.mesh_total_area(geom_id);
-                return power * area;
             }
+            todo!()
+        } else {
+            0.0
         }
-        todo!()
     }
     fn load_transform(&self, node: &NodeId, is_camera: bool) -> AffineTransform {
         let node = &self.graph.nodes[node];
@@ -186,7 +220,6 @@ impl SceneLoader {
             let cam = node.proxy::<nodes::PerspectiveCamera>(&self.graph).unwrap();
             let transform = self.load_transform(&cam.in_transform.as_node().unwrap().from, true);
             let fov = (*cam.in_fov.as_value().unwrap() as f32).to_radians();
-            dbg!(*cam.in_fov.as_value().unwrap() as f32);
             let focal_distance = *cam.in_focal_distance.as_value().unwrap() as f32;
             let fstop = *cam.in_fstop.as_value().unwrap() as f32;
             let lens_radius = focal_distance / (2.0 * fstop);
@@ -238,12 +271,6 @@ impl SceneLoader {
     }
     fn do_load(mut self) -> Scene {
         self.mesh_areas.resize(self.mesh_buffers.len(), vec![]);
-        let image_path_to_idx = self
-            .images
-            .keys()
-            .enumerate()
-            .map(|(i, k)| (k.clone(), i))
-            .collect::<HashMap<_, _>>();
         for mat_node in &self.material_nodes {
             let node = &self.graph.nodes[mat_node];
             let mat = node.proxy::<nodes::MaterialOutput>(&self.graph).unwrap();
@@ -251,7 +278,7 @@ impl SceneLoader {
                 let shader = self.surface_shader_compiler.compile(
                     &bsdf.from,
                     SvmCompileContext {
-                        images: &image_path_to_idx,
+                        images: &self.path_sampler_to_idx,
                         graph: &self.graph,
                     },
                 );
@@ -268,7 +295,7 @@ impl SceneLoader {
             let shader = self.surface_shader_compiler.compile(
                 surface,
                 SvmCompileContext {
-                    images: &image_path_to_idx,
+                    images: &self.path_sampler_to_idx,
                     graph: &self.graph,
                 },
             );
@@ -363,6 +390,10 @@ impl SceneLoader {
             camera,
             ..
         } = self;
+        log::info!(
+            "Shader variant count: {}",
+            surface_shader_compiler.variant_count()
+        );
         let svm = Arc::new(Svm {
             device: device.clone(),
             surface_shaders: surface_shader_compiler.upload(&device),
@@ -397,12 +428,21 @@ impl SceneLoader {
         let mut light_nodes = vec![];
         let mut meshes = vec![];
         let mut mesh_buffers = vec![];
+        let mut path_samplers: HashSet<(String, luisa::Sampler)> = HashSet::new();
+        let sorted_node_ids =  {
+            let mut sorted_node_ids = graph.nodes.keys().collect::<Vec<_>>();
+            sorted_node_ids.sort();
+            sorted_node_ids
+        };
         // let mut instance_nodes = vec![];
-        for (id, node) in &graph.nodes {
+        for id in sorted_node_ids {
+            let node = &graph.nodes[id];
             let ty = node.ty().unwrap();
             if ty == nodes::RGBImageTexture::ty() {
                 let tex = node.proxy::<nodes::RGBImageTexture>(&graph).unwrap();
                 let path = tex.in_path.as_value().unwrap();
+                let sampler = sampler_from_rgb_image_tex_node(&tex);
+                path_samplers.insert((path.clone(), sampler));
                 images_to_load.insert(path.clone());
             } else if ty == nodes::Mesh::ty() {
                 let mesh = node.proxy::<nodes::Mesh>(&graph).unwrap();
@@ -419,7 +459,6 @@ impl SceneLoader {
                     .collect::<HashMap<_, _>>();
                 log::info!("Loading mesh: {}", mesh.in_name.as_value().unwrap());
                 let vertices = load_buffer::<PackedFloat3>(&file_resolver, &buffers["vertices"]);
-                dbg!(&vertices);
                 let normals = load_buffer::<PackedFloat3>(&file_resolver, &buffers["normals"]);
                 let indices = load_buffer::<PackedUint3>(&file_resolver, &buffers["indices"]);
                 let mut uvs = vec![];
@@ -480,10 +519,13 @@ impl SceneLoader {
                 (path_s, img)
             })
             .collect::<HashMap<_, _>>();
+        log::info!("Loaded {} images", images.len());
+        let orded_image_paths = images.keys().collect::<Vec<_>>();
         let textures = {
-            let imgs = images.values().collect::<Vec<_>>();
-            imgs.into_par_iter()
-                .map(|img| {
+            orded_image_paths
+                .par_iter()
+                .map(|path| {
+                    let img = &images[*path];
                     let img = img.to_rgba8();
                     let tex =
                         device.create_tex2d(PixelStorage::Byte4, img.width(), img.height(), 1);
@@ -491,18 +533,36 @@ impl SceneLoader {
                 })
                 .collect::<Vec<_>>()
         };
-        let texture_heap = device.create_bindless_array(textures.len());
-        for (i, tex) in textures.iter().enumerate() {
-            texture_heap.emplace_tex2d_async(
-                i,
-                tex,
-                luisa::Sampler {
-                    filter: luisa::SamplerFilter::Point,
-                    address: luisa::SamplerAddress::Repeat,
-                },
-            );
-        }
-        texture_heap.update();
+        let path_to_texture_idx = orded_image_paths
+            .into_iter()
+            .enumerate()
+            .map(|(i, path)| (path.clone(), i))
+            .collect::<HashMap<_, _>>();
+        let (texture_heap, path_sampler_to_idx) = {
+            let mut path_sampler_to_idx = HashMap::new();
+            let mut to_be_commited_to_heap = vec![];
+            for (path, sampler) in &path_samplers {
+                let key = (path.clone(), sampler.clone());
+                if let None = path_sampler_to_idx.get(&key) {
+                    let idx = to_be_commited_to_heap.len();
+                    to_be_commited_to_heap.push((path.clone(), sampler.clone()));
+                    path_sampler_to_idx.insert(key, idx);
+                }
+            }
+            let texture_heap = device.create_bindless_array(to_be_commited_to_heap.len().max(1));
+            for (i, (path, sampler)) in to_be_commited_to_heap.into_iter().enumerate() {
+                let idx = path_to_texture_idx[&path];
+                texture_heap.emplace_tex2d_async(i, &textures[idx], sampler);
+            }
+            if !path_sampler_to_idx.is_empty() {
+                texture_heap.update();
+            }
+            (texture_heap, path_sampler_to_idx)
+        };
+        log::info!(
+            "Texture Heap contains total {} (texture, sampler) tuples",
+            path_sampler_to_idx.len()
+        );
         Self {
             device: device.clone(),
             images,
@@ -520,6 +580,7 @@ impl SceneLoader {
             light_nodes,
             mesh_areas: vec![],
             lights: PolymorphicBuilder::new(device.clone()),
+            path_sampler_to_idx,
         }
     }
 }
@@ -546,4 +607,22 @@ pub fn load_scene_graph<P: AsRef<Path>>(path: P) -> NodeGraph {
 
 pub fn load_from_path<P: AsRef<Path>>(device: Device, path: P) -> Arc<Scene> {
     SceneLoader::load_from_path(device, path)
+}
+
+pub(crate) fn sampler_from_rgb_image_tex_node(tex: &nodes::RGBImageTexture) -> luisa::Sampler {
+    let extension = tex.in_extension;
+    let interp = tex.in_interpolation;
+    let sampler = luisa::Sampler {
+        address: match extension {
+            nodes::TextureExtension::Repeat => luisa::SamplerAddress::Repeat,
+            nodes::TextureExtension::Clip => luisa::SamplerAddress::Zero,
+            nodes::TextureExtension::Mirror => luisa::SamplerAddress::Mirror,
+            nodes::TextureExtension::Extend => luisa::SamplerAddress::Edge,
+        },
+        filter: match interp {
+            nodes::TextureInterpolation::Linear => luisa::SamplerFilter::LinearLinear,
+            nodes::TextureInterpolation::Closest => luisa::SamplerFilter::LinearPoint,
+        },
+    };
+    sampler
 }

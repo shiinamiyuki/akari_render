@@ -15,6 +15,30 @@ pub struct AreaLight {
     pub area_sampling_index: u32,
 }
 
+impl AreaLightExpr {
+    fn emission(
+        &self,
+        wo: Expr<Float3>,
+        si: Expr<SurfaceInteraction>,
+        swl: Expr<SampledWavelengths>,
+        ctx: &LightEvalContext<'_>,
+    ) -> Color {
+        let emission = Color::from_flat(
+            ctx.color_repr(),
+            ctx.surface_eval
+                .evaluate_ex(
+                    self.surface(),
+                    si,
+                    wo,
+                    Float3Expr::zero(),
+                    swl,
+                    const_(SURFACE_EVAL_EMISSION),
+                )
+                .emission(),
+        );
+        emission
+    }
+}
 impl Light for AreaLightExpr {
     fn id(&self) -> Expr<u32> {
         self.light_id()
@@ -26,19 +50,7 @@ impl Light for AreaLightExpr {
         swl: Expr<SampledWavelengths>,
         ctx: &LightEvalContext<'_>,
     ) -> Color {
-        let emission = Color::from_flat(
-            ctx.color_repr(),
-            ctx.surface_eval
-                .evaluate_ex(
-                    self.surface(),
-                    si,
-                    -ray.d(),
-                    Float3Expr::zero(),
-                    swl,
-                    const_(SURFACE_EVAL_EMISSION),
-                )
-                .emission(),
-        );
+        let emission = self.emission(-ray.d(), si, swl, ctx);
         let ns = si.geometry().ns();
         select(
             ns.dot(ray.d()).cmplt(0.0),
@@ -85,20 +97,7 @@ impl Light for AreaLightExpr {
             Bool::from(true),
         );
         let wi = p - pn.p();
-        let emission = Color::from_flat(
-            ctx.color_repr(),
-            ctx.surface_eval
-                .evaluate_ex(
-                    self.surface(),
-                    si,
-                    -wi,
-                    Float3Expr::zero(),
-                    swl,
-                    const_(SURFACE_EVAL_EMISSION),
-                )
-                .emission(),
-        );
-
+        let emission = self.emission(-wi, si, swl, ctx);
         let dist2 = wi.length_squared();
         let wi = wi / dist2.sqrt();
         let li = select(

@@ -32,9 +32,12 @@ C = bpy.context
 depsgraph = C.evaluated_depsgraph_get()
 bpy.ops.object.mode_set(mode='OBJECT')
 # select one object to activate edit mode
-# first_obj = C.scene.objects[0]
-# first_obj.select_set(True)
-# C.view_layer.objects.active = first_obj
+for obj in C.scene.objects:
+    first_obj = C.scene.objects[0]
+    if first_obj.type == 'MESH':
+        first_obj.select_set(True)
+        C.view_layer.objects.active = first_obj
+        break
 
 bpy.ops.object.select_all(action='DESELECT')
 
@@ -74,9 +77,11 @@ class UniqueName:
         self.names = dict()
 
     def contains(self, m):
+        assert m is not None
         return m in self.m
 
     def get(self, m):
+        assert m is not None
         if m in self.m:
             return self.m[m]
         name = m.name
@@ -143,6 +148,7 @@ class MaterialExporter:
     def __init__(self) -> None:
         self.visited = set()
         self.output_node = None
+        self.exported_materials = dict()
     
     def get_node_input(self, node, key):
         try:
@@ -205,13 +211,36 @@ class MaterialExporter:
             print(f'MaterialOutput[',file=akr_file)
             input("Surface", 'surface')
             self.output_node = node
+        elif isinstance(node, T.ShaderNodeBsdfGlass):
+            print(f'GlassBsdf[',file=akr_file)
+            input("Color", 'color')
+            input('Roughness', 'roughness')
+            input('IOR', 'ior')
+        elif isinstance(node, T.ShaderNodeEmission):
+            print(f'Emission[',file=akr_file)
+            input("Color", 'color')
+            input('Strength', 'strength')
+        elif isinstance(node, T.ShaderNodeTexImage):
+            extension = {
+                'REPEAT': 'Repeat',
+                'EXTEND': 'Extend',
+                'CLIP': 'Clip',
+                'MIRROR': 'Mirror',
+            }[node.extension]
+            interpolation = {
+                'Closest': 'Nearest',
+                'Linear': 'Linear',
+                'Cubic': 'Linear',
+                'Smart': 'Linear',
+            }[node.interpolation]
         else:
             raise RuntimeError(f"Unsupported node type `{node.type}`")
         print("\n]",file=akr_file)
 
     def export_material(self, mat):
-        if VISITED.contains(mat):
-            return
+        assert mat is not None
+        if mat in self.exported_materials:
+            return self.exported_materials[mat]
         name = VISITED.get(mat)
         print(f"Exporting Material `{mat.name}` -> {name}")
         self.output_node = None
@@ -233,7 +262,9 @@ class MaterialExporter:
             dbg(node)
             self.export_node(node)
         assert self.output_node is not None
-        return VISITED.get(self.output_node)
+        out = VISITED.get(self.output_node)
+        self.exported_materials[mat] = out
+        return out
 
 class SceneExporter:
     def __init__(self, scene):
@@ -404,9 +435,9 @@ class SceneExporter:
         res_x = render_settings.resolution_x
         res_y = render_settings.resolution_y
         print(f'    transform = TRS[',file=akr_file)
-        print(f'        translation=[{",".join([str(x) for x in trs[0]])}],',file=akr_file)
-        print(f'        rotation=[{",".join([str(degrees(x)) for x in trs[1]])}],',file=akr_file)
-        print(f'        scale=[{",".join([str(x) for x in trs[2]])}],',file=akr_file)
+        print(f'        translation=[{",".join(["{:f}".format(x) for x in trs[0]])}],',file=akr_file)
+        print(f'        rotation=[{",".join(["{:f}".format(degrees(x)) for x in trs[1]])}],',file=akr_file)
+        print(f'        scale=[{",".join(["{:f}".format(x) for x in trs[2]])}],',file=akr_file)
         print(f'        coordinate_system=CoordinateSystem::Blender',file=akr_file)
         print(f'    ],',file=akr_file)
         print(f'    fov={fov},',file=akr_file)

@@ -208,15 +208,18 @@ pub struct AffineTransform {
     pub m_inv: Mat4,
     pub m3: Mat3,
     pub m3_inv: Mat3,
+    pub close_to_identity: bool,
 }
 impl AffineTransform {
     pub fn from_matrix(m: &glam::Mat4) -> Self {
+        let close_to_identity = m.abs_diff_eq(glam::Mat4::IDENTITY, 1e-4);
         let m3 = glam::Mat3::from_mat4(*m);
         Self {
             m: (*m).into(),
             m_inv: m.inverse().into(),
             m3: m3.into(),
             m3_inv: m3.inverse().into(),
+            close_to_identity,
         }
     }
     pub fn inverse(&self) -> Self {
@@ -225,23 +228,34 @@ impl AffineTransform {
             m_inv: self.m,
             m3: self.m3_inv,
             m3_inv: self.m3,
+            close_to_identity: self.close_to_identity,
         }
     }
 }
 impl AffineTransformExpr {
     pub fn transform_point(&self, p: Expr<Float3>) -> Expr<Float3> {
-        let q = make_float4(p.x(), p.y(), p.z(), 1.0);
-        let q = self.m() * q;
-        q.xyz() / q.w()
+        if_!(self.close_to_identity(), { p }, else, {
+            let q = make_float4(p.x(), p.y(), p.z(), 1.0);
+            let q = self.m() * q;
+            q.xyz() / q.w()
+        })
     }
     pub fn transform_vector(&self, v: Expr<Float3>) -> Expr<Float3> {
-        self.m3() * v
+        if_!(self.close_to_identity(), { v }, else, { self.m3() * v })
     }
     pub fn transform_normal(&self, n: Expr<Float3>) -> Expr<Float3> {
-        self.m3_inv().transpose() * n
+        if_!(self.close_to_identity(), { n }, else, {
+            self.m3_inv().transpose() * n
+        })
     }
     pub fn inverse(&self) -> Self {
-        Self::new(self.m_inv(), self.m(), self.m3_inv(), self.m3())
+        Self::new(
+            self.m_inv(),
+            self.m(),
+            self.m3_inv(),
+            self.m3(),
+            self.close_to_identity(),
+        )
     }
 }
 pub fn face_forward(v: Expr<Float3>, n: Expr<Float3>) -> Expr<Float3> {

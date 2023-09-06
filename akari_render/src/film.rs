@@ -1,7 +1,7 @@
 use std::f32::consts::PI;
 
 use crate::{
-    color::{Color, RgbColorSpace},
+    color::{Color, RgbColorSpace, SampledWavelengths},
     util::safe_div,
     *,
 };
@@ -115,7 +115,13 @@ impl Film {
         let ip = ip.uint();
         ip.x() + ip.y() * resolution.x()
     }
-    pub fn add_splat(&self, p: Expr<Float2>, color: &Color, weight: Expr<f32>) {
+    pub fn add_splat(
+        &self,
+        p: Expr<Float2>,
+        color: &Color,
+        _swl: Expr<SampledWavelengths>,
+        weight: Expr<f32>,
+    ) {
         let splat = self.splat.var();
         let i = self.linear_index(p);
         let nvalues = self.repr.nvalues();
@@ -132,7 +138,13 @@ impl Film {
             _ => todo!(),
         }
     }
-    pub fn add_sample(&self, p: Expr<Float2>, color: &Color, weight: Expr<f32>) {
+    pub fn add_sample(
+        &self,
+        p: Expr<Float2>,
+        color: &Color,
+        _swl: Expr<SampledWavelengths>,
+        weight: Expr<f32>,
+    ) {
         let color = color * weight;
         let pixels = self.pixels.var();
         let weights = self.weights.var();

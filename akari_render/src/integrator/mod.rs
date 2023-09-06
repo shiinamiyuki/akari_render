@@ -49,8 +49,8 @@ pub trait Integrator {
 }
 
 // pub mod gpt;
-// pub mod mcmc;
-// pub mod mcmc_opt;
+pub mod mcmc;
+pub mod mcmc_opt;
 // pub mod normal;
 pub mod pt;
 
@@ -61,10 +61,10 @@ pub enum Method {
     PathTracer(pt::Config),
     // #[serde(rename = "gpt")]
     // GradientPathTracer(gpt::Config),
-    // #[serde(rename = "mcmc")]
-    // Mcmc(mcmc::Config),
-    // #[serde(rename = "mcmc_opt")]
-    // McmcOpt(mcmc::Config),
+    #[serde(rename = "mcmc")]
+    Mcmc(mcmc::Config),
+    #[serde(rename = "mcmc_opt")]
+    McmcOpt(mcmc::Config),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -142,24 +142,24 @@ pub fn render(device: Device, scene: Arc<Scene>, task: &RenderTask, options: Ren
             //     &c,
             //     &options,
             // ),
-            // Method::Mcmc(c) => mcmc::render(
-            //     device.clone(),
-            //     scene.clone(),
-            //     config.sampler,
-            //     color_repr,
-            //     &mut film,
-            //     &c,
-            //     &options,
-            // ),
-            // Method::McmcOpt(c) => mcmc_opt::render(
-            //     device.clone(),
-            //     scene.clone(),
-            //     config.sampler,
-            //     color_repr,
-            //     &mut film,
-            //     &c,
-            //     &options,
-            // ),
+            Method::Mcmc(c) => mcmc::render(
+                device.clone(),
+                scene.clone(),
+                config.sampler,
+                config.color,
+                &mut film,
+                &c,
+                &options,
+            ),
+            Method::McmcOpt(c) => mcmc_opt::render(
+                device.clone(),
+                scene.clone(),
+                config.sampler,
+                config.color,
+                &mut film,
+                &c,
+                &options,
+            ),
             _ => todo!(),
         }
         let toc = std::time::Instant::now();

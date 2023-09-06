@@ -67,9 +67,7 @@ pub trait Surface {
         wo: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
         ctx: &BsdfEvalContext,
-    ) -> Color {
-        Color::zero(ctx.color_repr)
-    }
+    ) -> Color;
 }
 
 pub trait SurfaceShader {
@@ -80,6 +78,98 @@ pub trait SurfaceShader {
 pub enum BsdfBlendMode {
     Addictive,
     Mix,
+}
+pub struct EmissiveSurface {
+    pub inner: Option<Rc<dyn Surface>>,
+    pub emission: Color,
+}
+impl Surface for EmissiveSurface {
+    fn evaluate(
+        &self,
+        wo: Expr<Float3>,
+        wi: Expr<Float3>,
+        swl: Expr<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> Color {
+        if let Some(inner) = &self.inner {
+            inner.evaluate(wo, wi, swl, ctx)
+        } else {
+            Color::zero(ctx.color_repr)
+        }
+    }
+
+    fn sample(
+        &self,
+        wo: Expr<Float3>,
+        u_select: Expr<f32>,
+        u_sample: Expr<Float2>,
+        swl: Var<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> BsdfSample {
+        if let Some(inner) = &self.inner {
+            inner.sample(wo, u_select, u_sample, swl, ctx)
+        } else {
+            BsdfSample {
+                wi: make_float3(0.0, 0.0, 0.0),
+                pdf: const_(0.0f32),
+                color: Color::zero(ctx.color_repr),
+                valid: const_(false),
+            }
+        }
+    }
+
+    fn pdf(
+        &self,
+        wo: Expr<Float3>,
+        wi: Expr<Float3>,
+        swl: Expr<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> Float {
+        if let Some(inner) = &self.inner {
+            inner.pdf(wo, wi, swl, ctx)
+        } else {
+            const_(0.0f32)
+        }
+    }
+
+    fn albedo(
+        &self,
+        wo: Expr<Float3>,
+        swl: Expr<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> Color {
+        if let Some(inner) = &self.inner {
+            inner.albedo(wo, swl, ctx)
+        } else {
+            Color::zero(ctx.color_repr)
+        }
+    }
+
+    fn roughness(
+        &self,
+        wo: Expr<Float3>,
+        swl: Expr<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> Expr<f32> {
+        if let Some(inner) = &self.inner {
+            inner.roughness(wo, swl, ctx)
+        } else {
+            const_(1.0f32)
+        }
+    }
+
+    fn emission(
+        &self,
+        wo: Expr<Float3>,
+        swl: Expr<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> Color {
+        if let Some(inner) = &self.inner {
+            self.emission + inner.emission(wo, swl, ctx)
+        } else {
+            self.emission
+        }
+    }
 }
 pub struct BsdfMixture {
     pub frac: Box<dyn Fn(Expr<Float3>, &BsdfEvalContext) -> Expr<f32>>,
@@ -246,6 +336,23 @@ impl Surface for BsdfMixture {
         self.bsdf_a.roughness(wo, swl, ctx) * (1.0 - frac)
             + self.bsdf_b.roughness(wo, swl, ctx) * frac
     }
+    fn emission(
+        &self,
+        wo: Expr<Float3>,
+        swl: Expr<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> Color {
+        let frac: Expr<f32> = (self.frac)(wo, ctx);
+        match self.mode {
+            BsdfBlendMode::Addictive => {
+                self.bsdf_a.emission(wo, swl, ctx) + self.bsdf_b.emission(wo, swl, ctx)
+            }
+            BsdfBlendMode::Mix => {
+                self.bsdf_a.emission(wo, swl, ctx) * (1.0 - frac)
+                    + self.bsdf_b.emission(wo, swl, ctx) * frac
+            }
+        }
+    }
 }
 
 pub struct SurfaceClosure {
@@ -308,6 +415,14 @@ impl Surface for SurfaceClosure {
         ctx: &BsdfEvalContext,
     ) -> Expr<f32> {
         self.inner.roughness(self.frame.to_local(wo), swl, ctx)
+    }
+    fn emission(
+        &self,
+        wo: Expr<Float3>,
+        swl: Expr<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> Color {
+        self.inner.emission(self.frame.to_local(wo), swl, ctx)
     }
 }
 pub trait Fresnel {
@@ -400,6 +515,14 @@ impl Surface for MicrofacetReflection {
         _ctx: &BsdfEvalContext,
     ) -> Expr<f32> {
         self.dist.roughness()
+    }
+    fn emission(
+        &self,
+        _wo: Expr<Float3>,
+        _swl: Expr<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> Color {
+        Color::zero(ctx.color_repr)
     }
 }
 
@@ -510,6 +633,14 @@ impl Surface for MicrofacetTransmission {
         _ctx: &BsdfEvalContext,
     ) -> Expr<f32> {
         self.dist.roughness()
+    }
+    fn emission(
+        &self,
+        _wo: Expr<Float3>,
+        _swl: Expr<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> Color {
+        Color::zero(ctx.color_repr)
     }
 }
 

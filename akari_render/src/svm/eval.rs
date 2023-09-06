@@ -85,6 +85,7 @@ impl<'a> SvmEvaluator<'a> {
             }
             svm::SvmNode::RgbTex(rgb_tex) => {
                 let rgb = self.eval_float3(rgb_tex.rgb);
+
                 let colorspace = ColorSpaceId::to_colorspace(rgb_tex.colorspace);
                 Box::new(rgb_to_target_colorspace(
                     rgb,
@@ -103,6 +104,7 @@ impl<'a> SvmEvaluator<'a> {
             }
             svm::SvmNode::SpectralUplift(uplift) => {
                 let rgb = self.eval_float3(uplift.rgb);
+                // cpu_dbg!(rgb);
                 Box::new(spectral_uplift(
                     rgb,
                     self.color_pipeline.rgb_colorspace,
@@ -110,7 +112,9 @@ impl<'a> SvmEvaluator<'a> {
                     self.color_repr(),
                 ))
             }
+            svm::SvmNode::Emission(bsdf) => Box::new(bsdf.closure(self)),
             svm::SvmNode::DiffuseBsdf(bsdf) => Box::new(bsdf.closure(self)),
+            svm::SvmNode::GlassBsdf(bsdf) => Box::new(bsdf.closure(self)),
             svm::SvmNode::PrincipledBsdf(bsdf) => Box::new(bsdf.closure(self)),
             svm::SvmNode::MaterialOutput(out) => {
                 let closure = self.eval_bsdf_closure(out.surface);

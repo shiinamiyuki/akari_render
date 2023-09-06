@@ -259,7 +259,7 @@ impl McmcOpt {
         chain_id: Expr<u32>,
         mutator: Option<Mutator>,
         is_bootstrap: bool,
-    ) -> (Expr<Uint2>, Color, Expr<f32>, Expr<u32>) {
+    ) ->  (Expr<Uint2>, Color, Expr<SampledWavelengths>, Expr<f32>, Expr<u32>) {
         let sampler = LazyMcmcSampler::new(
             independent,
             samples,
@@ -275,13 +275,13 @@ impl McmcOpt {
         let res = const_(scene.camera.resolution());
         let p = sampler.next_2d() * res.float();
         let p = p.int().clamp(0, res.int() - 1);
+        let swl = def(sample_wavelengths(eval.color_repr(), &sampler));
         let (ray, ray_color, ray_w) =
             scene
                 .camera
-                .generate_ray(filter, p.uint(), &sampler, eval.color_repr);
-        let l = self.pt.radiance(scene, ray, &sampler, eval) * ray_color * ray_w;
-        let last_dim = *sampler.cur_dim;
-        (p.uint(), l.clone(), Self::scalar_contribution(&l), last_dim)
+                .generate_ray(filter, p.uint(), &sampler, eval.color_repr(), *swl);
+        let l = self.pt.radiance(scene, eval, ray, swl, &sampler) * ray_color * ray_w;
+        (p.uint(), l, *swl, Self::scalar_contribution(&l), *sampler.cur_dim)
     }
     pub fn scalar_contribution(color: &Color) -> Expr<f32> {
         color.max().clamp(0.0, 1e5)
@@ -311,7 +311,7 @@ impl McmcOpt {
                 let seed = seeds.var().read(i);
                 let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seed));
                 // DON'T WRITE INTO sample_buffer
-                let (_p, _l, f, _) =
+                let (_p, _l, _swl, f, _) =
                     self.evaluate(scene, filter, eval, &sample_buffer, &sampler, i, None, true);
                 fs.var().write(i, f);
             })
@@ -326,7 +326,7 @@ impl McmcOpt {
         );
         let at = AliasTable::new(self.device.clone(), &weights);
         let states = self.device.create_buffer(self.n_chains);
-        let cur_colors = ColorBuffer::new(self.device.clone(), self.n_chains, eval.color_repr);
+        let cur_colors = ColorBuffer::new(self.device.clone(), self.n_chains, eval.color_repr());
 
         self.device
             .create_kernel::<()>(&|| {
@@ -345,7 +345,7 @@ impl McmcOpt {
                     );
                 });
 
-                let (p, l, f, _) = self.evaluate(
+                let (p, l, swl, f, _) = self.evaluate(
                     scene,
                     filter,
                     eval,
@@ -355,7 +355,7 @@ impl McmcOpt {
                     None,
                     false,
                 );
-                cur_colors.write(i, l);
+                cur_colors.write(i, l, swl);
                 let state = MarkovStateExpr::new(p, i, f, 0.0, 0, 0, 0, 0, 0);
                 states.var().write(i, state);
             })
@@ -379,6 +379,7 @@ impl McmcOpt {
         contribution: Expr<f32>,
         state: Var<MarkovState>,
         cur_color_v: ColorVar,
+        cur_swl: Var<SampledWavelengths>,
         rng: &IndependentSampler,
     ) {
         let offset = *state.chain_id() * const_(self.sample_dimension() as u32);
@@ -401,7 +402,7 @@ impl McmcOpt {
                     cur_iter: *state.cur_iter(),
                     res: const_(scene.camera.resolution()).float(),
                 };
-                let (proposal_p, proposal_color, f, proposal_dim) = self.evaluate(
+                let (proposal_p, proposal_color, proposal_swl, f, proposal_dim) = self.evaluate(
                     scene,
                     film.filter(),
                     eval,
@@ -427,11 +428,13 @@ impl McmcOpt {
                 film.add_splat(
                     proposal_p.float(),
                     &(proposal_color.clone() / proposal_f),
+                    proposal_swl,
                     accept * contribution,
                 );
                 film.add_splat(
                     cur_p.float(),
                     &(cur_color / cur_f),
+                    *cur_swl,
                     (1.0 - accept) * contribution,
                 );
                 if_!(
@@ -439,6 +442,7 @@ impl McmcOpt {
                     {
                         state.set_cur_f(proposal_f);
                         cur_color_v.store(proposal_color);
+                        cur_swl.store(proposal_swl);
                         state.set_cur_pixel(proposal_p);
                         if_!(!is_large_step, {
                             *state.n_accepted().get_mut() += 1;
@@ -480,7 +484,9 @@ impl McmcOpt {
         let sampler =
             IndependentSampler::from_pcg32(var!(Pcg32, render_state.rng_states.var().read(i)));
         let state = var!(MarkovState, markov_states.read(i));
-        let cur_color_v = ColorVar::new(render_state.cur_colors.read(i));
+        let (cur_color, cur_swl) = render_state.cur_colors.read(i);
+        let cur_color_v = ColorVar::new(cur_color);
+        let cur_swl_v = def(cur_swl);
         for_range(const_(0)..mutations_per_chain.int(), |_| {
             // we are about to overflow
             if_!(state.cur_iter().cmpeq(u32::MAX - 1), {
@@ -508,11 +514,12 @@ impl McmcOpt {
                 contribution,
                 state,
                 cur_color_v,
+                cur_swl_v,
                 &sampler,
             );
         });
 
-        render_state.cur_colors.write(i, cur_color_v.load());
+        render_state.cur_colors.write(i, cur_color_v.load(), *cur_swl_v);
         render_state.rng_states.var().write(i, sampler.state.load());
         markov_states.write(i, state.load());
     }
@@ -632,7 +639,7 @@ impl Integrator for McmcOpt {
         &self,
         scene: Arc<Scene>,
         sampler_config: SamplerConfig,
-        color_repr: ColorRepr,
+        color_pipeline: ColorPipeline,
         film: &mut Film,
         options: &RenderOptions,
     ) {
@@ -643,7 +650,7 @@ impl Integrator for McmcOpt {
             resolution.y,
             &self.config
         );
-        let evaluators = scene.evaluators(color_repr);
+        let evaluators = scene.evaluators(color_pipeline);
         assert_eq!(resolution.x, film.resolution().x);
         assert_eq!(resolution.y, film.resolution().y);
         if self.config.direct_spp > 0 {
@@ -666,7 +673,7 @@ impl Integrator for McmcOpt {
             direct.render(
                 scene.clone(),
                 sampler_config,
-                color_repr,
+                color_pipeline,
                 film,
                 &Default::default(),
             );
@@ -680,11 +687,11 @@ pub fn render(
     device: Device,
     scene: Arc<Scene>,
     sampler: SamplerConfig,
-    color_repr: ColorRepr,
+    color_pipeline: ColorPipeline,
     film: &mut Film,
     config: &Config,
     options: &RenderOptions,
 ) {
     let mcmc = McmcOpt::new(device.clone(), config.clone());
-    mcmc.render(scene, sampler, color_repr, film, options);
+    mcmc.render(scene, sampler, color_pipeline, film, options);
 }

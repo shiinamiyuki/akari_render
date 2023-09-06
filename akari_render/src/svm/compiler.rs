@@ -6,7 +6,7 @@ use super::*;
 use crate::{color::ColorSpaceId, *};
 #[derive(Clone, Copy)]
 pub struct SvmCompileContext<'a> {
-    pub images: &'a HashMap<String, usize>,
+    pub images: &'a HashMap<(String, luisa::Sampler), usize>,
     pub graph: &'a NodeGraph,
 }
 pub struct CompilerDriver {
@@ -16,6 +16,9 @@ pub struct CompilerDriver {
 }
 
 impl CompilerDriver {
+    pub fn variant_count(&self) -> u32 {
+        self.shaders.len() as u32
+    }
     fn push_data<T: Value>(&mut self, data: T) -> usize {
         let layout = Layout::new::<T>();
         let size = layout.size();
@@ -48,7 +51,9 @@ impl CompilerDriver {
                 SvmNode::RgbTex(n) => self.push_data(*n),
                 SvmNode::RgbImageTex(n) => self.push_data(*n),
                 SvmNode::SpectralUplift(n) => self.push_data(*n),
+                SvmNode::Emission(n) => self.push_data(*n),
                 SvmNode::DiffuseBsdf(n) => self.push_data(*n),
+                SvmNode::GlassBsdf(n) => self.push_data(*n),
                 SvmNode::PrincipledBsdf(n) => self.push_data(*n),
                 SvmNode::MaterialOutput(n) => self.push_data(*n),
             };
@@ -76,6 +81,7 @@ impl CompilerDriver {
         }
     }
     pub fn compile(&mut self, out: &NodeId, ctx: SvmCompileContext<'_>) -> ShaderRef {
+        // dbg!(out);
         let shader = Compiler::compile(out.clone(), ctx);
         self.push_shader(shader)
     }
@@ -92,6 +98,7 @@ impl CompilerDriver {
             shader_hash_to_kind,
             shaders,
         } = self;
+        assert_eq!(shader_hash_to_kind.len(), shaders.len());
         let data = device.create_byte_buffer(shader_data.len());
         data.copy_from(&shader_data[..]);
         let shaders = shaders
@@ -139,7 +146,10 @@ impl<'a> NodeSorter<'a> {
         self.visited.insert(node.clone());
         self.sorted.push(node.clone());
         let node = &self.graph.nodes[node];
-        for (_, socket) in &node.inputs {
+        let mut keys = node.inputs.keys().cloned().collect::<Vec<_>>();
+        keys.sort();
+        for key in &keys {
+            let socket = &node.inputs[key];
             let v = &socket.value;
             match v {
                 SocketValue::Node(Some(link)) => {
@@ -246,7 +256,9 @@ impl<'a> Compiler<'a> {
                 let tex = node
                     .proxy::<nodes::RGBImageTexture>(compiler.graph())
                     .unwrap();
-                let tex_idx = compiler.ctx.images[&tex.in_path.as_value().unwrap().clone()];
+                let path = tex.in_path.as_value().unwrap().clone().clone();
+                let sampler = load::sampler_from_rgb_image_tex_node(&tex);
+                let tex_idx = compiler.ctx.images[&(path, sampler)];
                 SvmNode::RgbImageTex(SvmRgbImageTex {
                     tex_idx: tex_idx as u32,
                     colorspace: ColorSpaceId::from_colorspace(tex.in_colorspace.into()),
@@ -272,6 +284,26 @@ impl<'a> Compiler<'a> {
                 SvmNode::DiffuseBsdf(SvmDiffuseBsdf { reflectance: color })
             }
         );
+        when!(nodes::Emission, |compiler: &mut Compiler, node: &Node| {
+            let emission = node.proxy::<nodes::Emission>(compiler.graph()).unwrap();
+            let color = &emission.in_color.as_node().unwrap().from;
+            let color = compiler.get(color);
+            let strength = compiler.compile_float_socket(&emission.in_strength);
+            SvmNode::Emission(SvmEmission { color, strength })
+        });
+        when!(nodes::GlassBsdf, |compiler: &mut Compiler, node: &Node| {
+            let glass = node.proxy::<nodes::GlassBsdf>(compiler.graph()).unwrap();
+            let color = &glass.in_color.as_node().unwrap().from;
+            let color = compiler.get(color);
+            let eta = compiler.compile_float_socket(&glass.in_ior);
+            let roughness = compiler.compile_float_socket(&glass.in_roughness);
+            SvmNode::GlassBsdf(SvmGlassBsdf {
+                kr: color,
+                kt: color,
+                eta,
+                roughness,
+            })
+        });
         when!(
             nodes::PrincipledBsdf,
             |compiler: &mut Compiler, node: &Node| {
@@ -287,6 +319,7 @@ impl<'a> Compiler<'a> {
                 let specular = compiler.compile_float_socket(&principled.in_specular);
                 let ior = compiler.compile_float_socket(&principled.in_ior);
                 let transmission = compiler.compile_float_socket(&principled.in_transmission);
+                let emission = compiler.get(&principled.in_emission.as_node().unwrap().from);
                 SvmNode::PrincipledBsdf(SvmPrincipledBsdf {
                     color,
                     metallic,
@@ -295,6 +328,7 @@ impl<'a> Compiler<'a> {
                     clearcoat,
                     clearcoat_roughness,
                     transmission,
+                    emission,
                     eta: ior,
                 })
             }
@@ -316,6 +350,7 @@ impl<'a> Compiler<'a> {
         for node in sorted {
             compiler.compile_node(&node);
         }
+        // dbg!(&compiler.program);
         CompiledShader::new(compiler.program)
     }
 }
