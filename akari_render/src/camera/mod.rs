@@ -1,6 +1,6 @@
 use crate::{color::*, film::PixelFilter, geometry::*, sampler::*, *};
 
-pub trait Camera {
+pub trait Camera: Send + Sync {
     fn set_resolution(&mut self, resolution: Uint2);
     fn resolution(&self) -> Uint2;
     fn generate_ray(

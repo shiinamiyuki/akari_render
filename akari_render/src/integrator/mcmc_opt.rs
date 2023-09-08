@@ -674,8 +674,8 @@ impl Integrator for McmcOpt {
             let direct = PathTracer::new(
                 self.device.clone(),
                 pt::Config {
-                    max_depth: 2,
-                    rr_depth: 2,
+                    max_depth: 1,
+                    rr_depth: 1,
                     spp: self.config.direct_spp as u32,
                     indirect_only: false,
                     spp_per_pass: self.pt.spp_per_pass,

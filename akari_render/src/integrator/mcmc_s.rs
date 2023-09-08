@@ -3,7 +3,8 @@ use std::io::BufWriter;
 use std::sync::Arc;
 use std::time::Instant;
 
-use super::pt::{self, PathTracer};
+use super::mcmc::{Config, Method};
+use super::pt::{self, PathTracer, PathTracerBase};
 use super::{Integrator, IntermediateStats, RenderOptions, RenderStats};
 use crate::sampler::mcmc::IsotropicExponentialMutation;
 use crate::util::distribution::resample_with_f64;
@@ -21,72 +22,14 @@ use crate::{
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
-#[serde(tag = "type")]
-pub enum Method {
-    #[serde(rename = "kelemen")]
-    Kelemen {
-        exponential_mutation: bool,
-        small_sigma: f32,
-        large_step_prob: f32,
-        image_mutation_prob: f32,
-        image_mutation_size: Option<f32>,
-        adaptive: bool,
-    },
-}
-impl Default for Method {
-    fn default() -> Self {
-        Method::Kelemen {
-            exponential_mutation: true,
-            small_sigma: 0.01,
-            large_step_prob: 0.1,
-            image_mutation_prob: 0.0,
-            image_mutation_size: None,
-            adaptive: false,
-        }
-    }
-}
-pub struct Mcmc {
+pub struct SinglePathMcmc {
     pub device: Device,
-    pub pt: PathTracer,
     pub method: Method,
     pub n_chains: usize,
     pub n_bootstrap: usize,
-    pub mcmc_depth: u32,
     config: Config,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
-#[serde(default)]
-pub struct Config {
-    pub spp: u32,
-    pub max_depth: u32,
-    pub rr_depth: u32,
-    pub mcmc_depth: Option<u32>,
-    pub spp_per_pass: u32,
-    pub use_nee: bool,
-    pub method: Method,
-    pub n_chains: usize,
-    pub n_bootstrap: usize,
-    pub direct_spp: i32,
-}
-impl Default for Config {
-    fn default() -> Self {
-        let default_pt = pt::Config::default();
-        Self {
-            spp: default_pt.spp,
-            spp_per_pass: default_pt.spp_per_pass,
-            use_nee: default_pt.use_nee,
-            max_depth: default_pt.max_depth,
-            mcmc_depth: None,
-            rr_depth: default_pt.rr_depth,
-            method: Method::default(),
-            n_chains: 512,
-            n_bootstrap: 100000,
-            direct_spp: 64,
-        }
-    }
-}
 #[derive(Clone, Copy, Debug, Value)]
 #[repr(C)]
 pub struct MarkovState {
@@ -107,9 +50,10 @@ struct RenderState {
     b_init: f64,
     b_init_cnt: usize,
 }
-impl Mcmc {
-    fn sample_dimension(&self) -> usize {
-        4 + self.mcmc_depth as usize * (3 + 3 + 1)
+
+impl SinglePathMcmc {
+    fn sample_dimension(&self, depth: usize) -> usize {
+        4 + depth * 3 + 3
     }
     pub fn new(device: Device, config: Config) -> Self {
         let pt_config = pt::Config {
@@ -123,11 +67,9 @@ impl Mcmc {
         };
         Self {
             device: device.clone(),
-            pt: PathTracer::new(device.clone(), pt_config),
             method: config.method,
             n_chains: config.n_chains,
             n_bootstrap: config.n_bootstrap,
-            mcmc_depth: config.mcmc_depth.unwrap_or(pt_config.max_depth),
             config,
         }
     }
@@ -142,6 +84,7 @@ impl Mcmc {
         eval: &Evaluators,
         independent: &IndependentSampler,
         sample: PrimarySample,
+        depth: Expr<u32>,
     ) -> (Expr<Uint2>, Color, Expr<SampledWavelengths>, Expr<f32>) {
         let sampler = IndependentReplaySampler::new(independent, sample);
         sampler.start();
@@ -153,10 +96,29 @@ impl Mcmc {
             scene
                 .camera
                 .generate_ray(filter, p.uint(), &sampler, eval.color_repr(), *swl);
-        let l = self.pt.radiance(scene, eval, ray, swl, &sampler) * ray_color * ray_w;
+        let l = {
+            let w = ray_color * ray_w;
+            let pt = PathTracerBase::new(
+                scene,
+                eval,
+                depth,
+                depth,
+                self.config.use_nee,
+                self.config.direct_spp >= 0,
+                swl,
+            );
+            pt.run_at_depth(ray, depth, &sampler);
+            pt.radiance.load() * w
+        };
         (p.uint(), l, *swl, Self::scalar_contribution(&l))
     }
-    fn bootstrap(&self, scene: &Arc<Scene>, filter: PixelFilter, eval: &Evaluators) -> RenderState {
+    fn bootstrap(
+        &self,
+        scene: &Arc<Scene>,
+        filter: PixelFilter,
+        eval: &Evaluators,
+        depth: usize,
+    ) -> RenderState {
         let seeds = init_pcg32_buffer(self.device.clone(), self.n_bootstrap + self.n_chains);
 
         let fs = self
@@ -167,13 +129,14 @@ impl Mcmc {
                 let i = dispatch_id().x();
                 let seed = seeds.var().read(i);
                 let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seed));
-                let sample = VLArrayVar::<f32>::zero(self.sample_dimension());
+                let sample = VLArrayVar::<f32>::zero(self.sample_dimension(depth));
                 for_range(const_(0)..sample.len().int(), |i| {
                     let i = i.uint();
                     sample.write(i, sampler.next_1d());
                 });
                 let sample = PrimarySample { values: sample };
-                let (_p, _l, _swl, f) = self.evaluate(scene, filter, eval, &sampler, sample);
+                let (_p, _l, _swl, f) =
+                    self.evaluate(scene, filter, eval, &sampler, sample, const_(depth as u32));
                 fs.var().write(i, f);
             })
             .dispatch([self.n_bootstrap as u32, 1, 1]);
@@ -190,21 +153,21 @@ impl Mcmc {
         let cur_colors = ColorBuffer::new(self.device.clone(), self.n_chains, eval.color_repr());
         let sample_buffer = self
             .device
-            .create_buffer(self.sample_dimension() * self.n_chains);
+            .create_buffer(self.sample_dimension(depth) * self.n_chains);
         self.device
             .create_kernel::<()>(&|| {
                 let i = dispatch_id().x();
                 let seed_idx = resampled.var().read(i);
                 let seed = seeds.var().read(seed_idx);
                 let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seed));
-                let sample = VLArrayVar::<f32>::zero(self.sample_dimension());
+                let sample = VLArrayVar::<f32>::zero(self.sample_dimension(depth));
                 for_range(const_(0)..sample.len().int(), |i| {
                     let i = i.uint();
                     sample.write(i, sampler.next_1d());
                 });
 
                 for_range(const_(0)..sample.len().int(), |j| {
-                    let dim = self.sample_dimension();
+                    let dim = self.sample_dimension(depth);
                     let j = j.uint();
                     sample_buffer
                         .var()
@@ -212,7 +175,8 @@ impl Mcmc {
                 });
 
                 let sample = PrimarySample { values: sample };
-                let (p, l, swl, f) = self.evaluate(scene, filter, eval, &sampler, sample);
+                let (p, l, swl, f) =
+                    self.evaluate(scene, filter, eval, &sampler, sample, const_(depth as u32));
                 // cpu_dbg!(make_float2(f, fs.var().read(seed_idx)));
                 let sigma = match &self.method {
                     Method::Kelemen { small_sigma, .. } => *small_sigma,
@@ -245,6 +209,7 @@ impl Mcmc {
         cur_swl: Var<SampledWavelengths>,
         sample: PrimarySample,
         rng: &IndependentSampler,
+        depth: usize,
     ) {
         let res = const_(scene.camera.resolution()).float();
         // select a mutation strategy
@@ -272,8 +237,14 @@ impl Mcmc {
                     }
                 });
                 let clamped = proposal.sample.clamped();
-                let (proposal_p, proposal_color, proposal_swl, f) =
-                    self.evaluate(scene, film.filter(), eval, &rng, clamped);
+                let (proposal_p, proposal_color, proposal_swl, f) = self.evaluate(
+                    scene,
+                    film.filter(),
+                    eval,
+                    &rng,
+                    clamped,
+                    const_(depth as u32),
+                );
                 let proposal_f = f;
                 if_!(is_large_step, {
                     state.set_b(state.b().load() + proposal_f);
@@ -338,6 +309,7 @@ impl Mcmc {
         film: &Film,
         mutations_per_chain: Expr<u32>,
         contribution: Expr<f32>,
+        depth: usize,
     ) {
         let i = dispatch_id().x();
         let markov_states = render_state.states.var();
@@ -345,7 +317,7 @@ impl Mcmc {
             IndependentSampler::from_pcg32(var!(Pcg32, render_state.rng_states.var().read(i)));
         let state = var!(MarkovState, markov_states.read(i));
         let sample = {
-            let dim = self.sample_dimension();
+            let dim = self.sample_dimension(depth);
             let sample = VLArrayVar::<f32>::zero(dim);
             lc_assert!(i.cmpeq(state.chain_id().load()));
             for_range(const_(0)..const_(dim as i32), |j| {
@@ -368,10 +340,11 @@ impl Mcmc {
                 cur_swl_v,
                 sample,
                 &sampler,
+                depth,
             );
         });
         {
-            let dim = self.sample_dimension();
+            let dim = self.sample_dimension(depth);
             for_range(const_(0)..const_(dim as i32), |j| {
                 let j = j.uint();
                 render_state
@@ -394,6 +367,9 @@ impl Mcmc {
         state: &RenderState,
         film: &mut Film,
         options: &RenderOptions,
+        depth: usize,
+        spp: u32,
+        weight: f32,
     ) {
         let resolution = scene.camera.resolution();
         let npixels = resolution.x * resolution.y;
@@ -410,7 +386,15 @@ impl Mcmc {
                 } else {
                     set_block_size([256, 1, 1]);
                 }
-                self.advance_chain(scene, eval, state, film, mutations_per_chain, contribution)
+                self.advance_chain(
+                    scene,
+                    eval,
+                    state,
+                    film,
+                    mutations_per_chain,
+                    contribution,
+                    depth,
+                )
             },
         );
         let reconstruct = |film: &mut Film, spp: u32| {
@@ -436,21 +420,25 @@ impl Mcmc {
         let mut stats = RenderStats::default();
         {
             let mut cnt = 0;
-            let spp_per_pass = self.pt.spp_per_pass;
-            let progress = util::create_progess_bar(self.pt.spp as usize, "spp");
-            while cnt < self.pt.spp {
+            let spp_per_pass = self.config.spp_per_pass;
+            let progress = util::create_progess_bar(spp as usize, "spp");
+            // since mutations_per_chain is truncated, we need to compensate for the truncation error
+            // mutations_per_chain * n_chains * contribution = n_mutations
+            let contribution = {
+                let n_mutations = npixels as u64 * spp as u64;
+                let mutations_per_chain = (n_mutations / self.n_chains as u64).max(1);
+                n_mutations as f64 / (mutations_per_chain as f64 * self.n_chains as f64)
+            } as f32
+                * weight;
+            while cnt < spp {
                 let tic = Instant::now();
-                let cur_pass = (self.pt.spp - cnt).min(spp_per_pass);
+                let cur_pass = (spp - cnt).min(spp_per_pass);
                 let n_mutations = npixels as u64 * cur_pass as u64;
                 let mutations_per_chain = (n_mutations / self.n_chains as u64).max(1);
                 if mutations_per_chain > u32::MAX as u64 {
                     panic!("Number of mutations per chain exceeds u32::MAX, please reduce spp per pass or increase number of chains");
                 }
                 let mutations_per_chain = mutations_per_chain as u32;
-                // since mutations_per_chain is truncated, we need to compensate for the truncation error
-                // mutations_per_chain * n_chains * contribution = n_mutations
-                let contribution =
-                    n_mutations as f32 / (mutations_per_chain as f32 * self.n_chains as f32);
                 kernel.dispatch(
                     [self.n_chains as u32, 1, 1],
                     &mutations_per_chain,
@@ -469,7 +457,7 @@ impl Mcmc {
                     );
                     reconstruct(film, cnt);
                     film.copy_to_rgba_image(&output_image);
-                    let path = format!("{}-{}.exr", options.session, cnt);
+                    let path = format!("{}-depth-{}-{}.exr", options.session, depth, cnt);
                     util::write_image(&output_image, &path);
                     stats.intermediate.push(IntermediateStats {
                         time: acc_time,
@@ -480,7 +468,8 @@ impl Mcmc {
             }
             progress.finish();
             if options.save_stats {
-                let file = File::create(format!("{}.json", options.session)).unwrap();
+                let file =
+                    File::create(format!("{}-depth-{}.json", options.session, depth)).unwrap();
                 let json = serde_json::to_value(&stats).unwrap();
                 let writer = BufWriter::new(file);
                 serde_json::to_writer(writer, &json).unwrap();
@@ -488,10 +477,10 @@ impl Mcmc {
         }
 
         log::info!("Rendering finished in {:.2}s", acc_time);
-        reconstruct(film, self.pt.spp);
+        reconstruct(film, spp);
     }
 }
-impl Integrator for Mcmc {
+impl Integrator for SinglePathMcmc {
     fn render(
         &self,
         scene: Arc<Scene>,
@@ -522,8 +511,8 @@ impl Integrator for Mcmc {
                     rr_depth: 1,
                     spp: self.config.direct_spp as u32,
                     indirect_only: false,
-                    spp_per_pass: self.pt.spp_per_pass,
-                    use_nee: self.pt.use_nee,
+                    spp_per_pass: self.config.spp_per_pass,
+                    use_nee: self.config.use_nee,
                     ..Default::default()
                 },
             );
@@ -535,8 +524,58 @@ impl Integrator for Mcmc {
                 &Default::default(),
             );
         }
-        let render_state = self.bootstrap(&scene, film.filter(), &evaluators);
-        self.render_loop(&scene, &evaluators, &render_state, film, options);
+        let start_depth = if self.config.direct_spp >= 0 { 2 } else { 0 };
+        let depths = (start_depth..=self.config.max_depth).collect::<Vec<_>>();
+        let mut films = depths
+            .iter()
+            .map(|_| {
+                let film = film.clone();
+                film.clear();
+                film
+            })
+            .collect::<Vec<_>>();
+        let mut render_states = vec![];
+        let mut importance = vec![];
+        for i in 0..depths.len() {
+            let film = &mut films[i];
+            let render_state =
+                self.bootstrap(&scene, film.filter(), &evaluators, depths[i] as usize);
+            importance.push(render_state.b_init as f64 / render_state.b_init_cnt as f64);
+            render_states.push(render_state);
+        }
+        // Allocate more samples to higher importance depths
+        let mut spp_per_depth = vec![];
+        let mut weights_per_depth = vec![];
+        {
+            let sum = importance.iter().sum::<f64>();
+            for i in 0..importance.len() {
+                importance[i] /= sum;
+                log::info!("Depth {} has importance {:.6}", depths[i], importance[i]);
+            }
+            let total_spps = self.config.spp as u64 * depths.len() as u64;
+            for i in 0..depths.len() {
+                let expected_spp = total_spps as f64 * importance[i];
+                let allocated_spp = expected_spp.ceil() as u32;
+                spp_per_depth.push(allocated_spp);
+                weights_per_depth.push(1.0);
+            }
+        }
+
+        films.iter_mut().enumerate().for_each(|(i, film)| {
+            self.render_loop(
+                &scene,
+                &evaluators,
+                &render_states[i],
+                film,
+                options,
+                depths[i] as usize,
+                spp_per_depth[i],
+                weights_per_depth[i],
+            );
+        });
+        for f in &films {
+            film.merge(f);
+        }
     }
 }
 
@@ -549,6 +588,6 @@ pub fn render(
     config: &Config,
     options: &RenderOptions,
 ) {
-    let mcmc = Mcmc::new(device.clone(), config.clone());
+    let mcmc = SinglePathMcmc::new(device.clone(), config.clone());
     mcmc.render(scene, sampler, color_pipeline, film, options);
 }

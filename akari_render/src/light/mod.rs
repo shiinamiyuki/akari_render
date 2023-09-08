@@ -38,7 +38,7 @@ impl<'a> LightEvalContext<'a> {
     }
 }
 
-pub trait Light {
+pub trait Light: Send + Sync {
     fn id(&self) -> Expr<u32>;
     fn le(
         &self,
@@ -63,7 +63,7 @@ pub trait Light {
     ) -> Expr<f32>;
 }
 
-pub trait LightDistribution {
+pub trait LightDistribution: Send + Sync {
     fn sample_and_remap(&self, u: Expr<f32>) -> (Uint, Expr<f32>, Expr<f32>);
     fn pdf(&self, light_index: Uint) -> Float;
 }

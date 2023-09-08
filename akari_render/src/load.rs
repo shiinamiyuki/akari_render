@@ -35,7 +35,7 @@ pub struct SceneLoader {
     mesh_areas: Vec<Vec<f32>>,
     mesh_buffers: Vec<MeshBuffer>,
     graph: NodeGraph,
-    camera: Option<Box<dyn Camera>>,
+    camera: Option<Arc<dyn Camera>>,
     root: NodeId,
     surface_shader_compiler: CompilerDriver,
     material_nodes: Vec<NodeId>,
@@ -214,7 +214,7 @@ impl SceneLoader {
             panic!("Unsupported transform type: {}", ty);
         }
     }
-    fn load_camera(&self, node_id: &NodeId) -> Box<dyn Camera> {
+    fn load_camera(&self, node_id: &NodeId) -> Arc<dyn Camera> {
         let node = &self.graph.nodes[node_id];
         let ty = node.ty().unwrap();
         if ty == nodes::PerspectiveCamera::ty() {
@@ -226,7 +226,7 @@ impl SceneLoader {
             let lens_radius = focal_distance / (2.0 * fstop);
             let width = *cam.in_width.as_value().unwrap() as u32;
             let height = *cam.in_height.as_value().unwrap() as u32;
-            let cam = Box::new(PerspectiveCamera::new(
+            let cam = Arc::new(PerspectiveCamera::new(
                 self.device.clone(),
                 Uint2::new(width, height),
                 transform,
@@ -326,7 +326,7 @@ impl SceneLoader {
         // now compute light emission power
         for (i, inst) in instances.iter_mut().enumerate() {
             let power = self.estimate_surface_emission_power(inst, &instance_surfaces[i]);
-            
+
             if 0.0 < power && power <= 1e-4 {
                 log::warn!(
                     "Light power too low: {}, power: {}",
@@ -431,7 +431,7 @@ impl SceneLoader {
         let mut meshes = vec![];
         let mut mesh_buffers = vec![];
         let mut path_samplers: HashSet<(String, luisa::Sampler)> = HashSet::new();
-        let sorted_node_ids =  {
+        let sorted_node_ids = {
             let mut sorted_node_ids = graph.nodes.keys().collect::<Vec<_>>();
             sorted_node_ids.sort();
             sorted_node_ids

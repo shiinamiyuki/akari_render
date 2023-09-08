@@ -167,6 +167,43 @@ impl Film {
         self.pixels.view(..).fill(0.0);
         self.weights.view(..).fill(0.0);
     }
+    /// merge the content of `other` into `self`
+    /// `self` and `other` must have the same resolution
+    /// The splat buffer of `other` will be converted using `self.splat_scale`
+    pub fn merge(&self, other: &Self) {
+        assert_eq!(self.repr, other.repr);
+        assert_eq!(self.resolution, other.resolution);
+        self.device
+            .create_kernel::<(f32, f32)>(
+                &|self_splat_scale: Expr<f32>, other_splat_scale: Expr<f32>| {
+                    let p = dispatch_id().xy();
+                    let i = p.x() + p.y() * self.resolution.x;
+                    let pixels = self.pixels.var();
+                    let splat = self.splat.var();
+                    let weights = self.weights.var();
+                    let nvalues = self.repr.nvalues();
+                    let w = other.weights.var().read(i);
+                    weights.atomic_fetch_add(i, w);
+                    for c in 0..nvalues {
+                        // merge splat
+                        let s = safe_div(
+                            other.splat.var().read(i * nvalues as u32 + c as u32),
+                            self_splat_scale,
+                        ) * other_splat_scale;
+                        splat.atomic_fetch_add(i * nvalues as u32 + c as u32, s);
+
+                        // merge pixels
+                        let p = other.pixels.var().read(i * nvalues as u32 + c as u32);
+                        pixels.atomic_fetch_add(i * nvalues as u32 + c as u32, p * w);
+                    }
+                },
+            )
+            .dispatch(
+                [self.resolution.x, self.resolution.y, 1],
+                &self.splat_scale,
+                &other.splat_scale,
+            );
+    }
     pub fn copy_to_rgba_image(&self, image: &Tex2d<Float4>) {
         assert_eq!(image.width(), self.resolution.x);
         assert_eq!(image.height(), self.resolution.y);

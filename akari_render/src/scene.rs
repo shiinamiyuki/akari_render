@@ -25,7 +25,7 @@ pub struct Scene {
     pub svm: Arc<Svm>,
     pub lights: LightAggregate,
     pub meshes: Arc<MeshAggregate>,
-    pub camera: Box<dyn Camera>,
+    pub camera: Arc<dyn Camera>,
     pub device: Device,
     // pub env_map: Buffer<TagIndex>,
 }
