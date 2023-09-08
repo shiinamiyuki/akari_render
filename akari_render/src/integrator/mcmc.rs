@@ -6,6 +6,7 @@ use std::time::Instant;
 use super::pt::{self, PathTracer};
 use super::{Integrator, IntermediateStats, RenderOptions, RenderStats};
 use crate::sampler::mcmc::IsotropicExponentialMutation;
+use crate::util::distribution::resample_with_f64;
 use crate::{
     color::*,
     film::*,
@@ -14,7 +15,7 @@ use crate::{
         *,
     },
     scene::*,
-    util::alias_table::AliasTable,
+    util::distribution::AliasTable,
     *,
 };
 use rand::Rng;
@@ -103,8 +104,8 @@ struct RenderState {
     samples: Buffer<f32>,
     states: Buffer<MarkovState>,
     cur_colors: ColorBuffer,
-    b_init: f32,
-    b_init_cnt: u32,
+    b_init: f64,
+    b_init_cnt: usize,
 }
 impl Mcmc {
     fn sample_dimension(&self) -> usize {
@@ -178,13 +179,13 @@ impl Mcmc {
             .dispatch([self.n_bootstrap as u32, 1, 1]);
 
         let weights = fs.copy_to_vec();
-        let b = weights.iter().sum::<f32>();
+        let (b, resampled) = resample_with_f64(&weights, self.n_chains);
         assert!(b > 0.0, "Bootstrap failed, please retry with more samples");
         log::info!(
             "Normalization factor initial estimate: {}",
-            b / self.n_bootstrap as f32
+            b / self.n_bootstrap as f64
         );
-        let at = AliasTable::new(self.device.clone(), &weights);
+        let resampled = self.device.create_buffer_from_slice(&resampled);
         let states = self.device.create_buffer(self.n_chains);
         let cur_colors = ColorBuffer::new(self.device.clone(), self.n_chains, eval.color_repr());
         let sample_buffer = self
@@ -193,9 +194,7 @@ impl Mcmc {
         self.device
             .create_kernel::<()>(&|| {
                 let i = dispatch_id().x();
-                let seed = seeds.var().read(i + self.n_bootstrap as u32);
-                let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seed));
-                let (seed_idx, _, _) = at.sample_and_remap(sampler.next_1d());
+                let seed_idx = resampled.var().read(i);
                 let seed = seeds.var().read(seed_idx);
                 let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seed));
                 let sample = VLArrayVar::<f32>::zero(self.sample_dimension());
@@ -224,6 +223,7 @@ impl Mcmc {
                 states.var().write(i, state);
             })
             .dispatch([self.n_chains as u32, 1, 1]);
+
         let rng_states = init_pcg32_buffer(self.device.clone(), self.n_chains);
         RenderState {
             rng_states,
@@ -231,7 +231,7 @@ impl Mcmc {
             cur_colors,
             states,
             b_init: b,
-            b_init_cnt: self.n_bootstrap as u32,
+            b_init_cnt: self.n_bootstrap,
         }
     }
     fn mutate_chain(

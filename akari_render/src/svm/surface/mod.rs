@@ -546,9 +546,11 @@ impl Surface for MicrofacetTransmission {
         let eta = select(cos_o.cmpgt(0.0), self.eta, 1.0 / self.eta);
         let wh = (wo + wi * eta).normalize();
         let wh = face_forward(wh, make_float3(0.0, 1.0, 0.0));
+        let backfacing = (wh.dot(wi) * cos_i).cmplt(0.0) | (wh.dot(wo) * cos_o).cmplt(0.0);
         if_!((wh.dot(wo) * wi.dot(wh)).cmpgt(0.0)
             | cos_i.cmpeq(0.0)
             | cos_o.cmpeq(0.0)
+            | backfacing
             | Frame::same_hemisphere(wo, wi), {
             Color::zero(ctx.color_repr)
         }, else {
@@ -583,6 +585,7 @@ impl Surface for MicrofacetTransmission {
         let (refracted, _eta, wi) = refract(wo, wh, self.eta);
         let valid = refracted & !Frame::same_hemisphere(wo, wi);
         let pdf = self.pdf(wo, wi, *swl, ctx);
+        let valid = valid & pdf.cmpgt(0.0);
         // lc_assert!(pdf.cmpgt(0.0) | !valid);
         BsdfSample {
             pdf,
@@ -604,9 +607,11 @@ impl Surface for MicrofacetTransmission {
         let eta = select(cos_o.cmpgt(0.0), self.eta, 1.0 / self.eta);
         let wh = (wo + wi * eta).normalize();
         let wh = face_forward(wh, make_float3(0.0, 1.0, 0.0));
+        let backfacing = (wh.dot(wi) * cos_i).cmplt(0.0) | (wh.dot(wo) * cos_o).cmplt(0.0);
         if_!((wh.dot(wo) * wi.dot(wh)).cmpgt(0.0)
             | cos_i.cmpeq(0.0)
             | cos_o.cmpeq(0.0)
+            | backfacing
             | Frame::same_hemisphere(wo, wi), {
             const_(0.0f32)
         }, else {

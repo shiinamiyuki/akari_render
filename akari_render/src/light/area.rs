@@ -4,7 +4,7 @@ use crate::{
     light::*,
     sampling::uniform_sample_triangle,
     svm::{surface::SURFACE_EVAL_EMISSION, ShaderRef},
-    util::alias_table::{AliasTableEntry, BindlessAliasTableVar},
+    util::distribution::{AliasTableEntry, BindlessAliasTableVar},
 };
 #[derive(Clone, Copy, Value)]
 #[repr(C)]

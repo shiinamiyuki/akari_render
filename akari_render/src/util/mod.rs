@@ -1,6 +1,7 @@
-pub mod alias_table;
+pub mod distribution;
 pub mod binserde;
 pub mod hash;
+pub mod integration;
 use crate::{color::glam_linear_to_srgb, *};
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use lazy_static::lazy_static;
@@ -177,6 +178,99 @@ pub fn erf(x: Expr<f32>) -> Expr<f32> {
     ERF.call(x)
 }
 
+/// Regularized lower incomplete gamma function (based on code from Cephes)
+/// Based on PBRT-v4
+pub fn rl_gamma(a: f64, x: f64) -> f64 {
+    let eps = 1e-15f64;
+    let big = 4503599627370496.0;
+    let big_inv = 2.22044604925031308085e-16;
+
+    if a < 0.0 || x < 0.0 {
+        panic!("LLGamma: invalid arguments range!");
+    }
+
+    if x == 0.0 {
+        return 0.0;
+    }
+
+    let ax = (a * x.ln()) - x - libm::lgamma(a);
+    if ax < -709.78271289338399 {
+        return if a < x { 1.0 } else { 0.0 };
+    }
+    if x <= 1.0 || x <= a {
+        let mut r2 = a;
+        let mut c2 = 1f64;
+        let mut ans2 = 1f64;
+
+        loop {
+            r2 = r2 + 1.0;
+            c2 = c2 * x / r2;
+            ans2 += c2;
+            if !((c2 / ans2) > eps) {
+                break;
+            }
+        }
+
+        return ax.exp() * ans2 / a;
+    }
+
+    let mut c = 0i32;
+    let mut y = 1.0 - a;
+    let mut z = x + y + 1.0;
+    let mut p3 = 1.0;
+    let mut q3 = x;
+    let mut p2 = x + 1.0;
+    let mut q2 = z * x;
+    let mut ans = p2 / q2;
+
+    loop {
+        c += 1;
+        y += 1.0;
+        z += 2.0;
+        let yc = y * c as f64;
+        let p = (p2 * z) - (p3 * yc);
+        let q = (q2 * z) - (q3 * yc);
+        let error;
+        if q != 0.0 {
+            let nextans = p / q;
+            error = ((ans - nextans) / nextans).abs();
+            ans = nextans;
+        } else {
+            // zero div, skip
+            error = 1.0;
+        }
+
+        // shift
+        p3 = p2;
+        p2 = p;
+        q3 = q2;
+        q2 = q;
+
+        // normalize fraction when the numerator becomes large
+        if p.abs() > big {
+            p3 *= big_inv;
+            p2 *= big_inv;
+            q3 *= big_inv;
+            q2 *= big_inv;
+        }
+        if error <= eps {
+            break;
+        }
+    }
+
+    return 1.0 - (ax.exp() * ans);
+}
+
+pub fn chi2cdf(x: f64, dof: i32) -> f64 {
+    if dof < 1 || x < 0.0 {
+        panic!("Chi2CDF: invalid arguments range!");
+    } else if dof == 2 {
+        1.0 - (-0.5 * x).exp()
+    } else {
+        rl_gamma(0.5 * dof as f64, 0.5 * x)
+    }
+}
+
 pub fn mix_bits(v: Expr<u64>) -> Expr<u64> {
     lazy_static! {
         static ref MIX_BITS: Callable<(Expr<u64>,), Expr<u64>> =
@@ -221,6 +315,13 @@ pub fn log2u32(x: u32) -> u32 {
 pub fn log4u32(x: u32) -> u32 {
     log2u32(x) / 2
 }
+pub fn round_up_pow4(x: u32) -> u32 {
+    if is_power_of_four(x) {
+        x
+    } else {
+        1 << (log4u32(x) + 1) * 2
+    }
+}
 pub fn round_to(x: usize, align: usize) -> usize {
     (x + align - 1) / align * align
 }
@@ -233,6 +334,15 @@ mod test {
     fn test_log4u32() {
         for i in 1..100000 {
             test_log4u32_x(i);
+        }
+    }
+    #[test]
+    fn test_round_up_pow4() {
+        for i in 1..100000 {
+            let x = super::round_up_pow4(i);
+            assert!(super::is_power_of_four(x));
+            assert!(x >= i);
+            assert!(x < i * 4);
         }
     }
 }

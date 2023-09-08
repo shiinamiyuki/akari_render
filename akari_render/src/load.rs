@@ -143,6 +143,7 @@ impl SceneLoader {
                     let area = self.mesh_total_area(geom_id);
                     let transform: glam::Mat3 = instance.transform.m3.into();
                     let det = transform.determinant();
+                    // dbg!(power, area, det, strength);
                     return power * area * det.abs() * strength;
                 }
             }
@@ -325,6 +326,7 @@ impl SceneLoader {
         // now compute light emission power
         for (i, inst) in instances.iter_mut().enumerate() {
             let power = self.estimate_surface_emission_power(inst, &instance_surfaces[i]);
+            
             if 0.0 < power && power <= 1e-4 {
                 log::warn!(
                     "Light power too low: {}, power: {}",

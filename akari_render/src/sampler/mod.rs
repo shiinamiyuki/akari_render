@@ -8,7 +8,7 @@ use rand::{rngs::StdRng, thread_rng, Rng, SeedableRng};
 use crate::data::bluenoise::{BLUE_NOISE_RESOLUTION, N_BLUE_NOISE_TEXTURES};
 use crate::data::pmj02bn::N_PMJ02BN_SETS;
 use crate::util::hash::xxhash32_4;
-use crate::util::{is_power_of_four, log4u32};
+use crate::util::{is_power_of_four, log4u32, round_up_pow4};
 use crate::{scene::Scene, *};
 pub mod mcmc;
 use crate::data::{bluenoise, pmj02bn};
@@ -338,7 +338,7 @@ impl Pmj02BnSamplerCreator {
         w |= w >> 4;
         w |= w >> 8;
         w |= w >> 16;
-        let pixel_tile_size = 1u32 << (log4u32(pmj02bn::N_PMJ02BN_SAMPLES as u32) - log4u32(spp));
+        let pixel_tile_size = 1u32 << (log4u32(pmj02bn::N_PMJ02BN_SAMPLES as u32) - log4u32(round_up_pow4(spp)));
         let n_pixel_samples = pixel_tile_size.pow(2) * spp;
         let mut pixel_samples = vec![Float2::new(0.0, 0.0); n_pixel_samples as usize];
         let mut n_stored = vec![0u32; pixel_tile_size.pow(2) as usize];
@@ -500,6 +500,41 @@ impl Pmj02BnSampler {
                     .read(uv)
                     .x()
             };
+        // let permute_element_ = Arc::new(device.create_dyn_callable::<(Expr<u32>, Expr<u32>, Expr<u32>, Expr<u32>), Expr<u32>>(
+        //     Box::new(|i: Expr<u32>, l: Expr<u32>, w: Expr<u32>, p: Expr<u32>| {
+        //         let i0 = var!(u32, i);
+        //         let cnt = var!(u32, 0);
+        //         loop_!({
+        //             let mut i = *i0;
+        //             i ^= p;
+        //             i *= 0xe170893du32;
+        //             i ^= p >> 16u32;
+        //             i ^= (i & w) >> 4u32;
+        //             i ^= p >> 8u32;
+        //             i *= 0x0929eb3fu32;
+        //             i ^= p >> 23u32;
+        //             i ^= (i & w) >> 1u32;
+        //             i *= 1 | p >> 27u32;
+        //             i *= 0x6935fa69u32;
+        //             i ^= (i & w) >> 11u32;
+        //             i *= 0x74dcb303u32;
+        //             i ^= (i & w) >> 2u32;
+        //             i *= 0x9e501cc3u32;
+        //             i ^= (i & w) >> 2u32;
+        //             i *= 0xc860a3dfu32;
+        //             i &= w;
+        //             i ^= i >> 5u32;
+        //             *i0.get_mut() = i;
+        //             *cnt.get_mut() += 1;
+        //             if_!(i.cmplt(l), {
+        //                 break_();
+        //             })
+        //         });
+        //         let i = *i0;
+        //         (i + p) % l
+        //     })
+        // ));
+        // let permute_element = permute_element_.clone();
         let next_1d = {
             let bluenoise_textures = bluenoise_textures.clone();
             device.create_dyn_callable::<(Var<Pmj02BnState>,), Expr<f32>>(Box::new(
@@ -518,6 +553,7 @@ impl Pmj02BnSampler {
                 },
             ))
         };
+        // let permute_element = permute_element_.clone();
         let next_2d = {
             let pmj02bn_samples = pmj02bn_samples.clone();
             let bluenoise_textures = bluenoise_textures.clone();
@@ -587,6 +623,7 @@ impl Sampler for Pmj02BnSampler {
                 *self.state.sample_index().get_mut() += 1;
             }
         );
+        lc_assert!(self.state.sample_index().cmplt(*self.state.spp()));
     }
     fn clone_box(&self) -> Box<dyn Sampler> {
         Box::new(Self {

@@ -1,5 +1,7 @@
 use std::collections::VecDeque;
 
+use rand::Rng;
+
 use crate::*;
 
 use crate::sampling::{uniform_discrete_choice_and_remap, weighted_discrete_choice2_and_remap};
@@ -90,6 +92,31 @@ impl AliasTable {
     }
 }
 
+/// let (sum, samples) = resample_on_cpu(&weights, count);
+pub fn resample_with_f64(weights: &[f32], count: usize) -> (f64, Vec<u32>) {
+    let weights = weights.iter().map(|x| *x as f64).collect::<Vec<_>>();
+    let sum = weights.par_iter().sum::<f64>();
+    let mut cdf = vec![];
+    for i in 0..weights.len() {
+        let p = weights[i] / sum;
+        if i == 0 {
+            cdf.push(p);
+        } else {
+            cdf.push(cdf[i - 1] + p);
+        }
+    }
+
+    let mut rng = rand::thread_rng();
+
+    let resampled = (0..count)
+        .map(|_| {
+            let u = rng.gen::<f64>();
+            let i = cdf.partition_point(|x| u >= *x) as u32;
+            i.min(weights.len() as u32 - 1)
+        })
+        .collect();
+    (sum, resampled)
+}
 #[cfg(test)]
 mod test {
 

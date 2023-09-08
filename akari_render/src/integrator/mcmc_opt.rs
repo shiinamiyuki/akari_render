@@ -10,7 +10,8 @@ use crate::sampler::mcmc::{
     mutate_image_space_single, KelemenMutationRecord, KelemenMutationRecordExpr, KELEMEN_MUTATE,
 };
 use crate::sampling::sample_gaussian;
-use crate::{color::*, film::*, sampler::*, scene::*, util::alias_table::AliasTable, *};
+use crate::util::distribution::resample_with_f64;
+use crate::{color::*, film::*, sampler::*, scene::*, util::distribution::AliasTable, *};
 
 use super::mcmc::{Config, Mcmc, Method};
 #[derive(Clone, Copy, Value, Debug)]
@@ -49,8 +50,8 @@ struct RenderState {
     samples: Buffer<PssSample>,
     states: Buffer<MarkovState>,
     cur_colors: ColorBuffer,
-    b_init: f32,
-    b_init_cnt: u32,
+    b_init: f64,
+    b_init_cnt: usize,
 }
 
 pub struct LazyMcmcSampler<'a> {
@@ -259,7 +260,13 @@ impl McmcOpt {
         chain_id: Expr<u32>,
         mutator: Option<Mutator>,
         is_bootstrap: bool,
-    ) ->  (Expr<Uint2>, Color, Expr<SampledWavelengths>, Expr<f32>, Expr<u32>) {
+    ) -> (
+        Expr<Uint2>,
+        Color,
+        Expr<SampledWavelengths>,
+        Expr<f32>,
+        Expr<u32>,
+    ) {
         let sampler = LazyMcmcSampler::new(
             independent,
             samples,
@@ -281,14 +288,20 @@ impl McmcOpt {
                 .camera
                 .generate_ray(filter, p.uint(), &sampler, eval.color_repr(), *swl);
         let l = self.pt.radiance(scene, eval, ray, swl, &sampler) * ray_color * ray_w;
-        (p.uint(), l, *swl, Self::scalar_contribution(&l), *sampler.cur_dim)
+        (
+            p.uint(),
+            l,
+            *swl,
+            Self::scalar_contribution(&l),
+            *sampler.cur_dim,
+        )
     }
     pub fn scalar_contribution(color: &Color) -> Expr<f32> {
         color.max().clamp(0.0, 1e5)
         // const_(1.0f32)
     }
     fn bootstrap(&self, scene: &Arc<Scene>, filter: PixelFilter, eval: &Evaluators) -> RenderState {
-        let seeds = init_pcg32_buffer(self.device.clone(), self.n_bootstrap + self.n_chains);
+        let seeds = init_pcg32_buffer(self.device.clone(), self.n_bootstrap);
         let fs = self
             .device
             .create_buffer_from_fn(self.n_bootstrap, |_| 0.0f32);
@@ -318,22 +331,20 @@ impl McmcOpt {
             .dispatch([self.n_bootstrap as u32, 1, 1]);
 
         let weights = fs.copy_to_vec();
-        let b = weights.iter().sum::<f32>();
+        let (b, resampled) = resample_with_f64(&weights, self.n_chains);
         assert!(b > 0.0, "Bootstrap failed, please retry with more samples");
         log::info!(
             "Normalization factor initial estimate: {}",
-            b / self.n_bootstrap as f32
+            b / self.n_bootstrap as f64
         );
-        let at = AliasTable::new(self.device.clone(), &weights);
+        let resampled = self.device.create_buffer_from_slice(&resampled);
         let states = self.device.create_buffer(self.n_chains);
         let cur_colors = ColorBuffer::new(self.device.clone(), self.n_chains, eval.color_repr());
 
         self.device
             .create_kernel::<()>(&|| {
                 let i = dispatch_id().x();
-                let seed = seeds.var().read(i + self.n_bootstrap as u32);
-                let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seed));
-                let (seed_idx, _, _) = at.sample_and_remap(sampler.next_1d());
+                let seed_idx = resampled.var().read(i);
                 let seed = seeds.var().read(seed_idx);
                 let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seed));
                 let dim = const_(self.sample_dimension() as u32);
@@ -367,7 +378,7 @@ impl McmcOpt {
             cur_colors,
             states,
             b_init: b,
-            b_init_cnt: self.n_bootstrap as u32,
+            b_init_cnt: self.n_bootstrap,
         }
     }
     fn mutate_chain(
@@ -519,7 +530,9 @@ impl McmcOpt {
             );
         });
 
-        render_state.cur_colors.write(i, cur_color_v.load(), *cur_swl_v);
+        render_state
+            .cur_colors
+            .write(i, cur_color_v.load(), *cur_swl_v);
         render_state.rng_states.var().write(i, sampler.state.load());
         markov_states.write(i, state.load());
     }

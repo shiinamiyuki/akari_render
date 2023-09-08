@@ -4,7 +4,7 @@ use crate::geometry::{ShadingTriangle, Triangle};
 use crate::svm::ShaderRef;
 use crate::util::binserde::*;
 use crate::*;
-use crate::{geometry::AffineTransform, util::alias_table::AliasTable};
+use crate::{geometry::AffineTransform, util::distribution::AliasTable};
 use luisa::{AccelBuildRequest, AccelOption, BufferHeap};
 use serde::{Deserialize, Serialize};
 

@@ -6,7 +6,7 @@ use crate::{
     interaction::SurfaceInteraction,
     mesh::MeshAggregate,
     svm::{surface::SurfaceEvaluator, Svm},
-    util::alias_table::AliasTable,
+    util::distribution::AliasTable,
     *,
 };
 

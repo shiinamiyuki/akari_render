@@ -308,7 +308,7 @@ pub fn spherical_to_xyz(theta: Expr<f32>, phi: Expr<f32>) -> Expr<Float3> {
     make_float3(sin_theta * phi.cos(), theta.cos(), sin_theta * phi.sin())
 }
 
-// let (theta, phi) = xyz_to_spherical(v);
+/// let (theta, phi) = xyz_to_spherical(v);
 pub fn xyz_to_spherical(v: Expr<Float3>) -> (Expr<f32>, Expr<f32>) {
     let phi = v.z().atan2(v.x());
     let theta = v.y().acos();
