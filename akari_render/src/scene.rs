@@ -13,13 +13,7 @@ use crate::svm::surface::{
     SURFACE_EVAL_ROUGHNESS,
 };
 use crate::svm::{ShaderRef, Svm};
-use crate::{
-    camera::Camera,
-    geometry::*,
-    interaction::*,
-    mesh::*,
-    *,
-};
+use crate::{camera::Camera, geometry::*, interaction::*, mesh::*, *};
 
 pub struct Scene {
     pub svm: Arc<Svm>,
@@ -41,9 +35,9 @@ impl Evaluators {
 }
 
 impl Scene {
-    pub fn evaluators(&self, color_pipeline: ColorPipeline) -> Evaluators {
-        let surface = self.surface_evaluator(color_pipeline);
-        let light = self.light_evaluator(color_pipeline, &surface);
+    pub fn evaluators(&self, color_pipeline: ColorPipeline, ad_mode: Option<ADMode>) -> Evaluators {
+        let surface = self.surface_evaluator(color_pipeline, ad_mode);
+        let light = self.light_evaluator(color_pipeline, &surface, ad_mode);
         Evaluators {
             color_pipeline,
             light,
@@ -54,6 +48,7 @@ impl Scene {
         &self,
         color_pipeline: ColorPipeline,
         surface_eval: &SurfaceEvaluator,
+        ad_mode: Option<ADMode>,
     ) -> LightEvaluator {
         let le = {
             self.device.create_callable::<(
@@ -123,7 +118,11 @@ impl Scene {
             pdf,
         }
     }
-    pub fn surface_evaluator(&self, color_pipeline: ColorPipeline) -> SurfaceEvaluator {
+    pub fn surface_evaluator(
+        &self,
+        color_pipeline: ColorPipeline,
+        ad_mode: Option<ADMode>,
+    ) -> SurfaceEvaluator {
         let eval = {
             self.device.create_callable::<(
                 Expr<ShaderRef>,
@@ -142,6 +141,7 @@ impl Scene {
                     let ctx = BsdfEvalContext {
                         color_repr: color_pipeline.color_repr,
                         _marker: PhantomData,
+                        ad_mode,
                     };
                     let color_repr = ctx.color_repr;
                     let (color, pdf, albedo, emission, roughness) =
@@ -205,6 +205,7 @@ impl Scene {
                     let ctx = BsdfEvalContext {
                         color_repr: color_pipeline.color_repr,
                         _marker: PhantomData,
+                        ad_mode,
                     };
                     let sample = self.svm.dispatch_surface(
                         shader_ref,

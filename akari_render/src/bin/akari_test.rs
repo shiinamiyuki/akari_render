@@ -102,6 +102,7 @@ mod bsdf_test_old {
                     &BsdfEvalContext {
                         color_repr,
                         _marker: std::marker::PhantomData,
+                        ad_mode: None,
                     },
                 );
                 PdfSampleExpr::new(sample.pdf, sample.wi, sample.valid)
@@ -457,6 +458,7 @@ plt.show()"#
                         &BsdfEvalContext {
                             color_repr: color::ColorRepr::Rgb(color::RgbColorSpace::SRgb),
                             _marker: PhantomData {},
+                            ad_mode: None,
                         },
                     )
                 },
@@ -479,6 +481,7 @@ plt.show()"#
                         &BsdfEvalContext {
                             color_repr: color::ColorRepr::Rgb(color::RgbColorSpace::SRgb),
                             _marker: PhantomData {},
+                            ad_mode: None,
                         },
                     )
                 },

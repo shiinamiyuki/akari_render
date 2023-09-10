@@ -11,6 +11,7 @@ use super::ShaderRef;
 
 pub struct BsdfEvalContext<'a> {
     pub color_repr: ColorRepr,
+    pub ad_mode: Option<ADMode>,
     pub _marker: std::marker::PhantomData<&'a ()>,
 }
 
