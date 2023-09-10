@@ -497,6 +497,9 @@ fn main() {
         .no_build_target(true)
         .build();
     dbg!(out.display());
+    if cfg!(target_os = "linux") {
+        println!("cargo:rustc-link-lib=stdc++");
+    }
     println!("cargo:rustc-link-search=native={}/build", out.display());
     println!("cargo:rustc-link-lib=static=akari_cpp_ext");
     gen_nodegraph_defs();
