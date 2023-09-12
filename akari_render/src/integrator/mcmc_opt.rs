@@ -319,7 +319,7 @@ impl McmcOpt {
             );
         }
         self.device
-            .create_kernel::<()>(&|| {
+            .create_kernel::<fn()>(&|| {
                 let i = dispatch_id().x();
                 let seed = seeds.var().read(i);
                 let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seed));
@@ -342,7 +342,7 @@ impl McmcOpt {
         let cur_colors = ColorBuffer::new(self.device.clone(), self.n_chains, eval.color_repr());
 
         self.device
-            .create_kernel::<()>(&|| {
+            .create_kernel::<fn()>(&|| {
                 let i = dispatch_id().x();
                 let seed_idx = resampled.var().read(i);
                 let seed = seeds.var().read(seed_idx);
@@ -548,7 +548,7 @@ impl McmcOpt {
         let resolution = scene.camera.resolution();
         let npixels = resolution.x * resolution.y;
 
-        let kernel = self.device.create_kernel::<(u32, f32)>(
+        let kernel = self.device.create_kernel::<fn(u32, f32)>(
             &|mutations_per_chain: Expr<u32>, contribution: Expr<f32>| {
                 if is_cpu_backend() {
                     let num_threads = std::thread::available_parallelism().unwrap().get();

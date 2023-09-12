@@ -51,52 +51,55 @@ impl Scene {
         ad_mode: Option<ADMode>,
     ) -> LightEvaluator {
         let le = {
-            self.device.create_callable::<(
+            self.device.create_callable::<fn(
                 Expr<Ray>,
                 Expr<SurfaceInteraction>,
                 Expr<SampledWavelengths>,
-            ), Expr<FlatColor>>(&|ray, si: Expr<SurfaceInteraction>, swl| {
-                let inst_id = si.inst_id();
-                let instance = self.meshes.mesh_instances.var().read(inst_id);
-                if_!(instance.light().valid(), {
-                    let ctx = LightEvalContext {
-                        meshes: &self.meshes,
-                        color_pipeline,
-                        surface_eval
-                    };
-                    self.lights.le(ray, si,swl, &ctx).flatten()
-                }, else {
-                  Color::zero(color_pipeline.color_repr).flatten()
-                })
-            })
-        };
-        let sample = {
-            self.device
-                .create_callable::<(Expr<PointNormal>, Expr<Float3>, Expr<SampledWavelengths>), Expr<FlatLightSample>>(
-                    &|pn, u,swl| {
+            ) -> Expr<FlatColor>>(
+                &|ray, si: Expr<SurfaceInteraction>, swl| {
+                    let inst_id = si.inst_id();
+                    let instance = self.meshes.mesh_instances.var().read(inst_id);
+                    if_!(instance.light().valid(), {
                         let ctx = LightEvalContext {
                             meshes: &self.meshes,
                             color_pipeline,
                             surface_eval
                         };
-                        let sample = self.lights.sample_direct(pn, u.x(), u.yz(), swl, &ctx);
-                        FlatLightSampleExpr::new(
-                            sample.li.flatten(),
-                            sample.pdf,
-                            sample.wi,
-                            sample.shadow_ray,
-                            sample.n,
-                        )
-                    },
+                        self.lights.le(ray, si,swl, &ctx).flatten()
+                    }, else {
+                      Color::zero(color_pipeline.color_repr).flatten()
+                    })
+                },
+            )
+        };
+        let sample = {
+            self.device.create_callable::<fn(
+                Expr<PointNormal>,
+                Expr<Float3>,
+                Expr<SampledWavelengths>,
+            ) -> Expr<FlatLightSample>>(&|pn, u, swl| {
+                let ctx = LightEvalContext {
+                    meshes: &self.meshes,
+                    color_pipeline,
+                    surface_eval,
+                };
+                let sample = self.lights.sample_direct(pn, u.x(), u.yz(), swl, &ctx);
+                FlatLightSampleExpr::new(
+                    sample.li.flatten(),
+                    sample.pdf,
+                    sample.wi,
+                    sample.shadow_ray,
+                    sample.n,
                 )
+            })
         };
         let pdf = {
             let scene = self.clone();
-            self.device.create_callable::<(
+            self.device.create_callable::<fn(
                 Expr<SurfaceInteraction>,
                 Expr<PointNormal>,
                 Expr<SampledWavelengths>,
-            ), Expr<f32>>(&|si, pn, _swl| {
+            ) -> Expr<f32>>(&|si, pn, _swl| {
                 let inst_id = si.inst_id();
                 let instance = scene.meshes.mesh_instances.var().read(inst_id);
                 if_!(instance.light().valid(), {
@@ -124,14 +127,14 @@ impl Scene {
         ad_mode: Option<ADMode>,
     ) -> SurfaceEvaluator {
         let eval = {
-            self.device.create_callable::<(
+            self.device.create_callable::<fn(
                 Expr<ShaderRef>,
                 Expr<SurfaceInteraction>,
                 Expr<Float3>,
                 Expr<Float3>,
                 Expr<SampledWavelengths>,
                 Expr<u32>,
-            ), Expr<FlatSurfaceEvalResult>>(
+            ) -> Expr<FlatSurfaceEvalResult>>(
                 &|shader_ref: Expr<ShaderRef>,
                   si: Expr<SurfaceInteraction>,
                   wo: Expr<Float3>,
@@ -190,13 +193,13 @@ impl Scene {
             )
         };
         let sample = {
-            self.device.create_callable::<(
+            self.device.create_callable::<fn(
                 Expr<ShaderRef>,
                 Expr<SurfaceInteraction>,
                 Expr<Float3>,
                 Expr<Float3>,
                 Var<SampledWavelengths>,
-            ), Expr<FlatBsdfSample>>(
+            ) -> Expr<FlatBsdfSample>>(
                 &|shader_ref: Expr<ShaderRef>,
                   si: Expr<SurfaceInteraction>,
                   wo: Expr<Float3>,

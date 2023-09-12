@@ -97,8 +97,8 @@ impl Pcg32Var {
     }
     pub fn gen_u32(&self) -> Expr<u32> {
         lazy_static! {
-            static ref PCG_GEN_U32: Callable<(Var<Pcg32>,), Expr<u32>> =
-                create_static_callable::<(Var<Pcg32>,), Expr<u32>>(|pcg: Var<Pcg32>| {
+            static ref PCG_GEN_U32: Callable<fn(Var<Pcg32>) -> Expr<u32>> =
+                create_static_callable::<fn(Var<Pcg32>) -> Expr<u32>>(|pcg: Var<Pcg32>| {
                     let old_state = pcg.state().load();
                     pcg.state()
                         .store(old_state * Pcg32::PCG32_MULT + pcg.inc().load());
@@ -115,7 +115,7 @@ pub fn init_pcg32_buffer(device: Device, count: usize) -> Buffer<Pcg32> {
     let mut rng = thread_rng();
     let seeds = device.create_buffer_from_fn(count, |_| rng.gen::<u64>());
     device
-        .create_kernel::<()>(&|| {
+        .create_kernel::<fn()>(&|| {
             let i = dispatch_id().x();
             let seed = seeds.var().read(i);
             let pcg = Pcg32Var::new_seq_offset(i.ulong(), seed);
@@ -129,7 +129,7 @@ pub fn init_pcg32_buffer_with_seed(device: Device, count: usize, seed: u64) -> B
     let mut rng = StdRng::seed_from_u64(seed);
     let seeds = device.create_buffer_from_fn(count, |_| rng.gen::<u64>());
     device
-        .create_kernel::<()>(&|| {
+        .create_kernel::<fn()>(&|| {
             let i = dispatch_id().x();
             let seed = seeds.var().read(i);
             let pcg = Pcg32Var::new_seq_offset(i.ulong(), seed);
@@ -338,7 +338,8 @@ impl Pmj02BnSamplerCreator {
         w |= w >> 4;
         w |= w >> 8;
         w |= w >> 16;
-        let pixel_tile_size = 1u32 << (log4u32(pmj02bn::N_PMJ02BN_SAMPLES as u32) - log4u32(round_up_pow4(spp)));
+        let pixel_tile_size =
+            1u32 << (log4u32(pmj02bn::N_PMJ02BN_SAMPLES as u32) - log4u32(round_up_pow4(spp)));
         let n_pixel_samples = pixel_tile_size.pow(2) * spp;
         let mut pixel_samples = vec![Float2::new(0.0, 0.0); n_pixel_samples as usize];
         let mut n_stored = vec![0u32; pixel_tile_size.pow(2) as usize];
@@ -424,8 +425,8 @@ impl Pmj02BnSamplerCreator {
 
 // see https://github.com/LuisaGroup/LuisaRender/blob/next/src/samplers/pmj02bn.cpp#L56
 lazy_static! {
-    static ref PERMUTE_ELEMENT: Callable<(Expr<u32>, Expr<u32>, Expr<u32>, Expr<u32>), Expr<u32>> =
-        create_static_callable::<(Expr<u32>, Expr<u32>, Expr<u32>, Expr<u32>), Expr<u32>>(
+    static ref PERMUTE_ELEMENT: Callable<fn(Expr<u32>, Expr<u32>, Expr<u32>, Expr<u32>) -> Expr<u32>> =
+        create_static_callable::<fn(Expr<u32>, Expr<u32>, Expr<u32>, Expr<u32>) -> Expr<u32>>(
             |i: Expr<u32>, l: Expr<u32>, w: Expr<u32>, p: Expr<u32>| {
                 let i0 = var!(u32, i);
                 loop_!({
@@ -479,8 +480,8 @@ pub struct Pmj02BnSampler {
     state: Var<Pmj02BnState>,
     states: Arc<Buffer<Pmj02BnState>>,
     forget: Var<bool>,
-    next_1d: Arc<DynCallable<(Var<Pmj02BnState>,), Expr<f32>>>,
-    next_2d: Arc<DynCallable<(Var<Pmj02BnState>,), Expr<Float2>>>,
+    next_1d: Arc<DynCallable<fn(Var<Pmj02BnState>) -> Expr<f32>>>,
+    next_2d: Arc<DynCallable<fn(Var<Pmj02BnState>) -> Expr<Float2>>>,
 }
 impl Pmj02BnSampler {
     fn new(
@@ -537,7 +538,7 @@ impl Pmj02BnSampler {
         // let permute_element = permute_element_.clone();
         let next_1d = {
             let bluenoise_textures = bluenoise_textures.clone();
-            device.create_dyn_callable::<(Var<Pmj02BnState>,), Expr<f32>>(Box::new(
+            device.create_dyn_callable::<fn(Var<Pmj02BnState>) -> Expr<f32>>(Box::new(
                 move |state: Var<Pmj02BnState>| {
                     let hash = xxhash32_4(make_uint4(
                         *state.pixel().x(),
@@ -557,7 +558,7 @@ impl Pmj02BnSampler {
         let next_2d = {
             let pmj02bn_samples = pmj02bn_samples.clone();
             let bluenoise_textures = bluenoise_textures.clone();
-            device.create_dyn_callable::<(Var<Pmj02BnState>,), Expr<Float2>>(Box::new(
+            device.create_dyn_callable::<fn(Var<Pmj02BnState>) -> Expr<Float2>>(Box::new(
                 move |state: Var<Pmj02BnState>| {
                     let index = var!(u32, *state.sample_index());
                     let pmj_instance = *state.dim() / 2;

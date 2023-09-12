@@ -99,24 +99,13 @@ pub struct LightAggregate {
 pub struct LightEvaluator {
     pub(crate) color_pipeline: ColorPipeline,
     pub(crate) le: Callable<
-        (
-            Expr<Ray>,
-            Expr<SurfaceInteraction>,
-            Expr<SampledWavelengths>,
-        ),
-        Expr<FlatColor>,
+        fn(Expr<Ray>, Expr<SurfaceInteraction>, Expr<SampledWavelengths>) -> Expr<FlatColor>,
     >,
     pub(crate) pdf: Callable<
-        (
-            Expr<SurfaceInteraction>,
-            Expr<PointNormal>,
-            Expr<SampledWavelengths>,
-        ),
-        Expr<f32>,
+        fn(Expr<SurfaceInteraction>, Expr<PointNormal>, Expr<SampledWavelengths>) -> Expr<f32>,
     >,
     pub(crate) sample: Callable<
-        (Expr<PointNormal>, Expr<Float3>, Expr<SampledWavelengths>),
-        Expr<FlatLightSample>,
+        fn(Expr<PointNormal>, Expr<Float3>, Expr<SampledWavelengths>) -> Expr<FlatLightSample>,
     >,
 }
 impl LightEvaluator {

@@ -138,7 +138,7 @@ impl PerspectiveCameraData {
             focal_length,
         }]);
         device
-            .create_kernel::<()>(&|| {
+            .create_kernel::<fn()>(&|| {
                 let camera = buffer.var();
                 let c = camera.read(0);
                 let r2c = c.r2c();

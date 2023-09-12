@@ -33,7 +33,7 @@ mod bsdf_test_old {
 
         let final_bins = device.create_buffer::<f32>(100);
         final_bins.fill(0.0);
-        let kernel = device.create_kernel::<()>(&|| {
+        let kernel = device.create_kernel::<fn()>(&|| {
             let i = dispatch_id().x();
             let bins = var!([f32; 100]);
             let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seeds.var().read(i)));
@@ -180,7 +180,7 @@ mod bsdf_chi2_test {
         let samples_per_thread = sample_count / threads;
         let rngs = init_pcg32_buffer_with_seed(device.clone(), threads, 0);
         let kernel =
-            device.create_kernel::<(Float3, u32)>(&|wo: Expr<Float3>, samples: Expr<u32>| {
+            device.create_kernel::<fn(Float3, u32)>(&|wo: Expr<Float3>, samples: Expr<u32>| {
                 let i = dispatch_id().x();
                 let pcg = var!(Pcg32, rngs.var().read(i));
                 let sampler = IndependentSampler::from_pcg32(pcg);
@@ -217,7 +217,7 @@ mod bsdf_chi2_test {
         let pdf = Arc::new(pdf);
         let target = device.create_buffer((phi_res * theta_res) as usize);
         target.fill(0.0f32);
-        let kernel = device.create_kernel::<(Float3,)>(&|wo: Expr<Float3>| {
+        let kernel = device.create_kernel::<fn(Float3)>(&|wo: Expr<Float3>| {
             set_block_size([8, 8, 1]);
             let ij = dispatch_id().xy();
             let theta_h = PI / theta_res as f32;
@@ -592,7 +592,7 @@ mod invert {
         let bads = device.create_buffer::<u32>(count);
         bads.fill(0);
         let printer = Printer::new(&device, 32768);
-        let kernel = device.create_kernel::<()>(&|| {
+        let kernel = device.create_kernel::<fn()>(&|| {
             let i = dispatch_id().x();
             let sampler = IndependentSampler::from_pcg32(var!(Pcg32, rngs.var().read(i)));
             for_range(0..samples, |_| {

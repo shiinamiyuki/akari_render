@@ -1,5 +1,5 @@
-pub mod distribution;
 pub mod binserde;
+pub mod distribution;
 pub mod hash;
 pub mod integration;
 use crate::{color::glam_linear_to_srgb, *};
@@ -117,8 +117,8 @@ pub fn write_image_hdr(color: &Tex2d<Float4>, path: &str) {
 
 pub fn erf_inv(x: Expr<f32>) -> Expr<f32> {
     lazy_static! {
-        static ref ERF_INV: Callable<(Expr<f32>,), Expr<f32>> =
-            create_static_callable::<(Expr<f32>,), Expr<f32>>(|x| {
+        static ref ERF_INV: Callable<fn(Expr<f32>) -> Expr<f32>> =
+            create_static_callable::<fn(Expr<f32>) -> Expr<f32>>(|x| {
                 let clamped_x: Expr<f32> = x.clamp(-0.99999, 0.99999);
                 let w: Expr<f32> = -((1.0 - clamped_x) * (1.0 + clamped_x)).ln();
                 let p = if_!(w.cmplt(0.5), {
@@ -156,8 +156,8 @@ pub fn erf_inv(x: Expr<f32>) -> Expr<f32> {
 
 pub fn erf(x: Expr<f32>) -> Expr<f32> {
     lazy_static! {
-        static ref ERF: Callable<(Expr<f32>,), Expr<f32>> =
-            create_static_callable::<(Expr<f32>,), Expr<f32>>(|x| {
+        static ref ERF: Callable<fn(Expr<f32>)-> Expr<f32>> =
+            create_static_callable::<fn(Expr<f32>)-> Expr<f32>>(|x| {
             // constants
             let a1: f32 = 0.254_829_592;
             let a2: f32 = -0.284_496_736;
@@ -273,8 +273,8 @@ pub fn chi2cdf(x: f64, dof: i32) -> f64 {
 
 pub fn mix_bits(v: Expr<u64>) -> Expr<u64> {
     lazy_static! {
-        static ref MIX_BITS: Callable<(Expr<u64>,), Expr<u64>> =
-            create_static_callable::<(Expr<u64>,), Expr<u64>>(|mut v: Expr<u64>| {
+        static ref MIX_BITS: Callable<fn(Expr<u64>) -> Expr<u64>> =
+            create_static_callable::<fn(Expr<u64>) -> Expr<u64>>(|mut v: Expr<u64>| {
                 v ^= v >> 31;
                 v *= 0x7fb5d329728ea185;
                 v ^= v >> 27;

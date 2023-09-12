@@ -743,26 +743,24 @@ pub struct SurfaceEvaluator {
     pub(crate) color_repr: ColorRepr,
     // bsdf(surface, si, wo, wi, u_select, flags)
     pub(crate) eval: Callable<
-        (
+        fn(
             Expr<ShaderRef>,
             Expr<SurfaceInteraction>,
             Expr<Float3>,
             Expr<Float3>,
             Expr<SampledWavelengths>,
             Expr<u32>,
-        ),
-        Expr<FlatSurfaceEvalResult>,
+        ) -> Expr<FlatSurfaceEvalResult>,
     >,
     // bsdf_sample(surface, si, wo, (u_select, u_sample))
     pub(crate) sample: Callable<
-        (
+        fn(
             Expr<ShaderRef>,
             Expr<SurfaceInteraction>,
             Expr<Float3>,
             Expr<Float3>,
             Var<SampledWavelengths>,
-        ),
-        Expr<FlatBsdfSample>,
+        ) -> Expr<FlatBsdfSample>,
     >,
 }
 impl SurfaceEvaluator {

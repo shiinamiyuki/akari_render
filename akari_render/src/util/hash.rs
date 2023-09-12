@@ -3,8 +3,8 @@ use lazy_static::lazy_static;
 use crate::*;
 use luisa::runtime::create_static_callable;
 lazy_static! {
-    static ref XXHASH_32_1: Callable<(Expr<u32>,), Expr<u32>> =
-        create_static_callable::<(Expr<u32>,), Expr<u32>>(|p: Expr<u32>| {
+    static ref XXHASH_32_1: Callable<fn(Expr<u32>)-> Expr<u32>> =
+        create_static_callable::<fn(Expr<u32>)-> Expr<u32>>(|p: Expr<u32>| {
             const PRIME32_2: u32 = 2246822519;
             const PRIME32_3: u32 = 3266489917;
             const PRIME32_4: u32 = 668265263;
@@ -15,8 +15,8 @@ lazy_static! {
             h32 = PRIME32_3 * (h32 ^ (h32 >> 13u32));
             h32 ^ (h32 >> 16u32)
         });
-    static ref XXHASH_32_2: Callable<(Expr<Uint2>,), Expr<u32>> =
-        create_static_callable::<(Expr<Uint2>,), Expr<u32>>(|p: Expr<Uint2>| {
+    static ref XXHASH_32_2: Callable<fn(Expr<Uint2>)-> Expr<u32>> =
+        create_static_callable::<fn(Expr<Uint2>)-> Expr<u32>>(|p: Expr<Uint2>| {
             const PRIME32_2: u32 = 2246822519;
             const PRIME32_3: u32 = 3266489917;
             const PRIME32_4: u32 = 668265263;
@@ -27,8 +27,8 @@ lazy_static! {
             h32 = PRIME32_3 * (h32 ^ (h32 >> 13u32));
             h32 ^ (h32 >> 16u32)
         });
-    static ref XXHASH_32_3: Callable<(Expr<Uint3>,), Expr<u32>> =
-        create_static_callable::<(Expr<Uint3>,), Expr<u32>>(|p: Expr<Uint3>| {
+    static ref XXHASH_32_3: Callable<fn(Expr<Uint3>)->Expr<u32>> =
+        create_static_callable::<fn(Expr<Uint3>)->Expr<u32>>(|p: Expr<Uint3>| {
             const PRIME32_2: u32 = 2246822519;
             const PRIME32_3: u32 = 3266489917;
             const PRIME32_4: u32 = 668265263;
@@ -41,8 +41,8 @@ lazy_static! {
             h32 = PRIME32_3 * (h32 ^ (h32 >> 13u32));
             return h32 ^ (h32 >> 16u32);
         });
-    static ref XXHASH_32_4: Callable<(Expr<Uint4>,), Expr<u32>> =
-        create_static_callable::<(Expr<Uint4>,), Expr<u32>>(|p: Expr<Uint4>| {
+    static ref XXHASH_32_4: Callable<fn(Expr<Uint4>)->Expr<u32>> =
+        create_static_callable::<fn(Expr<Uint4>)->Expr<u32>>(|p: Expr<Uint4>| {
             const PRIME32_2: u32 = 2246822519;
             const PRIME32_3: u32 = 3266489917;
             const PRIME32_4: u32 = 668265263;

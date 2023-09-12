@@ -208,7 +208,7 @@ mod test {
     ) {
         let eps = 1e-6f32;
         let max_depth = 13;
-        let kernel = device.create_kernel::<()>(&|| {
+        let kernel = device.create_kernel::<fn()>(&|| {
             let i = dispatch_id().x();
             let endpoints = inputs.read(i);
             let x0 = endpoints.x();

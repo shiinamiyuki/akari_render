@@ -38,8 +38,8 @@ impl TrowbridgeReitzDistribution {
     }
 }
 lazy_static! {
-    static ref TR_D_IMPL: Callable<(Expr<Float3>, Expr<Float2>), Expr<f32>> =
-        create_static_callable::<(Expr<Float3>, Expr<Float2>), Expr<f32>>(|wh, alpha| {
+    static ref TR_D_IMPL: Callable<fn(Expr<Float3>, Expr<Float2>)-> Expr<f32>> =
+        create_static_callable::<fn(Expr<Float3>, Expr<Float2>)-> Expr<f32>>(|wh, alpha| {
             let tan2_theta = Frame::tan2_theta(wh);
             let cos4_theta = Frame::cos2_theta(wh).sqr();
             let ax = alpha.x();
@@ -58,8 +58,8 @@ lazy_static! {
             // Float e = tan2Theta * (Sqr(CosPhi(wm) / alpha_x) + Sqr(SinPhi(wm) / alpha_y));
             // return 1 / (Pi * alpha_x * alpha_y * cos4Theta * Sqr(1 + e));
         });
-    static ref TR_LAMBDA_IMPL: Callable<(Expr<Float3>, Expr<Float2>), Expr<f32>> =
-        create_static_callable::<(Expr<Float3>, Expr<Float2>), Expr<f32>>(|w, alpha| {
+    static ref TR_LAMBDA_IMPL: Callable<fn(Expr<Float3>, Expr<Float2>)-> Expr<f32>> =
+        create_static_callable::<fn(Expr<Float3>, Expr<Float2>)-> Expr<f32>>(|w, alpha| {
             let abs_tan_theta = Frame::tan_theta(w).abs();
             let alpha2 =
                 Frame::cos2_phi(w) * alpha.x().sqr() + Frame::sin2_phi(w) * alpha.y().sqr();
@@ -67,8 +67,8 @@ lazy_static! {
             let l = (-1.0 + (1.0 + alpha2_tan2_theta).sqrt()) * 0.5;
             select(!abs_tan_theta.is_finite(), const_(0.0f32), l)
         });
-    static ref TR_SAMPLE_11: Callable<(Expr<f32>, Expr<Float2>), Expr<Float2>> =
-        create_static_callable::<(Expr<f32>, Expr<Float2>), Expr<Float2>>(|cos_theta, u| {
+    static ref TR_SAMPLE_11: Callable<fn(Expr<f32>, Expr<Float2>)-> Expr<Float2>> =
+        create_static_callable::<fn(Expr<f32>, Expr<Float2>)-> Expr<Float2>>(|cos_theta, u| {
             if_!(
                 cos_theta.cmplt(0.99999),
                  {
@@ -105,8 +105,8 @@ lazy_static! {
                 }
             )
         });
-    static ref TR_SAMPLE: Callable<(Expr<Float3>, Expr<Float2>, Expr<Float2>), Expr<Float3>> =
-        create_static_callable::<(Expr<Float3>, Expr<Float2>, Expr<Float2>), Expr<Float3>>(
+    static ref TR_SAMPLE: Callable<fn(Expr<Float3>, Expr<Float2>, Expr<Float2>)-> Expr<Float3>> =
+        create_static_callable::<fn(Expr<Float3>, Expr<Float2>, Expr<Float2>)-> Expr<Float3>>(
             |wi, alpha, u| {
                 let wi_stretched =
                     make_float3(alpha.x() * wi.x(), wi.y(), alpha.y() * wi.z()).normalize();
@@ -143,8 +143,8 @@ impl MicrofacetDistribution for TrowbridgeReitzDistribution {
             s * wh
         } else {
             lazy_static! {
-                static ref SAMPLE: Callable<(Expr<Float2>, Expr<Float2>), Expr<Float3>> =
-                    create_static_callable::<(Expr<Float2>, Expr<Float2>), Expr<Float3>>(
+                static ref SAMPLE: Callable<fn(Expr<Float2>, Expr<Float2>) -> Expr<Float3>> =
+                    create_static_callable::<fn(Expr<Float2>, Expr<Float2>) -> Expr<Float3>>(
                         |alpha: Expr<Float2>, u: Expr<Float2>| {
                             let (phi, cos_theta) = if_!(alpha.x().cmpeq(alpha.y()), {
                                 let phi = 2.0 * PI * u.y();
@@ -178,8 +178,8 @@ impl MicrofacetDistribution for TrowbridgeReitzDistribution {
             unimplemented!("invert_wh is not available for visible wh sampling");
         } else {
             lazy_static! {
-                static ref INVERT_SAMPLE: Callable<(Expr<Float2>, Expr<Float3>), Expr<Float2>> =
-                    create_static_callable::<(Expr<Float2>, Expr<Float3>), Expr<Float2>>(
+                static ref INVERT_SAMPLE: Callable<fn(Expr<Float2>, Expr<Float3>)-> Expr<Float2>> =
+                    create_static_callable::<fn(Expr<Float2>, Expr<Float3>)-> Expr<Float2>>(
                         |alpha: Expr<Float2>, wh: Expr<Float3>| {
                             let (theta, phi) = xyz_to_spherical(wh);
                             let cos_theta = theta.cos();
@@ -243,7 +243,7 @@ mod test {
         let out = device.create_buffer::<f32>(seeds.len());
         let n_iters = 4098;
         let kernel =
-            device.create_kernel::<(Float3, Float2)>(&|wo: Expr<Float3>, alpha: Expr<Float2>| {
+            device.create_kernel::<fn(Float3, Float2)>(&|wo: Expr<Float3>, alpha: Expr<Float2>| {
                 let i = dispatch_id().x();
                 let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seeds.var().read(i)));
                 let out = out.var();

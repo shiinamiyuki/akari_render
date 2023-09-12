@@ -174,7 +174,7 @@ impl Film {
         assert_eq!(self.repr, other.repr);
         assert_eq!(self.resolution, other.resolution);
         self.device
-            .create_kernel::<(f32, f32)>(
+            .create_kernel::<fn(f32, f32)>(
                 &|self_splat_scale: Expr<f32>, other_splat_scale: Expr<f32>| {
                     let p = dispatch_id().xy();
                     let i = p.x() + p.y() * self.resolution.x;
@@ -208,7 +208,7 @@ impl Film {
         assert_eq!(image.width(), self.resolution.x);
         assert_eq!(image.height(), self.resolution.y);
         self.device
-            .create_kernel::<(f32,)>(&|splat_scale: Expr<f32>| {
+            .create_kernel::<fn(f32)>(&|splat_scale: Expr<f32>| {
                 let p = dispatch_id().xy();
                 let i = p.x() + p.y() * self.resolution.x;
                 let pixels = self.pixels.var();

@@ -105,8 +105,8 @@ pub struct KelemenMutationRecord {
     pub mutated: f32,
 }
 lazy_static! {
-    pub static ref KELEMEN_MUTATE: Callable<(Var<KelemenMutationRecord>,), ()> =
-        create_static_callable::<(Var<KelemenMutationRecord>,), ()>(
+    pub static ref KELEMEN_MUTATE: Callable<fn(Var<KelemenMutationRecord>) -> ()> =
+        create_static_callable::<fn(Var<KelemenMutationRecord>) -> ()>(
             |record: Var<KelemenMutationRecord>| {
                 let cur = record.cur().load();
                 let u = record.u().load();

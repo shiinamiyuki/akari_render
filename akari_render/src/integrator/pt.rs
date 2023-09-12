@@ -482,7 +482,7 @@ impl Integrator for PathTracer {
         assert_eq!(resolution.y, film.resolution().y);
         let sampler_creator = sampler_config.creator(self.device.clone(), &scene, self.spp);
         let evaluators = scene.evaluators(color_pipeline, None);
-        let kernel = self.device.create_kernel::<(u32, Int2)>(
+        let kernel = self.device.create_kernel::<fn(u32, Int2)>(
             &|spp_per_pass: Expr<u32>, pixel_offset: Expr<Int2>| {
                 let p = dispatch_id().xy();
                 let sampler = sampler_creator.create(p);
