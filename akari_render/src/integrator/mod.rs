@@ -5,23 +5,26 @@ use serde::{Deserialize, Serialize};
 use crate::{
     color::{Color, ColorPipeline, ColorRepr, RgbColorSpace},
     film::*,
+    gui::DisplayChannel,
     sampler::SamplerConfig,
     scene::*,
     *,
 };
 
-#[derive(Clone, Debug)]
-pub struct RenderOptions {
+#[derive(Clone)]
+pub struct RenderSession {
     pub save_intermediate: bool, // save intermediate results
-    pub session: String,
+    pub name: String,
     pub save_stats: bool, // save stats to {session}.json
+    pub display: Option<DisplayChannel>,
 }
-impl Default for RenderOptions {
+impl Default for RenderSession {
     fn default() -> Self {
         Self {
             save_intermediate: false,
-            session: String::from("default"),
+            name: String::from("default"),
             save_stats: false,
+            display: None,
         }
     }
 }
@@ -44,7 +47,7 @@ pub trait Integrator {
         sampler: SamplerConfig,
         color_pipeline: ColorPipeline,
         film: &mut Film,
-        options: &RenderOptions,
+        options: &RenderSession,
     );
 }
 
@@ -65,7 +68,7 @@ pub enum Method {
     #[serde(rename = "mcmc")]
     Mcmc(mcmc::Config),
     #[serde(rename = "mcmc_s")]
-    McmcSinglePath(mcmc::Config),
+    McmcSinglePath(mcmc_s::Config),
     #[serde(rename = "mcmc_opt")]
     McmcOpt(mcmc::Config),
 }
@@ -105,12 +108,12 @@ pub enum RenderTask {
     Multi(Vec<RenderConfig>),
 }
 
-pub fn render(device: Device, scene: Arc<Scene>, task: &RenderTask, options: RenderOptions) {
+pub fn render(device: Device, scene: Arc<Scene>, task: &RenderTask, options: RenderSession) {
     fn render_single(
         device: Device,
         scene: &Arc<Scene>,
         config: &RenderConfig,
-        options: &RenderOptions,
+        options: &RenderSession,
     ) {
         let mut film = Film::new(
             device.clone(),
@@ -176,7 +179,7 @@ pub fn render(device: Device, scene: Arc<Scene>, task: &RenderTask, options: Ren
         }
         let toc = std::time::Instant::now();
         log::info!("Completed in {:.1}ms", (toc - tic).as_secs_f64() * 1e3);
-        film.copy_to_rgba_image(&output_image);
+        film.copy_to_rgba_image(&output_image, true);
         util::write_image(&output_image, &config.film.out);
     }
     match task {

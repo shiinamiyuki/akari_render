@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Instant};
 use luisa::rtx::offset_ray_origin;
 use rand::Rng;
 
-use super::{Integrator, RenderOptions};
+use super::{Integrator, RenderSession};
 use crate::{
     color::*, film::*, geometry::*, interaction::SurfaceInteraction, mesh::MeshInstance,
     sampler::*, scene::*, svm::surface::*, *,
@@ -250,10 +250,13 @@ impl<'a> PathTracerBase<'a> {
             });
             let bsdf_sample = self.sample_surface(sampler.next_3d());
             let f = &bsdf_sample.color;
-            lc_assert!(f.min().cmpge(0.0));
-            if_!(bsdf_sample.pdf.cmple(0.0) | !bsdf_sample.valid, {
-                break_();
-            });
+
+            if_!(
+                bsdf_sample.pdf.cmple(0.0) | !bsdf_sample.valid | !f.min().cmpge(0.0),
+                {
+                    break_();
+                }
+            );
             self.mul_beta(f / bsdf_sample.pdf);
             {
                 *self.prev_bsdf_pdf.get_mut() = bsdf_sample.pdf;
@@ -302,10 +305,14 @@ impl<'a> PathTracerBase<'a> {
             });
             let bsdf_sample = self.sample_surface(sampler.next_3d());
             let f = &bsdf_sample.color;
-            lc_assert!(f.min().cmpge(0.0));
-            if_!(bsdf_sample.pdf.cmple(0.0) | !bsdf_sample.valid, {
-                break_();
-            });
+
+            if_!(
+                bsdf_sample.pdf.cmple(0.0) | !bsdf_sample.valid | !f.min().cmpge(0.0),
+                {
+                    break_();
+                }
+            );
+
             self.mul_beta(f / bsdf_sample.pdf);
             let (rr_effective, cont_prob) = self.continue_prob();
             if_!(rr_effective, {
@@ -469,7 +476,7 @@ impl Integrator for PathTracer {
         sampler_config: SamplerConfig,
         color_pipeline: ColorPipeline,
         film: &mut Film,
-        _options: &RenderOptions,
+        session: &RenderSession,
     ) {
         let resolution = scene.camera.resolution();
         log::info!(
@@ -506,28 +513,31 @@ impl Integrator for PathTracer {
                 });
             },
         );
-        let stream = self.device.default_stream();
         let mut cnt = 0;
         let progress = util::create_progess_bar(self.spp as usize, "spp");
         let mut acc_time = 0.0;
-        stream.with_scope(|s| {
-            while cnt < self.spp {
-                let cur_pass = (self.spp - cnt).min(self.spp_per_pass);
-                let mut cmds = vec![];
-                let tic = Instant::now();
-                cmds.push(kernel.dispatch_async(
-                    [resolution.x, resolution.y, 1],
-                    &cur_pass,
-                    &self.pixel_offset,
-                ));
-                s.submit(cmds);
-                s.synchronize();
-                let toc = Instant::now();
-                acc_time += toc.duration_since(tic).as_secs_f64();
-                progress.inc(cur_pass as u64);
-                cnt += cur_pass;
+        let update = || {
+            if let Some(channel) = &session.display {
+                film.copy_to_rgba_image(channel.screen_tex(), false);
+                channel.notify_update();
             }
-        });
+        };
+
+        while cnt < self.spp {
+            let cur_pass = (self.spp - cnt).min(self.spp_per_pass);
+            let tic = Instant::now();
+            kernel.dispatch(
+                [resolution.x, resolution.y, 1],
+                &cur_pass,
+                &self.pixel_offset,
+            );
+            let toc = Instant::now();
+            acc_time += toc.duration_since(tic).as_secs_f64();
+            update();
+            progress.inc(cur_pass as u64);
+            cnt += cur_pass;
+        }
+
         progress.finish();
         log::info!("Rendering finished in {:.2}s", acc_time);
     }
@@ -540,7 +550,7 @@ pub fn render(
     color_pipeline: ColorPipeline,
     film: &mut Film,
     config: &Config,
-    options: &RenderOptions,
+    options: &RenderSession,
 ) {
     let pt = PathTracer::new(device.clone(), config.clone());
     pt.render(scene, sampler, color_pipeline, film, options);

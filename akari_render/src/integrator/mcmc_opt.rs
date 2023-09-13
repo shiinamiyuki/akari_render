@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use super::pt::{self, PathTracer};
-use super::{Integrator, IntermediateStats, RenderOptions, RenderStats};
+use super::{Integrator, IntermediateStats, RenderSession, RenderStats};
 use crate::sampler::mcmc::{
     mutate_image_space_single, KelemenMutationRecord, KelemenMutationRecordExpr, KELEMEN_MUTATE,
 };
@@ -543,7 +543,7 @@ impl McmcOpt {
         eval: &Evaluators,
         state: &RenderState,
         film: &mut Film,
-        options: &RenderOptions,
+        options: &RenderSession,
     ) {
         let resolution = scene.camera.resolution();
         let npixels = resolution.x * resolution.y;
@@ -624,8 +624,8 @@ impl McmcOpt {
                         1,
                     );
                     reconstruct(film, cnt);
-                    film.copy_to_rgba_image(&output_image);
-                    let path = format!("{}-{}.exr", options.session, cnt);
+                    film.copy_to_rgba_image(&output_image, true);
+                    let path = format!("{}-{}.exr", options.name, cnt);
                     util::write_image(&output_image, &path);
                     stats.intermediate.push(IntermediateStats {
                         time: acc_time,
@@ -636,7 +636,7 @@ impl McmcOpt {
             }
             progress.finish();
             if options.save_stats {
-                let file = File::create(format!("{}.json", options.session)).unwrap();
+                let file = File::create(format!("{}.json", options.name)).unwrap();
                 let json = serde_json::to_value(&stats).unwrap();
                 let writer = BufWriter::new(file);
                 serde_json::to_writer(writer, &json).unwrap();
@@ -654,7 +654,7 @@ impl Integrator for McmcOpt {
         sampler_config: SamplerConfig,
         color_pipeline: ColorPipeline,
         film: &mut Film,
-        options: &RenderOptions,
+        options: &RenderSession,
     ) {
         let resolution = scene.camera.resolution();
         log::info!(
@@ -703,7 +703,7 @@ pub fn render(
     color_pipeline: ColorPipeline,
     film: &mut Film,
     config: &Config,
-    options: &RenderOptions,
+    options: &RenderSession,
 ) {
     let mcmc = McmcOpt::new(device.clone(), config.clone());
     mcmc.render(scene, sampler, color_pipeline, film, options);

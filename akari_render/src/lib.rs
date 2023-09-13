@@ -40,6 +40,7 @@ pub mod scene;
 pub mod svm;
 pub mod util;
 pub mod volume;
+pub mod gui;
 
 pub const ONE_MINUS_EPSILON: f32 = hexf32!("0x1.fffffep-1");
 pub const FRAC_1_2PI: f32 = 1.0 / (2.0 * std::f32::consts::PI);

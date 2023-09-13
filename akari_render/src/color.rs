@@ -414,6 +414,21 @@ pub fn srgb_to_linear(rgb: Float3Expr) -> Float3Expr {
         ((rgb + 0.055) / 1.055).powf(2.4),
     )
 }
+pub fn linear_to_srgb(rgb: Float3Expr) -> Float3Expr {
+    Float3Expr::select(
+        rgb.cmple(0.0031308),
+        rgb * 12.92,
+        rgb.powf(1.0 / 2.4) * 1.055 - 0.055,
+    )
+}
+#[inline]
+pub fn f32_linear_to_srgb1(l: f32) -> f32 {
+    if l <= 0.0031308 {
+        l * 12.92
+    } else {
+        l.powf(1.0 / 2.4) * 1.055 - 0.055
+    }
+}
 #[inline]
 pub fn f32_srgb_to_linear1(s: f32) -> f32 {
     if s <= 0.04045 {
@@ -430,14 +445,7 @@ pub fn glam_srgb_to_linear(rgb: glam::Vec3) -> glam::Vec3 {
         f32_srgb_to_linear1(rgb.z),
     )
 }
-#[inline]
-pub fn f32_linear_to_srgb1(l: f32) -> f32 {
-    if l <= 0.0031308 {
-        l * 12.92
-    } else {
-        l.powf(1.0 / 2.4) * 1.055 - 0.055
-    }
-}
+
 #[inline]
 pub fn glam_linear_to_srgb(linear: glam::Vec3) -> glam::Vec3 {
     glam::vec3(

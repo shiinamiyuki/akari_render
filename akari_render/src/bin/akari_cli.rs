@@ -1,4 +1,7 @@
-use akari_render::integrator::{render, RenderOptions, RenderTask};
+use akari_render::{
+    gui::DisplayWindow,
+    integrator::{render, RenderSession, RenderTask},
+};
 use clap::{arg, builder::BoolishValueParser, Arg, ArgAction, Command};
 use luisa_compute as luisa;
 use std::{env::current_exe, fs::File, process::exit};
@@ -23,6 +26,12 @@ fn main() {
                 .action(ArgAction::SetTrue)
                 .value_parser(BoolishValueParser::new()),
         )
+        .arg(
+            Arg::new("gui")
+                .long("gui")
+                .action(ArgAction::SetTrue)
+                .value_parser(BoolishValueParser::new()),
+        )
         .arg(Arg::new("save-stats").long("save-stats"));
     let help = cmd.render_help();
     let matches = cmd.get_matches();
@@ -30,6 +39,7 @@ fn main() {
     let method = matches.get_one::<String>("method");
     let save_intermediate = matches.get_one::<bool>("save-intermediate").copied();
     let session = matches.get_one::<String>("save-stats").cloned();
+    let gui = matches.get_one::<bool>("gui").copied().unwrap_or(false);
     if scene.is_none() {
         println!("{}", help);
         exit(1);
@@ -56,11 +66,29 @@ fn main() {
         serde_json::from_reader(file).unwrap()
     };
     let scene = akari_render::load::load_from_path(device.clone(), &scene.unwrap());
-
-    let options = RenderOptions {
-        save_intermediate: save_intermediate.unwrap_or(false),
-        session: session.clone().unwrap_or_else(|| String::from("default")),
-        save_stats: session.is_some(),
+    let window = if gui {
+        let window = DisplayWindow::new(
+            &device,
+            scene.camera.resolution().x,
+            scene.camera.resolution().y,
+        );
+        Some(window)
+    } else {
+        None
     };
-    render(device, scene, &task, options);
+    let session = RenderSession {
+        save_intermediate: save_intermediate.unwrap_or(false),
+        name: session.clone().unwrap_or_else(|| String::from("default")),
+        save_stats: session.is_some(),
+        display: window.as_ref().map(|w| w.channel()),
+    };
+    let render_thread = std::thread::spawn(move || {
+        render(device.clone(), scene, &task, session);
+    });
+   
+    if let Some(window) = window {
+        window.show();
+    } else {
+        render_thread.join().unwrap();
+    }
 }

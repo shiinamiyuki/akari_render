@@ -3,9 +3,10 @@ use std::io::BufWriter;
 use std::sync::Arc;
 use std::time::Instant;
 
-use super::mcmc::{Config, Method};
+use serde::{Deserialize, Serialize};
+
 use super::pt::{self, PathTracer, PathTracerBase};
-use super::{Integrator, IntermediateStats, RenderOptions, RenderStats};
+use super::{Integrator, IntermediateStats, RenderSession, RenderStats};
 use crate::sampler::mcmc::{
     IsotropicExponentialMutation, KelemenMutationRecord, KelemenMutationRecordExpr, KELEMEN_MUTATE,
 };
@@ -21,7 +22,60 @@ use crate::{
     scene::*,
     *,
 };
-
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum Method {
+    #[serde(rename = "kelemen")]
+    Kelemen {
+        exponential_mutation: bool,
+        small_sigma: f32,
+        large_step_prob: f32,
+        image_mutation_prob: f32,
+        image_mutation_size: Option<f32>,
+        depth_change_prob: f32,
+        adaptive: bool,
+    },
+}
+impl Default for Method {
+    fn default() -> Self {
+        Method::Kelemen {
+            exponential_mutation: true,
+            small_sigma: 0.01,
+            large_step_prob: 0.1,
+            image_mutation_prob: 0.0,
+            image_mutation_size: None,
+            depth_change_prob: 0.1,
+            adaptive: false,
+        }
+    }
+}
+#[derive(Clone, Serialize, Deserialize, Debug)]
+#[serde(default)]
+pub struct Config {
+    pub spp: u32,
+    pub max_depth: u32,
+    pub spp_per_pass: u32,
+    pub use_nee: bool,
+    pub method: Method,
+    pub n_chains: usize,
+    pub n_bootstrap: usize,
+    pub direct_spp: i32,
+}
+impl Default for Config {
+    fn default() -> Self {
+        let default_pt = pt::Config::default();
+        Self {
+            spp: default_pt.spp,
+            spp_per_pass: default_pt.spp_per_pass,
+            use_nee: default_pt.use_nee,
+            max_depth: default_pt.max_depth,
+            method: Method::default(),
+            n_chains: 512,
+            n_bootstrap: 100000,
+            direct_spp: 64,
+        }
+    }
+}
 pub struct SinglePathMcmc {
     pub device: Device,
     pub method: Method,
@@ -118,31 +172,30 @@ where
 pub struct Mutator {
     pub method: Method,
     pub is_large_step: Expr<bool>,
+    pub small_step_dim_change: Expr<bool>,
+    pub old_dim: Expr<u32>,
+    pub new_dim: Expr<u32>,
     // pub is_image_mutation: Expr<bool>,
 }
 impl Mutator {
     pub fn mutate(
         &self,
         samples: &Buffer<f32>,
-        start_dim: Expr<u32>,
-        end_dim: Expr<u32>,
         get_index: &impl Fn(Expr<u32>) -> Expr<u32>,
         get_back_index: &impl Fn(Expr<u32>) -> Expr<u32>,
         rng: &IndependentSampler,
     ) {
-        for_range(start_dim..end_dim, |i| {
+        for_range(const_(0u32)..self.new_dim, |i| {
             self.mutate_one(samples, i, get_index, get_back_index, rng);
         });
     }
     pub fn reject(
         &self,
         samples: &Buffer<f32>,
-        start_dim: Expr<u32>,
-        end_dim: Expr<u32>,
         get_index: &impl Fn(Expr<u32>) -> Expr<u32>,
         get_back_index: &impl Fn(Expr<u32>) -> Expr<u32>,
     ) {
-        for_range(start_dim..end_dim, |i| {
+        for_range(const_(0u32)..self.new_dim, |i| {
             let sample_idx = get_index(i);
             let backup_idx = get_back_index(i);
             let x = samples.read(backup_idx);
@@ -171,39 +224,36 @@ impl Mutator {
                 let u = rng.next_1d();
                 let sample_idx = get_index(i);
                 let backup_idx = get_back_index(i);
-                let x = samples.read(sample_idx);
-                samples.write(backup_idx, x);
-                if_!(
-                    self.is_large_step,
-                    {
-                        samples.write(sample_idx, u);
-                    },
-                    else,
-                    {
-                        if exponential_mutation {
-                            let record = var!(
-                                KelemenMutationRecord,
-                                KelemenMutationRecordExpr::new(
-                                    x,
-                                    u,
-                                    kelemen_mutate_size_low,
-                                    kelemen_mutate_size_high,
-                                    kelemen_log_ratio,
-                                    0.0
-                                )
-                            );
-                            KELEMEN_MUTATE.call(record);
-                            samples.write(sample_idx, *record.mutated());
-                        } else {
-                            let dv = sample_gaussian(u);
-                            let new = x + dv * small_sigma;
-                            let new = new - new.floor();
-                            // lc_assert!(new.is_finite());
-                            let new = select(new.is_finite(), new, const_(0.0f32));
-                            samples.write(sample_idx, new);
-                        }
+                let x = def(samples.read(sample_idx));
+                samples.write(backup_idx, *x);
+                let new = if_!(self.is_large_step, { u }, else, {
+                    if_!(self.small_step_dim_change & i.cmpgt(self.old_dim), {
+                        *x.get_mut() = rng.next_1d();
+                    });
+                    if exponential_mutation {
+                        let record = var!(
+                            KelemenMutationRecord,
+                            KelemenMutationRecordExpr::new(
+                                *x,
+                                u,
+                                kelemen_mutate_size_low,
+                                kelemen_mutate_size_high,
+                                kelemen_log_ratio,
+                                0.0
+                            )
+                        );
+                        KELEMEN_MUTATE.call(record);
+                        *record.mutated()
+                    } else {
+                        let dv = sample_gaussian(u);
+                        let new = *x + dv * small_sigma;
+                        let new = new - new.floor();
+                        // lc_assert!(new.is_finite());
+                        let new = select(new.is_finite(), new, const_(0.0f32));
+                        new
                     }
-                );
+                });
+                samples.write(sample_idx, new);
             }
         }
     }
@@ -245,22 +295,28 @@ impl SinglePathMcmc {
         samples: &Buffer<f32>,
         get_index: impl Fn(Expr<u32>) -> Expr<u32>,
         depth: Expr<u32>,
+        is_bootstrap: bool,
     ) -> (Expr<Uint2>, Color, Expr<SampledWavelengths>, Expr<f32>) {
-        let sampler = McmcSampler::new(
+        let mcmc_sampler = McmcSampler::new(
             independent,
             samples,
             get_index,
             self.sample_dimension_device(depth),
         );
+        let sampler = if is_bootstrap {
+            independent as &dyn Sampler
+        } else {
+            &mcmc_sampler as &dyn Sampler
+        };
         sampler.start();
         let res = const_(scene.camera.resolution());
         let p = sampler.next_2d() * res.float();
         let p = p.int().clamp(0, res.int() - 1);
-        let swl = def(sample_wavelengths(eval.color_repr(), &sampler));
+        let swl = def(sample_wavelengths(eval.color_repr(), sampler));
         let (ray, ray_color, ray_w) =
             scene
                 .camera
-                .generate_ray(filter, p.uint(), &sampler, eval.color_repr(), *swl);
+                .generate_ray(filter, p.uint(), sampler, eval.color_repr(), *swl);
         let l = {
             let w = ray_color * ray_w;
             let pt = PathTracerBase::new(
@@ -272,12 +328,12 @@ impl SinglePathMcmc {
                 self.config.direct_spp >= 0,
                 swl,
             );
-            pt.run_at_depth(ray, depth, &sampler);
+            pt.run_at_depth(ray, depth, sampler);
             pt.radiance.load() * w
         };
         (p.uint(), l, *swl, Self::scalar_contribution(&l))
     }
-    const SAMPLE_BUFFER_AOSOA_SIZE: u32 = 8;
+    const SAMPLE_BUFFER_AOSOA_SIZE: u32 = 4;
 
     // layout:
     // [[f32 x 8] x 2] x dims] x (n_chains / 8)
@@ -315,22 +371,22 @@ impl SinglePathMcmc {
         let fs = self
             .device
             .create_buffer_from_fn(self.n_bootstrap, |_| 0.0f32);
-        let sample_buffer = self.device.create_buffer(
-            self.sample_dimension(self.config.max_depth) as usize * self.n_bootstrap,
-        );
+        let sample_buffer = self
+            .device
+            .create_buffer(self.sample_dimension(self.config.max_depth) as usize * self.n_chains);
         let bootstrap_kernel = self.device.create_kernel::<fn()>(&|| {
             let i = dispatch_id().x();
             let seed = seeds.var().read(i);
             let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seed));
 
             let depth = self.sample_depth(&sampler);
-            // cpu_dbg!(depth);
-            for_range(const_(0u32)..self.sample_dimension_device(depth), |d| {
-                sample_buffer.write(
-                    self.sample_dimension(self.config.max_depth) * i + d,
-                    sampler.next_1d(),
-                );
-            });
+            // DON'T WRITE TO SAMPLE BUFFER
+            // for_range(const_(0u32)..self.sample_dimension_device(depth), |d| {
+            //     sample_buffer.write(
+            //         self.sample_dimension(self.config.max_depth) * i + d,
+            //         sampler.next_1d(),
+            //     );
+            // });
             let (_p, _l, _swl, f) = self.evaluate(
                 scene,
                 filter,
@@ -339,6 +395,7 @@ impl SinglePathMcmc {
                 &sample_buffer,
                 |d| self.sample_dimension(self.config.max_depth) * i + d,
                 depth,
+                true,
             );
             fs.var().write(i, f);
         });
@@ -357,7 +414,11 @@ impl SinglePathMcmc {
         let states = self.device.create_buffer(self.n_chains);
         let cur_colors = ColorBuffer::new(self.device.clone(), self.n_chains, eval.color_repr());
         let sample_buffer = self.device.create_buffer(
-            self.sample_dimension(self.max_depth) as usize * 2 * ((self.n_chains + 7) / 8) * 8,
+            self.sample_dimension(self.max_depth) as usize
+                * 2
+                * ((self.n_chains + Self::SAMPLE_BUFFER_AOSOA_SIZE as usize - 1)
+                    / Self::SAMPLE_BUFFER_AOSOA_SIZE as usize)
+                * Self::SAMPLE_BUFFER_AOSOA_SIZE as usize,
         );
         self.device
             .create_kernel::<fn()>(&|| {
@@ -378,6 +439,7 @@ impl SinglePathMcmc {
                     &sample_buffer,
                     |d| self.sample_index_aosoa(i, d),
                     depth,
+                    false,
                 );
 
                 // cpu_dbg!(make_float2(f, fs.var().read(seed_idx)));
@@ -423,9 +485,11 @@ impl SinglePathMcmc {
                 exponential_mutation,
                 image_mutation_size,
                 image_mutation_prob,
+                depth_change_prob,
             } => {
                 let chain_id = *state.chain_id();
                 let is_large_step = rng.next_1d().cmplt(large_step_prob);
+                let small_step_depth_change = rng.next_1d().cmplt(depth_change_prob);
                 let new_depth = var!(u32);
                 if_!(
                     is_large_step,
@@ -434,19 +498,28 @@ impl SinglePathMcmc {
                     },
                     else,
                     {
-                        new_depth.store(*state.depth());
+                        if_!(
+                            small_step_depth_change,
+                            {
+                                new_depth.store(self.sample_depth(rng));
+                            },
+                            else,
+                            {
+                                new_depth.store(*state.depth());
+                            }
+                        );
                     }
                 );
                 let mutator = Mutator {
                     is_large_step,
                     method: self.method,
+                    small_step_dim_change: small_step_depth_change,
+                    old_dim: self.sample_dimension_device(*state.depth()),
+                    new_dim: self.sample_dimension_device(*new_depth),
                 };
                 // perform mutation
-                let mutation_end_dim = self.sample_dimension_device(*new_depth);
                 mutator.mutate(
                     samples,
-                    const_(0u32),
-                    mutation_end_dim,
                     &|dim| self.sample_index_aosoa(chain_id, dim),
                     &|dim| self.backup_index_aosoa(chain_id, dim),
                     rng,
@@ -460,9 +533,10 @@ impl SinglePathMcmc {
                     samples,
                     |dim| self.sample_index_aosoa(chain_id, dim),
                     *new_depth,
+                    false,
                 );
                 let proposal_f = f;
-                if_!(is_large_step, {
+                if_!(is_large_step & state.b_cnt().cmplt(1024 * 1024), {
                     state.set_b(state.b().load() + proposal_f);
                     state.set_b_cnt(state.b_cnt().load() + 1);
                 });
@@ -494,14 +568,10 @@ impl SinglePathMcmc {
                     if_!(!is_large_step, {
                         state.set_n_accepted(state.n_accepted().load() + 1);
                     });
-                    if_!(is_large_step, {
-                        *state.depth().get_mut() = *new_depth;
-                    });
+                    *state.depth().get_mut() = *new_depth;
                 }, else {
                     mutator.reject(
                         samples,
-                        const_(0u32),
-                        mutation_end_dim,
                         &|dim| self.sample_index_aosoa(chain_id, dim),
                         &|dim| self.backup_index_aosoa(chain_id, dim),
                     );
@@ -571,7 +641,7 @@ impl SinglePathMcmc {
         eval: &Evaluators,
         state: &RenderState,
         film: &mut Film,
-        options: &RenderOptions,
+        session: &RenderSession,
     ) {
         let resolution = scene.camera.resolution();
         let npixels = resolution.x * resolution.y;
@@ -609,11 +679,23 @@ impl SinglePathMcmc {
             log::info!("Normalization factor: {}", b);
             log::info!("Acceptance rate: {:.2}%", accept_rate * 100.0);
             film.set_splat_scale(b as f32 / spp as f32);
+            if let Some(channel) = &session.display {
+                film.copy_to_rgba_image(channel.screen_tex(), false);
+                channel.notify_update();
+            }
         };
         let mut acc_time = 0.0f64;
         let mut stats = RenderStats::default();
         let spp_per_pass = self.config.spp_per_pass;
         let spp = self.config.spp;
+
+        let output_image: luisa::Tex2d<luisa::Float4> = self.device.create_tex2d(
+            luisa::PixelStorage::Float4,
+            scene.camera.resolution().x,
+            scene.camera.resolution().y,
+            1,
+        );
+
         {
             let mut cnt = 0;
             let progress = util::create_progess_bar(spp as usize, "spp");
@@ -642,16 +724,12 @@ impl SinglePathMcmc {
                 cnt += cur_pass;
                 let toc = Instant::now();
                 acc_time += toc.duration_since(tic).as_secs_f64();
-                if options.save_intermediate {
-                    let output_image: luisa::Tex2d<luisa::Float4> = self.device.create_tex2d(
-                        luisa::PixelStorage::Float4,
-                        scene.camera.resolution().x,
-                        scene.camera.resolution().y,
-                        1,
-                    );
+                if session.save_intermediate || session.display.is_some() {
                     reconstruct(film, cnt);
-                    film.copy_to_rgba_image(&output_image);
-                    let path = format!("{}-{}.exr", options.session, cnt);
+                }
+                if session.save_intermediate {
+                    film.copy_to_rgba_image(&output_image, true);
+                    let path = format!("{}-{}.exr", session.name, cnt);
                     util::write_image(&output_image, &path);
                     stats.intermediate.push(IntermediateStats {
                         time: acc_time,
@@ -661,8 +739,8 @@ impl SinglePathMcmc {
                 }
             }
             progress.finish();
-            if options.save_stats {
-                let file = File::create(format!("{}.json", options.session)).unwrap();
+            if session.save_stats {
+                let file = File::create(format!("{}.json", session.name)).unwrap();
                 let json = serde_json::to_value(&stats).unwrap();
                 let writer = BufWriter::new(file);
                 serde_json::to_writer(writer, &json).unwrap();
@@ -680,7 +758,7 @@ impl Integrator for SinglePathMcmc {
         sampler_config: SamplerConfig,
         color_pipeline: ColorPipeline,
         film: &mut Film,
-        options: &RenderOptions,
+        session: &RenderSession,
     ) {
         let resolution = scene.camera.resolution();
         log::info!(
@@ -714,11 +792,14 @@ impl Integrator for SinglePathMcmc {
                 sampler_config,
                 color_pipeline,
                 film,
-                &Default::default(),
+                &RenderSession {
+                    display: session.display.clone(),
+                    ..Default::default()
+                },
             );
         }
         let render_state = self.bootstrap(&scene, film.filter(), &evaluators);
-        self.render_loop(&scene, &evaluators, &render_state, film, options);
+        self.render_loop(&scene, &evaluators, &render_state, film, session);
     }
 }
 
@@ -729,7 +810,7 @@ pub fn render(
     color_pipeline: ColorPipeline,
     film: &mut Film,
     config: &Config,
-    options: &RenderOptions,
+    options: &RenderSession,
 ) {
     let mcmc = SinglePathMcmc::new(device.clone(), config.clone());
     mcmc.render(scene, sampler, color_pipeline, film, options);

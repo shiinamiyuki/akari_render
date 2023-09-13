@@ -1,7 +1,7 @@
 use std::f32::consts::PI;
 
 use crate::{
-    color::{Color, RgbColorSpace, SampledWavelengths},
+    color::{linear_to_srgb, Color, RgbColorSpace, SampledWavelengths},
     util::safe_div,
     *,
 };
@@ -57,7 +57,7 @@ impl FilmColorRepr {
         }
     }
 }
-#[derive(Clone)]
+
 pub struct Film {
     device: Device,
     pub(crate) pixels: Buffer<f32>,
@@ -67,6 +67,7 @@ pub struct Film {
     resolution: Uint2,
     splat_scale: f32,
     filter: PixelFilter,
+    copy_to_rgba_image: Kernel<fn(Tex2d<Float4>, f32, bool)>,
 }
 
 impl Film {
@@ -82,24 +83,52 @@ impl Film {
     pub fn new(
         device: Device,
         resolution: Uint2,
-        color: FilmColorRepr,
+        repr: FilmColorRepr,
         filter: PixelFilter,
     ) -> Self {
-        let nvalues = color.nvalues();
+        let nvalues = repr.nvalues();
         let pixels =
             device.create_buffer::<f32>(resolution.x as usize * resolution.y as usize * nvalues);
         let splat =
             device.create_buffer::<f32>(resolution.x as usize * resolution.y as usize * nvalues);
         let weights = device.create_buffer::<f32>(resolution.x as usize * resolution.y as usize);
+        let copy_to_rgba_image = device.create_kernel::<fn(Tex2d<Float4>, f32, bool)>(
+            &|image: Tex2dVar<Float4>, splat_scale: Expr<f32>, hdr: Expr<bool>| {
+                let p = dispatch_id().xy();
+                let i = p.x() + p.y() * resolution.x;
+                let pixels = pixels.var();
+                let splat = splat.var();
+                let weights = weights.var();
+                let nvalues = repr.nvalues();
+                match repr {
+                    FilmColorRepr::SRgb => {
+                        let s_r = splat.read(i * nvalues as u32 + 0) * splat_scale;
+                        let s_g = splat.read(i * nvalues as u32 + 1) * splat_scale;
+                        let s_b = splat.read(i * nvalues as u32 + 2) * splat_scale;
+
+                        let r = pixels.read(i * nvalues as u32 + 0);
+                        let g = pixels.read(i * nvalues as u32 + 1);
+                        let b = pixels.read(i * nvalues as u32 + 2);
+                        let w = weights.read(i);
+                        let rgb = make_float3(r, g, b) / select(w.cmpeq(0.0), const_(1.0f32), w);
+                        let rgb = rgb + make_float3(s_r, s_g, s_b);
+                        let rgb = if_!(hdr, { rgb }, else, { linear_to_srgb(rgb) });
+                        image.write(p, make_float4(rgb.x(), rgb.y(), rgb.z(), 1.0f32));
+                    }
+                    _ => todo!(),
+                }
+            },
+        );
         let film = Self {
             device,
             splat,
             pixels,
             weights,
-            repr: color,
+            repr,
             resolution,
             filter,
             splat_scale: 1.0,
+            copy_to_rgba_image,
         };
         film.clear();
         film
@@ -125,7 +154,7 @@ impl Film {
         let splat = self.splat.var();
         let i = self.linear_index(p);
         let nvalues = self.repr.nvalues();
-        let color = color * weight;
+        let color = color.remove_nan() * weight;
         match self.repr {
             FilmColorRepr::SRgb => {
                 let rgb: Float3Expr = color.to_rgb(RgbColorSpace::SRgb);
@@ -145,7 +174,7 @@ impl Film {
         _swl: Expr<SampledWavelengths>,
         weight: Expr<f32>,
     ) {
-        let color = color * weight;
+        let color = color.remove_nan() * weight;
         let pixels = self.pixels.var();
         let weights = self.weights.var();
         let i = self.linear_index(p);
@@ -204,37 +233,16 @@ impl Film {
                 &other.splat_scale,
             );
     }
-    pub fn copy_to_rgba_image(&self, image: &Tex2d<Float4>) {
+    pub fn copy_to_rgba_image(&self, image: &Tex2d<Float4>, hdr: bool) {
         assert_eq!(image.width(), self.resolution.x);
         assert_eq!(image.height(), self.resolution.y);
-        self.device
-            .create_kernel::<fn(f32)>(&|splat_scale: Expr<f32>| {
-                let p = dispatch_id().xy();
-                let i = p.x() + p.y() * self.resolution.x;
-                let pixels = self.pixels.var();
-                let splat = self.splat.var();
-                let weights = self.weights.var();
-                let nvalues = self.repr.nvalues();
-                match self.repr {
-                    FilmColorRepr::SRgb => {
-                        let s_r = splat.read(i * nvalues as u32 + 0) * splat_scale;
-                        let s_g = splat.read(i * nvalues as u32 + 1) * splat_scale;
-                        let s_b = splat.read(i * nvalues as u32 + 2) * splat_scale;
 
-                        let r = pixels.read(i * nvalues as u32 + 0);
-                        let g = pixels.read(i * nvalues as u32 + 1);
-                        let b = pixels.read(i * nvalues as u32 + 2);
-                        let w = weights.read(i);
-                        let rgb = make_float3(r, g, b) / select(w.cmpeq(0.0), const_(1.0f32), w);
-                        let rgb = rgb + make_float3(s_r, s_g, s_b);
-                        image
-                            .var()
-                            .write(p, make_float4(rgb.x(), rgb.y(), rgb.z(), 1.0f32));
-                    }
-                    _ => todo!(),
-                }
-            })
-            .dispatch([self.resolution.x, self.resolution.y, 1], &self.splat_scale)
+        self.copy_to_rgba_image.dispatch(
+            [self.resolution.x, self.resolution.y, 1],
+            image,
+            &self.splat_scale,
+            &hdr,
+        );
     }
 }
 
