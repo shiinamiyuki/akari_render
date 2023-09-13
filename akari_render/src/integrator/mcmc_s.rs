@@ -6,7 +6,10 @@ use std::time::Instant;
 use super::mcmc::{Config, Method};
 use super::pt::{self, PathTracer, PathTracerBase};
 use super::{Integrator, IntermediateStats, RenderOptions, RenderStats};
-use crate::sampler::mcmc::IsotropicExponentialMutation;
+use crate::sampler::mcmc::{
+    IsotropicExponentialMutation, KelemenMutationRecord, KelemenMutationRecordExpr, KELEMEN_MUTATE,
+};
+use crate::sampling::sample_gaussian;
 use crate::util::distribution::resample_with_f64;
 use crate::{
     color::*,
@@ -16,17 +19,16 @@ use crate::{
         *,
     },
     scene::*,
-    util::distribution::AliasTable,
     *,
 };
-use rand::Rng;
-use serde::{Deserialize, Serialize};
 
 pub struct SinglePathMcmc {
     pub device: Device,
     pub method: Method,
     pub n_chains: usize,
     pub n_bootstrap: usize,
+    max_depth: u32,
+    min_depth: u32,
     config: Config,
 }
 
@@ -41,6 +43,7 @@ pub struct MarkovState {
     n_accepted: u64,
     n_mutations: u64,
     sigma: f32,
+    depth: u32,
 }
 struct RenderState {
     rng_states: Buffer<Pcg32>,
@@ -50,26 +53,182 @@ struct RenderState {
     b_init: f64,
     b_init_cnt: usize,
 }
+pub struct McmcSampler<'a, F> {
+    pub base: &'a IndependentSampler,
+    pub samples: &'a Buffer<f32>,
+    pub get_index: F,
+    pub cur_dim: Var<u32>,
+    pub mcmc_dim: Expr<u32>,
+}
+impl<'a, F> McmcSampler<'a, F> {
+    pub fn new(
+        base: &'a IndependentSampler,
+        samples: &'a Buffer<f32>,
+        get_index: F,
+        mcmc_dim: Expr<u32>,
+    ) -> Self
+    where
+        F: Fn(Expr<u32>) -> Expr<u32>,
+    {
+        Self {
+            base,
+            samples,
+            get_index,
+            cur_dim: var!(u32, 0),
+            mcmc_dim,
+        }
+    }
+}
 
+impl<'a, F> Sampler for McmcSampler<'a, F>
+where
+    F: Fn(Expr<u32>) -> Expr<u32>,
+{
+    fn next_1d(&self) -> Float {
+        if_!(
+            self.cur_dim.load().cmplt(self.mcmc_dim),
+            {
+                let ret = self.samples.read((self.get_index)(*self.cur_dim));
+                self.cur_dim.store(self.cur_dim.load() + 1);
+                ret
+            },
+            else,
+            {
+                lc_unreachable!();
+                const_(0.0f32)
+            }
+        )
+    }
+    fn is_metropolis(&self) -> bool {
+        false
+    }
+    fn uniform(&self) -> Expr<f32> {
+        self.base.next_1d()
+    }
+    fn start(&self) {
+        self.cur_dim.store(0);
+    }
+    fn clone_box(&self) -> Box<dyn Sampler> {
+        todo!()
+    }
+    fn forget(&self) {
+        todo!()
+    }
+}
+pub struct Mutator {
+    pub method: Method,
+    pub is_large_step: Expr<bool>,
+    // pub is_image_mutation: Expr<bool>,
+}
+impl Mutator {
+    pub fn mutate(
+        &self,
+        samples: &Buffer<f32>,
+        start_dim: Expr<u32>,
+        end_dim: Expr<u32>,
+        get_index: &impl Fn(Expr<u32>) -> Expr<u32>,
+        get_back_index: &impl Fn(Expr<u32>) -> Expr<u32>,
+        rng: &IndependentSampler,
+    ) {
+        for_range(start_dim..end_dim, |i| {
+            self.mutate_one(samples, i, get_index, get_back_index, rng);
+        });
+    }
+    pub fn reject(
+        &self,
+        samples: &Buffer<f32>,
+        start_dim: Expr<u32>,
+        end_dim: Expr<u32>,
+        get_index: &impl Fn(Expr<u32>) -> Expr<u32>,
+        get_back_index: &impl Fn(Expr<u32>) -> Expr<u32>,
+    ) {
+        for_range(start_dim..end_dim, |i| {
+            let sample_idx = get_index(i);
+            let backup_idx = get_back_index(i);
+            let x = samples.read(backup_idx);
+            samples.write(sample_idx, x);
+        });
+    }
+    pub fn mutate_one(
+        &self,
+        samples: &Buffer<f32>,
+        i: Expr<u32>, // dim
+        get_index: &impl Fn(Expr<u32>) -> Expr<u32>,
+        get_back_index: &impl Fn(Expr<u32>) -> Expr<u32>,
+        rng: &IndependentSampler,
+    ) {
+        match self.method {
+            Method::Kelemen {
+                exponential_mutation,
+                small_sigma,
+                image_mutation_size,
+                image_mutation_prob,
+                ..
+            } => {
+                let kelemen_mutate_size_low = 1.0 / 1024.0f32;
+                let kelemen_mutate_size_high = 1.0 / 64.0f32;
+                let kelemen_log_ratio = -(kelemen_mutate_size_high / kelemen_mutate_size_low).ln();
+                let u = rng.next_1d();
+                let sample_idx = get_index(i);
+                let backup_idx = get_back_index(i);
+                let x = samples.read(sample_idx);
+                samples.write(backup_idx, x);
+                if_!(
+                    self.is_large_step,
+                    {
+                        samples.write(sample_idx, u);
+                    },
+                    else,
+                    {
+                        if exponential_mutation {
+                            let record = var!(
+                                KelemenMutationRecord,
+                                KelemenMutationRecordExpr::new(
+                                    x,
+                                    u,
+                                    kelemen_mutate_size_low,
+                                    kelemen_mutate_size_high,
+                                    kelemen_log_ratio,
+                                    0.0
+                                )
+                            );
+                            KELEMEN_MUTATE.call(record);
+                            samples.write(sample_idx, *record.mutated());
+                        } else {
+                            let dv = sample_gaussian(u);
+                            let new = x + dv * small_sigma;
+                            let new = new - new.floor();
+                            // lc_assert!(new.is_finite());
+                            let new = select(new.is_finite(), new, const_(0.0f32));
+                            samples.write(sample_idx, new);
+                        }
+                    }
+                );
+            }
+        }
+    }
+}
 impl SinglePathMcmc {
-    fn sample_dimension(&self, depth: usize) -> usize {
-        4 + depth * 3 + 3
+    fn sample_dimension(&self, depth: u32) -> u32 {
+        4 + (1 + depth) * 3 + 3
+    }
+    fn sample_dimension_device(&self, depth: Expr<u32>) -> Expr<u32> {
+        4 + (1 + depth) * 3 + 3
     }
     pub fn new(device: Device, config: Config) -> Self {
-        let pt_config = pt::Config {
-            spp: config.spp,
-            max_depth: config.max_depth,
-            spp_per_pass: config.spp_per_pass,
-            use_nee: config.use_nee,
-            rr_depth: config.rr_depth,
-            indirect_only: config.direct_spp >= 0,
-            ..Default::default()
-        };
+        // assert_eq!(
+        //     config.n_chains % Self::SAMPLE_BUFFER_AOSOA_SIZE as usize,
+        //     0,
+        //     "n_chains must be a multiple of {}",
+        //     Self::SAMPLE_BUFFER_AOSOA_SIZE
+        // );
         Self {
             device: device.clone(),
             method: config.method,
             n_chains: config.n_chains,
             n_bootstrap: config.n_bootstrap,
+            max_depth: config.max_depth,
+            min_depth: if config.direct_spp >= 0 { 2 } else { 0 },
             config,
         }
     }
@@ -83,10 +242,16 @@ impl SinglePathMcmc {
         filter: PixelFilter,
         eval: &Evaluators,
         independent: &IndependentSampler,
-        sample: PrimarySample,
+        samples: &Buffer<f32>,
+        get_index: impl Fn(Expr<u32>) -> Expr<u32>,
         depth: Expr<u32>,
     ) -> (Expr<Uint2>, Color, Expr<SampledWavelengths>, Expr<f32>) {
-        let sampler = IndependentReplaySampler::new(independent, sample);
+        let sampler = McmcSampler::new(
+            independent,
+            samples,
+            get_index,
+            self.sample_dimension_device(depth),
+        );
         sampler.start();
         let res = const_(scene.camera.resolution());
         let p = sampler.next_2d() * res.float();
@@ -112,78 +277,116 @@ impl SinglePathMcmc {
         };
         (p.uint(), l, *swl, Self::scalar_contribution(&l))
     }
-    fn bootstrap(
-        &self,
-        scene: &Arc<Scene>,
-        filter: PixelFilter,
-        eval: &Evaluators,
-        depth: usize,
-    ) -> RenderState {
-        let seeds = init_pcg32_buffer(self.device.clone(), self.n_bootstrap + self.n_chains);
+    const SAMPLE_BUFFER_AOSOA_SIZE: u32 = 8;
 
+    // layout:
+    // [[f32 x 8] x 2] x dims] x (n_chains / 8)
+    fn _sample_index_aosoa(
+        &self,
+        chain_id: Expr<u32>,
+        dim: Expr<u32>,
+        is_backup: Expr<u32>,
+    ) -> Expr<u32> {
+        // (chain_id / Self::SAMPLE_BUFFER_AOSOA_SIZE)
+        //     * Self::SAMPLE_BUFFER_AOSOA_SIZE
+        //     * 2
+        //     * self.sample_dimension(self.config.max_depth)
+        //     + dim * Self::SAMPLE_BUFFER_AOSOA_SIZE * 2
+        //     + (chain_id % Self::SAMPLE_BUFFER_AOSOA_SIZE)
+        //     + is_backup * Self::SAMPLE_BUFFER_AOSOA_SIZE
+        chain_id * self.sample_dimension(self.max_depth) * 2 + dim * 2 + is_backup
+    }
+    fn sample_index_aosoa(&self, chain_id: Expr<u32>, dim: Expr<u32>) -> Expr<u32> {
+        self._sample_index_aosoa(chain_id, dim, const_(0u32))
+    }
+    fn backup_index_aosoa(&self, chain_id: Expr<u32>, dim: Expr<u32>) -> Expr<u32> {
+        self._sample_index_aosoa(chain_id, dim, const_(1u32))
+    }
+    fn normalization_factor_correction(&self) -> f32 {
+        (self.max_depth - self.min_depth + 1) as f32
+    }
+    fn sample_depth(&self, sampler: &dyn Sampler) -> Expr<u32> {
+        let range = self.max_depth + 1 - self.min_depth;
+        (self.min_depth + (sampler.next_1d() * range as f32).uint())
+            .clamp(self.min_depth, self.config.max_depth as i32)
+    }
+    fn bootstrap(&self, scene: &Arc<Scene>, filter: PixelFilter, eval: &Evaluators) -> RenderState {
+        let seeds = init_pcg32_buffer(self.device.clone(), self.n_bootstrap);
         let fs = self
             .device
             .create_buffer_from_fn(self.n_bootstrap, |_| 0.0f32);
-        self.device
-            .create_kernel::<fn()>(&|| {
-                let i = dispatch_id().x();
-                let seed = seeds.var().read(i);
-                let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seed));
-                let sample = VLArrayVar::<f32>::zero(self.sample_dimension(depth));
-                for_range(const_(0)..sample.len().int(), |i| {
-                    let i = i.uint();
-                    sample.write(i, sampler.next_1d());
-                });
-                let sample = PrimarySample { values: sample };
-                let (_p, _l, _swl, f) =
-                    self.evaluate(scene, filter, eval, &sampler, sample, const_(depth as u32));
-                fs.var().write(i, f);
-            })
-            .dispatch([self.n_bootstrap as u32, 1, 1]);
+        let sample_buffer = self.device.create_buffer(
+            self.sample_dimension(self.config.max_depth) as usize * self.n_bootstrap,
+        );
+        let bootstrap_kernel = self.device.create_kernel::<fn()>(&|| {
+            let i = dispatch_id().x();
+            let seed = seeds.var().read(i);
+            let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seed));
+
+            let depth = self.sample_depth(&sampler);
+            // cpu_dbg!(depth);
+            for_range(const_(0u32)..self.sample_dimension_device(depth), |d| {
+                sample_buffer.write(
+                    self.sample_dimension(self.config.max_depth) * i + d,
+                    sampler.next_1d(),
+                );
+            });
+            let (_p, _l, _swl, f) = self.evaluate(
+                scene,
+                filter,
+                eval,
+                &sampler,
+                &sample_buffer,
+                |d| self.sample_dimension(self.config.max_depth) * i + d,
+                depth,
+            );
+            fs.var().write(i, f);
+        });
+        let t = Instant::now();
+        bootstrap_kernel.dispatch([self.n_bootstrap as u32, 1, 1]);
 
         let weights = fs.copy_to_vec();
         let (b, resampled) = resample_with_f64(&weights, self.n_chains);
+        log::info!("Bootstrap finished in {:.2}s", t.elapsed().as_secs_f64());
         assert!(b > 0.0, "Bootstrap failed, please retry with more samples");
         log::info!(
             "Normalization factor initial estimate: {}",
-            b / self.n_bootstrap as f64
+            b / self.n_bootstrap as f64 * self.normalization_factor_correction() as f64
         );
         let resampled = self.device.create_buffer_from_slice(&resampled);
         let states = self.device.create_buffer(self.n_chains);
         let cur_colors = ColorBuffer::new(self.device.clone(), self.n_chains, eval.color_repr());
-        let sample_buffer = self
-            .device
-            .create_buffer(self.sample_dimension(depth) * self.n_chains);
+        let sample_buffer = self.device.create_buffer(
+            self.sample_dimension(self.max_depth) as usize * 2 * ((self.n_chains + 7) / 8) * 8,
+        );
         self.device
             .create_kernel::<fn()>(&|| {
                 let i = dispatch_id().x();
                 let seed_idx = resampled.var().read(i);
                 let seed = seeds.var().read(seed_idx);
                 let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seed));
-                let sample = VLArrayVar::<f32>::zero(self.sample_dimension(depth));
-                for_range(const_(0)..sample.len().int(), |i| {
-                    let i = i.uint();
-                    sample.write(i, sampler.next_1d());
-                });
 
-                for_range(const_(0)..sample.len().int(), |j| {
-                    let dim = self.sample_dimension(depth);
-                    let j = j.uint();
-                    sample_buffer
-                        .var()
-                        .write(i * dim as u32 + j, sample.read(j));
+                let depth = self.sample_depth(&sampler);
+                for_range(const_(0u32)..self.sample_dimension_device(depth), |d| {
+                    sample_buffer.write(self.sample_index_aosoa(i, d), sampler.next_1d());
                 });
+                let (p, l, swl, f) = self.evaluate(
+                    scene,
+                    filter,
+                    eval,
+                    &sampler,
+                    &sample_buffer,
+                    |d| self.sample_index_aosoa(i, d),
+                    depth,
+                );
 
-                let sample = PrimarySample { values: sample };
-                let (p, l, swl, f) =
-                    self.evaluate(scene, filter, eval, &sampler, sample, const_(depth as u32));
                 // cpu_dbg!(make_float2(f, fs.var().read(seed_idx)));
                 let sigma = match &self.method {
                     Method::Kelemen { small_sigma, .. } => *small_sigma,
                     _ => todo!(),
                 };
                 cur_colors.write(i, l, swl);
-                let state = MarkovStateExpr::new(i, p, f, 0.0, 0, 0, 0, sigma);
+                let state = MarkovStateExpr::new(i, p, f, 0.0, 0, 0, 0, sigma, depth);
                 states.var().write(i, state);
             })
             .dispatch([self.n_chains as u32, 1, 1]);
@@ -207,9 +410,8 @@ impl SinglePathMcmc {
         state: Var<MarkovState>,
         cur_color_v: ColorVar,
         cur_swl: Var<SampledWavelengths>,
-        sample: PrimarySample,
+        samples: &Buffer<f32>,
         rng: &IndependentSampler,
-        depth: usize,
     ) {
         let res = const_(scene.camera.resolution()).float();
         // select a mutation strategy
@@ -222,28 +424,42 @@ impl SinglePathMcmc {
                 image_mutation_size,
                 image_mutation_prob,
             } => {
+                let chain_id = *state.chain_id();
                 let is_large_step = rng.next_1d().cmplt(large_step_prob);
-                let proposal = if_!(is_large_step, {
-                    let large = LargeStepMutation{};
-                    large.mutate(&sample, &rng)
-                }, else {
-                    let image_mutation = rng.next_1d().cmplt(image_mutation_prob);
-                    if exponential_mutation {
-                        let small = IsotropicExponentialMutation::new_default(false, image_mutation, image_mutation_size, res);
-                        small.mutate(&sample, &rng)
-                    } else {
-                        let small = IsotropicGaussianMutation { image_mutation, sigma: state.sigma().load(),compute_log_pdf:false, image_mutation_size, res};
-                        small.mutate(&sample, &rng)
+                let new_depth = var!(u32);
+                if_!(
+                    is_large_step,
+                    {
+                        new_depth.store(self.sample_depth(rng));
+                    },
+                    else,
+                    {
+                        new_depth.store(*state.depth());
                     }
-                });
-                let clamped = proposal.sample.clamped();
+                );
+                let mutator = Mutator {
+                    is_large_step,
+                    method: self.method,
+                };
+                // perform mutation
+                let mutation_end_dim = self.sample_dimension_device(*new_depth);
+                mutator.mutate(
+                    samples,
+                    const_(0u32),
+                    mutation_end_dim,
+                    &|dim| self.sample_index_aosoa(chain_id, dim),
+                    &|dim| self.backup_index_aosoa(chain_id, dim),
+                    rng,
+                );
+
                 let (proposal_p, proposal_color, proposal_swl, f) = self.evaluate(
                     scene,
                     film.filter(),
                     eval,
                     &rng,
-                    clamped,
-                    const_(depth as u32),
+                    samples,
+                    |dim| self.sample_index_aosoa(chain_id, dim),
+                    *new_depth,
                 );
                 let proposal_f = f;
                 if_!(is_large_step, {
@@ -270,7 +486,7 @@ impl SinglePathMcmc {
                     *cur_swl,
                     (1.0 - accept) * contribution,
                 );
-                if_!(rng.next_1d().cmplt(accept), {
+                if_!(rng.next_1d().cmplt(accept) & state.b_cnt().cmplt(1024 * 1024), {
                     state.set_cur_f(proposal_f);
                     cur_color_v.store(proposal_color);
                     cur_swl.store(proposal_swl);
@@ -278,7 +494,18 @@ impl SinglePathMcmc {
                     if_!(!is_large_step, {
                         state.set_n_accepted(state.n_accepted().load() + 1);
                     });
-                    sample.values.store(clamped.values.load());
+                    if_!(is_large_step, {
+                        *state.depth().get_mut() = *new_depth;
+                    });
+                }, else {
+                    mutator.reject(
+                        samples,
+                        const_(0u32),
+                        mutation_end_dim,
+                        &|dim| self.sample_index_aosoa(chain_id, dim),
+                        &|dim| self.backup_index_aosoa(chain_id, dim),
+                    );
+
                 });
                 if_!(!is_large_step, {
                     state.set_n_mutations(state.n_mutations().load() + 1);
@@ -309,23 +536,12 @@ impl SinglePathMcmc {
         film: &Film,
         mutations_per_chain: Expr<u32>,
         contribution: Expr<f32>,
-        depth: usize,
     ) {
         let i = dispatch_id().x();
         let markov_states = render_state.states.var();
         let sampler =
             IndependentSampler::from_pcg32(var!(Pcg32, render_state.rng_states.var().read(i)));
         let state = var!(MarkovState, markov_states.read(i));
-        let sample = {
-            let dim = self.sample_dimension(depth);
-            let sample = VLArrayVar::<f32>::zero(dim);
-            lc_assert!(i.cmpeq(state.chain_id().load()));
-            for_range(const_(0)..const_(dim as i32), |j| {
-                let j = j.uint();
-                sample.write(j, render_state.samples.var().read(i * dim as u32 + j));
-            });
-            PrimarySample { values: sample }
-        };
         let (cur_color, cur_swl) = render_state.cur_colors.read(i);
         let cur_color_v = ColorVar::new(cur_color);
         let cur_swl_v = def(cur_swl);
@@ -338,21 +554,10 @@ impl SinglePathMcmc {
                 state,
                 cur_color_v,
                 cur_swl_v,
-                sample,
+                &render_state.samples,
                 &sampler,
-                depth,
             );
         });
-        {
-            let dim = self.sample_dimension(depth);
-            for_range(const_(0)..const_(dim as i32), |j| {
-                let j = j.uint();
-                render_state
-                    .samples
-                    .var()
-                    .write(i * dim as u32 + j, sample.values.read(j));
-            });
-        }
         render_state
             .cur_colors
             .write(i, cur_color_v.load(), *cur_swl_v);
@@ -367,9 +572,6 @@ impl SinglePathMcmc {
         state: &RenderState,
         film: &mut Film,
         options: &RenderOptions,
-        depth: usize,
-        spp: u32,
-        weight: f32,
     ) {
         let resolution = scene.camera.resolution();
         let npixels = resolution.x * resolution.y;
@@ -386,15 +588,7 @@ impl SinglePathMcmc {
                 } else {
                     set_block_size([256, 1, 1]);
                 }
-                self.advance_chain(
-                    scene,
-                    eval,
-                    state,
-                    film,
-                    mutations_per_chain,
-                    contribution,
-                    depth,
-                )
+                self.advance_chain(scene, eval, state, film, mutations_per_chain, contribution)
             },
         );
         let reconstruct = |film: &mut Film, spp: u32| {
@@ -410,7 +604,7 @@ impl SinglePathMcmc {
                 mutations += s.n_mutations;
             }
             let accept_rate = accepted as f64 / mutations as f64;
-            let b = b / b_cnt as f64;
+            let b = b / b_cnt as f64 * self.normalization_factor_correction() as f64;
             log::info!("#indenpentent proposals: {}", b_cnt);
             log::info!("Normalization factor: {}", b);
             log::info!("Acceptance rate: {:.2}%", accept_rate * 100.0);
@@ -418,9 +612,10 @@ impl SinglePathMcmc {
         };
         let mut acc_time = 0.0f64;
         let mut stats = RenderStats::default();
+        let spp_per_pass = self.config.spp_per_pass;
+        let spp = self.config.spp;
         {
             let mut cnt = 0;
-            let spp_per_pass = self.config.spp_per_pass;
             let progress = util::create_progess_bar(spp as usize, "spp");
             // since mutations_per_chain is truncated, we need to compensate for the truncation error
             // mutations_per_chain * n_chains * contribution = n_mutations
@@ -428,8 +623,7 @@ impl SinglePathMcmc {
                 let n_mutations = npixels as u64 * spp as u64;
                 let mutations_per_chain = (n_mutations / self.n_chains as u64).max(1);
                 n_mutations as f64 / (mutations_per_chain as f64 * self.n_chains as f64)
-            } as f32
-                * weight;
+            } as f32;
             while cnt < spp {
                 let tic = Instant::now();
                 let cur_pass = (spp - cnt).min(spp_per_pass);
@@ -457,7 +651,7 @@ impl SinglePathMcmc {
                     );
                     reconstruct(film, cnt);
                     film.copy_to_rgba_image(&output_image);
-                    let path = format!("{}-depth-{}-{}.exr", options.session, depth, cnt);
+                    let path = format!("{}-{}.exr", options.session, cnt);
                     util::write_image(&output_image, &path);
                     stats.intermediate.push(IntermediateStats {
                         time: acc_time,
@@ -468,8 +662,7 @@ impl SinglePathMcmc {
             }
             progress.finish();
             if options.save_stats {
-                let file =
-                    File::create(format!("{}-depth-{}.json", options.session, depth)).unwrap();
+                let file = File::create(format!("{}.json", options.session)).unwrap();
                 let json = serde_json::to_value(&stats).unwrap();
                 let writer = BufWriter::new(file);
                 serde_json::to_writer(writer, &json).unwrap();
@@ -524,58 +717,8 @@ impl Integrator for SinglePathMcmc {
                 &Default::default(),
             );
         }
-        let start_depth = if self.config.direct_spp >= 0 { 2 } else { 0 };
-        let depths = (start_depth..=self.config.max_depth).collect::<Vec<_>>();
-        let mut films = depths
-            .iter()
-            .map(|_| {
-                let film = film.clone();
-                film.clear();
-                film
-            })
-            .collect::<Vec<_>>();
-        let mut render_states = vec![];
-        let mut importance = vec![];
-        for i in 0..depths.len() {
-            let film = &mut films[i];
-            let render_state =
-                self.bootstrap(&scene, film.filter(), &evaluators, depths[i] as usize);
-            importance.push(render_state.b_init as f64 / render_state.b_init_cnt as f64);
-            render_states.push(render_state);
-        }
-        // Allocate more samples to higher importance depths
-        let mut spp_per_depth = vec![];
-        let mut weights_per_depth = vec![];
-        {
-            let sum = importance.iter().sum::<f64>();
-            for i in 0..importance.len() {
-                importance[i] /= sum;
-                log::info!("Depth {} has importance {:.6}", depths[i], importance[i]);
-            }
-            let total_spps = self.config.spp as u64 * depths.len() as u64;
-            for i in 0..depths.len() {
-                let expected_spp = total_spps as f64 * importance[i];
-                let allocated_spp = expected_spp.ceil() as u32;
-                spp_per_depth.push(allocated_spp);
-                weights_per_depth.push(1.0);
-            }
-        }
-
-        films.iter_mut().enumerate().for_each(|(i, film)| {
-            self.render_loop(
-                &scene,
-                &evaluators,
-                &render_states[i],
-                film,
-                options,
-                depths[i] as usize,
-                spp_per_depth[i],
-                weights_per_depth[i],
-            );
-        });
-        for f in &films {
-            film.merge(f);
-        }
+        let render_state = self.bootstrap(&scene, film.filter(), &evaluators);
+        self.render_loop(&scene, &evaluators, &render_state, film, options);
     }
 }
 

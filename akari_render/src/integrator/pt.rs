@@ -118,16 +118,15 @@ impl<'a> PathTracerBase<'a> {
             { const_(false) }
         )
     }
-    pub fn sample_surface(&self, sampler: &dyn Sampler) -> BsdfSample {
+    pub fn sample_surface(&self, u_bsdf: Expr<Float3>) -> BsdfSample {
         let surface = *self.instance.surface();
-        let u_bsdf = sampler.next_3d();
         let sample = self
             .eval
             .surface
             .sample(surface, *self.si, *self.wo, u_bsdf, self.swl);
         sample
     }
-    pub fn sample_light(&self, sampler: &dyn Sampler) -> DirectLighting {
+    pub fn sample_light(&self, u: Expr<Float3>) -> DirectLighting {
         if self.use_nee {
             if_!(
                 !self.indirect_only | self.depth.load().cmpgt(1),
@@ -136,7 +135,7 @@ impl<'a> PathTracerBase<'a> {
                     let ng = *self.ng;
                     let pn = PointNormalExpr::new(p, ng);
                     let eval = self.eval;
-                    let sample = eval.light.sample(pn, sampler.next_3d(), *self.swl);
+                    let sample = eval.light.sample(pn, u, *self.swl);
                     let wi = sample.wi;
                     let surface = *self.instance.surface();
                     let wo = *self.wo;
@@ -214,6 +213,7 @@ impl<'a> PathTracerBase<'a> {
     /// and two final vertices with NEE and BSDF sampling respectively.
     pub fn run_at_depth(&self, ray: Expr<Ray>, target_depth: Expr<u32>, sampler: &dyn Sampler) {
         let ray = var!(Ray, ray);
+        let u_light = sampler.next_3d();
         loop_!({
             let hit = self.next_intersection(*ray);
             if_!(!hit, {
@@ -229,14 +229,14 @@ impl<'a> PathTracerBase<'a> {
                     self.add_radiance(direct * w);
                 });
             }
-           
+
             if_!(self.depth.load().cmpge(self.max_depth), {
                 break_();
             });
             *self.depth.get_mut() += 1;
 
             if_!(self.depth.cmpeq(target_depth), {
-                let direct_lighting = self.sample_light(sampler);
+                let direct_lighting = self.sample_light(u_light);
                 if_!(direct_lighting.valid, {
                     let shadow_ray = direct_lighting.shadow_ray;
                     if_!(!self.scene.occlude(shadow_ray), {
@@ -248,7 +248,7 @@ impl<'a> PathTracerBase<'a> {
                     });
                 });
             });
-            let bsdf_sample = self.sample_surface(sampler);
+            let bsdf_sample = self.sample_surface(sampler.next_3d());
             let f = &bsdf_sample.color;
             lc_assert!(f.min().cmpge(0.0));
             if_!(bsdf_sample.pdf.cmple(0.0) | !bsdf_sample.valid, {
@@ -283,13 +283,13 @@ impl<'a> PathTracerBase<'a> {
                 let (direct, w) = self.handle_surface_light(*ray);
                 self.add_radiance(direct * w);
             }
-           
+
             if_!(self.depth.load().cmpge(self.max_depth), {
                 break_();
             });
             *self.depth.get_mut() += 1;
-            
-            let direct_lighting = self.sample_light(sampler);
+
+            let direct_lighting = self.sample_light(sampler.next_3d());
             if_!(direct_lighting.valid, {
                 let shadow_ray = direct_lighting.shadow_ray;
                 if_!(!self.scene.occlude(shadow_ray), {
@@ -300,7 +300,7 @@ impl<'a> PathTracerBase<'a> {
                     self.add_radiance(direct);
                 });
             });
-            let bsdf_sample = self.sample_surface(sampler);
+            let bsdf_sample = self.sample_surface(sampler.next_3d());
             let f = &bsdf_sample.color;
             lc_assert!(f.min().cmpge(0.0));
             if_!(bsdf_sample.pdf.cmple(0.0) | !bsdf_sample.valid, {

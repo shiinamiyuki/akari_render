@@ -14,9 +14,9 @@ image = "0.24.3"
 indicatif = "0.17.3"
 lazy_static = "1.4"
 log = "0.4.17"
-# luisa_compute = { path = "../../luisa-compute-rs/luisa_compute" }
+luisa_compute = { path = "../../luisa-compute-rs/luisa_compute" }
 akari_data = { path = "../akari_data" }
-luisa_compute = { git = "https://github.com/LuisaGroup/luisa-compute-rs.git"}
+# luisa_compute = { git = "https://github.com/LuisaGroup/luisa-compute-rs.git"}
 parking_lot = "0.12"
 rand = "0.8.5"
 rayon = "1.7.0"

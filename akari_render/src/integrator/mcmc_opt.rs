@@ -228,7 +228,7 @@ impl Mutator {
 }
 impl McmcOpt {
     fn sample_dimension(&self) -> usize {
-        4 + self.mcmc_depth as usize * (3 + 3 + 1)
+        4 + (1 + self.mcmc_depth as usize) * (3 + 3 + 1)
     }
     pub fn new(device: Device, config: Config) -> Self {
         let pt_config = pt::Config {
