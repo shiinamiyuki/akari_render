@@ -35,7 +35,7 @@ impl Evaluators {
 }
 
 impl Scene {
-    pub fn evaluators(&self, color_pipeline: ColorPipeline, ad_mode: Option<ADMode>) -> Evaluators {
+    pub fn evaluators(&self, color_pipeline: ColorPipeline, ad_mode: ADMode) -> Evaluators {
         let surface = self.surface_evaluator(color_pipeline, ad_mode);
         let light = self.light_evaluator(color_pipeline, &surface, ad_mode);
         Evaluators {
@@ -48,7 +48,7 @@ impl Scene {
         &self,
         color_pipeline: ColorPipeline,
         surface_eval: &SurfaceEvaluator,
-        ad_mode: Option<ADMode>,
+        ad_mode: ADMode,
     ) -> LightEvaluator {
         let le = {
             self.device.create_callable::<fn(
@@ -124,7 +124,7 @@ impl Scene {
     pub fn surface_evaluator(
         &self,
         color_pipeline: ColorPipeline,
-        ad_mode: Option<ADMode>,
+        ad_mode: ADMode,
     ) -> SurfaceEvaluator {
         let eval = {
             self.device.create_callable::<fn(
@@ -276,6 +276,8 @@ impl Scene {
         let p = shading_triangle.p(bary);
         let n = shading_triangle.n(bary);
         let uv = shading_triangle.uv(bary);
+        let tt = shading_triangle.tangent(bary);
+        let ss = shading_triangle.bitangent(bary);
         let geometry = struct_!(SurfaceLocalGeometry {
             p: p,
             ng: shading_triangle.ng,
@@ -289,7 +291,7 @@ impl Scene {
             prim_id,
             bary,
             geometry,
-            FrameExpr::from_n(n),
+            FrameExpr::new(n, tt, ss),
             Bool::from(true),
         )
     }

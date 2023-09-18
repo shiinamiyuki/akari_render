@@ -66,11 +66,7 @@ impl Surface for DisneyDiffuseBsdf {
         ctx: &BsdfEvalContext,
     ) -> BsdfSample {
         let wi = cos_sample_hemisphere(u_sample);
-        let wi = select(
-            Frame::same_hemisphere(wo, wi),
-            wi,
-            make_float3(wi.x(), -wi.y(), wi.x()),
-        );
+        let wi = select(Frame::same_hemisphere(wo, wi), wi, -wi);
         let pdf = Frame::abs_cos_theta(wi) * FRAC_1_PI;
         let color = self.evaluate(wo, wi, *swl, ctx);
         BsdfSample {

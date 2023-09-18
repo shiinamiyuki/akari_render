@@ -37,11 +37,7 @@ impl Surface for DiffuseBsdf {
         _ctx: &BsdfEvalContext,
     ) -> BsdfSample {
         let wi = cos_sample_hemisphere(u_sample);
-        let wi = select(
-            Frame::same_hemisphere(wo, wi),
-            wi,
-            make_float3(wi.x(), -wi.y(), wi.z()),
-        );
+        let wi = select(Frame::same_hemisphere(wo, wi), wi, -wi);
         let pdf = Frame::abs_cos_theta(wi) * FRAC_1_PI;
         let color = &self.reflectance * Frame::abs_cos_theta(wi);
         BsdfSample {

@@ -47,6 +47,7 @@ pub const FRAC_1_2PI: f32 = 1.0 / (2.0 * std::f32::consts::PI);
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
 pub enum ADMode {
+    None,
     Forward,
     Backward,
 }

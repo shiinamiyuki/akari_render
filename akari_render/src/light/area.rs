@@ -79,6 +79,8 @@ impl Light for AreaLightExpr {
         let p = shading_triangle.p(bary);
         let n = shading_triangle.n(bary);
         let uv = shading_triangle.uv(bary);
+        let tt = shading_triangle.tangent(bary);
+        let ss = shading_triangle.bitangent(bary);
         let geometry = SurfaceLocalGeometryExpr::new(
             p,
             shading_triangle.ng,
@@ -93,7 +95,7 @@ impl Light for AreaLightExpr {
             prim_id,
             bary,
             geometry,
-            FrameExpr::from_n(n),
+            FrameExpr::new(n, tt, ss),
             Bool::from(true),
         );
         let wi = p - pn.p();

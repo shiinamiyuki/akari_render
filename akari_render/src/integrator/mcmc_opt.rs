@@ -543,7 +543,7 @@ impl McmcOpt {
         eval: &Evaluators,
         state: &RenderState,
         film: &mut Film,
-        options: &RenderSession,
+        session: &RenderSession,
     ) {
         let resolution = scene.camera.resolution();
         let npixels = resolution.x * resolution.y;
@@ -587,12 +587,21 @@ impl McmcOpt {
             log::info!("Normalization factor: {}", b);
             log::info!("Acceptance rate: {:.2}%", accept_rate * 100.0);
             film.set_splat_scale(b as f32 / spp as f32);
+            if let Some(channel) = &session.display {
+                film.copy_to_rgba_image(channel.screen_tex(), false);
+                channel.notify_update();
+            }
         };
         let mut acc_time = 0.0f64;
         let mut stats = RenderStats::default();
         {
             let mut cnt = 0;
             let spp_per_pass = self.pt.spp_per_pass;
+            let contribution = {
+                let n_mutations = npixels as u64 * self.pt.spp as u64;
+                let mutations_per_chain = (n_mutations / self.n_chains as u64).max(1);
+                n_mutations as f64 / (mutations_per_chain as f64 * self.n_chains as f64)
+            } as f32;
             let progress = util::create_progess_bar(self.pt.spp as usize, "spp");
             while cnt < self.pt.spp {
                 let tic = Instant::now();
@@ -603,10 +612,6 @@ impl McmcOpt {
                     panic!("Number of mutations per chain exceeds u32::MAX, please reduce spp per pass or increase number of chains");
                 }
                 let mutations_per_chain = mutations_per_chain as u32;
-                // since mutations_per_chain is truncated, we need to compensate for the truncation error
-                // mutations_per_chain * n_chains * contribution = n_mutations
-                let contribution =
-                    n_mutations as f32 / (mutations_per_chain as f32 * self.n_chains as f32);
                 kernel.dispatch(
                     [self.n_chains as u32, 1, 1],
                     &mutations_per_chain,
@@ -616,7 +621,10 @@ impl McmcOpt {
                 cnt += cur_pass;
                 let toc = Instant::now();
                 acc_time += toc.duration_since(tic).as_secs_f64();
-                if options.save_intermediate {
+                if session.save_intermediate || session.display.is_some() {
+                    reconstruct(film, cnt);
+                }
+                if session.save_intermediate {
                     let output_image: luisa::Tex2d<luisa::Float4> = self.device.create_tex2d(
                         luisa::PixelStorage::Float4,
                         scene.camera.resolution().x,
@@ -625,7 +633,7 @@ impl McmcOpt {
                     );
                     reconstruct(film, cnt);
                     film.copy_to_rgba_image(&output_image, true);
-                    let path = format!("{}-{}.exr", options.name, cnt);
+                    let path = format!("{}-{}.exr", session.name, cnt);
                     util::write_image(&output_image, &path);
                     stats.intermediate.push(IntermediateStats {
                         time: acc_time,
@@ -635,8 +643,8 @@ impl McmcOpt {
                 }
             }
             progress.finish();
-            if options.save_stats {
-                let file = File::create(format!("{}.json", options.name)).unwrap();
+            if session.save_stats {
+                let file = File::create(format!("{}.json", session.name)).unwrap();
                 let json = serde_json::to_value(&stats).unwrap();
                 let writer = BufWriter::new(file);
                 serde_json::to_writer(writer, &json).unwrap();
@@ -663,7 +671,7 @@ impl Integrator for McmcOpt {
             resolution.y,
             &self.config
         );
-        let evaluators = scene.evaluators(color_pipeline, None);
+        let evaluators = scene.evaluators(color_pipeline, ADMode::None);
         assert_eq!(resolution.x, film.resolution().x);
         assert_eq!(resolution.y, film.resolution().y);
         if self.config.direct_spp > 0 {

@@ -283,9 +283,15 @@ impl MeshAggregate {
             {
                 let tangents = self.mesh_tangents.buffer(geom_id);
                 let bitangent_signs = self.mesh_bitangent_signs.buffer(geom_id);
-                let t0 = transform.transform_vector(tangents.read(prim_id3 + 0).unpack());
-                let t1 = transform.transform_vector(tangents.read(prim_id3 + 1).unpack());
-                let t2 = transform.transform_vector(tangents.read(prim_id3 + 2).unpack());
+                let t0 = transform
+                    .transform_vector(tangents.read(prim_id3 + 0).unpack())
+                    .normalize();
+                let t1 = transform
+                    .transform_vector(tangents.read(prim_id3 + 1).unpack())
+                    .normalize();
+                let t2 = transform
+                    .transform_vector(tangents.read(prim_id3 + 2).unpack())
+                    .normalize();
                 let get_sign = |i: u32| {
                     let j = prim_id3 + i;
                     let sign = bitangent_signs.read(j / 32);

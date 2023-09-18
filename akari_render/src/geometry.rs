@@ -117,8 +117,8 @@ impl ShadingTriangle {
 #[repr(C)]
 pub struct Frame {
     pub n: Float3,
-    pub s: Float3,
     pub t: Float3,
+    pub s: Float3,
 }
 
 impl Frame {

@@ -67,6 +67,7 @@ fn main() {
     };
     let scene = akari_render::load::load_from_path(device.clone(), &scene.unwrap());
     let window = if gui {
+        std::env::set_var("WINIT_UNIX_BACKEND", "x11");
         let window = DisplayWindow::new(
             &device,
             scene.camera.resolution().x,
@@ -85,7 +86,7 @@ fn main() {
     let render_thread = std::thread::spawn(move || {
         render(device.clone(), scene, &task, session);
     });
-   
+
     if let Some(window) = window {
         window.show();
     } else {

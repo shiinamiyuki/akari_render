@@ -11,7 +11,7 @@ use super::ShaderRef;
 
 pub struct BsdfEvalContext<'a> {
     pub color_repr: ColorRepr,
-    pub ad_mode: Option<ADMode>,
+    pub ad_mode: ADMode,
     pub _marker: std::marker::PhantomData<&'a ()>,
 }
 
@@ -455,8 +455,8 @@ impl Surface for MicrofacetReflection {
         }, else {
             let wh = wh.normalize();
             let f = self.fresnel.evaluate(wi.dot(face_forward(wh, make_float3(0.0,1.0,0.0))), ctx);
-            let d = self.dist.d(wh);
-            let g = self.dist.g(wo, wi);
+            let d = self.dist.d(wh,ctx.ad_mode);
+            let g = self.dist.g(wo, wi,ctx.ad_mode);
             &self.color * &f * (0.25 * d * g / (cos_i * cos_o)).abs() * cos_o.abs()
         })
     }
@@ -469,7 +469,7 @@ impl Surface for MicrofacetReflection {
         swl: Var<SampledWavelengths>,
         ctx: &BsdfEvalContext,
     ) -> BsdfSample {
-        let wh = self.dist.sample_wh(wo, u_sample);
+        let wh = self.dist.sample_wh(wo, u_sample, ctx.ad_mode);
         let wi = reflect(wo, wh);
         let valid = Frame::same_hemisphere(wo, wi);
         BsdfSample {
@@ -485,7 +485,7 @@ impl Surface for MicrofacetReflection {
         wo: Expr<Float3>,
         wi: Expr<Float3>,
         _swl: Expr<SampledWavelengths>,
-        _ctx: &BsdfEvalContext,
+        ctx: &BsdfEvalContext,
     ) -> Float {
         let wh = wo + wi;
         let cos_o = Frame::cos_theta(wo);
@@ -498,7 +498,7 @@ impl Surface for MicrofacetReflection {
                 const_(0.0f32)
         }, else {
             let wh = wh.normalize();
-            self.dist.pdf(wo, wh) / (4.0 * wo.dot(wh))
+            self.dist.pdf(wo, wh,ctx.ad_mode) / (4.0 * wo.dot(wh))
         })
     }
     fn albedo(
@@ -513,9 +513,9 @@ impl Surface for MicrofacetReflection {
         &self,
         _wo: Expr<Float3>,
         _swl: Expr<SampledWavelengths>,
-        _ctx: &BsdfEvalContext,
+        ctx: &BsdfEvalContext,
     ) -> Expr<f32> {
-        self.dist.roughness()
+        self.dist.roughness(ctx.ad_mode)
     }
     fn emission(
         &self,
@@ -548,30 +548,42 @@ impl Surface for MicrofacetTransmission {
         let wh = (wo + wi * eta).normalize();
         let wh = face_forward(wh, make_float3(0.0, 1.0, 0.0));
         let backfacing = (wh.dot(wi) * cos_i).cmplt(0.0) | (wh.dot(wo) * cos_o).cmplt(0.0);
-        if_!((wh.dot(wo) * wi.dot(wh)).cmpgt(0.0)
-            | cos_i.cmpeq(0.0)
-            | cos_o.cmpeq(0.0)
-            | backfacing
-            | Frame::same_hemisphere(wo, wi), {
-            Color::zero(ctx.color_repr)
-        }, else {
-            let f = self.fresnel.evaluate(wo.dot(wh), ctx);
-            let denom = (wi.dot(wh)  + wo.dot(wh) / eta).sqr() * cos_i * cos_o;
-            (Color::one(ctx.color_repr) - f)
-                * &self.color *(self.dist.d(wh)
-                * self.dist.g(wo, wi) * eta.sqr()
-                * wi.dot(wh).abs() * wo.dot(wh).abs()
-                / denom).abs() * cos_o.abs()
+        if_!(
+            (wh.dot(wo) * wi.dot(wh)).cmpgt(0.0)
+                | cos_i.cmpeq(0.0)
+                | cos_o.cmpeq(0.0)
+                | backfacing
+                | Frame::same_hemisphere(wo, wi),
+            { Color::zero(ctx.color_repr) },
+            else,
+            {
+                let f = self.fresnel.evaluate(wo.dot(wh), ctx);
+                let denom = (wi.dot(wh) + wo.dot(wh) / eta).sqr() * cos_i * cos_o;
+                select(
+                    denom.cmpeq(0.0),
+                    Color::zero(ctx.color_repr),
+                    (Color::one(ctx.color_repr) - f)
+                        * &self.color
+                        * (self.dist.d(wh, ctx.ad_mode)
+                            * self.dist.g(wo, wi, ctx.ad_mode)
+                            * eta.sqr()
+                            * wi.dot(wh).abs()
+                            * wo.dot(wh).abs()
+                            / denom)
+                            .abs()
+                        * cos_o.abs(),
+                )
 
-            // Float denom = Sqr(Dot(wi, wm) + Dot(wo, wm) / etap) * cosTheta_i * cosTheta_o;
-            // Float ft = mfDistrib.D(wm) * (1 - F) * mfDistrib.G(wo, wi) *
-            //            std::abs(Dot(wi, wm) * Dot(wo, wm) / denom);
-            // // Account for non-symmetry with transmission to different medium
-            // if (mode == TransportMode::Radiance)
-            //     ft /= Sqr(etap);
+                // Float denom = Sqr(Dot(wi, wm) + Dot(wo, wm) / etap) * cosTheta_i * cosTheta_o;
+                // Float ft = mfDistrib.D(wm) * (1 - F) * mfDistrib.G(wo, wi) *
+                //            std::abs(Dot(wi, wm) * Dot(wo, wm) / denom);
+                // // Account for non-symmetry with transmission to different medium
+                // if (mode == TransportMode::Radiance)
+                //     ft /= Sqr(etap);
 
-            // return SampledSpectrum(ft);
-        })
+                // return SampledSpectrum(ft);
+            }
+        )
     }
 
     fn sample(
@@ -582,7 +594,7 @@ impl Surface for MicrofacetTransmission {
         swl: Var<SampledWavelengths>,
         ctx: &BsdfEvalContext,
     ) -> BsdfSample {
-        let wh = self.dist.sample_wh(wo, u_sample);
+        let wh = self.dist.sample_wh(wo, u_sample, ctx.ad_mode);
         let (refracted, _eta, wi) = refract(wo, wh, self.eta);
         let valid = refracted & !Frame::same_hemisphere(wo, wi);
         let pdf = self.pdf(wo, wi, *swl, ctx);
@@ -601,7 +613,7 @@ impl Surface for MicrofacetTransmission {
         wo: Expr<Float3>,
         wi: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
-        _ctx: &BsdfEvalContext,
+        ctx: &BsdfEvalContext,
     ) -> Float {
         let cos_o = Frame::cos_theta(wo);
         let cos_i = Frame::cos_theta(wi);
@@ -609,20 +621,27 @@ impl Surface for MicrofacetTransmission {
         let wh = (wo + wi * eta).normalize();
         let wh = face_forward(wh, make_float3(0.0, 1.0, 0.0));
         let backfacing = (wh.dot(wi) * cos_i).cmplt(0.0) | (wh.dot(wo) * cos_o).cmplt(0.0);
-        if_!((wh.dot(wo) * wi.dot(wh)).cmpgt(0.0)
-            | cos_i.cmpeq(0.0)
-            | cos_o.cmpeq(0.0)
-            | backfacing
-            | Frame::same_hemisphere(wo, wi), {
-            const_(0.0f32)
-        }, else {
-            // Float denom = Sqr(Dot(wi, wm) + Dot(wo, wm) / etap);
-            // Float dwm_dwi = AbsDot(wi, wm) / denom;
-            // pdf = mfDistrib.PDF(wo, wm) * dwm_dwi * pt / (pr + pt);
-            let denom = (wi.dot(wh) + wo.dot(wh) /  eta).sqr();
-            let dwh_dwi = wi.dot(wh).abs() / denom;
-            self.dist.pdf(wo, wh) * dwh_dwi
-        })
+        if_!(
+            (wh.dot(wo) * wi.dot(wh)).cmpgt(0.0)
+                | cos_i.cmpeq(0.0)
+                | cos_o.cmpeq(0.0)
+                | backfacing
+                | Frame::same_hemisphere(wo, wi),
+            { const_(0.0f32) },
+            else,
+            {
+                // Float denom = Sqr(Dot(wi, wm) + Dot(wo, wm) / etap);
+                // Float dwm_dwi = AbsDot(wi, wm) / denom;
+                // pdf = mfDistrib.PDF(wo, wm) * dwm_dwi * pt / (pr + pt);
+                let denom = (wi.dot(wh) + wo.dot(wh) / eta).sqr();
+                let dwh_dwi = wi.dot(wh).abs() / denom;
+                select(
+                    denom.cmpeq(0.0),
+                    const_(0.0f32),
+                    self.dist.pdf(wo, wh, ctx.ad_mode) * dwh_dwi,
+                )
+            }
+        )
     }
     fn albedo(
         &self,
@@ -636,9 +655,9 @@ impl Surface for MicrofacetTransmission {
         &self,
         _wo: Expr<Float3>,
         _swl: Expr<SampledWavelengths>,
-        _ctx: &BsdfEvalContext,
+        ctx: &BsdfEvalContext,
     ) -> Expr<f32> {
-        self.dist.roughness()
+        self.dist.roughness(ctx.ad_mode)
     }
     fn emission(
         &self,

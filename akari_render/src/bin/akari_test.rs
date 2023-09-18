@@ -102,7 +102,7 @@ mod bsdf_test_old {
                     &BsdfEvalContext {
                         color_repr,
                         _marker: std::marker::PhantomData,
-                        ad_mode: None,
+                        ad_mode: ADMode::None,
                     },
                 );
                 PdfSampleExpr::new(sample.pdf, sample.wi, sample.valid)
@@ -458,7 +458,7 @@ plt.show()"#
                         &BsdfEvalContext {
                             color_repr: color::ColorRepr::Rgb(color::RgbColorSpace::SRgb),
                             _marker: PhantomData {},
-                            ad_mode: None,
+                            ad_mode: ADMode::None,
                         },
                     )
                 },
@@ -481,7 +481,7 @@ plt.show()"#
                         &BsdfEvalContext {
                             color_repr: color::ColorRepr::Rgb(color::RgbColorSpace::SRgb),
                             _marker: PhantomData {},
-                            ad_mode: None,
+                            ad_mode: ADMode::None,
                         },
                     )
                 },
@@ -631,11 +631,11 @@ mod invert {
             "invert_ggx_iso",
             |u| {
                 let dist = TrowbridgeReitzDistribution::from_alpha(make_float2(ax, ax), false);
-                dist.sample_wh(make_float3(0.0, 1.0, 0.0), u)
+                dist.sample_wh(make_float3(0.0, 1.0, 0.0), u, ADMode::None)
             },
             |w| {
                 let dist = TrowbridgeReitzDistribution::from_alpha(make_float2(ax, ax), false);
-                dist.invert_wh(make_float3(0.0, 1.0, 0.0), w)
+                dist.invert_wh(make_float3(0.0, 1.0, 0.0), w, ADMode::None)
             },
         );
         test_invert_helper(
@@ -643,11 +643,11 @@ mod invert {
             "invert_ggx_aniso",
             |u| {
                 let dist = TrowbridgeReitzDistribution::from_alpha(make_float2(ax, ay), false);
-                dist.sample_wh(make_float3(0.0, 1.0, 0.0), u)
+                dist.sample_wh(make_float3(0.0, 1.0, 0.0), u, ADMode::None)
             },
             |w| {
                 let dist = TrowbridgeReitzDistribution::from_alpha(make_float2(ax, ay), false);
-                dist.invert_wh(make_float3(0.0, 1.0, 0.0), w)
+                dist.invert_wh(make_float3(0.0, 1.0, 0.0), w, ADMode::None)
             },
         );
     }

@@ -4,18 +4,18 @@ use lazy_static::lazy_static;
 use std::f32::consts::PI;
 
 pub trait MicrofacetDistribution {
-    fn g1(&self, w: Expr<Float3>) -> Expr<f32> {
-        1.0 / (1.0 + self.lambda(w))
+    fn g1(&self, w: Expr<Float3>, ad_mode: ADMode) -> Expr<f32> {
+        1.0 / (1.0 + self.lambda(w, ad_mode))
     }
-    fn g(&self, wo: Expr<Float3>, wi: Expr<Float3>) -> Expr<f32> {
-        1.0 / (1.0 + self.lambda(wo) + self.lambda(wi))
+    fn g(&self, wo: Expr<Float3>, wi: Expr<Float3>, ad_mode: ADMode) -> Expr<f32> {
+        1.0 / (1.0 + self.lambda(wo, ad_mode) + self.lambda(wi, ad_mode))
     }
-    fn d(&self, wh: Expr<Float3>) -> Expr<f32>;
-    fn lambda(&self, w: Expr<Float3>) -> Expr<f32>;
-    fn sample_wh(&self, wo: Expr<Float3>, u: Expr<Float2>) -> Expr<Float3>;
-    fn invert_wh(&self, wo: Expr<Float3>, wh: Expr<Float3>) -> Expr<Float2>;
-    fn pdf(&self, wo: Expr<Float3>, wh: Expr<Float3>) -> Expr<f32>;
-    fn roughness(&self) -> Expr<f32>;
+    fn d(&self, wh: Expr<Float3>, ad_mode: ADMode) -> Expr<f32>;
+    fn lambda(&self, w: Expr<Float3>, ad_mode: ADMode) -> Expr<f32>;
+    fn sample_wh(&self, wo: Expr<Float3>, u: Expr<Float2>, ad_mode: ADMode) -> Expr<Float3>;
+    fn invert_wh(&self, wo: Expr<Float3>, wh: Expr<Float3>, ad_mode: ADMode) -> Expr<Float2>;
+    fn pdf(&self, wo: Expr<Float3>, wh: Expr<Float3>, ad_mode: ADMode) -> Expr<f32>;
+    fn roughness(&self, ad_mode: ADMode) -> Expr<f32>;
 }
 
 pub struct TrowbridgeReitzDistribution {
@@ -37,38 +37,56 @@ impl TrowbridgeReitzDistribution {
         Self::from_alpha(alpha, sample_visible)
     }
 }
+fn tr_d_impl_(wh: Expr<Float3>, alpha: Expr<Float2>) -> Expr<f32> {
+    let tan2_theta = Frame::tan2_theta(wh);
+    let cos4_theta = Frame::cos2_theta(wh).sqr();
+    let ax = alpha.x();
+    let ay = alpha.y();
+    let e = tan2_theta * ((Frame::cos_phi(wh) / ax).sqr() + (Frame::sin_phi(wh) / ay).sqr());
+    let d = 1.0 / (PI * ax * ay * cos4_theta * (1.0 + e).sqr());
+    select(tan2_theta.is_infinite(), const_(0.0f32), d)
+}
+fn tr_lambda_impl_(w: Expr<Float3>, alpha: Expr<Float2>) -> Expr<f32> {
+    let abs_tan_theta = Frame::tan_theta(w).abs();
+    let alpha2 = Frame::cos2_phi(w) * alpha.x().sqr() + Frame::sin2_phi(w) * alpha.y().sqr();
+    let alpha2_tan2_theta = alpha2 * abs_tan_theta.sqr();
+    let l = (-1.0 + (1.0 + alpha2_tan2_theta).sqrt()) * 0.5;
+    select(!abs_tan_theta.is_finite(), const_(0.0f32), l)
+}
+fn tr_sample_impl_(alpha: Expr<Float2>, u: Expr<Float2>) -> Expr<Float3> {
+    let (phi, cos_theta) = if_!(alpha.x().cmpeq(alpha.y()), {
+        let phi = 2.0 * PI * u.y();
+        let tan_theta2 = alpha.x().sqr() * u.x() / (1.0 - u.x());
+        let cos_theta = 1.0 / (1.0 + tan_theta2).sqrt();
+        (phi, cos_theta)
+    }, else {
+        let phi = (alpha.y() / alpha.x() * (2.0 * PI * u.y() + PI * 0.5).tan()).atan();
+        let phi = select(u.y().cmpgt(0.5), phi + PI, phi);
+        let sin_phi = phi.sin();
+        let cos_phi = phi.cos();
+        let ax2 = alpha.x().sqr();
+        let ay2 = alpha.y().sqr();
+        let a2 = 1.0 / (cos_phi.sqr() / ax2 + sin_phi.sqr() / ay2);
+        let tan_theta2 = a2 * u.x() / (1.0 - u.x());
+        let cos_theta = 1.0 / (1.0 + tan_theta2).sqrt();
+        (phi, cos_theta)
+    });
+    let sin_theta = (1.0 - cos_theta.sqr()).max(0.0).sqrt();
+    let wh = spherical_to_xyz2(cos_theta, sin_theta, phi);
+    let wh = face_forward(wh, make_float3(0.0, 1.0, 0.0));
+    wh
+}
 lazy_static! {
-    static ref TR_D_IMPL: Callable<fn(Expr<Float3>, Expr<Float2>)-> Expr<f32>> =
-        create_static_callable::<fn(Expr<Float3>, Expr<Float2>)-> Expr<f32>>(|wh, alpha| {
-            let tan2_theta = Frame::tan2_theta(wh);
-            let cos4_theta = Frame::cos2_theta(wh).sqr();
-            let ax = alpha.x();
-            let ay = alpha.y();
-            let e =
-                tan2_theta * ((Frame::cos_phi(wh) / ax).sqr() + (Frame::sin_phi(wh) / ay).sqr());
-            let d = 1.0 / (PI * ax * ay * cos4_theta * (1.0 + e).sqr());
-            select(tan2_theta.is_infinite(), const_(0.0f32), d)
-
-            // Float tan2Theta = Tan2Theta(wm);
-            // if (IsInf(tan2Theta))
-            //     return 0;
-            // Float cos4Theta = Sqr(Cos2Theta(wm));
-            // if (cos4Theta < 1e-16f)
-            //     return 0;
-            // Float e = tan2Theta * (Sqr(CosPhi(wm) / alpha_x) + Sqr(SinPhi(wm) / alpha_y));
-            // return 1 / (Pi * alpha_x * alpha_y * cos4Theta * Sqr(1 + e));
+    static ref TR_D_IMPL: Callable<fn(Expr<Float3>, Expr<Float2>) -> Expr<f32>> =
+        create_static_callable::<fn(Expr<Float3>, Expr<Float2>) -> Expr<f32>>(|wh, alpha| {
+            tr_d_impl_(wh, alpha)
         });
-    static ref TR_LAMBDA_IMPL: Callable<fn(Expr<Float3>, Expr<Float2>)-> Expr<f32>> =
-        create_static_callable::<fn(Expr<Float3>, Expr<Float2>)-> Expr<f32>>(|w, alpha| {
-            let abs_tan_theta = Frame::tan_theta(w).abs();
-            let alpha2 =
-                Frame::cos2_phi(w) * alpha.x().sqr() + Frame::sin2_phi(w) * alpha.y().sqr();
-            let alpha2_tan2_theta = alpha2 * abs_tan_theta.sqr();
-            let l = (-1.0 + (1.0 + alpha2_tan2_theta).sqrt()) * 0.5;
-            select(!abs_tan_theta.is_finite(), const_(0.0f32), l)
+    static ref TR_LAMBDA_IMPL: Callable<fn(Expr<Float3>, Expr<Float2>) -> Expr<f32>> =
+        create_static_callable::<fn(Expr<Float3>, Expr<Float2>) -> Expr<f32>>(|w, alpha| {
+            tr_lambda_impl_(w, alpha)
         });
-    static ref TR_SAMPLE_11: Callable<fn(Expr<f32>, Expr<Float2>)-> Expr<Float2>> =
-        create_static_callable::<fn(Expr<f32>, Expr<Float2>)-> Expr<Float2>>(|cos_theta, u| {
+    static ref TR_SAMPLE_11: Callable<fn(Expr<f32>, Expr<Float2>) -> Expr<Float2>> =
+        create_static_callable::<fn(Expr<f32>, Expr<Float2>) -> Expr<Float2>>(|cos_theta, u| {
             if_!(
                 cos_theta.cmplt(0.99999),
                  {
@@ -105,8 +123,8 @@ lazy_static! {
                 }
             )
         });
-    static ref TR_SAMPLE: Callable<fn(Expr<Float3>, Expr<Float2>, Expr<Float2>)-> Expr<Float3>> =
-        create_static_callable::<fn(Expr<Float3>, Expr<Float2>, Expr<Float2>)-> Expr<Float3>>(
+    static ref TR_SAMPLE: Callable<fn(Expr<Float3>, Expr<Float2>, Expr<Float2>) -> Expr<Float3>> =
+        create_static_callable::<fn(Expr<Float3>, Expr<Float2>, Expr<Float2>) -> Expr<Float3>>(
             |wi, alpha, u| {
                 let wi_stretched =
                     make_float3(alpha.x() * wi.x(), wi.y(), alpha.y() * wi.z()).normalize();
@@ -124,56 +142,51 @@ lazy_static! {
         );
 }
 impl MicrofacetDistribution for TrowbridgeReitzDistribution {
-    fn d(&self, wh: Expr<Float3>) -> Expr<f32> {
-        TR_D_IMPL.call(wh, self.alpha)
+    fn d(&self, wh: Expr<Float3>, ad_mode: ADMode) -> Expr<f32> {
+        if ad_mode != ADMode::Backward {
+            TR_D_IMPL.call(wh, self.alpha)
+        } else {
+            tr_d_impl_(wh, self.alpha)
+        }
     }
 
-    fn lambda(&self, w: Expr<Float3>) -> Expr<f32> {
-        TR_LAMBDA_IMPL.call(w, self.alpha)
+    fn lambda(&self, w: Expr<Float3>, ad_mode: ADMode) -> Expr<f32> {
+        if ad_mode != ADMode::Backward {
+            TR_LAMBDA_IMPL.call(w, self.alpha)
+        } else {
+            tr_lambda_impl_(w, self.alpha)
+        }
     }
 
-    fn sample_wh(&self, wo: Expr<Float3>, u: Expr<Float2>) -> Expr<Float3> {
+    fn sample_wh(&self, wo: Expr<Float3>, u: Expr<Float2>, ad_mode: ADMode) -> Expr<Float3> {
         if self.sample_visible {
-            let s = select(
-                Frame::cos_theta(wo).cmpgt(0.0),
-                const_(1.0f32),
-                const_(-1.0f32),
-            );
-            let wh = TR_SAMPLE.call(s * wo, self.alpha, u);
-            s * wh
+            todo!("untested");
+            // let s = select(
+            //     Frame::cos_theta(wo).cmpgt(0.0),
+            //     const_(1.0f32),
+            //     const_(-1.0f32),
+            // );
+            // let wh = if self.ad_mode != ADMode::Backward {
+            //     TR_SAMPLE.call(s * wo, self.alpha, u)
+            // } else {
+            //     tr_sample_impl_(s * wo, self.alpha, u)
+            // };
+            // s * wh
         } else {
             lazy_static! {
                 static ref SAMPLE: Callable<fn(Expr<Float2>, Expr<Float2>) -> Expr<Float3>> =
                     create_static_callable::<fn(Expr<Float2>, Expr<Float2>) -> Expr<Float3>>(
-                        |alpha: Expr<Float2>, u: Expr<Float2>| {
-                            let (phi, cos_theta) = if_!(alpha.x().cmpeq(alpha.y()), {
-                                let phi = 2.0 * PI * u.y();
-                                let tan_theta2 = alpha.x().sqr() * u.x() / (1.0 - u.x());
-                                let cos_theta = 1.0 / (1.0 + tan_theta2).sqrt();
-                                (phi, cos_theta)
-                            }, else {
-                                let phi = (alpha.y() / alpha.x() * (2.0 * PI * u.y() + PI * 0.5).tan()).atan();
-                                let phi = select(u.y().cmpgt(0.5), phi + PI, phi);
-                                let sin_phi = phi.sin();
-                                let cos_phi = phi.cos();
-                                let ax2 = alpha.x().sqr();
-                                let ay2 = alpha.y().sqr();
-                                let a2 = 1.0 / (cos_phi.sqr() / ax2 + sin_phi.sqr() / ay2);
-                                let tan_theta2 = a2 * u.x() / (1.0 - u.x());
-                                let cos_theta = 1.0 / (1.0 + tan_theta2).sqrt();
-                                (phi, cos_theta)
-                            });
-                            let sin_theta = (1.0 - cos_theta.sqr()).max(0.0).sqrt();
-                            let wh = spherical_to_xyz2(cos_theta, sin_theta, phi);
-                            let wh = face_forward(wh, make_float3(0.0, 1.0, 0.0));
-                            wh
-                        }
+                        |alpha: Expr<Float2>, u: Expr<Float2>| { tr_sample_impl_(alpha, u) }
                     );
             }
-            SAMPLE.call(self.alpha, u)
+            if ad_mode != ADMode::Backward {
+                SAMPLE.call(self.alpha, u)
+            } else {
+                tr_sample_impl_(self.alpha, u)
+            }
         }
     }
-    fn invert_wh(&self, _wo: Expr<Float3>, wh: Expr<Float3>) -> Expr<Float2> {
+    fn invert_wh(&self, _wo: Expr<Float3>, wh: Expr<Float3>, ad_mode: ADMode) -> Expr<Float2> {
         if self.sample_visible {
             unimplemented!("invert_wh is not available for visible wh sampling");
         } else {
@@ -216,14 +229,14 @@ impl MicrofacetDistribution for TrowbridgeReitzDistribution {
             INVERT_SAMPLE.call(self.alpha, wh)
         }
     }
-    fn pdf(&self, wo: Expr<Float3>, wh: Expr<Float3>) -> Expr<f32> {
+    fn pdf(&self, wo: Expr<Float3>, wh: Expr<Float3>, ad_mode: ADMode) -> Expr<f32> {
         if self.sample_visible {
-            self.d(wh) * self.g1(wo) * wo.dot(wh).abs() / Frame::abs_cos_theta(wo)
+            self.d(wh, ad_mode) * self.g1(wo, ad_mode) * wo.dot(wh).abs() / Frame::abs_cos_theta(wo)
         } else {
-            self.d(wh) * Frame::abs_cos_theta(wh)
+            self.d(wh, ad_mode) * Frame::abs_cos_theta(wh)
         }
     }
-    fn roughness(&self) -> Expr<f32> {
+    fn roughness(&self, ad_mode: ADMode) -> Expr<f32> {
         self.roughness
     }
 }
@@ -249,8 +262,8 @@ mod test {
                 let out = out.var();
                 let dist = TrowbridgeReitzDistribution::from_alpha(alpha, false);
                 for_range(const_(0)..const_(n_iters), |_| {
-                    let wh = dist.sample_wh(wo, sampler.next_2d());
-                    let pdf = dist.pdf(wo, wh);
+                    let wh = dist.sample_wh(wo, sampler.next_2d(), ADMode::None);
+                    let pdf = dist.pdf(wo, wh, ADMode::None);
                     if_!(pdf.cmpgt(0.0), {
                         out.write(i, out.read(i) + 1.0 / pdf);
                     });

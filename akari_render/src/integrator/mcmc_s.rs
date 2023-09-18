@@ -3,10 +3,12 @@ use std::io::BufWriter;
 use std::sync::Arc;
 use std::time::Instant;
 
+use luisa::rtx::offset_ray_origin;
 use serde::{Deserialize, Serialize};
 
 use super::pt::{self, PathTracer, PathTracerBase};
 use super::{Integrator, IntermediateStats, RenderSession, RenderStats};
+use crate::geometry::{face_forward, Ray, RayExpr};
 use crate::sampler::mcmc::{
     IsotropicExponentialMutation, KelemenMutationRecord, KelemenMutationRecordExpr, KELEMEN_MUTATE,
 };
@@ -44,7 +46,7 @@ impl Default for Method {
             large_step_prob: 0.1,
             image_mutation_prob: 0.0,
             image_mutation_size: None,
-            depth_change_prob: 0.1,
+            depth_change_prob: 0.0,
             adaptive: false,
         }
     }
@@ -258,6 +260,183 @@ impl Mutator {
         }
     }
 }
+#[derive(Clone, Copy, Debug, Value)]
+#[repr(C)]
+pub struct PathVertex {
+    pub inst_id: u32,
+    pub prim_id: u32,
+    pub bary: Float2,
+    pub beta: FlatColor,
+    pub radiance: FlatColor,
+    pub ray: Ray,
+}
+
+impl<'a> PathTracerBase<'a> {
+    /// Sample a path prefix with length `target_depth - 1`
+    /// and two final vertices with NEE and BSDF sampling respectively.
+    pub fn run_at_depth(
+        &self,
+        ray: Expr<Ray>,
+        target_depth: Expr<u32>,
+        sampler: &dyn Sampler,
+        vertices: Option<VLArrayVar<PathVertex>>,
+    ) {
+        let ray = var!(Ray, ray);
+        let u_light = sampler.next_3d();
+        loop_!({
+            let hit = self.next_intersection(*ray);
+            if_!(!hit, {
+                if let Some(vertices) = vertices {
+                    // vertices.write(
+                    //     *self.depth,
+                    //     PathVertexExpr::new(u32::MAX, u32::MAX, make_float2(0.0, 0.0)),
+                    // );
+                    todo!()
+                }
+                let (direct, w) = self.hit_envmap(*ray);
+                if_!(self.depth.cmpeq(target_depth), {
+                    self.add_radiance(direct * w);
+                });
+                break_();
+            });
+            if let Some(vertices) = vertices {
+                // vertices.write(
+                //     *self.depth,
+                //     PathVertexExpr::new(*self.si.inst_id(), *self.si.prim_id(), *self.si.bary()),
+                // );
+                todo!()
+            }
+            {
+                if_!(self.depth.cmpeq(target_depth), {
+                    let (direct, w) = self.handle_surface_light(*ray);
+                    self.add_radiance(direct * w);
+                });
+            }
+
+            if_!(self.depth.load().cmpge(self.max_depth), {
+                break_();
+            });
+            *self.depth.get_mut() += 1;
+
+            if_!(self.depth.cmpeq(target_depth), {
+                let direct_lighting = self.sample_light(u_light);
+                if_!(direct_lighting.valid, {
+                    let shadow_ray = direct_lighting.shadow_ray;
+                    if_!(!self.scene.occlude(shadow_ray), {
+                        let direct = direct_lighting.irradiance
+                            * direct_lighting.bsdf_f
+                            * direct_lighting.weight
+                            / direct_lighting.pdf;
+                        self.add_radiance(direct);
+                    });
+                });
+            });
+            let bsdf_sample = self.sample_surface(sampler.next_3d());
+            let f = &bsdf_sample.color;
+            lc_assert!(f.min().cmpge(0.0));
+            if_!(bsdf_sample.pdf.cmple(0.0) | !bsdf_sample.valid, {
+                break_();
+            });
+            self.mul_beta(f / bsdf_sample.pdf);
+            {
+                *self.prev_bsdf_pdf.get_mut() = bsdf_sample.pdf;
+                *self.prev_ng.get_mut() = *self.ng;
+                let ro = offset_ray_origin(*self.p, face_forward(*self.ng, bsdf_sample.wi));
+                *ray.get_mut() = RayExpr::new(
+                    ro,
+                    bsdf_sample.wi,
+                    0.0,
+                    1e20,
+                    make_uint2(*self.si.inst_id(), *self.si.prim_id()),
+                    make_uint2(u32::MAX, u32::MAX),
+                );
+            }
+        })
+    }
+
+    pub fn run_at_depth_replayed(
+        &self,
+        ray: Expr<Ray>,
+        target_depth: Expr<u32>,
+        sampler: &dyn Sampler,
+        vertices: VLArrayVar<PathVertex>,
+    ) {
+        let ray = var!(Ray, ray);
+        let u_light = sampler.next_3d();
+        let prev_p = var!(Float3);
+        loop_!({
+            let hit = {
+                let v = vertices.read(*self.depth);
+                let hit = v.inst_id().cmpeq(u32::MAX);
+                if_!(hit, {
+                    let si = self
+                        .scene
+                        .si_from_hitinfo(v.inst_id(), v.prim_id(), v.bary());
+                    let wo = if_!(self.depth.cmpeq(0), {
+                        -*ray.d()
+                    }, else {
+                        (si.geometry().p() - *prev_p).normalize()
+                    });
+                    self.set_si(si, wo)
+                });
+                hit
+            };
+            if_!(!hit, {
+                let (direct, w) = self.hit_envmap(*ray);
+                if_!(self.depth.cmpeq(target_depth), {
+                    self.add_radiance(direct * w);
+                });
+                break_();
+            });
+            {
+                if_!(self.depth.cmpeq(target_depth), {
+                    let (direct, w) = self.handle_surface_light(*ray);
+                    self.add_radiance(direct * w);
+                });
+            }
+
+            if_!(self.depth.load().cmpge(self.max_depth), {
+                break_();
+            });
+            *self.depth.get_mut() += 1;
+
+            if_!(self.depth.cmpeq(target_depth), {
+                let direct_lighting = self.sample_light(u_light);
+                if_!(direct_lighting.valid, {
+                    let shadow_ray = direct_lighting.shadow_ray;
+                    if_!(!self.scene.occlude(shadow_ray), {
+                        let direct = direct_lighting.irradiance
+                            * direct_lighting.bsdf_f
+                            * direct_lighting.weight
+                            / direct_lighting.pdf;
+                        self.add_radiance(direct);
+                    });
+                });
+            });
+            let bsdf_sample = self.sample_surface(sampler.next_3d());
+            let f = &bsdf_sample.color;
+            lc_assert!(f.min().cmpge(0.0));
+            if_!(bsdf_sample.pdf.cmple(0.0) | !bsdf_sample.valid, {
+                break_();
+            });
+            self.mul_beta(f / bsdf_sample.pdf);
+            {
+                *self.prev_bsdf_pdf.get_mut() = bsdf_sample.pdf;
+                *self.prev_ng.get_mut() = *self.ng;
+                *prev_p.get_mut() = *self.p;
+                let ro = offset_ray_origin(*self.p, face_forward(*self.ng, bsdf_sample.wi));
+                *ray.get_mut() = RayExpr::new(
+                    ro,
+                    bsdf_sample.wi,
+                    0.0,
+                    1e20,
+                    make_uint2(*self.si.inst_id(), *self.si.prim_id()),
+                    make_uint2(u32::MAX, u32::MAX),
+                );
+            }
+        })
+    }
+}
 impl SinglePathMcmc {
     fn sample_dimension(&self, depth: u32) -> u32 {
         4 + (1 + depth) * 3 + 3
@@ -328,7 +507,7 @@ impl SinglePathMcmc {
                 self.config.direct_spp >= 0,
                 swl,
             );
-            pt.run_at_depth(ray, depth, sampler);
+            pt.run_at_depth(ray, depth, sampler, None);
             pt.radiance.load() * w
         };
         (p.uint(), l, *swl, Self::scalar_contribution(&l))
@@ -767,7 +946,7 @@ impl Integrator for SinglePathMcmc {
             resolution.y,
             &self.config
         );
-        let evaluators = scene.evaluators(color_pipeline, None);
+        let evaluators = scene.evaluators(color_pipeline, ADMode::None);
         assert_eq!(resolution.x, film.resolution().x);
         assert_eq!(resolution.y, film.resolution().y);
         if self.config.direct_spp > 0 {
