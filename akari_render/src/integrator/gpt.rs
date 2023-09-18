@@ -162,10 +162,10 @@ impl Integrator for GradientPathTracer {
                     // let x_y_m1_w = weights.read(4);
 
                     if_!(ip.x().cmpgt(0), {
-                        Gx.add_sample(p.float() - make_float2(1.0, 0.0), &(base - x_m1_y), base_w);
+                        Gx.add_sample(p.float() - Float2::expr(1.0, 0.0), &(base - x_m1_y), base_w);
                     });
                     if_!(ip.y().cmpgt(0), {
-                        Gy.add_sample(p.float() - make_float2(0.0, 1.0), &(base - x_y_m1), base_w);
+                        Gy.add_sample(p.float() - Float2::expr(0.0, 1.0), &(base - x_y_m1), base_w);
                     });
                     Gx.add_sample(p.float(), &(x_p1_y - base), base_w);
                     Gy.add_sample(p.float(), &(x_y_p1 - base), base_w);

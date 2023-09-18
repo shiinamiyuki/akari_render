@@ -69,19 +69,19 @@ impl Camera for PerspectiveCamera {
         _swl: Expr<SampledWavelengths>,
     ) -> (Expr<Ray>, Color, Expr<f32>) {
         let camera = self.data.var().read(0);
-        let fpixel = pixel.float() + make_float2(0.5, 0.5);
+        let fpixel = pixel.float() + Float2::expr(0.5, 0.5);
         let (offset, w) = filter.sample(sampler.next_2d());
         let p_film = fpixel + offset;
         let mut ray = RayExpr::new(
-            make_float3(0.0, 0.0, 0.0),
+            Float3::expr(0.0, 0.0, 0.0),
             camera
                 .r2c()
-                .transform_point(make_float3(p_film.x(), p_film.y(), 0.0))
+                .transform_point(Float3::expr(p_film.x(), p_film.y(), 0.0))
                 .normalize(),
             Float::from(0.0),
             Float::from(1e20),
-            make_uint2(u32::MAX, u32::MAX),
-            make_uint2(u32::MAX, u32::MAX),
+            Uint2::expr(u32::MAX, u32::MAX),
+            Uint2::expr(u32::MAX, u32::MAX),
         );
         ray = ray.set_o(camera.c2w().transform_point(ray.o()));
         ray = ray.set_d(camera.c2w().transform_vector(ray.d()));
@@ -144,8 +144,8 @@ impl PerspectiveCameraData {
                 let r2c = c.r2c();
                 let resolution = c.resolution();
                 let a = {
-                    let p_min = r2c.transform_point(make_float3(0.0, 0.0, 0.0));
-                    let p_max = r2c.transform_point(make_float3(
+                    let p_min = r2c.transform_point(Float3::expr(0.0, 0.0, 0.0));
+                    let p_max = r2c.transform_point(Float3::expr(
                         resolution.x().float(),
                         resolution.y().float(),
                         0.0,

@@ -22,9 +22,8 @@ pub struct AnisotropicDiagonalGaussianMutation {
 impl Mutation for AnisotropicDiagonalGaussianMutation {
     fn log_pdf(&self, cur: &PrimarySample, proposal: &PrimarySample) -> Expr<f32> {
         assert_eq!(cur.values.static_len(), proposal.values.static_len());
-        let log_prob = var!(f32, 0.0);
-        for_range(const_(0)..cur.values.len().int(), |i| {
-            let i = i.uint();
+        let log_prob = 0.0f32.var();
+        for_range(0u32.expr()..cur.values.len(), |i| {
             let cur = cur.values.read(i);
             let proposal = proposal.values.read(i);
             let x = proposal - cur - self.drift.read(i);
@@ -34,8 +33,7 @@ impl Mutation for AnisotropicDiagonalGaussianMutation {
     }
     fn mutate(&self, s: &PrimarySample, sampler: &IndependentSampler) -> Proposal {
         let values = VLArrayVar::<f32>::zero(s.values.static_len());
-        for_range(const_(0)..values.len().int(), |i| {
-            let i = i.uint();
+        for_range(0u32.expr()..values.len().int(), |i| {
             let cur = s.values.read(i);
             let x = sample_gaussian(sampler.next_1d());
             let new = cur + self.drift.read(i) + x * self.sigma.read(i);
@@ -111,9 +109,9 @@ lazy_static! {
                 let cur = record.cur().load();
                 let u = record.u().load();
                 let (u, add) = if_!(u.cmplt(0.5), {
-                    (u * 2.0, const_(true))
+                    (u * 2.0, true.expr())
                 }, else {
-                    ((u - 0.5) * 2.0, const_(false))
+                    ((u - 0.5) * 2.0, false.expr())
                 });
                 let dv = record.mutation_size_high().load() * (record.log_ratio().load() * u).exp();
                 let new = if_!(add, {
@@ -168,7 +166,7 @@ impl Mutation for IsotropicExponentialMutation {
         let log_pdf = if self.compute_log_pdf {
             self.log_pdf(&s, &proposal)
         } else {
-            const_(0.0f32)
+            0.0f32.expr()
         };
         Proposal {
             sample: proposal,
@@ -193,9 +191,9 @@ pub fn mutate_image_space_single(
 ) -> Expr<f32> {
     let u = sampler.next_1d();
     let (u, add) = if_!(u.cmplt(0.5), {
-        (u * 2.0, const_(true))
+        (u * 2.0, true.expr())
     }, else {
-        ((u - 0.5) * 2.0, const_(false))
+        ((u - 0.5) * 2.0, false.expr())
     });
     let offset = u * mutation_size;
     let offset = select(add, offset, -offset);
@@ -258,7 +256,7 @@ impl Mutation for IsotropicGaussianMutation {
         let log_pdf = if self.compute_log_pdf {
             self.log_pdf(&s, &proposal)
         } else {
-            const_(0.0f32)
+            0.0f32.expr()
         };
         Proposal {
             sample: proposal,
@@ -269,7 +267,7 @@ impl Mutation for IsotropicGaussianMutation {
 pub struct LargeStepMutation {}
 impl Mutation for LargeStepMutation {
     fn log_pdf(&self, _cur: &PrimarySample, _proposal: &PrimarySample) -> Expr<f32> {
-        const_(0.0f32)
+        0.0f32.expr()
     }
     fn mutate(&self, s: &PrimarySample, sampler: &IndependentSampler) -> Proposal {
         let values = VLArrayVar::<f32>::zero(s.values.static_len());
@@ -279,7 +277,7 @@ impl Mutation for LargeStepMutation {
         });
         Proposal {
             sample: PrimarySample { values },
-            log_pdf: const_(0.0f32),
+            log_pdf: 0.0f32.expr(),
         }
     }
 }

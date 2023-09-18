@@ -32,7 +32,7 @@ impl AreaLightExpr {
                     wo,
                     Float3Expr::zero(),
                     swl,
-                    const_(SURFACE_EVAL_EMISSION),
+                    SURFACE_EVAL_EMISSION.into(),
                 )
                 .emission(),
         );
@@ -115,8 +115,8 @@ impl Light for AreaLightExpr {
             wi,
             0.0,
             dist * (1.0 - 1e-3),
-            make_uint2(u32::MAX, u32::MAX),
-            make_uint2(self.instance_id(), prim_id),
+            Uint2::expr(u32::MAX, u32::MAX),
+            Uint2::expr(self.instance_id(), prim_id),
         );
         // cpu_dbg!( u);
         LightSample {

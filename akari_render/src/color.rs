@@ -44,8 +44,8 @@ pub struct SampledWavelengths {
 impl SampledWavelengthsExpr {
     pub fn rgb_wavelengths() -> Self {
         struct_!(SampledWavelengths {
-            wavelengths: make_float4(0.0, 0.0, 0.0, 0.0),
-            pdf: make_float4(1.0, 1.0, 1.0, 1.0),
+            wavelengths: Float4::expr(0.0, 0.0, 0.0, 0.0),
+            pdf: Float4::expr(1.0, 1.0, 1.0, 1.0),
         })
     }
 }
@@ -146,20 +146,20 @@ impl ColorBuffer {
 impl ColorVar {
     pub fn zero(repr: ColorRepr) -> Self {
         match repr {
-            ColorRepr::Spectral => ColorVar::Spectral(var!(Float4)),
-            ColorRepr::Rgb(cs) => ColorVar::Rgb(var!(Float3), cs),
+            ColorRepr::Spectral => ColorVar::Spectral(Var::<Float4>::zeroed()),
+            ColorRepr::Rgb(cs) => ColorVar::Rgb(Var::<Float3>::zeroed(), cs),
         }
     }
     pub fn new(value: Color) -> Self {
         match value {
-            Color::Rgb(v, cs) => ColorVar::Rgb(var!(Float3, v), cs),
-            Color::Spectral(v) => ColorVar::Spectral(var!(Float4, v)),
+            Color::Rgb(v, cs) => ColorVar::Rgb(v.var(), cs),
+            Color::Spectral(v) => ColorVar::Spectral(v.var()),
         }
     }
     pub fn one(repr: ColorRepr) -> Self {
         match repr {
-            ColorRepr::Spectral => ColorVar::Spectral(var!(Float4, Float4Expr::one())),
-            ColorRepr::Rgb(cs) => ColorVar::Rgb(var!(Float3, Float3Expr::one()), cs),
+            ColorRepr::Spectral => ColorVar::Spectral(Float4Expr::one().var()),
+            ColorRepr::Rgb(cs) => ColorVar::Rgb(Float3Expr::one().var(), cs),
         }
     }
     pub fn repr(&self) -> ColorRepr {
@@ -202,10 +202,10 @@ impl Color {
                 } else {
                     match (cs, colorspace) {
                         (RgbColorSpace::SRgb, RgbColorSpace::ACEScg) => {
-                            const_(Mat3::from(srgb_to_aces_with_cat_mat())) * *rgb
+                            (Mat3::from(srgb_to_aces_with_cat_mat())).expr() * *rgb
                         }
                         (RgbColorSpace::ACEScg, RgbColorSpace::SRgb) => {
-                            const_(Mat3::from(aces_to_srgb_with_cat_mat())) * *rgb
+                            (Mat3::from(aces_to_srgb_with_cat_mat())).expr() * *rgb
                         }
                         _ => unreachable!(),
                     }
@@ -242,7 +242,7 @@ impl Color {
     }
     pub fn flatten(&self) -> Expr<FlatColor> {
         match self {
-            Color::Rgb(rgb, _) => make_float4(rgb.x(), rgb.y(), rgb.z(), 0.0),
+            Color::Rgb(rgb, _) => Float4::expr(rgb.x(), rgb.y(), rgb.z(), 0.0),
             Color::Spectral(samples) => *samples,
         }
     }

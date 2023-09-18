@@ -24,7 +24,7 @@ pub fn adaptive_simpson<U: Value>(
     max_depth: usize,
 ) -> Expr<f32> {
     let stack = VLArrayVar::<WorkItem>::zero(max_depth * 2 + 1);
-    let sp = var!(u32, 0);
+    let sp = 0u32.var();
     let push = |item: Expr<WorkItem>| {
         stack.write(*sp, item);
         *sp.get_mut() += 1;
@@ -51,7 +51,7 @@ pub fn adaptive_simpson<U: Value>(
         eps,
         max_depth as u32,
     ));
-    let result = var!(f32, 0.0);
+    let result = 0.0f32.var();
     while_!(sp.cmpne(0), {
         let item = pop();
         let a = item.a();
@@ -123,7 +123,7 @@ pub fn adaptive_simpson_2d<U: Value>(
         adaptive_simpson::<U>(
             device,
             user_data,
-            |user_data, y| f(user_data, make_float2(x, y)),
+            |user_data, y| f(user_data, Float2::expr(x, y)),
             y0,
             y1,
             eps,
@@ -133,7 +133,7 @@ pub fn adaptive_simpson_2d<U: Value>(
     adaptive_simpson::<U>(
         device,
         user_data,
-        |user_data, x| integrate_y(user_data, make_float3(x, x0.y(), x1.y())),
+        |user_data, x| integrate_y(user_data, Float3::expr(x, x0.y(), x1.y())),
         x0.x(),
         x1.x(),
         eps,
@@ -171,7 +171,7 @@ pub fn adaptive_simpson_2d<U: Value>(
 //                 adaptive_simpson::<U>(
 //                     &device_,
 //                     user_data,
-//                     |user_data, y| f(user_data, make_float2(x, y)),
+//                     |user_data, y| f(user_data, Float2::expr(x, y)),
 //                     y0,
 //                     y1,
 //                     eps,
@@ -183,7 +183,7 @@ pub fn adaptive_simpson_2d<U: Value>(
 //     adaptive_simpson::<U>(
 //         device,
 //         user_data,
-//         |user_data, x| integrate_y.call(user_data, make_float3(x, x0.y(), x1.y())),
+//         |user_data, x| integrate_y.call(user_data, Float3::expr(x, x0.y(), x1.y())),
 //         x0.x(),
 //         x1.x(),
 //         eps,
@@ -216,7 +216,7 @@ mod test {
             let int_simpson =
                 adaptive_simpson::<bool>(&device, true.into(), |_, x| f(x), x0, x1, eps, max_depth);
             let int_analytic = analytic(x1) - analytic(x0);
-            outputs.write(i, make_float2(int_simpson, int_analytic));
+            outputs.write(i, Float2::expr(int_simpson, int_analytic));
         });
         kernel.dispatch([inputs.len() as u32, 1, 1]);
         let inputs = inputs.copy_to_vec();

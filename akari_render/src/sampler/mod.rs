@@ -10,7 +10,7 @@ use crate::data::pmj02bn::N_PMJ02BN_SETS;
 use crate::util::hash::xxhash32_4;
 use crate::util::{is_power_of_four, log4u32, round_up_pow4};
 use crate::{scene::Scene, *};
-pub mod mcmc;
+// pub mod mcmc;
 use crate::data::{bluenoise, pmj02bn};
 use serde::{Deserialize, Serialize};
 
@@ -19,17 +19,17 @@ pub trait Sampler {
     fn next_2d(&self) -> Expr<Float2> {
         let u0 = self.next_1d();
         let u1 = self.next_1d();
-        make_float2(u0, u1)
+        Float2::expr(u0, u1)
     }
     fn next_3d(&self) -> Expr<Float3> {
         let u0 = self.next_1d();
         let u12 = self.next_2d();
-        make_float3(u0, u12.x(), u12.y())
+        Float3::expr(u0, u12.x(), u12.y())
     }
     fn next_4d(&self) -> Expr<Float4> {
         let u01 = self.next_2d();
         let u23 = self.next_2d();
-        make_float4(u01.x(), u01.y(), u23.x(), u23.y())
+        Float4::expr(u01.x(), u01.y(), u23.x(), u23.y())
     }
     fn is_metropolis(&self) -> bool {
         false
@@ -38,10 +38,10 @@ pub trait Sampler {
         self.next_1d()
     }
     fn uniform2(&self) -> Expr<Float2> {
-        make_float2(self.next_1d(), self.next_1d())
+        Float2::expr(self.next_1d(), self.next_1d())
     }
     fn uniform3(&self) -> Expr<Float3> {
-        make_float3(self.next_1d(), self.next_1d(), self.next_1d())
+        Float3::expr(self.next_1d(), self.next_1d(), self.next_1d())
     }
 
     fn start(&self);
@@ -83,7 +83,7 @@ impl Pcg32 {
 }
 impl Pcg32Var {
     fn set_seq_offset(seq: Expr<u64>, seed: Expr<u64>) -> Self {
-        let pcg = var!(Pcg32, Pcg32Expr::new(0, (seq << 1) | 1));
+        let pcg = Pcg32Expr::new(0, (seq << 1) | 1).var();
         pcg.gen_u32();
         pcg.state().store(pcg.state().load() + seed);
         pcg.gen_u32();
@@ -157,9 +157,9 @@ impl IndependentSampler {
     pub fn from_pcg32(state: Pcg32Var) -> Self {
         Self {
             state,
-            index: const_(0u32),
+            index: 0u32.expr(),
             states: None,
-            forget: var!(bool, false),
+            forget: false.var(),
         }
     }
 }
@@ -171,10 +171,10 @@ impl Sampler for IndependentSampler {
     fn start(&self) {}
     fn clone_box(&self) -> Box<dyn Sampler> {
         Box::new(Self {
-            state: var!(Pcg32, *self.state),
+            state: (*self.state).var(),
             index: self.index,
             states: self.states.clone(),
-            forget: var!(bool, *self.forget),
+            forget: (*self.forget).var(),
         })
     }
     fn forget(&self) {
@@ -188,7 +188,7 @@ pub struct PrimarySample {
 impl PrimarySample {
     pub fn clamped(&self) -> Self {
         let values = VLArrayVar::zero(self.values.static_len());
-        for_range(const_(0)..values.len().int(), |i| {
+        for_range(0u32.expr()..values.len(), |i| {
             let i = i.uint();
             let x = self.values.read(i);
             values.write(i, x - x.floor());
@@ -197,7 +197,7 @@ impl PrimarySample {
     }
     pub fn new(len: usize, sampler: &dyn Sampler) -> Self {
         let values = VLArrayVar::zero(len);
-        for_range(const_(0)..values.len().int(), |i| {
+        for_range(0u32.expr()..values.len(), |i| {
             let i = i.uint();
             values.write(i, sampler.next_1d());
         });
@@ -214,7 +214,7 @@ impl<'a> IndependentReplaySampler<'a> {
         Self {
             base,
             sample,
-            cur_dim: var!(u32, 0),
+            cur_dim: 0u32.var(),
         }
     }
 }
@@ -274,11 +274,11 @@ impl IndependentSamplerCreator {
 impl SamplerCreator for IndependentSamplerCreator {
     fn create(&self, pixel: Expr<Uint2>) -> Box<dyn Sampler> {
         let i = pixel.x() + pixel.y() * self.resolution.x;
-        let state = var!(Pcg32, self.states.read(i));
+        let state = self.states.read(i).var();
         Box::new(IndependentSampler {
             state,
             index: i,
-            forget: var!(bool, false),
+            forget: false.var(),
             states: Some(self.states.clone()),
         })
     }
@@ -315,7 +315,7 @@ pub fn pmj02bn_sample(
     lc_assert!(sample_index.cmplt(pmj02bn::N_PMJ02BN_SAMPLES as u32));
     sample_index %= pmj02bn::N_PMJ02BN_SAMPLES as u32;
     let i = pmj02bn::N_PMJ02BN_SAMPLES as u32 * set_index + sample_index;
-    make_float2(
+    Float2::expr(
         pmj02bn_samples.var().read(i * 2).float() * hexf32!("0x1p-32"),
         pmj02bn_samples.var().read(i * 2 + 1).float() * hexf32!("0x1p-32"),
     )
@@ -373,7 +373,7 @@ impl Pmj02BnSamplerCreator {
         let bluenoise_textures = device.create_bindless_array(N_BLUE_NOISE_TEXTURES);
         for i in 0..N_BLUE_NOISE_TEXTURES {
             let tex = device.create_tex2d::<f32>(
-                luisa::PixelStorage::Short1,
+                PixelStorage::Short1,
                 BLUE_NOISE_RESOLUTION as u32,
                 BLUE_NOISE_RESOLUTION as u32,
                 1,
@@ -388,9 +388,9 @@ impl Pmj02BnSamplerCreator {
             bluenoise_textures.set_tex2d(
                 i as usize,
                 &tex,
-                luisa::Sampler {
-                    filter: luisa::SamplerFilter::Point,
-                    address: luisa::SamplerAddress::Repeat,
+                TextureSampler {
+                    filter: SamplerFilter::Point,
+                    address: SamplerAddress::Repeat,
                 },
             );
         }
@@ -428,7 +428,7 @@ lazy_static! {
     static ref PERMUTE_ELEMENT: Callable<fn(Expr<u32>, Expr<u32>, Expr<u32>, Expr<u32>) -> Expr<u32>> =
         create_static_callable::<fn(Expr<u32>, Expr<u32>, Expr<u32>, Expr<u32>) -> Expr<u32>>(
             |i: Expr<u32>, l: Expr<u32>, w: Expr<u32>, p: Expr<u32>| {
-                let i0 = var!(u32, i);
+                let i0 = i.var();
                 loop_!({
                     let mut i = *i0;
                     i ^= p;
@@ -540,7 +540,7 @@ impl Pmj02BnSampler {
             let bluenoise_textures = bluenoise_textures.clone();
             device.create_dyn_callable::<fn(Var<Pmj02BnState>) -> Expr<f32>>(Box::new(
                 move |state: Var<Pmj02BnState>| {
-                    let hash = xxhash32_4(make_uint4(
+                    let hash = xxhash32_4(Uint4::expr(
                         *state.pixel().x(),
                         *state.pixel().y(),
                         *state.dim(),
@@ -560,10 +560,10 @@ impl Pmj02BnSampler {
             let bluenoise_textures = bluenoise_textures.clone();
             device.create_dyn_callable::<fn(Var<Pmj02BnState>) -> Expr<Float2>>(Box::new(
                 move |state: Var<Pmj02BnState>| {
-                    let index = var!(u32, *state.sample_index());
+                    let index = state.sample_index().var();
                     let pmj_instance = *state.dim() / 2;
                     if_!(pmj_instance.cmpge(N_PMJ02BN_SETS as u32), {
-                        let hash = xxhash32_4(make_uint4(
+                        let hash = xxhash32_4(Uint4::expr(
                             *state.pixel().x(),
                             *state.pixel().y(),
                             *state.dim(),
@@ -573,7 +573,7 @@ impl Pmj02BnSampler {
                             permute_element(*state.sample_index(), *state.spp(), *state.w(), hash);
                     });
                     let u = pmj02bn_sample(&pmj02bn_samples, pmj_instance, *index);
-                    let u = u + make_float2(
+                    let u = u + Float2::expr(
                         bluenoise(&bluenoise_textures, *state.dim(), *state.pixel()),
                         bluenoise(&bluenoise_textures, *state.dim() + 1, *state.pixel()),
                     );
@@ -586,8 +586,8 @@ impl Pmj02BnSampler {
             pmj02bn_samples,
             pixel_samples,
             bluenoise_textures,
-            state: var!(Pmj02BnState, states.read(i)),
-            forget: var!(bool, false),
+            state: states.read(i).var(),
+            forget: false.var(),
             states,
             i,
             next_1d: Arc::new(next_1d),
@@ -609,7 +609,7 @@ impl Sampler for Pmj02BnSampler {
     }
     fn next_2d(&self) -> Expr<Float2> {
         (self.next_2d).call(self.state)
-        // make_float2(
+        // Float2::expr(
         //     self.next_1d(),
         // self.next_1d())
     }
@@ -632,9 +632,9 @@ impl Sampler for Pmj02BnSampler {
             pixel_samples: self.pixel_samples.clone(),
             bluenoise_textures: self.bluenoise_textures.clone(),
             i: self.i,
-            state: var!(Pmj02BnState, *self.state),
+            state: self.state.var(),
             states: self.states.clone(),
-            forget: var!(bool, *self.forget),
+            forget: self.forget.var(),
             next_1d: self.next_1d.clone(),
             next_2d: self.next_2d.clone(),
         })

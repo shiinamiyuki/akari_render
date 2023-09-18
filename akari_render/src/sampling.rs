@@ -4,20 +4,20 @@ use crate::{util::erf_inv, *};
 pub fn uniform_sample_disk(u: Expr<Float2>) -> Expr<Float2> {
     let r = u.x().sqrt();
     let phi = u.y() * 2.0 * std::f32::consts::PI;
-    make_float2(r * phi.cos(), r * phi.sin())
+    Float2::expr(r * phi.cos(), r * phi.sin())
 }
 pub fn invert_uniform_sample_disk(p: Expr<Float2>) -> Expr<Float2> {
     let r = p.x().sqr() + p.y().sqr();
     let phi = p.y().atan2(p.x()) / (2.0 * std::f32::consts::PI);
-    make_float2(r, phi.fract())
+    Float2::expr(r, phi.fract())
 }
 pub fn cos_sample_hemisphere(u: Expr<Float2>) -> Expr<Float3> {
     let d = uniform_sample_disk(u);
     let z = (1.0 - d.x() * d.x() - d.y() * d.y()).max(0.0).sqrt();
-    make_float3(d.x(), z, d.y())
+    Float3::expr(d.x(), z, d.y())
 }
 pub fn invert_cos_sample_hemisphere(p: Expr<Float3>) -> Expr<Float2> {
-    let d = make_float2(p.x(), p.z());
+    let d = Float2::expr(p.x(), p.z());
     invert_uniform_sample_disk(d)
 }
 pub fn cos_hemisphere_pdf(cos_theta: Float) -> Float {
@@ -25,7 +25,7 @@ pub fn cos_hemisphere_pdf(cos_theta: Float) -> Float {
 }
 pub fn uniform_sample_triangle(u: Expr<Float2>) -> Expr<Float2> {
     let su0 = u.x().sqrt();
-    make_float2(1.0 - su0, u.y() * su0)
+    Float2::expr(1.0 - su0, u.y() * su0)
 }
 
 pub fn sample_gaussian(u: Expr<f32>) -> Expr<f32> {

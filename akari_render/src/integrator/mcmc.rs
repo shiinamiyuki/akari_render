@@ -133,7 +133,7 @@ impl Mcmc {
     }
     pub fn scalar_contribution(color: &Color) -> Expr<f32> {
         color.max().clamp(0.0, 1e5)
-        // const_(1.0f32)
+        // 1.0f32.expr()
     }
     fn evaluate(
         &self,
@@ -213,7 +213,7 @@ impl Mcmc {
 
                 let sample = PrimarySample { values: sample };
                 let (p, l, swl, f) = self.evaluate(scene, filter, eval, &sampler, sample);
-                // cpu_dbg!(make_float2(f, fs.var().read(seed_idx)));
+                // cpu_dbg!(Float2::expr(f, fs.var().read(seed_idx)));
                 let sigma = match &self.method {
                     Method::Kelemen { small_sigma, .. } => *small_sigma,
                     _ => todo!(),
@@ -284,7 +284,7 @@ impl Mcmc {
                 let cur_color = cur_color_v.load();
                 let accept = select(
                     cur_f.cmpeq(0.0),
-                    const_(1.0f32),
+                    1.0f32.expr(),
                     (proposal_f / cur_f).clamp(0.0, 1.0),
                 );
                 film.add_splat(
@@ -320,7 +320,7 @@ impl Mcmc {
                                 + (r - OPTIMAL_ACCEPT_RATE) / state.n_mutations().load().float();
                             let new_sigma = new_sigma.clamp(1e-5, 0.1);
                             if_!(state.chain_id().load().cmpeq(0), {
-                                cpu_dbg!(make_float3(r, state.sigma().load(), new_sigma));
+                                cpu_dbg!(Float3::expr(r, state.sigma().load(), new_sigma));
                             });
                             state.sigma().store(new_sigma);
                         });

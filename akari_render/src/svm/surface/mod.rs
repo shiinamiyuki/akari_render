@@ -111,10 +111,10 @@ impl Surface for EmissiveSurface {
             inner.sample(wo, u_select, u_sample, swl, ctx)
         } else {
             BsdfSample {
-                wi: make_float3(0.0, 0.0, 0.0),
-                pdf: const_(0.0f32),
+                wi: Float3::expr(0.0, 0.0, 0.0),
+                pdf: 0.0f32.expr(),
                 color: Color::zero(ctx.color_repr),
-                valid: const_(false),
+                valid: false.expr(),
             }
         }
     }
@@ -129,7 +129,7 @@ impl Surface for EmissiveSurface {
         if let Some(inner) = &self.inner {
             inner.pdf(wo, wi, swl, ctx)
         } else {
-            const_(0.0f32)
+            0.0f32.expr()
         }
     }
 
@@ -155,7 +155,7 @@ impl Surface for EmissiveSurface {
         if let Some(inner) = &self.inner {
             inner.roughness(wo, swl, ctx)
         } else {
-            const_(1.0f32)
+            1.0f32.expr()
         }
     }
 
@@ -226,9 +226,9 @@ impl Surface for BsdfMixture {
     ) -> BsdfSample {
         let frac: Expr<f32> = (self.frac)(wo, ctx);
         let (which, remapped) =
-            weighted_discrete_choice2_and_remap(frac, const_(1u32), const_(0u32), u_select);
+            weighted_discrete_choice2_and_remap(frac, 1u32.expr(), 0u32.expr(), u_select);
         let zero_f = Color::zero(ctx.color_repr);
-        let zero_pdf = const_(0.0f32);
+        let zero_pdf = 0.0f32.expr();
         if_!(
             which.cmpeq(0),
             {
@@ -245,7 +245,7 @@ impl Surface for BsdfMixture {
                         { (zero_f, zero_pdf) }
                     )
                 };
-                // cpu_dbg!(make_float2(sample.pdf, pdf_b));
+                // cpu_dbg!(Float2::expr(sample.pdf, pdf_b));
                 match self.mode {
                     BsdfBlendMode::Addictive => {
                         sample.color = sample.color + f_b;
@@ -295,7 +295,7 @@ impl Surface for BsdfMixture {
         ctx: &BsdfEvalContext,
     ) -> Float {
         let frac: Expr<f32> = (self.frac)(wo, ctx);
-        let zero = const_(0.0f32);
+        let zero = 0.0f32.expr();
         let pdf_a = if_!(
             frac.cmplt(1.0 - Self::EPS),
             { self.bsdf_a.pdf(wo, wi, swl, ctx) },
@@ -454,7 +454,7 @@ impl Surface for MicrofacetReflection {
                 Color::zero(ctx.color_repr)
         }, else {
             let wh = wh.normalize();
-            let f = self.fresnel.evaluate(wi.dot(face_forward(wh, make_float3(0.0,1.0,0.0))), ctx);
+            let f = self.fresnel.evaluate(wi.dot(face_forward(wh, Float3::expr(0.0,1.0,0.0))), ctx);
             let d = self.dist.d(wh,ctx.ad_mode);
             let g = self.dist.g(wo, wi,ctx.ad_mode);
             &self.color * &f * (0.25 * d * g / (cos_i * cos_o)).abs() * cos_o.abs()
@@ -495,7 +495,7 @@ impl Surface for MicrofacetReflection {
             | cos_i.cmpeq(0.0)
             | cos_o.cmpeq(0.0)
             | !Frame::same_hemisphere(wo, wi), {
-                const_(0.0f32)
+                0.0f32.expr()
         }, else {
             let wh = wh.normalize();
             self.dist.pdf(wo, wh,ctx.ad_mode) / (4.0 * wo.dot(wh))
@@ -546,7 +546,7 @@ impl Surface for MicrofacetTransmission {
         let cos_i = Frame::cos_theta(wi);
         let eta = select(cos_o.cmpgt(0.0), self.eta, 1.0 / self.eta);
         let wh = (wo + wi * eta).normalize();
-        let wh = face_forward(wh, make_float3(0.0, 1.0, 0.0));
+        let wh = face_forward(wh, Float3::expr(0.0, 1.0, 0.0));
         let backfacing = (wh.dot(wi) * cos_i).cmplt(0.0) | (wh.dot(wo) * cos_o).cmplt(0.0);
         if_!(
             (wh.dot(wo) * wi.dot(wh)).cmpgt(0.0)
@@ -619,7 +619,7 @@ impl Surface for MicrofacetTransmission {
         let cos_i = Frame::cos_theta(wi);
         let eta = select(cos_o.cmpgt(0.0), self.eta, 1.0 / self.eta);
         let wh = (wo + wi * eta).normalize();
-        let wh = face_forward(wh, make_float3(0.0, 1.0, 0.0));
+        let wh = face_forward(wh, Float3::expr(0.0, 1.0, 0.0));
         let backfacing = (wh.dot(wi) * cos_i).cmplt(0.0) | (wh.dot(wo) * cos_o).cmplt(0.0);
         if_!(
             (wh.dot(wo) * wi.dot(wh)).cmpgt(0.0)
@@ -627,7 +627,7 @@ impl Surface for MicrofacetTransmission {
                 | cos_o.cmpeq(0.0)
                 | backfacing
                 | Frame::same_hemisphere(wo, wi),
-            { const_(0.0f32) },
+            { 0.0f32.expr() },
             else,
             {
                 // Float denom = Sqr(Dot(wi, wm) + Dot(wo, wm) / etap);
@@ -637,7 +637,7 @@ impl Surface for MicrofacetTransmission {
                 let dwh_dwi = wi.dot(wh).abs() / denom;
                 select(
                     denom.cmpeq(0.0),
-                    const_(0.0f32),
+                    0.0f32.expr(),
                     self.dist.pdf(wo, wh, ctx.ad_mode) * dwh_dwi,
                 )
             }
@@ -678,7 +678,7 @@ pub fn fr_dielectric(cos_theta_i: Expr<f32>, eta: Expr<f32>) -> Expr<f32> {
     let sin2_theta_i = 1.0 - cos_theta_i.sqr();
     let sin2_theta_t = sin2_theta_i / eta.sqr();
     if_!(sin2_theta_t.cmpge(1.0), {
-        const_(1.0f32)
+        1.0f32.expr()
     }, else {
         let cos_theta_t = (1.0 - sin2_theta_t).max(0.0).sqrt();
         let r_parl = (eta * cos_theta_i - cos_theta_t) / (eta * cos_theta_i + cos_theta_t);
@@ -804,7 +804,7 @@ impl SurfaceEvaluator {
     ) -> Color {
         let result = self
             .eval
-            .call(surface, si, wo, wi, swl, const_(SURFACE_EVAL_COLOR));
+            .call(surface, si, wo, wi, swl, SURFACE_EVAL_COLOR.expr());
         Color::from_flat(self.color_repr, result.color())
     }
     pub fn pdf(
@@ -817,7 +817,7 @@ impl SurfaceEvaluator {
     ) -> Float {
         let result = self
             .eval
-            .call(surface, si, wo, wi, swl, const_(SURFACE_EVAL_PDF));
+            .call(surface, si, wo, wi, swl, SURFACE_EVAL_PDF.expr());
         result.pdf()
     }
     pub fn evaluate_color_and_pdf(
@@ -834,7 +834,7 @@ impl SurfaceEvaluator {
             wo,
             wi,
             swl,
-            const_(SURFACE_EVAL_COLOR | SURFACE_EVAL_PDF),
+            (SURFACE_EVAL_COLOR | SURFACE_EVAL_PDF).expr(),
         );
         (
             Color::from_flat(self.color_repr, result.color()),
@@ -854,7 +854,7 @@ impl SurfaceEvaluator {
             wo,
             Float3Expr::zero(),
             swl,
-            const_(SURFACE_EVAL_ALBEDO),
+            SURFACE_EVAL_ALBEDO.expr(),
         );
         Color::from_flat(self.color_repr, result.albedo())
     }

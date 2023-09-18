@@ -3,9 +3,9 @@ pub mod distribution;
 pub mod hash;
 pub mod integration;
 use crate::{color::glam_linear_to_srgb, *};
+use glam::Vec4Swizzles;
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use lazy_static::lazy_static;
-use luisa_compute::glam::Vec4Swizzles;
 use std::{
     path::{Path, PathBuf},
     sync::atomic::{AtomicBool, Ordering},
@@ -166,7 +166,7 @@ pub fn erf(x: Expr<f32>) -> Expr<f32> {
             let a5: f32 = 1.061_405_429;
             let p: f32 = 0.327_591_1;
             // save the sign of x
-            let sign = select(x.cmplt(0.0), const_(-1.0f32), const_(1.0f32));
+            let sign = select(x.cmplt(0.0), -1.0f32.expr(), 1.0f32.expr());
             let x: Expr<f32> = x.abs();
             // A&S formula 7.1.26
             let t: Expr<f32> = 1.0 as f32 / (1.0 as f32 + p * x);
@@ -287,7 +287,7 @@ pub fn mix_bits(v: Expr<u64>) -> Expr<u64> {
 }
 
 pub fn safe_div(a: Expr<f32>, b: Expr<f32>) -> Expr<f32> {
-    select(b.cmpeq(0.0), const_(0.0f32), a / b)
+    select(b.cmpeq(0.0), 0.0f32.expr(), a / b)
 }
 
 #[derive(Clone, Copy, Debug, Value)]

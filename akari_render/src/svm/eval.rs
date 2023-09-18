@@ -81,7 +81,7 @@ impl<'a> SvmEvaluator<'a> {
                 let x = self.eval_float(mk_f3.x);
                 let y = self.eval_float(mk_f3.y);
                 let z = self.eval_float(mk_f3.z);
-                Box::new(make_float3(x, y, z))
+                Box::new(Float3::expr(x, y, z))
             }
             svm::SvmNode::RgbTex(rgb_tex) => {
                 let rgb = self.eval_float3(rgb_tex.rgb);

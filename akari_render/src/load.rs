@@ -16,7 +16,6 @@ use akari_nodegraph::{parse, Node, NodeGraph, NodeGraphDesc, NodeId, NodeProxy};
 use image::io::Reader as ImageReader;
 
 use lazy_static::lazy_static;
-use luisa::PixelStorage;
 use std::{
     collections::{HashMap, HashSet},
     f32::consts::PI,
@@ -42,7 +41,7 @@ pub struct SceneLoader {
     light_nodes: Vec<NodeId>,
     lights: PolymorphicBuilder<(), dyn Light>,
     nodes_to_surface_shader: HashMap<NodeId, ShaderRef>,
-    path_sampler_to_idx: HashMap<(String, luisa::Sampler), usize>,
+    path_sampler_to_idx: HashMap<(String, TextureSampler), usize>,
 }
 fn load_buffer<T>(file_resolver: &dyn FileResolver, path: impl AsRef<Path>) -> Vec<T>
 where
@@ -430,7 +429,7 @@ impl SceneLoader {
         let mut light_nodes = vec![];
         let mut meshes = vec![];
         let mut mesh_buffers = vec![];
-        let mut path_samplers: HashSet<(String, luisa::Sampler)> = HashSet::new();
+        let mut path_samplers: HashSet<(String, TextureSampler)> = HashSet::new();
         let sorted_node_ids = {
             let mut sorted_node_ids = graph.nodes.keys().collect::<Vec<_>>();
             sorted_node_ids.sort();
@@ -611,19 +610,19 @@ pub fn load_from_path<P: AsRef<Path>>(device: Device, path: P) -> Arc<Scene> {
     SceneLoader::load_from_path(device, path)
 }
 
-pub(crate) fn sampler_from_rgb_image_tex_node(tex: &nodes::RGBImageTexture) -> luisa::Sampler {
+pub(crate) fn sampler_from_rgb_image_tex_node(tex: &nodes::RGBImageTexture) -> TextureSampler {
     let extension = tex.in_extension;
     let interp = tex.in_interpolation;
-    let sampler = luisa::Sampler {
+    let sampler = TextureSampler {
         address: match extension {
-            nodes::TextureExtension::Repeat => luisa::SamplerAddress::Repeat,
-            nodes::TextureExtension::Clip => luisa::SamplerAddress::Zero,
-            nodes::TextureExtension::Mirror => luisa::SamplerAddress::Mirror,
-            nodes::TextureExtension::Extend => luisa::SamplerAddress::Edge,
+            nodes::TextureExtension::Repeat => SamplerAddress::Repeat,
+            nodes::TextureExtension::Clip => SamplerAddress::Zero,
+            nodes::TextureExtension::Mirror => SamplerAddress::Mirror,
+            nodes::TextureExtension::Extend => SamplerAddress::Edge,
         },
         filter: match interp {
-            nodes::TextureInterpolation::Linear => luisa::SamplerFilter::LinearLinear,
-            nodes::TextureInterpolation::Closest => luisa::SamplerFilter::LinearPoint,
+            nodes::TextureInterpolation::Linear => SamplerFilter::LinearLinear,
+            nodes::TextureInterpolation::Closest => SamplerFilter::LinearPoint,
         },
     };
     sampler

@@ -48,7 +48,7 @@ impl Surface for DisneyDiffuseBsdf {
                         * select(
                             valid,
                             FRAC_1_PI * rr * (fo + fi + fo * fi * (rr - 1.0)),
-                            const_(0.0f32),
+                            0.0f32.expr(),
                         )
                 };
                 (diffuse + retro) * Frame::abs_cos_theta(wi)
@@ -153,7 +153,7 @@ impl SurfaceShader for SvmPrincipledBsdf {
                 color,
                 fresnel,
                 dist: Box::new(TrowbridgeReitzDistribution::from_roughness(
-                    make_float2(roughness, roughness),
+                    Float2::expr(roughness, roughness),
                     false,
                 )),
             })
@@ -161,13 +161,13 @@ impl SurfaceShader for SvmPrincipledBsdf {
         let clearcoat_brdf = {
             let f0 = 0.04f32;
             let fresnel = Box::new(FresnelSchlick {
-                f0: Color::one(svm_eval.color_repr()) * const_(f0),
+                f0: Color::one(svm_eval.color_repr()) * f0.expr(),
             });
             Rc::new(MicrofacetReflection {
                 color: Color::one(svm_eval.color_repr()) * clearcoat,
                 fresnel,
                 dist: Box::new(TrowbridgeReitzDistribution::from_roughness(
-                    make_float2(clearcoat_roughness, clearcoat_roughness),
+                    Float2::expr(clearcoat_roughness, clearcoat_roughness),
                     false,
                 )),
             })
@@ -181,7 +181,7 @@ impl SurfaceShader for SvmPrincipledBsdf {
                 color: kr,
                 fresnel: fresnel.clone(),
                 dist: Box::new(TrowbridgeReitzDistribution::from_roughness(
-                    make_float2(roughness, roughness),
+                    Float2::expr(roughness, roughness),
                     false,
                 )),
             });
@@ -189,7 +189,7 @@ impl SurfaceShader for SvmPrincipledBsdf {
                 color: kt,
                 fresnel: fresnel.clone(),
                 dist: Box::new(TrowbridgeReitzDistribution::from_roughness(
-                    make_float2(roughness, roughness),
+                    Float2::expr(roughness, roughness),
                     false,
                 )),
                 eta,

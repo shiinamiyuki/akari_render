@@ -19,7 +19,7 @@ impl SurfaceShader for SvmGlassBsdf {
             color: kr,
             fresnel: fresnel.clone(),
             dist: Box::new(TrowbridgeReitzDistribution::from_roughness(
-                make_float2(roughness, roughness),
+                Float2::expr(roughness, roughness),
                 false,
             )),
         });
@@ -27,7 +27,7 @@ impl SurfaceShader for SvmGlassBsdf {
             color: kt,
             fresnel: fresnel.clone(),
             dist: Box::new(TrowbridgeReitzDistribution::from_roughness(
-                make_float2(roughness, roughness),
+                Float2::expr(roughness, roughness),
                 false,
             )),
             eta,

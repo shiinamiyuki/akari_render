@@ -6,7 +6,7 @@ use super::*;
 use crate::{color::ColorSpaceId, *};
 #[derive(Clone, Copy)]
 pub struct SvmCompileContext<'a> {
-    pub images: &'a HashMap<(String, luisa::Sampler), usize>,
+    pub images: &'a HashMap<(String, TextureSampler), usize>,
     pub graph: &'a NodeGraph,
 }
 pub struct CompilerDriver {

@@ -66,7 +66,7 @@ impl Surface for DiffuseBsdf {
         _swl: Expr<SampledWavelengths>,
         _ctx: &BsdfEvalContext,
     ) -> Color {
-        self.reflectance * const_(PI)
+        self.reflectance * PI.expr()
     }
     fn roughness(
         &self,
@@ -74,7 +74,7 @@ impl Surface for DiffuseBsdf {
         _swl: Expr<color::SampledWavelengths>,
         _ctx: &BsdfEvalContext,
     ) -> Expr<f32> {
-        const_(1.0f32)
+        1.0f32.expr()
     }
     fn emission(
         &self,
@@ -87,7 +87,7 @@ impl Surface for DiffuseBsdf {
 }
 impl SurfaceShader for SvmDiffuseBsdf {
     fn closure(&self, svm_eval: &SvmEvaluator<'_>) -> Rc<dyn Surface> {
-        let reflectance = svm_eval.eval_color(self.reflectance) * const_(FRAC_1_PI);
+        let reflectance = svm_eval.eval_color(self.reflectance) * FRAC_1_PI.expr();
         Rc::new(DiffuseBsdf { reflectance })
     }
 }

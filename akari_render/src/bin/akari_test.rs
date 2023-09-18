@@ -16,138 +16,6 @@ use akari_render::*;
 use luisa::init_logger;
 use luisa_compute as luisa;
 
-mod bsdf_test_old {
-    use super::*;
-    #[derive(Clone, Copy, Value)]
-    #[repr(C)]
-    struct PdfSample {
-        pdf: f32,
-        w: Float3,
-        valid: bool,
-    }
-
-    fn test_bsdf_pdf(device: Device, sample_fn: impl Fn(Expr<Float3>) -> Expr<PdfSample>) {
-        let n_threads: u32 = 32768 * 4;
-        let seeds = init_pcg32_buffer(device.clone(), n_threads as usize);
-        let n_iters: i32 = 4096 * 4;
-
-        let final_bins = device.create_buffer::<f32>(100);
-        final_bins.fill(0.0);
-        let kernel = device.create_kernel::<fn()>(&|| {
-            let i = dispatch_id().x();
-            let bins = var!([f32; 100]);
-            let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seeds.var().read(i)));
-            for_range(const_(0)..const_(n_iters), |_| {
-                let sample = sample_fn(sampler.next_3d());
-                lc_assert!(sample.pdf().is_finite());
-                if_!(sample.valid() & sample.pdf().cmpgt(0.0), {
-                    lc_assert!(sample.pdf().cmpgt(0.0));
-                    let w = sample.w();
-                    let w = face_forward(w, make_float3(0.0, 1.0, 0.0));
-                    let (theta, phi) = xyz_to_spherical(w);
-                    let phi = (phi + PI) / (2.0 * PI);
-                    lc_assert!(phi.cmpge(0.0) & phi.cmple(1.000001));
-                    let cos_theta = theta.cos();
-                    lc_assert!(cos_theta.cmpge(0.0));
-                    let bin_i = (cos_theta * 10.0).uint().min(9);
-                    let bin_j = (phi * 10.0).uint().min(9);
-                    let i = bin_i * 10 + bin_j;
-                    bins.write(i, bins.read(i) + 1.0 / sample.pdf());
-                });
-            });
-            for_range(0..100u32, |i| {
-                final_bins.var().atomic_fetch_add(i, bins.read(i));
-            });
-        });
-        kernel.dispatch([n_threads, 1, 1]);
-        let total_samples = n_threads as usize * n_iters as usize;
-        let final_bins = final_bins.copy_to_vec();
-        let sum = final_bins.iter().copied().sum::<f32>();
-        let expected = 2.0 * PI;
-        println!("sum: {:6.3}", sum / total_samples as f32);
-        let mut num_bad = 0;
-        for i in 0..10 {
-            for j in 0..10 {
-                let i = i as usize;
-                let j = j as usize;
-                let bin = final_bins[i * 10 + j];
-                let area = bin / total_samples as f32 * 100.0;
-                if (area - expected).abs() > 0.1 {
-                    num_bad += 1;
-                }
-                print!("{:6.3} ", area);
-            }
-            println!("");
-        }
-        println!("bad: {}", num_bad);
-        if num_bad > 0 {
-            eprintln!("test failed");
-            exit(-1);
-        }
-    }
-
-    pub fn test_bsdf_old(device: &Device) {
-        let color_repr = color::ColorRepr::Rgb(color::RgbColorSpace::SRgb);
-        let test_bsdf = |name: &str, bsdf: &dyn Fn() -> Box<dyn Surface>| {
-            println!("testing {}", name);
-            test_bsdf_pdf(device.clone(), |u| {
-                let bsdf = bsdf();
-                let wo: Float3Expr = make_float3(0.0, 1.0, 0.0);
-                let swl = def(SampledWavelengthsExpr::rgb_wavelengths());
-                let sample = bsdf.sample(
-                    wo,
-                    u.x(),
-                    u.yz(),
-                    swl,
-                    &BsdfEvalContext {
-                        color_repr,
-                        _marker: std::marker::PhantomData,
-                        ad_mode: ADMode::None,
-                    },
-                );
-                PdfSampleExpr::new(sample.pdf, sample.wi, sample.valid)
-            });
-        };
-        test_bsdf("diffuse", &|| {
-            Box::new(DiffuseBsdf {
-                reflectance: Color::one(color_repr),
-            })
-        });
-
-        for roughness in [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8] {
-            test_bsdf(
-                &format!("microfacet reflection, roughess={}", roughness),
-                &|| {
-                    Box::new(MicrofacetReflection {
-                        color: Color::one(color_repr),
-                        fresnel: Box::new(ConstFresnel {}),
-                        dist: Box::new(TrowbridgeReitzDistribution::from_roughness(
-                            make_float2(roughness, roughness),
-                            false,
-                        )),
-                    })
-                },
-            );
-        }
-
-        for roughness in [0.8] {
-            test_bsdf(
-                &format!("microfacet transmission, roughess={}", roughness),
-                &|| {
-                    Box::new(MicrofacetTransmission {
-                        color: Color::one(color_repr),
-                        fresnel: Box::new(ConstFresnel {}),
-                        dist: Box::new(TrowbridgeReitzDistribution::from_roughness(
-                            make_float2(roughness, roughness),
-                            false,
-                        )),
-                        eta: const_(1.3f32),
-                    })
-                },
-            );
-        }
-    }
-}
 mod bsdf_chi2_test {
     use std::{
         fs::{create_dir_all, File},
@@ -182,9 +50,9 @@ mod bsdf_chi2_test {
         let kernel =
             device.create_kernel::<fn(Float3, u32)>(&|wo: Expr<Float3>, samples: Expr<u32>| {
                 let i = dispatch_id().x();
-                let pcg = var!(Pcg32, rngs.var().read(i));
+                let pcg = rngs.var().read(i).var();
                 let sampler = IndependentSampler::from_pcg32(pcg);
-                for_range(const_(0u32)..samples, |_| {
+                for_range(0u32.expr()..samples, |_| {
                     let u = sampler.next_3d();
                     let s = sample(wo, u);
                     if_!(s.valid, {
@@ -192,9 +60,9 @@ mod bsdf_chi2_test {
                         let (theta, phi) = xyz_to_spherical(s.wi);
                         let phi = select(phi.cmplt(0.0), phi + 2.0 * PI, phi) / (2.0 * PI);
                         let theta = theta / PI;
-                        // cpu_dbg!(make_float2(phi, theta));
-                        // cpu_dbg!(make_float4(s.wi.x(), s.wi.y(), s.wi.z(), s.wi.y().acos()));
-                        // cpu_dbg!(make_float2(theta / PI, s.wi.y().acos() / PI));
+                        // cpu_dbg!(Float2::expr(phi, theta));
+                        // cpu_dbg!(Float4::expr(s.wi.x(), s.wi.y(), s.wi.z(), s.wi.y().acos()));
+                        // cpu_dbg!(Float2::expr(theta / PI, s.wi.y().acos() / PI));
                         // lc_assert!(phi.cmpge(0.0) & phi.cmple(1.0001));
                         // lc_assert!(theta.cmpge(0.0) & theta.cmple(1.0001));
                         let bin_theta = (theta * theta_res as f32).uint().min(theta_res - 1);
@@ -240,8 +108,8 @@ mod bsdf_chi2_test {
                     let wi = spherical_to_xyz(theta, phi);
                     pdf(wo, wi) * sin_theta
                 },
-                make_float2(phi_begin, theta_begin),
-                make_float2(phi_end, theta_end),
+                Float2::expr(phi_begin, theta_begin),
+                Float2::expr(phi_end, theta_end),
                 1e-6,
                 6,
             );
@@ -454,7 +322,7 @@ plt.show()"#
                         wo,
                         u.x(),
                         u.yz(),
-                        def(SampledWavelengthsExpr::rgb_wavelengths()),
+                        SampledWavelengthsExpr::rgb_wavelengths().var(),
                         &BsdfEvalContext {
                             color_repr: color::ColorRepr::Rgb(color::RgbColorSpace::SRgb),
                             _marker: PhantomData {},
@@ -551,7 +419,7 @@ plt.show()"#
                         color: Color::one(color_repr),
                         fresnel: Box::new(ConstFresnel {}),
                         dist: Box::new(TrowbridgeReitzDistribution::from_roughness(
-                            make_float2(roughness, roughness),
+                            Float2::expr(roughness, roughness),
                             false,
                         )),
                     })
@@ -566,10 +434,10 @@ plt.show()"#
                 move || {
                     Box::new(MicrofacetTransmission {
                         color: Color::one(color_repr),
-                        eta: const_(1.33f32),
+                        eta: 1.33f32.expr(),
                         fresnel: Box::new(ConstFresnel {}),
                         dist: Box::new(TrowbridgeReitzDistribution::from_roughness(
-                            make_float2(roughness, roughness),
+                            Float2::expr(roughness, roughness),
                             false,
                         )),
                     })
@@ -594,7 +462,7 @@ mod invert {
         let printer = Printer::new(&device, 32768);
         let kernel = device.create_kernel::<fn()>(&|| {
             let i = dispatch_id().x();
-            let sampler = IndependentSampler::from_pcg32(var!(Pcg32, rngs.var().read(i)));
+            let sampler = IndependentSampler::from_pcg32(rngs.var().read(i).var());
             for_range(0..samples, |_| {
                 let u = sampler.next_2d();
                 let w = sample(u);
@@ -630,24 +498,24 @@ mod invert {
             device,
             "invert_ggx_iso",
             |u| {
-                let dist = TrowbridgeReitzDistribution::from_alpha(make_float2(ax, ax), false);
-                dist.sample_wh(make_float3(0.0, 1.0, 0.0), u, ADMode::None)
+                let dist = TrowbridgeReitzDistribution::from_alpha(Float2::expr(ax, ax), false);
+                dist.sample_wh(Float3::expr(0.0, 1.0, 0.0), u, ADMode::None)
             },
             |w| {
-                let dist = TrowbridgeReitzDistribution::from_alpha(make_float2(ax, ax), false);
-                dist.invert_wh(make_float3(0.0, 1.0, 0.0), w, ADMode::None)
+                let dist = TrowbridgeReitzDistribution::from_alpha(Float2::expr(ax, ax), false);
+                dist.invert_wh(Float3::expr(0.0, 1.0, 0.0), w, ADMode::None)
             },
         );
         test_invert_helper(
             device,
             "invert_ggx_aniso",
             |u| {
-                let dist = TrowbridgeReitzDistribution::from_alpha(make_float2(ax, ay), false);
-                dist.sample_wh(make_float3(0.0, 1.0, 0.0), u, ADMode::None)
+                let dist = TrowbridgeReitzDistribution::from_alpha(Float2::expr(ax, ay), false);
+                dist.sample_wh(Float3::expr(0.0, 1.0, 0.0), u, ADMode::None)
             },
             |w| {
-                let dist = TrowbridgeReitzDistribution::from_alpha(make_float2(ax, ay), false);
-                dist.invert_wh(make_float3(0.0, 1.0, 0.0), w, ADMode::None)
+                let dist = TrowbridgeReitzDistribution::from_alpha(Float2::expr(ax, ay), false);
+                dist.invert_wh(Float3::expr(0.0, 1.0, 0.0), w, ADMode::None)
             },
         );
     }
@@ -667,7 +535,6 @@ fn main() {
     init_logger();
     let test = &args[2];
     match test.as_str() {
-        "bsdf_old" => bsdf_test_old::test_bsdf_old(&device),
         "bsdf" => bsdf_chi2_test::test(&device),
         "invert" => invert::test_invert(&device),
         _ => {

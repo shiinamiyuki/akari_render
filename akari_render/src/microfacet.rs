@@ -44,14 +44,14 @@ fn tr_d_impl_(wh: Expr<Float3>, alpha: Expr<Float2>) -> Expr<f32> {
     let ay = alpha.y();
     let e = tan2_theta * ((Frame::cos_phi(wh) / ax).sqr() + (Frame::sin_phi(wh) / ay).sqr());
     let d = 1.0 / (PI * ax * ay * cos4_theta * (1.0 + e).sqr());
-    select(tan2_theta.is_infinite(), const_(0.0f32), d)
+    select(tan2_theta.is_infinite(), 0.0f32.expr(), d)
 }
 fn tr_lambda_impl_(w: Expr<Float3>, alpha: Expr<Float2>) -> Expr<f32> {
     let abs_tan_theta = Frame::tan_theta(w).abs();
     let alpha2 = Frame::cos2_phi(w) * alpha.x().sqr() + Frame::sin2_phi(w) * alpha.y().sqr();
     let alpha2_tan2_theta = alpha2 * abs_tan_theta.sqr();
     let l = (-1.0 + (1.0 + alpha2_tan2_theta).sqrt()) * 0.5;
-    select(!abs_tan_theta.is_finite(), const_(0.0f32), l)
+    select(!abs_tan_theta.is_finite(), 0.0f32.expr(), l)
 }
 fn tr_sample_impl_(alpha: Expr<Float2>, u: Expr<Float2>) -> Expr<Float3> {
     let (phi, cos_theta) = if_!(alpha.x().cmpeq(alpha.y()), {
@@ -73,7 +73,7 @@ fn tr_sample_impl_(alpha: Expr<Float2>, u: Expr<Float2>) -> Expr<Float3> {
     });
     let sin_theta = (1.0 - cos_theta.sqr()).max(0.0).sqrt();
     let wh = spherical_to_xyz2(cos_theta, sin_theta, phi);
-    let wh = face_forward(wh, make_float3(0.0, 1.0, 0.0));
+    let wh = face_forward(wh, Float3::expr(0.0, 1.0, 0.0));
     wh
 }
 lazy_static! {
@@ -109,17 +109,17 @@ lazy_static! {
                         slope_x_2,
                     );
 
-                    let s = select(u.y().cmpgt(0.5), const_(1.0f32), const_(-1.0f32));
+                    let s = select(u.y().cmpgt(0.5), 1.0f32.expr(), (-1.0f32).expr());
                     let u2 = select(u.y().cmpgt(0.5), 2.0 * (u.y() - 0.5), 2.0 * (0.5 - u.y()));
                     let z = (u2 * (u2 * (u2 * 0.27385 - 0.73369) + 0.46341))
                         / (u2 * (u2 * (u2 * 0.093073 + 0.309420) - 1.000000) + 0.597999);
                     let slope_y = s * z * (1.0 + slope_x.sqr()).sqrt();
-                    make_float2(slope_x, slope_y)
+                    Float2::expr(slope_x, slope_y)
                 },
                 else {
                     let r = (u.x() / (1.0 - u.x())).sqrt();
                     let phi = 2.0 * PI * u.y();
-                    make_float2(r * phi.cos(), r * phi.sin())
+                    Float2::expr(r * phi.cos(), r * phi.sin())
                 }
             )
         });
@@ -127,17 +127,17 @@ lazy_static! {
         create_static_callable::<fn(Expr<Float3>, Expr<Float2>, Expr<Float2>) -> Expr<Float3>>(
             |wi, alpha, u| {
                 let wi_stretched =
-                    make_float3(alpha.x() * wi.x(), wi.y(), alpha.y() * wi.z()).normalize();
+                    Float3::expr(alpha.x() * wi.x(), wi.y(), alpha.y() * wi.z()).normalize();
                 let slope = TR_SAMPLE_11.call(Frame::cos_theta(wi_stretched), u);
 
-                let slope = make_float2(
+                let slope = Float2::expr(
                     Frame::cos_phi(wi_stretched) * slope.x()
                         - Frame::sin_phi(wi_stretched) * slope.y(),
                     Frame::sin_phi(wi_stretched) * slope.x()
                         + Frame::cos_phi(wi_stretched) * slope.y(),
                 );
                 let slope = alpha * slope;
-                make_float3(-slope.x(), 1.0, -slope.y()).normalize()
+                Float3::expr(-slope.x(), 1.0, -slope.y()).normalize()
             }
         );
 }
@@ -163,8 +163,8 @@ impl MicrofacetDistribution for TrowbridgeReitzDistribution {
             todo!("untested");
             // let s = select(
             //     Frame::cos_theta(wo).cmpgt(0.0),
-            //     const_(1.0f32),
-            //     const_(-1.0f32),
+            //     1.0f32.expr(),
+            //     (-1.0f32).expr(),
             // );
             // let wh = if self.ad_mode != ADMode::Backward {
             //     TR_SAMPLE.call(s * wo, self.alpha, u)
@@ -206,7 +206,7 @@ impl MicrofacetDistribution for TrowbridgeReitzDistribution {
                                 let tan_theta2 = cos_theta.sqr().recip() - 1.0;
                                 let gamma = tan_theta2 / alpha.x().sqr();
                                 let ux = gamma / (1.0 + gamma);
-                                make_float2(ux, uy)
+                                Float2::expr(ux, uy)
                             }, else, {
                                 // let phi = (alpha.y() / alpha.x() * (2.0 * PI * u.y() + PI * 0.5).tan()).atan();
                                 let uy = (((phi.atan() * alpha.x() / alpha.y()).atan() - PI * 0.5) * FRAC_1_2PI).fract();
@@ -221,7 +221,7 @@ impl MicrofacetDistribution for TrowbridgeReitzDistribution {
                                 let tan_theta2 = cos_theta.sqr().recip() - 1.0;
                                 let gamma = tan_theta2 / a2;
                                 let ux = gamma / (1.0 + gamma);
-                                make_float2(ux, uy)
+                                Float2::expr(ux, uy)
                             })
                         }
                     );
@@ -254,14 +254,14 @@ mod test {
         let device = ctx.create_cpu_device();
         let seeds = init_pcg32_buffer(device.clone(), 8192);
         let out = device.create_buffer::<f32>(seeds.len());
-        let n_iters = 4098;
+        let n_iters = 4098u32;
         let kernel =
             device.create_kernel::<fn(Float3, Float2)>(&|wo: Expr<Float3>, alpha: Expr<Float2>| {
                 let i = dispatch_id().x();
-                let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seeds.var().read(i)));
+                let sampler = IndependentSampler::from_pcg32(seeds.var().read(i).var());
                 let out = out.var();
                 let dist = TrowbridgeReitzDistribution::from_alpha(alpha, false);
-                for_range(const_(0)..const_(n_iters), |_| {
+                for_range(0u32.expr()..n_iters.expr(), |_| {
                     let wh = dist.sample_wh(wo, sampler.next_2d(), ADMode::None);
                     let pdf = dist.pdf(wo, wh, ADMode::None);
                     if_!(pdf.cmpgt(0.0), {

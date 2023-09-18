@@ -5,7 +5,8 @@ use crate::svm::ShaderRef;
 use crate::util::binserde::*;
 use crate::*;
 use crate::{geometry::AffineTransform, util::distribution::AliasTable};
-use luisa::{AccelBuildRequest, AccelOption, BufferHeap};
+use luisa::rtx::*;
+use luisa::resource::BufferHeap;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -259,9 +260,9 @@ impl MeshAggregate {
             },
             else,
             {
-                let uv0 = make_float2(0.0, 0.0);
-                let uv1 = make_float2(1.0, 0.0);
-                let uv2 = make_float2(0.0, 0.1);
+                let uv0 = Float2::expr(0.0, 0.0);
+                let uv1 = Float2::expr(1.0, 0.0);
+                let uv2 = Float2::expr(0.0, 0.1);
                 (uv0, uv1, uv2)
             }
         );
@@ -296,7 +297,7 @@ impl MeshAggregate {
                     let j = prim_id3 + i;
                     let sign = bitangent_signs.read(j / 32);
                     let sign = (sign >> (j % 32)) & 1;
-                    select(sign.cmpeq(0), const_(1.0f32), const_(-1.0f32))
+                    select(sign.cmpeq(0), 1.0f32.expr(), -1.0f32.expr())
                 };
                 let s0 = get_sign(0u32);
                 let s1 = get_sign(1u32);

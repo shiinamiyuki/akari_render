@@ -38,21 +38,21 @@ impl SphereExpr {
         let delta = b.sqr() - 4.0 * a * c;
         if_!(
             delta.cmplt(0.0),
-            { (const_(false), const_(0.0f32)) },
+            { (false.expr(), 0.0f32.expr()) },
             else,
             {
                 let t0 = (-b - delta.sqrt()) / (2.0 * a);
                 let t1 = (-b + delta.sqrt()) / (2.0 * a);
                 if_!(
                     t0.cmplt(ray.t_max()) & t0.cmpge(ray.t_min()),
-                    { (const_(true), t0) },
+                    { (true.expr(), t0) },
                     else,
                     {
                         if_!(
                             t1.cmplt(ray.t_max()) & t1.cmpge(ray.t_min()),
-                            { (const_(true), t1) },
+                            { (true.expr(), t1) },
                             else,
-                            { (const_(false), const_(0.0f32)) }
+                            { (false.expr(), 0.0f32.expr()) }
                         )
                     }
                 )
@@ -158,7 +158,7 @@ impl Frame {
         let sin_theta = Self::sin_theta(w);
         select(
             sin_theta.cmpeq(0.0),
-            const_(0.0f32),
+            0.0f32.expr(),
             (w.x() / sin_theta).clamp(-1.0, 1.0),
         )
     }
@@ -175,7 +175,7 @@ impl Frame {
         let sin_theta = Self::sin_theta(w);
         select(
             sin_theta.cmpeq(0.0),
-            const_(1.0f32),
+            1.0f32.expr(),
             (w.z() / sin_theta).clamp(-1.0, 1.0),
         )
     }
@@ -187,9 +187,9 @@ impl Frame {
 impl FrameExpr {
     pub fn from_n(n: Expr<Float3>) -> Self {
         let t = if_!(n.x().abs().cmpgt(n.y().abs()), {
-            make_float3(-n.z(), 0.0, n.x()) / (n.x() * n.x() + n.z() * n.z()).sqrt()
+            Float3::expr(-n.z(), 0.0, n.x()) / (n.x() * n.x() + n.z() * n.z()).sqrt()
         }, else {
-            make_float3(0.0, n.z(), -n.y()) / (n.y() * n.y() + n.z() * n.z()).sqrt()
+            Float3::expr(0.0, n.z(), -n.y()) / (n.y() * n.y() + n.z() * n.z()).sqrt()
         });
         let s = n.cross(t);
         Self::new(n, s, t)
@@ -198,7 +198,7 @@ impl FrameExpr {
         self.s() * v.x() + self.n() * v.y() + self.t() * v.z()
     }
     pub fn to_local(&self, v: Expr<Float3>) -> Expr<Float3> {
-        make_float3(self.s().dot(v), self.n().dot(v), self.t().dot(v))
+        Float3::expr(self.s().dot(v), self.n().dot(v), self.t().dot(v))
     }
 }
 #[derive(Clone, Copy, Debug, Value)]
@@ -235,7 +235,7 @@ impl AffineTransform {
 impl AffineTransformExpr {
     pub fn transform_point(&self, p: Expr<Float3>) -> Expr<Float3> {
         if_!(self.close_to_identity(), { p }, else, {
-            let q = make_float4(p.x(), p.y(), p.z(), 1.0);
+            let q = Float4::expr(p.x(), p.y(), p.z(), 1.0);
             let q = self.m() * q;
             q.xyz() / q.w()
         })
@@ -278,11 +278,11 @@ pub fn refract(
     let sin2_theta_i = (1.0 - cos_theta_i.sqr()).max(0.0);
     let sin2_theta_t = sin2_theta_i / eta.sqr();
     if_!(sin2_theta_t.cmpge(1.0), {
-        (const_(false),eta, Float3Expr::zero())
+        (false.expr(),eta, Float3Expr::zero())
     }, else {
         let cos_theta_t = (1.0 - sin2_theta_t).sqrt();
         let wt = -w / eta + (cos_theta_i / eta - cos_theta_t) * n;
-        (const_(true), eta, wt)
+        (true.expr(), eta, wt)
     })
     //   // Compute $\cos\,\theta_\roman{t}$ using Snell's law
     //   Float sin2Theta_i = std::max<Float>(0, 1 - Sqr(cosTheta_i));
@@ -301,11 +301,11 @@ pub fn spherical_to_xyz2(
     sin_theta: Expr<f32>,
     phi: Expr<f32>,
 ) -> Expr<Float3> {
-    make_float3(sin_theta * phi.cos(), cos_theta, sin_theta * phi.sin())
+    Float3::expr(sin_theta * phi.cos(), cos_theta, sin_theta * phi.sin())
 }
 pub fn spherical_to_xyz(theta: Expr<f32>, phi: Expr<f32>) -> Expr<Float3> {
     let sin_theta = theta.sin();
-    make_float3(sin_theta * phi.cos(), theta.cos(), sin_theta * phi.sin())
+    Float3::expr(sin_theta * phi.cos(), theta.cos(), sin_theta * phi.sin())
 }
 
 /// let (theta, phi) = xyz_to_spherical(v);

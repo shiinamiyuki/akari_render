@@ -74,7 +74,7 @@ impl<'a> LazyMcmcSampler<'a> {
             base,
             samples,
             offset,
-            cur_dim: var!(u32, 0),
+            cur_dim: 0u32.var(),
             mcmc_dim,
             mutator,
         }
@@ -146,7 +146,7 @@ impl Mutator {
                 let kelemen_mutate_size_high = 1.0 / 64.0f32;
                 let kelemen_log_ratio = -(kelemen_mutate_size_high / kelemen_mutate_size_low).ln();
                 let u = rng.next_1d();
-                let sample = var!(PssSample, samples.var().read(offset + i));
+                let sample = samples.var().read(offset + i).var();
                 if_!(sample.last_modified().cmplt(self.last_large_iter), {
                     sample.set_cur(rng.next_1d());
                     sample.set_last_modified(self.last_large_iter);
@@ -171,22 +171,20 @@ impl Mutator {
                         lc_assert!(target_iter.cmpge(*sample.last_modified()));
                         let n_small = target_iter - *sample.last_modified();
                         if exponential_mutation {
-                            let x = var!(f32, *sample.cur());
-                            for_range(const_(0u32)..n_small, |_| {
+                            let x = sample.cur().var();
+                            for_range(0u32.into()..n_small, |_| {
                                 let u = rng.next_1d();
                                 if_!(u.cmplt(1.0 - image_mutation_prob), {
                                     let u = u / (1.0 - image_mutation_prob);
-                                    let record = var!(
-                                        KelemenMutationRecord,
-                                        KelemenMutationRecordExpr::new(
-                                            *x,
-                                            u,
-                                            kelemen_mutate_size_low,
-                                            kelemen_mutate_size_high,
-                                            kelemen_log_ratio,
-                                            0.0
-                                        )
-                                    );
+                                    let record = KelemenMutationRecordExpr::new(
+                                        *x,
+                                        u,
+                                        kelemen_mutate_size_low,
+                                        kelemen_mutate_size_high,
+                                        kelemen_log_ratio,
+                                        0.0,
+                                    )
+                                    .var();
                                     KELEMEN_MUTATE.call(record);
                                     x.store(*record.mutated());
                                 });
@@ -201,7 +199,7 @@ impl Mutator {
                                     + dv * small_sigma
                                         * ((1.0 - image_mutation_prob) * n_small.float()).sqrt();
                                 let new = new - new.floor();
-                                let new = select(new.is_finite(), new, const_(0.0f32));
+                                let new = select(new.is_finite(), new, 0.0f32.expr());
                                 sample.set_cur(new);
                             });
                         }
@@ -210,7 +208,7 @@ impl Mutator {
                                 let new = mutate_image_space_single(
                                     *sample.cur(),
                                     rng,
-                                    const_(image_mutation_size.unwrap()),
+                                    image_mutation_size.unwrap().expr(),
                                     self.res,
                                     i,
                                 );
@@ -272,10 +270,11 @@ impl McmcOpt {
             samples,
             chain_id * const_(self.sample_dimension() as u32),
             if is_bootstrap {
-                const_(0u32)
+                0u32
             } else {
-                const_(self.sample_dimension() as u32)
-            },
+                self.sample_dimension() as u32
+            }
+            .expr(),
             mutator,
         );
         sampler.start();
@@ -298,7 +297,7 @@ impl McmcOpt {
     }
     pub fn scalar_contribution(color: &Color) -> Expr<f32> {
         color.max().clamp(0.0, 1e5)
-        // const_(1.0f32)
+        // 1.0f32.expr()
     }
     fn bootstrap(&self, scene: &Arc<Scene>, filter: PixelFilter, eval: &Evaluators) -> RenderState {
         let seeds = init_pcg32_buffer(self.device.clone(), self.n_bootstrap);
@@ -433,7 +432,7 @@ impl McmcOpt {
                 let cur_color = cur_color_v.load();
                 let accept = select(
                     cur_f.cmpeq(0.0),
-                    const_(1.0f32),
+                    1.0f32.expr(),
                     (proposal_f / cur_f).clamp(0.0, 1.0),
                 );
                 film.add_splat(
@@ -625,8 +624,8 @@ impl McmcOpt {
                     reconstruct(film, cnt);
                 }
                 if session.save_intermediate {
-                    let output_image: luisa::Tex2d<luisa::Float4> = self.device.create_tex2d(
-                        luisa::PixelStorage::Float4,
+                    let output_image: Tex2d<Float4> = self.device.create_tex2d(
+                        PixelStorage::Float4,
                         scene.camera.resolution().x,
                         scene.camera.resolution().y,
                         1,

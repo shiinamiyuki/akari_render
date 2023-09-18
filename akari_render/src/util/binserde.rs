@@ -1,6 +1,6 @@
 use std::io::{Read, Write};
 
-use luisa_compute::{PackedFloat3, PackedUint3, Float2};
+use crate::{PackedFloat3, PackedUint3, Float2};
 
 /* minimal binary ser/de
  * we cannot use bincode 2.0 as it is unstable as of 01-31-2022

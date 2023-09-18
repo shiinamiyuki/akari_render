@@ -10,7 +10,6 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 
-
 pub struct PathTracerBase<'a> {
     pub max_depth: Expr<u32>,
     pub use_nee: bool,
@@ -49,10 +48,10 @@ impl DirectLighting {
         Self {
             irradiance: Color::zero(color_pipeline.color_repr),
             wi: Float3Expr::zero(),
-            pdf: const_(0.0f32),
-            weight: const_(0.0f32),
-            shadow_ray: zeroed::<Ray>(),
-            valid: const_(false),
+            pdf: 0.0f32.expr(),
+            weight: 0.0f32.expr(),
+            shadow_ray: Expr::<Ray>::zeroed(),
+            valid: false.expr(),
             bsdf_f: Color::zero(color_pipeline.color_repr),
         }
     }
@@ -79,16 +78,16 @@ impl<'a> PathTracerBase<'a> {
             color_pipeline,
             eval,
             scene,
-            depth: var!(u32, 0),
-            si: var!(SurfaceInteraction),
-            prev_bsdf_pdf: var!(f32),
-            prev_ng: var!(Float3),
+            depth: Var::<u32>::zeroed(),
+            si: Var::<SurfaceInteraction>::zeroed(),
+            prev_bsdf_pdf: Var::<f32>::zeroed(),
+            prev_ng: Var::<Float3>::zeroed(),
             swl,
-            instance: var!(MeshInstance),
-            p: var!(Float3),
-            wo: var!(Float3),
-            ns: var!(Float3),
-            ng: var!(Float3),
+            instance: Var::<MeshInstance>::zeroed(),
+            p: Var::<Float3>::zeroed(),
+            wo: Var::<Float3>::zeroed(),
+            ns: Var::<Float3>::zeroed(),
+            ng: Var::<Float3>::zeroed(),
         }
     }
     pub fn add_radiance(&self, r: Color) {
@@ -115,10 +114,10 @@ impl<'a> PathTracerBase<'a> {
             si.valid(),
             {
                 self.set_si(si, -ray.d());
-                const_(true)
+                true.expr()
             },
             else,
-            { const_(false) }
+            { false.expr() }
         )
     }
     pub fn sample_surface(&self, u_bsdf: Expr<Float3>) -> BsdfSample {
@@ -150,14 +149,14 @@ impl<'a> PathTracerBase<'a> {
                     let w = mis_weight(sample.pdf, bsdf_pdf, 1);
                     let shadow_ray = sample
                         .shadow_ray
-                        .set_exclude0(make_uint2(*self.si.inst_id(), *self.si.prim_id()));
+                        .set_exclude0(Uint2::expr(*self.si.inst_id(), *self.si.prim_id()));
                     DirectLighting {
                         weight: w,
                         irradiance: sample.li,
                         wi,
                         pdf: sample.pdf,
                         shadow_ray,
-                        valid: const_(true),
+                        valid: true.expr(),
                         bsdf_f,
                     }
                 },
@@ -177,11 +176,11 @@ impl<'a> PathTracerBase<'a> {
                 let cont_prob = beta.load().max().clamp(0.0, 1.0) * 0.95;
                 (true.into(), cont_prob)
             },
-            { (false.into(), const_(1.0f32)) }
+            { (false.into(), 1.0f32.expr()) }
         )
     }
     pub fn hit_envmap(&self, ray: Expr<Ray>) -> (Color, Expr<f32>) {
-        (Color::zero(self.color_pipeline.color_repr), const_(0.0f32))
+        (Color::zero(self.color_pipeline.color_repr), 0.0f32.expr())
     }
     pub fn handle_surface_light(&self, ray: Expr<Ray>) -> (Color, Expr<f32>) {
         let instance = *self.instance;
@@ -195,7 +194,7 @@ impl<'a> PathTracerBase<'a> {
                 let direct = eval.light.le(ray, si, *self.swl);
                 // cpu_dbg!(direct.flatten());
                 if_!(depth.cmpeq(0) | !self.use_nee, {
-                   (direct, const_(1.0f32))
+                   (direct, 1.0f32.expr())
                 }, else {
                     let pn = {
                         let p = ray.o();
@@ -209,12 +208,12 @@ impl<'a> PathTracerBase<'a> {
                 })
             },
             else,
-            { (Color::zero(self.color_pipeline.color_repr), const_(0.0f32)) }
+            { (Color::zero(self.color_pipeline.color_repr), 0.0f32.expr()) }
         )
     }
 
     pub fn run_megakernel(&self, ray: Expr<Ray>, sampler: &dyn Sampler) {
-        let ray = var!(Ray, ray);
+        let ray = ray.var();
         loop_!({
             let hit = self.next_intersection(*ray);
             if_!(!hit, {
@@ -268,8 +267,8 @@ impl<'a> PathTracerBase<'a> {
                     bsdf_sample.wi,
                     0.0,
                     1e20,
-                    make_uint2(*self.si.inst_id(), *self.si.prim_id()),
-                    make_uint2(u32::MAX, u32::MAX),
+                    Uint2::expr(*self.si.inst_id(), *self.si.prim_id()),
+                    Uint2::expr(u32::MAX, u32::MAX),
                 );
             }
         })
@@ -329,7 +328,7 @@ impl PathTracer {
 }
 pub fn mis_weight(pdf_a: Expr<f32>, pdf_b: Expr<f32>, power: u32) -> Expr<f32> {
     let apply_power = |x: Expr<f32>| {
-        let mut p = const_(1.0f32);
+        let mut p = 1.0f32.expr();
         for _ in 0..power {
             p = p * x;
         }
@@ -431,11 +430,11 @@ impl Integrator for PathTracer {
                 let p = dispatch_id().xy();
                 let sampler = sampler_creator.create(p);
                 let sampler = sampler.as_ref();
-                for_range(const_(0)..spp_per_pass.int(), |_| {
+                for_range(0u32.expr()..spp_per_pass, |_| {
                     sampler.start();
                     let ip = p.int();
                     let shifted = ip + pixel_offset;
-                    let shifted = shifted.clamp(0, const_(resolution).int() - 1).uint();
+                    let shifted = shifted.clamp(0, resolution.expr().int() - 1).uint();
                     let swl = sample_wavelengths(color_pipeline.color_repr, sampler);
                     let (ray, ray_color, ray_w) = scene.camera.generate_ray(
                         film.filter(),
@@ -444,7 +443,7 @@ impl Integrator for PathTracer {
                         color_pipeline.color_repr,
                         swl,
                     );
-                    let swl = def(swl);
+                    let swl = swl.var();
                     let l = self.radiance(&scene, &evaluators, ray, swl, sampler) * ray_color;
                     film.add_sample(p.float(), &l, *swl, ray_w);
                 });

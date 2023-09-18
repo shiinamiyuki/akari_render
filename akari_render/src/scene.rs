@@ -110,7 +110,7 @@ impl Scene {
                     };
                     scene.lights.pdf_direct(si, pn, &ctx)
                 }, else {
-                    const_(0.0f32)
+                    0.0f32.expr()
                 })
             })
         };
@@ -261,7 +261,7 @@ impl Scene {
     //     let u = phi / (2.0 * PI);
     //     let v = theta / PI;
     //     let si = var!(SurfaceInteraction);
-    //     si.set_geometry(zeroed::<SurfaceLocalGeometry>().set_uv(make_float2(u, v)));
+    //     si.set_geometry(zeroed::<SurfaceLocalGeometry>().set_uv(Float2::expr(u, v)));
     //     evals
     //         .texture
     //         .evaluate_color(self.env_map.var().read(0), si.load())
@@ -325,7 +325,7 @@ impl Scene {
             let bary = hit.bary();
             self.si_from_hitinfo(inst_id, prim_id, bary)
         }, else {
-            zeroed::<SurfaceInteraction>().set_valid(Bool::from(false))
+            Expr::<SurfaceInteraction>::zeroed().set_valid(Bool::from(false))
         })
     }
     pub fn occlude(&self, ray: Expr<Ray>) -> Expr<bool> {
@@ -515,9 +515,9 @@ impl Scene {
 //                 self.bindless_texture.set_tex2d(
 //                     index as usize,
 //                     &tex,
-//                     luisa::Sampler {
-//                         filter: luisa::SamplerFilter::Point,
-//                         address: luisa::SamplerAddress::Repeat,
+//                     TextureSampler {
+//                         filter: TextureSamplerFilter::Point,
+//                         address: TextureSamplerAddress::Repeat,
 //                     },
 //                 );
 //                 self.texture_cache.insert(path.clone(), index);

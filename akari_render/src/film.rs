@@ -29,16 +29,16 @@ pub enum PixelFilter {
 impl PixelFilter {
     pub fn sample(&self, u: Expr<Float2>) -> (Expr<Float2>, Expr<f32>) {
         match self {
-            PixelFilter::Box => (u * 0.5 - 0.5, const_(1.0f32)),
+            PixelFilter::Box => (u * 0.5 - 0.5, 1.0f32.expr()),
             PixelFilter::Gaussian { radius: width } => {
                 let sigma = *width / 3.0;
                 let u1 = u.x();
                 let u2 = u.y();
                 let r = (-2.0 * u1.ln()).sqrt();
                 let theta = 2.0 * PI * u2;
-                let offset = make_float2(r * theta.cos(), r * theta.sin()) * sigma;
+                let offset = Float2::expr(r * theta.cos(), r * theta.sin()) * sigma;
                 let offset = offset.clamp(-*width, *width);
-                (offset, const_(1.0f32))
+                (offset, 1.0f32.expr())
             }
         }
     }
@@ -110,10 +110,10 @@ impl Film {
                         let g = pixels.read(i * nvalues as u32 + 1);
                         let b = pixels.read(i * nvalues as u32 + 2);
                         let w = weights.read(i);
-                        let rgb = make_float3(r, g, b) / select(w.cmpeq(0.0), const_(1.0f32), w);
-                        let rgb = rgb + make_float3(s_r, s_g, s_b);
+                        let rgb = Float3::expr(r, g, b) / select(w.cmpeq(0.0), 1.0f32.expr(), w);
+                        let rgb = rgb + Float3::expr(s_r, s_g, s_b);
                         let rgb = if_!(hdr, { rgb }, else, { linear_to_srgb(rgb) });
-                        image.write(p, make_float4(rgb.x(), rgb.y(), rgb.z(), 1.0f32));
+                        image.write(p, Float4::expr(rgb.x(), rgb.y(), rgb.z(), 1.0f32));
                     }
                     _ => todo!(),
                 }
@@ -137,7 +137,7 @@ impl Film {
         self.splat_scale = scale;
     }
     fn linear_index(&self, p: Expr<Float2>) -> Expr<u32> {
-        let resolution = const_(self.resolution);
+        let resolution = self.resolution.expr();
         let ip = p.floor().int();
         let oob = ip.cmplt(0).any() | ip.cmpge(resolution.int()).any();
         lc_assert!(!oob);
@@ -277,7 +277,7 @@ impl VarFilm {
         }
     }
     fn linear_index(&self, p: Expr<Uint2>) -> Expr<u32> {
-        let resolution = const_(self.resolution);
+        let resolution = self.resolution.expr();
         let ip = p.int();
         let oob = ip.cmplt(0).any() | ip.cmpge(resolution.int()).any();
         lc_assert!(!oob);
@@ -289,7 +289,7 @@ impl VarFilm {
         let locks = self.locks.var();
         while_!(locks.atomic_compare_exchange(i, 0, 1).cmpne(0), {});
         let var = self.vars.var().read(i);
-        let var = var!(VarTracker, var);
+        let var = var.var();
         var.set_w_sum(var.w_sum().load() + w);
         var.set_w2_sum(var.w2_sum().load() + w * w);
         let mean_old = var.mean().load();

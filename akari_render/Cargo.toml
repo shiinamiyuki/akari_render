@@ -14,7 +14,7 @@ image = "0.24.3"
 indicatif = "0.17.3"
 lazy_static = "1.4"
 log = "0.4.17"
-luisa_compute = { path = "../../luisa-compute-rs/luisa_compute" }
+luisa_compute = { path = "../../lc-rs-refactor/luisa_compute" }
 akari_data = { path = "../akari_data" }
 # luisa_compute = { git = "https://github.com/LuisaGroup/luisa-compute-rs.git"}
 parking_lot = "0.12"
@@ -26,6 +26,7 @@ akari_nodegraph = { path = "../akari_nodegraph" }
 sha2 = "0.10.7"
 libm = "0.2.7"
 winit = "0.28"
+glam = "0.24.0"
 
 [build-dependencies]
 cmake = "0.1.50"

@@ -1,7 +1,10 @@
-use crate::{color::{
-    aces_to_srgb_with_cat_mat, srgb_to_aces_with_cat_mat, srgb_to_linear, Color, ColorSpaceId,
-    RgbColorSpace, SampledWavelengths, FlatColor,
-}, interaction::SurfaceInteraction};
+use crate::{
+    color::{
+        aces_to_srgb_with_cat_mat, srgb_to_aces_with_cat_mat, srgb_to_linear, Color, ColorSpaceId,
+        FlatColor, RgbColorSpace, SampledWavelengths,
+    },
+    interaction::SurfaceInteraction,
+};
 
 use super::*;
 
@@ -13,14 +16,14 @@ pub fn rgb_to_target_colorspace(
     match colorspace {
         RgbColorSpace::SRgb => {
             if target == RgbColorSpace::ACEScg {
-                const_(Mat3::from(srgb_to_aces_with_cat_mat())) * rgb
+                Mat3::from(srgb_to_aces_with_cat_mat()).expr() * rgb
             } else {
                 rgb
             }
         }
         RgbColorSpace::ACEScg => {
             if target == RgbColorSpace::SRgb {
-                const_(Mat3::from(aces_to_srgb_with_cat_mat())) * rgb
+                Mat3::from(aces_to_srgb_with_cat_mat()).expr() * rgb
             } else {
                 rgb
             }

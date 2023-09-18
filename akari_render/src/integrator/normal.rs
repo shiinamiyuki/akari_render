@@ -47,9 +47,9 @@ impl Integrator for NormalVis {
             // cpu_dbg!(ray);
             let color = if_!(si.valid(), {
                 let ns = si.geometry().ng();
-                // cpu_dbg!(make_uint2(si.inst_id(), si.prim_id()));
+                // cpu_dbg!(Uint2::expr(si.inst_id(), si.prim_id()));
                 Color::Rgb(ns * 0.5 + 0.5, color_repr.rgb_colorspace().unwrap()) * ray_color
-                // Color::Rgb(make_float3(si.bary().x(),si.bary().y(), 1.0))
+                // Color::Rgb(Float3::expr(si.bary().x(),si.bary().y(), 1.0))
             }, else {
                 Color::zero(color_repr)
             });
