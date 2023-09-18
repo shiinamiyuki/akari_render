@@ -5,7 +5,7 @@ use rand::Rng;
 
 use super::{Integrator, RenderSession};
 use crate::{
-    color::*, film::*, geometry::*, interaction::SurfaceInteraction, mesh::MeshInstance,
+    color::*, film::*, geometry::*, interaction::SurfaceInteraction, loop_, mesh::MeshInstance,
     sampler::*, scene::*, svm::surface::*, *,
 };
 use serde::{Deserialize, Serialize};
@@ -214,64 +214,66 @@ impl<'a> PathTracerBase<'a> {
 
     pub fn run_megakernel(&self, ray: Expr<Ray>, sampler: &dyn Sampler) {
         let ray = ray.var();
-        loop_!({
-            let hit = self.next_intersection(*ray);
-            if_!(!hit, {
-                let (direct, w) = self.hit_envmap(*ray);
-                self.add_radiance(direct * w);
-                break_();
-            });
-            {
-                let (direct, w) = self.handle_surface_light(*ray);
-                self.add_radiance(direct * w);
+        track!({
+            loop {
+                let hit = self.next_intersection(*ray);
+                if !hit {
+                    let (direct, w) = self.hit_envmap(*ray);
+                    self.add_radiance(direct * w);
+                    break;
+                }
+                {
+                    let (direct, w) = self.handle_surface_light(*ray);
+                    self.add_radiance(direct * w);
+                }
+
+                if self.depth.load() >= self.max_depth {
+                    break;
+                }
+                *self.depth.get_mut() += 1;
+
+                let direct_lighting = self.sample_light(sampler.next_3d());
+                if direct_lighting.valid {
+                    let shadow_ray = direct_lighting.shadow_ray;
+                    if !self.scene.occlude(shadow_ray) {
+                        let direct = direct_lighting.irradiance
+                            * direct_lighting.bsdf_f
+                            * direct_lighting.weight
+                            / direct_lighting.pdf;
+                        self.add_radiance(direct);
+                    }
+                }
+                let bsdf_sample = self.sample_surface(sampler.next_3d());
+                let f = &bsdf_sample.color;
+                lc_assert!(f.min().cmpge(0.0));
+                if bsdf_sample.pdf <= 0.0 || !bsdf_sample.valid {
+                    break;
+                }
+
+                self.mul_beta(f / bsdf_sample.pdf);
+                let (rr_effective, cont_prob) = self.continue_prob();
+                if rr_effective {
+                    let rr = sampler.next_1d().cmpge(cont_prob);
+                    if rr {
+                        break;
+                    }
+                    self.mul_beta(Color::one(self.color_pipeline.color_repr) / cont_prob);
+                }
+                {
+                    *self.prev_bsdf_pdf.get_mut() = bsdf_sample.pdf;
+                    *self.prev_ng.get_mut() = *self.ng;
+                    let ro = offset_ray_origin(*self.p, face_forward(*self.ng, bsdf_sample.wi));
+                    *ray.get_mut() = RayExpr::new(
+                        ro,
+                        bsdf_sample.wi,
+                        0.0,
+                        1e20,
+                        Uint2::expr(*self.si.inst_id(), *self.si.prim_id()),
+                        Uint2::expr(u32::MAX, u32::MAX),
+                    );
+                }
             }
-
-            if_!(self.depth.load().cmpge(self.max_depth), {
-                break_();
-            });
-            *self.depth.get_mut() += 1;
-
-            let direct_lighting = self.sample_light(sampler.next_3d());
-            if_!(direct_lighting.valid, {
-                let shadow_ray = direct_lighting.shadow_ray;
-                if_!(!self.scene.occlude(shadow_ray), {
-                    let direct = direct_lighting.irradiance
-                        * direct_lighting.bsdf_f
-                        * direct_lighting.weight
-                        / direct_lighting.pdf;
-                    self.add_radiance(direct);
-                });
-            });
-            let bsdf_sample = self.sample_surface(sampler.next_3d());
-            let f = &bsdf_sample.color;
-            lc_assert!(f.min().cmpge(0.0));
-            if_!(bsdf_sample.pdf.cmple(0.0) | !bsdf_sample.valid, {
-                break_();
-            });
-
-            self.mul_beta(f / bsdf_sample.pdf);
-            let (rr_effective, cont_prob) = self.continue_prob();
-            if_!(rr_effective, {
-                let rr = sampler.next_1d().cmpge(cont_prob);
-                if_!(rr, {
-                    break_();
-                });
-                self.mul_beta(Color::one(self.color_pipeline.color_repr) / cont_prob);
-            });
-            {
-                *self.prev_bsdf_pdf.get_mut() = bsdf_sample.pdf;
-                *self.prev_ng.get_mut() = *self.ng;
-                let ro = offset_ray_origin(*self.p, face_forward(*self.ng, bsdf_sample.wi));
-                *ray.get_mut() = RayExpr::new(
-                    ro,
-                    bsdf_sample.wi,
-                    0.0,
-                    1e20,
-                    Uint2::expr(*self.si.inst_id(), *self.si.prim_id()),
-                    Uint2::expr(u32::MAX, u32::MAX),
-                );
-            }
-        })
+        });
     }
 }
 #[derive(Clone)]

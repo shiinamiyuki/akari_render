@@ -1,7 +1,7 @@
 use color::ColorRepr;
 use hexf::hexf32;
 use integrator::FilmConfig;
-pub use luisa::prelude::{if_, lc_assert, loop_, while_, Aggregate, Value};
+pub use luisa::prelude::{track, if_, lc_assert, loop_, while_, Aggregate, Value};
 pub use luisa::resource::Sampler as TextureSampler;
 pub use luisa::{
     impl_polymorphic,

@@ -277,10 +277,12 @@ impl Color {
         }
     }
     pub fn remove_nan(&self) -> Self {
-        if_!(self.has_nan(), {
-            Self::zero(self.repr())
-        }, else {
-            self.clone()
+        track!({
+            if self.has_nan() {
+                Self::zero(self.repr())
+            } else {
+                self.clone()
+            }
         })
     }
     pub fn clamp(&self, max_contrib: impl Into<Expr<f32>>) -> Self {
