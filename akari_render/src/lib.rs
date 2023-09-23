@@ -1,7 +1,7 @@
 use color::ColorRepr;
 use hexf::hexf32;
 use integrator::FilmConfig;
-pub use luisa::prelude::{track, if_, lc_assert, loop_, while_, Aggregate, Value};
+pub use luisa::prelude::{if_, lc_assert, loop_, track, tracked, while_, Aggregate, Value};
 pub use luisa::resource::Sampler as TextureSampler;
 pub use luisa::{
     impl_polymorphic,
@@ -11,8 +11,7 @@ pub use luisa::{
         index::*,
         ops::*,
         poly::*,
-        swizzle::*,
-        types::{array::*, core::*, vector::*, *},
+        types::{array::*, core::*, vector::alias::*, vector::swizzle::*, vector::*, *},
     },
     lc_info,
     printer::Printer,
@@ -23,10 +22,9 @@ pub use luisa::{
     },
     rtx,
     runtime::{
-        api::StreamTag, create_static_callable, Callable, Command, Device, DynCallable, Kernel,
+        api::StreamTag, Callable, Command, Device, DynCallable, Kernel,
         Stream, Swapchain,
     },
-    struct_,
 };
 pub use luisa_compute as luisa;
 pub use rayon::prelude::*;

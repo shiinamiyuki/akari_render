@@ -187,7 +187,7 @@ impl Svm {
             .copied()
             .collect::<Vec<_>>();
         kinds.sort();
-        let mut sw = switch::<R>(shader_ref.shader_kind().int());
+        let mut sw = switch::<R>(shader_ref.shader_kind().cast_i32());
         for k in kinds {
             sw = sw.case(k as i32, || {
                 let eval = SvmEvaluator::new(

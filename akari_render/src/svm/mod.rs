@@ -44,7 +44,7 @@ impl SvmFloat {
 #[derive(Clone, Copy, Debug, Value)]
 #[repr(C)]
 pub struct SvmFloat3 {
-    pub value: PackedFloat3,
+    pub value: [f32;3],
 }
 impl SvmFloat3 {
     pub fn hash<H: Digest>(&self, hasher: &mut H) {

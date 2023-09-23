@@ -49,7 +49,7 @@ mod bsdf_chi2_test {
         let rngs = init_pcg32_buffer_with_seed(device.clone(), threads, 0);
         let kernel =
             device.create_kernel::<fn(Float3, u32)>(&|wo: Expr<Float3>, samples: Expr<u32>| {
-                let i = dispatch_id().x();
+                let i = dispatch_id().x;
                 let pcg = rngs.var().read(i).var();
                 let sampler = IndependentSampler::from_pcg32(pcg);
                 for_range(0u32.expr()..samples, |_| {
@@ -58,15 +58,15 @@ mod bsdf_chi2_test {
                     if_!(s.valid, {
                         // cpu_dbg!(s.wi);
                         let (theta, phi) = xyz_to_spherical(s.wi);
-                        let phi = select(phi.cmplt(0.0), phi + 2.0 * PI, phi) / (2.0 * PI);
+                        let phi = select(phi.lt(0.0), phi + 2.0 * PI, phi) / (2.0 * PI);
                         let theta = theta / PI;
                         // cpu_dbg!(Float2::expr(phi, theta));
-                        // cpu_dbg!(Float4::expr(s.wi.x(), s.wi.y(), s.wi.z(), s.wi.y().acos()));
-                        // cpu_dbg!(Float2::expr(theta / PI, s.wi.y().acos() / PI));
-                        // lc_assert!(phi.cmpge(0.0) & phi.cmple(1.0001));
-                        // lc_assert!(theta.cmpge(0.0) & theta.cmple(1.0001));
-                        let bin_theta = (theta * theta_res as f32).uint().min(theta_res - 1);
-                        let bin_phi = (phi * phi_res as f32).uint().min(phi_res - 1);
+                        // cpu_dbg!(Float4::expr(s.wi.x, s.wi.y, s.wi.z, s.wi.y.acos()));
+                        // cpu_dbg!(Float2::expr(theta / PI, s.wi.y.acos() / PI));
+                        // lc_assert!(phi.ge(0.0) & phi.le(1.0001));
+                        // lc_assert!(theta.ge(0.0) & theta.le(1.0001));
+                        let bin_theta = (theta * theta_res as f32).cast_u32().min(theta_res - 1);
+                        let bin_phi = (phi * phi_res as f32).cast_u32().min(phi_res - 1);
                         let bin_idx = bin_theta * phi_res + bin_phi;
                         target.var().atomic_fetch_add(bin_idx, 1);
                     });
@@ -90,20 +90,20 @@ mod bsdf_chi2_test {
             let ij = dispatch_id().xy();
             let theta_h = PI / theta_res as f32;
             let phi_h = 2.0 * PI / phi_res as f32;
-            let bin_idx = ij.x() * phi_res + ij.y();
-            let i = ij.x();
-            let j = ij.y();
-            let theta_begin = theta_h * i.float();
-            let theta_end = theta_h * (i + 1).float();
-            let phi_begin = phi_h * j.float();
-            let phi_end = phi_h * (j + 1).float();
+            let bin_idx = ij.x * phi_res + ij.y;
+            let i = ij.x;
+            let j = ij.y;
+            let theta_begin = theta_h * i.cast_f32();
+            let theta_end = theta_h * (i + 1).cast_f32();
+            let phi_begin = phi_h * j.cast_f32();
+            let phi_end = phi_h * (j + 1).cast_f32();
             let pdf = pdf.clone();
             let integral = adaptive_simpson_2d::<Float3>(
                 device,
                 wo,
                 move |wo, sph| {
-                    let phi = sph.x();
-                    let theta = sph.y();
+                    let phi = sph.x;
+                    let theta = sph.y;
                     let sin_theta = theta.sin();
                     let wi = spherical_to_xyz(theta, phi);
                     pdf(wo, wi) * sin_theta
@@ -320,7 +320,7 @@ plt.show()"#
                     let bsdf = bsdf();
                     bsdf.sample(
                         wo,
-                        u.x(),
+                        u.x,
                         u.yz(),
                         SampledWavelengthsExpr::rgb_wavelengths().var(),
                         &BsdfEvalContext {
@@ -461,13 +461,13 @@ mod invert {
         bads.fill(0);
         let printer = Printer::new(&device, 32768);
         let kernel = device.create_kernel::<fn()>(&|| {
-            let i = dispatch_id().x();
+            let i = dispatch_id().x;
             let sampler = IndependentSampler::from_pcg32(rngs.var().read(i).var());
             for_range(0..samples, |_| {
                 let u = sampler.next_2d();
                 let w = sample(u);
                 let u2 = invert(w);
-                let bad = (u2 - u).length().cmpgt(0.01);
+                let bad = (u2 - u).length().gt(0.01);
                 if_!(bad, {
                     bads.var().atomic_fetch_add(i, 1);
                     lc_info!(printer, "bad: u: {:?} u2:{:?} w:{:?}", u, u2, w);

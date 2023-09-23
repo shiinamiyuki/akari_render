@@ -18,13 +18,13 @@ pub struct BindlessAliasTableVar(
     pub BindlessBufferVar<f32>,
 );
 impl BindlessAliasTableVar {
-    pub fn pdf(&self, i: Uint) -> Float {
+    pub fn pdf(&self, i: Expr<u32>) -> Expr<f32> {
         self.1.read(i)
     }
-    pub fn sample_and_remap(&self, u: Expr<f32>) -> (Uint, Float, Float) {
-        let (idx, u) = uniform_discrete_choice_and_remap(self.0.len().uint(), u);
+    pub fn sample_and_remap(&self, u: Expr<f32>) -> (Expr<u32>, Expr<f32>, Expr<f32>) {
+        let (idx, u) = uniform_discrete_choice_and_remap(self.0.len_expr().as_u32(), u);
         let entry = self.0.read(idx);
-        let (idx, u) = weighted_discrete_choice2_and_remap(entry.t(), idx, entry.j(), u);
+        let (idx, u) = weighted_discrete_choice2_and_remap(entry.t, idx, entry.j, u);
         let pdf = self.1.read(idx);
         (idx, pdf, u)
     }
@@ -74,19 +74,19 @@ impl AliasTable {
             device.create_buffer_from_fn(prob.len(), |i| weights[i] / sum),
         )
     }
-    pub fn pdf(&self, i: Uint) -> Float {
+    pub fn pdf(&self, i: Expr<u32>) -> Expr<f32> {
         self.1.var().read(i)
     }
-    pub fn sample_and_remap(&self, u: Expr<f32>) -> (Uint, Float, Float) {
-        // let idx = (u.x() * self.0.var().len().float()).uint();
+    pub fn sample_and_remap(&self, u: Expr<f32>) -> (Expr<u32>, Expr<f32>, Expr<f32>) {
+        // let idx = (u.x * self.0.var().len().cast_f32()).cast_u32();
         // let idx = idx.min(self.0.var().len() - 1);
         // let entry = self.0.var().read(idx);
-        // let idx = select(u.y().cmpge(entry.t()), entry.j(), idx);
+        // let idx = select(u.y.ge(entry.t()), entry.j(), idx);
         // let pdf = self.1.var().read(idx);
         // (idx, pdf)
-        let (idx, u) = uniform_discrete_choice_and_remap(self.0.var().len().uint(), u);
+        let (idx, u) = uniform_discrete_choice_and_remap(self.0.var().len_expr().as_u32(), u);
         let entry = self.0.var().read(idx);
-        let (idx, u) = weighted_discrete_choice2_and_remap(entry.t(), idx, entry.j(), u);
+        let (idx, u) = weighted_discrete_choice2_and_remap(entry.t, idx, entry.j, u);
         let pdf = self.1.var().read(idx);
         (idx, pdf, u)
     }

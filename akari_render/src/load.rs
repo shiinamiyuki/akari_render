@@ -459,16 +459,16 @@ impl SceneLoader {
                     })
                     .collect::<HashMap<_, _>>();
                 log::info!("Loading mesh: {}", mesh.in_name.as_value().unwrap());
-                let vertices = load_buffer::<PackedFloat3>(&file_resolver, &buffers["vertices"]);
-                let normals = load_buffer::<PackedFloat3>(&file_resolver, &buffers["normals"]);
-                let indices = load_buffer::<PackedUint3>(&file_resolver, &buffers["indices"]);
+                let vertices = load_buffer::<[f32;3]>(&file_resolver, &buffers["vertices"]);
+                let normals = load_buffer::<[f32;3]>(&file_resolver, &buffers["normals"]);
+                let indices = load_buffer::<[u32;3]>(&file_resolver, &buffers["indices"]);
                 let mut uvs = vec![];
                 if let Some(uv) = buffers.get("uvs") {
                     uvs = load_buffer::<Float2>(&file_resolver, uv);
                 }
                 let mut tangents = vec![];
                 if let Some(tangent) = buffers.get("tangents") {
-                    tangents = load_buffer::<PackedFloat3>(&file_resolver, tangent);
+                    tangents = load_buffer::<[f32;3]>(&file_resolver, tangent);
                 }
                 let mut bitangent_signs = vec![];
                 if let Some(bitangent_sign) = buffers.get("bitangent_signs") {

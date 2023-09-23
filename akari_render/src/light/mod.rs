@@ -13,7 +13,7 @@ use crate::{
 #[derive(Clone, Aggregate)]
 pub struct LightSample {
     pub li: Color,
-    pub pdf: Float,
+    pub pdf: Expr<f32>,
     pub wi: Expr<Float3>,
     pub shadow_ray: Expr<Ray>,
     pub n: Expr<Float3>,
@@ -38,7 +38,7 @@ impl<'a> LightEvalContext<'a> {
     }
 }
 
-pub trait Light: Send + Sync {
+pub trait Light {
     fn id(&self) -> Expr<u32>;
     fn le(
         &self,
@@ -64,8 +64,8 @@ pub trait Light: Send + Sync {
 }
 
 pub trait LightDistribution: Send + Sync {
-    fn sample_and_remap(&self, u: Expr<f32>) -> (Uint, Expr<f32>, Expr<f32>);
-    fn pdf(&self, light_index: Uint) -> Float;
+    fn sample_and_remap(&self, u: Expr<f32>) -> (Expr<u32>, Expr<f32>, Expr<f32>);
+    fn pdf(&self, light_index: Expr<u32>) -> Expr<f32>;
 }
 
 pub struct WeightedLightDistribution {
@@ -73,10 +73,10 @@ pub struct WeightedLightDistribution {
 }
 
 impl LightDistribution for WeightedLightDistribution {
-    fn sample_and_remap(&self, u: Expr<f32>) -> (Uint, Expr<f32>, Expr<f32>) {
+    fn sample_and_remap(&self, u: Expr<f32>) -> (Expr<u32>, Expr<f32>, Expr<f32>) {
         self.alias_table.sample_and_remap(u)
     }
-    fn pdf(&self, light_index: Uint) -> Float {
+    fn pdf(&self, light_index: Expr<u32>) -> Expr<f32> {
         self.alias_table.pdf(light_index)
     }
 }
@@ -144,9 +144,9 @@ impl LightEvaluator {
 }
 impl LightAggregate {
     pub fn light(&self, si: Expr<SurfaceInteraction>) -> PolymorphicRef<(), dyn Light> {
-        let inst_id = si.inst_id();
+        let inst_id = si.inst_id;
         let instance = self.meshes.mesh_instances.var().read(inst_id);
-        let light = self.lights.get(instance.light());
+        let light = self.lights.get(instance.light);
         light
     }
     pub fn le(
@@ -180,6 +180,7 @@ impl LightAggregate {
         sample.pdf = sample.pdf * light_choice_pdf;
         sample
     }
+    #[tracked]
     pub fn pdf_direct(
         &self,
         si: Expr<SurfaceInteraction>,

@@ -31,7 +31,7 @@ impl Surface for DiffuseBsdf {
     fn sample(
         &self,
         wo: Expr<Float3>,
-        _u_select: Float,
+        _u_select: Expr<f32>,
         u_sample: Expr<Float2>,
         _swl: Var<SampledWavelengths>,
         _ctx: &BsdfEvalContext,
@@ -44,7 +44,7 @@ impl Surface for DiffuseBsdf {
             wi,
             pdf,
             color,
-            valid: Bool::from(true),
+            valid: true.expr(),
         }
     }
     fn pdf(
@@ -53,11 +53,11 @@ impl Surface for DiffuseBsdf {
         wi: Expr<Float3>,
         _swl: Expr<SampledWavelengths>,
         _ctx: &BsdfEvalContext,
-    ) -> Float {
+    ) -> Expr<f32> {
         select(
             Frame::same_hemisphere(wo, wi),
             Frame::abs_cos_theta(wi) * FRAC_1_PI,
-            Float::from(0.0),
+            0.0f32.expr(),
         )
     }
     fn albedo(

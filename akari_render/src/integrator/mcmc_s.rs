@@ -142,7 +142,7 @@ where
 {
     fn next_1d(&self) -> Float {
         if_!(
-            self.cur_dim.load().cmplt(self.mcmc_dim),
+            self.cur_dim.load().lt(self.mcmc_dim),
             {
                 let ret = self.samples.read((self.get_index)(*self.cur_dim));
                 self.cur_dim.store(self.cur_dim.load() + 1);
@@ -229,7 +229,7 @@ impl Mutator {
                 let x = def(samples.read(sample_idx));
                 samples.write(backup_idx, *x);
                 let new = if_!(self.is_large_step, { u }, else, {
-                    if_!(self.small_step_dim_change & i.cmpgt(self.old_dim), {
+                    if_!(self.small_step_dim_change & i.gt(self.old_dim), {
                         *x.get_mut() = rng.next_1d();
                     });
                     if exponential_mutation {
@@ -294,7 +294,7 @@ impl<'a> PathTracerBase<'a> {
                     todo!()
                 }
                 let (direct, w) = self.hit_envmap(*ray);
-                if_!(self.depth.cmpeq(target_depth), {
+                if_!(self.depth.eq(target_depth), {
                     self.add_radiance(direct * w);
                 });
                 break_();
@@ -307,18 +307,18 @@ impl<'a> PathTracerBase<'a> {
                 todo!()
             }
             {
-                if_!(self.depth.cmpeq(target_depth), {
+                if_!(self.depth.eq(target_depth), {
                     let (direct, w) = self.handle_surface_light(*ray);
                     self.add_radiance(direct * w);
                 });
             }
 
-            if_!(self.depth.load().cmpge(self.max_depth), {
+            if_!(self.depth.load().ge(self.max_depth), {
                 break_();
             });
             *self.depth.get_mut() += 1;
 
-            if_!(self.depth.cmpeq(target_depth), {
+            if_!(self.depth.eq(target_depth), {
                 let direct_lighting = self.sample_light(u_light);
                 if_!(direct_lighting.valid, {
                     let shadow_ray = direct_lighting.shadow_ray;
@@ -333,8 +333,8 @@ impl<'a> PathTracerBase<'a> {
             });
             let bsdf_sample = self.sample_surface(sampler.next_3d());
             let f = &bsdf_sample.color;
-            lc_assert!(f.min().cmpge(0.0));
-            if_!(bsdf_sample.pdf.cmple(0.0) | !bsdf_sample.valid, {
+            lc_assert!(f.min().ge(0.0));
+            if_!(bsdf_sample.pdf.le(0.0) | !bsdf_sample.valid, {
                 break_();
             });
             self.mul_beta(f / bsdf_sample.pdf);
@@ -367,13 +367,13 @@ impl<'a> PathTracerBase<'a> {
         loop_!({
             let hit = {
                 let v = vertices.read(*self.depth);
-                let hit = v.inst_id().cmpeq(u32::MAX);
+                let hit = v.inst_id().eq(u32::MAX);
                 if_!(hit, {
                     let si = self
                         .scene
                         .si_from_hitinfo(v.inst_id(), v.prim_id(), v.bary());
-                    let wo = if_!(self.depth.cmpeq(0), {
-                        -*ray.d()
+                    let wo = if_!(self.depth.eq(0), {
+                        -*ray.d
                     }, else {
                         (si.geometry().p() - *prev_p).normalize()
                     });
@@ -383,24 +383,24 @@ impl<'a> PathTracerBase<'a> {
             };
             if_!(!hit, {
                 let (direct, w) = self.hit_envmap(*ray);
-                if_!(self.depth.cmpeq(target_depth), {
+                if_!(self.depth.eq(target_depth), {
                     self.add_radiance(direct * w);
                 });
                 break_();
             });
             {
-                if_!(self.depth.cmpeq(target_depth), {
+                if_!(self.depth.eq(target_depth), {
                     let (direct, w) = self.handle_surface_light(*ray);
                     self.add_radiance(direct * w);
                 });
             }
 
-            if_!(self.depth.load().cmpge(self.max_depth), {
+            if_!(self.depth.load().ge(self.max_depth), {
                 break_();
             });
             *self.depth.get_mut() += 1;
 
-            if_!(self.depth.cmpeq(target_depth), {
+            if_!(self.depth.eq(target_depth), {
                 let direct_lighting = self.sample_light(u_light);
                 if_!(direct_lighting.valid, {
                     let shadow_ray = direct_lighting.shadow_ray;
@@ -415,8 +415,8 @@ impl<'a> PathTracerBase<'a> {
             });
             let bsdf_sample = self.sample_surface(sampler.next_3d());
             let f = &bsdf_sample.color;
-            lc_assert!(f.min().cmpge(0.0));
-            if_!(bsdf_sample.pdf.cmple(0.0) | !bsdf_sample.valid, {
+            lc_assert!(f.min().ge(0.0));
+            if_!(bsdf_sample.pdf.le(0.0) | !bsdf_sample.valid, {
                 break_();
             });
             self.mul_beta(f / bsdf_sample.pdf);
@@ -489,13 +489,13 @@ impl SinglePathMcmc {
         };
         sampler.start();
         let res = const_(scene.camera.resolution());
-        let p = sampler.next_2d() * res.float();
-        let p = p.int().clamp(0, res.int() - 1);
+        let p = sampler.next_2d() * res.cast_f32();
+        let p = p.cast_i32().clamp(0, res.cast_i32() - 1);
         let swl = def(sample_wavelengths(eval.color_repr(), sampler));
         let (ray, ray_color, ray_w) =
             scene
                 .camera
-                .generate_ray(filter, p.uint(), sampler, eval.color_repr(), *swl);
+                .generate_ray(filter, p.cast_u32(), sampler, eval.color_repr(), *swl);
         let l = {
             let w = ray_color * ray_w;
             let pt = PathTracerBase::new(
@@ -510,7 +510,7 @@ impl SinglePathMcmc {
             pt.run_at_depth(ray, depth, sampler, None);
             pt.radiance.load() * w
         };
-        (p.uint(), l, *swl, Self::scalar_contribution(&l))
+        (p.cast_u32(), l, *swl, Self::scalar_contribution(&l))
     }
     const SAMPLE_BUFFER_AOSOA_SIZE: u32 = 4;
 
@@ -542,7 +542,7 @@ impl SinglePathMcmc {
     }
     fn sample_depth(&self, sampler: &dyn Sampler) -> Expr<u32> {
         let range = self.max_depth + 1 - self.min_depth;
-        (self.min_depth + (sampler.next_1d() * range as f32).uint())
+        (self.min_depth + (sampler.next_1d() * range as f32).cast_u32())
             .clamp(self.min_depth, self.config.max_depth as i32)
     }
     fn bootstrap(&self, scene: &Arc<Scene>, filter: PixelFilter, eval: &Evaluators) -> RenderState {
@@ -554,7 +554,7 @@ impl SinglePathMcmc {
             .device
             .create_buffer(self.sample_dimension(self.config.max_depth) as usize * self.n_chains);
         let bootstrap_kernel = self.device.create_kernel::<fn()>(&|| {
-            let i = dispatch_id().x();
+            let i = dispatch_id().x;
             let seed = seeds.var().read(i);
             let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seed));
 
@@ -601,7 +601,7 @@ impl SinglePathMcmc {
         );
         self.device
             .create_kernel::<fn()>(&|| {
-                let i = dispatch_id().x();
+                let i = dispatch_id().x;
                 let seed_idx = resampled.var().read(i);
                 let seed = seeds.var().read(seed_idx);
                 let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seed));
@@ -654,7 +654,7 @@ impl SinglePathMcmc {
         samples: &Buffer<f32>,
         rng: &IndependentSampler,
     ) {
-        let res = const_(scene.camera.resolution()).float();
+        let res = const_(scene.camera.resolution()).cast_f32();
         // select a mutation strategy
         match self.method {
             Method::Kelemen {
@@ -667,8 +667,8 @@ impl SinglePathMcmc {
                 depth_change_prob,
             } => {
                 let chain_id = *state.chain_id();
-                let is_large_step = rng.next_1d().cmplt(large_step_prob);
-                let small_step_depth_change = rng.next_1d().cmplt(depth_change_prob);
+                let is_large_step = rng.next_1d().lt(large_step_prob);
+                let small_step_depth_change = rng.next_1d().lt(depth_change_prob);
                 let new_depth = var!(u32);
                 if_!(
                     is_large_step,
@@ -715,7 +715,7 @@ impl SinglePathMcmc {
                     false,
                 );
                 let proposal_f = f;
-                if_!(is_large_step & state.b_cnt().cmplt(1024 * 1024), {
+                if_!(is_large_step & state.b_cnt().lt(1024 * 1024), {
                     state.set_b(state.b().load() + proposal_f);
                     state.set_b_cnt(state.b_cnt().load() + 1);
                 });
@@ -723,23 +723,23 @@ impl SinglePathMcmc {
                 let cur_p = state.cur_pixel().load();
                 let cur_color = cur_color_v.load();
                 let accept = select(
-                    cur_f.cmpeq(0.0),
+                    cur_f.eq(0.0),
                     1.0f32.expr(),
                     (proposal_f / cur_f).clamp(0.0, 1.0),
                 );
                 film.add_splat(
-                    proposal_p.float(),
+                    proposal_p.cast_f32(),
                     &(proposal_color.clone() / proposal_f),
                     proposal_swl,
                     accept * contribution,
                 );
                 film.add_splat(
-                    cur_p.float(),
+                    cur_p.cast_f32(),
                     &(cur_color / cur_f),
                     *cur_swl,
                     (1.0 - accept) * contribution,
                 );
-                if_!(rng.next_1d().cmplt(accept) & state.b_cnt().cmplt(1024 * 1024), {
+                if_!(rng.next_1d().lt(accept) & state.b_cnt().lt(1024 * 1024), {
                     state.set_cur_f(proposal_f);
                     cur_color_v.store(proposal_color);
                     cur_swl.store(proposal_swl);
@@ -760,13 +760,13 @@ impl SinglePathMcmc {
                     state.set_n_mutations(state.n_mutations().load() + 1);
                     if adaptive {
                         let r =
-                            state.n_accepted().load().float() / state.n_mutations().load().float();
+                            state.n_accepted().load().cast_f32() / state.n_mutations().load().cast_f32();
                         const OPTIMAL_ACCEPT_RATE: f32 = 0.234;
-                        if_!(state.n_mutations().load().cmpgt(50), {
+                        if_!(state.n_mutations().load().gt(50), {
                             let new_sigma = state.sigma().load()
-                                + (r - OPTIMAL_ACCEPT_RATE) / state.n_mutations().load().float();
+                                + (r - OPTIMAL_ACCEPT_RATE) / state.n_mutations().load().cast_f32();
                             let new_sigma = new_sigma.clamp(1e-5, 0.1);
-                            if_!(state.chain_id().load().cmpeq(0), {
+                            if_!(state.chain_id().load().eq(0), {
                                 cpu_dbg!(Float3::expr(r, state.sigma().load(), new_sigma));
                             });
                             state.sigma().store(new_sigma);
@@ -786,7 +786,7 @@ impl SinglePathMcmc {
         mutations_per_chain: Expr<u32>,
         contribution: Expr<f32>,
     ) {
-        let i = dispatch_id().x();
+        let i = dispatch_id().x;
         let markov_states = render_state.states.var();
         let sampler =
             IndependentSampler::from_pcg32(var!(Pcg32, render_state.rng_states.var().read(i)));
@@ -794,7 +794,7 @@ impl SinglePathMcmc {
         let (cur_color, cur_swl) = render_state.cur_colors.read(i);
         let cur_color_v = ColorVar::new(cur_color);
         let cur_swl_v = def(cur_swl);
-        for_range(const_(0)..mutations_per_chain.int(), |_| {
+        for_range(const_(0)..mutations_per_chain.cast_i32(), |_| {
             self.mutate_chain(
                 scene,
                 eval,

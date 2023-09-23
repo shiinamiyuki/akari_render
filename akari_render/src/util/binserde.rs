@@ -1,6 +1,6 @@
 use std::io::{Read, Write};
 
-use crate::{PackedFloat3, PackedUint3, Float2};
+use crate::Float2;
 
 /* minimal binary ser/de
  * we cannot use bincode 2.0 as it is unstable as of 01-31-2022
@@ -86,8 +86,6 @@ impl_binserde!(u32);
 impl_binserde!([u32; 2]);
 impl_binserde!([u32; 3]);
 impl_binserde!(u8);
-impl_binserde!(PackedFloat3);
-impl_binserde!(PackedUint3);
 impl_binserde!(Float2);
 
 impl Encode for String {

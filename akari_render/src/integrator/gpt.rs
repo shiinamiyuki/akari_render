@@ -109,9 +109,9 @@ impl Integrator for GradientPathTracer {
                 }
 
                 let p = dispatch_id().xy();
-                for_range(const_(0)..spp_per_pass.int(), |_| {
+                for_range(const_(0)..spp_per_pass.cast_i32(), |_| {
 
-                    let ip = p.int();
+                    let ip = p.cast_i32();
                     let colors = var!([FlatColor; 5]);
                     let weights = var!([f32; 5]);
                     let offsets = [
@@ -129,10 +129,10 @@ impl Integrator for GradientPathTracer {
                         let offset = offsets.read(i);
                         let shifted = ip + offset;
                         if_!(
-                            !(shifted.cmplt(0).any()
-                                | shifted.cmpge(const_(resolution).int()).any()),
+                            !(shifted.lt(0).any()
+                                | shifted.ge(const_(resolution).cast_i32()).any()),
                             {
-                                let shifted = shifted.uint();
+                                let shifted = shifted.cast_u32();
                                 let (ray, ray_color, ray_w) = scene.camera.generate_ray(
                                     filter,
                                     shifted,
@@ -145,7 +145,7 @@ impl Integrator for GradientPathTracer {
                                 weights.write(i, ray_w);
                             }
                         );
-                        if_!(i.cmpne(4), {
+                        if_!(i.ne(4), {
                             sampler.forget();
                         });
                     });
@@ -161,36 +161,36 @@ impl Integrator for GradientPathTracer {
                     let x_y_m1 = Color::from_flat(color_repr, colors.read(4));
                     // let x_y_m1_w = weights.read(4);
 
-                    if_!(ip.x().cmpgt(0), {
-                        Gx.add_sample(p.float() - Float2::expr(1.0, 0.0), &(base - x_m1_y), base_w);
+                    if_!(ip.x.gt(0), {
+                        Gx.add_sample(p.cast_f32() - Float2::expr(1.0, 0.0), &(base - x_m1_y), base_w);
                     });
-                    if_!(ip.y().cmpgt(0), {
-                        Gy.add_sample(p.float() - Float2::expr(0.0, 1.0), &(base - x_y_m1), base_w);
+                    if_!(ip.y.gt(0), {
+                        Gy.add_sample(p.cast_f32() - Float2::expr(0.0, 1.0), &(base - x_y_m1), base_w);
                     });
-                    Gx.add_sample(p.float(), &(x_p1_y - base), base_w);
-                    Gy.add_sample(p.float(), &(x_y_p1 - base), base_w);
+                    Gx.add_sample(p.cast_f32(), &(x_p1_y - base), base_w);
+                    Gy.add_sample(p.cast_f32(), &(x_y_p1 - base), base_w);
                     for_range(0..5u32, |i| {
                         let offset = offsets.read(i);
                         let shifted = ip + offset;
                         if_!(
-                            !(shifted.cmplt(0).any()
-                                | shifted.cmpge(const_(resolution).int()).any()),
+                            !(shifted.lt(0).any()
+                                | shifted.ge(const_(resolution).cast_i32()).any()),
                             {
                                 // let num_samples = var!(u32, 5);
-                                // if_!(shifted.x().cmpeq(0), {
+                                // if_!(shifted.x.eq(0), {
                                 //     *num_samples.get_mut() -= 1;
                                 // });
-                                // if_!(shifted.y().cmpeq(0), {
+                                // if_!(shifted.y.eq(0), {
                                 //     *num_samples.get_mut() -= 1;
                                 // });
-                                // if_!(shifted.x().cmpeq(const_(resolution.x).int() - 1), {
+                                // if_!(shifted.x.eq(const_(resolution.x).cast_i32() - 1), {
                                 //     *num_samples.get_mut() -= 1;
                                 // });
-                                // if_!(shifted.y().cmpeq(const_(resolution.y).int() - 1), {
+                                // if_!(shifted.y.eq(const_(resolution.y).cast_i32() - 1), {
                                 //     *num_samples.get_mut() -= 1;
                                 // });
                                 primal.add_sample(
-                                    shifted.float(),
+                                    shifted.cast_f32(),
                                     &Color::from_flat(color_repr, colors.read(i)),
                                     weights.read(i),
                                 );

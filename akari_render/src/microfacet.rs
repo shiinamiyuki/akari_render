@@ -4,9 +4,11 @@ use lazy_static::lazy_static;
 use std::f32::consts::PI;
 
 pub trait MicrofacetDistribution {
+    #[tracked]
     fn g1(&self, w: Expr<Float3>, ad_mode: ADMode) -> Expr<f32> {
         1.0 / (1.0 + self.lambda(w, ad_mode))
     }
+    #[tracked]
     fn g(&self, wo: Expr<Float3>, wi: Expr<Float3>, ad_mode: ADMode) -> Expr<f32> {
         1.0 / (1.0 + self.lambda(wo, ad_mode) + self.lambda(wi, ad_mode))
     }
@@ -25,11 +27,12 @@ pub struct TrowbridgeReitzDistribution {
 }
 impl TrowbridgeReitzDistribution {
     pub const MIN_ALPHA: f32 = 1e-4;
+    #[tracked]
     pub fn from_alpha(alpha: Expr<Float2>, sample_visible: bool) -> Self {
         Self {
-            alpha: alpha.max(Self::MIN_ALPHA),
+            alpha: alpha.max_(Self::MIN_ALPHA),
             sample_visible,
-            roughness: (alpha.max(Self::MIN_ALPHA).reduce_sum() * 0.5).sqrt(),
+            roughness: (alpha.max_(Self::MIN_ALPHA).reduce_sum() * 0.5).sqrt(),
         }
     }
     pub fn from_roughness(roughness: Expr<Float2>, sample_visible: bool) -> Self {
@@ -40,34 +43,34 @@ impl TrowbridgeReitzDistribution {
 fn tr_d_impl_(wh: Expr<Float3>, alpha: Expr<Float2>) -> Expr<f32> {
     let tan2_theta = Frame::tan2_theta(wh);
     let cos4_theta = Frame::cos2_theta(wh).sqr();
-    let ax = alpha.x();
-    let ay = alpha.y();
+    let ax = alpha.x;
+    let ay = alpha.y;
     let e = tan2_theta * ((Frame::cos_phi(wh) / ax).sqr() + (Frame::sin_phi(wh) / ay).sqr());
     let d = 1.0 / (PI * ax * ay * cos4_theta * (1.0 + e).sqr());
     select(tan2_theta.is_infinite(), 0.0f32.expr(), d)
 }
 fn tr_lambda_impl_(w: Expr<Float3>, alpha: Expr<Float2>) -> Expr<f32> {
     let abs_tan_theta = Frame::tan_theta(w).abs();
-    let alpha2 = Frame::cos2_phi(w) * alpha.x().sqr() + Frame::sin2_phi(w) * alpha.y().sqr();
+    let alpha2 = Frame::cos2_phi(w) * alpha.x.sqr() + Frame::sin2_phi(w) * alpha.y.sqr();
     let alpha2_tan2_theta = alpha2 * abs_tan_theta.sqr();
     let l = (-1.0 + (1.0 + alpha2_tan2_theta).sqrt()) * 0.5;
     select(!abs_tan_theta.is_finite(), 0.0f32.expr(), l)
 }
 fn tr_sample_impl_(alpha: Expr<Float2>, u: Expr<Float2>) -> Expr<Float3> {
-    let (phi, cos_theta) = if_!(alpha.x().cmpeq(alpha.y()), {
-        let phi = 2.0 * PI * u.y();
-        let tan_theta2 = alpha.x().sqr() * u.x() / (1.0 - u.x());
+    let (phi, cos_theta) = if_!(alpha.x.eq(alpha.y), {
+        let phi = 2.0 * PI * u.y;
+        let tan_theta2 = alpha.x.sqr() * u.x / (1.0 - u.x);
         let cos_theta = 1.0 / (1.0 + tan_theta2).sqrt();
         (phi, cos_theta)
     }, else {
-        let phi = (alpha.y() / alpha.x() * (2.0 * PI * u.y() + PI * 0.5).tan()).atan();
-        let phi = select(u.y().cmpgt(0.5), phi + PI, phi);
+        let phi = (alpha.y / alpha.x * (2.0 * PI * u.y + PI * 0.5).tan()).atan();
+        let phi = select(u.y.gt(0.5), phi + PI, phi);
         let sin_phi = phi.sin();
         let cos_phi = phi.cos();
-        let ax2 = alpha.x().sqr();
-        let ay2 = alpha.y().sqr();
+        let ax2 = alpha.x.sqr();
+        let ay2 = alpha.y.sqr();
         let a2 = 1.0 / (cos_phi.sqr() / ax2 + sin_phi.sqr() / ay2);
-        let tan_theta2 = a2 * u.x() / (1.0 - u.x());
+        let tan_theta2 = a2 * u.x / (1.0 - u.x);
         let cos_theta = 1.0 / (1.0 + tan_theta2).sqrt();
         (phi, cos_theta)
     });
@@ -78,24 +81,23 @@ fn tr_sample_impl_(alpha: Expr<Float2>, u: Expr<Float2>) -> Expr<Float3> {
 }
 lazy_static! {
     static ref TR_D_IMPL: Callable<fn(Expr<Float3>, Expr<Float2>) -> Expr<f32>> =
-        create_static_callable::<fn(Expr<Float3>, Expr<Float2>) -> Expr<f32>>(|wh, alpha| {
+        Callable::<fn(Expr<Float3>, Expr<Float2>) -> Expr<f32>>::new_static(|wh, alpha| {
             tr_d_impl_(wh, alpha)
         });
     static ref TR_LAMBDA_IMPL: Callable<fn(Expr<Float3>, Expr<Float2>) -> Expr<f32>> =
-        create_static_callable::<fn(Expr<Float3>, Expr<Float2>) -> Expr<f32>>(|w, alpha| {
+        Callable::<fn(Expr<Float3>, Expr<Float2>) -> Expr<f32>>::new_static(|w, alpha| {
             tr_lambda_impl_(w, alpha)
         });
     static ref TR_SAMPLE_11: Callable<fn(Expr<f32>, Expr<Float2>) -> Expr<Float2>> =
-        create_static_callable::<fn(Expr<f32>, Expr<Float2>) -> Expr<Float2>>(|cos_theta, u| {
-            if_!(
-                cos_theta.cmplt(0.99999),
-                 {
+        Callable::<fn(Expr<f32>, Expr<Float2>) -> Expr<Float2>>::new_static(track!(
+            |cos_theta, u| {
+                if cos_theta.lt(0.99999) {
                     let sin_theta = (1.0 - cos_theta.sqr()).max(0.0).sqrt();
                     let tan_theta = sin_theta / cos_theta;
                     let a = 1.0 / tan_theta;
                     let g1 = 2.0 / (1.0 + (1.0 + 1.0 / a.sqr()).sqrt());
 
-                    let a = 2.0 * u.x() / g1 - 1.0;
+                    let a = 2.0 * u.x / g1 - 1.0;
                     let tmp = (1.0 / (a.sqr() - 1.0)).min(1e10f32);
                     let b = tan_theta;
                     let d = ((b * tmp).sqr() - (a.sqr() - b.sqr()) * tmp)
@@ -104,41 +106,37 @@ lazy_static! {
                     let slope_x_1 = b * tmp - d;
                     let slope_x_2 = b * tmp + d;
                     let slope_x = select(
-                        a.cmplt(0.0) | (slope_x_2 * tan_theta).cmpgt(1.0),
+                        a.lt(0.0) | (slope_x_2 * tan_theta).gt(1.0),
                         slope_x_1,
                         slope_x_2,
                     );
 
-                    let s = select(u.y().cmpgt(0.5), 1.0f32.expr(), (-1.0f32).expr());
-                    let u2 = select(u.y().cmpgt(0.5), 2.0 * (u.y() - 0.5), 2.0 * (0.5 - u.y()));
+                    let s = select(u.y.gt(0.5), 1.0f32.expr(), (-1.0f32).expr());
+                    let u2 = select(u.y.gt(0.5), 2.0 * (u.y - 0.5), 2.0 * (0.5 - u.y));
                     let z = (u2 * (u2 * (u2 * 0.27385 - 0.73369) + 0.46341))
                         / (u2 * (u2 * (u2 * 0.093073 + 0.309420) - 1.000000) + 0.597999);
                     let slope_y = s * z * (1.0 + slope_x.sqr()).sqrt();
                     Float2::expr(slope_x, slope_y)
-                },
-                else {
-                    let r = (u.x() / (1.0 - u.x())).sqrt();
-                    let phi = 2.0 * PI * u.y();
+                } else {
+                    let r = (u.x / (1.0 - u.x)).sqrt();
+                    let phi = 2.0 * PI * u.y;
                     Float2::expr(r * phi.cos(), r * phi.sin())
                 }
-            )
-        });
+            }
+        ));
     static ref TR_SAMPLE: Callable<fn(Expr<Float3>, Expr<Float2>, Expr<Float2>) -> Expr<Float3>> =
-        create_static_callable::<fn(Expr<Float3>, Expr<Float2>, Expr<Float2>) -> Expr<Float3>>(
-            |wi, alpha, u| {
-                let wi_stretched =
-                    Float3::expr(alpha.x() * wi.x(), wi.y(), alpha.y() * wi.z()).normalize();
+        Callable::<fn(Expr<Float3>, Expr<Float2>, Expr<Float2>) -> Expr<Float3>>::new_static(
+            track!(|wi, alpha, u| {
+                let wi_stretched = Float3::expr(alpha.x * wi.x, wi.y, alpha.y * wi.z).normalize();
                 let slope = TR_SAMPLE_11.call(Frame::cos_theta(wi_stretched), u);
 
                 let slope = Float2::expr(
-                    Frame::cos_phi(wi_stretched) * slope.x()
-                        - Frame::sin_phi(wi_stretched) * slope.y(),
-                    Frame::sin_phi(wi_stretched) * slope.x()
-                        + Frame::cos_phi(wi_stretched) * slope.y(),
+                    Frame::cos_phi(wi_stretched) * slope.x - Frame::sin_phi(wi_stretched) * slope.y,
+                    Frame::sin_phi(wi_stretched) * slope.x + Frame::cos_phi(wi_stretched) * slope.y,
                 );
                 let slope = alpha * slope;
-                Float3::expr(-slope.x(), 1.0, -slope.y()).normalize()
-            }
+                Float3::expr(-slope.x, 1.0, -slope.y).normalize()
+            })
         );
 }
 impl MicrofacetDistribution for TrowbridgeReitzDistribution {
@@ -162,7 +160,7 @@ impl MicrofacetDistribution for TrowbridgeReitzDistribution {
         if self.sample_visible {
             todo!("untested");
             // let s = select(
-            //     Frame::cos_theta(wo).cmpgt(0.0),
+            //     Frame::cos_theta(wo).gt(0.0),
             //     1.0f32.expr(),
             //     (-1.0f32).expr(),
             // );
@@ -175,7 +173,7 @@ impl MicrofacetDistribution for TrowbridgeReitzDistribution {
         } else {
             lazy_static! {
                 static ref SAMPLE: Callable<fn(Expr<Float2>, Expr<Float2>) -> Expr<Float3>> =
-                    create_static_callable::<fn(Expr<Float2>, Expr<Float2>) -> Expr<Float3>>(
+                    Callable::<fn(Expr<Float2>, Expr<Float2>) -> Expr<Float3>>::new_static(
                         |alpha: Expr<Float2>, u: Expr<Float2>| { tr_sample_impl_(alpha, u) }
                     );
             }
@@ -192,39 +190,39 @@ impl MicrofacetDistribution for TrowbridgeReitzDistribution {
         } else {
             lazy_static! {
                 static ref INVERT_SAMPLE: Callable<fn(Expr<Float2>, Expr<Float3>)-> Expr<Float2>> =
-                    create_static_callable::<fn(Expr<Float2>, Expr<Float3>)-> Expr<Float2>>(
-                        |alpha: Expr<Float2>, wh: Expr<Float3>| {
+                    Callable::<fn(Expr<Float2>, Expr<Float3>)-> Expr<Float2>>::new_static(
+                        track!(|alpha: Expr<Float2>, wh: Expr<Float3>| {
                             let (theta, phi) = xyz_to_spherical(wh);
                             let cos_theta = theta.cos();
-                            if_!(alpha.x().cmpeq(alpha.y()), {
+                            if alpha.x.eq(alpha.y) {
                                 // see https://github.com/tunabrain/tungsten/blob/master/src/core/bsdfs/Microfacet.hpp
-                                // let phi = 2.0 * PI * u.y();
-                                // let tan_theta2 = alpha.x().sqr() * u.x() / (1.0 - u.x());
+                                // let phi = 2.0 * PI * u.y;
+                                // let tan_theta2 = alpha.x.sqr() * u.x / (1.0 - u.x);
                                 // let cos_theta = 1.0 / (1.0 + tan_theta2).sqrt();
                                 // (phi, cos_theta)
                                 let uy = (phi * FRAC_1_2PI).fract();
                                 let tan_theta2 = cos_theta.sqr().recip() - 1.0;
-                                let gamma = tan_theta2 / alpha.x().sqr();
+                                let gamma = tan_theta2 / alpha.x.sqr();
                                 let ux = gamma / (1.0 + gamma);
                                 Float2::expr(ux, uy)
-                            }, else, {
-                                // let phi = (alpha.y() / alpha.x() * (2.0 * PI * u.y() + PI * 0.5).tan()).atan();
-                                let uy = (((phi.atan() * alpha.x() / alpha.y()).atan() - PI * 0.5) * FRAC_1_2PI).fract();
-                                // let phi = select(u.y().cmpgt(0.5), phi + PI, phi);
+                            } else {
+                                // let phi = (alpha.y / alpha.x * (2.0 * PI * u.y + PI * 0.5).tan()).atan();
+                                let uy = (((phi.atan() * alpha.x / alpha.y).atan() - PI * 0.5) * FRAC_1_2PI).fract();
+                                // let phi = select(u.y.gt(0.5), phi + PI, phi);
                                 let sin_phi = phi.sin();
                                 let cos_phi = phi.cos();
-                                let ax2 = alpha.x().sqr();
-                                let ay2 = alpha.y().sqr();
+                                let ax2 = alpha.x.sqr();
+                                let ay2 = alpha.y.sqr();
                                 let a2 = 1.0 / (cos_phi.sqr() / ax2 + sin_phi.sqr() / ay2);
-                                // let tan_theta2 = a2 * u.x() / (1.0 - u.x());
+                                // let tan_theta2 = a2 * u.x / (1.0 - u.x);
                                 // let cos_theta = 1.0 / (1.0 + tan_theta2).sqrt();
                                 let tan_theta2 = cos_theta.sqr().recip() - 1.0;
                                 let gamma = tan_theta2 / a2;
                                 let ux = gamma / (1.0 + gamma);
                                 Float2::expr(ux, uy)
-                            })
+                            }
                         }
-                    );
+                    ));
             }
             INVERT_SAMPLE.call(self.alpha, wh)
         }
@@ -255,20 +253,22 @@ mod test {
         let seeds = init_pcg32_buffer(device.clone(), 8192);
         let out = device.create_buffer::<f32>(seeds.len());
         let n_iters = 4098u32;
-        let kernel =
-            device.create_kernel::<fn(Float3, Float2)>(&|wo: Expr<Float3>, alpha: Expr<Float2>| {
-                let i = dispatch_id().x();
+        let kernel = Kernel::<fn(Float3, Float2)>::new(
+            &device,
+            track!(|wo: Expr<Float3>, alpha: Expr<Float2>| {
+                let i = dispatch_id().x;
                 let sampler = IndependentSampler::from_pcg32(seeds.var().read(i).var());
                 let out = out.var();
                 let dist = TrowbridgeReitzDistribution::from_alpha(alpha, false);
                 for_range(0u32.expr()..n_iters.expr(), |_| {
                     let wh = dist.sample_wh(wo, sampler.next_2d(), ADMode::None);
                     let pdf = dist.pdf(wo, wh, ADMode::None);
-                    if_!(pdf.cmpgt(0.0), {
+                    if_!(pdf.gt(0.0), {
                         out.write(i, out.read(i) + 1.0 / pdf);
                     });
                 });
-            });
+            }),
+        );
         let test_alpha = |theta: f32, alpha_x: f32, alpha_y: f32| {
             kernel.dispatch(
                 [seeds.len() as u32, 1, 1],

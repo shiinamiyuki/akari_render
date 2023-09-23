@@ -146,15 +146,15 @@ impl Mcmc {
         let sampler = IndependentReplaySampler::new(independent, sample);
         sampler.start();
         let res = const_(scene.camera.resolution());
-        let p = sampler.next_2d() * res.float();
-        let p = p.int().clamp(0, res.int() - 1);
+        let p = sampler.next_2d() * res.cast_f32();
+        let p = p.cast_i32().clamp(0, res.cast_i32() - 1);
         let swl = def(sample_wavelengths(eval.color_repr(), &sampler));
         let (ray, ray_color, ray_w) =
             scene
                 .camera
-                .generate_ray(filter, p.uint(), &sampler, eval.color_repr(), *swl);
+                .generate_ray(filter, p.cast_u32(), &sampler, eval.color_repr(), *swl);
         let l = self.pt.radiance(scene, eval, ray, swl, &sampler) * ray_color * ray_w;
-        (p.uint(), l, *swl, Self::scalar_contribution(&l))
+        (p.cast_u32(), l, *swl, Self::scalar_contribution(&l))
     }
     fn bootstrap(&self, scene: &Arc<Scene>, filter: PixelFilter, eval: &Evaluators) -> RenderState {
         let seeds = init_pcg32_buffer(self.device.clone(), self.n_bootstrap + self.n_chains);
@@ -164,12 +164,12 @@ impl Mcmc {
             .create_buffer_from_fn(self.n_bootstrap, |_| 0.0f32);
         self.device
             .create_kernel::<fn()>(&|| {
-                let i = dispatch_id().x();
+                let i = dispatch_id().x;
                 let seed = seeds.var().read(i);
                 let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seed));
                 let sample = VLArrayVar::<f32>::zero(self.sample_dimension());
-                for_range(const_(0)..sample.len().int(), |i| {
-                    let i = i.uint();
+                for_range(const_(0)..sample.len().cast_i32(), |i| {
+                    let i = i.cast_u32();
                     sample.write(i, sampler.next_1d());
                 });
                 let sample = PrimarySample { values: sample };
@@ -193,19 +193,19 @@ impl Mcmc {
             .create_buffer(self.sample_dimension() * self.n_chains);
         self.device
             .create_kernel::<fn()>(&|| {
-                let i = dispatch_id().x();
+                let i = dispatch_id().x;
                 let seed_idx = resampled.var().read(i);
                 let seed = seeds.var().read(seed_idx);
                 let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seed));
                 let sample = VLArrayVar::<f32>::zero(self.sample_dimension());
-                for_range(const_(0)..sample.len().int(), |i| {
-                    let i = i.uint();
+                for_range(const_(0)..sample.len().cast_i32(), |i| {
+                    let i = i.cast_u32();
                     sample.write(i, sampler.next_1d());
                 });
 
-                for_range(const_(0)..sample.len().int(), |j| {
+                for_range(const_(0)..sample.len().cast_i32(), |j| {
                     let dim = self.sample_dimension();
-                    let j = j.uint();
+                    let j = j.cast_u32();
                     sample_buffer
                         .var()
                         .write(i * dim as u32 + j, sample.read(j));
@@ -246,7 +246,7 @@ impl Mcmc {
         sample: PrimarySample,
         rng: &IndependentSampler,
     ) {
-        let res = const_(scene.camera.resolution()).float();
+        let res = const_(scene.camera.resolution()).cast_f32();
         // select a mutation strategy
         match self.method {
             Method::Kelemen {
@@ -257,12 +257,12 @@ impl Mcmc {
                 image_mutation_size,
                 image_mutation_prob,
             } => {
-                let is_large_step = rng.next_1d().cmplt(large_step_prob);
+                let is_large_step = rng.next_1d().lt(large_step_prob);
                 let proposal = if_!(is_large_step, {
                     let large = LargeStepMutation{};
                     large.mutate(&sample, &rng)
                 }, else {
-                    let image_mutation = rng.next_1d().cmplt(image_mutation_prob);
+                    let image_mutation = rng.next_1d().lt(image_mutation_prob);
                     if exponential_mutation {
                         let small = IsotropicExponentialMutation::new_default(false, image_mutation, image_mutation_size, res);
                         small.mutate(&sample, &rng)
@@ -283,23 +283,23 @@ impl Mcmc {
                 let cur_p = state.cur_pixel().load();
                 let cur_color = cur_color_v.load();
                 let accept = select(
-                    cur_f.cmpeq(0.0),
+                    cur_f.eq(0.0),
                     1.0f32.expr(),
                     (proposal_f / cur_f).clamp(0.0, 1.0),
                 );
                 film.add_splat(
-                    proposal_p.float(),
+                    proposal_p.cast_f32(),
                     &(proposal_color.clone() / proposal_f),
                     proposal_swl,
                     accept * contribution,
                 );
                 film.add_splat(
-                    cur_p.float(),
+                    cur_p.cast_f32(),
                     &(cur_color / cur_f),
                     *cur_swl,
                     (1.0 - accept) * contribution,
                 );
-                if_!(rng.next_1d().cmplt(accept), {
+                if_!(rng.next_1d().lt(accept), {
                     state.set_cur_f(proposal_f);
                     cur_color_v.store(proposal_color);
                     cur_swl.store(proposal_swl);
@@ -313,13 +313,13 @@ impl Mcmc {
                     state.set_n_mutations(state.n_mutations().load() + 1);
                     if adaptive {
                         let r =
-                            state.n_accepted().load().float() / state.n_mutations().load().float();
+                            state.n_accepted().load().cast_f32() / state.n_mutations().load().cast_f32();
                         const OPTIMAL_ACCEPT_RATE: f32 = 0.234;
-                        if_!(state.n_mutations().load().cmpgt(50), {
+                        if_!(state.n_mutations().load().gt(50), {
                             let new_sigma = state.sigma().load()
-                                + (r - OPTIMAL_ACCEPT_RATE) / state.n_mutations().load().float();
+                                + (r - OPTIMAL_ACCEPT_RATE) / state.n_mutations().load().cast_f32();
                             let new_sigma = new_sigma.clamp(1e-5, 0.1);
-                            if_!(state.chain_id().load().cmpeq(0), {
+                            if_!(state.chain_id().load().eq(0), {
                                 cpu_dbg!(Float3::expr(r, state.sigma().load(), new_sigma));
                             });
                             state.sigma().store(new_sigma);
@@ -339,7 +339,7 @@ impl Mcmc {
         mutations_per_chain: Expr<u32>,
         contribution: Expr<f32>,
     ) {
-        let i = dispatch_id().x();
+        let i = dispatch_id().x;
         let markov_states = render_state.states.var();
         let sampler =
             IndependentSampler::from_pcg32(var!(Pcg32, render_state.rng_states.var().read(i)));
@@ -347,9 +347,9 @@ impl Mcmc {
         let sample = {
             let dim = self.sample_dimension();
             let sample = VLArrayVar::<f32>::zero(dim);
-            lc_assert!(i.cmpeq(state.chain_id().load()));
+            lc_assert!(i.eq(state.chain_id().load()));
             for_range(const_(0)..const_(dim as i32), |j| {
-                let j = j.uint();
+                let j = j.cast_u32();
                 sample.write(j, render_state.samples.var().read(i * dim as u32 + j));
             });
             PrimarySample { values: sample }
@@ -357,7 +357,7 @@ impl Mcmc {
         let (cur_color, cur_swl) = render_state.cur_colors.read(i);
         let cur_color_v = ColorVar::new(cur_color);
         let cur_swl_v = def(cur_swl);
-        for_range(const_(0)..mutations_per_chain.int(), |_| {
+        for_range(const_(0)..mutations_per_chain.cast_i32(), |_| {
             self.mutate_chain(
                 scene,
                 eval,
@@ -373,7 +373,7 @@ impl Mcmc {
         {
             let dim = self.sample_dimension();
             for_range(const_(0)..const_(dim as i32), |j| {
-                let j = j.uint();
+                let j = j.cast_u32();
                 render_state
                     .samples
                     .var()

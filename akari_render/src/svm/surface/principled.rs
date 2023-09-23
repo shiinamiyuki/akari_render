@@ -38,7 +38,7 @@ impl Surface for DisneyDiffuseBsdf {
                 };
                 let retro = {
                     let wh = wo + wi;
-                    let valid = wh.cmpne(0.0).any();
+                    let valid = wh.ne(0.0).any();
                     let wh = wh.normalize();
                     let cos_theta_d = wi.dot(wh);
                     let fo = schlick_weight(Frame::abs_cos_theta(wo));
@@ -73,7 +73,7 @@ impl Surface for DisneyDiffuseBsdf {
             wi,
             pdf,
             color,
-            valid: Bool::from(true),
+            valid: true.expr(),
         }
     }
     fn pdf(
@@ -82,11 +82,11 @@ impl Surface for DisneyDiffuseBsdf {
         wi: Expr<Float3>,
         _swl: Expr<SampledWavelengths>,
         _ctx: &BsdfEvalContext,
-    ) -> Float {
+    ) -> Expr<f32> {
         select(
             Frame::same_hemisphere(wo, wi),
             Frame::abs_cos_theta(wi) * FRAC_1_PI,
-            Float::from(0.0),
+            0.0f32.expr(),
         )
     }
     fn albedo(

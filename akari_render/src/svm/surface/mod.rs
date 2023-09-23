@@ -200,13 +200,13 @@ impl Surface for BsdfMixture {
                 let frac: Expr<f32> = (self.frac)(wo, ctx);
                 let zero = Color::zero(ctx.color_repr);
                 let f_a = if_!(
-                    frac.cmplt(1.0 - Self::EPS),
+                    frac.lt(1.0 - Self::EPS),
                     { self.bsdf_a.evaluate(wo, wi, swl, ctx) },
                     else,
                     { zero }
                 );
                 let f_b = if_!(
-                    frac.cmpgt(Self::EPS),
+                    frac.gt(Self::EPS),
                     { self.bsdf_b.evaluate(wo, wi, swl, ctx) },
                     else,
                     { zero }
@@ -230,12 +230,12 @@ impl Surface for BsdfMixture {
         let zero_f = Color::zero(ctx.color_repr);
         let zero_pdf = 0.0f32.expr();
         if_!(
-            which.cmpeq(0),
+            which.eq(0),
             {
                 let mut sample = self.bsdf_a.sample(wo, remapped, u_sample, swl, ctx);
                 let (f_b, pdf_b) = {
                     if_!(
-                        frac.cmpgt(Self::EPS),
+                        frac.gt(Self::EPS),
                         {
                             let f_b = self.bsdf_b.evaluate(wo, sample.wi, *swl, ctx);
                             let pdf_b = self.bsdf_b.pdf(wo, sample.wi, *swl, ctx);
@@ -263,7 +263,7 @@ impl Surface for BsdfMixture {
                 let mut sample = self.bsdf_b.sample(wo, remapped, u_sample, swl, ctx);
                 let (f_a, pdf_a) = {
                     if_!(
-                        frac.cmplt(1.0 - Self::EPS),
+                        frac.lt(1.0 - Self::EPS),
                         {
                             let f_a = self.bsdf_a.evaluate(wo, sample.wi, *swl, ctx);
                             let pdf_a = self.bsdf_a.pdf(wo, sample.wi, *swl, ctx);
@@ -297,13 +297,13 @@ impl Surface for BsdfMixture {
         let frac: Expr<f32> = (self.frac)(wo, ctx);
         let zero = 0.0f32.expr();
         let pdf_a = if_!(
-            frac.cmplt(1.0 - Self::EPS),
+            frac.lt(1.0 - Self::EPS),
             { self.bsdf_a.pdf(wo, wi, swl, ctx) },
             else,
             { zero }
         );
         let pdf_b = if_!(
-            frac.cmpgt(Self::EPS),
+            frac.gt(Self::EPS),
             { self.bsdf_b.pdf(wo, wi, swl, ctx) },
             else,
             { zero }
@@ -446,10 +446,10 @@ impl Surface for MicrofacetReflection {
         let wh = wo + wi;
         let cos_o = Frame::cos_theta(wo);
         let cos_i = Frame::cos_theta(wi);
-        if_!((wh.dot(wo) * wi.dot(wh)).cmplt(0.0)
-            | wh.cmpeq(0.0).all()
-            | cos_i.cmpeq(0.0)
-            | cos_o.cmpeq(0.0)
+        if_!((wh.dot(wo) * wi.dot(wh)).lt(0.0)
+            | wh.eq(0.0).all()
+            | cos_i.eq(0.0)
+            | cos_o.eq(0.0)
             | !Frame::same_hemisphere(wo, wi), {
                 Color::zero(ctx.color_repr)
         }, else {
@@ -490,10 +490,10 @@ impl Surface for MicrofacetReflection {
         let wh = wo + wi;
         let cos_o = Frame::cos_theta(wo);
         let cos_i = Frame::cos_theta(wi);
-        if_!((wh.dot(wo) * wi.dot(wh)).cmplt(0.0)
-            | wh.cmpeq(0.0).all()
-            | cos_i.cmpeq(0.0)
-            | cos_o.cmpeq(0.0)
+        if_!((wh.dot(wo) * wi.dot(wh)).lt(0.0)
+            | wh.eq(0.0).all()
+            | cos_i.eq(0.0)
+            | cos_o.eq(0.0)
             | !Frame::same_hemisphere(wo, wi), {
                 0.0f32.expr()
         }, else {
@@ -544,14 +544,14 @@ impl Surface for MicrofacetTransmission {
     ) -> Color {
         let cos_o = Frame::cos_theta(wo);
         let cos_i = Frame::cos_theta(wi);
-        let eta = select(cos_o.cmpgt(0.0), self.eta, 1.0 / self.eta);
+        let eta = select(cos_o.gt(0.0), self.eta, 1.0 / self.eta);
         let wh = (wo + wi * eta).normalize();
         let wh = face_forward(wh, Float3::expr(0.0, 1.0, 0.0));
-        let backfacing = (wh.dot(wi) * cos_i).cmplt(0.0) | (wh.dot(wo) * cos_o).cmplt(0.0);
+        let backfacing = (wh.dot(wi) * cos_i).lt(0.0) | (wh.dot(wo) * cos_o).lt(0.0);
         if_!(
-            (wh.dot(wo) * wi.dot(wh)).cmpgt(0.0)
-                | cos_i.cmpeq(0.0)
-                | cos_o.cmpeq(0.0)
+            (wh.dot(wo) * wi.dot(wh)).gt(0.0)
+                | cos_i.eq(0.0)
+                | cos_o.eq(0.0)
                 | backfacing
                 | Frame::same_hemisphere(wo, wi),
             { Color::zero(ctx.color_repr) },
@@ -560,7 +560,7 @@ impl Surface for MicrofacetTransmission {
                 let f = self.fresnel.evaluate(wo.dot(wh), ctx);
                 let denom = (wi.dot(wh) + wo.dot(wh) / eta).sqr() * cos_i * cos_o;
                 select(
-                    denom.cmpeq(0.0),
+                    denom.eq(0.0),
                     Color::zero(ctx.color_repr),
                     (Color::one(ctx.color_repr) - f)
                         * &self.color
@@ -598,8 +598,8 @@ impl Surface for MicrofacetTransmission {
         let (refracted, _eta, wi) = refract(wo, wh, self.eta);
         let valid = refracted & !Frame::same_hemisphere(wo, wi);
         let pdf = self.pdf(wo, wi, *swl, ctx);
-        let valid = valid & pdf.cmpgt(0.0);
-        // lc_assert!(pdf.cmpgt(0.0) | !valid);
+        let valid = valid & pdf.gt(0.0);
+        // lc_assert!(pdf.gt(0.0) | !valid);
         BsdfSample {
             pdf,
             color: self.evaluate(wo, wi, *swl, ctx),
@@ -617,14 +617,14 @@ impl Surface for MicrofacetTransmission {
     ) -> Float {
         let cos_o = Frame::cos_theta(wo);
         let cos_i = Frame::cos_theta(wi);
-        let eta = select(cos_o.cmpgt(0.0), self.eta, 1.0 / self.eta);
+        let eta = select(cos_o.gt(0.0), self.eta, 1.0 / self.eta);
         let wh = (wo + wi * eta).normalize();
         let wh = face_forward(wh, Float3::expr(0.0, 1.0, 0.0));
-        let backfacing = (wh.dot(wi) * cos_i).cmplt(0.0) | (wh.dot(wo) * cos_o).cmplt(0.0);
+        let backfacing = (wh.dot(wi) * cos_i).lt(0.0) | (wh.dot(wo) * cos_o).lt(0.0);
         if_!(
-            (wh.dot(wo) * wi.dot(wh)).cmpgt(0.0)
-                | cos_i.cmpeq(0.0)
-                | cos_o.cmpeq(0.0)
+            (wh.dot(wo) * wi.dot(wh)).gt(0.0)
+                | cos_i.eq(0.0)
+                | cos_o.eq(0.0)
                 | backfacing
                 | Frame::same_hemisphere(wo, wi),
             { 0.0f32.expr() },
@@ -636,7 +636,7 @@ impl Surface for MicrofacetTransmission {
                 let denom = (wi.dot(wh) + wo.dot(wh) / eta).sqr();
                 let dwh_dwi = wi.dot(wh).abs() / denom;
                 select(
-                    denom.cmpeq(0.0),
+                    denom.eq(0.0),
                     0.0f32.expr(),
                     self.dist.pdf(wo, wh, ctx.ad_mode) * dwh_dwi,
                 )
@@ -671,13 +671,13 @@ impl Surface for MicrofacetTransmission {
 
 pub fn fr_dielectric(cos_theta_i: Expr<f32>, eta: Expr<f32>) -> Expr<f32> {
     let cos_theta_i = cos_theta_i.clamp(-1.0, 1.0);
-    let eta = select(cos_theta_i.cmpgt(0.0), eta, 1.0 / eta);
+    let eta = select(cos_theta_i.gt(0.0), eta, 1.0 / eta);
     let cos_theta_i = cos_theta_i.abs();
     //
     // Compute $\cos\,\theta_\roman{t}$ for Fresnel equations using Snell's law
     let sin2_theta_i = 1.0 - cos_theta_i.sqr();
     let sin2_theta_t = sin2_theta_i / eta.sqr();
-    if_!(sin2_theta_t.cmpge(1.0), {
+    if_!(sin2_theta_t.ge(1.0), {
         1.0f32.expr()
     }, else {
         let cos_theta_t = (1.0 - sin2_theta_t).max(0.0).sqrt();
@@ -852,7 +852,7 @@ impl SurfaceEvaluator {
             surface,
             si,
             wo,
-            Float3Expr::zero(),
+            Expr::<Float3>::zero(),
             swl,
             SURFACE_EVAL_ALBEDO.expr(),
         );

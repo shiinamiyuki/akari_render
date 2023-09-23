@@ -47,7 +47,7 @@ impl DirectLighting {
     pub fn invalid(color_pipeline: ColorPipeline) -> Self {
         Self {
             irradiance: Color::zero(color_pipeline.color_repr),
-            wi: Float3Expr::zero(),
+            wi: Expr::<Float3>::zero(),
             pdf: 0.0f32.expr(),
             weight: 0.0f32.expr(),
             shadow_ray: Expr::<Ray>::zeroed(),
@@ -113,7 +113,7 @@ impl<'a> PathTracerBase<'a> {
         if_!(
             si.valid(),
             {
-                self.set_si(si, -ray.d());
+                self.set_si(si, -ray.d);
                 true.expr()
             },
             else,
@@ -131,7 +131,7 @@ impl<'a> PathTracerBase<'a> {
     pub fn sample_light(&self, u: Expr<Float3>) -> DirectLighting {
         if self.use_nee {
             if_!(
-                !self.indirect_only | self.depth.load().cmpgt(1),
+                !self.indirect_only | self.depth.load().gt(1),
                 {
                     let p = *self.p;
                     let ng = *self.ng;
@@ -144,8 +144,8 @@ impl<'a> PathTracerBase<'a> {
                     let (bsdf_f, bsdf_pdf) = eval
                         .surface
                         .evaluate_color_and_pdf(surface, *self.si, wo, wi, *self.swl);
-                    lc_assert!(bsdf_pdf.cmpge(0.0));
-                    lc_assert!(bsdf_f.min().cmpge(0.0));
+                    lc_assert!(bsdf_pdf.ge(0.0));
+                    lc_assert!(bsdf_f.min().ge(0.0));
                     let w = mis_weight(sample.pdf, bsdf_pdf, 1);
                     let shadow_ray = sample
                         .shadow_ray
@@ -171,7 +171,7 @@ impl<'a> PathTracerBase<'a> {
         let depth = &self.depth;
         let beta = &self.beta;
         if_!(
-            depth.load().cmpgt(self.rr_depth),
+            depth.load().gt(self.rr_depth),
             {
                 let cont_prob = beta.load().max().clamp(0.0, 1.0) * 0.95;
                 (true.into(), cont_prob)
@@ -188,16 +188,16 @@ impl<'a> PathTracerBase<'a> {
         let depth = &self.depth;
 
         if_!(
-            instance.light().valid() & (!self.indirect_only | depth.cmpgt(1)),
+            instance.light().valid() & (!self.indirect_only | depth.gt(1)),
             {
                 let si = *self.si;
                 let direct = eval.light.le(ray, si, *self.swl);
                 // cpu_dbg!(direct.flatten());
-                if_!(depth.cmpeq(0) | !self.use_nee, {
+                if_!(depth.eq(0) | !self.use_nee, {
                    (direct, 1.0f32.expr())
                 }, else {
                     let pn = {
-                        let p = ray.o();
+                        let p = ray.o;
                         let n = *self.prev_ng;
                         PointNormalExpr::new(p, n)
                     };
@@ -245,7 +245,7 @@ impl<'a> PathTracerBase<'a> {
                 }
                 let bsdf_sample = self.sample_surface(sampler.next_3d());
                 let f = &bsdf_sample.color;
-                lc_assert!(f.min().cmpge(0.0));
+                lc_assert!(f.min().ge(0.0));
                 if bsdf_sample.pdf <= 0.0 || !bsdf_sample.valid {
                     break;
                 }
@@ -253,7 +253,7 @@ impl<'a> PathTracerBase<'a> {
                 self.mul_beta(f / bsdf_sample.pdf);
                 let (rr_effective, cont_prob) = self.continue_prob();
                 if rr_effective {
-                    let rr = sampler.next_1d().cmpge(cont_prob);
+                    let rr = sampler.next_1d().ge(cont_prob);
                     if rr {
                         break;
                     }
@@ -351,11 +351,11 @@ impl VertexType {
 #[repr(C)]
 pub struct ReconnectionVertex {
     pub bary: Float2,
-    pub direct: PackedFloat3,
-    pub direct_wi: PackedFloat3,
-    pub indirect: PackedFloat3,
-    pub wo: PackedFloat3,
-    pub wi: PackedFloat3,
+    pub direct: [f32; 3],
+    pub direct_wi: [f32; 3],
+    pub indirect: [f32; 3],
+    pub wo: [f32; 3],
+    pub wi: [f32; 3],
     pub direct_light_pdf: f32,
     pub inst_id: u32,
     pub prim_id: u32,
@@ -367,7 +367,7 @@ pub struct ReconnectionVertex {
 }
 impl ReconnectionVertexVar {
     pub fn valid(&self) -> Expr<bool> {
-        self.type_().load().cmpne(VertexType::INVALID)
+        self.type_().load().ne(VertexType::INVALID)
     }
 }
 #[derive(Clone, Copy)]
@@ -434,9 +434,9 @@ impl Integrator for PathTracer {
                 let sampler = sampler.as_ref();
                 for_range(0u32.expr()..spp_per_pass, |_| {
                     sampler.start();
-                    let ip = p.int();
+                    let ip = p.cast_i32();
                     let shifted = ip + pixel_offset;
-                    let shifted = shifted.clamp(0, resolution.expr().int() - 1).uint();
+                    let shifted = shifted.clamp(0, resolution.expr().cast_i32() - 1).cast_u32();
                     let swl = sample_wavelengths(color_pipeline.color_repr, sampler);
                     let (ray, ray_color, ray_w) = scene.camera.generate_ray(
                         film.filter(),
@@ -447,7 +447,7 @@ impl Integrator for PathTracer {
                     );
                     let swl = swl.var();
                     let l = self.radiance(&scene, &evaluators, ray, swl, sampler) * ray_color;
-                    film.add_sample(p.float(), &l, *swl, ray_w);
+                    film.add_sample(p.cast_f32(), &l, *swl, ray_w);
                 });
             },
         );

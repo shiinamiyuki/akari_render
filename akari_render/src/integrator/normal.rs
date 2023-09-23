@@ -49,11 +49,11 @@ impl Integrator for NormalVis {
                 let ns = si.geometry().ng();
                 // cpu_dbg!(Uint2::expr(si.inst_id(), si.prim_id()));
                 Color::Rgb(ns * 0.5 + 0.5, color_repr.rgb_colorspace().unwrap()) * ray_color
-                // Color::Rgb(Float3::expr(si.bary().x(),si.bary().y(), 1.0))
+                // Color::Rgb(Float3::expr(si.bary().x,si.bary().y, 1.0))
             }, else {
                 Color::zero(color_repr)
             });
-            film.add_sample(p.float(), &color, ray_w);
+            film.add_sample(p.cast_f32(), &color, ray_w);
         });
         let stream = self.device.default_stream();
         stream.with_scope(|s| {

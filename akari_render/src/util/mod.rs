@@ -118,13 +118,13 @@ pub fn write_image_hdr(color: &Tex2d<Float4>, path: &str) {
 pub fn erf_inv(x: Expr<f32>) -> Expr<f32> {
     lazy_static! {
         static ref ERF_INV: Callable<fn(Expr<f32>) -> Expr<f32>> =
-            create_static_callable::<fn(Expr<f32>) -> Expr<f32>>(|x| {
+            Callable::<fn(Expr<f32>) -> Expr<f32>>(|x| {
                 let clamped_x: Expr<f32> = x.clamp(-0.99999, 0.99999);
                 let w: Expr<f32> = -((1.0 - clamped_x) * (1.0 + clamped_x)).ln();
-                let p = if_!(w.cmplt(0.5), {
+                let p = if_!(w.lt(0.5), {
                     let mut w = w;
                     w -= 2.5 as f32;
-                    let mut p = Float::from(2.810_226_36e-08);
+                    let mut p = (2.810_226_36e-08).expr();
                     p = 3.432_739_39e-07 + p * w;
                     p = -3.523_387_7e-06 + p * w;
                     p = -4.391_506_54e-06 + p * w;
@@ -137,7 +137,7 @@ pub fn erf_inv(x: Expr<f32>) -> Expr<f32> {
                 }, else {
                     let mut w = w;
                     w = w.sqrt() - 3.0 as f32;
-                    let mut p = Float::from(-0.000_200_214_257);
+                    let mut p = (-0.000_200_214_257).expr();
                     p = 0.000_100_950_558 + p * w;
                     p = 0.001_349_343_22 + p * w;
                     p = -0.003_673_428_44 + p * w;
@@ -157,7 +157,7 @@ pub fn erf_inv(x: Expr<f32>) -> Expr<f32> {
 pub fn erf(x: Expr<f32>) -> Expr<f32> {
     lazy_static! {
         static ref ERF: Callable<fn(Expr<f32>)-> Expr<f32>> =
-            create_static_callable::<fn(Expr<f32>)-> Expr<f32>>(|x| {
+            Callable::<fn(Expr<f32>)-> Expr<f32>>(|x| {
             // constants
             let a1: f32 = 0.254_829_592;
             let a2: f32 = -0.284_496_736;
@@ -166,7 +166,7 @@ pub fn erf(x: Expr<f32>) -> Expr<f32> {
             let a5: f32 = 1.061_405_429;
             let p: f32 = 0.327_591_1;
             // save the sign of x
-            let sign = select(x.cmplt(0.0), -1.0f32.expr(), 1.0f32.expr());
+            let sign = select(x.lt(0.0), -1.0f32.expr(), 1.0f32.expr());
             let x: Expr<f32> = x.abs();
             // A&S formula 7.1.26
             let t: Expr<f32> = 1.0 as f32 / (1.0 as f32 + p * x);
@@ -274,7 +274,7 @@ pub fn chi2cdf(x: f64, dof: i32) -> f64 {
 pub fn mix_bits(v: Expr<u64>) -> Expr<u64> {
     lazy_static! {
         static ref MIX_BITS: Callable<fn(Expr<u64>) -> Expr<u64>> =
-            create_static_callable::<fn(Expr<u64>) -> Expr<u64>>(|mut v: Expr<u64>| {
+            Callable::<fn(Expr<u64>) -> Expr<u64>>(|mut v: Expr<u64>| {
                 v ^= v >> 31;
                 v *= 0x7fb5d329728ea185;
                 v ^= v >> 27;
@@ -287,7 +287,7 @@ pub fn mix_bits(v: Expr<u64>) -> Expr<u64> {
 }
 
 pub fn safe_div(a: Expr<f32>, b: Expr<f32>) -> Expr<f32> {
-    select(b.cmpeq(0.0), 0.0f32.expr(), a / b)
+    select(b.eq(0.0), 0.0f32.expr(), a / b)
 }
 
 #[derive(Clone, Copy, Debug, Value)]

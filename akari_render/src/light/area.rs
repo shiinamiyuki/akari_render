@@ -30,7 +30,7 @@ impl AreaLightExpr {
                     self.surface(),
                     si,
                     wo,
-                    Float3Expr::zero(),
+                    Expr::<Float3>::zero(),
                     swl,
                     SURFACE_EVAL_EMISSION.into(),
                 )
@@ -50,10 +50,10 @@ impl Light for AreaLightExpr {
         swl: Expr<SampledWavelengths>,
         ctx: &LightEvalContext<'_>,
     ) -> Color {
-        let emission = self.emission(-ray.d(), si, swl, ctx);
+        let emission = self.emission(-ray.d, si, swl, ctx);
         let ns = si.geometry().ns();
         select(
-            ns.dot(ray.d()).cmplt(0.0),
+            ns.dot(ray.d).lt(0.0),
             emission,
             Color::zero(ctx.color_repr()),
         )
@@ -96,14 +96,14 @@ impl Light for AreaLightExpr {
             bary,
             geometry,
             FrameExpr::new(n, tt, ss),
-            Bool::from(true),
+            true.expr(),
         );
         let wi = p - pn.p();
         let emission = self.emission(-wi, si, swl, ctx);
         let dist2 = wi.length_squared();
         let wi = wi / dist2.sqrt();
         let li = select(
-            wi.dot(n).cmplt(0.0),
+            wi.dot(n).lt(0.0),
             emission,
             Color::zero(ctx.color_repr()),
         );
@@ -139,7 +139,7 @@ impl Light for AreaLightExpr {
         let at_entries = area_samplers.buffer::<AliasTableEntry>(self.area_sampling_index());
         let at_pdf = area_samplers.buffer::<f32>(self.area_sampling_index() + 1);
         let at = BindlessAliasTableVar(at_entries, at_pdf);
-        lc_assert!(si.inst_id().cmpeq(self.instance_id()));
+        lc_assert!(si.inst_id().eq(self.instance_id()));
         let shading_triangle = meshes.shading_triangle(si.inst_id(), si.prim_id());
         let area = shading_triangle.area();
         let prim_pdf = at.pdf(prim_id);

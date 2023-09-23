@@ -33,7 +33,7 @@ impl Mutation for AnisotropicDiagonalGaussianMutation {
     }
     fn mutate(&self, s: &PrimarySample, sampler: &IndependentSampler) -> Proposal {
         let values = VLArrayVar::<f32>::zero(s.values.static_len());
-        for_range(0u32.expr()..values.len().int(), |i| {
+        for_range(0u32.expr()..values.len().cast_i32(), |i| {
             let cur = s.values.read(i);
             let x = sample_gaussian(sampler.next_1d());
             let new = cur + self.drift.read(i) + x * self.sigma.read(i);
@@ -104,11 +104,11 @@ pub struct KelemenMutationRecord {
 }
 lazy_static! {
     pub static ref KELEMEN_MUTATE: Callable<fn(Var<KelemenMutationRecord>) -> ()> =
-        create_static_callable::<fn(Var<KelemenMutationRecord>) -> ()>(
+        Callable::<fn(Var<KelemenMutationRecord>) -> ()>(
             |record: Var<KelemenMutationRecord>| {
                 let cur = record.cur().load();
                 let u = record.u().load();
-                let (u, add) = if_!(u.cmplt(0.5), {
+                let (u, add) = if_!(u.lt(0.5), {
                     (u * 2.0, true.expr())
                 }, else {
                     ((u - 0.5) * 2.0, false.expr())
@@ -116,10 +116,10 @@ lazy_static! {
                 let dv = record.mutation_size_high().load() * (record.log_ratio().load() * u).exp();
                 let new = if_!(add, {
                     let new = cur + dv;
-                    select(new.cmpgt(1.0), new - 1.0, new)
+                    select(new.gt(1.0), new - 1.0, new)
                 }, else {
                     let new = cur - dv;
-                    select(new.cmplt(0.0), new + 1.0, new)
+                    select(new.lt(0.0), new + 1.0, new)
                 });
                 record.set_mutated(new);
             }
@@ -139,10 +139,10 @@ impl Mutation for IsotropicExponentialMutation {
         } else {
             0
         };
-        for_range(const_(begin)..values.len().int(), |i| {
-            let i = i.uint();
+        for_range(const_(begin)..values.len().cast_i32(), |i| {
+            let i = i.cast_u32();
             let cur = s.values.read(i);
-            let new = if_!(!self.image_mutation | i.cmplt(2), {
+            let new = if_!(!self.image_mutation | i.lt(2), {
                 let u = sampler.next_1d();
                 let record = var!(
                     KelemenMutationRecord,
@@ -190,14 +190,14 @@ pub fn mutate_image_space_single(
     dim: Expr<u32>,
 ) -> Expr<f32> {
     let u = sampler.next_1d();
-    let (u, add) = if_!(u.cmplt(0.5), {
+    let (u, add) = if_!(u.lt(0.5), {
         (u * 2.0, true.expr())
     }, else {
         ((u - 0.5) * 2.0, false.expr())
     });
     let offset = u * mutation_size;
     let offset = select(add, offset, -offset);
-    let new = cur + offset / select(dim.cmpeq(0), res.x(), res.y());
+    let new = cur + offset / select(dim.eq(0), res.x, res.y);
     new - new.floor()
 }
 // mutates the image space coordinate within range [0, mutation_size]
@@ -220,8 +220,8 @@ impl Mutation for IsotropicGaussianMutation {
     fn log_pdf(&self, cur: &PrimarySample, proposal: &PrimarySample) -> Expr<f32> {
         // assert_eq!(cur.values.static_len(), proposal.values.static_len());
         // let log_prob = var!(f32, 0.0);
-        // for_range(const_(0)..cur.values.len().int(), |i| {
-        //     let i = i.uint();
+        // for_range(const_(0)..cur.values.len().cast_i32(), |i| {
+        //     let i = i.cast_u32();
         //     let cur = cur.values.read(i);
         //     let proposal = proposal.values.read(i);
         //     let x = proposal - cur;
@@ -240,10 +240,10 @@ impl Mutation for IsotropicGaussianMutation {
             0
         };
 
-        for_range(const_(begin)..s.values.len().int(), |i| {
-            let i = i.uint();
+        for_range(const_(begin)..s.values.len().cast_i32(), |i| {
+            let i = i.cast_u32();
             let cur = s.values.read(i);
-            let new = if_!(!self.image_mutation | i.cmplt(2), {
+            let new = if_!(!self.image_mutation | i.lt(2), {
                 let x = sample_gaussian(sampler.next_1d());
                 cur + x * self.sigma
             }, else {
@@ -271,8 +271,8 @@ impl Mutation for LargeStepMutation {
     }
     fn mutate(&self, s: &PrimarySample, sampler: &IndependentSampler) -> Proposal {
         let values = VLArrayVar::<f32>::zero(s.values.static_len());
-        for_range(const_(0)..values.len().int(), |i| {
-            let i = i.uint();
+        for_range(const_(0)..values.len().cast_i32(), |i| {
+            let i = i.cast_u32();
             values.write(i, sampler.next_1d());
         });
         Proposal {

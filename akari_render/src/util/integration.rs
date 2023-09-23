@@ -52,7 +52,7 @@ pub fn adaptive_simpson<U: Value>(
         max_depth as u32,
     ));
     let result = 0.0f32.var();
-    while_!(sp.cmpne(0), {
+    while_!(sp.ne(0), {
         let item = pop();
         let a = item.a();
         let b = item.b();
@@ -73,7 +73,7 @@ pub fn adaptive_simpson<U: Value>(
         let ip = i0 + i1;
         let depth = item.depth();
         if_!(
-            depth.cmple(0) | (ip - i).abs().cmplt(15.0 * eps),
+            depth.le(0) | (ip - i).abs().lt(15.0 * eps),
             {
                 *result.get_mut() += ip + (1.0 / 15.0) * (ip - i);
             },
@@ -117,9 +117,9 @@ pub fn adaptive_simpson_2d<U: Value>(
     max_depth: usize,
 ) -> Expr<f32> {
     let integrate_y = |user_data: Expr<U>, x: Expr<Float3>| {
-        let y0 = x.y();
-        let y1 = x.z();
-        let x = x.x();
+        let y0 = x.y;
+        let y1 = x.z;
+        let x = x.x;
         adaptive_simpson::<U>(
             device,
             user_data,
@@ -133,9 +133,9 @@ pub fn adaptive_simpson_2d<U: Value>(
     adaptive_simpson::<U>(
         device,
         user_data,
-        |user_data, x| integrate_y(user_data, Float3::expr(x, x0.y(), x1.y())),
-        x0.x(),
-        x1.x(),
+        |user_data, x| integrate_y(user_data, Float3::expr(x, x0.y, x1.y)),
+        x0.x,
+        x1.x,
         eps,
         max_depth,
     )
@@ -165,9 +165,9 @@ pub fn adaptive_simpson_2d<U: Value>(
 //         let device_ = device.clone();
 //         device.create_dyn_callable::<(Expr<U>, Expr<Float3>), Expr<f32>>(Box::new(
 //             move |user_data: Expr<U>, x: Expr<Float3>| {
-//                 let y0 = x.y();
-//                 let y1 = x.z();
-//                 let x = x.x();
+//                 let y0 = x.y;
+//                 let y1 = x.z;
+//                 let x = x.x;
 //                 adaptive_simpson::<U>(
 //                     &device_,
 //                     user_data,
@@ -183,9 +183,9 @@ pub fn adaptive_simpson_2d<U: Value>(
 //     adaptive_simpson::<U>(
 //         device,
 //         user_data,
-//         |user_data, x| integrate_y.call(user_data, Float3::expr(x, x0.y(), x1.y())),
-//         x0.x(),
-//         x1.x(),
+//         |user_data, x| integrate_y.call(user_data, Float3::expr(x, x0.y, x1.y)),
+//         x0.x,
+//         x1.x,
 //         eps,
 //         max_depth,
 //     )
@@ -209,10 +209,10 @@ mod test {
         let eps = 1e-6f32;
         let max_depth = 13;
         let kernel = device.create_kernel::<fn()>(&|| {
-            let i = dispatch_id().x();
+            let i = dispatch_id().x;
             let endpoints = inputs.read(i);
-            let x0 = endpoints.x();
-            let x1 = endpoints.y();
+            let x0 = endpoints.x;
+            let x1 = endpoints.y;
             let int_simpson =
                 adaptive_simpson::<bool>(&device, true.into(), |_, x| f(x), x0, x1, eps, max_depth);
             let int_analytic = analytic(x1) - analytic(x0);
