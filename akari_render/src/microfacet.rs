@@ -46,8 +46,10 @@ fn tr_d_impl_(wh: Expr<Float3>, alpha: Expr<Float2>) -> Expr<f32> {
     let cos4_theta = Frame::cos2_theta(wh).sqr();
     let ax = alpha.x;
     let ay = alpha.y;
+    // cpu_dbg!(cos4_theta);
     let e = tan2_theta * ((Frame::cos_phi(wh) / ax).sqr() + (Frame::sin_phi(wh) / ay).sqr());
     let d = 1.0 / (PI * ax * ay * cos4_theta * (1.0 + e).sqr());
+    // cpu_dbg!(d);
     select(tan2_theta.is_infinite(), 0.0f32.expr(), d)
 }
 #[tracked]
@@ -187,7 +189,7 @@ impl MicrofacetDistribution for TrowbridgeReitzDistribution {
             }
         }
     }
-    fn invert_wh(&self, _wo: Expr<Float3>, wh: Expr<Float3>, ad_mode: ADMode) -> Expr<Float2> {
+    fn invert_wh(&self, _wo: Expr<Float3>, wh: Expr<Float3>, _ad_mode: ADMode) -> Expr<Float2> {
         if self.sample_visible {
             unimplemented!("invert_wh is not available for visible wh sampling");
         } else {
@@ -240,7 +242,8 @@ impl MicrofacetDistribution for TrowbridgeReitzDistribution {
             track!(self.d(wh, ad_mode) * Frame::abs_cos_theta(wh))
         }
     }
-    fn roughness(&self, ad_mode: ADMode) -> Expr<f32> {
+    #[tracked]
+    fn roughness(&self, _ad_mode: ADMode) -> Expr<f32> {
         self.roughness
     }
 }

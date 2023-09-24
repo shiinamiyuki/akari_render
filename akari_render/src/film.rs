@@ -84,6 +84,7 @@ impl Film {
     pub fn filter(&self) -> PixelFilter {
         self.filter
     }
+    #[tracked]
     pub fn new(
         device: Device,
         resolution: Uint2,
@@ -100,27 +101,25 @@ impl Film {
             &device,
             &|image: Tex2dVar<Float4>, splat_scale: Expr<f32>, hdr: Expr<bool>| {
                 let p = dispatch_id().xy();
-                let i = track!(p.x + p.y * resolution.x);
+                let i = p.x + p.y * resolution.x;
                 let pixels = pixels.var();
                 let splat = splat.var();
                 let weights = weights.var();
                 let nvalues = repr.nvalues();
                 match repr {
                     FilmColorRepr::SRgb => {
-                        track!({
-                            let s_r = splat.read(i * nvalues as u32 + 0) * splat_scale;
-                            let s_g = splat.read(i * nvalues as u32 + 1) * splat_scale;
-                            let s_b = splat.read(i * nvalues as u32 + 2) * splat_scale;
+                        let s_r = splat.read(i * nvalues as u32 + 0) * splat_scale;
+                        let s_g = splat.read(i * nvalues as u32 + 1) * splat_scale;
+                        let s_b = splat.read(i * nvalues as u32 + 2) * splat_scale;
 
-                            let r = pixels.read(i * nvalues as u32 + 0);
-                            let g = pixels.read(i * nvalues as u32 + 1);
-                            let b = pixels.read(i * nvalues as u32 + 2);
-                            let w = weights.read(i);
-                            let rgb = Float3::expr(r, g, b) / select(w.eq(0.0), 1.0f32.expr(), w);
-                            let rgb = rgb + Float3::expr(s_r, s_g, s_b);
-                            let rgb = if_!(hdr, { rgb }, else, { linear_to_srgb(rgb) });
-                            image.write(p, Float4::expr(rgb.x, rgb.y, rgb.z, 1.0f32));
-                        });
+                        let r = pixels.read(i * nvalues as u32 + 0);
+                        let g = pixels.read(i * nvalues as u32 + 1);
+                        let b = pixels.read(i * nvalues as u32 + 2);
+                        let w = weights.read(i);
+                        let rgb = Float3::expr(r, g, b) / select(w.eq(0.0), 1.0f32.expr(), w);
+                        let rgb = rgb + Float3::expr(s_r, s_g, s_b);
+                        let rgb = if_!(hdr, { rgb }, else, { linear_to_srgb(rgb) });
+                        image.write(p, Float4::expr(rgb.x, rgb.y, rgb.z, 1.0f32));
                     }
                     _ => todo!(),
                 }
@@ -177,6 +176,7 @@ impl Film {
             _ => todo!(),
         }
     }
+    #[tracked]
     pub fn add_sample(
         &self,
         p: Expr<Float2>,
@@ -192,18 +192,17 @@ impl Film {
         match self.repr {
             FilmColorRepr::SRgb => {
                 let rgb: Expr<Float3> = color.to_rgb(RgbColorSpace::SRgb);
-                for c in 0..nvalues {
-                    track!({
-                        let v = rgb[c as i32];
-                        let v = select(v.is_nan(), 0.0f32.expr(), v);
-                        pixels.atomic_fetch_add(i * nvalues as u32 + c as u32, v);
-                    });
-                }
+                (0..nvalues).for_each(|c| {
+                    let v = rgb[c as i32];
+                    let v = select(v.is_nan(), 0.0f32.expr(), v);
+                    pixels.atomic_fetch_add(i * nvalues as u32 + c as u32, v);
+                });
                 weights.atomic_fetch_add(i, weight);
             }
             _ => todo!(),
         }
     }
+    #[tracked]
     pub fn clear(&self) {
         self.pixels.view(..).fill(0.0);
         self.weights.view(..).fill(0.0);
@@ -211,12 +210,13 @@ impl Film {
     /// merge the content of `other` into `self`
     /// `self` and `other` must have the same resolution
     /// The splat buffer of `other` will be converted using `self.splat_scale`
+    #[tracked]
     pub fn merge(&self, other: &Self) {
         assert_eq!(self.repr, other.repr);
         assert_eq!(self.resolution, other.resolution);
         Kernel::<fn(f32, f32)>::new(
             &self.device,
-            &track!(|self_splat_scale: Expr<f32>, other_splat_scale: Expr<f32>| {
+            &|self_splat_scale: Expr<f32>, other_splat_scale: Expr<f32>| {
                 let p = dispatch_id().xy();
                 let i = p.x + p.y * self.resolution.x;
                 let pixels = self.pixels.var();
@@ -234,14 +234,14 @@ impl Film {
                                 self_splat_scale,
                             ) * other_splat_scale;
                             splat.atomic_fetch_add(i * nvalues as u32 + c as u32, s);
-    
+
                             // merge pixels
                             let p = other.pixels.var().read(i * nvalues as u32 + c as u32);
                             pixels.atomic_fetch_add(i * nvalues as u32 + c as u32, p * w);
                         });
                     }
-                });             
-            }),
+                });
+            },
         )
         .dispatch(
             [self.resolution.x, self.resolution.y, 1],

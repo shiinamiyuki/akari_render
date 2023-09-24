@@ -350,7 +350,7 @@ plt.show()"#
                         &BsdfEvalContext {
                             color_repr: color::ColorRepr::Rgb(color::RgbColorSpace::SRgb),
                             _marker: PhantomData {},
-                            ad_mode: ADMode::None,
+                            ad_mode: ADMode::Backward,
                         },
                     )
                 },

@@ -430,7 +430,7 @@ impl Surface for MicrofacetReflection {
         &self,
         wo: Expr<Float3>,
         wi: Expr<Float3>,
-        swl: Expr<SampledWavelengths>,
+        _swl: Expr<SampledWavelengths>,
         ctx: &BsdfEvalContext,
     ) -> Color {
         let wh = wo + wi;
@@ -492,7 +492,8 @@ impl Surface for MicrofacetReflection {
             0.0f32.expr()
         } else {
             let wh = wh.normalize();
-            self.dist.pdf(wo, wh, ctx.ad_mode) / (4.0 * wo.dot(wh))
+            cpu_dbg!(wh);
+            self.dist.pdf(wo, wh, ctx.ad_mode) // / (4.0 * wo.dot(wh).abs())
         }
     }
     fn albedo(

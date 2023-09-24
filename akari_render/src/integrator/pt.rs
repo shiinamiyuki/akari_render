@@ -132,7 +132,7 @@ impl<'a> PathTracerBase<'a> {
     pub fn sample_light(&self, u: Expr<Float3>) -> DirectLighting {
         if self.use_nee {
             track!({
-                if !self.indirect_only | self.depth.load().gt(1) {
+                if !self.indirect_only || self.depth.load().gt(1) {
                     let p = **self.p;
                     let ng = **self.ng;
                     let pn = PointNormal::new_expr(p, ng);
@@ -141,6 +141,7 @@ impl<'a> PathTracerBase<'a> {
                     let wi = sample.wi;
                     let surface = **self.instance.surface;
                     let wo = **self.wo;
+                    // cpu_dbg!(wi);
                     let (bsdf_f, bsdf_pdf) = eval
                         .surface
                         .evaluate_color_and_pdf(surface, **self.si, wo, wi, **self.swl);
@@ -149,6 +150,7 @@ impl<'a> PathTracerBase<'a> {
                     let w = mis_weight(sample.pdf, bsdf_pdf, 1);
                     let shadow_ray = sample.shadow_ray.var();
                     *shadow_ray.exclude0 = Uint2::expr(**self.si.inst_id, **self.si.prim_id);
+                    // cpu_dbg!(**shadow_ray);
                     DirectLighting {
                         weight: w,
                         irradiance: sample.li,
@@ -208,69 +210,68 @@ impl<'a> PathTracerBase<'a> {
             (Color::zero(self.color_pipeline.color_repr), 0.0f32.expr())
         }
     }
-
+    #[tracked]
     pub fn run_megakernel(&self, ray: Expr<Ray>, sampler: &dyn Sampler) {
         let ray = ray.var();
-        track!({
-            loop {
-                let hit = self.next_intersection(**ray);
-                if !hit {
-                    let (direct, w) = self.hit_envmap(**ray);
-                    self.add_radiance(direct * w);
-                    break;
-                }
-                {
-                    let (direct, w) = self.handle_surface_light(**ray);
-                    self.add_radiance(direct * w);
-                }
 
-                if self.depth.load() >= self.max_depth {
-                    break;
-                }
-                *self.depth += 1;
+        loop {
+            let hit = self.next_intersection(**ray);
+            if !hit {
+                let (direct, w) = self.hit_envmap(**ray);
+                self.add_radiance(direct * w);
+                break;
+            }
+            {
+                let (direct, w) = self.handle_surface_light(**ray);
+                self.add_radiance(direct * w);
+            }
 
-                let direct_lighting = self.sample_light(sampler.next_3d());
-                if direct_lighting.valid {
-                    let shadow_ray = direct_lighting.shadow_ray;
-                    if !self.scene.occlude(shadow_ray) {
-                        let direct = direct_lighting.irradiance
-                            * direct_lighting.bsdf_f
-                            * direct_lighting.weight
-                            / direct_lighting.pdf;
-                        self.add_radiance(direct);
-                    }
-                }
-                let bsdf_sample = self.sample_surface(sampler.next_3d());
-                let f = &bsdf_sample.color;
-                lc_assert!(f.min().ge(0.0));
-                if bsdf_sample.pdf <= 0.0 || !bsdf_sample.valid {
-                    break;
-                }
+            if self.depth.load() >= self.max_depth {
+                break;
+            }
+            *self.depth += 1;
 
-                self.mul_beta(f / bsdf_sample.pdf);
-                let (rr_effective, cont_prob) = self.continue_prob();
-                if rr_effective {
-                    let rr = sampler.next_1d().ge(cont_prob);
-                    if rr {
-                        break;
-                    }
-                    self.mul_beta(Color::one(self.color_pipeline.color_repr) / cont_prob);
-                }
-                {
-                    *self.prev_bsdf_pdf = bsdf_sample.pdf;
-                    *self.prev_ng = **self.ng;
-                    let ro = offset_ray_origin(**self.p, face_forward(**self.ng, bsdf_sample.wi));
-                    *ray = Ray::new_expr(
-                        ro,
-                        bsdf_sample.wi,
-                        0.0,
-                        1e20,
-                        Uint2::expr(**self.si.inst_id, **self.si.prim_id),
-                        Uint2::expr(u32::MAX, u32::MAX),
-                    );
+            let direct_lighting = self.sample_light(sampler.next_3d());
+            if direct_lighting.valid {
+                let shadow_ray = direct_lighting.shadow_ray;
+                if !self.scene.occlude(shadow_ray) {
+                    let direct = direct_lighting.irradiance
+                        * direct_lighting.bsdf_f
+                        * direct_lighting.weight
+                        / direct_lighting.pdf;
+                    self.add_radiance(direct);
                 }
             }
-        });
+            let bsdf_sample = self.sample_surface(sampler.next_3d());
+            let f = &bsdf_sample.color;
+            lc_assert!(f.min().ge(0.0));
+            if bsdf_sample.pdf <= 0.0 || !bsdf_sample.valid {
+                break;
+            }
+
+            self.mul_beta(f / bsdf_sample.pdf);
+            let (rr_effective, cont_prob) = self.continue_prob();
+            if rr_effective {
+                let rr = sampler.next_1d().ge(cont_prob);
+                if rr {
+                    break;
+                }
+                self.mul_beta(Color::one(self.color_pipeline.color_repr) / cont_prob);
+            }
+            {
+                *self.prev_bsdf_pdf = bsdf_sample.pdf;
+                *self.prev_ng = **self.ng;
+                let ro = offset_ray_origin(**self.p, face_forward(**self.ng, bsdf_sample.wi));
+                *ray = Ray::new_expr(
+                    ro,
+                    bsdf_sample.wi,
+                    0.0,
+                    1e20,
+                    Uint2::expr(**self.si.inst_id, **self.si.prim_id),
+                    Uint2::expr(u32::MAX, u32::MAX),
+                );
+            }
+        }
     }
 }
 #[derive(Clone)]
@@ -425,32 +426,33 @@ impl Integrator for PathTracer {
         assert_eq!(resolution.y, film.resolution().y);
         let sampler_creator = sampler_config.creator(self.device.clone(), &scene, self.spp);
         let evaluators = scene.evaluators(color_pipeline, ADMode::None);
-        let kernel = self.device.create_kernel::<fn(u32, Int2)>(
-            &track!(|spp_per_pass: Expr<u32>, pixel_offset: Expr<Int2>| {
-                let p = dispatch_id().xy();
-                let sampler = sampler_creator.create(p);
-                let sampler = sampler.as_ref();
-                for_range(0u32.expr()..spp_per_pass, |_| {
-                    sampler.start();
-                    let ip = p.cast_i32();
-                    let shifted = ip + pixel_offset;
-                    let shifted = shifted
-                        .clamp(0, resolution.expr().cast_i32() - 1)
-                        .cast_u32();
-                    let swl = sample_wavelengths(color_pipeline.color_repr, sampler);
-                    let (ray, ray_color, ray_w) = scene.camera.generate_ray(
-                        film.filter(),
-                        shifted,
-                        sampler,
-                        color_pipeline.color_repr,
-                        swl,
-                    );
-                    let swl = swl.var();
-                    let l = self.radiance(&scene, &evaluators, ray, swl, sampler) * ray_color;
-                    film.add_sample(p.cast_f32(), &l, **swl, ray_w);
-                });
-            })
-        );
+        let kernel =
+            self.device.create_kernel::<fn(u32, Int2)>(&track!(
+                |spp_per_pass: Expr<u32>, pixel_offset: Expr<Int2>| {
+                    let p = dispatch_id().xy();
+                    let sampler = sampler_creator.create(p);
+                    let sampler = sampler.as_ref();
+                    for_range(0u32.expr()..spp_per_pass, |_| {
+                        sampler.start();
+                        let ip = p.cast_i32();
+                        let shifted = ip + pixel_offset;
+                        let shifted = shifted
+                            .clamp(0, resolution.expr().cast_i32() - 1)
+                            .cast_u32();
+                        let swl = sample_wavelengths(color_pipeline.color_repr, sampler);
+                        let (ray, ray_color, ray_w) = scene.camera.generate_ray(
+                            film.filter(),
+                            shifted,
+                            sampler,
+                            color_pipeline.color_repr,
+                            swl,
+                        );
+                        let swl = swl.var();
+                        let l = self.radiance(&scene, &evaluators, ray, swl, sampler) * ray_color;
+                        film.add_sample(p.cast_f32(), &l, **swl, ray_w);
+                    });
+                }
+            ));
         let mut cnt = 0;
         let progress = util::create_progess_bar(self.spp as usize, "spp");
         let mut acc_time = 0.0;

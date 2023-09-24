@@ -262,14 +262,14 @@ impl Scene {
 
         let hit = self.meshes.accel.var().query_all(
             rtx_ray,
-            255,
+            u32::MAX,
             rtx::RayQuery {
                 on_triangle_hit: |candidate: rtx::TriangleCandidate| {
                     if (candidate.inst.ne(ray.exclude0.x) | candidate.prim.ne(ray.exclude0.y))
                         & (candidate.inst.ne(ray.exclude1.x) | candidate.prim.ne(ray.exclude1.y))
                     {
                         candidate.commit();
-                    };
+                    }
                 },
                 on_procedural_hit: |_| {},
             },
@@ -295,7 +295,7 @@ impl Scene {
 
         let hit = self.meshes.accel.var().query_any(
             rtx_ray,
-            255,
+            u32::MAX,
             rtx::RayQuery {
                 on_triangle_hit: |candidate: rtx::TriangleCandidate| {
                     if (candidate.inst.ne(ray.exclude0.x) | candidate.prim.ne(ray.exclude0.y))

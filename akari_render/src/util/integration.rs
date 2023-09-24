@@ -197,7 +197,7 @@ mod test {
     use rand::{thread_rng, Rng};
 
     use super::*;
-   
+
     fn test_integration_helper(
         device: &Device,
         inputs: &Buffer<Float2>,
@@ -249,6 +249,7 @@ mod test {
         }
     }
     #[test]
+    #[tracked]
     fn simpson_integration() {
         let ctx = Context::new(current_exe().unwrap());
         let device = ctx.create_cpu_device();
@@ -259,25 +260,23 @@ mod test {
             Float2::new(x0.min(x1), x0.max(x1))
         });
         let outputs = device.create_buffer(inputs.len());
-        track!({
-            test_integration_helper(&device, &inputs, &outputs, |x| x * x, |x| x * x * x / 3.0);
-            test_integration_helper(&device, &inputs, &outputs, |x| x.sin(), |x| -x.cos());
-            test_integration_helper(
-                &device,
-                &inputs,
-                &outputs,
-                |x| x * (-x * x).exp(),
-                |x| -(-x * x).exp() * 0.5,
-            );
-            let k = 4.0f32;
-            test_integration_helper(
-                &device,
-                &inputs,
-                &outputs,
-                |x| x * (k * x * x).sin(),
-                |x| -(k * x * x).cos() / (2.0 * k),
-            );
-        });
-      
+
+        test_integration_helper(&device, &inputs, &outputs, |x| x * x, |x| x * x * x / 3.0);
+        test_integration_helper(&device, &inputs, &outputs, |x| x.sin(), |x| -x.cos());
+        test_integration_helper(
+            &device,
+            &inputs,
+            &outputs,
+            |x| x * (-x * x).exp(),
+            |x| -(-x * x).exp() * 0.5,
+        );
+        let k = 4.0f32;
+        test_integration_helper(
+            &device,
+            &inputs,
+            &outputs,
+            |x| x * (k * x * x).sin(),
+            |x| -(k * x * x).cos() / (2.0 * k),
+        );
     }
 }

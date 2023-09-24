@@ -196,23 +196,22 @@ impl Color {
             Color::Spectral(_) => todo!(),
         }
     }
+    #[tracked]
     pub fn to_rgb(&self, colorspace: RgbColorSpace) -> Expr<Float3> {
         match self {
             Color::Rgb(rgb, cs) => {
                 if *cs == colorspace {
                     *rgb
                 } else {
-                    track!({
-                        match (cs, colorspace) {
-                            (RgbColorSpace::SRgb, RgbColorSpace::ACEScg) => {
-                                (Mat3::from(srgb_to_aces_with_cat_mat())).expr() * *rgb
-                            }
-                            (RgbColorSpace::ACEScg, RgbColorSpace::SRgb) => {
-                                (Mat3::from(aces_to_srgb_with_cat_mat())).expr() * *rgb
-                            }
-                            _ => unreachable!(),
+                    match (cs, colorspace) {
+                        (RgbColorSpace::SRgb, RgbColorSpace::ACEScg) => {
+                            (Mat3::from(srgb_to_aces_with_cat_mat())).expr() * *rgb
                         }
-                    })
+                        (RgbColorSpace::ACEScg, RgbColorSpace::SRgb) => {
+                            (Mat3::from(aces_to_srgb_with_cat_mat())).expr() * *rgb
+                        }
+                        _ => unreachable!(),
+                    }
                 }
             }
             Color::Spectral(_) => {
