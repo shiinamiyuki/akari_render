@@ -149,7 +149,7 @@ impl Frame {
     #[tracked]
     pub fn sin2_theta(w: Expr<Float3>) -> Expr<f32> {
         let c2 = Self::cos2_theta(w);
-        (1.0 - c2).min_(0.0)
+        (1.0 - c2).max_(0.0)
     }
     #[inline]
     #[tracked]
@@ -290,12 +290,16 @@ impl AffineTransformExpr {
     }
 }
 #[tracked]
-pub fn face_forward(v: Expr<Float3>, n: Expr<Float3>) -> Expr<Float3> {
+pub fn face_forward(v: impl AsExpr<Value = Float3>, n: impl AsExpr<Value = Float3>) -> Expr<Float3> {
+    let v = v.as_expr();
+    let n = n.as_expr();
     select(v.dot(n) < 0.0, -v, v)
 }
 
 #[tracked]
-pub fn reflect(w: Expr<Float3>, n: Expr<Float3>) -> Expr<Float3> {
+pub fn reflect(w: impl AsExpr<Value = Float3>, n: impl AsExpr<Value = Float3>) -> Expr<Float3> {
+    let w = w.as_expr();
+    let n = n.as_expr();
     -w + 2.0 * w.dot(n) * n
 }
 #[tracked]

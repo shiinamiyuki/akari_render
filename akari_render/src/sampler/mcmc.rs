@@ -94,6 +94,7 @@ impl IsotropicExponentialMutation {
 }
 #[derive(Clone, Copy, Value, Debug)]
 #[repr(C)]
+#[value_new(pub)]
 pub struct KelemenMutationRecord {
     pub cur: f32,
     pub u: f32,
@@ -104,26 +105,26 @@ pub struct KelemenMutationRecord {
 }
 lazy_static! {
     pub static ref KELEMEN_MUTATE: Callable<fn(Var<KelemenMutationRecord>) -> ()> =
-        Callable::<fn(Var<KelemenMutationRecord>) -> ()>(
-            |record: Var<KelemenMutationRecord>| {
-                let cur = record.cur().load();
-                let u = record.u().load();
-                let (u, add) = if_!(u.lt(0.5), {
-                    (u * 2.0, true.expr())
-                }, else {
-                    ((u - 0.5) * 2.0, false.expr())
-                });
-                let dv = record.mutation_size_high().load() * (record.log_ratio().load() * u).exp();
-                let new = if_!(add, {
-                    let new = cur + dv;
-                    select(new.gt(1.0), new - 1.0, new)
-                }, else {
-                    let new = cur - dv;
-                    select(new.lt(0.0), new + 1.0, new)
-                });
-                record.set_mutated(new);
-            }
-        );
+        Callable::<fn(Var<KelemenMutationRecord>) -> ()>::new_static(track!(|record: Var<
+            KelemenMutationRecord,
+        >| {
+            let cur = **record.cur;
+            let u = **record.u;
+            let (u, add) = if u.lt(0.5) {
+                (u * 2.0, true.expr())
+            } else {
+                ((u - 0.5) * 2.0, false.expr())
+            };
+            let dv = record.mutation_size_high * (record.log_ratio * u).exp();
+            let new = if add {
+                let new = cur + dv;
+                select(new.gt(1.0), new - 1.0, new)
+            } else {
+                let new = cur - dv;
+                select(new.lt(0.0), new + 1.0, new)
+            };
+            **record.mutated = new;
+        }));
 }
 impl Mutation for IsotropicExponentialMutation {
     fn log_pdf(&self, _cur: &PrimarySample, _proposal: &PrimarySample) -> Expr<f32> {
@@ -139,27 +140,23 @@ impl Mutation for IsotropicExponentialMutation {
         } else {
             0
         };
-        for_range(const_(begin)..values.len().cast_i32(), |i| {
-            let i = i.cast_u32();
+        for_range(begin.expr()..values.len_expr().cast_u32(), |i| {
             let cur = s.values.read(i);
-            let new = if_!(!self.image_mutation | i.lt(2), {
+            let new = if !self.image_mutation | i.lt(2) {
                 let u = sampler.next_1d();
-                let record = var!(
-                    KelemenMutationRecord,
-                    KelemenMutationRecordExpr::new(
-                        cur,
-                        u,
-                        self.mutation_size_low,
-                        self.mutation_size_high,
-                        self.log_ratio,
-                        0.0
-                    )
+                let record = KelemenMutationRecord::new_expr(
+                    cur,
+                    u,
+                    self.mutation_size_low,
+                    self.mutation_size_high,
+                    self.log_ratio,
+                    0.0,
                 );
                 KELEMEN_MUTATE.call(record);
-                record.mutated().load()
-            }, else {
+                **record.mutated
+            } else {
                 cur
-            });
+            };
             values.write(i, new);
         });
         let proposal = PrimarySample { values };
@@ -181,7 +178,7 @@ pub struct IsotropicGaussianMutation {
     pub res: Expr<Float2>,
     pub image_mutation: Expr<bool>,
 }
-
+#[tracked]
 pub fn mutate_image_space_single(
     cur: Expr<f32>,
     sampler: &IndependentSampler,
@@ -190,11 +187,11 @@ pub fn mutate_image_space_single(
     dim: Expr<u32>,
 ) -> Expr<f32> {
     let u = sampler.next_1d();
-    let (u, add) = if_!(u.lt(0.5), {
+    let (u, add) = if u.lt(0.5) {
         (u * 2.0, true.expr())
-    }, else {
+    } else {
         ((u - 0.5) * 2.0, false.expr())
-    });
+    };
     let offset = u * mutation_size;
     let offset = select(add, offset, -offset);
     let new = cur + offset / select(dim.eq(0), res.x, res.y);

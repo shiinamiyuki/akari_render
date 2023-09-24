@@ -492,8 +492,8 @@ impl Surface for MicrofacetReflection {
             0.0f32.expr()
         } else {
             let wh = wh.normalize();
-            cpu_dbg!(wh);
-            self.dist.pdf(wo, wh, ctx.ad_mode) // / (4.0 * wo.dot(wh).abs())
+            // cpu_dbg!(wh);
+            self.dist.pdf(wo, wh, ctx.ad_mode)  / (4.0 * wo.dot(wh).abs())
         }
     }
     fn albedo(

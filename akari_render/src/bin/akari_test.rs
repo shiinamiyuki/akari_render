@@ -327,7 +327,7 @@ plt.show()"#
                         &BsdfEvalContext {
                             color_repr: color::ColorRepr::Rgb(color::RgbColorSpace::SRgb),
                             _marker: PhantomData {},
-                            ad_mode: ADMode::None,
+                            ad_mode: ADMode::Backward,
                         },
                     )
                 },
@@ -350,7 +350,7 @@ plt.show()"#
                         &BsdfEvalContext {
                             color_repr: color::ColorRepr::Rgb(color::RgbColorSpace::SRgb),
                             _marker: PhantomData {},
-                            ad_mode: ADMode::Backward,
+                            ad_mode: ADMode::None,
                         },
                     )
                 },
@@ -469,10 +469,10 @@ mod invert {
                 let w = sample(u);
                 let u2 = invert(w);
                 let bad = (u2 - u).length().gt(0.01);
-                if bad {
+                if_!(bad, {
                     bads.var().atomic_fetch_add(i, 1);
                     lc_info!(printer, "bad: u: {:?} u2:{:?} w:{:?}", u, u2, w);
-                }
+                });
             });
         }));
         let stream = device.default_stream();

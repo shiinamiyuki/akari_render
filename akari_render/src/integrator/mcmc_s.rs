@@ -9,21 +9,10 @@ use serde::{Deserialize, Serialize};
 use super::pt::{self, PathTracer, PathTracerBase};
 use super::{Integrator, IntermediateStats, RenderSession, RenderStats};
 use crate::geometry::{face_forward, Ray, RayExpr};
-use crate::sampler::mcmc::{
-    IsotropicExponentialMutation, KelemenMutationRecord, KelemenMutationRecordExpr, KELEMEN_MUTATE,
-};
+use crate::sampler::mcmc::{KelemenMutationRecord, KELEMEN_MUTATE};
 use crate::sampling::sample_gaussian;
 use crate::util::distribution::resample_with_f64;
-use crate::{
-    color::*,
-    film::*,
-    sampler::{
-        mcmc::{IsotropicGaussianMutation, LargeStepMutation, Mutation},
-        *,
-    },
-    scene::*,
-    *,
-};
+use crate::{color::*, film::*, sampler::*, scene::*, *};
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum Method {
@@ -90,6 +79,7 @@ pub struct SinglePathMcmc {
 
 #[derive(Clone, Copy, Debug, Value)]
 #[repr(C)]
+#[value_new]
 pub struct MarkovState {
     chain_id: u32,
     cur_pixel: Uint2,
@@ -130,7 +120,7 @@ impl<'a, F> McmcSampler<'a, F> {
             base,
             samples,
             get_index,
-            cur_dim: var!(u32, 0),
+            cur_dim: u32::var_zeroed(),
             mcmc_dim,
         }
     }
@@ -140,20 +130,16 @@ impl<'a, F> Sampler for McmcSampler<'a, F>
 where
     F: Fn(Expr<u32>) -> Expr<u32>,
 {
-    fn next_1d(&self) -> Float {
-        if_!(
-            self.cur_dim.load().lt(self.mcmc_dim),
-            {
-                let ret = self.samples.read((self.get_index)(*self.cur_dim));
-                self.cur_dim.store(self.cur_dim.load() + 1);
-                ret
-            },
-            else,
-            {
-                lc_unreachable!();
-                0.0f32.expr()
-            }
-        )
+    #[tracked]
+    fn next_1d(&self) -> Expr<f32> {
+        if self.cur_dim.load().lt(self.mcmc_dim) {
+            let ret = self.samples.read((self.get_index)(**self.cur_dim));
+            *self.cur_dim += 1;
+            ret
+        } else {
+            lc_unreachable!();
+            0.0f32.expr()
+        }
     }
     fn is_metropolis(&self) -> bool {
         false
@@ -187,7 +173,7 @@ impl Mutator {
         get_back_index: &impl Fn(Expr<u32>) -> Expr<u32>,
         rng: &IndependentSampler,
     ) {
-        for_range(const_(0u32)..self.new_dim, |i| {
+        for_range(0u32.expr()..self.new_dim, |i| {
             self.mutate_one(samples, i, get_index, get_back_index, rng);
         });
     }
@@ -197,13 +183,14 @@ impl Mutator {
         get_index: &impl Fn(Expr<u32>) -> Expr<u32>,
         get_back_index: &impl Fn(Expr<u32>) -> Expr<u32>,
     ) {
-        for_range(const_(0u32)..self.new_dim, |i| {
+        for_range(0u32.expr()..self.new_dim, |i| {
             let sample_idx = get_index(i);
             let backup_idx = get_back_index(i);
             let x = samples.read(backup_idx);
             samples.write(sample_idx, x);
         });
     }
+    #[tracked]
     pub fn mutate_one(
         &self,
         samples: &Buffer<f32>,
@@ -226,35 +213,41 @@ impl Mutator {
                 let u = rng.next_1d();
                 let sample_idx = get_index(i);
                 let backup_idx = get_back_index(i);
-                let x = def(samples.read(sample_idx));
-                samples.write(backup_idx, *x);
-                let new = if_!(self.is_large_step, { u }, else, {
-                    if_!(self.small_step_dim_change & i.gt(self.old_dim), {
-                        *x.get_mut() = rng.next_1d();
-                    });
-                    if exponential_mutation {
-                        let record = var!(
-                            KelemenMutationRecord,
-                            KelemenMutationRecordExpr::new(
-                                *x,
-                                u,
-                                kelemen_mutate_size_low,
-                                kelemen_mutate_size_high,
-                                kelemen_log_ratio,
-                                0.0
-                            )
-                        );
-                        KELEMEN_MUTATE.call(record);
-                        *record.mutated()
-                    } else {
-                        let dv = sample_gaussian(u);
-                        let new = *x + dv * small_sigma;
-                        let new = new - new.floor();
-                        // lc_assert!(new.is_finite());
-                        let new = select(new.is_finite(), new, 0.0f32.expr());
-                        new
+                let x = samples.read(sample_idx).var();
+                samples.write(backup_idx, x);
+                let new = if self.is_large_step {
+                    u
+                } else {
+                    if self.small_step_dim_change & i.gt(self.old_dim) {
+                        *x = rng.next_1d();
                     }
-                });
+                    escape!({
+                        if exponential_mutation {
+                            track!({
+                                let record = KelemenMutationRecord::new_expr(
+                                    **x,
+                                    u,
+                                    kelemen_mutate_size_low,
+                                    kelemen_mutate_size_high,
+                                    kelemen_log_ratio,
+                                    0.0,
+                                )
+                                .var();
+                                KELEMEN_MUTATE.call(record);
+                                **record.mutated
+                            })
+                        } else {
+                            track!({
+                                let dv = sample_gaussian(u);
+                                let new = x + dv * small_sigma;
+                                let new = new - new.floor();
+                                // lc_assert!(new.is_finite());
+                                let new = select(new.is_finite(), new, 0.0f32.expr());
+                                new
+                            })
+                        }
+                    })
+                };
                 samples.write(sample_idx, new);
             }
         }
@@ -274,6 +267,7 @@ pub struct PathVertex {
 impl<'a> PathTracerBase<'a> {
     /// Sample a path prefix with length `target_depth - 1`
     /// and two final vertices with NEE and BSDF sampling respectively.
+    #[tracked]
     pub fn run_at_depth(
         &self,
         ray: Expr<Ray>,
@@ -281,11 +275,11 @@ impl<'a> PathTracerBase<'a> {
         sampler: &dyn Sampler,
         vertices: Option<VLArrayVar<PathVertex>>,
     ) {
-        let ray = var!(Ray, ray);
+        let ray = ray.var();
         let u_light = sampler.next_3d();
-        loop_!({
-            let hit = self.next_intersection(*ray);
-            if_!(!hit, {
+        loop {
+            let hit = self.next_intersection(**ray);
+            if !hit {
                 if let Some(vertices) = vertices {
                     // vertices.write(
                     //     *self.depth,
@@ -293,12 +287,12 @@ impl<'a> PathTracerBase<'a> {
                     // );
                     todo!()
                 }
-                let (direct, w) = self.hit_envmap(*ray);
-                if_!(self.depth.eq(target_depth), {
+                let (direct, w) = self.hit_envmap(**ray);
+                if self.depth.eq(target_depth) {
                     self.add_radiance(direct * w);
-                });
+                };
                 break_();
-            });
+            }
             if let Some(vertices) = vertices {
                 // vertices.write(
                 //     *self.depth,
@@ -307,140 +301,141 @@ impl<'a> PathTracerBase<'a> {
                 todo!()
             }
             {
-                if_!(self.depth.eq(target_depth), {
-                    let (direct, w) = self.handle_surface_light(*ray);
+                if self.depth.eq(target_depth) {
+                    let (direct, w) = self.handle_surface_light(**ray);
                     self.add_radiance(direct * w);
-                });
+                }
             }
 
-            if_!(self.depth.load().ge(self.max_depth), {
-                break_();
-            });
-            *self.depth.get_mut() += 1;
-
-            if_!(self.depth.eq(target_depth), {
-                let direct_lighting = self.sample_light(u_light);
-                if_!(direct_lighting.valid, {
-                    let shadow_ray = direct_lighting.shadow_ray;
-                    if_!(!self.scene.occlude(shadow_ray), {
-                        let direct = direct_lighting.irradiance
-                            * direct_lighting.bsdf_f
-                            * direct_lighting.weight
-                            / direct_lighting.pdf;
-                        self.add_radiance(direct);
-                    });
-                });
-            });
-            let bsdf_sample = self.sample_surface(sampler.next_3d());
-            let f = &bsdf_sample.color;
-            lc_assert!(f.min().ge(0.0));
-            if_!(bsdf_sample.pdf.le(0.0) | !bsdf_sample.valid, {
-                break_();
-            });
-            self.mul_beta(f / bsdf_sample.pdf);
-            {
-                *self.prev_bsdf_pdf.get_mut() = bsdf_sample.pdf;
-                *self.prev_ng.get_mut() = *self.ng;
-                let ro = offset_ray_origin(*self.p, face_forward(*self.ng, bsdf_sample.wi));
-                *ray.get_mut() = RayExpr::new(
-                    ro,
-                    bsdf_sample.wi,
-                    0.0,
-                    1e20,
-                    Uint2::expr(*self.si.inst_id(), *self.si.prim_id()),
-                    Uint2::expr(u32::MAX, u32::MAX),
-                );
-            }
-        })
-    }
-
-    pub fn run_at_depth_replayed(
-        &self,
-        ray: Expr<Ray>,
-        target_depth: Expr<u32>,
-        sampler: &dyn Sampler,
-        vertices: VLArrayVar<PathVertex>,
-    ) {
-        let ray = var!(Ray, ray);
-        let u_light = sampler.next_3d();
-        let prev_p = var!(Float3);
-        loop_!({
-            let hit = {
-                let v = vertices.read(*self.depth);
-                let hit = v.inst_id().eq(u32::MAX);
-                if_!(hit, {
-                    let si = self
-                        .scene
-                        .si_from_hitinfo(v.inst_id(), v.prim_id(), v.bary());
-                    let wo = if_!(self.depth.eq(0), {
-                        -*ray.d
-                    }, else {
-                        (si.geometry().p() - *prev_p).normalize()
-                    });
-                    self.set_si(si, wo)
-                });
-                hit
+            if self.depth.ge(self.max_depth) {
+                break;
             };
-            if_!(!hit, {
-                let (direct, w) = self.hit_envmap(*ray);
-                if_!(self.depth.eq(target_depth), {
-                    self.add_radiance(direct * w);
-                });
-                break_();
-            });
-            {
-                if_!(self.depth.eq(target_depth), {
-                    let (direct, w) = self.handle_surface_light(*ray);
-                    self.add_radiance(direct * w);
-                });
-            }
+            *self.depth += 1;
 
-            if_!(self.depth.load().ge(self.max_depth), {
-                break_();
-            });
-            *self.depth.get_mut() += 1;
-
-            if_!(self.depth.eq(target_depth), {
+            if self.depth.eq(target_depth) {
                 let direct_lighting = self.sample_light(u_light);
-                if_!(direct_lighting.valid, {
+                if direct_lighting.valid {
                     let shadow_ray = direct_lighting.shadow_ray;
-                    if_!(!self.scene.occlude(shadow_ray), {
+                    if !self.scene.occlude(shadow_ray) {
                         let direct = direct_lighting.irradiance
                             * direct_lighting.bsdf_f
                             * direct_lighting.weight
                             / direct_lighting.pdf;
                         self.add_radiance(direct);
-                    });
-                });
-            });
+                    }
+                }
+            }
             let bsdf_sample = self.sample_surface(sampler.next_3d());
             let f = &bsdf_sample.color;
             lc_assert!(f.min().ge(0.0));
-            if_!(bsdf_sample.pdf.le(0.0) | !bsdf_sample.valid, {
-                break_();
-            });
+            if bsdf_sample.pdf.le(0.0) | !bsdf_sample.valid {
+                break_;
+            }
             self.mul_beta(f / bsdf_sample.pdf);
             {
-                *self.prev_bsdf_pdf.get_mut() = bsdf_sample.pdf;
-                *self.prev_ng.get_mut() = *self.ng;
-                *prev_p.get_mut() = *self.p;
-                let ro = offset_ray_origin(*self.p, face_forward(*self.ng, bsdf_sample.wi));
-                *ray.get_mut() = RayExpr::new(
+                *self.prev_bsdf_pdf = bsdf_sample.pdf;
+                *self.prev_ng = self.ng;
+                let ro = offset_ray_origin(self.p, face_forward(self.ng, bsdf_sample.wi));
+                *ray = Ray::new_expr(
                     ro,
                     bsdf_sample.wi,
                     0.0,
                     1e20,
-                    Uint2::expr(*self.si.inst_id(), *self.si.prim_id()),
+                    Uint2::expr(self.si.inst_id, self.si.prim_id),
                     Uint2::expr(u32::MAX, u32::MAX),
                 );
             }
-        })
+        }
     }
+    // #[tracked]
+    // pub fn run_at_depth_replayed(
+    //     &self,
+    //     ray: Expr<Ray>,
+    //     target_depth: Expr<u32>,
+    //     sampler: &dyn Sampler,
+    //     vertices: VLArrayVar<PathVertex>,
+    // ) {
+    //     let ray = ray.var();
+    //     let u_light = sampler.next_3d();
+    //     let prev_p = var!(Float3);
+    //     loop_!({
+    //         let hit = {
+    //             let v = vertices.read(*self.depth);
+    //             let hit = v.inst_id().eq(u32::MAX);
+    //             if_!(hit, {
+    //                 let si = self
+    //                     .scene
+    //                     .si_from_hitinfo(v.inst_id(), v.prim_id(), v.bary());
+    //                 let wo = if_!(self.depth.eq(0), {
+    //                     -*ray.d
+    //                 }, else {
+    //                     (si.geometry().p() - *prev_p).normalize()
+    //                 });
+    //                 self.set_si(si, wo)
+    //             });
+    //             hit
+    //         };
+    //         if_!(!hit, {
+    //             let (direct, w) = self.hit_envmap(*ray);
+    //             if_!(self.depth.eq(target_depth), {
+    //                 self.add_radiance(direct * w);
+    //             });
+    //             break_();
+    //         });
+    //         {
+    //             if_!(self.depth.eq(target_depth), {
+    //                 let (direct, w) = self.handle_surface_light(*ray);
+    //                 self.add_radiance(direct * w);
+    //             });
+    //         }
+
+    //         if_!(self.depth.load().ge(self.max_depth), {
+    //             break_();
+    //         });
+    //         *self.depth.get_mut() += 1;
+
+    //         if_!(self.depth.eq(target_depth), {
+    //             let direct_lighting = self.sample_light(u_light);
+    //             if_!(direct_lighting.valid, {
+    //                 let shadow_ray = direct_lighting.shadow_ray;
+    //                 if_!(!self.scene.occlude(shadow_ray), {
+    //                     let direct = direct_lighting.irradiance
+    //                         * direct_lighting.bsdf_f
+    //                         * direct_lighting.weight
+    //                         / direct_lighting.pdf;
+    //                     self.add_radiance(direct);
+    //                 });
+    //             });
+    //         });
+    //         let bsdf_sample = self.sample_surface(sampler.next_3d());
+    //         let f = &bsdf_sample.color;
+    //         lc_assert!(f.min().ge(0.0));
+    //         if_!(bsdf_sample.pdf.le(0.0) | !bsdf_sample.valid, {
+    //             break_();
+    //         });
+    //         self.mul_beta(f / bsdf_sample.pdf);
+    //         {
+    //             *self.prev_bsdf_pdf.get_mut() = bsdf_sample.pdf;
+    //             *self.prev_ng.get_mut() = *self.ng;
+    //             *prev_p.get_mut() = *self.p;
+    //             let ro = offset_ray_origin(*self.p, face_forward(*self.ng, bsdf_sample.wi));
+    //             *ray.get_mut() = RayExpr::new(
+    //                 ro,
+    //                 bsdf_sample.wi,
+    //                 0.0,
+    //                 1e20,
+    //                 Uint2::expr(*self.si.inst_id(), *self.si.prim_id()),
+    //                 Uint2::expr(u32::MAX, u32::MAX),
+    //             );
+    //         }
+    //     })
+    // }
 }
 impl SinglePathMcmc {
     fn sample_dimension(&self, depth: u32) -> u32 {
         4 + (1 + depth) * 3 + 3
     }
+    #[tracked]
     fn sample_dimension_device(&self, depth: Expr<u32>) -> Expr<u32> {
         4 + (1 + depth) * 3 + 3
     }
@@ -461,10 +456,12 @@ impl SinglePathMcmc {
             config,
         }
     }
+    #[tracked]
     pub fn scalar_contribution(color: &Color) -> Expr<f32> {
-        color.max().clamp(0.0, 1e5)
+        color.max().clamp(0.0f32.expr(), 1e5f32.expr())
         // 1.0f32.expr()
     }
+    #[tracked]
     fn evaluate(
         &self,
         scene: &Arc<Scene>,
@@ -488,14 +485,14 @@ impl SinglePathMcmc {
             &mcmc_sampler as &dyn Sampler
         };
         sampler.start();
-        let res = const_(scene.camera.resolution());
+        let res = scene.camera.resolution().expr();
         let p = sampler.next_2d() * res.cast_f32();
         let p = p.cast_i32().clamp(0, res.cast_i32() - 1);
-        let swl = def(sample_wavelengths(eval.color_repr(), sampler));
+        let swl = sample_wavelengths(eval.color_repr(), sampler).var();
         let (ray, ray_color, ray_w) =
             scene
                 .camera
-                .generate_ray(filter, p.cast_u32(), sampler, eval.color_repr(), *swl);
+                .generate_ray(filter, p.cast_u32(), sampler, eval.color_repr(), **swl);
         let l = {
             let w = ray_color * ray_w;
             let pt = PathTracerBase::new(
@@ -510,12 +507,13 @@ impl SinglePathMcmc {
             pt.run_at_depth(ray, depth, sampler, None);
             pt.radiance.load() * w
         };
-        (p.cast_u32(), l, *swl, Self::scalar_contribution(&l))
+        (p.cast_u32(), l, **swl, Self::scalar_contribution(&l))
     }
     const SAMPLE_BUFFER_AOSOA_SIZE: u32 = 4;
 
     // layout:
     // [[f32 x 8] x 2] x dims] x (n_chains / 8)
+    #[tracked]
     fn _sample_index_aosoa(
         &self,
         chain_id: Expr<u32>,
@@ -532,19 +530,21 @@ impl SinglePathMcmc {
         chain_id * self.sample_dimension(self.max_depth) * 2 + dim * 2 + is_backup
     }
     fn sample_index_aosoa(&self, chain_id: Expr<u32>, dim: Expr<u32>) -> Expr<u32> {
-        self._sample_index_aosoa(chain_id, dim, const_(0u32))
+        self._sample_index_aosoa(chain_id, dim, 0u32.expr())
     }
     fn backup_index_aosoa(&self, chain_id: Expr<u32>, dim: Expr<u32>) -> Expr<u32> {
-        self._sample_index_aosoa(chain_id, dim, const_(1u32))
+        self._sample_index_aosoa(chain_id, dim, 1u32.expr())
     }
     fn normalization_factor_correction(&self) -> f32 {
         (self.max_depth - self.min_depth + 1) as f32
     }
+    #[tracked]
     fn sample_depth(&self, sampler: &dyn Sampler) -> Expr<u32> {
         let range = self.max_depth + 1 - self.min_depth;
         (self.min_depth + (sampler.next_1d() * range as f32).cast_u32())
-            .clamp(self.min_depth, self.config.max_depth as i32)
+            .clamp(self.min_depth.expr(), self.config.max_depth.expr())
     }
+
     fn bootstrap(&self, scene: &Arc<Scene>, filter: PixelFilter, eval: &Evaluators) -> RenderState {
         let seeds = init_pcg32_buffer(self.device.clone(), self.n_bootstrap);
         let fs = self
@@ -553,14 +553,14 @@ impl SinglePathMcmc {
         let sample_buffer = self
             .device
             .create_buffer(self.sample_dimension(self.config.max_depth) as usize * self.n_chains);
-        let bootstrap_kernel = self.device.create_kernel::<fn()>(&|| {
+        let bootstrap_kernel = self.device.create_kernel::<fn()>(&track!(|| {
             let i = dispatch_id().x;
             let seed = seeds.var().read(i);
-            let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seed));
+            let sampler = IndependentSampler::from_pcg32(seed.var());
 
             let depth = self.sample_depth(&sampler);
             // DON'T WRITE TO SAMPLE BUFFER
-            // for_range(const_(0u32)..self.sample_dimension_device(depth), |d| {
+            // for_range(0u32.expr()..self.sample_dimension_device(depth), |d| {
             //     sample_buffer.write(
             //         self.sample_dimension(self.config.max_depth) * i + d,
             //         sampler.next_1d(),
@@ -577,7 +577,7 @@ impl SinglePathMcmc {
                 true,
             );
             fs.var().write(i, f);
-        });
+        }));
         let t = Instant::now();
         bootstrap_kernel.dispatch([self.n_bootstrap as u32, 1, 1]);
 
@@ -600,14 +600,14 @@ impl SinglePathMcmc {
                 * Self::SAMPLE_BUFFER_AOSOA_SIZE as usize,
         );
         self.device
-            .create_kernel::<fn()>(&|| {
+            .create_kernel::<fn()>(&track!(|| {
                 let i = dispatch_id().x;
                 let seed_idx = resampled.var().read(i);
                 let seed = seeds.var().read(seed_idx);
-                let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seed));
+                let sampler = IndependentSampler::from_pcg32(seed.var());
 
                 let depth = self.sample_depth(&sampler);
-                for_range(const_(0u32)..self.sample_dimension_device(depth), |d| {
+                for_range(0u32.expr()..self.sample_dimension_device(depth), |d| {
                     sample_buffer.write(self.sample_index_aosoa(i, d), sampler.next_1d());
                 });
                 let (p, l, swl, f) = self.evaluate(
@@ -627,9 +627,9 @@ impl SinglePathMcmc {
                     _ => todo!(),
                 };
                 cur_colors.write(i, l, swl);
-                let state = MarkovStateExpr::new(i, p, f, 0.0, 0, 0, 0, sigma, depth);
+                let state = MarkovState::new_expr(i, p, f, 0.0, 0, 0, 0, sigma, depth);
                 states.var().write(i, state);
-            })
+            }))
             .dispatch([self.n_chains as u32, 1, 1]);
 
         let rng_states = init_pcg32_buffer(self.device.clone(), self.n_chains);
@@ -642,6 +642,7 @@ impl SinglePathMcmc {
             b_init_cnt: self.n_bootstrap,
         }
     }
+    #[tracked]
     fn mutate_chain(
         &self,
         scene: &Arc<Scene>,
@@ -654,7 +655,7 @@ impl SinglePathMcmc {
         samples: &Buffer<f32>,
         rng: &IndependentSampler,
     ) {
-        let res = const_(scene.camera.resolution()).cast_f32();
+        let res = scene.camera.resolution().expr().cast_f32();
         // select a mutation strategy
         match self.method {
             Method::Kelemen {
@@ -666,35 +667,26 @@ impl SinglePathMcmc {
                 image_mutation_prob,
                 depth_change_prob,
             } => {
-                let chain_id = *state.chain_id();
+                let chain_id = **state.chain_id;
                 let is_large_step = rng.next_1d().lt(large_step_prob);
                 let small_step_depth_change = rng.next_1d().lt(depth_change_prob);
-                let new_depth = var!(u32);
-                if_!(
-                    is_large_step,
-                    {
+                let new_depth = u32::var_zeroed();
+                if is_large_step {
+                    new_depth.store(self.sample_depth(rng));
+                } else {
+                    if small_step_depth_change {
                         new_depth.store(self.sample_depth(rng));
-                    },
-                    else,
-                    {
-                        if_!(
-                            small_step_depth_change,
-                            {
-                                new_depth.store(self.sample_depth(rng));
-                            },
-                            else,
-                            {
-                                new_depth.store(*state.depth());
-                            }
-                        );
+                    } else {
+                        new_depth.store(state.depth);
                     }
-                );
+                }
+
                 let mutator = Mutator {
                     is_large_step,
                     method: self.method,
                     small_step_dim_change: small_step_depth_change,
-                    old_dim: self.sample_dimension_device(*state.depth()),
-                    new_dim: self.sample_dimension_device(*new_depth),
+                    old_dim: self.sample_dimension_device(**state.depth),
+                    new_dim: self.sample_dimension_device(**new_depth),
                 };
                 // perform mutation
                 mutator.mutate(
@@ -711,16 +703,16 @@ impl SinglePathMcmc {
                     &rng,
                     samples,
                     |dim| self.sample_index_aosoa(chain_id, dim),
-                    *new_depth,
+                    **new_depth,
                     false,
                 );
                 let proposal_f = f;
-                if_!(is_large_step & state.b_cnt().lt(1024 * 1024), {
-                    state.set_b(state.b().load() + proposal_f);
-                    state.set_b_cnt(state.b_cnt().load() + 1);
-                });
-                let cur_f = state.cur_f().load();
-                let cur_p = state.cur_pixel().load();
+                if is_large_step & state.b_cnt().lt(1024 * 1024) {
+                    *state.b += proposal_f;
+                    *state.b_cnt += 1;
+                }
+                let cur_f = **state.cur_f;
+                let cur_p = **state.cur_pixel;
                 let cur_color = cur_color_v.load();
                 let accept = select(
                     cur_f.eq(0.0),
@@ -736,43 +728,43 @@ impl SinglePathMcmc {
                 film.add_splat(
                     cur_p.cast_f32(),
                     &(cur_color / cur_f),
-                    *cur_swl,
+                    **cur_swl,
                     (1.0 - accept) * contribution,
                 );
-                if_!(rng.next_1d().lt(accept) & state.b_cnt().lt(1024 * 1024), {
-                    state.set_cur_f(proposal_f);
+                if rng.next_1d().lt(accept) & state.b_cnt.lt(1024 * 1024) {
+                    *state.cur_f = proposal_f;
                     cur_color_v.store(proposal_color);
                     cur_swl.store(proposal_swl);
-                    state.set_cur_pixel(proposal_p);
-                    if_!(!is_large_step, {
-                        state.set_n_accepted(state.n_accepted().load() + 1);
-                    });
-                    *state.depth().get_mut() = *new_depth;
-                }, else {
+                    *state.cur_pixel = proposal_p;
+                    if !is_large_step {
+                        *state.n_accepted += 1;
+                    }
+                    *state.depth = new_depth;
+                } else {
                     mutator.reject(
                         samples,
                         &|dim| self.sample_index_aosoa(chain_id, dim),
                         &|dim| self.backup_index_aosoa(chain_id, dim),
                     );
 
-                });
-                if_!(!is_large_step, {
-                    state.set_n_mutations(state.n_mutations().load() + 1);
-                    if adaptive {
-                        let r =
-                            state.n_accepted().load().cast_f32() / state.n_mutations().load().cast_f32();
-                        const OPTIMAL_ACCEPT_RATE: f32 = 0.234;
-                        if_!(state.n_mutations().load().gt(50), {
-                            let new_sigma = state.sigma().load()
-                                + (r - OPTIMAL_ACCEPT_RATE) / state.n_mutations().load().cast_f32();
-                            let new_sigma = new_sigma.clamp(1e-5, 0.1);
-                            if_!(state.chain_id().load().eq(0), {
-                                cpu_dbg!(Float3::expr(r, state.sigma().load(), new_sigma));
-                            });
-                            state.sigma().store(new_sigma);
-                        });
-                    }
-                });
+                }
+                if !is_large_step {
+                    *state.n_mutations += 1;
+                    // if adaptive {
+                    //     let r = state.n_accepted().load().cast_f32()
+                    //         / state.n_mutations().load().cast_f32();
+                    //     const OPTIMAL_ACCEPT_RATE: f32 = 0.234;
+                    //     if_!(state.n_mutations().load().gt(50), {
+                    //         let new_sigma = state.sigma().load()
+                    //             + (r - OPTIMAL_ACCEPT_RATE) / state.n_mutations().load().cast_f32();
+                    //         let new_sigma = new_sigma.clamp(1e-5, 0.1);
+                    //         if_!(state.chain_id().load().eq(0), {
+                    //             cpu_dbg!(Float3::expr(r, state.sigma().load(), new_sigma));
+                    //         });
+                    //         state.sigma().store(new_sigma);
+                    //     });
+                    // }
+                }
             }
             _ => todo!(),
         }
