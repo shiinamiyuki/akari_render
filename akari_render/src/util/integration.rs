@@ -75,7 +75,7 @@ pub fn adaptive_simpson<U: Value>(
         let ip = i0 + i1;
         let depth = item.depth;
         if depth.le(0) | (ip - i).abs().lt(15.0 * eps) {
-            *result += ip + (1.0 / 15.0) * (ip - i);
+            *result += ip + (1.0f32 / 15.0) * (ip - i);
         } else {
             push(WorkItem::new_expr(
                 a,
@@ -197,6 +197,7 @@ mod test {
     use rand::{thread_rng, Rng};
 
     use super::*;
+   
     fn test_integration_helper(
         device: &Device,
         inputs: &Buffer<Float2>,
@@ -206,16 +207,16 @@ mod test {
     ) {
         let eps = 1e-6f32;
         let max_depth = 13;
-        let kernel = device.create_kernel::<fn()>(&|| {
+        let kernel = device.create_kernel::<fn()>(&track!(|| {
             let i = dispatch_id().x;
             let endpoints = inputs.read(i);
             let x0 = endpoints.x;
             let x1 = endpoints.y;
             let int_simpson =
-                adaptive_simpson::<bool>(&device, true.into(), |_, x| f(x), x0, x1, eps, max_depth);
+                adaptive_simpson::<bool>(&device, true.expr(), |_, x| f(x), x0, x1, eps, max_depth);
             let int_analytic = analytic(x1) - analytic(x0);
             outputs.write(i, Float2::expr(int_simpson, int_analytic));
-        });
+        }));
         kernel.dispatch([inputs.len() as u32, 1, 1]);
         let inputs = inputs.copy_to_vec();
         let outputs = outputs.copy_to_vec();
@@ -258,22 +259,25 @@ mod test {
             Float2::new(x0.min(x1), x0.max(x1))
         });
         let outputs = device.create_buffer(inputs.len());
-        test_integration_helper(&device, &inputs, &outputs, |x| x * x, |x| x * x * x / 3.0);
-        test_integration_helper(&device, &inputs, &outputs, |x| x.sin(), |x| -x.cos());
-        test_integration_helper(
-            &device,
-            &inputs,
-            &outputs,
-            |x| x * (-x * x).exp(),
-            |x| -(-x * x).exp() * 0.5,
-        );
-        let k = 4.0f32;
-        test_integration_helper(
-            &device,
-            &inputs,
-            &outputs,
-            |x| x * (k * x * x).sin(),
-            |x| -(k * x * x).cos() / (2.0 * k),
-        );
+        track!({
+            test_integration_helper(&device, &inputs, &outputs, |x| x * x, |x| x * x * x / 3.0);
+            test_integration_helper(&device, &inputs, &outputs, |x| x.sin(), |x| -x.cos());
+            test_integration_helper(
+                &device,
+                &inputs,
+                &outputs,
+                |x| x * (-x * x).exp(),
+                |x| -(-x * x).exp() * 0.5,
+            );
+            let k = 4.0f32;
+            test_integration_helper(
+                &device,
+                &inputs,
+                &outputs,
+                |x| x * (k * x * x).sin(),
+                |x| -(k * x * x).cos() / (2.0 * k),
+            );
+        });
+      
     }
 }

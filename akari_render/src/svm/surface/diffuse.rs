@@ -15,6 +15,7 @@ pub struct DiffuseBsdf {
 }
 
 impl Surface for DiffuseBsdf {
+    #[tracked]
     fn evaluate(
         &self,
         wo: Expr<Float3>,
@@ -22,12 +23,13 @@ impl Surface for DiffuseBsdf {
         _swl: Expr<SampledWavelengths>,
         ctx: &BsdfEvalContext,
     ) -> Color {
-        if_!(Frame::same_hemisphere(wo, wi), {
+        if Frame::same_hemisphere(wo, wi) {
             &self.reflectance * Frame::abs_cos_theta(wi)
-        }, else {
+        } else {
             Color::zero(ctx.color_repr)
-        })
+        }
     }
+    #[tracked]
     fn sample(
         &self,
         wo: Expr<Float3>,
@@ -47,6 +49,7 @@ impl Surface for DiffuseBsdf {
             valid: true.expr(),
         }
     }
+    #[tracked]
     fn pdf(
         &self,
         wo: Expr<Float3>,
@@ -60,6 +63,7 @@ impl Surface for DiffuseBsdf {
             0.0f32.expr(),
         )
     }
+    #[tracked]
     fn albedo(
         &self,
         _wo: Expr<Float3>,

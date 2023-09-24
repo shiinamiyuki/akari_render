@@ -47,7 +47,7 @@ impl DirectLighting {
     pub fn invalid(color_pipeline: ColorPipeline) -> Self {
         Self {
             irradiance: Color::zero(color_pipeline.color_repr),
-            wi: Expr::<Float3>::zero(),
+            wi: Expr::<Float3>::zeroed(),
             pdf: 0.0f32.expr(),
             weight: 0.0f32.expr(),
             shadow_ray: Expr::<Ray>::zeroed(),
@@ -97,140 +97,137 @@ impl<'a> PathTracerBase<'a> {
     pub fn mul_beta(&self, r: Color) {
         self.beta.store(self.beta.load() * r);
     }
+    #[tracked]
     pub fn set_si(&self, si: Expr<SurfaceInteraction>, wo: Expr<Float3>) {
         self.si.store(si);
-        let g = si.geometry();
-        *self.p.get_mut() = g.p();
-        *self.ns.get_mut() = g.ns();
-        *self.ng.get_mut() = g.ng();
-        *self.wo.get_mut() = wo;
-        let inst_id = si.inst_id();
+        let g = si.geometry;
+        *self.p = g.p;
+        *self.ns = g.ns;
+        *self.ng = g.ng;
+        *self.wo = wo;
+        let inst_id = si.inst_id;
         let instance = self.scene.meshes.mesh_instances.var().read(inst_id);
-        *self.instance.get_mut() = instance;
+        *self.instance = instance;
     }
+    #[tracked]
     pub fn next_intersection(&self, ray: Expr<Ray>) -> Expr<bool> {
         let si = self.scene.intersect(ray);
-        if_!(
-            si.valid(),
-            {
-                self.set_si(si, -ray.d);
-                true.expr()
-            },
-            else,
-            { false.expr() }
-        )
+        if si.valid {
+            self.set_si(si, -ray.d);
+            true.expr()
+        } else {
+            false.expr()
+        }
     }
+    #[tracked]
     pub fn sample_surface(&self, u_bsdf: Expr<Float3>) -> BsdfSample {
-        let surface = *self.instance.surface();
+        let surface = **self.instance.surface;
         let sample = self
             .eval
             .surface
-            .sample(surface, *self.si, *self.wo, u_bsdf, self.swl);
+            .sample(surface, **self.si, **self.wo, u_bsdf, self.swl);
         sample
     }
+
     pub fn sample_light(&self, u: Expr<Float3>) -> DirectLighting {
         if self.use_nee {
-            if_!(
-                !self.indirect_only | self.depth.load().gt(1),
-                {
-                    let p = *self.p;
-                    let ng = *self.ng;
-                    let pn = PointNormalExpr::new(p, ng);
+            track!({
+                if !self.indirect_only | self.depth.load().gt(1) {
+                    let p = **self.p;
+                    let ng = **self.ng;
+                    let pn = PointNormal::new_expr(p, ng);
                     let eval = self.eval;
-                    let sample = eval.light.sample(pn, u, *self.swl);
+                    let sample = eval.light.sample(pn, u, **self.swl);
                     let wi = sample.wi;
-                    let surface = *self.instance.surface();
-                    let wo = *self.wo;
+                    let surface = **self.instance.surface;
+                    let wo = **self.wo;
                     let (bsdf_f, bsdf_pdf) = eval
                         .surface
-                        .evaluate_color_and_pdf(surface, *self.si, wo, wi, *self.swl);
+                        .evaluate_color_and_pdf(surface, **self.si, wo, wi, **self.swl);
                     lc_assert!(bsdf_pdf.ge(0.0));
                     lc_assert!(bsdf_f.min().ge(0.0));
                     let w = mis_weight(sample.pdf, bsdf_pdf, 1);
-                    let shadow_ray = sample
-                        .shadow_ray
-                        .set_exclude0(Uint2::expr(*self.si.inst_id(), *self.si.prim_id()));
+                    let shadow_ray = sample.shadow_ray.var();
+                    *shadow_ray.exclude0 = Uint2::expr(**self.si.inst_id, **self.si.prim_id);
                     DirectLighting {
                         weight: w,
                         irradiance: sample.li,
                         wi,
                         pdf: sample.pdf,
-                        shadow_ray,
+                        shadow_ray: shadow_ray.load(),
                         valid: true.expr(),
                         bsdf_f,
                     }
-                },
-                else,
-                { DirectLighting::invalid(self.color_pipeline) }
-            )
+                } else {
+                    DirectLighting::invalid(self.color_pipeline)
+                }
+            })
         } else {
             DirectLighting::invalid(self.color_pipeline)
         }
     }
+    #[tracked]
     pub fn continue_prob(&self) -> (Expr<bool>, Expr<f32>) {
-        let depth = &self.depth;
-        let beta = &self.beta;
-        if_!(
-            depth.load().gt(self.rr_depth),
-            {
-                let cont_prob = beta.load().max().clamp(0.0, 1.0) * 0.95;
-                (true.into(), cont_prob)
-            },
-            { (false.into(), 1.0f32.expr()) }
-        )
+        let depth = **self.depth;
+        let beta = self.beta.load();
+        if depth.gt(self.rr_depth) {
+            let cont_prob = beta.max().clamp(0.0.expr(), 1.0.expr()) * 0.95;
+            (true.expr(), cont_prob)
+        } else {
+            (false.expr(), 1.0f32.expr())
+        }
     }
+    #[tracked]
     pub fn hit_envmap(&self, ray: Expr<Ray>) -> (Color, Expr<f32>) {
         (Color::zero(self.color_pipeline.color_repr), 0.0f32.expr())
     }
+    #[tracked]
     pub fn handle_surface_light(&self, ray: Expr<Ray>) -> (Color, Expr<f32>) {
         let instance = *self.instance;
         let eval = self.eval;
-        let depth = &self.depth;
+        let depth = **self.depth;
 
-        if_!(
-            instance.light().valid() & (!self.indirect_only | depth.gt(1)),
-            {
-                let si = *self.si;
-                let direct = eval.light.le(ray, si, *self.swl);
-                // cpu_dbg!(direct.flatten());
-                if_!(depth.eq(0) | !self.use_nee, {
-                   (direct, 1.0f32.expr())
-                }, else {
-                    let pn = {
-                        let p = ray.o;
-                        let n = *self.prev_ng;
-                        PointNormalExpr::new(p, n)
-                    };
-                    let light_pdf = eval.light.pdf(si, pn, *self.swl);
-                    let w = mis_weight(*self.prev_bsdf_pdf, light_pdf, 1);
+        if instance.light.valid() & (!self.indirect_only | depth.gt(1)) {
+            let si = **self.si;
+            let direct = eval.light.le(ray, si, **self.swl);
+            // cpu_dbg!(direct.flatten());
+            if depth.eq(0) | !self.use_nee {
+                (direct, 1.0f32.expr())
+            } else {
+                let pn = {
+                    let p = ray.o;
+                    let n = self.prev_ng;
+                    PointNormal::new_expr(p, **n)
+                };
+                let light_pdf = eval.light.pdf(si, pn, **self.swl);
+                let w = mis_weight(**self.prev_bsdf_pdf, light_pdf, 1);
 
-                    (direct, w)
-                })
-            },
-            else,
-            { (Color::zero(self.color_pipeline.color_repr), 0.0f32.expr()) }
-        )
+                (direct, w)
+            }
+        } else {
+            (Color::zero(self.color_pipeline.color_repr), 0.0f32.expr())
+        }
     }
 
     pub fn run_megakernel(&self, ray: Expr<Ray>, sampler: &dyn Sampler) {
         let ray = ray.var();
         track!({
             loop {
-                let hit = self.next_intersection(*ray);
+                let hit = self.next_intersection(**ray);
                 if !hit {
-                    let (direct, w) = self.hit_envmap(*ray);
+                    let (direct, w) = self.hit_envmap(**ray);
                     self.add_radiance(direct * w);
                     break;
                 }
                 {
-                    let (direct, w) = self.handle_surface_light(*ray);
+                    let (direct, w) = self.handle_surface_light(**ray);
                     self.add_radiance(direct * w);
                 }
 
                 if self.depth.load() >= self.max_depth {
                     break;
                 }
-                *self.depth.get_mut() += 1;
+                *self.depth += 1;
 
                 let direct_lighting = self.sample_light(sampler.next_3d());
                 if direct_lighting.valid {
@@ -260,15 +257,15 @@ impl<'a> PathTracerBase<'a> {
                     self.mul_beta(Color::one(self.color_pipeline.color_repr) / cont_prob);
                 }
                 {
-                    *self.prev_bsdf_pdf.get_mut() = bsdf_sample.pdf;
-                    *self.prev_ng.get_mut() = *self.ng;
-                    let ro = offset_ray_origin(*self.p, face_forward(*self.ng, bsdf_sample.wi));
-                    *ray.get_mut() = RayExpr::new(
+                    *self.prev_bsdf_pdf = bsdf_sample.pdf;
+                    *self.prev_ng = **self.ng;
+                    let ro = offset_ray_origin(**self.p, face_forward(**self.ng, bsdf_sample.wi));
+                    *ray = Ray::new_expr(
                         ro,
                         bsdf_sample.wi,
                         0.0,
                         1e20,
-                        Uint2::expr(*self.si.inst_id(), *self.si.prim_id()),
+                        Uint2::expr(**self.si.inst_id, **self.si.prim_id),
                         Uint2::expr(u32::MAX, u32::MAX),
                     );
                 }
@@ -328,17 +325,18 @@ impl PathTracer {
         }
     }
 }
+
 pub fn mis_weight(pdf_a: Expr<f32>, pdf_b: Expr<f32>, power: u32) -> Expr<f32> {
     let apply_power = |x: Expr<f32>| {
         let mut p = 1.0f32.expr();
         for _ in 0..power {
-            p = p * x;
+            p = track!(p * x);
         }
         p
     };
     let pdf_a = apply_power(pdf_a);
     let pdf_b = apply_power(pdf_b);
-    pdf_a / (pdf_a + pdf_b)
+    track!(pdf_a / (pdf_a + pdf_b))
 }
 pub struct VertexType;
 impl VertexType {
@@ -367,7 +365,7 @@ pub struct ReconnectionVertex {
 }
 impl ReconnectionVertexVar {
     pub fn valid(&self) -> Expr<bool> {
-        self.type_().load().ne(VertexType::INVALID)
+        self.type_.load().ne(VertexType::INVALID)
     }
 }
 #[derive(Clone, Copy)]
@@ -397,8 +395,8 @@ impl PathTracer {
         let pt = PathTracerBase::new(
             scene,
             eval,
-            self.max_depth.into(),
-            self.rr_depth.into(),
+            self.max_depth.expr(),
+            self.rr_depth.expr(),
             self.use_nee,
             self.indirect_only,
             swl,
@@ -428,7 +426,7 @@ impl Integrator for PathTracer {
         let sampler_creator = sampler_config.creator(self.device.clone(), &scene, self.spp);
         let evaluators = scene.evaluators(color_pipeline, ADMode::None);
         let kernel = self.device.create_kernel::<fn(u32, Int2)>(
-            &|spp_per_pass: Expr<u32>, pixel_offset: Expr<Int2>| {
+            &track!(|spp_per_pass: Expr<u32>, pixel_offset: Expr<Int2>| {
                 let p = dispatch_id().xy();
                 let sampler = sampler_creator.create(p);
                 let sampler = sampler.as_ref();
@@ -436,7 +434,9 @@ impl Integrator for PathTracer {
                     sampler.start();
                     let ip = p.cast_i32();
                     let shifted = ip + pixel_offset;
-                    let shifted = shifted.clamp(0, resolution.expr().cast_i32() - 1).cast_u32();
+                    let shifted = shifted
+                        .clamp(0, resolution.expr().cast_i32() - 1)
+                        .cast_u32();
                     let swl = sample_wavelengths(color_pipeline.color_repr, sampler);
                     let (ray, ray_color, ray_w) = scene.camera.generate_ray(
                         film.filter(),
@@ -447,9 +447,9 @@ impl Integrator for PathTracer {
                     );
                     let swl = swl.var();
                     let l = self.radiance(&scene, &evaluators, ray, swl, sampler) * ray_color;
-                    film.add_sample(p.cast_f32(), &l, *swl, ray_w);
+                    film.add_sample(p.cast_f32(), &l, **swl, ray_w);
                 });
-            },
+            })
         );
         let mut cnt = 0;
         let progress = util::create_progess_bar(self.spp as usize, "spp");

@@ -141,7 +141,7 @@ impl PerspectiveCameraData {
         }]);
         Kernel::<fn()>::new(
             &device,
-            track!(|| {
+            track!(&|| {
                 let camera = buffer;
                 let c = camera.read(0);
                 let r2c = c.r2c;

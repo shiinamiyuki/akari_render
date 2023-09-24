@@ -128,7 +128,7 @@ impl LightEvaluator {
     ) -> LightSample {
         let sample = self.sample.call(pn, u, swl);
         LightSample {
-            li: Color::from_flat(self.color_pipeline.color_repr, sample.li()),
+            li: Color::from_flat(self.color_pipeline.color_repr, sample.li),
             pdf: sample.pdf,
             wi: sample.wi,
             shadow_ray: sample.shadow_ray,

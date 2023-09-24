@@ -3,6 +3,7 @@ use std::f32::consts::PI;
 use crate::*;
 #[derive(Clone, Copy, Debug, Value)]
 #[repr(C)]
+#[value_new(pub)]
 pub struct PointNormal {
     pub p: Float3,
     pub n: Float3,

@@ -47,15 +47,15 @@ mod bsdf_chi2_test {
         assert!(sample_count % threads == 0);
         let samples_per_thread = sample_count / threads;
         let rngs = init_pcg32_buffer_with_seed(device.clone(), threads, 0);
-        let kernel =
-            device.create_kernel::<fn(Float3, u32)>(&|wo: Expr<Float3>, samples: Expr<u32>| {
+        let kernel = device.create_kernel::<fn(Float3, u32)>(&track!(
+            |wo: Expr<Float3>, samples: Expr<u32>| {
                 let i = dispatch_id().x;
                 let pcg = rngs.var().read(i).var();
                 let sampler = IndependentSampler::from_pcg32(pcg);
                 for_range(0u32.expr()..samples, |_| {
                     let u = sampler.next_3d();
                     let s = sample(wo, u);
-                    if_!(s.valid, {
+                    if s.valid {
                         // cpu_dbg!(s.wi);
                         let (theta, phi) = xyz_to_spherical(s.wi);
                         let phi = select(phi.lt(0.0), phi + 2.0 * PI, phi) / (2.0 * PI);
@@ -65,13 +65,14 @@ mod bsdf_chi2_test {
                         // cpu_dbg!(Float2::expr(theta / PI, s.wi.y.acos() / PI));
                         // lc_assert!(phi.ge(0.0) & phi.le(1.0001));
                         // lc_assert!(theta.ge(0.0) & theta.le(1.0001));
-                        let bin_theta = (theta * theta_res as f32).cast_u32().min(theta_res - 1);
-                        let bin_phi = (phi * phi_res as f32).cast_u32().min(phi_res - 1);
+                        let bin_theta = (theta * theta_res as f32).cast_u32().min_(theta_res - 1);
+                        let bin_phi = (phi * phi_res as f32).cast_u32().min_(phi_res - 1);
                         let bin_idx = bin_theta * phi_res + bin_phi;
                         target.var().atomic_fetch_add(bin_idx, 1);
-                    });
+                    }
                 });
-            });
+            }
+        ));
         kernel.dispatch([threads as u32, 1, 1], &wo, &(samples_per_thread as u32));
         target.copy_to_vec()
     }
@@ -85,7 +86,7 @@ mod bsdf_chi2_test {
         let pdf = Arc::new(pdf);
         let target = device.create_buffer((phi_res * theta_res) as usize);
         target.fill(0.0f32);
-        let kernel = device.create_kernel::<fn(Float3)>(&|wo: Expr<Float3>| {
+        let kernel = device.create_kernel::<fn(Float3)>(&track!(|wo: Expr<Float3>| {
             set_block_size([8, 8, 1]);
             let ij = dispatch_id().xy();
             let theta_h = PI / theta_res as f32;
@@ -114,7 +115,7 @@ mod bsdf_chi2_test {
                 6,
             );
             target.write(bin_idx, integral);
-        });
+        }));
         kernel.dispatch([theta_res, phi_res, 1], &wo);
         target.copy_to_vec()
     }
@@ -460,7 +461,7 @@ mod invert {
         let bads = device.create_buffer::<u32>(count);
         bads.fill(0);
         let printer = Printer::new(&device, 32768);
-        let kernel = device.create_kernel::<fn()>(&|| {
+        let kernel = device.create_kernel::<fn()>(&track!(|| {
             let i = dispatch_id().x;
             let sampler = IndependentSampler::from_pcg32(rngs.var().read(i).var());
             for_range(0..samples, |_| {
@@ -468,12 +469,12 @@ mod invert {
                 let w = sample(u);
                 let u2 = invert(w);
                 let bad = (u2 - u).length().gt(0.01);
-                if_!(bad, {
+                if bad {
                     bads.var().atomic_fetch_add(i, 1);
                     lc_info!(printer, "bad: u: {:?} u2:{:?} w:{:?}", u, u2, w);
-                });
+                }
             });
-        });
+        }));
         let stream = device.default_stream();
         stream.with_scope(|s| {
             s.reset_printer(&printer)

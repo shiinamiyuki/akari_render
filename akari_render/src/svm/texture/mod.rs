@@ -16,14 +16,14 @@ pub fn rgb_to_target_colorspace(
     match colorspace {
         RgbColorSpace::SRgb => {
             if target == RgbColorSpace::ACEScg {
-                Mat3::from(srgb_to_aces_with_cat_mat()).expr() * rgb
+                track!(Mat3::from(srgb_to_aces_with_cat_mat()).expr() * rgb)
             } else {
                 rgb
             }
         }
         RgbColorSpace::ACEScg => {
             if target == RgbColorSpace::SRgb {
-                Mat3::from(aces_to_srgb_with_cat_mat()).expr() * rgb
+                track!(Mat3::from(aces_to_srgb_with_cat_mat()).expr() * rgb)
             } else {
                 rgb
             }

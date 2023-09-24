@@ -192,8 +192,8 @@ pub struct PrimarySample {
 impl PrimarySample {
     #[tracked]
     pub fn clamped(&self) -> Self {
-        let values = VLArrayVar::zero(self.values.static_len());
-        for_range(0u32.expr()..values.len(), |i| {
+        let values = VLArrayVar::zero(self.values.len());
+        for_range(0u64.expr()..values.len_expr(), |i| {
             let x = self.values.read(i);
             values.write(i, x - x.floor());
         });
@@ -202,7 +202,7 @@ impl PrimarySample {
     #[tracked]
     pub fn new(len: usize, sampler: &dyn Sampler) -> Self {
         let values = VLArrayVar::zero(len);
-        for_range(0u32.expr()..values.len(), |i| {
+        for_range(0u64.expr()..values.len_expr(), |i| {
             values.write(i, sampler.next_1d());
         });
         Self { values }
@@ -226,7 +226,7 @@ impl<'a> IndependentReplaySampler<'a> {
 impl<'a> Sampler for IndependentReplaySampler<'a> {
     #[tracked]
     fn next_1d(&self) -> Expr<f32> {
-        if self.cur_dim.load().lt(self.sample.values.len()) {
+        if self.cur_dim.load().lt(self.sample.values.len_expr().cast_u32()) {
             let ret = self.sample.values.read(self.cur_dim.load());
             *self.cur_dim += 1;
             ret

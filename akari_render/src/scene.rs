@@ -256,9 +256,9 @@ impl Scene {
     }
     #[tracked]
     pub fn intersect(&self, ray: Expr<Ray>) -> Expr<SurfaceInteraction> {
-        let ro = ray.o;
-        let rd = ray.d;
-        let rtx_ray = rtx::RayExpr::new(ro, ray.t_min, rd, ray.t_max);
+        let ro: Expr<[f32; 3]> = ray.o.into();
+        let rd: Expr<[f32; 3]> = ray.d.into();
+        let rtx_ray = rtx::Ray::new_expr(ro, ray.t_min, rd, ray.t_max);
 
         let hit = self.meshes.accel.var().query_all(
             rtx_ray,
@@ -289,8 +289,8 @@ impl Scene {
     }
     #[tracked]
     pub fn occlude(&self, ray: Expr<Ray>) -> Expr<bool> {
-        let ro = ray.o;
-        let rd = ray.d;
+        let ro: Expr<[f32; 3]> = ray.o.into();
+        let rd: Expr<[f32; 3]> = ray.d.into();
         let rtx_ray = rtx::Ray::new_expr(ro, ray.t_min, rd, ray.t_max);
 
         let hit = self.meshes.accel.var().query_any(

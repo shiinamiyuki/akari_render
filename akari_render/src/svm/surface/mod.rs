@@ -425,6 +425,7 @@ pub struct MicrofacetReflection {
 }
 
 impl Surface for MicrofacetReflection {
+    #[tracked]
     fn evaluate(
         &self,
         wo: Expr<Float3>,
@@ -435,21 +436,24 @@ impl Surface for MicrofacetReflection {
         let wh = wo + wi;
         let cos_o = Frame::cos_theta(wo);
         let cos_i = Frame::cos_theta(wi);
-        if_!((wh.dot(wo) * wi.dot(wh)).lt(0.0)
+        if (wh.dot(wo) * wi.dot(wh)).lt(0.0)
             | wh.eq(0.0).all()
             | cos_i.eq(0.0)
             | cos_o.eq(0.0)
-            | !Frame::same_hemisphere(wo, wi), {
-                Color::zero(ctx.color_repr)
-        }, else {
+            | !Frame::same_hemisphere(wo, wi)
+        {
+            Color::zero(ctx.color_repr)
+        } else {
             let wh = wh.normalize();
-            let f = self.fresnel.evaluate(wi.dot(face_forward(wh, Float3::expr(0.0,1.0,0.0))), ctx);
-            let d = self.dist.d(wh,ctx.ad_mode);
-            let g = self.dist.g(wo, wi,ctx.ad_mode);
+            let f = self
+                .fresnel
+                .evaluate(wi.dot(face_forward(wh, Float3::expr(0.0, 1.0, 0.0))), ctx);
+            let d = self.dist.d(wh, ctx.ad_mode);
+            let g = self.dist.g(wo, wi, ctx.ad_mode);
             &self.color * &f * (0.25 * d * g / (cos_i * cos_o)).abs() * cos_o.abs()
-        })
+        }
     }
-
+    #[tracked]
     fn sample(
         &self,
         wo: Expr<Float3>,
@@ -462,13 +466,13 @@ impl Surface for MicrofacetReflection {
         let wi = reflect(wo, wh);
         let valid = Frame::same_hemisphere(wo, wi);
         BsdfSample {
-            color: self.evaluate(wo, wi, *swl, ctx),
-            pdf: self.pdf(wo, wi, *swl, ctx),
+            color: self.evaluate(wo, wi, **swl, ctx),
+            pdf: self.pdf(wo, wi, **swl, ctx),
             valid,
             wi,
         }
     }
-
+    #[tracked]
     fn pdf(
         &self,
         wo: Expr<Float3>,
@@ -479,16 +483,17 @@ impl Surface for MicrofacetReflection {
         let wh = wo + wi;
         let cos_o = Frame::cos_theta(wo);
         let cos_i = Frame::cos_theta(wi);
-        if_!((wh.dot(wo) * wi.dot(wh)).lt(0.0)
+        if (wh.dot(wo) * wi.dot(wh)).lt(0.0)
             | wh.eq(0.0).all()
             | cos_i.eq(0.0)
             | cos_o.eq(0.0)
-            | !Frame::same_hemisphere(wo, wi), {
-                0.0f32.expr()
-        }, else {
+            | !Frame::same_hemisphere(wo, wi)
+        {
+            0.0f32.expr()
+        } else {
             let wh = wh.normalize();
-            self.dist.pdf(wo, wh,ctx.ad_mode) / (4.0 * wo.dot(wh))
-        })
+            self.dist.pdf(wo, wh, ctx.ad_mode) / (4.0 * wo.dot(wh))
+        }
     }
     fn albedo(
         &self,
@@ -655,24 +660,25 @@ impl Surface for MicrofacetTransmission {
     }
 }
 
+#[tracked]
 pub fn fr_dielectric(cos_theta_i: Expr<f32>, eta: Expr<f32>) -> Expr<f32> {
-    let cos_theta_i = cos_theta_i.clamp(-1.0, 1.0);
+    let cos_theta_i = cos_theta_i.clamp(-1.0.expr(), 1.0.expr());
     let eta = select(cos_theta_i.gt(0.0), eta, 1.0 / eta);
     let cos_theta_i = cos_theta_i.abs();
     //
     // Compute $\cos\,\theta_\roman{t}$ for Fresnel equations using Snell's law
     let sin2_theta_i = 1.0 - cos_theta_i.sqr();
     let sin2_theta_t = sin2_theta_i / eta.sqr();
-    if_!(sin2_theta_t.ge(1.0), {
+    if sin2_theta_t.ge(1.0) {
         1.0f32.expr()
-    }, else {
-        let cos_theta_t = (1.0 - sin2_theta_t).max(0.0).sqrt();
+    } else {
+        let cos_theta_t = (1.0 - sin2_theta_t).max_(0.0).sqrt();
         let r_parl = (eta * cos_theta_i - cos_theta_t) / (eta * cos_theta_i + cos_theta_t);
         let r_perp = (cos_theta_i - eta * cos_theta_t) / (cos_theta_i + eta * cos_theta_t);
         let fr = (r_parl.sqr() + r_perp.sqr()) * 0.5;
         // cpu_dbg!(fr);
-        fr.clamp(0.0, 1.0)
-    })
+        fr.clamp(0.0.expr(), 1.0.expr())
+    }
     //     Expr<f32> sin2Theta_i = 1 - Sqr(cosTheta_i);
     //     Expr<f32> sin2Theta_t = sin2Theta_i / Sqr(eta);
     //     if (sin2Theta_t >= 1)
@@ -683,9 +689,9 @@ pub fn fr_dielectric(cos_theta_i: Expr<f32>, eta: Expr<f32>) -> Expr<f32> {
     //     Expr<f32> r_perp = (cosTheta_i - eta * cosTheta_t) / (cosTheta_i + eta * cosTheta_t);
     //     return (Sqr(r_parl) + Sqr(r_perp)) / 2;
 }
-
+#[tracked]
 pub fn fr_schlick(f0: Color, cos_theta_i: Expr<f32>) -> Color {
-    let cos_theta_i = cos_theta_i.clamp(-1.0, 1.0).abs();
+    let cos_theta_i = cos_theta_i.clamp(-1.0.expr(), 1.0.expr()).abs();
     let pow5 = |x: Expr<f32>| x.sqr().sqr() * x;
     let fr = f0 + (Color::one(f0.repr()) - f0) * pow5(1.0 - cos_theta_i).abs();
     fr
@@ -704,6 +710,7 @@ pub struct FresnelDielectric {
     pub eta: Expr<f32>, //eta = eta_t / eta_i
 }
 impl Fresnel for FresnelDielectric {
+    #[tracked]
     fn evaluate(&self, cos_theta_i: Expr<f32>, ctx: &BsdfEvalContext) -> Color {
         Color::one(ctx.color_repr) * fr_dielectric(cos_theta_i, self.eta)
     }
@@ -793,7 +800,7 @@ impl SurfaceEvaluator {
         let result = self
             .eval
             .call(surface, si, wo, wi, swl, SURFACE_EVAL_COLOR.expr());
-        Color::from_flat(self.color_repr, result.color())
+        Color::from_flat(self.color_repr, result.color)
     }
     pub fn pdf(
         &self,
@@ -806,7 +813,7 @@ impl SurfaceEvaluator {
         let result = self
             .eval
             .call(surface, si, wo, wi, swl, SURFACE_EVAL_PDF.expr());
-        result.pdf()
+        result.pdf
     }
     pub fn evaluate_color_and_pdf(
         &self,
@@ -824,10 +831,7 @@ impl SurfaceEvaluator {
             swl,
             (SURFACE_EVAL_COLOR | SURFACE_EVAL_PDF).expr(),
         );
-        (
-            Color::from_flat(self.color_repr, result.color()),
-            result.pdf(),
-        )
+        (Color::from_flat(self.color_repr, result.color), result.pdf)
     }
     pub fn albedo(
         &self,
@@ -840,11 +844,11 @@ impl SurfaceEvaluator {
             surface,
             si,
             wo,
-            Expr::<Float3>::zero(),
+            Expr::<Float3>::zeroed(),
             swl,
             SURFACE_EVAL_ALBEDO.expr(),
         );
-        Color::from_flat(self.color_repr, result.albedo())
+        Color::from_flat(self.color_repr, result.albedo)
     }
     pub fn sample(
         &self,
@@ -856,10 +860,10 @@ impl SurfaceEvaluator {
     ) -> BsdfSample {
         let sample = self.sample.call(surface, si, wo, u, swl);
         BsdfSample {
-            wi: sample.wi(),
-            pdf: sample.pdf(),
-            color: Color::from_flat(self.color_repr, sample.color()),
-            valid: sample.valid(),
+            wi: sample.wi,
+            pdf: sample.pdf,
+            color: Color::from_flat(self.color_repr, sample.color),
+            valid: sample.valid,
         }
     }
 }
