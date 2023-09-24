@@ -83,11 +83,12 @@ impl Camera for PerspectiveCamera {
             1e20,
             Uint2::expr(u32::MAX, u32::MAX),
             Uint2::expr(u32::MAX, u32::MAX),
-        ).var();
+        )
+        .var();
         *ray.o = camera.c2w.transform_point(ray.o);
         *ray.d = camera.c2w.transform_vector(ray.d);
         // cpu_dbg!(ray);
-        (ray, Color::one(color_repr), w)
+        (**ray, Color::one(color_repr), w)
     }
 }
 #[derive(Clone, Copy, Debug, Value)]
@@ -138,12 +139,13 @@ impl PerspectiveCameraData {
             lens_radius,
             focal_length,
         }]);
-        device
-            .create_kernel::<fn()>(&|| {
+        Kernel::<fn()>::new(
+            &device,
+            track!(|| {
                 let camera = buffer;
                 let c = camera.read(0);
-                let r2c = c.r2c();
-                let resolution = c.resolution();
+                let r2c = c.r2c;
+                let resolution = c.resolution;
                 let a = {
                     let p_min = r2c.transform_point(Float3::expr(0.0, 0.0, 0.0));
                     let p_max = r2c.transform_point(Float3::expr(
@@ -155,11 +157,13 @@ impl PerspectiveCameraData {
                     let p_max = p_max / p_max.z;
                     ((p_max.x - p_min.x) * (p_max.y - p_min.y)).abs()
                 };
-                let c = c.set_lens_area(a);
-                let c = c.set_w2c(c.c2w().inverse());
-                let c = c.set_c2r(c.r2c().inverse());
+                let c = c.var();
+                *c.lens_area = a;
+                *c.w2c = c.c2w.inverse();
+                *c.c2r = c.r2c.inverse();
                 camera.write(0, c);
-            })
-            .dispatch([1, 1, 1]);
+            }),
+        )
+        .dispatch([1, 1, 1]);
     }
 }

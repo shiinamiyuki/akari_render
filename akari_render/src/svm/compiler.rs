@@ -236,7 +236,7 @@ impl<'a> Compiler<'a> {
                 let g = *rgb.in_g.as_value().unwrap() as f32;
                 let b = *rgb.in_b.as_value().unwrap() as f32;
                 SvmNode::Float3(SvmFloat3 {
-                    value: [f32;3]::new(r, g, b),
+                    value: [r, g, b],
                 })
             } else {
                 let r = compiler.compile_float_socket(&rgb.in_r);

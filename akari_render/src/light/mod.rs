@@ -20,6 +20,7 @@ pub struct LightSample {
 }
 #[derive(Clone, Copy, Value)]
 #[repr(C)]
+#[value_new(pub)]
 pub struct FlatLightSample {
     pub li: FlatColor,
     pub pdf: f32,
@@ -118,6 +119,7 @@ impl LightEvaluator {
         let color = self.le.call(ray, si, swl);
         Color::from_flat(self.color_pipeline.color_repr, color)
     }
+    #[tracked]
     pub fn sample(
         &self,
         pn: Expr<PointNormal>,
@@ -127,10 +129,10 @@ impl LightEvaluator {
         let sample = self.sample.call(pn, u, swl);
         LightSample {
             li: Color::from_flat(self.color_pipeline.color_repr, sample.li()),
-            pdf: sample.pdf(),
-            wi: sample.wi(),
-            shadow_ray: sample.shadow_ray(),
-            n: sample.n(),
+            pdf: sample.pdf,
+            wi: sample.wi,
+            shadow_ray: sample.shadow_ray,
+            n: sample.n,
         }
     }
     pub fn pdf(
@@ -163,6 +165,7 @@ impl LightAggregate {
         let direct = light.dispatch(|_tag, _key, light| light.le(ray, si, swl, ctx));
         direct
     }
+    #[tracked]
     pub fn sample_direct(
         &self,
         pn: Expr<PointNormal>,

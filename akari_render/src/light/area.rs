@@ -27,21 +27,21 @@ impl AreaLightExpr {
             ctx.color_repr(),
             ctx.surface_eval
                 .evaluate_ex(
-                    self.surface(),
+                    self.surface,
                     si,
                     wo,
-                    Expr::<Float3>::zero(),
+                    Expr::<Float3>::zeroed(),
                     swl,
-                    SURFACE_EVAL_EMISSION.into(),
+                    SURFACE_EVAL_EMISSION.expr(),
                 )
-                .emission(),
+                .emission,
         );
         emission
     }
 }
 impl Light for AreaLightExpr {
     fn id(&self) -> Expr<u32> {
-        self.light_id()
+        self.light_id
     }
     fn le(
         &self,
@@ -51,14 +51,14 @@ impl Light for AreaLightExpr {
         ctx: &LightEvalContext<'_>,
     ) -> Color {
         let emission = self.emission(-ray.d, si, swl, ctx);
-        let ns = si.geometry().ns();
+        let ns = si.geometry.ns;
         select(
             ns.dot(ray.d).lt(0.0),
             emission,
             Color::zero(ctx.color_repr()),
         )
     }
-
+    #[tracked]
     fn sample_direct(
         &self,
         pn: Expr<PointNormal>,
@@ -69,11 +69,11 @@ impl Light for AreaLightExpr {
     ) -> LightSample {
         let meshes = ctx.meshes;
         let area_samplers = meshes.mesh_area_samplers.var();
-        let at_entries = area_samplers.buffer::<AliasTableEntry>(self.area_sampling_index());
-        let at_pdf = area_samplers.buffer::<f32>(self.area_sampling_index() + 1);
+        let at_entries = area_samplers.buffer::<AliasTableEntry>(self.area_sampling_index);
+        let at_pdf = area_samplers.buffer::<f32>(self.area_sampling_index + 1);
         let at = BindlessAliasTableVar(at_entries, at_pdf);
         let (prim_id, pdf, _) = at.sample_and_remap(u_select);
-        let shading_triangle = meshes.shading_triangle(self.instance_id(), prim_id);
+        let shading_triangle = meshes.shading_triangle(self.instance_id, prim_id);
         let bary = uniform_sample_triangle(u_sample);
         let area = shading_triangle.area();
         let p = shading_triangle.p(bary);
@@ -81,42 +81,38 @@ impl Light for AreaLightExpr {
         let uv = shading_triangle.uv(bary);
         let tt = shading_triangle.tangent(bary);
         let ss = shading_triangle.bitangent(bary);
-        let geometry = SurfaceLocalGeometryExpr::new(
+        let geometry = SurfaceLocalGeometry::from_comps_expr(SurfaceLocalGeometryComps {
             p,
-            shading_triangle.ng,
-            n,
-            shading_triangle.tangent(bary),
-            shading_triangle.bitangent(bary),
+            ng: shading_triangle.ng,
+            ns: n,
+            tangent: shading_triangle.tangent(bary),
+            bitangent: shading_triangle.bitangent(bary),
             uv,
-        );
+        });
 
-        let si = SurfaceInteractionExpr::new(
-            self.instance_id(),
+        let si = SurfaceInteraction::from_comps_expr(SurfaceInteractionComps {
+            inst_id: self.instance_id,
             prim_id,
             bary,
             geometry,
-            FrameExpr::new(n, tt, ss),
-            true.expr(),
-        );
-        let wi = p - pn.p();
+            frame: Frame::new_expr(n, tt, ss),
+            valid: true.expr(),
+        });
+        let wi = p - pn.p;
         let emission = self.emission(-wi, si, swl, ctx);
         let dist2 = wi.length_squared();
         let wi = wi / dist2.sqrt();
-        let li = select(
-            wi.dot(n).lt(0.0),
-            emission,
-            Color::zero(ctx.color_repr()),
-        );
-        let pdf = pdf / area * dist2 / n.dot(-wi).max(1e-6);
-        let ro = rtx::offset_ray_origin(pn.p(), face_forward(pn.n(), wi));
+        let li = select(wi.dot(n).lt(0.0), emission, Color::zero(ctx.color_repr()));
+        let pdf = pdf / area * dist2 / n.dot(-wi).max_(1e-6);
+        let ro = rtx::offset_ray_origin(pn.p, face_forward(pn.n, wi));
         let dist = (p - ro).length();
-        let shadow_ray = RayExpr::new(
+        let shadow_ray = Ray::new_expr(
             ro,
             wi,
             0.0,
-            dist * (1.0 - 1e-3),
+            dist * (1.0f32 - 1e-3),
             Uint2::expr(u32::MAX, u32::MAX),
-            Uint2::expr(self.instance_id(), prim_id),
+            Uint2::expr(self.instance_id, prim_id),
         );
         // cpu_dbg!( u);
         LightSample {
@@ -127,29 +123,30 @@ impl Light for AreaLightExpr {
             n,
         }
     }
+    #[tracked]
     fn pdf_direct(
         &self,
         si: Expr<SurfaceInteraction>,
         pn: Expr<PointNormal>,
         ctx: &LightEvalContext<'_>,
     ) -> Expr<f32> {
-        let prim_id = si.prim_id();
+        let prim_id = si.prim_id;
         let meshes = ctx.meshes;
         let area_samplers = meshes.mesh_area_samplers.var();
-        let at_entries = area_samplers.buffer::<AliasTableEntry>(self.area_sampling_index());
-        let at_pdf = area_samplers.buffer::<f32>(self.area_sampling_index() + 1);
+        let at_entries = area_samplers.buffer::<AliasTableEntry>(self.area_sampling_index);
+        let at_pdf = area_samplers.buffer::<f32>(self.area_sampling_index + 1);
         let at = BindlessAliasTableVar(at_entries, at_pdf);
-        lc_assert!(si.inst_id().eq(self.instance_id()));
-        let shading_triangle = meshes.shading_triangle(si.inst_id(), si.prim_id());
+        lc_assert!(si.inst_id.eq(self.instance_id));
+        let shading_triangle = meshes.shading_triangle(si.inst_id, si.prim_id);
         let area = shading_triangle.area();
         let prim_pdf = at.pdf(prim_id);
-        let bary = si.bary();
+        let bary = si.bary;
         let n = shading_triangle.n(bary);
         let p = shading_triangle.p(bary);
-        let wi = p - pn.p();
+        let wi = p - pn.p;
         let dist2 = wi.length_squared();
         let wi = wi / dist2.sqrt();
-        let pdf = prim_pdf / area * dist2 / n.dot(-wi).max(1e-6);
+        let pdf = prim_pdf / area * dist2 / n.dot(-wi).max_(1e-6);
         pdf
     }
 }

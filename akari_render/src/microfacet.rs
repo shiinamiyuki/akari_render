@@ -40,6 +40,7 @@ impl TrowbridgeReitzDistribution {
         Self::from_alpha(alpha, sample_visible)
     }
 }
+#[tracked]
 fn tr_d_impl_(wh: Expr<Float3>, alpha: Expr<Float2>) -> Expr<f32> {
     let tan2_theta = Frame::tan2_theta(wh);
     let cos4_theta = Frame::cos2_theta(wh).sqr();
@@ -49,6 +50,7 @@ fn tr_d_impl_(wh: Expr<Float3>, alpha: Expr<Float2>) -> Expr<f32> {
     let d = 1.0 / (PI * ax * ay * cos4_theta * (1.0 + e).sqr());
     select(tan2_theta.is_infinite(), 0.0f32.expr(), d)
 }
+#[tracked]
 fn tr_lambda_impl_(w: Expr<Float3>, alpha: Expr<Float2>) -> Expr<f32> {
     let abs_tan_theta = Frame::tan_theta(w).abs();
     let alpha2 = Frame::cos2_phi(w) * alpha.x.sqr() + Frame::sin2_phi(w) * alpha.y.sqr();
@@ -56,13 +58,14 @@ fn tr_lambda_impl_(w: Expr<Float3>, alpha: Expr<Float2>) -> Expr<f32> {
     let l = (-1.0 + (1.0 + alpha2_tan2_theta).sqrt()) * 0.5;
     select(!abs_tan_theta.is_finite(), 0.0f32.expr(), l)
 }
+#[tracked]
 fn tr_sample_impl_(alpha: Expr<Float2>, u: Expr<Float2>) -> Expr<Float3> {
-    let (phi, cos_theta) = if_!(alpha.x.eq(alpha.y), {
+    let (phi, cos_theta) = if alpha.x.eq(alpha.y) {
         let phi = 2.0 * PI * u.y;
         let tan_theta2 = alpha.x.sqr() * u.x / (1.0 - u.x);
         let cos_theta = 1.0 / (1.0 + tan_theta2).sqrt();
         (phi, cos_theta)
-    }, else {
+    } else {
         let phi = (alpha.y / alpha.x * (2.0 * PI * u.y + PI * 0.5).tan()).atan();
         let phi = select(u.y.gt(0.5), phi + PI, phi);
         let sin_phi = phi.sin();
@@ -73,8 +76,8 @@ fn tr_sample_impl_(alpha: Expr<Float2>, u: Expr<Float2>) -> Expr<Float3> {
         let tan_theta2 = a2 * u.x / (1.0 - u.x);
         let cos_theta = 1.0 / (1.0 + tan_theta2).sqrt();
         (phi, cos_theta)
-    });
-    let sin_theta = (1.0 - cos_theta.sqr()).max(0.0).sqrt();
+    };
+    let sin_theta = (1.0 - cos_theta.sqr()).max_(0.0).sqrt();
     let wh = spherical_to_xyz2(cos_theta, sin_theta, phi);
     let wh = face_forward(wh, Float3::expr(0.0, 1.0, 0.0));
     wh
@@ -92,16 +95,16 @@ lazy_static! {
         Callable::<fn(Expr<f32>, Expr<Float2>) -> Expr<Float2>>::new_static(track!(
             |cos_theta, u| {
                 if cos_theta.lt(0.99999) {
-                    let sin_theta = (1.0 - cos_theta.sqr()).max(0.0).sqrt();
+                    let sin_theta = (1.0 - cos_theta.sqr()).max_(0.0).sqrt();
                     let tan_theta = sin_theta / cos_theta;
                     let a = 1.0 / tan_theta;
                     let g1 = 2.0 / (1.0 + (1.0 + 1.0 / a.sqr()).sqrt());
 
                     let a = 2.0 * u.x / g1 - 1.0;
-                    let tmp = (1.0 / (a.sqr() - 1.0)).min(1e10f32);
+                    let tmp = (1.0 / (a.sqr() - 1.0)).min_(1e10f32);
                     let b = tan_theta;
                     let d = ((b * tmp).sqr() - (a.sqr() - b.sqr()) * tmp)
-                        .max(0.0)
+                        .max_(0.0)
                         .sqrt();
                     let slope_x_1 = b * tmp - d;
                     let slope_x_2 = b * tmp + d;
@@ -229,9 +232,12 @@ impl MicrofacetDistribution for TrowbridgeReitzDistribution {
     }
     fn pdf(&self, wo: Expr<Float3>, wh: Expr<Float3>, ad_mode: ADMode) -> Expr<f32> {
         if self.sample_visible {
-            self.d(wh, ad_mode) * self.g1(wo, ad_mode) * wo.dot(wh).abs() / Frame::abs_cos_theta(wo)
+            track!(
+                self.d(wh, ad_mode) * self.g1(wo, ad_mode) * wo.dot(wh).abs()
+                    / Frame::abs_cos_theta(wo)
+            )
         } else {
-            self.d(wh, ad_mode) * Frame::abs_cos_theta(wh)
+            track!(self.d(wh, ad_mode) * Frame::abs_cos_theta(wh))
         }
     }
     fn roughness(&self, ad_mode: ADMode) -> Expr<f32> {
@@ -255,7 +261,7 @@ mod test {
         let n_iters = 4098u32;
         let kernel = Kernel::<fn(Float3, Float2)>::new(
             &device,
-            track!(|wo: Expr<Float3>, alpha: Expr<Float2>| {
+            &track!(|wo: Expr<Float3>, alpha: Expr<Float2>| {
                 let i = dispatch_id().x;
                 let sampler = IndependentSampler::from_pcg32(seeds.var().read(i).var());
                 let out = out.var();
@@ -263,9 +269,9 @@ mod test {
                 for_range(0u32.expr()..n_iters.expr(), |_| {
                     let wh = dist.sample_wh(wo, sampler.next_2d(), ADMode::None);
                     let pdf = dist.pdf(wo, wh, ADMode::None);
-                    if_!(pdf.gt(0.0), {
+                    if pdf.gt(0.0) {
                         out.write(i, out.read(i) + 1.0 / pdf);
-                    });
+                    }
                 });
             }),
         );

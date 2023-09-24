@@ -233,10 +233,10 @@ impl MeshAggregate {
         let geom_id = inst.geom_id;
         let vertices = self.mesh_vertices.buffer(geom_id);
         let indices = self.mesh_indices.buffer(geom_id);
-        let i = indices.read(prim_id);
-        let v0 = transform.transform_point(vertices.read(i.x).into());
-        let v1 = transform.transform_point(vertices.read(i.y).into());
-        let v2 = transform.transform_point(vertices.read(i.z).into());
+        let i: Expr<Uint3> = indices.read(prim_id).into();
+        let v0 = transform.transform_point(Expr::<Float3>::from(vertices.read(i.x)));
+        let v1 = transform.transform_point(Expr::<Float3>::from(vertices.read(i.y)));
+        let v2 = transform.transform_point(Expr::<Float3>::from(vertices.read(i.z)));
         Triangle { v0, v1, v2 }
     }
     #[tracked]
@@ -246,10 +246,10 @@ impl MeshAggregate {
         let vertices = self.mesh_vertices.buffer(geom_id);
         let indices = self.mesh_indices.buffer(geom_id);
         let i: Expr<Uint3> = indices.read(prim_id).into();
-        let transform: geometry::AffineTransformExpr = inst.transform;
-        let v0 = transform.transform_point(vertices.read(i.x).into());
-        let v1 = transform.transform_point(vertices.read(i.y).into());
-        let v2 = transform.transform_point(vertices.read(i.z).into());
+        let transform = inst.transform;
+        let v0 = transform.transform_point(Expr::<Float3>::from(vertices.read(i.x)));
+        let v1 = transform.transform_point(Expr::<Float3>::from(vertices.read(i.y)));
+        let v2 = transform.transform_point(Expr::<Float3>::from(vertices.read(i.z)));
         let prim_id3 = prim_id * 3;
         let (uv0, uv1, uv2) = if inst.has_uvs {
             let uvs = self.mesh_uvs.buffer(geom_id);
@@ -266,9 +266,9 @@ impl MeshAggregate {
         let ng = (v1 - v0).cross(v2 - v0).normalize();
         let (n0, n1, n2) = if inst.has_normals {
             let normals = self.mesh_normals.buffer(geom_id);
-            let n0 = transform.transform_normal(normals.read(prim_id3 + 0).into());
-            let n1 = transform.transform_normal(normals.read(prim_id3 + 1).into());
-            let n2 = transform.transform_normal(normals.read(prim_id3 + 2).into());
+            let n0 = transform.transform_normal(Expr::<Float3>::from(normals.read(prim_id3 + 0)));
+            let n1 = transform.transform_normal(Expr::<Float3>::from(normals.read(prim_id3 + 1)));
+            let n2 = transform.transform_normal(Expr::<Float3>::from(normals.read(prim_id3 + 2)));
             (n0, n1, n2)
         } else {
             (ng, ng, ng)
@@ -277,13 +277,13 @@ impl MeshAggregate {
             let tangents = self.mesh_tangents.buffer(geom_id);
             let bitangent_signs = self.mesh_bitangent_signs.buffer(geom_id);
             let t0 = transform
-                .transform_vector(tangents.read(prim_id3 + 0).into())
+                .transform_vector(Expr::<Float3>::from(tangents.read(prim_id3 + 0)))
                 .normalize();
             let t1 = transform
-                .transform_vector(tangents.read(prim_id3 + 1).into())
+                .transform_vector(Expr::<Float3>::from(tangents.read(prim_id3 + 1)))
                 .normalize();
             let t2 = transform
-                .transform_vector(tangents.read(prim_id3 + 2).into())
+                .transform_vector(Expr::<Float3>::from(tangents.read(prim_id3 + 2)))
                 .normalize();
             let get_sign = |i: u32| {
                 let j = prim_id3 + i;

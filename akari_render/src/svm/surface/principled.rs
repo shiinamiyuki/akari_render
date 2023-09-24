@@ -4,21 +4,23 @@ use crate::microfacet::TrowbridgeReitzDistribution;
 use crate::sampling::cos_sample_hemisphere;
 use crate::svm::{surface::*, SvmPrincipledBsdf};
 use crate::*;
-use crate::{color::Color, svm::SvmPrincipledBsdfExpr};
+use crate::{color::Color};
 use std::f32::consts::FRAC_1_PI;
 
 use super::{BsdfEvalContext, FresnelSchlick, MicrofacetTransmission, SurfaceShader};
 
+#[tracked]
 fn schlick_weight(cos_theta: Expr<f32>) -> Expr<f32> {
-    let m = (1.0 - cos_theta).clamp(0.0, 1.0);
+    let m = (1.0 - cos_theta).clamp(0.0.expr(), 1.0.expr());
     m.sqr().sqr() * m
 }
 pub struct DisneyDiffuseBsdf {
     pub reflectance: Color,
-    pub roughness: Float,
+    pub roughness: Expr<f32>,
 }
 
 impl Surface for DisneyDiffuseBsdf {
+    #[tracked]
     fn evaluate(
         &self,
         wo: Expr<Float3>,
@@ -26,41 +28,39 @@ impl Surface for DisneyDiffuseBsdf {
         swl: Expr<SampledWavelengths>,
         ctx: &BsdfEvalContext,
     ) -> Color {
-        if_!(
-            Frame::same_hemisphere(wo, wi),
-            {
-                let diffuse = {
-                    let fo = schlick_weight(Frame::abs_cos_theta(wo));
-                    let fi = schlick_weight(Frame::abs_cos_theta(wi));
-                    // Diffuse fresnel - go from 1 at normal incidence to .5 at grazing.
-                    // Burley 2015, eq (4).
-                    self.reflectance * (FRAC_1_PI * (1.0 - fo * 0.5) * (1.0 - fi * 0.5))
-                };
-                let retro = {
-                    let wh = wo + wi;
-                    let valid = wh.ne(0.0).any();
-                    let wh = wh.normalize();
-                    let cos_theta_d = wi.dot(wh);
-                    let fo = schlick_weight(Frame::abs_cos_theta(wo));
-                    let fi = schlick_weight(Frame::abs_cos_theta(wi));
-                    let rr = 2.0 * self.roughness * cos_theta_d * cos_theta_d;
-                    self.reflectance
-                        * select(
-                            valid,
-                            FRAC_1_PI * rr * (fo + fi + fo * fi * (rr - 1.0)),
-                            0.0f32.expr(),
-                        )
-                };
-                (diffuse + retro) * Frame::abs_cos_theta(wi)
-            },
-            else,
-            { Color::zero(ctx.color_repr) }
-        )
+        if Frame::same_hemisphere(wo, wi) {
+            let diffuse = {
+                let fo = schlick_weight(Frame::abs_cos_theta(wo));
+                let fi = schlick_weight(Frame::abs_cos_theta(wi));
+                // Diffuse fresnel - go from 1 at normal incidence to .5 at grazing.
+                // Burley 2015, eq (4).
+                self.reflectance * (FRAC_1_PI * (1.0 - fo * 0.5) * (1.0 - fi * 0.5))
+            };
+            let retro = {
+                let wh = wo + wi;
+                let valid = wh.ne(0.0).any();
+                let wh = wh.normalize();
+                let cos_theta_d = wi.dot(wh);
+                let fo = schlick_weight(Frame::abs_cos_theta(wo));
+                let fi = schlick_weight(Frame::abs_cos_theta(wi));
+                let rr = 2.0 * self.roughness * cos_theta_d * cos_theta_d;
+                self.reflectance
+                    * select(
+                        valid,
+                        FRAC_1_PI * rr * (fo + fi + fo * fi * (rr - 1.0)),
+                        0.0f32.expr(),
+                    )
+            };
+            (diffuse + retro) * Frame::abs_cos_theta(wi)
+        } else {
+            Color::zero(ctx.color_repr)
+        }
     }
+    #[tracked]
     fn sample(
         &self,
         wo: Expr<Float3>,
-        _u_select: Float,
+        _u_select: Expr<f32>,
         u_sample: Expr<Float2>,
         swl: Var<SampledWavelengths>,
         ctx: &BsdfEvalContext,
@@ -68,7 +68,7 @@ impl Surface for DisneyDiffuseBsdf {
         let wi = cos_sample_hemisphere(u_sample);
         let wi = select(Frame::same_hemisphere(wo, wi), wi, -wi);
         let pdf = Frame::abs_cos_theta(wi) * FRAC_1_PI;
-        let color = self.evaluate(wo, wi, *swl, ctx);
+        let color = self.evaluate(wo, wi, **swl, ctx);
         BsdfSample {
             wi,
             pdf,
@@ -76,6 +76,7 @@ impl Surface for DisneyDiffuseBsdf {
             valid: true.expr(),
         }
     }
+    #[tracked]
     fn pdf(
         &self,
         wo: Expr<Float3>,
@@ -121,6 +122,7 @@ pub struct DisneyFresnel {
     pub eta: Expr<f32>,
 }
 impl Fresnel for DisneyFresnel {
+    #[tracked]
     fn evaluate(&self, cos_theta_i: Expr<f32>, ctx: &BsdfEvalContext) -> Color {
         let fr = Color::one(ctx.color_repr) * fr_dielectric(cos_theta_i, self.eta);
         let f0 = fr_schlick(self.f0, cos_theta_i);
@@ -128,6 +130,7 @@ impl Fresnel for DisneyFresnel {
     }
 }
 impl SurfaceShader for SvmPrincipledBsdf {
+    #[tracked]
     fn closure(&self, svm_eval: &SvmEvaluator<'_>) -> Rc<dyn Surface> {
         let (color, transmission_color) = {
             let color = svm_eval.eval_color(self.color);

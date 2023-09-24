@@ -118,12 +118,12 @@ pub fn write_image_hdr(color: &Tex2d<Float4>, path: &str) {
 pub fn erf_inv(x: Expr<f32>) -> Expr<f32> {
     lazy_static! {
         static ref ERF_INV: Callable<fn(Expr<f32>) -> Expr<f32>> =
-            Callable::<fn(Expr<f32>) -> Expr<f32>>(|x| {
-                let clamped_x: Expr<f32> = x.clamp(-0.99999, 0.99999);
+            Callable::<fn(Expr<f32>) -> Expr<f32>>::new_static(track!(|x| {
+                let clamped_x: Expr<f32> = x.clamp(-0.99999f32.expr(), 0.99999f32.expr());
                 let w: Expr<f32> = -((1.0 - clamped_x) * (1.0 + clamped_x)).ln();
-                let p = if_!(w.lt(0.5), {
-                    let mut w = w;
-                    w -= 2.5 as f32;
+                let p = if w.lt(0.5) {
+                    let w = w.var();
+                    *w -= 2.5 as f32;
                     let mut p = (2.810_226_36e-08).expr();
                     p = 3.432_739_39e-07 + p * w;
                     p = -3.523_387_7e-06 + p * w;
@@ -134,7 +134,7 @@ pub fn erf_inv(x: Expr<f32>) -> Expr<f32> {
                     p = 0.246_640_727 + p * w;
                     p = 1.501_409_41 + p * w;
                     p
-                }, else {
+                } else {
                     let mut w = w;
                     w = w.sqrt() - 3.0 as f32;
                     let mut p = (-0.000_200_214_257).expr();
@@ -147,9 +147,9 @@ pub fn erf_inv(x: Expr<f32>) -> Expr<f32> {
                     p = 1.001_674_06 + p * w;
                     p = 2.832_976_82 + p * w;
                     p
-                });
+                };
                 p * clamped_x
-            });
+            }));
     }
     ERF_INV.call(x)
 }
@@ -157,7 +157,7 @@ pub fn erf_inv(x: Expr<f32>) -> Expr<f32> {
 pub fn erf(x: Expr<f32>) -> Expr<f32> {
     lazy_static! {
         static ref ERF: Callable<fn(Expr<f32>)-> Expr<f32>> =
-            Callable::<fn(Expr<f32>)-> Expr<f32>>(|x| {
+            Callable::<fn(Expr<f32>)-> Expr<f32>>::new_static(track!(|x| {
             // constants
             let a1: f32 = 0.254_829_592;
             let a2: f32 = -0.284_496_736;
@@ -173,7 +173,7 @@ pub fn erf(x: Expr<f32>) -> Expr<f32> {
             let y: Expr<f32> =
                 1.0 as f32 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * (-x * x).exp();
             sign * y
-        });
+        }));
     }
     ERF.call(x)
 }
@@ -274,35 +274,44 @@ pub fn chi2cdf(x: f64, dof: i32) -> f64 {
 pub fn mix_bits(v: Expr<u64>) -> Expr<u64> {
     lazy_static! {
         static ref MIX_BITS: Callable<fn(Expr<u64>) -> Expr<u64>> =
-            Callable::<fn(Expr<u64>) -> Expr<u64>>(|mut v: Expr<u64>| {
-                v ^= v >> 31;
-                v *= 0x7fb5d329728ea185;
-                v ^= v >> 27;
-                v *= 0x81dadef4bc2dd44d;
-                v ^= v >> 33;
-                v
-            });
+            Callable::<fn(Expr<u64>) -> Expr<u64>>::new_static(track!(|v: Expr<u64>| {
+                let v = v.var();
+                *v ^= v >> 31;
+                *v *= 0x7fb5d329728ea185;
+                *v ^= v >> 27;
+                *v *= 0x81dadef4bc2dd44d;
+                *v ^= v >> 33;
+                **v
+            }));
     }
     MIX_BITS.call(v)
 }
-
+#[tracked]
 pub fn safe_div(a: Expr<f32>, b: Expr<f32>) -> Expr<f32> {
     select(b.eq(0.0), 0.0f32.expr(), a / b)
 }
 
 #[derive(Clone, Copy, Debug, Value)]
 #[repr(C)]
+#[value_new]
 pub struct CompensatedSum {
     pub sum: f32,
     pub c: f32,
 }
 impl CompensatedSumExpr {
-    pub fn update(&self, v: Expr<f32>) -> Self {
-        let y = v - self.c();
-        let t = self.sum() + y;
-        let c = (t - self.sum()) - y;
+    #[tracked]
+    pub fn update(&self, v: Expr<f32>) -> Expr<CompensatedSum> {
+        let y = v - self.c;
+        let t = self.sum + y;
+        let c = (t - self.sum) - y;
         let sum = t;
-        Self::new(sum, c)
+        CompensatedSum::new_expr(sum, c)
+    }
+}
+impl CompensatedSumVar {
+    #[tracked]
+    pub fn update(&self, v:Expr<f32>) {
+        *self.self_ = (**self.self_).update(v);
     }
 }
 

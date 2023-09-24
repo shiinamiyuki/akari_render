@@ -16,7 +16,7 @@ pub fn invert_uniform_sample_disk(p: Expr<Float2>) -> Expr<Float2> {
 #[tracked]
 pub fn cos_sample_hemisphere(u: Expr<Float2>) -> Expr<Float3> {
     let d = uniform_sample_disk(u);
-    let z = (1.0 - d.x * d.x - d.y * d.y).max(0.0).sqrt();
+    let z = (1.0 - d.x * d.x - d.y * d.y).max_(0.0).sqrt();
     Float3::expr(d.x, z, d.y)
 }
 #[tracked]

@@ -60,21 +60,25 @@ impl<'a> SvmEvaluator<'a> {
     fn node_offset(&self, index: u32) -> u32 {
         self.shader.node_offset[index as usize] as u32
     }
+    #[tracked]
     fn get_node_expr<T: Value>(&self, index: u32) -> Expr<T> {
         let offset = self.node_offset(index);
-        self.shader_data
-            .read::<T>(offset + self.shader_ref.offset())
+        unsafe {
+            self.shader_data
+                .read_as::<T>(offset + self.shader_ref.offset)
+        }
     }
+    #[tracked]
     fn do_eval(&mut self, node: SvmNodeRef) -> Box<dyn Any> {
         let idx = node.index as usize;
         let node = &self.shader.nodes[idx];
         match node {
             svm::SvmNode::Float(_) => {
-                let value = self.get_node_expr::<SvmFloat>(idx as u32).value();
+                let value = self.get_node_expr::<SvmFloat>(idx as u32).value;
                 Box::new(value)
             }
             svm::SvmNode::Float3(_) => {
-                let value = self.get_node_expr::<SvmFloat3>(idx as u32).value().unpack();
+                let value: Expr<Float3> = self.get_node_expr::<SvmFloat3>(idx as u32).value.into();
                 Box::new(value)
             }
             svm::SvmNode::MakeFloat3(mk_f3) => {
@@ -94,10 +98,10 @@ impl<'a> SvmEvaluator<'a> {
                 ))
             }
             svm::SvmNode::RgbImageTex(img_tex) => {
-                let tex_idx = self.get_node_expr::<SvmRgbImageTex>(idx as u32).tex_idx();
+                let tex_idx = self.get_node_expr::<SvmRgbImageTex>(idx as u32).tex_idx;
                 let textures = &self.svm.image_textures.var();
                 let texture = textures.tex2d(tex_idx);
-                let uv = self.si().geometry().uv();
+                let uv = self.si().geometry.uv;
                 let rgb = texture.sample(uv.fract()).xyz();
                 let colorspace = ColorSpaceId::to_colorspace(img_tex.colorspace);
                 Box::new(rgb_gamma_correction(rgb, colorspace))
@@ -187,7 +191,7 @@ impl Svm {
             .copied()
             .collect::<Vec<_>>();
         kinds.sort();
-        let mut sw = switch::<R>(shader_ref.shader_kind().cast_i32());
+        let mut sw = switch::<R>(shader_ref.shader_kind.cast_i32());
         for k in kinds {
             sw = sw.case(k as i32, || {
                 let eval = SvmEvaluator::new(
@@ -205,7 +209,7 @@ impl Svm {
                     .clone();
                 let closure = SurfaceClosure {
                     inner: bsdf,
-                    frame: si.frame(),
+                    frame: si.frame,
                 };
                 f(&closure)
             });

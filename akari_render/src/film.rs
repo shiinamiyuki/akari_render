@@ -98,7 +98,7 @@ impl Film {
         let weights = device.create_buffer::<f32>(resolution.x as usize * resolution.y as usize);
         let copy_to_rgba_image = Kernel::<fn(Tex2d<Float4>, f32, bool)>::new(
             &device,
-            |image: Tex2dVar<Float4>, splat_scale: Expr<f32>, hdr: Expr<bool>| {
+            &|image: Tex2dVar<Float4>, splat_scale: Expr<f32>, hdr: Expr<bool>| {
                 let p = dispatch_id().xy();
                 let i = track!(p.x + p.y * resolution.x);
                 let pixels = pixels.var();
@@ -216,7 +216,7 @@ impl Film {
         assert_eq!(self.resolution, other.resolution);
         Kernel::<fn(f32, f32)>::new(
             &self.device,
-            track!(|self_splat_scale: Expr<f32>, other_splat_scale: Expr<f32>| {
+            &track!(|self_splat_scale: Expr<f32>, other_splat_scale: Expr<f32>| {
                 let p = dispatch_id().xy();
                 let i = p.x + p.y * self.resolution.x;
                 let pixels = self.pixels.var();

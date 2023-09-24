@@ -3,6 +3,7 @@ use std::sync::Arc;
 use crate::*;
 #[derive(Clone, Copy, Value)]
 #[repr(C)]
+#[value_new]
 struct WorkItem {
     a: f32,
     b: f32,
@@ -14,6 +15,7 @@ struct WorkItem {
     eps: f32,
     depth: u32,
 }
+#[tracked]
 pub fn adaptive_simpson<U: Value>(
     _device: &Device,
     user_data: Expr<U>,
@@ -26,12 +28,12 @@ pub fn adaptive_simpson<U: Value>(
     let stack = VLArrayVar::<WorkItem>::zero(max_depth * 2 + 1);
     let sp = 0u32.var();
     let push = |item: Expr<WorkItem>| {
-        stack.write(*sp, item);
-        *sp.get_mut() += 1;
+        stack.write(sp, item);
+        *sp += 1;
     };
     let pop = || {
-        *sp.get_mut() -= 1;
-        stack.read(*sp)
+        *sp -= 1;
+        stack.read(sp)
     };
     let a = x0;
     let b = 0.5 * (x0 + x1);
@@ -40,7 +42,7 @@ pub fn adaptive_simpson<U: Value>(
     let fb = f(user_data, b);
     let fc = f(user_data, c);
     let i = (c - a) * (1.0f32 / 6.0) * (fa + 4.0 * fb + fc);
-    push(WorkItemExpr::new(
+    push(WorkItem::new_expr(
         a,
         b,
         c,
@@ -52,61 +54,57 @@ pub fn adaptive_simpson<U: Value>(
         max_depth as u32,
     ));
     let result = 0.0f32.var();
-    while_!(sp.ne(0), {
+    while sp != 0 {
         let item = pop();
-        let a = item.a();
-        let b = item.b();
-        let c = item.c();
-        let fa = item.fa();
-        let fb = item.fb();
-        let fc = item.fc();
-        let i = item.i();
+        let a = item.a;
+        let b = item.b;
+        let c = item.c;
+        let fa = item.fa;
+        let fb = item.fb;
+        let fc = item.fc;
+        let i = item.i;
         let d = 0.5 * (a + b);
         let e = 0.5 * (b + c);
         let fd = f(user_data, d);
         let fe = f(user_data, e);
-        let eps = item.eps();
+        let eps = item.eps;
 
         let h = c - a;
-        let i0 = (1.0 / 12.0) * h * (fa + 4.0 * fd + fb);
-        let i1 = (1.0 / 12.0) * h * (fb + 4.0 * fe + fc);
+        let i0 = (1.0 / 12.0f32) * h * (fa + 4.0 * fd + fb);
+        let i1 = (1.0 / 12.0f32) * h * (fb + 4.0 * fe + fc);
         let ip = i0 + i1;
-        let depth = item.depth();
-        if_!(
-            depth.le(0) | (ip - i).abs().lt(15.0 * eps),
-            {
-                *result.get_mut() += ip + (1.0 / 15.0) * (ip - i);
-            },
-            else,
-            {
-                push(WorkItemExpr::new(
-                    a,
-                    d,
-                    b,
-                    fa,
-                    fd,
-                    fb,
-                    i0,
-                    0.5 * eps,
-                    depth - 1,
-                ));
-                push(WorkItemExpr::new(
-                    b,
-                    e,
-                    c,
-                    fb,
-                    fe,
-                    fc,
-                    i1,
-                    0.5 * eps,
-                    depth - 1,
-                ));
-            }
-        );
-    });
-    *result
+        let depth = item.depth;
+        if depth.le(0) | (ip - i).abs().lt(15.0 * eps) {
+            *result += ip + (1.0 / 15.0) * (ip - i);
+        } else {
+            push(WorkItem::new_expr(
+                a,
+                d,
+                b,
+                fa,
+                fd,
+                fb,
+                i0,
+                0.5 * eps,
+                depth - 1,
+            ));
+            push(WorkItem::new_expr(
+                b,
+                e,
+                c,
+                fb,
+                fe,
+                fc,
+                i1,
+                0.5 * eps,
+                depth - 1,
+            ));
+        }
+    }
+    **result
 }
 
+#[tracked]
 pub fn adaptive_simpson_2d<U: Value>(
     device: &Device,
     user_data: Expr<U>,

@@ -464,7 +464,7 @@ impl SceneLoader {
                 let indices = load_buffer::<[u32;3]>(&file_resolver, &buffers["indices"]);
                 let mut uvs = vec![];
                 if let Some(uv) = buffers.get("uvs") {
-                    uvs = load_buffer::<Float2>(&file_resolver, uv);
+                    uvs = load_buffer::<[f32;2]>(&file_resolver, uv);
                 }
                 let mut tangents = vec![];
                 if let Some(tangent) = buffers.get("tangents") {

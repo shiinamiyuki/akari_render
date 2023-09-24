@@ -24,7 +24,7 @@ pub struct BsdfSample {
     pub wi: Expr<Float3>,
     pub pdf: Expr<f32>,
     pub color: Color,
-    pub valid: Bool,
+    pub valid: Expr<bool>,
 }
 
 pub trait Surface {
@@ -50,7 +50,7 @@ pub trait Surface {
         wi: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
         ctx: &BsdfEvalContext,
-    ) -> Float;
+    ) -> Expr<f32>;
     fn albedo(
         &self,
         wo: Expr<Float3>,
@@ -125,7 +125,7 @@ impl Surface for EmissiveSurface {
         wi: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
         ctx: &BsdfEvalContext,
-    ) -> Float {
+    ) -> Expr<f32> {
         if let Some(inner) = &self.inner {
             inner.pdf(wo, wi, swl, ctx)
         } else {
@@ -183,6 +183,7 @@ impl BsdfMixture {
 }
 
 impl Surface for BsdfMixture {
+    #[tracked]
     fn evaluate(
         &self,
         wo: Expr<Float3>,
@@ -199,23 +200,21 @@ impl Surface for BsdfMixture {
             BsdfBlendMode::Mix => {
                 let frac: Expr<f32> = (self.frac)(wo, ctx);
                 let zero = Color::zero(ctx.color_repr);
-                let f_a = if_!(
-                    frac.lt(1.0 - Self::EPS),
-                    { self.bsdf_a.evaluate(wo, wi, swl, ctx) },
-                    else,
-                    { zero }
-                );
-                let f_b = if_!(
-                    frac.gt(Self::EPS),
-                    { self.bsdf_b.evaluate(wo, wi, swl, ctx) },
-                    else,
-                    { zero }
-                );
+                let f_a = if frac.lt(1.0 - Self::EPS) {
+                    self.bsdf_a.evaluate(wo, wi, swl, ctx)
+                } else {
+                    zero
+                };
+                let f_b = if frac.gt(Self::EPS) {
+                    self.bsdf_b.evaluate(wo, wi, swl, ctx)
+                } else {
+                    zero
+                };
                 f_a * (1.0 - frac) + f_b * frac
             }
         }
     }
-
+    #[tracked]
     fn sample(
         &self,
         wo: Expr<Float3>,
@@ -229,87 +228,75 @@ impl Surface for BsdfMixture {
             weighted_discrete_choice2_and_remap(frac, 1u32.expr(), 0u32.expr(), u_select);
         let zero_f = Color::zero(ctx.color_repr);
         let zero_pdf = 0.0f32.expr();
-        if_!(
-            which.eq(0),
-            {
-                let mut sample = self.bsdf_a.sample(wo, remapped, u_sample, swl, ctx);
-                let (f_b, pdf_b) = {
-                    if_!(
-                        frac.gt(Self::EPS),
-                        {
-                            let f_b = self.bsdf_b.evaluate(wo, sample.wi, *swl, ctx);
-                            let pdf_b = self.bsdf_b.pdf(wo, sample.wi, *swl, ctx);
-                            (f_b, pdf_b)
-                        },
-                        else,
-                        { (zero_f, zero_pdf) }
-                    )
-                };
-                // cpu_dbg!(Float2::expr(sample.pdf, pdf_b));
-                match self.mode {
-                    BsdfBlendMode::Addictive => {
-                        sample.color = sample.color + f_b;
-                    }
-                    BsdfBlendMode::Mix => {
-                        sample.color = sample.color * (1.0 - frac) + f_b * frac;
-                    }
+        if which.eq(0) {
+            let mut sample = self.bsdf_a.sample(wo, remapped, u_sample, swl, ctx);
+            let (f_b, pdf_b) = {
+                if frac.gt(Self::EPS) {
+                    let f_b = self.bsdf_b.evaluate(wo, sample.wi, **swl, ctx);
+                    let pdf_b = self.bsdf_b.pdf(wo, sample.wi, **swl, ctx);
+                    (f_b, pdf_b)
+                } else {
+                    (zero_f, zero_pdf)
                 }
-
-                sample.pdf = sample.pdf * (1.0 - frac) + pdf_b * frac;
-                sample
-            },
-            else,
-            {
-                let mut sample = self.bsdf_b.sample(wo, remapped, u_sample, swl, ctx);
-                let (f_a, pdf_a) = {
-                    if_!(
-                        frac.lt(1.0 - Self::EPS),
-                        {
-                            let f_a = self.bsdf_a.evaluate(wo, sample.wi, *swl, ctx);
-                            let pdf_a = self.bsdf_a.pdf(wo, sample.wi, *swl, ctx);
-                            (f_a, pdf_a)
-                        },
-                        else,
-                        { (zero_f, zero_pdf) }
-                    )
-                };
-                match self.mode {
-                    BsdfBlendMode::Addictive => {
-                        sample.color = sample.color + f_a;
-                    }
-                    BsdfBlendMode::Mix => {
-                        sample.color = f_a * (1.0 - frac) + sample.color * frac;
-                    }
+            };
+            // cpu_dbg!(Float2::expr(sample.pdf, pdf_b));
+            match self.mode {
+                BsdfBlendMode::Addictive => {
+                    sample.color = sample.color + f_b;
                 }
-                sample.pdf = pdf_a * (1.0 - frac) + sample.pdf * frac;
-                sample
+                BsdfBlendMode::Mix => {
+                    sample.color = sample.color * (1.0 - frac) + f_b * frac;
+                }
             }
-        )
-    }
 
+            sample.pdf = sample.pdf * (1.0 - frac) + pdf_b * frac;
+            sample
+        } else {
+            let mut sample = self.bsdf_b.sample(wo, remapped, u_sample, swl, ctx);
+            let (f_a, pdf_a) = {
+                if frac.lt(1.0 - Self::EPS) {
+                    let f_a = self.bsdf_a.evaluate(wo, sample.wi, **swl, ctx);
+                    let pdf_a = self.bsdf_a.pdf(wo, sample.wi, **swl, ctx);
+                    (f_a, pdf_a)
+                } else {
+                    (zero_f, zero_pdf)
+                }
+            };
+            match self.mode {
+                BsdfBlendMode::Addictive => {
+                    sample.color = sample.color + f_a;
+                }
+                BsdfBlendMode::Mix => {
+                    sample.color = f_a * (1.0 - frac) + sample.color * frac;
+                }
+            }
+            sample.pdf = pdf_a * (1.0 - frac) + sample.pdf * frac;
+            sample
+        }
+    }
+    #[tracked]
     fn pdf(
         &self,
         wo: Expr<Float3>,
         wi: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
         ctx: &BsdfEvalContext,
-    ) -> Float {
+    ) -> Expr<f32> {
         let frac: Expr<f32> = (self.frac)(wo, ctx);
         let zero = 0.0f32.expr();
-        let pdf_a = if_!(
-            frac.lt(1.0 - Self::EPS),
-            { self.bsdf_a.pdf(wo, wi, swl, ctx) },
-            else,
-            { zero }
-        );
-        let pdf_b = if_!(
-            frac.gt(Self::EPS),
-            { self.bsdf_b.pdf(wo, wi, swl, ctx) },
-            else,
-            { zero }
-        );
+        let pdf_a = if frac.lt(1.0 - Self::EPS) {
+            self.bsdf_a.pdf(wo, wi, swl, ctx)
+        } else {
+            zero
+        };
+        let pdf_b = if frac.gt(Self::EPS) {
+            self.bsdf_b.pdf(wo, wi, swl, ctx)
+        } else {
+            zero
+        };
         pdf_a * (1.0 - frac) + pdf_b * frac
     }
+    #[tracked]
     fn albedo(
         &self,
         wo: Expr<Float3>,
@@ -327,6 +314,7 @@ impl Surface for BsdfMixture {
             }
         }
     }
+    #[tracked]
     fn roughness(
         &self,
         wo: Expr<Float3>,
@@ -337,6 +325,7 @@ impl Surface for BsdfMixture {
         self.bsdf_a.roughness(wo, swl, ctx) * (1.0 - frac)
             + self.bsdf_b.roughness(wo, swl, ctx) * frac
     }
+    #[tracked]
     fn emission(
         &self,
         wo: Expr<Float3>,
@@ -397,7 +386,7 @@ impl Surface for SurfaceClosure {
         wi: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
         ctx: &BsdfEvalContext,
-    ) -> Float {
+    ) -> Expr<f32> {
         self.inner
             .pdf(self.frame.to_local(wo), self.frame.to_local(wi), swl, ctx)
     }
@@ -486,7 +475,7 @@ impl Surface for MicrofacetReflection {
         wi: Expr<Float3>,
         _swl: Expr<SampledWavelengths>,
         ctx: &BsdfEvalContext,
-    ) -> Float {
+    ) -> Expr<f32> {
         let wh = wo + wi;
         let cos_o = Frame::cos_theta(wo);
         let cos_i = Frame::cos_theta(wi);
@@ -535,6 +524,7 @@ pub struct MicrofacetTransmission {
 }
 
 impl Surface for MicrofacetTransmission {
+    #[tracked]
     fn evaluate(
         &self,
         wo: Expr<Float3>,
@@ -548,44 +538,42 @@ impl Surface for MicrofacetTransmission {
         let wh = (wo + wi * eta).normalize();
         let wh = face_forward(wh, Float3::expr(0.0, 1.0, 0.0));
         let backfacing = (wh.dot(wi) * cos_i).lt(0.0) | (wh.dot(wo) * cos_o).lt(0.0);
-        if_!(
-            (wh.dot(wo) * wi.dot(wh)).gt(0.0)
-                | cos_i.eq(0.0)
-                | cos_o.eq(0.0)
-                | backfacing
-                | Frame::same_hemisphere(wo, wi),
-            { Color::zero(ctx.color_repr) },
-            else,
-            {
-                let f = self.fresnel.evaluate(wo.dot(wh), ctx);
-                let denom = (wi.dot(wh) + wo.dot(wh) / eta).sqr() * cos_i * cos_o;
-                select(
-                    denom.eq(0.0),
-                    Color::zero(ctx.color_repr),
-                    (Color::one(ctx.color_repr) - f)
-                        * &self.color
-                        * (self.dist.d(wh, ctx.ad_mode)
-                            * self.dist.g(wo, wi, ctx.ad_mode)
-                            * eta.sqr()
-                            * wi.dot(wh).abs()
-                            * wo.dot(wh).abs()
-                            / denom)
-                            .abs()
-                        * cos_o.abs(),
-                )
+        if (wh.dot(wo) * wi.dot(wh)).gt(0.0)
+            | cos_i.eq(0.0)
+            | cos_o.eq(0.0)
+            | backfacing
+            | Frame::same_hemisphere(wo, wi)
+        {
+            Color::zero(ctx.color_repr)
+        } else {
+            let f = self.fresnel.evaluate(wo.dot(wh), ctx);
+            let denom = (wi.dot(wh) + wo.dot(wh) / eta).sqr() * cos_i * cos_o;
+            select(
+                denom.eq(0.0),
+                Color::zero(ctx.color_repr),
+                (Color::one(ctx.color_repr) - f)
+                    * &self.color
+                    * (self.dist.d(wh, ctx.ad_mode)
+                        * self.dist.g(wo, wi, ctx.ad_mode)
+                        * eta.sqr()
+                        * wi.dot(wh).abs()
+                        * wo.dot(wh).abs()
+                        / denom)
+                        .abs()
+                    * cos_o.abs(),
+            )
 
-                // Float denom = Sqr(Dot(wi, wm) + Dot(wo, wm) / etap) * cosTheta_i * cosTheta_o;
-                // Float ft = mfDistrib.D(wm) * (1 - F) * mfDistrib.G(wo, wi) *
-                //            std::abs(Dot(wi, wm) * Dot(wo, wm) / denom);
-                // // Account for non-symmetry with transmission to different medium
-                // if (mode == TransportMode::Radiance)
-                //     ft /= Sqr(etap);
+            // Expr<f32> denom = Sqr(Dot(wi, wm) + Dot(wo, wm) / etap) * cosTheta_i * cosTheta_o;
+            // Expr<f32> ft = mfDistrib.D(wm) * (1 - F) * mfDistrib.G(wo, wi) *
+            //            std::abs(Dot(wi, wm) * Dot(wo, wm) / denom);
+            // // Account for non-symmetry with transmission to different medium
+            // if (mode == TransportMode::Radiance)
+            //     ft /= Sqr(etap);
 
-                // return SampledSpectrum(ft);
-            }
-        )
+            // return SampledSpectrum(ft);
+        }
     }
-
+    #[tracked]
     fn sample(
         &self,
         wo: Expr<Float3>,
@@ -597,51 +585,49 @@ impl Surface for MicrofacetTransmission {
         let wh = self.dist.sample_wh(wo, u_sample, ctx.ad_mode);
         let (refracted, _eta, wi) = refract(wo, wh, self.eta);
         let valid = refracted & !Frame::same_hemisphere(wo, wi);
-        let pdf = self.pdf(wo, wi, *swl, ctx);
+        let pdf = self.pdf(wo, wi, **swl, ctx);
         let valid = valid & pdf.gt(0.0);
         // lc_assert!(pdf.gt(0.0) | !valid);
         BsdfSample {
             pdf,
-            color: self.evaluate(wo, wi, *swl, ctx),
+            color: self.evaluate(wo, wi, **swl, ctx),
             wi,
             valid,
         }
     }
-
+    #[tracked]
     fn pdf(
         &self,
         wo: Expr<Float3>,
         wi: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
         ctx: &BsdfEvalContext,
-    ) -> Float {
+    ) -> Expr<f32> {
         let cos_o = Frame::cos_theta(wo);
         let cos_i = Frame::cos_theta(wi);
         let eta = select(cos_o.gt(0.0), self.eta, 1.0 / self.eta);
         let wh = (wo + wi * eta).normalize();
         let wh = face_forward(wh, Float3::expr(0.0, 1.0, 0.0));
         let backfacing = (wh.dot(wi) * cos_i).lt(0.0) | (wh.dot(wo) * cos_o).lt(0.0);
-        if_!(
-            (wh.dot(wo) * wi.dot(wh)).gt(0.0)
-                | cos_i.eq(0.0)
-                | cos_o.eq(0.0)
-                | backfacing
-                | Frame::same_hemisphere(wo, wi),
-            { 0.0f32.expr() },
-            else,
-            {
-                // Float denom = Sqr(Dot(wi, wm) + Dot(wo, wm) / etap);
-                // Float dwm_dwi = AbsDot(wi, wm) / denom;
-                // pdf = mfDistrib.PDF(wo, wm) * dwm_dwi * pt / (pr + pt);
-                let denom = (wi.dot(wh) + wo.dot(wh) / eta).sqr();
-                let dwh_dwi = wi.dot(wh).abs() / denom;
-                select(
-                    denom.eq(0.0),
-                    0.0f32.expr(),
-                    self.dist.pdf(wo, wh, ctx.ad_mode) * dwh_dwi,
-                )
-            }
-        )
+        if (wh.dot(wo) * wi.dot(wh)).gt(0.0)
+            | cos_i.eq(0.0)
+            | cos_o.eq(0.0)
+            | backfacing
+            | Frame::same_hemisphere(wo, wi)
+        {
+            0.0f32.expr()
+        } else {
+            // Expr<f32> denom = Sqr(Dot(wi, wm) + Dot(wo, wm) / etap);
+            // Expr<f32> dwm_dwi = AbsDot(wi, wm) / denom;
+            // pdf = mfDistrib.PDF(wo, wm) * dwm_dwi * pt / (pr + pt);
+            let denom = (wi.dot(wh) + wo.dot(wh) / eta).sqr();
+            let dwh_dwi = wi.dot(wh).abs() / denom;
+            select(
+                denom.eq(0.0),
+                0.0f32.expr(),
+                self.dist.pdf(wo, wh, ctx.ad_mode) * dwh_dwi,
+            )
+        }
     }
     fn albedo(
         &self,
@@ -687,14 +673,14 @@ pub fn fr_dielectric(cos_theta_i: Expr<f32>, eta: Expr<f32>) -> Expr<f32> {
         // cpu_dbg!(fr);
         fr.clamp(0.0, 1.0)
     })
-    //     Float sin2Theta_i = 1 - Sqr(cosTheta_i);
-    //     Float sin2Theta_t = sin2Theta_i / Sqr(eta);
+    //     Expr<f32> sin2Theta_i = 1 - Sqr(cosTheta_i);
+    //     Expr<f32> sin2Theta_t = sin2Theta_i / Sqr(eta);
     //     if (sin2Theta_t >= 1)
     //         return 1.f;
-    //     Float cosTheta_t = SafeSqrt(1 - sin2Theta_t);
+    //     Expr<f32> cosTheta_t = SafeSqrt(1 - sin2Theta_t);
 
-    //     Float r_parl = (eta * cosTheta_i - cosTheta_t) / (eta * cosTheta_i + cosTheta_t);
-    //     Float r_perp = (cosTheta_i - eta * cosTheta_t) / (cosTheta_i + eta * cosTheta_t);
+    //     Expr<f32> r_parl = (eta * cosTheta_i - cosTheta_t) / (eta * cosTheta_i + cosTheta_t);
+    //     Expr<f32> r_perp = (cosTheta_i - eta * cosTheta_t) / (cosTheta_i + eta * cosTheta_t);
     //     return (Sqr(r_parl) + Sqr(r_perp)) / 2;
 }
 
@@ -758,29 +744,31 @@ pub struct FlatSurfaceEvalResult {
     pub emission: FlatColor,
     pub roughness: f32,
 }
+pub type EvalSurfaceCallable = Callable<
+    fn(
+        Expr<ShaderRef>,
+        Expr<SurfaceInteraction>,
+        Expr<Float3>,
+        Expr<Float3>,
+        Expr<SampledWavelengths>,
+        Expr<u32>,
+    ) -> Expr<FlatSurfaceEvalResult>,
+>;
+pub type SampleSurfaceCallable = Callable<
+    fn(
+        Expr<ShaderRef>,
+        Expr<SurfaceInteraction>,
+        Expr<Float3>,
+        Expr<Float3>,
+        Var<SampledWavelengths>,
+    ) -> Expr<FlatBsdfSample>,
+>;
 pub struct SurfaceEvaluator {
     pub(crate) color_repr: ColorRepr,
     // bsdf(surface, si, wo, wi, u_select, flags)
-    pub(crate) eval: Callable<
-        fn(
-            Expr<ShaderRef>,
-            Expr<SurfaceInteraction>,
-            Expr<Float3>,
-            Expr<Float3>,
-            Expr<SampledWavelengths>,
-            Expr<u32>,
-        ) -> Expr<FlatSurfaceEvalResult>,
-    >,
+    pub(crate) eval: EvalSurfaceCallable,
     // bsdf_sample(surface, si, wo, (u_select, u_sample))
-    pub(crate) sample: Callable<
-        fn(
-            Expr<ShaderRef>,
-            Expr<SurfaceInteraction>,
-            Expr<Float3>,
-            Expr<Float3>,
-            Var<SampledWavelengths>,
-        ) -> Expr<FlatBsdfSample>,
-    >,
+    pub(crate) sample: SampleSurfaceCallable,
 }
 impl SurfaceEvaluator {
     pub fn evaluate_ex(
@@ -814,7 +802,7 @@ impl SurfaceEvaluator {
         wo: Expr<Float3>,
         wi: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
-    ) -> Float {
+    ) -> Expr<f32> {
         let result = self
             .eval
             .call(surface, si, wo, wi, swl, SURFACE_EVAL_PDF.expr());
@@ -827,7 +815,7 @@ impl SurfaceEvaluator {
         wo: Expr<Float3>,
         wi: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
-    ) -> (Color, Float) {
+    ) -> (Color, Expr<f32>) {
         let result = self.eval.call(
             surface,
             si,
