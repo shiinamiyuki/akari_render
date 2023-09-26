@@ -7,14 +7,6 @@ pub enum RgbColorSpace {
     #[serde(rename = "aces")]
     ACEScg,
 }
-impl From<nodes::ColorSpace> for RgbColorSpace {
-    fn from(value: nodes::ColorSpace) -> Self {
-        match value {
-            nodes::ColorSpace::ACEScg => RgbColorSpace::ACEScg,
-            nodes::ColorSpace::SRGB => RgbColorSpace::SRgb,
-        }
-    }
-}
 pub struct ColorSpaceId;
 impl ColorSpaceId {
     pub const NONE: u32 = 0;

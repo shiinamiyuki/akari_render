@@ -44,7 +44,7 @@ impl SvmFloat {
 #[derive(Clone, Copy, Debug, Value)]
 #[repr(C)]
 pub struct SvmFloat3 {
-    pub value: [f32;3],
+    pub value: [f32; 3],
 }
 impl SvmFloat3 {
     pub fn hash<H: Digest>(&self, hasher: &mut H) {
@@ -176,6 +176,7 @@ pub struct SvmPrincipledBsdf {
     pub eta: SvmNodeRef,
     pub transmission: SvmNodeRef,
     pub emission: SvmNodeRef,
+    pub emission_strength: SvmNodeRef,
 }
 impl SvmPrincipledBsdf {
     pub fn hash<H: Digest>(&self, hasher: &mut H) {
@@ -183,10 +184,13 @@ impl SvmPrincipledBsdf {
         self.color.hash(hasher);
         self.metallic.hash(hasher);
         self.roughness.hash(hasher);
+        self.specular.hash(hasher);
         self.clearcoat.hash(hasher);
         self.clearcoat_roughness.hash(hasher);
         self.eta.hash(hasher);
         self.transmission.hash(hasher);
+        self.emission.hash(hasher);
+        self.emission_strength.hash(hasher);
     }
 }
 #[derive(Clone, Copy, Debug, Value)]

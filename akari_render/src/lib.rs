@@ -42,7 +42,7 @@ pub mod light;
 pub mod load;
 pub mod mesh;
 pub mod microfacet;
-pub mod nodes;
+pub mod node;
 pub mod sampler;
 pub mod sampling;
 pub mod scene;
