@@ -95,7 +95,7 @@ pub struct Scene {
     pub geometries: Collection<Geometry>,
     pub materials: Collection<Material>,
     pub lights: Collection<Light>,
-    pub images: Collection<Image>,
+    pub images: Vec<Image>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Buffer {
@@ -253,7 +253,7 @@ pub mod shader {
             emission_strength: Ref<Node>,
         },
         Emission {
-            emission: Ref<Node>,
+            color: Ref<Node>,
             strength: Ref<Node>,
         },
         MixBsdf {
@@ -326,7 +326,7 @@ pub mod shader {
                     self.visit(emission);
                     self.visit(emission_strength);
                 }
-                Node::Emission { emission, strength } => {
+                Node::Emission { color: emission, strength } => {
                     self.visit(emission);
                     self.visit(strength);
                 }

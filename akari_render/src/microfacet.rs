@@ -49,7 +49,6 @@ fn tr_d_impl_(wh: Expr<Float3>, alpha: Expr<Float2>) -> Expr<f32> {
     // cpu_dbg!(cos4_theta);
     let e = tan2_theta * ((Frame::cos_phi(wh) / ax).sqr() + (Frame::sin_phi(wh) / ay).sqr());
     let d = 1.0 / (PI * ax * ay * cos4_theta * (1.0 + e).sqr());
-    // cpu_dbg!(d);
     select(tan2_theta.is_infinite(), 0.0f32.expr(), d)
 }
 #[tracked]

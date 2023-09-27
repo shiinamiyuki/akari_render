@@ -3,6 +3,7 @@ use std::collections::{HashMap, HashSet};
 use super::*;
 use crate::{
     color::ColorSpaceId,
+    load::sampler_from_rgb_image_tex_node,
     node::{
         shader::{Node, NodeSorter},
         Ref, ShaderGraph,
@@ -173,7 +174,22 @@ impl<'a> Compiler<'a> {
                 })
             }
             Node::Float4(_) => todo!(),
-            Node::TexImage(_) => todo!(),
+            Node::TexImage(img) => {
+                let colorspace = &img.colorspace;
+                let path = match &img.data {
+                    node::Buffer::External(path) => path.clone(),
+                    _ => panic!("not implemented"),
+                };
+                let sampler = sampler_from_rgb_image_tex_node(img);
+                let tex_idx = self.ctx.images[&(path, sampler)];
+                SvmNode::RgbImageTex(SvmRgbImageTex {
+                    tex_idx: tex_idx as u32,
+                    colorspace: ColorSpaceId::from_colorspace(match colorspace {
+                        node::ColorSpace::Rgb(rgb) => *rgb,
+                        _ => panic!("not implemented"),
+                    }),
+                })
+            }
             Node::DiffuseBsdf { color } => {
                 let color = self.get(&color);
                 SvmNode::DiffuseBsdf(SvmDiffuseBsdf { reflectance: color })
@@ -217,7 +233,7 @@ impl<'a> Compiler<'a> {
                     emission_strength,
                 })
             }
-            Node::Emission { emission, strength } => {
+            Node::Emission { color: emission, strength } => {
                 let emission = self.get(&emission);
                 let strength = self.get(&strength);
                 SvmNode::Emission(SvmEmission {

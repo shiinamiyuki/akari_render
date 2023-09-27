@@ -115,7 +115,7 @@ impl SceneLoader {
                 emission_strength,
                 ..
             } => (Some(emission), Some(emission_strength)),
-            Node::Emission { emission, strength } => (Some(emission), Some(strength)),
+            Node::Emission { color: emission, strength } => (Some(emission), Some(strength)),
             _ => (None, None),
         };
         let emission = emission
@@ -376,7 +376,7 @@ impl SceneLoader {
         let mut mesh_buffers = vec![];
         let mut path_samplers: HashSet<(String, TextureSampler)> = HashSet::new();
         // let mut instance_nodes = vec![];
-        for (_, tex) in &graph.images {
+        for tex in &graph.images {
             match &tex.data {
                 node::Buffer::External(path) => {
                     let sampler = sampler_from_rgb_image_tex_node(&tex);
@@ -443,6 +443,7 @@ impl SceneLoader {
         let images = images_to_load
             .into_par_iter()
             .map(|path_s| {
+                dbg!(path_s.clone());
                 let path = PathBuf::from(&path_s);
                 let path = path.canonicalize().unwrap();
                 log::info!("Loading image: {}", path.display());
@@ -467,6 +468,8 @@ impl SceneLoader {
                     let img = img.to_rgba8();
                     let tex =
                         device.create_tex2d(PixelStorage::Byte4, img.width(), img.height(), 1);
+                    let pixels = img.pixels().map(|p| p.0).collect::<Vec<_>>();
+                    tex.view(0).copy_from(&pixels);
                     tex
                 })
                 .collect::<Vec<_>>()

@@ -273,18 +273,22 @@ impl MeshAggregate {
         } else {
             (ng, ng, ng)
         };
+        let make_default = || {
+            let t0 = (v1 - v0).normalize();
+            let t1 = (v2 - v1).normalize();
+            let t2 = (v0 - v2).normalize();
+            let b0 = ng.cross(t0);
+            let b1 = ng.cross(t1);
+            let b2 = ng.cross(t2);
+            (t0, t1, t2, b0, b1, b2)
+        };
         let (t0, t1, t2, b0, b1, b2) = if inst.has_tangents {
             let tangents = self.mesh_tangents.buffer(geom_id);
             let bitangent_signs = self.mesh_bitangent_signs.buffer(geom_id);
-            let t0 = transform
-                .transform_vector(Expr::<Float3>::from(tangents.read(prim_id3 + 0)))
-                .normalize();
-            let t1 = transform
-                .transform_vector(Expr::<Float3>::from(tangents.read(prim_id3 + 1)))
-                .normalize();
-            let t2 = transform
-                .transform_vector(Expr::<Float3>::from(tangents.read(prim_id3 + 2)))
-                .normalize();
+            let t0 = transform.transform_vector(Expr::<Float3>::from(tangents.read(prim_id3 + 0)));
+            let t1 = transform.transform_vector(Expr::<Float3>::from(tangents.read(prim_id3 + 1)));
+            let t2 = transform.transform_vector(Expr::<Float3>::from(tangents.read(prim_id3 + 2)));
+          
             let get_sign = |i: u32| {
                 let j = prim_id3 + i;
                 let sign = bitangent_signs.read(j / 32);
@@ -294,18 +298,27 @@ impl MeshAggregate {
             let s0 = get_sign(0u32);
             let s1 = get_sign(1u32);
             let s2 = get_sign(2u32);
-            let b0 = ng.cross(t0) * s0;
-            let b1 = ng.cross(t1) * s1;
-            let b2 = ng.cross(t2) * s2;
-            (t0, t1, t2, b0, b1, b2)
+            let b0 = ng.cross(t0).normalize() * s0;
+            let b1 = ng.cross(t1).normalize() * s1;
+            let b2 = ng.cross(t2).normalize() * s2;
+            let all_good = b0.is_finite().all() & b1.is_finite().all() & b2.is_finite().all();
+            if !all_good {
+                // cpu_dbg!(t0);
+                // cpu_dbg!(t1);
+                // cpu_dbg!(t2);
+                // cpu_dbg!(b0);
+                // cpu_dbg!(b1);
+                // cpu_dbg!(b2);
+                // cpu_dbg!(s0);
+                // cpu_dbg!(s1);
+                // cpu_dbg!(s2);
+                // lc_assert!(all_good);
+                make_default()
+            } else {
+                (t0, t1, t2, b0, b1, b2)
+            }
         } else {
-            let t0 = (v1 - v0).normalize();
-            let t1 = (v2 - v1).normalize();
-            let t2 = (v0 - v2).normalize();
-            let b0 = ng.cross(t0);
-            let b1 = ng.cross(t1);
-            let b2 = ng.cross(t2);
-            (t0, t1, t2, b0, b1, b2)
+            make_default()
         };
         ShadingTriangle {
             v0,

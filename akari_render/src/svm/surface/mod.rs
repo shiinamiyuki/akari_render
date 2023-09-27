@@ -359,6 +359,8 @@ impl Surface for SurfaceClosure {
         swl: Expr<SampledWavelengths>,
         ctx: &BsdfEvalContext,
     ) -> Color {
+        lc_assert!(wo.is_finite().all());
+        lc_assert!(wi.is_finite().all());
         self.inner
             .evaluate(self.frame.to_local(wo), self.frame.to_local(wi), swl, ctx)
     }
@@ -444,13 +446,23 @@ impl Surface for MicrofacetReflection {
         {
             Color::zero(ctx.color_repr)
         } else {
+            let wh0 = wh;
             let wh = wh.normalize();
             let f = self
                 .fresnel
                 .evaluate(wi.dot(face_forward(wh, Float3::expr(0.0, 1.0, 0.0))), ctx);
+            lc_assert!(f.min().ge(0.0));
             let d = self.dist.d(wh, ctx.ad_mode);
             let g = self.dist.g(wo, wi, ctx.ad_mode);
-            &self.color * &f * (0.25 * d * g / (cos_i * cos_o)).abs() * cos_o.abs()
+            let f = &self.color * &f * (0.25 * d * g / (cos_i * cos_o)).abs() * cos_o.abs();
+            // cpu_dbg!(wo);
+            // cpu_dbg!(wi);
+            // cpu_dbg!(wh0);
+            // cpu_dbg!(wh);
+            lc_assert!(d.ge(0.0));
+            lc_assert!(g.ge(0.0));
+            lc_assert!(f.min().ge(0.0));
+            f
         }
     }
     #[tracked]
