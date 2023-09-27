@@ -15,12 +15,13 @@ use crate::{
 use image::io::Reader as ImageReader;
 
 use std::{
+    cell::RefCell,
     collections::{HashMap, HashSet},
     f32::consts::PI,
     fs::File,
     io::{BufReader, Read},
     path::{Path, PathBuf},
-    sync::Arc, cell::RefCell,
+    sync::Arc,
 };
 pub struct SceneLoader {
     device: Device,
@@ -104,6 +105,10 @@ impl SceneLoader {
         surface: &ShaderGraph,
     ) -> f32 {
         let out = &surface[&surface.out];
+        let out = match out {
+            Node::OutputSurface { surface: out } => &surface[out],
+            _ => unreachable!(),
+        };
         let (emission, strength) = match out {
             Node::PrincipledBsdf {
                 emission,
@@ -144,7 +149,6 @@ impl SceneLoader {
                 let r = glam::Vec3::from(trs.rotation);
                 let s = glam::Vec3::from(trs.scale);
                 // dbg!(t,r,s);
-                let r = glam::vec3(r.x.to_radians(), r.y.to_radians(), r.z.to_radians());
 
                 if !is_camera {
                     m = glam::Mat4::from_scale(s) * m;
@@ -223,17 +227,16 @@ impl SceneLoader {
         }
     }
     fn do_load(mut self) -> Scene {
-        self.mesh_areas.borrow_mut().resize(self.mesh_buffers.len(), vec![]);
+        self.mesh_areas
+            .borrow_mut()
+            .resize(self.mesh_buffers.len(), vec![]);
         for (mat_id, mat) in &self.graph.materials {
-            if let Some(bsdf) = &mat.surface {
-                let shader = self.surface_shader_compiler.compile(SvmCompileContext {
-                    images: &self.path_sampler_to_idx,
-                    graph: &bsdf,
-                });
-                self.nodes_to_surface_shader.insert(mat_id.clone(), shader);
-            } else {
-                panic!("No bsdf node found");
-            }
+            let shader = &mat.shader;
+            let shader = self.surface_shader_compiler.compile(SvmCompileContext {
+                images: &self.path_sampler_to_idx,
+                graph: &shader,
+            });
+            self.nodes_to_surface_shader.insert(mat_id.clone(), shader);
         }
         // for (light_id, light) in &self.graph.lights {
         //     let surface = &light.in_surface.as_node().unwrap().from;
@@ -265,12 +268,8 @@ impl SceneLoader {
         for (i, inst) in instances.iter_mut().enumerate() {
             let power = self.estimate_surface_emission_power(
                 inst,
-                self.graph.materials[&instance_surfaces[i]]
-                    .surface
-                    .as_ref()
-                    .unwrap(),
+                &self.graph.materials[&instance_surfaces[i]].shader,
             );
-
             if 0.0 < power && power <= 1e-4 {
                 log::warn!(
                     "Light power too low: {:?}, power: {}",
@@ -287,7 +286,10 @@ impl SceneLoader {
                 self.compute_mesh_area(geom_id);
                 let mesh = &mut self.mesh_buffers[geom_id];
                 if mesh.area_sampler.is_none() {
-                    mesh.build_area_sampler(self.device.clone(), &self.mesh_areas.borrow()[geom_id]);
+                    mesh.build_area_sampler(
+                        self.device.clone(),
+                        &self.mesh_areas.borrow()[geom_id],
+                    );
                 }
                 let surface_shader = &self.nodes_to_surface_shader[&instance_node.material];
                 let light_ref = self.lights.push(
@@ -401,9 +403,21 @@ impl SceneLoader {
                     let vertices = load_buffer::<[f32; 3]>(&file_resolver, &mesh.vertices);
                     let normals = load_buffer::<[f32; 3]>(&file_resolver, &mesh.normals);
                     let indices = load_buffer::<[u32; 3]>(&file_resolver, &mesh.indices);
-                    let uvs = load_buffer::<[f32; 2]>(&file_resolver, &mesh.uvs);
-                    let tangents = load_buffer::<[f32; 3]>(&file_resolver, &mesh.tangents);
-                    let bitangent_signs = load_buffer::<u32>(&file_resolver, &mesh.bitangent_signs);
+                    let uvs = mesh
+                        .uvs
+                        .as_ref()
+                        .map(|b| load_buffer::<[f32; 2]>(&file_resolver, b))
+                        .unwrap_or(vec![]);
+                    let tangents = mesh
+                        .tangents
+                        .as_ref()
+                        .map(|b| load_buffer::<[f32; 3]>(&file_resolver, b))
+                        .unwrap_or(vec![]);
+                    let bitangent_signs = mesh
+                        .bitangent_signs
+                        .as_ref()
+                        .map(|b| load_buffer::<u32>(&file_resolver, b))
+                        .unwrap_or(vec![]);
                     let mesh = Arc::new(TriangleMesh {
                         name: id.id.clone(),
                         vertices,

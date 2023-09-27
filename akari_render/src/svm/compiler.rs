@@ -194,16 +194,16 @@ impl<'a> Compiler<'a> {
                 emission,
                 emission_strength,
             } => {
-                let color = self.get(&color);
-                let metallic = self.get(&metallic);
-                let roughness = self.get(&roughness);
-                let specular = self.get(&specular);
-                let clearcoat = self.get(&clearcoat);
-                let clearcoat_roughness = self.get(&clearcoat_roughness);
-                let transmission = self.get(&transmission);
-                let emission = self.get(&emission);
-                let emission_strength = self.get(&emission_strength);
-                let ior = self.push_float(*ior);
+                let color = self.get(color);
+                let metallic = self.get(metallic);
+                let roughness = self.get(roughness);
+                let specular = self.get(specular);
+                let clearcoat = self.get(clearcoat);
+                let clearcoat_roughness = self.get(clearcoat_roughness);
+                let transmission = self.get(transmission);
+                let emission = self.get(emission);
+                let emission_strength = self.get(emission_strength);
+                let ior = self.get(ior);
                 SvmNode::PrincipledBsdf(SvmPrincipledBsdf {
                     color,
                     metallic,
@@ -230,8 +230,8 @@ impl<'a> Compiler<'a> {
                 ior,
                 roughness,
             } => {
-                let color = self.get(&color);
-                let ior = self.push_float(*ior);
+                let color = self.get(color);
+                let ior = self.get(ior);
                 let roughness = self.get(&roughness);
                 SvmNode::GlassBsdf(SvmGlassBsdf {
                     kr: color,
@@ -246,6 +246,10 @@ impl<'a> Compiler<'a> {
                 factor,
             } => todo!(),
             Node::ExtractElement { node, field } => todo!(),
+            Node::OutputSurface { surface } => {
+                let surface = self.get(&surface);
+                SvmNode::MaterialOutput(SvmMaterialOutput { surface })
+            }
         };
 
         // when!(

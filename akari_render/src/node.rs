@@ -106,10 +106,10 @@ pub enum Buffer {
 pub struct Mesh {
     pub vertices: Buffer,
     pub normals: Buffer,
-    pub uvs: Buffer,
     pub indices: Buffer,
-    pub tangents: Buffer,
-    pub bitangent_signs: Buffer,
+    pub uvs: Option<Buffer>,
+    pub tangents: Option<Buffer>,
+    pub bitangent_signs: Option<Buffer>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -119,6 +119,7 @@ pub enum Geometry {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Ref<T> {
     pub id: String,
+    #[serde(skip)]
     phantom: std::marker::PhantomData<T>,
 }
 impl<T> PartialEq for Ref<T> {
@@ -176,8 +177,7 @@ pub struct Instance {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Material {
-    pub surface: Option<ShaderGraph>,
-    pub volume: Option<ShaderGraph>,
+    pub shader: ShaderGraph,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -236,7 +236,7 @@ pub mod shader {
         },
         GlassBsdf {
             color: Ref<Node>,
-            ior: f32,
+            ior: Ref<Node>,
             roughness: Ref<Node>,
         },
         SpectralUplift(Ref<Node>),
@@ -247,7 +247,7 @@ pub mod shader {
             specular: Ref<Node>,
             clearcoat: Ref<Node>,
             clearcoat_roughness: Ref<Node>,
-            ior: f32,
+            ior: Ref<Node>,
             transmission: Ref<Node>,
             emission: Ref<Node>,
             emission_strength: Ref<Node>,
@@ -264,6 +264,9 @@ pub mod shader {
         ExtractElement {
             node: Ref<Node>,
             field: String,
+        },
+        OutputSurface {
+            surface: Ref<Node>,
         },
     }
 
@@ -307,7 +310,7 @@ pub mod shader {
                     specular,
                     clearcoat,
                     clearcoat_roughness,
-                    ior: _,
+                    ior,
                     transmission,
                     emission,
                     emission_strength,
@@ -318,6 +321,7 @@ pub mod shader {
                     self.visit(specular);
                     self.visit(clearcoat);
                     self.visit(clearcoat_roughness);
+                    self.visit(ior);
                     self.visit(transmission);
                     self.visit(emission);
                     self.visit(emission_strength);
@@ -338,12 +342,14 @@ pub mod shader {
                 Node::ExtractElement { node, field: _ } => self.visit(node),
                 Node::GlassBsdf {
                     color,
-                    ior: _,
+                    ior,
                     roughness,
                 } => {
                     self.visit(color);
+                    self.visit(ior);
                     self.visit(roughness);
                 }
+                Node::OutputSurface { surface } => self.visit(surface),
             }
         }
     }
