@@ -138,28 +138,32 @@ impl<'a> PathTracerBase<'a> {
                     let pn = PointNormal::new_expr(p, ng);
                     let eval = self.eval;
                     let sample = eval.light.sample(pn, u, **self.swl);
-                    let wi = sample.wi;
-                    let surface = **self.instance.surface;
-                    let wo = **self.wo;
-                    // cpu_dbg!(wi);
-                    let (bsdf_f, bsdf_pdf) = eval
-                        .surface
-                        .evaluate_color_and_pdf(surface, **self.si, wo, wi, **self.swl);
-
-                    lc_assert!(bsdf_pdf.ge(0.0));
-                    lc_assert!(bsdf_f.min().ge(0.0));
-                    let w = mis_weight(sample.pdf, bsdf_pdf, 1);
-                    let shadow_ray = sample.shadow_ray.var();
-                    *shadow_ray.exclude0 = Uint2::expr(**self.si.inst_id, **self.si.prim_id);
-                    // cpu_dbg!(**shadow_ray);
-                    DirectLighting {
-                        weight: w,
-                        irradiance: sample.li,
-                        wi,
-                        pdf: sample.pdf,
-                        shadow_ray: shadow_ray.load(),
-                        valid: true.expr(),
-                        bsdf_f,
+                    if sample.valid {
+                        let wi = sample.wi;
+                        let surface = **self.instance.surface;
+                        let wo = **self.wo;
+                        // cpu_dbg!(wi);
+                        let (bsdf_f, bsdf_pdf) = eval
+                            .surface
+                            .evaluate_color_and_pdf(surface, **self.si, wo, wi, **self.swl);
+                        // let (bsdf_f, bsdf_pdf) = (Color::one(self.color_pipeline.color_repr), 1.0f32.expr());
+                        lc_assert!(bsdf_pdf.ge(0.0));
+                        lc_assert!(bsdf_f.min().ge(0.0));
+                        let w = mis_weight(sample.pdf, bsdf_pdf, 1);
+                        let shadow_ray = sample.shadow_ray.var();
+                        *shadow_ray.exclude0 = Uint2::expr(**self.si.inst_id, **self.si.prim_id);
+                        // cpu_dbg!(**shadow_ray);
+                        DirectLighting {
+                            weight: w,
+                            irradiance: sample.li,
+                            wi,
+                            pdf: sample.pdf,
+                            shadow_ray: shadow_ray.load(),
+                            valid: true.expr(),
+                            bsdf_f,
+                        }
+                    } else {
+                        DirectLighting::invalid(self.color_pipeline)
                     }
                 } else {
                     DirectLighting::invalid(self.color_pipeline)

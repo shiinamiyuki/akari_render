@@ -22,6 +22,7 @@ pub struct Scene {
     pub meshes: Arc<MeshAggregate>,
     pub camera: Arc<dyn Camera>,
     pub device: Device,
+    pub use_rq: bool,
     // pub env_map: Buffer<TagIndex>,
 }
 pub struct Evaluators {
@@ -272,65 +273,71 @@ impl Scene {
         let ro: Expr<[f32; 3]> = ray.o.into();
         let rd: Expr<[f32; 3]> = ray.d.into();
         let rtx_ray = rtx::Ray::new_expr(ro, ray.t_min, rd, ray.t_max);
-
-        let hit = self.meshes.accel.var().trace_closest(rtx_ray);
-        if !hit.miss() {
-            let inst_id = hit.inst_id;
-            let prim_id = hit.prim_id;
-            let bary = Float2::expr(hit.u, hit.v);
-            self.si_from_hitinfo(inst_id, prim_id, bary)
+        if !self.use_rq {
+            let hit = self.meshes.accel.var().trace_closest(rtx_ray);
+            if !hit.miss() {
+                let inst_id = hit.inst_id;
+                let prim_id = hit.prim_id;
+                let bary = Float2::expr(hit.u, hit.v);
+                self.si_from_hitinfo(inst_id, prim_id, bary)
+            } else {
+                let si = Var::<SurfaceInteraction>::zeroed();
+                *si.valid = false.expr();
+                **si
+            }
         } else {
-            let si = Var::<SurfaceInteraction>::zeroed();
-            *si.valid = false.expr();
-            **si
+            let hit = self.meshes.accel.var().query_all(
+                rtx_ray,
+                u32::MAX,
+                rtx::RayQuery {
+                    on_triangle_hit: |candidate: rtx::TriangleCandidate| {
+                        if (candidate.inst.ne(ray.exclude0.x) | candidate.prim.ne(ray.exclude0.y))
+                            & (candidate.inst.ne(ray.exclude1.x)
+                                | candidate.prim.ne(ray.exclude1.y))
+                        {
+                            candidate.commit();
+                        }
+                    },
+                    on_procedural_hit: |_| {},
+                },
+            );
+
+            if hit.triangle_hit() {
+                let inst_id = hit.inst_id;
+                let prim_id = hit.prim_id;
+                let bary = hit.bary;
+                self.si_from_hitinfo(inst_id, prim_id, bary)
+            } else {
+                let si = Var::<SurfaceInteraction>::zeroed();
+                *si.valid = false.expr();
+                **si
+            }
         }
-
-        // let hit = self.meshes.accel.var().query_all(
-        //     rtx_ray,
-        //     u32::MAX,
-        //     rtx::RayQuery {
-        //         on_triangle_hit: |candidate: rtx::TriangleCandidate| {
-        //             if (candidate.inst.ne(ray.exclude0.x) | candidate.prim.ne(ray.exclude0.y))
-        //                 & (candidate.inst.ne(ray.exclude1.x) | candidate.prim.ne(ray.exclude1.y))
-        //             {
-        //                 candidate.commit();
-        //             }
-        //         },
-        //         on_procedural_hit: |_| {},
-        //     },
-        // );
-
-        // if hit.triangle_hit() {
-        //     let inst_id = hit.inst_id;
-        //     let prim_id = hit.prim_id;
-        //     let bary = hit.bary;
-        //     self.si_from_hitinfo(inst_id, prim_id, bary)
-        // } else {
-        //     let si = Var::<SurfaceInteraction>::zeroed();
-        //     *si.valid = false.expr();
-        //     **si
-        // }
     }
     #[tracked]
     pub fn occlude(&self, ray: Expr<Ray>) -> Expr<bool> {
         let ro: Expr<[f32; 3]> = ray.o.into();
         let rd: Expr<[f32; 3]> = ray.d.into();
         let rtx_ray = rtx::Ray::new_expr(ro, ray.t_min, rd, ray.t_max);
-        self.meshes.accel.var().trace_any(rtx_ray)
-        // let hit = self.meshes.accel.var().query_any(
-        //     rtx_ray,
-        //     u32::MAX,
-        //     rtx::RayQuery {
-        //         on_triangle_hit: |candidate: rtx::TriangleCandidate| {
-        //             if (candidate.inst.ne(ray.exclude0.x) | candidate.prim.ne(ray.exclude0.y))
-        //                 & (candidate.inst.ne(ray.exclude1.x) | candidate.prim.ne(ray.exclude1.y))
-        //             {
-        //                 candidate.commit();
-        //             }
-        //         },
-        //         on_procedural_hit: |_| {},
-        //     },
-        // );
-        // !hit.miss()
+        if !self.use_rq {
+            self.meshes.accel.var().trace_any(rtx_ray)
+        } else {
+            let hit = self.meshes.accel.var().query_any(
+                rtx_ray,
+                u32::MAX,
+                rtx::RayQuery {
+                    on_triangle_hit: |candidate: rtx::TriangleCandidate| {
+                        if (candidate.inst.ne(ray.exclude0.x) | candidate.prim.ne(ray.exclude0.y))
+                            & (candidate.inst.ne(ray.exclude1.x)
+                                | candidate.prim.ne(ray.exclude1.y))
+                        {
+                            candidate.commit();
+                        }
+                    },
+                    on_procedural_hit: |_| {},
+                },
+            );
+            !hit.miss()
+        }
     }
 }

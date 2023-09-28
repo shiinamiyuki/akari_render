@@ -309,6 +309,7 @@ impl SceneLoader {
             }
         }
         let area_light_count = lights.len();
+        assert!(area_light_count == light_ids_to_lights.len());
         log::info!("{} mesh lights found", area_light_count);
         // now add other lights
         {
@@ -368,6 +369,7 @@ impl SceneLoader {
             meshes: mesh_aggregate.clone(),
             camera: camera.unwrap(),
             device,
+            use_rq: false,
             // env_map: todo!(),
         }
     }

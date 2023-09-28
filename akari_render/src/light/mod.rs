@@ -179,6 +179,7 @@ impl LightAggregate {
     ) -> LightSample {
         let light_dist = &self.light_distribution;
         let (light_idx, light_choice_pdf, u_select) = light_dist.sample_and_remap(u_select);
+        // let (light_idx, light_choice_pdf) = (0u32.expr(), 1.0f32.expr());
         let light = self.light_ids_to_lights.var().read(light_idx);
         let light = self.lights.get(light);
         let mut sample =

@@ -84,6 +84,8 @@ impl AliasTable {
         // let idx = select(u.y.ge(entry.t()), entry.j(), idx);
         // let pdf = self.1.var().read(idx);
         // (idx, pdf)
+        // lc_assert!((self.0.len() as u32).expr().eq(self.0.var().len_expr().as_u32()));
+        // let (idx, u) = uniform_discrete_choice_and_remap((self.0.len() as u32).expr(), u);
         let (idx, u) = uniform_discrete_choice_and_remap(self.0.var().len_expr().as_u32(), u);
         let entry = self.0.var().read(idx);
         let (idx, u) = weighted_discrete_choice2_and_remap(entry.t, idx, entry.j, u);
