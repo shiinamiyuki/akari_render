@@ -17,6 +17,7 @@ pub struct LightSample {
     pub wi: Expr<Float3>,
     pub shadow_ray: Expr<Ray>,
     pub n: Expr<Float3>,
+    pub valid: Expr<bool>,
 }
 #[derive(Clone, Copy, Value)]
 #[repr(C)]
@@ -27,6 +28,7 @@ pub struct FlatLightSample {
     pub wi: Float3,
     pub shadow_ray: Ray,
     pub n: Float3,
+    pub valid: bool,
 }
 pub struct LightEvalContext<'a> {
     pub color_pipeline: ColorPipeline,
@@ -133,6 +135,7 @@ impl LightEvaluator {
             wi: sample.wi,
             shadow_ray: sample.shadow_ray,
             n: sample.n,
+            valid: sample.valid,
         }
     }
     pub fn pdf(

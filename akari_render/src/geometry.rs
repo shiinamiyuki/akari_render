@@ -80,9 +80,9 @@ pub struct ShadingTriangle {
     pub t0: Expr<Float3>,
     pub t1: Expr<Float3>,
     pub t2: Expr<Float3>,
-    pub b0: Expr<Float3>,
-    pub b1: Expr<Float3>,
-    pub b2: Expr<Float3>,
+    // pub b0: Expr<f32>,
+    // pub b1: Expr<f32>,
+    // pub b2: Expr<f32>,
     pub ng: Expr<Float3>,
 }
 
@@ -96,12 +96,18 @@ impl ShadingTriangle {
         ((1.0 - bary.x - bary.y) * self.n0 + bary.x * self.n1 + bary.y * self.n2).normalize()
     }
     #[tracked]
-    pub fn tangent(&self, bary: Expr<Float2>) -> Expr<Float3> {
-        ((1.0 - bary.x - bary.y) * self.t0 + bary.x * self.t1 + bary.y * self.t2).normalize()
-    }
-    #[tracked]
-    pub fn bitangent(&self, bary: Expr<Float2>) -> Expr<Float3> {
-        ((1.0 - bary.x - bary.y) * self.b0 + bary.x * self.b1 + bary.y * self.b2).normalize()
+    pub fn ortho_frame(&self, bary: Expr<Float2>) -> Expr<Frame> {
+        let n = self.n(bary);
+        let t =
+            ((1.0 - bary.x - bary.y) * self.t0 + bary.x * self.t1 + bary.y * self.t2).normalize();
+        let s = n.cross(t);
+        if s.length_squared() > 0.0 {
+            let s = s.normalize();
+            let t = s.cross(n).normalize();
+            Frame::new_expr(n, t, s)
+        } else {
+            FrameExpr::from_n(n)
+        }
     }
     #[tracked]
     pub fn uv(&self, bary: Expr<Float2>) -> Expr<Float2> {
@@ -290,7 +296,10 @@ impl AffineTransformExpr {
     }
 }
 #[tracked]
-pub fn face_forward(v: impl AsExpr<Value = Float3>, n: impl AsExpr<Value = Float3>) -> Expr<Float3> {
+pub fn face_forward(
+    v: impl AsExpr<Value = Float3>,
+    n: impl AsExpr<Value = Float3>,
+) -> Expr<Float3> {
     let v = v.as_expr();
     let n = n.as_expr();
     select(v.dot(n) < 0.0, -v, v)

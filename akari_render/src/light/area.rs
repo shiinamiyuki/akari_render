@@ -77,16 +77,15 @@ impl Light for AreaLightExpr {
         let bary = uniform_sample_triangle(u_sample);
         let area = shading_triangle.area();
         let p = shading_triangle.p(bary);
-        let n = shading_triangle.n(bary);
         let uv = shading_triangle.uv(bary);
-        let tt = shading_triangle.tangent(bary);
-        let ss = shading_triangle.bitangent(bary);
+        let frame = shading_triangle.ortho_frame(bary);
+        let n = frame.n;
         let geometry = SurfaceLocalGeometry::from_comps_expr(SurfaceLocalGeometryComps {
             p,
             ng: shading_triangle.ng,
             ns: n,
-            tangent: shading_triangle.tangent(bary),
-            bitangent: shading_triangle.bitangent(bary),
+            tangent: frame.t,
+            bitangent: frame.s,
             uv,
         });
 
@@ -95,32 +94,44 @@ impl Light for AreaLightExpr {
             prim_id,
             bary,
             geometry,
-            frame: Frame::new_expr(n, tt, ss),
+            frame,
             valid: true.expr(),
         });
         let wi = p - pn.p;
-        let emission = self.emission(-wi, si, swl, ctx);
-        let dist2 = wi.length_squared();
-        let wi = wi / dist2.sqrt();
-        let li = select(wi.dot(n).lt(0.0), emission, Color::zero(ctx.color_repr()));
-        let pdf = pdf / area * dist2 / n.dot(-wi).max_(1e-6);
-        let ro = rtx::offset_ray_origin(pn.p, face_forward(pn.n, wi));
-        let dist = (p - ro).length();
-        let shadow_ray = Ray::new_expr(
-            ro,
-            wi,
-            0.0,
-            dist * (1.0f32 - 1e-3),
-            Uint2::expr(u32::MAX, u32::MAX),
-            Uint2::expr(self.instance_id, prim_id),
-        );
-        // cpu_dbg!( u);
-        LightSample {
-            li,
-            pdf,
-            shadow_ray,
-            wi,
-            n,
+        if wi.length_squared() == 0.0 {
+            LightSample {
+                li: Color::zero(ctx.color_repr()),
+                pdf,
+                shadow_ray: Expr::<Ray>::zeroed(),
+                wi,
+                n,
+                valid: false.expr(),
+            }
+        } else {
+            let emission = self.emission(-wi, si, swl, ctx);
+            let dist2 = wi.length_squared();
+            let wi = wi / dist2.sqrt();
+            let li = select(wi.dot(n).lt(0.0), emission, Color::zero(ctx.color_repr()));
+            let pdf = pdf / area * dist2 / n.dot(-wi).max_(1e-6);
+            let ro = rtx::offset_ray_origin(pn.p, face_forward(pn.n, wi));
+            let dist = (p - ro).length();
+            let shadow_ray = Ray::new_expr(
+                ro,
+                wi,
+                0.0,
+                dist * (1.0f32 - 1e-3),
+                Uint2::expr(u32::MAX, u32::MAX),
+                Uint2::expr(self.instance_id, prim_id),
+            );
+            // cpu_dbg!( u);
+            LightSample {
+                li,
+                pdf,
+                shadow_ray,
+                wi,
+                n,
+                valid: true.expr(),
+            }
         }
     }
     #[tracked]

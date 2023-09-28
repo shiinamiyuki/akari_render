@@ -115,7 +115,10 @@ impl SceneLoader {
                 emission_strength,
                 ..
             } => (Some(emission), Some(emission_strength)),
-            Node::Emission { color: emission, strength } => (Some(emission), Some(strength)),
+            Node::Emission {
+                color: emission,
+                strength,
+            } => (Some(emission), Some(strength)),
             _ => (None, None),
         };
         let emission = emission
@@ -443,7 +446,6 @@ impl SceneLoader {
         let images = images_to_load
             .into_par_iter()
             .map(|path_s| {
-                dbg!(path_s.clone());
                 let path = PathBuf::from(&path_s);
                 let path = path.canonicalize().unwrap();
                 log::info!("Loading image: {}", path.display());
@@ -454,7 +456,8 @@ impl SceneLoader {
                     .with_guessed_format()
                     .unwrap()
                     .decode()
-                    .unwrap();
+                    .unwrap()
+                    .flipv();
                 (path_s, img)
             })
             .collect::<HashMap<_, _>>();
@@ -462,7 +465,7 @@ impl SceneLoader {
         let orded_image_paths = images.keys().collect::<Vec<_>>();
         let textures = {
             orded_image_paths
-                .par_iter()
+                .iter()
                 .map(|path| {
                     let img = &images[*path];
                     let img = img.to_rgba8();

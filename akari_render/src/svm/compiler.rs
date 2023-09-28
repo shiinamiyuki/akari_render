@@ -152,9 +152,7 @@ impl<'a> Compiler<'a> {
     fn push_float(&mut self, value: f32) -> SvmNodeRef {
         self.push(SvmNode::Float(SvmFloat { value }))
     }
-    fn graph(&self) -> &ShaderGraph {
-        self.ctx.graph
-    }
+
     fn compile_node(&mut self, node_id: &Ref<Node>) {
         let graph = self.ctx.graph;
         let node = &graph.nodes[node_id];

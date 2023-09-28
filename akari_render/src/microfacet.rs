@@ -46,10 +46,13 @@ fn tr_d_impl_(wh: Expr<Float3>, alpha: Expr<Float2>) -> Expr<f32> {
     let cos4_theta = Frame::cos2_theta(wh).sqr();
     let ax = alpha.x;
     let ay = alpha.y;
-    // cpu_dbg!(cos4_theta);
     let e = tan2_theta * ((Frame::cos_phi(wh) / ax).sqr() + (Frame::sin_phi(wh) / ay).sqr());
-    let d = 1.0 / (PI * ax * ay * cos4_theta * (1.0 + e).sqr());
-    select(tan2_theta.is_infinite(), 0.0f32.expr(), d)
+    let inv_d = PI * ax * ay * cos4_theta * (1.0 + e).sqr();
+    select(
+        !tan2_theta.is_finite() | !inv_d.is_finite() | inv_d.eq(0.0),
+        0.0f32.expr(),
+        1.0 / inv_d,
+    )
 }
 #[tracked]
 fn tr_lambda_impl_(w: Expr<Float3>, alpha: Expr<Float2>) -> Expr<f32> {
@@ -232,14 +235,16 @@ impl MicrofacetDistribution for TrowbridgeReitzDistribution {
         }
     }
     fn pdf(&self, wo: Expr<Float3>, wh: Expr<Float3>, ad_mode: ADMode) -> Expr<f32> {
-        if self.sample_visible {
+        let pdf = if self.sample_visible {
             track!(
                 self.d(wh, ad_mode) * self.g1(wo, ad_mode) * wo.dot(wh).abs()
                     / Frame::abs_cos_theta(wo)
             )
         } else {
             track!(self.d(wh, ad_mode) * Frame::abs_cos_theta(wh))
-        }
+        };
+        lc_assert!(pdf.is_finite());
+        pdf
     }
     #[tracked]
     fn roughness(&self, _ad_mode: ADMode) -> Expr<f32> {

@@ -547,7 +547,7 @@ impl Surface for MicrofacetTransmission {
         &self,
         wo: Expr<Float3>,
         wi: Expr<Float3>,
-        swl: Expr<SampledWavelengths>,
+        _swl: Expr<SampledWavelengths>,
         ctx: &BsdfEvalContext,
     ) -> Color {
         let cos_o = Frame::cos_theta(wo);
@@ -836,6 +836,7 @@ impl SurfaceEvaluator {
         wi: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
     ) -> (Color, Expr<f32>) {
+        
         let result = self.eval.call(
             surface,
             si,

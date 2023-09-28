@@ -1,3 +1,5 @@
+use std::env;
+
 use color::ColorRepr;
 use hexf::hexf32;
 use integrator::FilmConfig;
@@ -58,4 +60,18 @@ pub enum ADMode {
     None,
     Forward,
     Backward,
+}
+
+pub fn debug_mode() -> bool {
+    cfg!(debug_assertions)
+        || match env::var("LUISA_DEBUG") {
+            Ok(x) => {
+                if x == "1" || x == "full" {
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
 }
