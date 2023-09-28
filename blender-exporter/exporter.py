@@ -7,47 +7,51 @@ import mathutils
 import sys
 from typing import List, Tuple, Dict
 from enum import Enum, auto
+import json
 import os
 import struct
+
+
 def dbg(*args, **kwargs):
     print(f"Debug {sys._getframe().f_back.f_lineno}: ", end="")
     print(*args, **kwargs)
 
+
 def convert_coord_sys_matrix():
     # blender is z-up, right-handed
     # we are y-up, right-handed
-    m = mathutils.Matrix([
-        [1, 0, 0, 0],
-        [0, 0, 1, 0],
-        [0,-1, 0, 0],
-        [0, 0, 0, 1]
-    ])
+    m = mathutils.Matrix([[1, 0, 0, 0], [0, 0, 1, 0], [0, -1, 0, 0], [0, 0, 0, 1]])
     return m
+
+
 CONVERT_COORD_SYS_MATRIX = convert_coord_sys_matrix()
+
+
 def path_join(a, b):
     return os.path.join(a, b).replace("\\", "/")
+
 
 D = bpy.data
 C = bpy.context
 depsgraph = C.evaluated_depsgraph_get()
-bpy.ops.object.mode_set(mode='OBJECT')
+bpy.ops.object.mode_set(mode="OBJECT")
 # select one object to activate edit mode
 for obj in C.scene.objects:
     first_obj = C.scene.objects[0]
-    if first_obj.type == 'MESH':
+    if first_obj.type == "MESH":
         first_obj.select_set(True)
         C.view_layer.objects.active = first_obj
         break
 
-bpy.ops.object.select_all(action='DESELECT')
+bpy.ops.object.select_all(action="DESELECT")
 
 argv = sys.argv
 print(argv)
 argv_offset = argv.index("--") + 1
 argv = argv[argv_offset:]
-force_export ='--force' in argv or '-f' in argv
-update_mesh_only = '--update-mesh-only' in argv or '-u' in argv
-save_modified_blend = '--save-modified-blend' in argv or '-s' in argv
+force_export = "--force" in argv or "-f" in argv
+update_mesh_only = "--update-mesh-only" in argv or "-u" in argv
+save_modified_blend = "--save-modified-blend" in argv or "-s" in argv
 
 
 OUT_DIR = argv[0]
@@ -65,7 +69,7 @@ else:
                 print("Force export")
             if update_mesh_only:
                 print("Update mesh only")
-akr_file = open(os.path.join(OUT_DIR, "scene.akr"), "w")
+akr_file = open(os.path.join(OUT_DIR, "scene.json"), "w")
 MESH_DIR = path_join(OUT_DIR, "meshes")
 if not os.path.exists(MESH_DIR):
     os.makedirs(MESH_DIR)
@@ -88,7 +92,7 @@ class UniqueName:
         name = name.replace(" ", "_")
         name = name.replace(".", "_")
         name = name.replace("-", "_")
-        
+
         if name not in self.names:
             self.names[name] = 0
             gened_name = name
@@ -99,17 +103,19 @@ class UniqueName:
         dbg(name, gened_name)
         return gened_name
 
+
 def compute_uv_map(obj):
     # compute uv mapping using smart uv project
-    bpy.ops.object.mode_set(mode='OBJECT')
-    bpy.ops.object.select_all(action='DESELECT')
+    bpy.ops.object.mode_set(mode="OBJECT")
+    bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)
     C.view_layer.objects.active = obj
-    bpy.ops.object.mode_set(mode='EDIT')
-    bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
     bpy.ops.uv.smart_project()
-    bpy.ops.object.mode_set(mode='OBJECT')
+    bpy.ops.object.mode_set(mode="OBJECT")
     obj.select_set(False)
+
 
 def is_uv_map_valid(obj):
     if len(obj.data.uv_layers) == 0:
@@ -120,11 +126,16 @@ def is_uv_map_valid(obj):
         if v[0] != 0.0 or v[1] != 0.0:
             return True
     return False
+
+
 VISITED = UniqueName()
+
+
 def toposort(node_tree):
     nodes = node_tree.nodes
     visited = set()
     order = list()
+
     def dfs(node):
         if node in visited:
             return
@@ -133,8 +144,9 @@ def toposort(node_tree):
         for input in node.inputs:
             for link in input.links:
                 from_node = link.from_node
-                dbg('recurse!', node, from_node)
+                dbg("recurse!", node, from_node)
                 dfs(from_node)
+
     sorted = []
     for node in nodes:
         order = []
@@ -143,19 +155,46 @@ def toposort(node_tree):
         sorted.extend(order)
     assert len(sorted) == len(nodes)
     return sorted
+
+class NodeType:
+    pass
+# PrimitiveNodeType = Enum("PrimitiveNodeType", ["Float", "Float3", "RGB", "Spectrum", "BSDF"])
+class PrimitiveNodeType(NodeType, Enum):
+    FLOAT = auto()
+    FLOAT3 = auto()
+    RGB = auto()
+    SPECTRUM = auto()
+    BSDF = auto()
+class CompositeNodeType(NodeType):
+    def __init__(self, fields) -> None:
+        self.fields = fields
+
+    def __eq__(self, o: object) -> bool:
+        if not isinstance(o, CompositeNodeType):
+            return False
+        return self.fields == o.fields
+
 class MaterialExporter:
     socket_to_node_output: Dict[T.NodeSocket, Tuple[T.Node, str]] = dict()
-    def __init__(self) -> None:
-        self.visited = set()
+    visited: Dict[T.Node, NodeType]
+
+    def __init__(self, exported_images) -> None:
+        self.visited = dict()
         self.output_node = None
-        self.exported_materials = dict()
-    
-    def get_node_input(self, node, key):
+        self.shader_graph = dict()
+        self.exported_images = exported_images
+
+    def push_node(self, node):
+        name = f"$tmp_{len(self.shader_graph)}"
+        self.shader_graph[name] = node
+        return {"id": name}
+
+    def get_node_input(self, node, key, node_ty, akr_key):
         try:
             s = node.inputs[key]
         except KeyError as e:
             print(f"Node `{node.name}` has no input `{key}`")
-            print(f'keys: {node.inputs.keys()}')
+            print(f"keys: {node.inputs.keys()}")
             raise e
         connected = len(s.links) != 0
         assert not connected or len(s.links) == 1
@@ -168,12 +207,25 @@ class MaterialExporter:
                 or isinstance(s, T.NodeSocketFloatAngle)
                 or isinstance(s, T.NodeSocketFloatUnsigned)
             ):
-                return f'{s.default_value}'
+                assert (
+                    node_ty == PrimitiveNodeType.FLOAT
+                ), f"Epxected {PrimitiveNodeType.FLOAT} but got {node_ty}"
+                return self.push_node({"Float": s.default_value})
             elif isinstance(s, T.NodeSocketColor):
                 r = s.default_value[0]
                 g = s.default_value[1]
                 b = s.default_value[2]
-                return f'SpectralUplift[rgb=RGB[r={r}, g={g}, b={b}, colorspace=ColorSpace::SRGB]]'
+                assert (
+                    node_ty == PrimitiveNodeType.RGB or node_ty == PrimitiveNodeType.SPECTRUM
+                ), f"Epxected {PrimitiveNodeType.RGB} or {PrimitiveNodeType.SPECTRUM} but got {node_ty}"
+                rgb = self.push_node(
+                    {"Rgb": {"value": [r, g, b], "colorspace": "srgb"}}
+                )
+                if node_ty == PrimitiveNodeType.RGB:
+                    return rgb
+                else:
+                    uplift = self.push_node({"SpectralUplift": rgb})
+                    return uplift
             else:
                 raise RuntimeError(f"Unsupported socket type `{s}`")
         else:
@@ -181,66 +233,109 @@ class MaterialExporter:
             from_socket = link.from_socket
             (from_node, from_key) = self.socket_to_node_output[from_socket]
             assert from_socket.node == from_node, f"{from_socket.node} {from_node}"
-            return f'${VISITED.get(from_node)}.{from_key}'
+            has_single_output = len(from_node.outputs) == 1
+            
+            input_ty = self.visited[from_node]
+            if isinstance(input_ty, PrimitiveNodeType):
+                input_node = {"id": VISITED.get(from_node)}
+            else:
+                input_node = self.push_node(
+                    {
+                        "ExtractElement": {
+                            "node": VISITED.get(from_node),
+                            "field": akr_key,
+                        }
+                    }
+                )
+            if isinstance(input_ty, PrimitiveNodeType):
+                if node_ty == input_ty:
+                    pass
+                else:
+                     NotImplementedError()
+            elif isinstance(input_ty, CompositeNodeType):
+                input_ty = input_ty.fields[akr_key]
+            if node_ty == PrimitiveNodeType.SPECTRUM:
+                if input_ty == PrimitiveNodeType.RGB:
+                    input_node = self.push_node({"SpectralUplift": input_node})
+            else:
+                assert node_ty == input_ty, f"{node_ty} {input_ty}"
+            return input_node
 
     def export_node(self, node):
         if node in self.visited:
             return
         name = VISITED.get(node)
-        self.visited.add(node)
-        print(f'${name} = ', end="",file=akr_file)
-        cnt = 0
-        def input(blender_key, akr_key):
-            nonlocal cnt
-            if cnt != 0:
-                print(",\n",file=akr_file, end="")
-            print(f'    {akr_key}={self.get_node_input(node, blender_key)}', end="",file=akr_file)
-            cnt += 1
+
+        mat = {}
+        node_ty = None
+
+        def input(blender_key, akr_key, node_ty):
+            mat[akr_key] = self.get_node_input(node, blender_key, node_ty, akr_key)
+
         if isinstance(node, T.ShaderNodeBsdfPrincipled):
-            print(f'PrincipledBsdf[',file=akr_file)
-            input("Base Color", 'color')
-            input('Roughness', 'roughness')
-            input('Metallic', 'metallic')
-            input('Specular', 'specular')
-            input('Emission', 'emission')
-            input('Clearcoat', 'clearcoat')
-            input('Clearcoat Roughness', 'clearcoat_roughness')
-            input('Transmission', 'transmission')
-            input('IOR', 'ior')
+            input("Base Color", "color", PrimitiveNodeType.SPECTRUM)
+            input("Roughness", "roughness", PrimitiveNodeType.FLOAT)
+            input("Metallic", "metallic", PrimitiveNodeType.FLOAT)
+            input("Specular", "specular", PrimitiveNodeType.FLOAT)
+            input("Emission", "emission", PrimitiveNodeType.SPECTRUM)
+            input("Emission Strength", "emission_strength", PrimitiveNodeType.FLOAT)
+            input("Clearcoat", "clearcoat", PrimitiveNodeType.FLOAT)
+            input("Clearcoat Roughness", "clearcoat_roughness", PrimitiveNodeType.FLOAT)
+            input("Transmission", "transmission", PrimitiveNodeType.FLOAT)
+            input("IOR", "ior", PrimitiveNodeType.FLOAT)
+            mat = {"PrincipledBsdf": mat}
+            node_ty = PrimitiveNodeType.BSDF
         elif isinstance(node, T.ShaderNodeOutputMaterial):
-            print(f'MaterialOutput[',file=akr_file)
-            input("Surface", 'surface')
-            self.output_node = node
+            assert self.output_node is None, "Multiple output node"
+            input("Surface", "surface", PrimitiveNodeType.BSDF)
+            mat = {"OutputSurface": mat}
+            self.output_node = name
         elif isinstance(node, T.ShaderNodeBsdfGlass):
-            print(f'GlassBsdf[',file=akr_file)
-            input("Color", 'color')
-            input('Roughness', 'roughness')
-            input('IOR', 'ior')
+            input("Color", "color", PrimitiveNodeType.SPECTRUM)
+            input("Roughness", "roughness", PrimitiveNodeType.FLOAT)
+            input("IOR", "ior", PrimitiveNodeType.FLOAT)
+            mat = {"GlassBsdf": mat}
+            node_ty = PrimitiveNodeType.BSDF
+        elif isinstance(node, T.ShaderNodeBsdfDiffuse):
+            input("Color", "color", PrimitiveNodeType.SPECTRUM)
+            mat = {"DiffuseBsdf": mat}
+            node_ty = PrimitiveNodeType.BSDF
         elif isinstance(node, T.ShaderNodeEmission):
-            print(f'Emission[',file=akr_file)
-            input("Color", 'color')
-            input('Strength', 'strength')
+            input("Color", "color", PrimitiveNodeType.SPECTRUM)
+            input("Strength", "strength", PrimitiveNodeType.FLOAT)
+            mat = {"Emission": mat}
+            node_ty = PrimitiveNodeType.BSDF
         elif isinstance(node, T.ShaderNodeTexImage):
             extension = {
-                'REPEAT': 'Repeat',
-                'EXTEND': 'Extend',
-                'CLIP': 'Clip',
-                'MIRROR': 'Mirror',
+                "REPEAT": "Repeat",
+                "EXTEND": "Extend",
+                "CLIP": "Clip",
+                "MIRROR": "Mirror",
             }[node.extension]
             interpolation = {
-                'Closest': 'Nearest',
-                'Linear': 'Linear',
-                'Cubic': 'Linear',
-                'Smart': 'Linear',
+                "Closest": "Nearest",
+                "Linear": "Linear",
+                "Cubic": "Linear",
+                "Smart": "Linear",
             }[node.interpolation]
+            assert node.image.filepath != ""
+            mat = {
+                "TexImage": {
+                    "data": make_external_buffer(node.image.filepath),
+                    "extension": extension,
+                    "interpolation": interpolation,
+                    'colorspace': {'Rgb':'srgb'},
+                }
+            }
+            self.exported_images.append(mat['TexImage'])
+            node_ty = PrimitiveNodeType.RGB
         else:
             raise RuntimeError(f"Unsupported node type `{node.type}`")
-        print("\n]",file=akr_file)
+        self.visited[node] = node_ty
+        self.shader_graph[name] = mat
 
-    def export_material(self, mat):
+    def export_material(self, mat) -> dict:
         assert mat is not None
-        if mat in self.exported_materials:
-            return self.exported_materials[mat]
         name = VISITED.get(mat)
         print(f"Exporting Material `{mat.name}` -> {name}")
         self.output_node = None
@@ -257,27 +352,54 @@ class MaterialExporter:
                 # print(node.outputs[key])
                 def rename_key(key):
                     return key.lower().replace(" ", "_")
+
                 self.socket_to_node_output[node.outputs[key]] = (node, rename_key(key))
         for node in sorted_nodes:
             dbg(node)
             self.export_node(node)
         assert self.output_node is not None
-        out = VISITED.get(self.output_node)
-        self.exported_materials[mat] = out
-        return out
+        return name
+
+
+def make_external_buffer(path):
+    return {"External": path}
+
+
+def make_ref(id):
+    return {"id": id}
+
 
 class SceneExporter:
     def __init__(self, scene):
         self.scene = scene
-        self.exported_instances = list()
-        self.mat_exporter = MaterialExporter()
+        self.exported_instances = dict()
+        self.exported_geometries = dict()
+        self.exported_materials = dict()
+        self.exported_images = list()
+        self.material_cache = dict()
+        self.image_cache = dict()
 
+    def export_image(self, img):
+        if img in self.image_cache:
+            return self.image_cache[img]
+        self.exported_images.append(img)
     def visible_objects(self):
         return [ob for ob in self.scene.objects if not ob.hide_render]
 
     def export_material(self, m):
-        return self.mat_exporter.export_material(m)
-    
+        if m in self.material_cache:
+            return self.material_cache[m]
+        exporter = MaterialExporter(self.exported_images)
+        out = exporter.export_material(m)
+        self.exported_materials[out] = {
+            "shader": {
+                "nodes": exporter.shader_graph,
+                "out": {"id": exporter.output_node},
+            }
+        }
+        self.material_cache[m] = out
+        return out
+
     def export_mesh_data(self, m, name, has_uv):
         bm = bmesh.new()
         bm.from_mesh(m)
@@ -302,13 +424,13 @@ class SceneExporter:
         normal_buffer = open(os.path.join(MESH_DIR, f"{name}.normal"), "wb")
         bit_counter = 0
         packed_bits = 0
-        vert_buffer.write(struct.pack('Q', len(V)))
-        ind_buffer.write(struct.pack('Q', len(F)))
-        normal_buffer.write(struct.pack('Q', len(F) * 3))
+        vert_buffer.write(struct.pack("Q", len(V)))
+        ind_buffer.write(struct.pack("Q", len(F)))
+        normal_buffer.write(struct.pack("Q", len(F) * 3))
         if has_uv:
-            uv_buffer.write(struct.pack('Q', len(F) * 3))
-            tangent_buffer.write(struct.pack('Q', len(F) * 3))
-            bitangent_buffer.write(struct.pack('Q', (len(F) * 3 + 31) // 32))
+            uv_buffer.write(struct.pack("Q", len(F) * 3))
+            tangent_buffer.write(struct.pack("Q", len(F) * 3))
+            bitangent_buffer.write(struct.pack("Q", (len(F) * 3 + 31) // 32))
         for v in V:
             vert_buffer.write(struct.pack("fff", *v.co))
         for f in F:
@@ -343,46 +465,53 @@ class SceneExporter:
             tangent_buffer.close()
             bitangent_buffer.close()
         normal_buffer.close()
-        print(f'${name}_vert = Buffer[name="vertices", path="{path_join(MESH_DIR, f"{name}.vert")}"]',file=akr_file)
-        print(f'${name}_ind = Buffer[name="indices", path="{path_join(MESH_DIR, f"{name}.ind")}"]',file=akr_file)
-        print(f'${name}_normal = Buffer[name="normals", path="{path_join(MESH_DIR, f"{name}.normal")}"]',file=akr_file)
+
+        exported_mesh = {}
+
+        exported_mesh["vertices"] = make_external_buffer(
+            path_join(MESH_DIR, f"{name}.vert")
+        )
+        exported_mesh["indices"] = make_external_buffer(
+            path_join(MESH_DIR, f"{name}.ind")
+        )
+        exported_mesh["normals"] = make_external_buffer(
+            path_join(MESH_DIR, f"{name}.normal")
+        )
         if has_uv:
-            print(f'${name}_uv = Buffer[name="uvs", path="{path_join(MESH_DIR, f"{name}.uv")}"]',file=akr_file)
-            print(f'${name}_tangent = Buffer[name="tangents", path="{path_join(MESH_DIR, f"{name}.tangent")}"]',file=akr_file)
-            print(f'${name}_bitangent = Buffer[name="bitangent_signs", path="{path_join(MESH_DIR, f"{name}.bitangent")}"]',file=akr_file)
-        buffers = [f"{name}_vert", f"{name}_ind", f"{name}_normal"]
-        if has_uv:
-            buffers.extend([f"{name}_uv", f"{name}_tangent", f"{name}_bitangent"])
-       
-        
-        print(f'${name} = Mesh[\n    name="{name}",\n    buffers=[',file=akr_file)
-        for i, buffer in enumerate(buffers):
-            print(f'        ${buffer}',file=akr_file, end="")
-            if i != len(buffers) - 1:
-                print(",",file=akr_file)
-            else:
-                print(file=akr_file)
-        print("    ],",file=akr_file)
-        print("]",file=akr_file)
+            exported_mesh["uvs"] = make_external_buffer(
+                path_join(MESH_DIR, f"{name}.uv")
+            )
+            exported_mesh["tangents"] = make_external_buffer(
+                path_join(MESH_DIR, f"{name}.tangent")
+            )
+            exported_mesh["bitangent_signs"] = make_external_buffer(
+                path_join(MESH_DIR, f"{name}.bitangent")
+            )
+        else:
+            exported_mesh["uvs"] = None
+            exported_mesh["tangents"] = None
+            exported_mesh["bitangent_signs"] = None
+        self.exported_geometries[name] = {"Mesh": exported_mesh}
 
     def convert_matrix_to_list(self, mat):
         l = [[x for x in row] for row in mat.row]
-        # flatten
-        return [x for row in l for x in row]
+        return l
 
-    def export_mesh(self, obj): # TODO: support instancing
+    def export_mesh(self, obj):  # TODO: support instancing
         if VISITED.contains(obj):
             return
         name = VISITED.get(obj)
         print(f"Exporting Mesh `{obj.name}` -> {name}")
         # print(obj.data)
         # print(obj.matrix_local)
-        print(f'World matrix:')
+        print(f"World matrix:")
         print(obj.matrix_world)
         # print(self.convert_matrix_to_list(obj.matrix_world))
         # print(self.transfrom_from_object(obj))
         m = obj.data
-        assert len(m.uv_layers) <= 1, f"Only one uv layer is supported but found {len(m.uv_layers)}"
+        assert (
+            len(m.uv_layers) <= 1
+        ), f"Only one uv layer is supported but found {len(m.uv_layers)}"
         has_uv = len(m.uv_layers) == 1
         if has_uv:
             if not is_uv_map_valid(obj):
@@ -390,30 +519,31 @@ class SceneExporter:
                 has_uv = False
         if not has_uv:
             print(f"Mesh `{obj.name}` has no uv map")
-            print(f'Try to compute uv map for `{obj.name}`')
+            print(f"Try to compute uv map for `{obj.name}`")
             try:
                 compute_uv_map(obj)
                 has_uv = True
             except Exception as e:
                 print(f"Failed to compute uv map for `{obj.name}`")
-                print(f'Reason: {e}')
+                print(f"Reason: {e}")
                 print("Continue without uv map")
         else:
             print(f"Mesh `{obj.name}` has uv map")
         eval_obj = obj.evaluated_get(depsgraph)
         m = eval_obj.to_mesh()
-        self.export_mesh_data(m, f'{name}_mesh', has_uv)
-        assert len(obj.data.materials) == 1, f"Mesh `{obj.name}` has {len(obj.data.materials)} materials"
+        self.export_mesh_data(m, f"{name}_mesh", has_uv)
+        assert (
+            len(obj.data.materials) == 1
+        ), f"Mesh `{obj.name}` has {len(obj.data.materials)} materials"
         mat = self.export_material(obj.data.materials[0])
         matrix_world = CONVERT_COORD_SYS_MATRIX @ obj.matrix_world
         print(matrix_world)
-        print(f'${name} = Instance[',file=akr_file)
-        print(f'    name="{name}",',file=akr_file)
-        print(f'    geometry=${name}_mesh,',file=akr_file)
-        print(f'    material=${mat},',file=akr_file)
-        print(f'    transform=MatrixTransform[matrix=[{",".join(["{:f}".format(x) for x in self.convert_matrix_to_list(matrix_world)])}]],',file=akr_file)
-        print(f']',file=akr_file)
-        self.exported_instances.append(name)
+        instance = {
+            "geometry": make_ref(f"{name}_mesh"),
+            "material": make_ref(f"{mat}"),
+            "transform": {"Matrix": self.convert_matrix_to_list(matrix_world)},
+        }
+        self.exported_instances[name] = instance
 
     def transfrom_from_object(self, b_object):
         translate = b_object.location
@@ -428,26 +558,27 @@ class SceneExporter:
         print(f"Exporting Camera `{camera.name}`")
         print(type(camera))
         print(type(camera.data))
-        print(f'${name} = PerspectiveCamera[',file=akr_file)
+        exported_camera = {}
         trs = self.transfrom_from_object(camera)
         dof = camera.data.dof
         render_settings = self.scene.render
         res_x = render_settings.resolution_x
         res_y = render_settings.resolution_y
-        print(f'    transform = TRS[',file=akr_file)
-        print(f'        translation=[{",".join(["{:f}".format(x) for x in trs[0]])}],',file=akr_file)
-        print(f'        rotation=[{",".join(["{:f}".format(degrees(x)) for x in trs[1]])}],',file=akr_file)
-        print(f'        scale=[{",".join(["{:f}".format(x) for x in trs[2]])}],',file=akr_file)
-        print(f'        coordinate_system=CoordinateSystem::Blender',file=akr_file)
-        print(f'    ],',file=akr_file)
-        print(f'    fov={fov},',file=akr_file)
+        exported_camera["transform"] = {
+            "TRS": {
+                "translation": [x for x in trs[0]],
+                "rotation": [x for x in trs[1]],
+                "scale": [x for x in trs[2]],
+                "coordinate_system": "Blender",
+            }
+        }
+        exported_camera["fov"] = fov
         if dof is not None:
-            print(f'    focal_distance={dof.focus_distance},',file=akr_file)
-            print(f'    fstop={dof.aperture_fstop},',file=akr_file)
-        print(f'    width={res_x},',file=akr_file)
-        print(f'    height={res_y},',file=akr_file)
-        print(f']',file=akr_file)
-        return name
+            exported_camera["focal_distance"] = dof.focus_distance
+            exported_camera["fstop"] = dof.aperture_fstop
+        exported_camera["sensor_width"] = res_x
+        exported_camera["sensor_height"] = res_y
+        return {"Perspective": exported_camera}
 
     def export(self):
         name = VISITED.get(self.scene)
@@ -456,37 +587,35 @@ class SceneExporter:
         # seperate meshes by material
         print("Seperating meshes by material")
         for obj in self.visible_objects():
-            if obj.type == 'MESH':
-                bpy.ops.object.mode_set(mode='OBJECT')
-                bpy.ops.object.select_all(action='DESELECT')
+            if obj.type == "MESH":
+                bpy.ops.object.mode_set(mode="OBJECT")
+                bpy.ops.object.select_all(action="DESELECT")
                 obj.select_set(True)
-                bpy.ops.object.mode_set(mode='EDIT')
+                bpy.ops.object.mode_set(mode="EDIT")
                 # Seperate by material
-                bpy.ops.mesh.separate(type='MATERIAL')
-                bpy.ops.object.mode_set(mode='OBJECT')
+                bpy.ops.mesh.separate(type="MATERIAL")
+                bpy.ops.object.mode_set(mode="OBJECT")
                 obj.select_set(False)
-        bpy.ops.object.select_all(action='DESELECT')
+        bpy.ops.object.select_all(action="DESELECT")
         for obj in self.visible_objects():
-            if obj.type == 'MESH':
+            if obj.type == "MESH":
                 self.export_mesh(obj)
-        print(f'${name} = Scene[\n    instances=[',file=akr_file)
-        for i, m in enumerate(self.exported_instances):
-            print(f'    ${m}',file=akr_file, end="")
-            if i != len(self.exported_instances) - 1:
-                print(",",file=akr_file)
-            else:
-                print(file=akr_file)
-        print("    ],",file=akr_file)
-        print('    lights=[',file=akr_file)
-        print("    ],",file=akr_file)
-        print(f'    camera=${camera},',file=akr_file)
-        print(']',file=akr_file)
-        print("Scene exported")
+        scene = {
+            "camera": camera,
+            "instances": self.exported_instances,
+            "lights": {},
+            "geometries": self.exported_geometries,
+            "materials": self.exported_materials,
+            'images': self.exported_images,
+        }
+        json.dump(scene, akr_file, indent=4)
 
 
 def export_scene(scene):
     exporter = SceneExporter(scene)
     exporter.export()
+
+
 export_scene(C.scene)
 akr_file.close()
 print("Export finished")

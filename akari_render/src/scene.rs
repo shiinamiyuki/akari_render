@@ -94,6 +94,7 @@ impl Scene {
                     sample.wi,
                     sample.shadow_ray,
                     sample.n,
+                    sample.valid,
                 )
             })
         };
@@ -142,6 +143,19 @@ impl Scene {
                  wi: Expr<Float3>,
                  swl: Expr<SampledWavelengths>,
                  mode: Expr<u32>| {
+                    let check_wi = || {
+                        if debug_mode() {
+                            lc_assert!(wi.is_finite().all());
+                            lc_assert!(wi.ne(0.0).any());
+                        }
+                    };
+                    let check_wo = || {
+                        if debug_mode() {
+                            lc_assert!(wo.is_finite().all());
+                            lc_assert!(wo.ne(0.0).any());
+                        }
+                    };
+                    check_wo();
                     let ctx = BsdfEvalContext {
                         color_repr: color_pipeline.color_repr,
                         _marker: PhantomData,
@@ -152,11 +166,13 @@ impl Scene {
                         self.svm
                             .dispatch_surface(shader_ref, color_pipeline, si, swl, |closure| {
                                 let color = if (mode & SURFACE_EVAL_COLOR).ne(0) {
+                                    check_wi();
                                     closure.evaluate(wo, wi, swl, &ctx)
                                 } else {
                                     Color::zero(color_repr)
                                 };
                                 let pdf = if (mode & SURFACE_EVAL_PDF).ne(0) {
+                                    check_wi();
                                     closure.pdf(wo, wi, swl, &ctx)
                                 } else {
                                     0.0.expr()
@@ -197,6 +213,12 @@ impl Scene {
                  wo: Expr<Float3>,
                  u: Expr<Float3>,
                  swl: Var<SampledWavelengths>| {
+                    if debug_mode() {
+                        lc_assert!(u.is_finite().all());
+                        lc_assert!(wo.is_finite().all());
+                        lc_assert!(u.ne(0.0).any());
+                        lc_assert!(wo.ne(0.0).any());
+                    }
                     let ctx = BsdfEvalContext {
                         color_repr: color_pipeline.color_repr,
                         _marker: PhantomData,
@@ -233,26 +255,17 @@ impl Scene {
     ) -> Expr<SurfaceInteraction> {
         let shading_triangle = self.meshes.shading_triangle(inst_id, prim_id);
         let p = shading_triangle.p(bary);
-        let n = shading_triangle.n(bary);
         let uv = shading_triangle.uv(bary);
-        let tt = shading_triangle.tangent(bary);
-        let ss = shading_triangle.bitangent(bary);
+        let frame = shading_triangle.ortho_frame(bary);
         let geometry = SurfaceLocalGeometry::from_comps_expr(SurfaceLocalGeometryComps {
             p,
             ng: shading_triangle.ng,
-            ns: n,
+            ns: frame.n,
             uv,
-            tangent: shading_triangle.tangent(bary),
-            bitangent: shading_triangle.bitangent(bary),
+            tangent: frame.t,
+            bitangent: frame.s,
         });
-        SurfaceInteraction::new_expr(
-            inst_id,
-            prim_id,
-            bary,
-            geometry,
-            Frame::new_expr(n, tt, ss),
-            true.expr(),
-        )
+        SurfaceInteraction::new_expr(inst_id, prim_id, bary, geometry, frame, true.expr())
     }
     #[tracked]
     pub fn intersect(&self, ray: Expr<Ray>) -> Expr<SurfaceInteraction> {
@@ -260,55 +273,64 @@ impl Scene {
         let rd: Expr<[f32; 3]> = ray.d.into();
         let rtx_ray = rtx::Ray::new_expr(ro, ray.t_min, rd, ray.t_max);
 
-        let hit = self.meshes.accel.var().query_all(
-            rtx_ray,
-            u32::MAX,
-            rtx::RayQuery {
-                on_triangle_hit: |candidate: rtx::TriangleCandidate| {
-                    if (candidate.inst.ne(ray.exclude0.x) | candidate.prim.ne(ray.exclude0.y))
-                        & (candidate.inst.ne(ray.exclude1.x) | candidate.prim.ne(ray.exclude1.y))
-                    {
-                        candidate.commit();
-                    }
-                },
-                on_procedural_hit: |_| {},
-            },
-        );
-
-        // cpu_dbg!(hit);
-        if hit.triangle_hit() {
+        let hit = self.meshes.accel.var().trace_closest(rtx_ray);
+        if !hit.miss() {
             let inst_id = hit.inst_id;
             let prim_id = hit.prim_id;
-            let bary = hit.bary;
+            let bary = Float2::expr(hit.u, hit.v);
             self.si_from_hitinfo(inst_id, prim_id, bary)
         } else {
             let si = Var::<SurfaceInteraction>::zeroed();
             *si.valid = false.expr();
             **si
         }
+
+        // let hit = self.meshes.accel.var().query_all(
+        //     rtx_ray,
+        //     u32::MAX,
+        //     rtx::RayQuery {
+        //         on_triangle_hit: |candidate: rtx::TriangleCandidate| {
+        //             if (candidate.inst.ne(ray.exclude0.x) | candidate.prim.ne(ray.exclude0.y))
+        //                 & (candidate.inst.ne(ray.exclude1.x) | candidate.prim.ne(ray.exclude1.y))
+        //             {
+        //                 candidate.commit();
+        //             }
+        //         },
+        //         on_procedural_hit: |_| {},
+        //     },
+        // );
+
+        // if hit.triangle_hit() {
+        //     let inst_id = hit.inst_id;
+        //     let prim_id = hit.prim_id;
+        //     let bary = hit.bary;
+        //     self.si_from_hitinfo(inst_id, prim_id, bary)
+        // } else {
+        //     let si = Var::<SurfaceInteraction>::zeroed();
+        //     *si.valid = false.expr();
+        //     **si
+        // }
     }
     #[tracked]
     pub fn occlude(&self, ray: Expr<Ray>) -> Expr<bool> {
         let ro: Expr<[f32; 3]> = ray.o.into();
         let rd: Expr<[f32; 3]> = ray.d.into();
         let rtx_ray = rtx::Ray::new_expr(ro, ray.t_min, rd, ray.t_max);
-
-        let hit = self.meshes.accel.var().query_any(
-            rtx_ray,
-            u32::MAX,
-            rtx::RayQuery {
-                on_triangle_hit: |candidate: rtx::TriangleCandidate| {
-                    if (candidate.inst.ne(ray.exclude0.x) | candidate.prim.ne(ray.exclude0.y))
-                        & (candidate.inst.ne(ray.exclude1.x) | candidate.prim.ne(ray.exclude1.y))
-                    {
-                        candidate.commit();
-                    }
-                },
-                on_procedural_hit: |_| {},
-            },
-        );
-        // cpu_dbg!(ray);
-        // cpu_dbg!(hit);
-        !hit.miss()
+        self.meshes.accel.var().trace_any(rtx_ray)
+        // let hit = self.meshes.accel.var().query_any(
+        //     rtx_ray,
+        //     u32::MAX,
+        //     rtx::RayQuery {
+        //         on_triangle_hit: |candidate: rtx::TriangleCandidate| {
+        //             if (candidate.inst.ne(ray.exclude0.x) | candidate.prim.ne(ray.exclude0.y))
+        //                 & (candidate.inst.ne(ray.exclude1.x) | candidate.prim.ne(ray.exclude1.y))
+        //             {
+        //                 candidate.commit();
+        //             }
+        //         },
+        //         on_procedural_hit: |_| {},
+        //     },
+        // );
+        // !hit.miss()
     }
 }

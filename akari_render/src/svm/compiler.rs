@@ -1,13 +1,19 @@
 use std::collections::{HashMap, HashSet};
 
-use akari_nodegraph::{Node, NodeGraph, NodeId, NodeProxyInput, SocketValue};
-
 use super::*;
-use crate::{color::ColorSpaceId, *};
+use crate::{
+    color::ColorSpaceId,
+    load::sampler_from_rgb_image_tex_node,
+    node::{
+        shader::{Node, NodeSorter},
+        Ref, ShaderGraph,
+    },
+    *,
+};
 #[derive(Clone, Copy)]
 pub struct SvmCompileContext<'a> {
     pub images: &'a HashMap<(String, TextureSampler), usize>,
-    pub graph: &'a NodeGraph,
+    pub graph: &'a ShaderGraph,
 }
 pub struct CompilerDriver {
     shader_hash_to_kind: HashMap<ShaderHash, u32>,
@@ -80,9 +86,9 @@ impl CompilerDriver {
             size: size.try_into().unwrap(),
         }
     }
-    pub fn compile(&mut self, out: &NodeId, ctx: SvmCompileContext<'_>) -> ShaderRef {
+    pub fn compile(&mut self, ctx: SvmCompileContext<'_>) -> ShaderRef {
         // dbg!(out);
-        let shader = Compiler::compile(out.clone(), ctx);
+        let shader = Compiler::compile(ctx);
         self.push_shader(shader)
     }
     pub fn new() -> Self {
@@ -113,12 +119,6 @@ impl CompilerDriver {
     }
 }
 
-pub struct NodeSorter<'a> {
-    graph: &'a NodeGraph,
-    sorted: Vec<NodeId>,
-    visited: HashSet<NodeId>,
-}
-
 pub(crate) fn shader_hash(nodes: &[SvmNode]) -> ShaderHash {
     let mut hasher = Sha256::new();
     for node in nodes {
@@ -128,52 +128,9 @@ pub(crate) fn shader_hash(nodes: &[SvmNode]) -> ShaderHash {
     result.into()
 }
 
-impl<'a> NodeSorter<'a> {
-    pub fn sort(graph: &'a NodeGraph, root: NodeId) -> Vec<NodeId> {
-        let mut sorter = Self {
-            graph,
-            sorted: vec![],
-            visited: HashSet::new(),
-        };
-        sorter.visit(&root);
-        sorter.sorted.reverse();
-        sorter.sorted
-    }
-    fn visit(&mut self, node: &NodeId) {
-        if self.visited.contains(node) {
-            return;
-        }
-        self.visited.insert(node.clone());
-        self.sorted.push(node.clone());
-        let node = &self.graph.nodes[node];
-        let mut keys = node.inputs.keys().cloned().collect::<Vec<_>>();
-        keys.sort();
-        for key in &keys {
-            let socket = &node.inputs[key];
-            let v = &socket.value;
-            match v {
-                SocketValue::Node(Some(link)) => {
-                    self.visit(&link.from);
-                }
-                SocketValue::List(nodes) => {
-                    for node in nodes {
-                        match node {
-                            SocketValue::Node(Some(link)) => {
-                                self.visit(&link.from);
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
-}
-
 struct Compiler<'a> {
     ctx: SvmCompileContext<'a>,
-    env: HashMap<NodeId, SvmNodeRef>,
+    env: HashMap<Ref<Node>, SvmNodeRef>,
     program: Vec<SvmNode>,
 }
 
@@ -195,131 +152,72 @@ impl<'a> Compiler<'a> {
     fn push_float(&mut self, value: f32) -> SvmNodeRef {
         self.push(SvmNode::Float(SvmFloat { value }))
     }
-    fn compile_float_socket(&mut self, socket: &NodeProxyInput<f64>) -> SvmNodeRef {
-        match socket {
-            NodeProxyInput::Value(v) => self.push_float(*v as f32),
-            NodeProxyInput::Node(Some(link)) => self.get(&link.from),
-            _ => unreachable!("Invalid socket value"),
-        }
-    }
-    fn graph(&self) -> &NodeGraph {
-        self.ctx.graph
-    }
-    fn compile_node(&mut self, node_id: &NodeId) {
+
+    fn compile_node(&mut self, node_id: &Ref<Node>) {
         let graph = self.ctx.graph;
         let node = &graph.nodes[node_id];
-        let ty = node.ty().unwrap();
-        let mut pat_match: HashMap<
-            &'static str,
-            Option<Box<dyn FnOnce(&mut Self, &Node) -> SvmNode>>,
-        > = HashMap::new();
-        macro_rules! when {
-            ($t:ty, $e:expr) => {
-                pat_match.insert(<$t as akari_nodegraph::NodeProxy>::ty(), Some(Box::new($e)));
-            };
-        }
-        when!(nodes::Float, |compiler: &mut Compiler, node: &Node| {
-            let node = node.proxy::<nodes::Float>(compiler.graph()).unwrap();
-            if let Some(v) = node.in_value.as_value() {
-                SvmNode::Float(SvmFloat { value: *v as f32 })
-            } else {
-                panic!("Float node must have a value");
-            }
-        });
-        when!(nodes::RGB, |compiler: &mut Compiler, node: &Node| {
-            let rgb = node.proxy::<nodes::RGB>(compiler.graph()).unwrap();
-            let rgb_value = if rgb.in_r.as_value().is_some()
-                && rgb.in_g.as_value().is_some()
-                && rgb.in_b.as_value().is_some()
-            {
-                let r = *rgb.in_r.as_value().unwrap() as f32;
-                let g = *rgb.in_g.as_value().unwrap() as f32;
-                let b = *rgb.in_b.as_value().unwrap() as f32;
-                SvmNode::Float3(SvmFloat3 {
-                    value: [r, g, b],
+        let node = match node {
+            Node::Float(v) => SvmNode::Float(SvmFloat { value: *v as f32 }),
+            Node::Float3(v) => SvmNode::Float3(SvmFloat3 { value: *v }),
+            Node::Rgb { value, colorspace } => {
+                let data = SvmNode::MakeFloat3(SvmMakeFloat3 {
+                    x: self.push_float(value[0]),
+                    y: self.push_float(value[1]),
+                    z: self.push_float(value[2]),
+                });
+                let data = self.push(data);
+                SvmNode::RgbTex(SvmRgbTex {
+                    rgb: data,
+                    colorspace: ColorSpaceId::from_colorspace(*colorspace),
                 })
-            } else {
-                let r = compiler.compile_float_socket(&rgb.in_r);
-                let g = compiler.compile_float_socket(&rgb.in_g);
-                let b = compiler.compile_float_socket(&rgb.in_b);
-                SvmNode::MakeFloat3(SvmMakeFloat3 { x: r, y: g, z: b })
-            };
-            let rgb_value = compiler.push(rgb_value);
-            SvmNode::RgbTex(SvmRgbTex {
-                rgb: rgb_value,
-                colorspace: ColorSpaceId::from_colorspace(rgb.in_colorspace.into()),
-            })
-        });
-        when!(
-            nodes::RGBImageTexture,
-            |compiler: &mut Compiler, node: &Node| {
-                let tex = node
-                    .proxy::<nodes::RGBImageTexture>(compiler.graph())
-                    .unwrap();
-                let path = tex.in_path.as_value().unwrap().clone().clone();
-                let sampler = load::sampler_from_rgb_image_tex_node(&tex);
-                let tex_idx = compiler.ctx.images[&(path, sampler)];
+            }
+            Node::Float4(_) => todo!(),
+            Node::TexImage(img) => {
+                let colorspace = &img.colorspace;
+                let path = match &img.data {
+                    node::Buffer::External(path) => path.clone(),
+                    _ => panic!("not implemented"),
+                };
+                let sampler = sampler_from_rgb_image_tex_node(img);
+                let tex_idx = self.ctx.images[&(path, sampler)];
                 SvmNode::RgbImageTex(SvmRgbImageTex {
                     tex_idx: tex_idx as u32,
-                    colorspace: ColorSpaceId::from_colorspace(tex.in_colorspace.into()),
+                    colorspace: ColorSpaceId::from_colorspace(match colorspace {
+                        node::ColorSpace::Rgb(rgb) => *rgb,
+                        _ => panic!("not implemented"),
+                    }),
                 })
             }
-        );
-        when!(
-            nodes::SpectralUplift,
-            |compiler: &mut Compiler, node: &Node| {
-                let uplift = node
-                    .proxy::<nodes::SpectralUplift>(compiler.graph())
-                    .unwrap();
-                let rgb = compiler.get(&uplift.in_rgb.as_node().unwrap().from);
-                SvmNode::SpectralUplift(SvmSpectralUplift { rgb })
-            }
-        );
-        when!(
-            nodes::DiffuseBsdf,
-            |compiler: &mut Compiler, node: &Node| {
-                let diffuse = node.proxy::<nodes::DiffuseBsdf>(compiler.graph()).unwrap();
-                let color = &diffuse.in_color.as_node().unwrap().from;
-                let color = compiler.get(color);
+            Node::DiffuseBsdf { color } => {
+                let color = self.get(&color);
                 SvmNode::DiffuseBsdf(SvmDiffuseBsdf { reflectance: color })
             }
-        );
-        when!(nodes::Emission, |compiler: &mut Compiler, node: &Node| {
-            let emission = node.proxy::<nodes::Emission>(compiler.graph()).unwrap();
-            let color = &emission.in_color.as_node().unwrap().from;
-            let color = compiler.get(color);
-            let strength = compiler.compile_float_socket(&emission.in_strength);
-            SvmNode::Emission(SvmEmission { color, strength })
-        });
-        when!(nodes::GlassBsdf, |compiler: &mut Compiler, node: &Node| {
-            let glass = node.proxy::<nodes::GlassBsdf>(compiler.graph()).unwrap();
-            let color = &glass.in_color.as_node().unwrap().from;
-            let color = compiler.get(color);
-            let eta = compiler.compile_float_socket(&glass.in_ior);
-            let roughness = compiler.compile_float_socket(&glass.in_roughness);
-            SvmNode::GlassBsdf(SvmGlassBsdf {
-                kr: color,
-                kt: color,
-                eta,
+            Node::SpectralUplift(rgb) => {
+                let rgb = self.get(&rgb);
+                SvmNode::SpectralUplift(SvmSpectralUplift { rgb })
+            }
+            Node::PrincipledBsdf {
+                color,
+                metallic,
                 roughness,
-            })
-        });
-        when!(
-            nodes::PrincipledBsdf,
-            |compiler: &mut Compiler, node: &Node| {
-                let principled = node
-                    .proxy::<nodes::PrincipledBsdf>(compiler.graph())
-                    .unwrap();
-                let color = compiler.get(&principled.in_color.as_node().unwrap().from);
-                let metallic = compiler.compile_float_socket(&principled.in_metallic);
-                let roughness = compiler.compile_float_socket(&principled.in_roughness);
-                let clearcoat = compiler.compile_float_socket(&principled.in_clearcoat);
-                let clearcoat_roughness =
-                    compiler.compile_float_socket(&principled.in_clearcoat_roughness);
-                let specular = compiler.compile_float_socket(&principled.in_specular);
-                let ior = compiler.compile_float_socket(&principled.in_ior);
-                let transmission = compiler.compile_float_socket(&principled.in_transmission);
-                let emission = compiler.get(&principled.in_emission.as_node().unwrap().from);
+                specular,
+                clearcoat,
+                clearcoat_roughness,
+                ior,
+                transmission,
+                emission,
+                emission_strength,
+            } => {
+                let color = self.get(color);
+                let metallic = self.get(metallic);
+                let roughness = self.get(roughness);
+                let specular = self.get(specular);
+                let clearcoat = self.get(clearcoat);
+                let clearcoat_roughness = self.get(clearcoat_roughness);
+                let transmission = self.get(transmission);
+                let emission = self.get(emission);
+                let emission_strength = self.get(emission_strength);
+                let ior = self.get(ior);
                 SvmNode::PrincipledBsdf(SvmPrincipledBsdf {
                     color,
                     metallic,
@@ -327,26 +225,84 @@ impl<'a> Compiler<'a> {
                     specular,
                     clearcoat,
                     clearcoat_roughness,
+                    eta: ior,
                     transmission,
                     emission,
-                    eta: ior,
+                    emission_strength,
                 })
             }
-        );
-        let f = pat_match.get_mut(ty).unwrap();
-        let f = f.take().unwrap();
-        let node = (f)(self, node);
+            Node::Emission { color: emission, strength } => {
+                let emission = self.get(&emission);
+                let strength = self.get(&strength);
+                SvmNode::Emission(SvmEmission {
+                    color: emission,
+                    strength,
+                })
+            }
+            Node::GlassBsdf {
+                color,
+                ior,
+                roughness,
+            } => {
+                let color = self.get(color);
+                let ior = self.get(ior);
+                let roughness = self.get(&roughness);
+                SvmNode::GlassBsdf(SvmGlassBsdf {
+                    kr: color,
+                    kt: color,
+                    eta: ior,
+                    roughness,
+                })
+            }
+            Node::MixBsdf {
+                first,
+                second,
+                factor,
+            } => todo!(),
+            Node::ExtractElement { node, field } => todo!(),
+            Node::OutputSurface { surface } => {
+                let surface = self.get(&surface);
+                SvmNode::MaterialOutput(SvmMaterialOutput { surface })
+            }
+        };
+
+        // when!(
+        //     nodes::RGBImageTexture,
+        //     |compiler: &mut Compiler, node: &Node| {
+        //         let tex = node
+        //             .proxy::<nodes::RGBImageTexture>(compiler.graph())
+        //             .unwrap();
+        //         let path = tex.in_path.as_value().unwrap().clone().clone();
+        //         let sampler = load::sampler_from_rgb_image_tex_node(&tex);
+        //         let tex_idx = compiler.ctx.images[&(path, sampler)];
+        //         SvmNode::RgbImageTex(SvmRgbImageTex {
+        //             tex_idx: tex_idx as u32,
+        //             colorspace: ColorSpaceId::from_colorspace(tex.in_colorspace.into()),
+        //         })
+        //     }
+        // );
+        // when!(
+        //     nodes::SpectralUplift,
+        //     |compiler: &mut Compiler, node: &Node| {
+        //         let uplift = node
+        //             .proxy::<nodes::SpectralUplift>(compiler.graph())
+        //             .unwrap();
+        //         let rgb = compiler.get(&uplift.in_rgb.as_node().unwrap().from);
+        //         SvmNode::SpectralUplift(SvmSpectralUplift { rgb })
+        //     }
+        // );
+
         let node_ref = self.push(node);
         self.env.insert(node_id.clone(), node_ref);
     }
 
-    fn get(&self, node: &NodeId) -> SvmNodeRef {
+    fn get(&self, node: &Ref<Node>) -> SvmNodeRef {
         self.env[node]
     }
 
-    fn compile(out: NodeId, ctx: SvmCompileContext<'a>) -> CompiledShader {
+    fn compile(ctx: SvmCompileContext<'a>) -> CompiledShader {
         let mut compiler = Self::new(ctx);
-        let sorted = NodeSorter::sort(ctx.graph, out);
+        let sorted = NodeSorter::sort(ctx.graph);
         for node in sorted {
             compiler.compile_node(&node);
         }

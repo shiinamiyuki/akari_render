@@ -1,3 +1,5 @@
+use std::env;
+
 use color::ColorRepr;
 use hexf::hexf32;
 use integrator::FilmConfig;
@@ -42,7 +44,7 @@ pub mod light;
 pub mod load;
 pub mod mesh;
 pub mod microfacet;
-pub mod nodes;
+pub mod node;
 pub mod sampler;
 pub mod sampling;
 pub mod scene;
@@ -58,4 +60,18 @@ pub enum ADMode {
     None,
     Forward,
     Backward,
+}
+
+pub fn debug_mode() -> bool {
+    cfg!(debug_assertions)
+        || match env::var("LUISA_DEBUG") {
+            Ok(x) => {
+                if x == "1" || x == "full" {
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
 }
