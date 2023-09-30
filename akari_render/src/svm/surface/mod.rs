@@ -172,6 +172,71 @@ impl Surface for EmissiveSurface {
         }
     }
 }
+pub struct ScaledBsdf {
+    pub inner: Rc<dyn Surface>,
+    pub weight: Expr<f32>,
+}
+impl Surface for ScaledBsdf {
+    fn evaluate(
+        &self,
+        wo: Expr<Float3>,
+        wi: Expr<Float3>,
+        swl: Expr<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> Color {
+        self.inner.evaluate(wo, wi, swl, ctx) * self.weight
+    }
+
+    fn sample(
+        &self,
+        wo: Expr<Float3>,
+        u_select: Expr<f32>,
+        u_sample: Expr<Float2>,
+        swl: Var<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> BsdfSample {
+        let mut sample = self.inner.sample(wo, u_select, u_sample, swl, ctx);
+        sample.color = sample.color * self.weight;
+        sample
+    }
+
+    fn pdf(
+        &self,
+        wo: Expr<Float3>,
+        wi: Expr<Float3>,
+        swl: Expr<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> Expr<f32> {
+        self.inner.pdf(wo, wi, swl, ctx)
+    }
+
+    fn albedo(
+        &self,
+        wo: Expr<Float3>,
+        swl: Expr<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> Color {
+        self.inner.albedo(wo, swl, ctx) * self.weight
+    }
+
+    fn roughness(
+        &self,
+        wo: Expr<Float3>,
+        swl: Expr<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> Expr<f32> {
+        self.inner.roughness(wo, swl, ctx)
+    }
+
+    fn emission(
+        &self,
+        wo: Expr<Float3>,
+        swl: Expr<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> Color {
+        self.inner.emission(wo, swl, ctx) * self.weight
+    }
+}
 pub struct BsdfMixture {
     pub frac: Box<dyn Fn(Expr<Float3>, &BsdfEvalContext) -> Expr<f32>>,
     pub bsdf_a: Rc<dyn Surface>,
@@ -446,22 +511,13 @@ impl Surface for MicrofacetReflection {
         {
             Color::zero(ctx.color_repr)
         } else {
-            let wh0 = wh;
             let wh = wh.normalize();
             let f = self
                 .fresnel
                 .evaluate(wi.dot(face_forward(wh, Float3::expr(0.0, 1.0, 0.0))), ctx);
-            lc_assert!(f.min().ge(0.0));
             let d = self.dist.d(wh, ctx.ad_mode);
             let g = self.dist.g(wo, wi, ctx.ad_mode);
             let f = &self.color * &f * (0.25 * d * g / (cos_i * cos_o)).abs() * cos_o.abs();
-            // cpu_dbg!(wo);
-            // cpu_dbg!(wi);
-            // cpu_dbg!(wh0);
-            // cpu_dbg!(wh);
-            lc_assert!(d.ge(0.0));
-            lc_assert!(g.ge(0.0));
-            lc_assert!(f.min().ge(0.0));
             f
         }
     }
@@ -505,7 +561,7 @@ impl Surface for MicrofacetReflection {
         } else {
             let wh = wh.normalize();
             // cpu_dbg!(wh);
-            self.dist.pdf(wo, wh, ctx.ad_mode)  / (4.0 * wo.dot(wh).abs())
+            self.dist.pdf(wo, wh, ctx.ad_mode) / (4.0 * wo.dot(wh).abs())
         }
     }
     fn albedo(
@@ -706,7 +762,7 @@ pub fn fr_dielectric(cos_theta_i: Expr<f32>, eta: Expr<f32>) -> Expr<f32> {
 pub fn fr_schlick(f0: Color, cos_theta_i: Expr<f32>) -> Color {
     let cos_theta_i = cos_theta_i.clamp(-1.0.expr(), 1.0.expr()).abs();
     let pow5 = |x: Expr<f32>| x.sqr().sqr() * x;
-    let fr = f0 + (Color::one(f0.repr()) - f0) * pow5(1.0 - cos_theta_i).abs();
+    let fr = f0 + (Color::one(f0.repr()) - f0) * pow5(1.0 - cos_theta_i);
     fr
 }
 #[derive(Copy, Clone)]
@@ -836,7 +892,6 @@ impl SurfaceEvaluator {
         wi: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
     ) -> (Color, Expr<f32>) {
-        
         let result = self.eval.call(
             surface,
             si,

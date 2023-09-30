@@ -3,12 +3,13 @@ use std::io::BufWriter;
 use std::sync::Arc;
 use std::time::Instant;
 
+use luisa::lang::debug::is_cpu_backend;
 use luisa::rtx::offset_ray_origin;
 use serde::{Deserialize, Serialize};
 
 use super::pt::{self, PathTracer, PathTracerBase};
 use super::{Integrator, IntermediateStats, RenderSession, RenderStats};
-use crate::geometry::{face_forward, Ray, RayExpr};
+use crate::geometry::{face_forward, Ray};
 use crate::sampler::mcmc::{KelemenMutationRecord, KELEMEN_MUTATE};
 use crate::sampling::sample_gaussian;
 use crate::util::distribution::resample_with_f64;
@@ -707,7 +708,7 @@ impl SinglePathMcmc {
                     false,
                 );
                 let proposal_f = f;
-                if is_large_step & state.b_cnt().lt(1024 * 1024) {
+                if is_large_step & state.b_cnt.lt(1024u64 * 1024) {
                     *state.b += proposal_f;
                     *state.b_cnt += 1;
                 }
@@ -717,7 +718,7 @@ impl SinglePathMcmc {
                 let accept = select(
                     cur_f.eq(0.0),
                     1.0f32.expr(),
-                    (proposal_f / cur_f).clamp(0.0, 1.0),
+                    (proposal_f / cur_f).clamp(0.0.expr(), 1.0.expr()),
                 );
                 film.add_splat(
                     proposal_p.cast_f32(),
@@ -731,7 +732,7 @@ impl SinglePathMcmc {
                     **cur_swl,
                     (1.0 - accept) * contribution,
                 );
-                if rng.next_1d().lt(accept) & state.b_cnt.lt(1024 * 1024) {
+                if rng.next_1d().lt(accept) {
                     *state.cur_f = proposal_f;
                     cur_color_v.store(proposal_color);
                     cur_swl.store(proposal_swl);
@@ -746,24 +747,9 @@ impl SinglePathMcmc {
                         &|dim| self.sample_index_aosoa(chain_id, dim),
                         &|dim| self.backup_index_aosoa(chain_id, dim),
                     );
-
-                }
+                };
                 if !is_large_step {
                     *state.n_mutations += 1;
-                    // if adaptive {
-                    //     let r = state.n_accepted().load().cast_f32()
-                    //         / state.n_mutations().load().cast_f32();
-                    //     const OPTIMAL_ACCEPT_RATE: f32 = 0.234;
-                    //     if_!(state.n_mutations().load().gt(50), {
-                    //         let new_sigma = state.sigma().load()
-                    //             + (r - OPTIMAL_ACCEPT_RATE) / state.n_mutations().load().cast_f32();
-                    //         let new_sigma = new_sigma.clamp(1e-5, 0.1);
-                    //         if_!(state.chain_id().load().eq(0), {
-                    //             cpu_dbg!(Float3::expr(r, state.sigma().load(), new_sigma));
-                    //         });
-                    //         state.sigma().store(new_sigma);
-                    //     });
-                    // }
                 }
             }
             _ => todo!(),
@@ -780,13 +766,12 @@ impl SinglePathMcmc {
     ) {
         let i = dispatch_id().x;
         let markov_states = render_state.states.var();
-        let sampler =
-            IndependentSampler::from_pcg32(var!(Pcg32, render_state.rng_states.var().read(i)));
-        let state = var!(MarkovState, markov_states.read(i));
+        let sampler = IndependentSampler::from_pcg32(render_state.rng_states.read(i).var());
+        let state = markov_states.read(i).var();
         let (cur_color, cur_swl) = render_state.cur_colors.read(i);
         let cur_color_v = ColorVar::new(cur_color);
-        let cur_swl_v = def(cur_swl);
-        for_range(const_(0)..mutations_per_chain.cast_i32(), |_| {
+        let cur_swl_v = cur_swl.var();
+        for_range(0i32.expr()..mutations_per_chain.cast_i32(), |_| {
             self.mutate_chain(
                 scene,
                 eval,
@@ -801,7 +786,7 @@ impl SinglePathMcmc {
         });
         render_state
             .cur_colors
-            .write(i, cur_color_v.load(), *cur_swl_v);
+            .write(i, cur_color_v.load(), **cur_swl_v);
         render_state.rng_states.var().write(i, sampler.state.load());
         markov_states.write(i, state.load());
     }
@@ -860,8 +845,8 @@ impl SinglePathMcmc {
         let spp_per_pass = self.config.spp_per_pass;
         let spp = self.config.spp;
 
-        let output_image: luisa::Tex2d<luisa::Float4> = self.device.create_tex2d(
-            luisa::PixelStorage::Float4,
+        let output_image: Tex2d<Float4> = self.device.create_tex2d(
+            PixelStorage::Float4,
             scene.camera.resolution().x,
             scene.camera.resolution().y,
             1,

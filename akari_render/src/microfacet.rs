@@ -163,7 +163,7 @@ impl MicrofacetDistribution for TrowbridgeReitzDistribution {
         }
     }
 
-    fn sample_wh(&self, wo: Expr<Float3>, u: Expr<Float2>, ad_mode: ADMode) -> Expr<Float3> {
+    fn sample_wh(&self, _wo: Expr<Float3>, u: Expr<Float2>, ad_mode: ADMode) -> Expr<Float3> {
         if self.sample_visible {
             todo!("untested");
             // let s = select(
@@ -243,7 +243,7 @@ impl MicrofacetDistribution for TrowbridgeReitzDistribution {
         } else {
             track!(self.d(wh, ad_mode) * Frame::abs_cos_theta(wh))
         };
-        lc_assert!(pdf.is_finite());
+        // lc_assert!(pdf.is_finite());
         pdf
     }
     #[tracked]

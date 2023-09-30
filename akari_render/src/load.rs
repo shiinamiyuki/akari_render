@@ -391,16 +391,7 @@ impl SceneLoader {
                 node::Buffer::Internal(_) => todo!(),
             }
         }
-        // for id in sorted_node_ids {
-        //     let node = &graph.nodes[id];
-        //     let ty = node.ty().unwrap();
-        //     if ty == nodes::RGBImageTexture::ty() {
-        //         let tex = node.proxy::<nodes::RGBImageTexture>(&graph).unwrap();
-        //         let path = tex.in_path.as_value().unwrap();
-        //         let sampler = sampler_from_rgb_image_tex_node(&tex);
-        //         path_samplers.insert((path.clone(), sampler));
-        //         images_to_load.insert(path.clone());
-        //     } else if ty == nodes::Mesh::ty() {
+
         for (id, geometry) in &graph.geometries {
             match geometry {
                 node::Geometry::Mesh(mesh) => {

@@ -3,11 +3,9 @@ use std::f32::consts::PI;
 use std::process::exit;
 
 use akari_render::color::{Color, SampledWavelengthsExpr};
-use akari_render::geometry::{face_forward, xyz_to_spherical};
+use akari_render::geometry::xyz_to_spherical;
 use akari_render::microfacet::{MicrofacetDistribution, TrowbridgeReitzDistribution};
-use akari_render::sampler::{
-    init_pcg32_buffer, init_pcg32_buffer_with_seed, IndependentSampler, Pcg32, Sampler,
-};
+use akari_render::sampler::{init_pcg32_buffer_with_seed, IndependentSampler, Sampler};
 use akari_render::sampling::{cos_sample_hemisphere, invert_cos_sample_hemisphere};
 use akari_render::svm::surface::*;
 

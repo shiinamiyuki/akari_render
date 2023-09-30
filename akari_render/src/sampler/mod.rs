@@ -10,7 +10,7 @@ use crate::data::pmj02bn::N_PMJ02BN_SETS;
 use crate::util::hash::xxhash32_4;
 use crate::util::{is_power_of_four, log4u32, round_up_pow4};
 use crate::{scene::Scene, *};
-// pub mod mcmc;
+pub mod mcmc;
 use crate::data::{bluenoise, pmj02bn};
 use serde::{Deserialize, Serialize};
 
