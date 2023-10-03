@@ -146,11 +146,7 @@ impl<'a> PathTracerBase<'a> {
                         let (bsdf_f, bsdf_pdf) = eval
                             .surface
                             .evaluate_color_and_pdf(surface, **self.si, wo, wi, **self.swl);
-                        // let (bsdf_f, bsdf_pdf) = (Color::one(self.color_pipeline.color_repr), 1.0f32.expr());
                         lc_assert!(bsdf_pdf.ge(0.0));
-                        // (0..1000).for_each(|i| {
-                        //     lc_assert!(bsdf_pdf.ne(-i as f32));
-                        // });
                         lc_assert!(bsdf_f.min().ge(0.0));
                         let w = mis_weight(sample.pdf, bsdf_pdf, 1);
                         let shadow_ray = sample.shadow_ray.var();

@@ -47,12 +47,13 @@ bpy.ops.object.select_all(action="DESELECT")
 
 argv = sys.argv
 print(argv)
-argv_offset = argv.index("--") + 1
+argv_offset = argv.index("--") + 2
+BLEND_FILE_ABS_PATH = argv[argv_offset - 1]
 argv = argv[argv_offset:]
 force_export = "--force" in argv or "-f" in argv
 update_mesh_only = "--update-mesh-only" in argv or "-u" in argv
 save_modified_blend = "--save-modified-blend" in argv or "-s" in argv
-
+BLEND_FILE_DIR = os.path.dirname(BLEND_FILE_ABS_PATH)
 
 OUT_DIR = argv[0]
 if not os.path.exists(OUT_DIR):
@@ -71,8 +72,12 @@ else:
                 print("Update mesh only")
 akr_file = open(os.path.join(OUT_DIR, "scene.json"), "w")
 MESH_DIR = path_join(OUT_DIR, "meshes")
+TEXTURE_DIR = path_join(OUT_DIR, "textures")
 if not os.path.exists(MESH_DIR):
     os.makedirs(MESH_DIR)
+
+if not os.path.exists(TEXTURE_DIR):
+    os.makedirs(TEXTURE_DIR)
 
 
 class UniqueName:
@@ -156,8 +161,11 @@ def toposort(node_tree):
     assert len(sorted) == len(nodes)
     return sorted
 
+
 class NodeType:
     pass
+
+
 # PrimitiveNodeType = Enum("PrimitiveNodeType", ["Float", "Float3", "RGB", "Spectrum", "BSDF"])
 class PrimitiveNodeType(NodeType, Enum):
     FLOAT = auto()
@@ -165,6 +173,8 @@ class PrimitiveNodeType(NodeType, Enum):
     RGB = auto()
     SPECTRUM = auto()
     BSDF = auto()
+
+
 class CompositeNodeType(NodeType):
     def __init__(self, fields) -> None:
         self.fields = fields
@@ -174,15 +184,15 @@ class CompositeNodeType(NodeType):
             return False
         return self.fields == o.fields
 
+
 class MaterialExporter:
     socket_to_node_output: Dict[T.NodeSocket, Tuple[T.Node, str]] = dict()
     visited: Dict[T.Node, NodeType]
 
-    def __init__(self, exported_images) -> None:
+    def __init__(self) -> None:
         self.visited = dict()
         self.output_node = None
         self.shader_graph = dict()
-        self.exported_images = exported_images
 
     def push_node(self, node):
         name = f"$tmp_{len(self.shader_graph)}"
@@ -216,7 +226,8 @@ class MaterialExporter:
                 g = s.default_value[1]
                 b = s.default_value[2]
                 assert (
-                    node_ty == PrimitiveNodeType.RGB or node_ty == PrimitiveNodeType.SPECTRUM
+                    node_ty == PrimitiveNodeType.RGB
+                    or node_ty == PrimitiveNodeType.SPECTRUM
                 ), f"Epxected {PrimitiveNodeType.RGB} or {PrimitiveNodeType.SPECTRUM} but got {node_ty}"
                 rgb = self.push_node(
                     {"Rgb": {"value": [r, g, b], "colorspace": "srgb"}}
@@ -234,7 +245,7 @@ class MaterialExporter:
             (from_node, from_key) = self.socket_to_node_output[from_socket]
             assert from_socket.node == from_node, f"{from_socket.node} {from_node}"
             has_single_output = len(from_node.outputs) == 1
-            
+
             input_ty = self.visited[from_node]
             if isinstance(input_ty, PrimitiveNodeType):
                 input_node = {"id": VISITED.get(from_node)}
@@ -251,7 +262,7 @@ class MaterialExporter:
                 if node_ty == input_ty:
                     pass
                 else:
-                     NotImplementedError()
+                    NotImplementedError()
             elif isinstance(input_ty, CompositeNodeType):
                 input_ty = input_ty.fields[akr_key]
             if node_ty == PrimitiveNodeType.SPECTRUM:
@@ -277,6 +288,7 @@ class MaterialExporter:
             input("Roughness", "roughness", PrimitiveNodeType.FLOAT)
             input("Metallic", "metallic", PrimitiveNodeType.FLOAT)
             input("Specular", "specular", PrimitiveNodeType.FLOAT)
+            input("Specular Tint", "specular_tint", PrimitiveNodeType.FLOAT)
             input("Emission", "emission", PrimitiveNodeType.SPECTRUM)
             input("Emission Strength", "emission_strength", PrimitiveNodeType.FLOAT)
             input("Clearcoat", "clearcoat", PrimitiveNodeType.FLOAT)
@@ -319,15 +331,20 @@ class MaterialExporter:
                 "Smart": "Linear",
             }[node.interpolation]
             assert node.image.filepath != ""
+            filepath = node.image.filepath
+            filepath = filepath.replace("//", "./")
+            filepath = filepath.replace("\\", "/")
+
+            filepath = os.path.normpath(os.path.join(BLEND_FILE_DIR, filepath))
+            filepath = filepath.replace("\\", "/")
             mat = {
                 "TexImage": {
-                    "data": make_external_buffer(node.image.filepath),
+                    "path": filepath,
                     "extension": extension,
                     "interpolation": interpolation,
-                    'colorspace': {'Rgb':'srgb'},
+                    "colorspace": {"Rgb": "srgb"},
                 }
             }
-            self.exported_images.append(mat['TexImage'])
             node_ty = PrimitiveNodeType.RGB
         else:
             raise RuntimeError(f"Unsupported node type `{node.type}`")
@@ -375,21 +392,16 @@ class SceneExporter:
         self.exported_instances = dict()
         self.exported_geometries = dict()
         self.exported_materials = dict()
-        self.exported_images = list()
         self.material_cache = dict()
         self.image_cache = dict()
 
-    def export_image(self, img):
-        if img in self.image_cache:
-            return self.image_cache[img]
-        self.exported_images.append(img)
     def visible_objects(self):
         return [ob for ob in self.scene.objects if not ob.hide_render]
 
     def export_material(self, m):
         if m in self.material_cache:
             return self.material_cache[m]
-        exporter = MaterialExporter(self.exported_images)
+        exporter = MaterialExporter()
         out = exporter.export_material(m)
         self.exported_materials[out] = {
             "shader": {
@@ -606,7 +618,6 @@ class SceneExporter:
             "lights": {},
             "geometries": self.exported_geometries,
             "materials": self.exported_materials,
-            'images': self.exported_images,
         }
         json.dump(scene, akr_file, indent=4)
 

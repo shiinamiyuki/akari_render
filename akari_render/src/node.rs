@@ -95,7 +95,6 @@ pub struct Scene {
     pub geometries: Collection<Geometry>,
     pub materials: Collection<Material>,
     pub lights: Collection<Light>,
-    pub images: Vec<Image>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Buffer {
@@ -200,7 +199,7 @@ pub enum ImageInterpolationMode {
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Image {
-    pub data: Buffer,
+    pub path: String,
     pub colorspace: ColorSpace,
     pub extension: ImageExtenisionMode,
     pub interpolation: ImageInterpolationMode,
@@ -245,6 +244,7 @@ pub mod shader {
             metallic: Ref<Node>,
             roughness: Ref<Node>,
             specular: Ref<Node>,
+            specular_tint: Ref<Node>,
             clearcoat: Ref<Node>,
             clearcoat_roughness: Ref<Node>,
             ior: Ref<Node>,
@@ -308,6 +308,7 @@ pub mod shader {
                     metallic,
                     roughness,
                     specular,
+                    specular_tint,
                     clearcoat,
                     clearcoat_roughness,
                     ior,
@@ -319,6 +320,7 @@ pub mod shader {
                     self.visit(metallic);
                     self.visit(roughness);
                     self.visit(specular);
+                    self.visit(specular_tint);
                     self.visit(clearcoat);
                     self.visit(clearcoat_roughness);
                     self.visit(ior);
@@ -326,7 +328,10 @@ pub mod shader {
                     self.visit(emission);
                     self.visit(emission_strength);
                 }
-                Node::Emission { color: emission, strength } => {
+                Node::Emission {
+                    color: emission,
+                    strength,
+                } => {
                     self.visit(emission);
                     self.visit(strength);
                 }

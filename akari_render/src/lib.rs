@@ -35,7 +35,6 @@ pub mod cpp_ext;
 pub mod data;
 pub mod ext;
 pub mod film;
-pub mod filter;
 pub mod geometry;
 pub mod gui;
 pub mod integrator;

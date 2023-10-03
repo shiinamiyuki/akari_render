@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use super::pt::{self, PathTracer, PathTracerBase};
 use super::{Integrator, IntermediateStats, RenderSession, RenderStats};
 use crate::geometry::{face_forward, Ray};
-use crate::sampler::mcmc::{KelemenMutationRecord, KELEMEN_MUTATE};
+use crate::sampler::mcmc::{mutate_image_space_single, KelemenMutationRecord, KELEMEN_MUTATE};
 use crate::sampling::sample_gaussian;
 use crate::util::distribution::resample_with_f64;
 use crate::{color::*, film::*, sampler::*, scene::*, *};
@@ -164,7 +164,8 @@ pub struct Mutator {
     pub small_step_dim_change: Expr<bool>,
     pub old_dim: Expr<u32>,
     pub new_dim: Expr<u32>,
-    // pub is_image_mutation: Expr<bool>,
+    pub is_image_mutation: Expr<bool>,
+    pub res: Expr<Float2>,
 }
 impl Mutator {
     pub fn mutate(
@@ -205,7 +206,6 @@ impl Mutator {
                 exponential_mutation,
                 small_sigma,
                 image_mutation_size,
-                image_mutation_prob,
                 ..
             } => {
                 let kelemen_mutate_size_low = 1.0 / 1024.0f32;
@@ -221,10 +221,18 @@ impl Mutator {
                 } else {
                     if self.small_step_dim_change & i.gt(self.old_dim) {
                         *x = rng.next_1d();
-                    }
-                    escape!({
-                        if exponential_mutation {
-                            track!({
+                    };
+                    if self.is_image_mutation & i.gt(2) {
+                        mutate_image_space_single(
+                            **x,
+                            rng,
+                            image_mutation_size.unwrap_or(0.0).expr(),
+                            self.res,
+                            i,
+                        )
+                    } else {
+                        if !self.is_image_mutation {
+                            if exponential_mutation {
                                 let record = KelemenMutationRecord::new_expr(
                                     **x,
                                     u,
@@ -236,18 +244,18 @@ impl Mutator {
                                 .var();
                                 KELEMEN_MUTATE.call(record);
                                 **record.mutated
-                            })
-                        } else {
-                            track!({
+                            } else {
                                 let dv = sample_gaussian(u);
                                 let new = x + dv * small_sigma;
                                 let new = new - new.floor();
                                 // lc_assert!(new.is_finite());
                                 let new = select(new.is_finite(), new, 0.0f32.expr());
                                 new
-                            })
+                            }
+                        } else {
+                            **x
                         }
-                    })
+                    }
                 };
                 samples.write(sample_idx, new);
             }
@@ -330,7 +338,7 @@ impl<'a> PathTracerBase<'a> {
             let f = &bsdf_sample.color;
             lc_assert!(f.min().ge(0.0));
             if bsdf_sample.pdf.le(0.0) | !bsdf_sample.valid {
-                break_;
+                break;
             }
             self.mul_beta(f / bsdf_sample.pdf);
             {
@@ -662,11 +670,10 @@ impl SinglePathMcmc {
             Method::Kelemen {
                 small_sigma: _,
                 large_step_prob,
-                adaptive,
-                exponential_mutation,
-                image_mutation_size,
-                image_mutation_prob,
                 depth_change_prob,
+                image_mutation_prob,
+                image_mutation_size,
+                ..
             } => {
                 let chain_id = **state.chain_id;
                 let is_large_step = rng.next_1d().lt(large_step_prob);
@@ -688,6 +695,9 @@ impl SinglePathMcmc {
                     small_step_dim_change: small_step_depth_change,
                     old_dim: self.sample_dimension_device(**state.depth),
                     new_dim: self.sample_dimension_device(**new_depth),
+                    res,
+                    is_image_mutation: rng.next_1d().lt(image_mutation_prob)
+                        & image_mutation_size.is_some(),
                 };
                 // perform mutation
                 mutator.mutate(

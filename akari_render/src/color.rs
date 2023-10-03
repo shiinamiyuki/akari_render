@@ -290,6 +290,21 @@ impl Color {
             ),
         }
     }
+    pub fn lerp(&self, other: Color, fac: Expr<f32>) -> Self {
+        match (self, other) {
+            (Color::Spectral(_s), Color::Spectral(_t)) => todo!(),
+            (Color::Rgb(s, cs), Color::Rgb(t, _)) => {
+                Color::Rgb(s.lerp(t, Float3::splat_expr(fac)), *cs)
+            }
+            _ => panic!("cannot lerp spectral and rgb"),
+        }
+    }
+    pub fn lum(&self) -> Expr<f32> {
+        match self {
+            Color::Spectral(_s) => todo!(),
+            Color::Rgb(v, _) => v.dot(Float3::expr(0.2126, 0.7152, 0.0722)),
+        }
+    }
 }
 impl std::ops::Mul<Expr<f32>> for &Color {
     type Output = Color;

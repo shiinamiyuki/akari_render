@@ -8,4 +8,5 @@ if __name__ == "__main__":
     blend = argv[1]
     args = argv[2:]
     cur_dir = os.path.dirname(__file__)
-    os.system(f"blender -b {blend} -P {os.path.join(cur_dir, 'exporter.py')} -- {' '.join(args)}")
+    blend_abs_path = os.path.abspath(blend)
+    os.system(f"blender -b {blend} -P {os.path.join(cur_dir, 'exporter.py')} -- {blend_abs_path} {' '.join(args)}")

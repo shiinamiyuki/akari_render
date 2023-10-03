@@ -1,10 +1,10 @@
+use crate::color::Color;
 use crate::color::*;
 use crate::geometry::Frame;
 use crate::microfacet::TrowbridgeReitzDistribution;
 use crate::sampling::cos_sample_hemisphere;
 use crate::svm::{surface::*, SvmPrincipledBsdf};
 use crate::*;
-use crate::{color::Color};
 use std::f32::consts::FRAC_1_PI;
 
 use super::{BsdfEvalContext, FresnelSchlick, MicrofacetTransmission, SurfaceShader};
@@ -29,9 +29,9 @@ impl Surface for DisneyDiffuseBsdf {
         ctx: &BsdfEvalContext,
     ) -> Color {
         if Frame::same_hemisphere(wo, wi) {
+            let fo = schlick_weight(Frame::abs_cos_theta(wo));
+            let fi = schlick_weight(Frame::abs_cos_theta(wi));
             let diffuse = {
-                let fo = schlick_weight(Frame::abs_cos_theta(wo));
-                let fi = schlick_weight(Frame::abs_cos_theta(wi));
                 // Diffuse fresnel - go from 1 at normal incidence to .5 at grazing.
                 // Burley 2015, eq (4).
                 self.reflectance * (FRAC_1_PI * (1.0 - fo * 0.5) * (1.0 - fi * 0.5))
@@ -41,8 +41,6 @@ impl Surface for DisneyDiffuseBsdf {
                 let valid = wh.ne(0.0).any();
                 let wh = wh.normalize();
                 let cos_theta_d = wi.dot(wh);
-                let fo = schlick_weight(Frame::abs_cos_theta(wo));
-                let fi = schlick_weight(Frame::abs_cos_theta(wi));
                 let rr = 2.0 * self.roughness * cos_theta_d * cos_theta_d;
                 self.reflectance
                     * select(
@@ -116,19 +114,19 @@ impl Surface for DisneyDiffuseBsdf {
     }
 }
 
-pub struct DisneyFresnel {
-    pub f0: Color,
-    pub metallic: Expr<f32>,
-    pub eta: Expr<f32>,
-}
-impl Fresnel for DisneyFresnel {
-    #[tracked]
-    fn evaluate(&self, cos_theta_i: Expr<f32>, ctx: &BsdfEvalContext) -> Color {
-        let fr = Color::one(ctx.color_repr) * fr_dielectric(cos_theta_i, self.eta);
-        let f0 = fr_schlick(self.f0, cos_theta_i);
-        fr * (1.0 - self.metallic) + f0 * self.metallic
-    }
-}
+// pub struct DisneyFresnel {
+//     pub f0: Color,
+//     pub metallic: Expr<f32>,
+//     pub eta: Expr<f32>,
+// }
+// impl Fresnel for DisneyFresnel {
+//     #[tracked]
+//     fn evaluate(&self, cos_theta_i: Expr<f32>, ctx: &BsdfEvalContext) -> Color {
+//         let fr = Color::one(ctx.color_repr) * fr_dielectric(cos_theta_i, self.eta);
+//         let f0 = fr_schlick(self.f0, cos_theta_i);
+//         fr * (1.0 - self.metallic) + f0 * self.metallic
+//     }
+// }
 impl SurfaceShader for SvmPrincipledBsdf {
     #[tracked]
     fn closure(&self, svm_eval: &SvmEvaluator<'_>) -> Rc<dyn Surface> {
@@ -137,6 +135,8 @@ impl SurfaceShader for SvmPrincipledBsdf {
             let transmission_color = color;
             (color, transmission_color)
         };
+        let lum = color.lum();
+        let color_tint = select(lum.eq(0.0), color, color / lum);
         let emission = svm_eval.eval_color(self.emission);
         let metallic = svm_eval.eval_float(self.metallic);
         let roughness = svm_eval.eval_float(self.roughness);
@@ -146,14 +146,18 @@ impl SurfaceShader for SvmPrincipledBsdf {
             reflectance: color,
             roughness,
         });
+        let specular = svm_eval.eval_float(self.specular);
+        let specular_tint = svm_eval.eval_float(self.specular_tint);
         let clearcoat = svm_eval.eval_float(self.clearcoat);
         let clearcoat_roughness = svm_eval.eval_float(self.clearcoat_roughness);
-        let metal = {
-            let f0 = ((eta - 1.0) / (eta + 1.0)).sqr();
-            let f0 = Color::one(svm_eval.color_repr()) * f0 * (1.0 - metallic) + color * metallic;
-            let fresnel = Box::new(DisneyFresnel { f0, metallic, eta });
+        let specular_brdf = {
+            let f0 = (Color::one(svm_eval.color_repr()).lerp(color_tint, specular_tint)
+                * specular
+                * 0.08.expr())
+            .lerp(color, metallic);
+            let fresnel = Box::new(FresnelSchlick { f0 });
             Rc::new(MicrofacetReflection {
-                color,
+                color: Color::one(svm_eval.color_repr()),
                 fresnel,
                 dist: Box::new(TrowbridgeReitzDistribution::from_roughness(
                     Float2::expr(roughness, roughness),
@@ -207,20 +211,26 @@ impl SurfaceShader for SvmPrincipledBsdf {
             });
             dieletric
         };
-        let brdf = Rc::new(BsdfMixture {
-            frac: Box::new(move |_, _| -> Expr<f32> { metallic }),
-            bsdf_a: diffuse,
-            bsdf_b: metal,
-            mode: BsdfBlendMode::Mix,
-        });
         let bsdf = Rc::new(BsdfMixture {
             frac: Box::new(move |_, _| -> Expr<f32> { transmission }),
-            bsdf_a: brdf,
+            bsdf_a: diffuse,
             bsdf_b: dieletric,
             mode: BsdfBlendMode::Mix,
         });
+
         let bsdf = Rc::new(BsdfMixture {
-            frac: Box::new(move |_, _| -> Expr<f32> { clearcoat }),
+            frac: Box::new(move |_, _| -> Expr<f32> { 0.5f32.expr() }),
+            bsdf_a: Rc::new(ScaledBsdf {
+                inner: bsdf,
+                weight: 1.0f32 - metallic,
+            }),
+            bsdf_b: specular_brdf,
+            mode: BsdfBlendMode::Addictive,
+        });
+        let bsdf = Rc::new(BsdfMixture {
+            frac: Box::new(move |_, _| -> Expr<f32> {
+                0.0f32.expr().lerp(0.5f32.expr(), clearcoat)
+            }),
             bsdf_a: bsdf,
             bsdf_b: clearcoat_brdf,
             mode: BsdfBlendMode::Addictive,

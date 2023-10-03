@@ -174,12 +174,9 @@ impl<'a> Compiler<'a> {
             Node::Float4(_) => todo!(),
             Node::TexImage(img) => {
                 let colorspace = &img.colorspace;
-                let path = match &img.data {
-                    node::Buffer::External(path) => path.clone(),
-                    _ => panic!("not implemented"),
-                };
+                let path = &img.path;
                 let sampler = sampler_from_rgb_image_tex_node(img);
-                let tex_idx = self.ctx.images[&(path, sampler)];
+                let tex_idx = self.ctx.images[&(path.clone(), sampler)];
                 SvmNode::RgbImageTex(SvmRgbImageTex {
                     tex_idx: tex_idx as u32,
                     colorspace: ColorSpaceId::from_colorspace(match colorspace {
@@ -201,6 +198,7 @@ impl<'a> Compiler<'a> {
                 metallic,
                 roughness,
                 specular,
+                specular_tint,
                 clearcoat,
                 clearcoat_roughness,
                 ior,
@@ -212,6 +210,7 @@ impl<'a> Compiler<'a> {
                 let metallic = self.get(metallic);
                 let roughness = self.get(roughness);
                 let specular = self.get(specular);
+                let specular_tint = self.get(specular_tint);
                 let clearcoat = self.get(clearcoat);
                 let clearcoat_roughness = self.get(clearcoat_roughness);
                 let transmission = self.get(transmission);
@@ -223,6 +222,7 @@ impl<'a> Compiler<'a> {
                     metallic,
                     roughness,
                     specular,
+                    specular_tint,
                     clearcoat,
                     clearcoat_roughness,
                     eta: ior,
@@ -231,7 +231,10 @@ impl<'a> Compiler<'a> {
                     emission_strength,
                 })
             }
-            Node::Emission { color: emission, strength } => {
+            Node::Emission {
+                color: emission,
+                strength,
+            } => {
                 let emission = self.get(&emission);
                 let strength = self.get(&strength);
                 SvmNode::Emission(SvmEmission {

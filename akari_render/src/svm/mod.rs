@@ -171,6 +171,7 @@ pub struct SvmPrincipledBsdf {
     pub metallic: SvmNodeRef,
     pub roughness: SvmNodeRef,
     pub specular: SvmNodeRef,
+    pub specular_tint: SvmNodeRef,
     pub clearcoat: SvmNodeRef,
     pub clearcoat_roughness: SvmNodeRef,
     pub eta: SvmNodeRef,
@@ -185,6 +186,7 @@ impl SvmPrincipledBsdf {
         self.metallic.hash(hasher);
         self.roughness.hash(hasher);
         self.specular.hash(hasher);
+        self.specular_tint.hash(hasher);
         self.clearcoat.hash(hasher);
         self.clearcoat_roughness.hash(hasher);
         self.eta.hash(hasher);

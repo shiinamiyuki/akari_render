@@ -381,15 +381,25 @@ impl SceneLoader {
         let mut mesh_buffers = vec![];
         let mut path_samplers: HashSet<(String, TextureSampler)> = HashSet::new();
         // let mut instance_nodes = vec![];
-        for tex in &graph.images {
-            match &tex.data {
-                node::Buffer::External(path) => {
-                    let sampler = sampler_from_rgb_image_tex_node(&tex);
-                    path_samplers.insert((path.clone(), sampler));
-                    images_to_load.insert(path.clone());
+
+        let image_nodes = {
+            let mut images = vec![];
+            for (_, mat) in &graph.materials {
+                for (_, n) in &mat.shader.nodes {
+                    match n {
+                        Node::TexImage(tex) => images.push(tex.clone()),
+                        _ => {}
+                    }
                 }
-                node::Buffer::Internal(_) => todo!(),
             }
+            images
+        };
+
+        for tex in &image_nodes {
+            let path = &tex.path;
+            let sampler = sampler_from_rgb_image_tex_node(tex);
+            path_samplers.insert((path.clone(), sampler));
+            images_to_load.insert(path.clone());
         }
 
         for (id, geometry) in &graph.geometries {
