@@ -138,6 +138,7 @@ where
             *self.cur_dim += 1;
             ret
         } else {
+            lc_assert!(false.expr());
             lc_unreachable!();
             0.0f32.expr()
         }
@@ -219,43 +220,43 @@ impl Mutator {
                 let new = if self.is_large_step {
                     u
                 } else {
-                    if self.small_step_dim_change & i.gt(self.old_dim) {
-                        *x = rng.next_1d();
-                    };
-                    if self.is_image_mutation & i.gt(2) {
-                        mutate_image_space_single(
+                    // if self.small_step_dim_change & i.gt(self.old_dim) {
+                    //     *x = rng.next_1d();
+                    // };
+                    // if self.is_image_mutation & i.lt(2) {
+                    //     mutate_image_space_single(
+                    //         **x,
+                    //         rng,
+                    //         image_mutation_size.unwrap_or(0.0).expr(),
+                    //         self.res,
+                    //         i,
+                    //     )
+                    // } else {
+                    //     if !self.is_image_mutation {
+                    if exponential_mutation {
+                        let record = KelemenMutationRecord::new_expr(
                             **x,
-                            rng,
-                            image_mutation_size.unwrap_or(0.0).expr(),
-                            self.res,
-                            i,
+                            u,
+                            kelemen_mutate_size_low,
+                            kelemen_mutate_size_high,
+                            kelemen_log_ratio,
+                            0.0,
                         )
+                        .var();
+                        KELEMEN_MUTATE.call(record);
+                        **record.mutated
                     } else {
-                        if !self.is_image_mutation {
-                            if exponential_mutation {
-                                let record = KelemenMutationRecord::new_expr(
-                                    **x,
-                                    u,
-                                    kelemen_mutate_size_low,
-                                    kelemen_mutate_size_high,
-                                    kelemen_log_ratio,
-                                    0.0,
-                                )
-                                .var();
-                                KELEMEN_MUTATE.call(record);
-                                **record.mutated
-                            } else {
-                                let dv = sample_gaussian(u);
-                                let new = x + dv * small_sigma;
-                                let new = new - new.floor();
-                                // lc_assert!(new.is_finite());
-                                let new = select(new.is_finite(), new, 0.0f32.expr());
-                                new
-                            }
-                        } else {
-                            **x
-                        }
+                        let dv = sample_gaussian(u);
+                        let new = x + dv * small_sigma;
+                        let new = new - new.floor();
+                        // lc_assert!(new.is_finite());
+                        let new = select(new.is_finite(), new, 0.0f32.expr());
+                        new
                     }
+                    // } else {
+                    //     **x
+                    // }
+                    // }
                 };
                 samples.write(sample_idx, new);
             }
@@ -277,52 +278,40 @@ impl<'a> PathTracerBase<'a> {
     /// Sample a path prefix with length `target_depth - 1`
     /// and two final vertices with NEE and BSDF sampling respectively.
     #[tracked]
-    pub fn run_at_depth(
-        &self,
-        ray: Expr<Ray>,
-        target_depth: Expr<u32>,
-        sampler: &dyn Sampler,
-        vertices: Option<VLArrayVar<PathVertex>>,
-    ) {
-        let ray = ray.var();
-        let u_light = sampler.next_3d();
+    pub fn run_at_depth(&self, ray: Expr<Ray>, target_depth: Expr<u32>, sampler: &dyn Sampler) {
+        let ray: Var<Ray> = ray.var();
+        let u_light = Var::<Float3>::zeroed();
+        let first = true.var();
         loop {
+            // this is due to potential nvcc bug
+            if **first {
+                *first = false;
+                *u_light = sampler.next_3d();
+            };
+
             let hit = self.next_intersection(**ray);
             if !hit {
-                if let Some(vertices) = vertices {
-                    // vertices.write(
-                    //     *self.depth,
-                    //     PathVertexExpr::new(u32::MAX, u32::MAX, Float2::expr(0.0, 0.0)),
-                    // );
-                    todo!()
-                }
-                let (direct, w) = self.hit_envmap(**ray);
                 if self.depth.eq(target_depth) {
+                    let (direct, w) = self.hit_envmap(**ray);
                     self.add_radiance(direct * w);
                 };
-                break_();
-            }
-            if let Some(vertices) = vertices {
-                // vertices.write(
-                //     *self.depth,
-                //     PathVertexExpr::new(*self.si.inst_id(), *self.si.prim_id(), *self.si.bary()),
-                // );
-                todo!()
+                break;
             }
             {
                 if self.depth.eq(target_depth) {
                     let (direct, w) = self.handle_surface_light(**ray);
                     self.add_radiance(direct * w);
+                    break_();
                 }
             }
 
-            if self.depth.ge(self.max_depth) {
+            if self.depth >= target_depth {
                 break;
-            };
+            }
             *self.depth += 1;
 
-            if self.depth.eq(target_depth) {
-                let direct_lighting = self.sample_light(u_light);
+            if self.depth == target_depth {
+                let direct_lighting = self.sample_light(**u_light);
                 if direct_lighting.valid {
                     let shadow_ray = direct_lighting.shadow_ray;
                     if !self.scene.occlude(shadow_ray) {
@@ -333,7 +322,7 @@ impl<'a> PathTracerBase<'a> {
                         self.add_radiance(direct);
                     }
                 }
-            }
+            };
             let bsdf_sample = self.sample_surface(sampler.next_3d());
             let f = &bsdf_sample.color;
             lc_assert!(f.min().ge(0.0));
@@ -343,14 +332,14 @@ impl<'a> PathTracerBase<'a> {
             self.mul_beta(f / bsdf_sample.pdf);
             {
                 *self.prev_bsdf_pdf = bsdf_sample.pdf;
-                *self.prev_ng = self.ng;
-                let ro = offset_ray_origin(self.p, face_forward(self.ng, bsdf_sample.wi));
+                *self.prev_ng = **self.ng;
+                let ro = offset_ray_origin(**self.p, face_forward(**self.ng, bsdf_sample.wi));
                 *ray = Ray::new_expr(
                     ro,
                     bsdf_sample.wi,
                     0.0,
                     1e20,
-                    Uint2::expr(self.si.inst_id, self.si.prim_id),
+                    Uint2::expr(**self.si.inst_id, **self.si.prim_id),
                     Uint2::expr(u32::MAX, u32::MAX),
                 );
             }
@@ -442,11 +431,11 @@ impl<'a> PathTracerBase<'a> {
 }
 impl SinglePathMcmc {
     fn sample_dimension(&self, depth: u32) -> u32 {
-        4 + (1 + depth) * 3 + 3
+        4 + (1 + depth) * 3 + 3 + 1
     }
     #[tracked]
     fn sample_dimension_device(&self, depth: Expr<u32>) -> Expr<u32> {
-        4 + (1 + depth) * 3 + 3
+        4 + (1 + depth) * 3 + 3 + 1
     }
     pub fn new(device: Device, config: Config) -> Self {
         // assert_eq!(
@@ -513,7 +502,7 @@ impl SinglePathMcmc {
                 self.config.direct_spp >= 0,
                 swl,
             );
-            pt.run_at_depth(ray, depth, sampler, None);
+            pt.run_at_depth(ray, depth, sampler);
             pt.radiance.load() * w
         };
         (p.cast_u32(), l, **swl, Self::scalar_contribution(&l))
@@ -555,7 +544,7 @@ impl SinglePathMcmc {
     }
 
     fn bootstrap(&self, scene: &Arc<Scene>, filter: PixelFilter, eval: &Evaluators) -> RenderState {
-        let seeds = init_pcg32_buffer(self.device.clone(), self.n_bootstrap);
+        let seeds = init_pcg32_buffer_with_seed(self.device.clone(), self.n_bootstrap, 0);
         let fs = self
             .device
             .create_buffer_from_fn(self.n_bootstrap, |_| 0.0f32);
@@ -633,7 +622,6 @@ impl SinglePathMcmc {
                 // cpu_dbg!(Float2::expr(f, fs.var().read(seed_idx)));
                 let sigma = match &self.method {
                     Method::Kelemen { small_sigma, .. } => *small_sigma,
-                    _ => todo!(),
                 };
                 cur_colors.write(i, l, swl);
                 let state = MarkovState::new_expr(i, p, f, 0.0, 0, 0, 0, sigma, depth);
@@ -641,7 +629,7 @@ impl SinglePathMcmc {
             }))
             .dispatch([self.n_chains as u32, 1, 1]);
 
-        let rng_states = init_pcg32_buffer(self.device.clone(), self.n_chains);
+        let rng_states = init_pcg32_buffer_with_seed(self.device.clone(), self.n_chains, 1);
         RenderState {
             rng_states,
             samples: sample_buffer,
@@ -730,18 +718,22 @@ impl SinglePathMcmc {
                     1.0f32.expr(),
                     (proposal_f / cur_f).clamp(0.0.expr(), 1.0.expr()),
                 );
-                film.add_splat(
-                    proposal_p.cast_f32(),
-                    &(proposal_color.clone() / proposal_f),
-                    proposal_swl,
-                    accept * contribution,
-                );
-                film.add_splat(
-                    cur_p.cast_f32(),
-                    &(cur_color / cur_f),
-                    **cur_swl,
-                    (1.0 - accept) * contribution,
-                );
+                if proposal_f > 0.0 {
+                    film.add_splat(
+                        proposal_p.cast_f32(),
+                        &(proposal_color.clone() / proposal_f),
+                        proposal_swl,
+                        accept * contribution,
+                    );
+                };
+                if cur_f > 0.0 {
+                    film.add_splat(
+                        cur_p.cast_f32(),
+                        &(cur_color / cur_f),
+                        **cur_swl,
+                        (1.0 - accept) * contribution,
+                    );
+                };
                 if rng.next_1d().lt(accept) {
                     *state.cur_f = proposal_f;
                     cur_color_v.store(proposal_color);
@@ -881,11 +873,17 @@ impl SinglePathMcmc {
                     panic!("Number of mutations per chain exceeds u32::MAX, please reduce spp per pass or increase number of chains");
                 }
                 let mutations_per_chain = mutations_per_chain as u32;
-                kernel.dispatch(
-                    [self.n_chains as u32, 1, 1],
-                    &mutations_per_chain,
-                    &contribution,
-                );
+                self.device.default_stream().with_scope(|s| {
+                    let printer = &scene.printer;
+                    s.reset_printer(printer);
+                    s.submit([kernel.dispatch_async(
+                        [self.n_chains as u32, 1, 1],
+                        &mutations_per_chain,
+                        &contribution,
+                    )]);
+                    s.print(printer);
+                });
+
                 progress.inc(cur_pass as u64);
                 cnt += cur_pass;
                 let toc = Instant::now();

@@ -4,7 +4,8 @@ use color::ColorRepr;
 use hexf::hexf32;
 use integrator::FilmConfig;
 pub use luisa::prelude::{
-    cpu_dbg, if_, lc_assert, lc_unreachable, loop_, track, tracked, while_, Aggregate, Value,
+    cpu_dbg, if_, lc_assert, lc_comment_lineno, lc_unreachable, loop_, track, tracked, while_,
+    Aggregate, Value,
 };
 pub use luisa::resource::Sampler as TextureSampler;
 pub use luisa::{

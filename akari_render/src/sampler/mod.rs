@@ -38,10 +38,10 @@ pub trait Sampler {
         self.next_1d()
     }
     fn uniform2(&self) -> Expr<Float2> {
-        Float2::expr(self.next_1d(), self.next_1d())
+        Float2::expr(self.uniform(), self.uniform())
     }
     fn uniform3(&self) -> Expr<Float3> {
-        Float3::expr(self.next_1d(), self.next_1d(), self.next_1d())
+        Float3::expr(self.uniform(), self.uniform(), self.uniform())
     }
 
     fn start(&self);

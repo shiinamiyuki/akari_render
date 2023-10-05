@@ -1,8 +1,9 @@
-use std::f32::consts::PI;
 use std::fs::File;
 use std::io::BufWriter;
 use std::sync::Arc;
 use std::time::Instant;
+
+use luisa::lang::debug::is_cpu_backend;
 
 use super::pt::{self, PathTracer};
 use super::{Integrator, IntermediateStats, RenderSession, RenderStats};
@@ -13,9 +14,10 @@ use crate::sampling::sample_gaussian;
 use crate::util::distribution::resample_with_f64;
 use crate::{color::*, film::*, sampler::*, scene::*, util::distribution::AliasTable, *};
 
-use super::mcmc::{Config, Mcmc, Method};
+use super::mcmc::{Config, Method};
 #[derive(Clone, Copy, Value, Debug)]
 #[repr(C, align(16))]
+#[value_new(pub)]
 pub struct PssSample {
     pub cur: f32,
     pub backup: f32,
@@ -34,6 +36,7 @@ pub struct McmcOpt {
 
 #[derive(Clone, Copy, Debug, Value)]
 #[repr(C)]
+#[value_new(pub)]
 pub struct MarkovState {
     cur_pixel: Uint2,
     chain_id: u32,
@@ -82,25 +85,21 @@ impl<'a> LazyMcmcSampler<'a> {
 }
 
 impl<'a> Sampler for LazyMcmcSampler<'a> {
-    fn next_1d(&self) -> Float {
-        if_!(
-            self.cur_dim.load().lt(self.mcmc_dim),
-            {
-                let ret = if let Some(m) = &self.mutator {
-                    m.mutate_one(self.samples, self.offset, *self.cur_dim, self.base)
-                        .cur()
-                } else {
-                    self.samples.read(self.offset + *self.cur_dim).cur()
-                };
-                self.cur_dim.store(self.cur_dim.load() + 1);
-                ret
-            },
-            else,
-            {
-                self.cur_dim.store(self.cur_dim.load() + 1);
-                self.base.next_1d()
-            }
-        )
+    #[tracked]
+    fn next_1d(&self) -> Expr<f32> {
+        if self.cur_dim.load().lt(self.mcmc_dim) {
+            let ret = if let Some(m) = &self.mutator {
+                m.mutate_one(self.samples, self.offset, **self.cur_dim, self.base)
+                    .cur
+            } else {
+                self.samples.read(self.offset + **self.cur_dim).cur
+            };
+            *self.cur_dim += 1;
+            ret
+        } else {
+            *self.cur_dim += 1;
+            self.base.next_1d()
+        }
     }
     fn is_metropolis(&self) -> bool {
         false
@@ -127,6 +126,7 @@ pub struct Mutator {
     pub res: Expr<Float2>,
 }
 impl Mutator {
+    #[tracked]
     pub fn mutate_one(
         &self,
         samples: &Buffer<PssSample>,
@@ -147,86 +147,82 @@ impl Mutator {
                 let kelemen_log_ratio = -(kelemen_mutate_size_high / kelemen_mutate_size_low).ln();
                 let u = rng.next_1d();
                 let sample = samples.var().read(offset + i).var();
-                if_!(sample.last_modified().lt(self.last_large_iter), {
-                    sample.set_cur(rng.next_1d());
-                    sample.set_last_modified(self.last_large_iter);
-                });
+                if sample.last_modified.lt(self.last_large_iter) {
+                    *sample.cur = rng.next_1d();
+                    *sample.last_modified = self.last_large_iter;
+                };
 
-                sample.set_backup(*sample.cur());
-                sample.set_modified_backup(*sample.last_modified());
-                if_!(
-                    self.is_large_step,
-                    {
-                        sample.set_cur(u);
-                    },
-                    else,
-                    {
-                        let is_cur_dim_under_image_mutation =
-                            image_mutation_size.is_some() & self.is_image_mutation;
-                        let should_cur_dim_be_mutated =
-                            !is_cur_dim_under_image_mutation | i.lt(2);
-                        let target_iter = if_!(should_cur_dim_be_mutated, { self.cur_iter }, {
-                            self.cur_iter - 1
+                *sample.backup = sample.cur;
+                *sample.modified_backup = sample.last_modified;
+                if self.is_large_step {
+                    *sample.cur = u;
+                } else {
+                    let is_cur_dim_under_image_mutation =
+                        image_mutation_size.is_some() & self.is_image_mutation;
+                    let should_cur_dim_be_mutated = !is_cur_dim_under_image_mutation | i.lt(2);
+                    let target_iter = if should_cur_dim_be_mutated {
+                        self.cur_iter
+                    } else {
+                        self.cur_iter - 1
+                    };
+                    lc_assert!(target_iter.ge(sample.last_modified));
+                    let n_small = target_iter - sample.last_modified;
+                    if exponential_mutation {
+                        let x = sample.cur.var();
+                        for_range(0u32.expr()..n_small, |_| {
+                            let u = rng.next_1d();
+                            if u.lt(1.0 - image_mutation_prob) {
+                                let u = u / (1.0 - image_mutation_prob);
+                                let record = KelemenMutationRecord::new_expr(
+                                    **x,
+                                    u,
+                                    kelemen_mutate_size_low,
+                                    kelemen_mutate_size_high,
+                                    kelemen_log_ratio,
+                                    0.0,
+                                )
+                                .var();
+                                KELEMEN_MUTATE.call(record);
+                                x.store(**record.mutated);
+                            };
                         });
-                        lc_assert!(target_iter.ge(*sample.last_modified()));
-                        let n_small = target_iter - *sample.last_modified();
-                        if exponential_mutation {
-                            let x = sample.cur().var();
-                            for_range(0u32.into()..n_small, |_| {
-                                let u = rng.next_1d();
-                                if_!(u.lt(1.0 - image_mutation_prob), {
-                                    let u = u / (1.0 - image_mutation_prob);
-                                    let record = KelemenMutationRecordExpr::new(
-                                        *x,
-                                        u,
-                                        kelemen_mutate_size_low,
-                                        kelemen_mutate_size_high,
-                                        kelemen_log_ratio,
-                                        0.0,
-                                    )
-                                    .var();
-                                    KELEMEN_MUTATE.call(record);
-                                    x.store(*record.mutated());
-                                });
-                            });
-                            sample.set_cur(*x);
-                        } else {
-                            if_!(n_small.gt(0), {
-                                // let tmp1 = (-2.0 * (1.0 - rng.next_1d()).ln()).sqrt();
-                                // let dv = tmp1 * (2.0 * PI * rng.next_1d()).cos();
-                                let dv = sample_gaussian(u);
-                                let new = *sample.cur()
-                                    + dv * small_sigma
-                                        * ((1.0 - image_mutation_prob) * n_small.cast_f32()).sqrt();
-                                let new = new - new.floor();
-                                let new = select(new.is_finite(), new, 0.0f32.expr());
-                                sample.set_cur(new);
-                            });
-                        }
-                        if image_mutation_size.is_some() {
-                            if_!(self.is_image_mutation & i.lt(2), {
-                                let new = mutate_image_space_single(
-                                    *sample.cur(),
-                                    rng,
-                                    image_mutation_size.unwrap().expr(),
-                                    self.res,
-                                    i,
-                                );
-                                sample.set_cur(new);
-                            });
-                        }
+                        *sample.cur = x;
+                    } else {
+                        if n_small.gt(0) {
+                            // let tmp1 = (-2.0 * (1.0 - rng.next_1d()).ln()).sqrt();
+                            // let dv = tmp1 * (2.0 * PI * rng.next_1d()).cos();
+                            let dv = sample_gaussian(u);
+                            let new = sample.cur
+                                + dv * small_sigma
+                                    * ((1.0 - image_mutation_prob) * n_small.cast_f32()).sqrt();
+                            let new = new - new.floor();
+                            let new = select(new.is_finite(), new, 0.0f32.expr());
+                            *sample.cur = new;
+                        };
+                    };
+                    if image_mutation_size.is_some() {
+                        if self.is_image_mutation & i.lt(2) {
+                            let new = mutate_image_space_single(
+                                **sample.cur,
+                                rng,
+                                image_mutation_size.unwrap().expr(),
+                                self.res,
+                                i,
+                            );
+                            *sample.cur = new;
+                        };
                     }
-                );
-                sample.set_last_modified(self.cur_iter);
-                samples.var().write(offset + i, *sample);
-                *sample
+                };
+                *sample.last_modified = self.cur_iter;
+                samples.var().write(offset + i, **sample);
+                **sample
             }
         }
     }
 }
 impl McmcOpt {
     fn sample_dimension(&self) -> usize {
-        4 + (1 + self.mcmc_depth as usize) * (3 + 3 + 1)
+        4 + 1 + (1 + self.mcmc_depth as usize) * (3 + 3 + 1)
     }
     pub fn new(device: Device, config: Config) -> Self {
         let pt_config = pt::Config {
@@ -248,6 +244,7 @@ impl McmcOpt {
             config,
         }
     }
+    #[tracked]
     fn evaluate(
         &self,
         scene: &Arc<Scene>,
@@ -268,7 +265,7 @@ impl McmcOpt {
         let sampler = LazyMcmcSampler::new(
             independent,
             samples,
-            chain_id * const_(self.sample_dimension() as u32),
+            chain_id * (self.sample_dimension() as u32).expr(),
             if is_bootstrap {
                 0u32
             } else {
@@ -278,29 +275,29 @@ impl McmcOpt {
             mutator,
         );
         sampler.start();
-        let res = const_(scene.camera.resolution());
+        let res = scene.camera.resolution().expr();
         let p = sampler.next_2d() * res.cast_f32();
         let p = p.cast_i32().clamp(0, res.cast_i32() - 1);
-        let swl = def(sample_wavelengths(eval.color_repr(), &sampler));
+        let swl = sample_wavelengths(eval.color_repr(), &sampler).var();
         let (ray, ray_color, ray_w) =
             scene
                 .camera
-                .generate_ray(filter, p.cast_u32(), &sampler, eval.color_repr(), *swl);
+                .generate_ray(filter, p.cast_u32(), &sampler, eval.color_repr(), **swl);
         let l = self.pt.radiance(scene, eval, ray, swl, &sampler) * ray_color * ray_w;
         (
             p.cast_u32(),
             l,
-            *swl,
+            **swl,
             Self::scalar_contribution(&l),
-            *sampler.cur_dim,
+            **sampler.cur_dim,
         )
     }
     pub fn scalar_contribution(color: &Color) -> Expr<f32> {
-        color.max().clamp(0.0, 1e5)
+        color.max().clamp(0.0f32.expr(), 1e5f32.expr())
         // 1.0f32.expr()
     }
     fn bootstrap(&self, scene: &Arc<Scene>, filter: PixelFilter, eval: &Evaluators) -> RenderState {
-        let seeds = init_pcg32_buffer(self.device.clone(), self.n_bootstrap);
+        let seeds = init_pcg32_buffer_with_seed(self.device.clone(), self.n_bootstrap, 0);
         let fs = self
             .device
             .create_buffer_from_fn(self.n_bootstrap, |_| 0.0f32);
@@ -321,7 +318,7 @@ impl McmcOpt {
             .create_kernel::<fn()>(&|| {
                 let i = dispatch_id().x;
                 let seed = seeds.var().read(i);
-                let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seed));
+                let sampler = IndependentSampler::from_pcg32(seed.var());
                 // DON'T WRITE INTO sample_buffer
                 let (_p, _l, _swl, f, _) =
                     self.evaluate(scene, filter, eval, &sample_buffer, &sampler, i, None, true);
@@ -341,17 +338,16 @@ impl McmcOpt {
         let cur_colors = ColorBuffer::new(self.device.clone(), self.n_chains, eval.color_repr());
 
         self.device
-            .create_kernel::<fn()>(&|| {
+            .create_kernel::<fn()>(&track!(|| {
                 let i = dispatch_id().x;
                 let seed_idx = resampled.var().read(i);
                 let seed = seeds.var().read(seed_idx);
-                let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seed));
-                let dim = const_(self.sample_dimension() as u32);
-                for_range(const_(0)..dim.cast_i32(), |j| {
-                    let j = j.cast_u32();
+                let sampler = IndependentSampler::from_pcg32(seed.var());
+                let dim = (self.sample_dimension() as u32).expr();
+                for_range(0u32.expr()..dim, |j| {
                     sample_buffer.write(
                         i * dim + j,
-                        PssSampleExpr::new(sampler.next_1d(), 0.0, 0, 0),
+                        PssSample::new_expr(sampler.next_1d(), 0.0, 0, 0),
                     );
                 });
 
@@ -366,11 +362,11 @@ impl McmcOpt {
                     false,
                 );
                 cur_colors.write(i, l, swl);
-                let state = MarkovStateExpr::new(p, i, f, 0.0, 0, 0, 0, 0, 0);
+                let state = MarkovState::new_expr(p, i, f, 0.0, 0, 0, 0, 0, 0);
                 states.var().write(i, state);
-            })
+            }))
             .dispatch([self.n_chains as u32, 1, 1]);
-        let rng_states = init_pcg32_buffer(self.device.clone(), self.n_chains);
+        let rng_states = init_pcg32_buffer_with_seed(self.device.clone(), self.n_chains, 1);
         RenderState {
             rng_states,
             samples: sample_buffer,
@@ -380,6 +376,7 @@ impl McmcOpt {
             b_init_cnt: self.n_bootstrap,
         }
     }
+    #[tracked]
     fn mutate_chain(
         &self,
         scene: &Arc<Scene>,
@@ -392,8 +389,8 @@ impl McmcOpt {
         cur_swl: Var<SampledWavelengths>,
         rng: &IndependentSampler,
     ) {
-        let offset = *state.chain_id() * const_(self.sample_dimension() as u32);
-        *state.cur_iter().get_mut() += 1;
+        let offset = state.chain_id * self.sample_dimension() as u32;
+        *state.cur_iter += 1;
         // select a mutation strategy
         match self.method {
             Method::Kelemen {
@@ -408,9 +405,9 @@ impl McmcOpt {
                     is_large_step,
                     is_image_mutation,
                     method: self.method,
-                    last_large_iter: *state.last_large_iter(),
-                    cur_iter: *state.cur_iter(),
-                    res: const_(scene.camera.resolution()).cast_f32(),
+                    last_large_iter: **state.last_large_iter,
+                    cur_iter: **state.cur_iter,
+                    res: scene.camera.resolution().expr().cast_f32(),
                 };
                 let (proposal_p, proposal_color, proposal_swl, f, proposal_dim) = self.evaluate(
                     scene,
@@ -418,22 +415,22 @@ impl McmcOpt {
                     eval,
                     &render_state.samples,
                     &rng,
-                    *state.chain_id(),
+                    **state.chain_id,
                     Some(mutator),
                     false,
                 );
                 let proposal_f = f;
-                if_!(is_large_step & state.b_cnt().lt(u32::MAX - 1), {
-                    state.set_b(state.b().load() + proposal_f);
-                    state.set_b_cnt(state.b_cnt().load() + 1);
-                });
-                let cur_f = state.cur_f().load();
-                let cur_p = state.cur_pixel().load();
+                if is_large_step & state.b_cnt.lt(1024u32 * 1024) {
+                    *state.b += proposal_f;
+                    *state.b_cnt += 1;
+                };
+                let cur_f = **state.cur_f;
+                let cur_p = **state.cur_pixel;
                 let cur_color = cur_color_v.load();
                 let accept = select(
                     cur_f.eq(0.0),
                     1.0f32.expr(),
-                    (proposal_f / cur_f).clamp(0.0, 1.0),
+                    (proposal_f / cur_f).clamp(0.0f32.expr(), 1.0f32.expr()),
                 );
                 film.add_splat(
                     proposal_p.cast_f32(),
@@ -444,42 +441,39 @@ impl McmcOpt {
                 film.add_splat(
                     cur_p.cast_f32(),
                     &(cur_color / cur_f),
-                    *cur_swl,
+                    **cur_swl,
                     (1.0 - accept) * contribution,
                 );
-                if_!(
-                    rng.next_1d().lt(accept),
-                    {
-                        state.set_cur_f(proposal_f);
-                        cur_color_v.store(proposal_color);
-                        cur_swl.store(proposal_swl);
-                        state.set_cur_pixel(proposal_p);
-                        if_!(!is_large_step, {
-                            *state.n_accepted().get_mut() += 1;
-                        }, else {
-                            state.set_last_large_iter(*state.cur_iter());
-                        });
-                    },
-                    else, // reject
-                    {
-                        *state.cur_iter().get_mut() -= 1;
-                        let dim = proposal_dim.min(self.sample_dimension() as u32);
-                        for_range(const_(0u32)..dim, |i| {
-                            let sample =
-                                var!(PssSample, render_state.samples.var().read(offset + i));
-                            sample.set_cur(*sample.backup());
-                            sample.set_last_modified(*sample.modified_backup());
-                            render_state.samples.var().write(offset + i, *sample);
-                        });
-                    }
-                );
-                if_!(!is_large_step, {
-                    state.set_n_mutations(state.n_mutations().load() + 1);
-                });
+                if rng.next_1d().lt(accept) {
+                    *state.cur_f = proposal_f;
+                    cur_color_v.store(proposal_color);
+                    cur_swl.store(proposal_swl);
+                    *state.cur_pixel = proposal_p;
+                    if !is_large_step {
+                        *state.n_accepted += 1;
+                    } else {
+                        *state.last_large_iter = state.cur_iter;
+                    };
+                } else
+                // reject
+                {
+                    *state.cur_iter -= 1;
+                    let dim = proposal_dim.min_(self.sample_dimension() as u32);
+                    for_range(0u32.expr()..dim, |i| {
+                        let sample = render_state.samples.var().read(offset + i).var();
+                        *sample.cur = sample.backup;
+                        *sample.last_modified = sample.modified_backup;
+                        render_state.samples.var().write(offset + i, **sample);
+                    });
+                };
+                if !is_large_step {
+                    *state.n_mutations += 1;
+                };
             }
             _ => todo!(),
         }
     }
+    #[tracked]
     fn advance_chain(
         &self,
         scene: &Arc<Scene>,
@@ -491,31 +485,26 @@ impl McmcOpt {
     ) {
         let i = dispatch_id().x;
         let markov_states = render_state.states.var();
-        let sampler =
-            IndependentSampler::from_pcg32(var!(Pcg32, render_state.rng_states.var().read(i)));
-        let state = var!(MarkovState, markov_states.read(i));
+        let sampler = IndependentSampler::from_pcg32(render_state.rng_states.var().read(i).var());
+        let state = markov_states.read(i).var();
         let (cur_color, cur_swl) = render_state.cur_colors.read(i);
         let cur_color_v = ColorVar::new(cur_color);
-        let cur_swl_v = def(cur_swl);
-        for_range(const_(0)..mutations_per_chain.cast_i32(), |_| {
+        let cur_swl_v = cur_swl.var();
+        for_range(0u32.expr()..mutations_per_chain, |_| {
             // we are about to overflow
-            if_!(state.cur_iter().eq(u32::MAX - 1), {
+            if state.cur_iter.eq(u32::MAX - 1) {
                 // cpu_dbg!(i);
                 let dim = self.sample_dimension();
-                for_range(const_(0)..const_(dim as i32), |j| {
-                    let j = j.cast_u32();
-                    let sample = var!(
-                        PssSample,
-                        render_state.samples.var().read(i * dim as u32 + j)
-                    );
-                    if_!(sample.last_modified().lt(*state.last_large_iter()), {
-                        sample.set_cur(sampler.next_1d());
-                    });
-                    *sample.last_modified().get_mut() = const_(0u32);
+                for_range(0u32.expr()..(dim as u32).expr(), |j| {
+                    let sample = render_state.samples.var().read(i * dim as u32 + j).var();
+                    if sample.last_modified.lt(state.last_large_iter) {
+                        *sample.cur = sampler.next_1d();
+                    };
+                    *sample.last_modified = 0u32;
                 });
-                *state.cur_iter().get_mut() -= *state.last_large_iter();
-                *state.last_large_iter().get_mut() = const_(0u32);
-            });
+                *state.cur_iter -= state.last_large_iter;
+                *state.last_large_iter = 0u32;
+            };
             self.mutate_chain(
                 scene,
                 eval,
@@ -531,7 +520,7 @@ impl McmcOpt {
 
         render_state
             .cur_colors
-            .write(i, cur_color_v.load(), *cur_swl_v);
+            .write(i, cur_color_v.load(), **cur_swl_v);
         render_state.rng_states.var().write(i, sampler.state.load());
         markov_states.write(i, state.load());
     }
@@ -551,18 +540,12 @@ impl McmcOpt {
             &|mutations_per_chain: Expr<u32>, contribution: Expr<f32>| {
                 if is_cpu_backend() {
                     let num_threads = std::thread::available_parallelism().unwrap().get();
-                    if self.n_chains > 10000 {
-                        log::warn!("Number of chains is too large, this may cause performance issues on CPU backend");
-                    }
                     if self.n_chains <= num_threads * 20 {
                         set_block_size([1, 1, 1]);
                     } else {
-                        set_block_size([256, 1, 1]);
+                        set_block_size([(num_threads / 20).clamp(1, 256) as u32, 1, 1]);
                     }
                 } else {
-                    if self.n_chains <= 10000 {
-                        log::warn!("Number of chains is too small, this may cause performance issues on GPU backend");
-                    }
                     set_block_size([256, 1, 1]);
                 }
                 self.advance_chain(scene, eval, state, film, mutations_per_chain, contribution)

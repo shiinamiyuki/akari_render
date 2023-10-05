@@ -23,6 +23,7 @@ pub struct Scene {
     pub camera: Arc<dyn Camera>,
     pub device: Device,
     pub use_rq: bool,
+    pub printer: Printer,
     // pub env_map: Buffer<TagIndex>,
 }
 pub struct Evaluators {

@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Instant};
+use std::{marker::PhantomData, sync::Arc, time::Instant};
 
 use luisa::rtx::offset_ray_origin;
 use rand::Rng;
@@ -36,8 +36,6 @@ pub struct PathTracerBase<'a> {
 #[derive(Aggregate)]
 pub struct DirectLighting {
     pub irradiance: Color,
-    pub bsdf_f: Color,
-    pub weight: Expr<f32>,
     pub wi: Expr<Float3>,
     pub pdf: Expr<f32>,
     pub shadow_ray: Expr<Ray>,
@@ -49,10 +47,8 @@ impl DirectLighting {
             irradiance: Color::zero(color_pipeline.color_repr),
             wi: Expr::<Float3>::zeroed(),
             pdf: 0.0f32.expr(),
-            weight: 0.0f32.expr(),
             shadow_ray: Expr::<Ray>::zeroed(),
             valid: false.expr(),
-            bsdf_f: Color::zero(color_pipeline.color_repr),
         }
     }
 }
@@ -140,26 +136,17 @@ impl<'a> PathTracerBase<'a> {
                     let sample = eval.light.sample(pn, u, **self.swl);
                     if sample.valid {
                         let wi = sample.wi;
-                        let surface = **self.instance.surface;
-                        let wo = **self.wo;
-                        // cpu_dbg!(wi);
-                        let (bsdf_f, bsdf_pdf) = eval
-                            .surface
-                            .evaluate_color_and_pdf(surface, **self.si, wo, wi, **self.swl);
-                        lc_assert!(bsdf_pdf.ge(0.0));
-                        lc_assert!(bsdf_f.min().ge(0.0));
-                        let w = mis_weight(sample.pdf, bsdf_pdf, 1);
+                        // let surface = **self.instance.surface;
+                        // let wo = **self.wo;
                         let shadow_ray = sample.shadow_ray.var();
                         *shadow_ray.exclude0 = Uint2::expr(**self.si.inst_id, **self.si.prim_id);
                         // cpu_dbg!(**shadow_ray);
                         DirectLighting {
-                            weight: w,
                             irradiance: sample.li,
                             wi,
                             pdf: sample.pdf,
                             shadow_ray: shadow_ray.load(),
                             valid: true.expr(),
-                            bsdf_f,
                         }
                     } else {
                         DirectLighting::invalid(self.color_pipeline)
@@ -237,17 +224,40 @@ impl<'a> PathTracerBase<'a> {
             *self.depth += 1;
 
             let direct_lighting = self.sample_light(sampler.next_3d());
+            let di_occluded = true.var();
             if direct_lighting.valid {
                 let shadow_ray = direct_lighting.shadow_ray;
-                if !self.scene.occlude(shadow_ray) {
-                    let direct = direct_lighting.irradiance
-                        * direct_lighting.bsdf_f
-                        * direct_lighting.weight
-                        / direct_lighting.pdf;
-                    self.add_radiance(direct);
-                }
+                *di_occluded = self.scene.occlude(shadow_ray);
             }
-            let bsdf_sample = self.sample_surface(sampler.next_3d());
+            let bsdf_sample = {
+                let svm = &self.scene.svm;
+                let u_bsdf = sampler.next_3d();
+                svm.dispatch_surface(
+                    **self.instance.surface,
+                    self.color_pipeline,
+                    **self.si,
+                    **self.swl,
+                    |closure| {
+                        let ctx = BsdfEvalContext {
+                            color_repr: self.color_pipeline.color_repr,
+                            _marker: PhantomData,
+                            ad_mode: ADMode::None,
+                        };
+                        if direct_lighting.valid & !di_occluded {
+                            let f =
+                                closure.evaluate(**self.wo, direct_lighting.wi, **self.swl, &ctx);
+                            let pdf = closure.pdf(**self.wo, direct_lighting.wi, **self.swl, &ctx);
+                            let w = mis_weight(direct_lighting.pdf, pdf, 1);
+                            self.add_radiance(
+                                direct_lighting.irradiance * f * w / direct_lighting.pdf,
+                            );
+                        };
+                        let sample =
+                            closure.sample(**self.wo, u_bsdf.x, u_bsdf.yz(), self.swl, &ctx);
+                        sample
+                    },
+                )
+            };
             let f = &bsdf_sample.color;
             lc_assert!(f.min().ge(0.0));
             if bsdf_sample.pdf <= 0.0 || !bsdf_sample.valid {

@@ -363,6 +363,7 @@ impl SceneLoader {
             light_ids_to_lights: device.create_buffer_from_slice(&light_ids_to_lights),
             meshes: mesh_aggregate.clone(),
         };
+        let printer = Printer::new(&device, 1024 * 1024 * 64);
         Scene {
             svm,
             lights: light_aggregate,
@@ -370,7 +371,7 @@ impl SceneLoader {
             camera: camera.unwrap(),
             device,
             use_rq: false,
-            // env_map: todo!(),
+            printer, // env_map: todo!(),
         }
     }
     fn preload(device: Device, graph: node::Scene) -> Self {

@@ -11,7 +11,7 @@ fn main() {
         .arg(arg!(-s --scene <SCENE> "Scene file to render"))
         .arg(arg!(-m --method <METHOD> "Render method config file"))
         .arg(
-            arg!(-d --device <DEVICE> "Compute device. One of: cpu, cuda, metal. Default: cpu"),
+            arg!(-d --device <DEVICE> "Compute device. One of: cpu, cuda, dx, metal. Default: cpu"),
         )
         .arg(
             Arg::new("verbose")
@@ -48,16 +48,10 @@ fn main() {
         println!("{}", help);
         exit(1);
     }
-    // no dx
-    let supported_devices = ["cpu", "cuda", "metal"];
     let device = matches
         .get_one::<String>("device")
         .cloned()
         .unwrap_or("cpu".to_string());
-    if !supported_devices.contains(&device.as_str()) {
-        println!("{}", help);
-        exit(1);
-    }
     let verbose = matches.get_one::<bool>("verbose").copied();
     if let Some(true) = verbose {
         luisa::init_logger_verbose();

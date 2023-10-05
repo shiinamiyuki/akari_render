@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 
-use rand::Rng;
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 
 use crate::*;
 
@@ -12,7 +13,7 @@ pub struct AliasTableEntry {
     pub t: f32,
 }
 
-pub struct AliasTable(pub Buffer<AliasTableEntry>, pub Buffer<f32>);
+pub struct AliasTable(pub Buffer<AliasTableEntry>, pub Buffer<f32>, Buffer<u32>);
 pub struct BindlessAliasTableVar(
     pub BindlessBufferVar<AliasTableEntry>,
     pub BindlessBufferVar<f32>,
@@ -72,6 +73,7 @@ impl AliasTable {
         Self(
             device.create_buffer_from_slice(&table),
             device.create_buffer_from_fn(prob.len(), |i| weights[i] / sum),
+            device.create_buffer_from_slice(&[table.len() as u32]),
         )
     }
     pub fn pdf(&self, i: Expr<u32>) -> Expr<f32> {
@@ -86,7 +88,7 @@ impl AliasTable {
         // (idx, pdf)
         // lc_assert!((self.0.len() as u32).expr().eq(self.0.var().len_expr().as_u32()));
         // let (idx, u) = uniform_discrete_choice_and_remap((self.0.len() as u32).expr(), u);
-        let (idx, u) = uniform_discrete_choice_and_remap(self.0.var().len_expr().as_u32(), u);
+        let (idx, u) = uniform_discrete_choice_and_remap(self.2.read(0), u);
         let entry = self.0.var().read(idx);
         let (idx, u) = weighted_discrete_choice2_and_remap(entry.t, idx, entry.j, u);
         let pdf = self.1.var().read(idx);
@@ -108,7 +110,7 @@ pub fn resample_with_f64(weights: &[f32], count: usize) -> (f64, Vec<u32>) {
         }
     }
 
-    let mut rng = rand::thread_rng();
+    let mut rng = StdRng::seed_from_u64(0);
 
     let resampled = (0..count)
         .map(|_| {

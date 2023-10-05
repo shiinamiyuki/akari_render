@@ -113,7 +113,8 @@ impl Light for AreaLightExpr {
             let dist2 = wi.length_squared();
             let wi = wi / dist2.sqrt();
             let li = select(wi.dot(n).lt(0.0), emission, Color::zero(ctx.color_repr()));
-            let pdf = pdf / area * dist2 / n.dot(-wi).max_(1e-6);
+            let cos_theta_i = n.dot(wi).abs();
+            let pdf = pdf / area * dist2 / cos_theta_i;
             let ro = rtx::offset_ray_origin(pn.p, face_forward(pn.n, wi));
             let dist = (p - ro).length();
             let shadow_ray = Ray::new_expr(
@@ -131,7 +132,7 @@ impl Light for AreaLightExpr {
                 shadow_ray,
                 wi,
                 n,
-                valid: true.expr(),
+                valid: pdf.is_finite(),
             }
         }
     }
