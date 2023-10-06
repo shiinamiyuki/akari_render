@@ -1,18 +1,27 @@
-use std::{marker::PhantomData, sync::Arc, time::Instant};
+use std::{f32::consts::FRAC_1_PI, marker::PhantomData, rc::Rc, sync::Arc, time::Instant};
 
 use luisa::rtx::offset_ray_origin;
 use rand::Rng;
 
 use super::{Integrator, RenderSession};
 use crate::{
-    color::*, film::*, geometry::*, interaction::SurfaceInteraction, loop_, mesh::MeshInstance,
-    sampler::*, scene::*, svm::surface::*, *,
+    color::*,
+    film::*,
+    geometry::*,
+    interaction::SurfaceInteraction,
+    loop_,
+    mesh::MeshInstance,
+    sampler::*,
+    scene::*,
+    svm::surface::{diffuse::DiffuseBsdf, *},
+    *,
 };
 use serde::{Deserialize, Serialize};
 
 pub struct PathTracerBase<'a> {
     pub max_depth: Expr<u32>,
     pub use_nee: bool,
+    pub force_diffuse: bool,
     pub rr_depth: Expr<u32>,
     pub indirect_only: bool,
     pub radiance: ColorVar,
@@ -84,6 +93,7 @@ impl<'a> PathTracerBase<'a> {
             wo: Var::<Float3>::zeroed(),
             ns: Var::<Float3>::zeroed(),
             ng: Var::<Float3>::zeroed(),
+            force_diffuse: false,
         }
     }
     pub fn add_radiance(&self, r: Color) {
@@ -117,12 +127,31 @@ impl<'a> PathTracerBase<'a> {
     }
     #[tracked]
     pub fn sample_surface(&self, u_bsdf: Expr<Float3>) -> BsdfSample {
-        let surface = **self.instance.surface;
-        let sample = self
-            .eval
-            .surface
-            .sample(surface, **self.si, **self.wo, u_bsdf, self.swl);
-        sample
+        if self.force_diffuse {
+            let diffuse = Rc::new(DiffuseBsdf {
+                reflectance: Color::one(self.color_pipeline.color_repr)
+                    * FRAC_1_PI.expr()
+                    * 0.8f32.expr(),
+            });
+            let ctx = BsdfEvalContext {
+                color_repr: self.color_pipeline.color_repr,
+                _marker: PhantomData,
+                ad_mode: ADMode::None,
+            };
+            let diffuse = SurfaceClosure {
+                inner: diffuse,
+                frame: **self.si.frame,
+            };
+            let sample = diffuse.sample(**self.wo, u_bsdf.x, u_bsdf.yz(), self.swl, &ctx);
+            sample
+        } else {
+            let surface = **self.instance.surface;
+            let sample = self
+                .eval
+                .surface
+                .sample(surface, **self.si, **self.wo, u_bsdf, self.swl);
+            sample
+        }
     }
 
     pub fn sample_light(&self, u: Expr<Float3>) -> DirectLighting {
@@ -230,33 +259,59 @@ impl<'a> PathTracerBase<'a> {
                 *di_occluded = self.scene.occlude(shadow_ray);
             }
             let bsdf_sample = {
-                let svm = &self.scene.svm;
-                let u_bsdf = sampler.next_3d();
-                svm.dispatch_surface(
-                    **self.instance.surface,
-                    self.color_pipeline,
-                    **self.si,
-                    **self.swl,
-                    |closure| {
-                        let ctx = BsdfEvalContext {
-                            color_repr: self.color_pipeline.color_repr,
-                            _marker: PhantomData,
-                            ad_mode: ADMode::None,
-                        };
-                        if direct_lighting.valid & !di_occluded {
-                            let f =
-                                closure.evaluate(**self.wo, direct_lighting.wi, **self.swl, &ctx);
-                            let pdf = closure.pdf(**self.wo, direct_lighting.wi, **self.swl, &ctx);
-                            let w = mis_weight(direct_lighting.pdf, pdf, 1);
-                            self.add_radiance(
-                                direct_lighting.irradiance * f * w / direct_lighting.pdf,
-                            );
-                        };
-                        let sample =
-                            closure.sample(**self.wo, u_bsdf.x, u_bsdf.yz(), self.swl, &ctx);
-                        sample
-                    },
-                )
+                let ctx = BsdfEvalContext {
+                    color_repr: self.color_pipeline.color_repr,
+                    _marker: PhantomData,
+                    ad_mode: ADMode::None,
+                };
+                if self.force_diffuse {
+                    let u_bsdf = sampler.next_3d();
+                    let diffuse = Rc::new(DiffuseBsdf {
+                        reflectance: Color::one(self.color_pipeline.color_repr)
+                            * FRAC_1_PI.expr()
+                            * 0.8f32.expr(),
+                    });
+                    let closure = SurfaceClosure {
+                        inner: diffuse,
+                        frame: **self.si.frame,
+                    };
+                    if direct_lighting.valid & !di_occluded {
+                        let f = closure.evaluate(**self.wo, direct_lighting.wi, **self.swl, &ctx);
+                        let pdf = closure.pdf(**self.wo, direct_lighting.wi, **self.swl, &ctx);
+                        let w = mis_weight(direct_lighting.pdf, pdf, 1);
+                        self.add_radiance(direct_lighting.irradiance * f * w / direct_lighting.pdf);
+                    };
+                    let sample = closure.sample(**self.wo, u_bsdf.x, u_bsdf.yz(), self.swl, &ctx);
+                    sample
+                } else {
+                    let svm = &self.scene.svm;
+                    let u_bsdf = sampler.next_3d();
+                    svm.dispatch_surface(
+                        **self.instance.surface,
+                        self.color_pipeline,
+                        **self.si,
+                        **self.swl,
+                        |closure| {
+                            if direct_lighting.valid & !di_occluded {
+                                let f = closure.evaluate(
+                                    **self.wo,
+                                    direct_lighting.wi,
+                                    **self.swl,
+                                    &ctx,
+                                );
+                                let pdf =
+                                    closure.pdf(**self.wo, direct_lighting.wi, **self.swl, &ctx);
+                                let w = mis_weight(direct_lighting.pdf, pdf, 1);
+                                self.add_radiance(
+                                    direct_lighting.irradiance * f * w / direct_lighting.pdf,
+                                );
+                            };
+                            let sample =
+                                closure.sample(**self.wo, u_bsdf.x, u_bsdf.yz(), self.swl, &ctx);
+                            sample
+                        },
+                    )
+                }
             };
             let f = &bsdf_sample.color;
             lc_assert!(f.min().ge(0.0));
@@ -299,6 +354,7 @@ pub struct PathTracer {
     pub rr_depth: u32,
     pub indirect_only: bool,
     pub pixel_offset: Int2,
+    pub force_diffuse: bool,
     config: Config,
 }
 
@@ -311,6 +367,7 @@ pub struct Config {
     pub use_nee: bool,
     pub rr_depth: u32,
     pub indirect_only: bool,
+    pub force_diffuse: bool,
     pub pixel_offset: [i32; 2],
 }
 impl Default for Config {
@@ -322,6 +379,7 @@ impl Default for Config {
             spp_per_pass: 64,
             use_nee: true,
             indirect_only: false,
+            force_diffuse: false,
             pixel_offset: [0, 0],
         }
     }
@@ -336,6 +394,7 @@ impl PathTracer {
             use_nee: config.use_nee,
             rr_depth: config.rr_depth,
             indirect_only: config.indirect_only,
+            force_diffuse: config.force_diffuse,
             pixel_offset: Int2::new(config.pixel_offset[0], config.pixel_offset[1]),
             config,
         }
@@ -408,7 +467,7 @@ impl PathTracer {
         swl: Var<SampledWavelengths>,
         sampler: &dyn Sampler,
     ) -> Color {
-        let pt = PathTracerBase::new(
+        let mut pt = PathTracerBase::new(
             scene,
             eval,
             self.max_depth.expr(),
@@ -417,6 +476,7 @@ impl PathTracer {
             self.indirect_only,
             swl,
         );
+        pt.force_diffuse = self.force_diffuse;
         pt.run_megakernel(ray, sampler);
         pt.radiance.load()
     }
