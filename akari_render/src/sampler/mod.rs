@@ -226,7 +226,11 @@ impl<'a> IndependentReplaySampler<'a> {
 impl<'a> Sampler for IndependentReplaySampler<'a> {
     #[tracked]
     fn next_1d(&self) -> Expr<f32> {
-        if self.cur_dim.load().lt(self.sample.values.len_expr().cast_u32()) {
+        if self
+            .cur_dim
+            .load()
+            .lt(self.sample.values.len_expr().cast_u32())
+        {
             let ret = self.sample.values.read(self.cur_dim.load());
             *self.cur_dim += 1;
             ret
@@ -319,7 +323,9 @@ pub fn pmj02bn_sample(
     mut sample_index: Expr<u32>,
 ) -> Expr<Float2> {
     set_index = set_index % pmj02bn::N_PMJ02BN_SETS as u32;
-    lc_assert!(sample_index.lt(pmj02bn::N_PMJ02BN_SAMPLES as u32));
+    if debug_mode() {
+        lc_assert!(sample_index.lt(pmj02bn::N_PMJ02BN_SAMPLES as u32));
+    }
     sample_index = sample_index % pmj02bn::N_PMJ02BN_SAMPLES as u32;
     let i = pmj02bn::N_PMJ02BN_SAMPLES as u32 * set_index + sample_index;
     Float2::expr(
@@ -597,8 +603,10 @@ impl Sampler for Pmj02BnSampler {
             *self.state.sample_index = 0;
         } else {
             *self.state.sample_index += 1;
-        }
-        lc_assert!(self.state.sample_index.lt(self.state.spp));
+        };
+        if debug_mode() {
+            lc_assert!(self.state.sample_index.lt(self.state.spp));
+        };
     }
     fn clone_box(&self) -> Box<dyn Sampler> {
         Box::new(Self {

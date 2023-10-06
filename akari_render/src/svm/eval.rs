@@ -99,14 +99,16 @@ impl<'a> SvmEvaluator<'a> {
             }
             svm::SvmNode::RgbImageTex(img_tex) => {
                 let tex_idx = self.get_node_expr::<SvmRgbImageTex>(idx as u32).tex_idx;
-               
+
                 let textures = &self.svm.image_textures.var();
                 let texture = textures.tex2d(tex_idx);
                 let uv = self.si().geometry.uv;
                 let rgb = texture.sample(uv).xyz();
                 let colorspace = ColorSpaceId::to_colorspace(img_tex.colorspace);
                 let rgb = rgb_gamma_correction(rgb, colorspace);
-                lc_assert!(rgb.reduce_min().ge(0.0));
+                if debug_mode() {
+                    lc_assert!(rgb.reduce_min().ge(0.0));
+                }
                 Box::new(rgb)
             }
             svm::SvmNode::SpectralUplift(uplift) => {

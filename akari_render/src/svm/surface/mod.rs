@@ -424,8 +424,10 @@ impl Surface for SurfaceClosure {
         swl: Expr<SampledWavelengths>,
         ctx: &BsdfEvalContext,
     ) -> Color {
-        lc_assert!(wo.is_finite().all());
-        lc_assert!(wi.is_finite().all());
+        if debug_mode() {
+            lc_assert!(wo.is_finite().all());
+            lc_assert!(wi.is_finite().all());
+        }
         self.inner
             .evaluate(self.frame.to_local(wo), self.frame.to_local(wi), swl, ctx)
     }

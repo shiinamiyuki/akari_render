@@ -149,7 +149,9 @@ impl Light for AreaLightExpr {
         let at_entries = area_samplers.buffer::<AliasTableEntry>(self.area_sampling_index);
         let at_pdf = area_samplers.buffer::<f32>(self.area_sampling_index + 1);
         let at = BindlessAliasTableVar(at_entries, at_pdf);
-        lc_assert!(si.inst_id.eq(self.instance_id));
+        if debug_mode() {
+            lc_assert!(si.inst_id.eq(self.instance_id));
+        }
         let shading_triangle = meshes.shading_triangle(si.inst_id, si.prim_id);
         let area = shading_triangle.area();
         let prim_pdf = at.pdf(prim_id);

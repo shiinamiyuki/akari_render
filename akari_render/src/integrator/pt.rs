@@ -314,7 +314,9 @@ impl<'a> PathTracerBase<'a> {
                 }
             };
             let f = &bsdf_sample.color;
-            lc_assert!(f.min().ge(0.0));
+            if debug_mode() {
+                lc_assert!(f.min().ge(0.0));
+            };
             if bsdf_sample.pdf <= 0.0 || !bsdf_sample.valid {
                 break;
             }

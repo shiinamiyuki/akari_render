@@ -243,7 +243,6 @@ impl MicrofacetDistribution for TrowbridgeReitzDistribution {
         } else {
             track!(self.d(wh, ad_mode) * Frame::abs_cos_theta(wh))
         };
-        // lc_assert!(pdf.is_finite());
         pdf
     }
     #[tracked]

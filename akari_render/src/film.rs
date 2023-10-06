@@ -147,7 +147,9 @@ impl Film {
         let resolution = self.resolution.expr();
         let ip = p.floor().cast_i32();
         let oob = ip.lt(0).any() | ip.ge(resolution.cast_i32()).any();
-        lc_assert!(!oob);
+        if debug_mode() {
+            lc_assert!(!oob);
+        }
         let ip = ip.cast_u32();
         ip.x + ip.y * resolution.x
     }
