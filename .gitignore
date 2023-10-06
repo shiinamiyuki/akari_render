@@ -22,5 +22,3 @@ crates/lib/akari_core/src/pbrt-v4-rgb2spec-opt/rgbspectrum_*
 Cargo.lock
 akari_data/src/rgb8.rs
 akari_render/src/pbrt-v4-rgb2spec-opt/build
-akari_render/src/nodes.rs
-akari_render/src/nodes.json

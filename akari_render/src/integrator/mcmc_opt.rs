@@ -428,9 +428,13 @@ impl McmcOpt {
                 let cur_p = **state.cur_pixel;
                 let cur_color = cur_color_v.load();
                 let accept = select(
-                    cur_f.eq(0.0),
-                    1.0f32.expr(),
-                    (proposal_f / cur_f).clamp(0.0f32.expr(), 1.0f32.expr()),
+                    proposal_f.is_finite(),
+                    select(
+                        cur_f.eq(0.0) | !cur_f.is_finite(),
+                        1.0f32.expr(),
+                        (proposal_f / cur_f).clamp(0.0f32.expr(), 1.0f32.expr()),
+                    ),
+                    0.0f32.expr(),
                 );
                 film.add_splat(
                     proposal_p.cast_f32(),
