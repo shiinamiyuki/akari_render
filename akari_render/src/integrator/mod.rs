@@ -54,13 +54,16 @@ pub trait Integrator {
 // pub mod gpt;
 pub mod mcmc;
 pub mod mcmc_opt;
+pub mod wfpt;
 // pub mod mcmc_s;
-// pub mod normal;
+pub mod normal;
 pub mod pt;
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum Method {
+    #[serde(rename = "normal")]
+    NormalVis(normal::Config),
     #[serde(rename = "pt")]
     PathTracer(pt::Config),
     // #[serde(rename = "gpt")]
@@ -175,7 +178,15 @@ pub fn render(device: Device, scene: Arc<Scene>, task: &RenderTask, options: Ren
                 &c,
                 &options,
             ),
-            _ => todo!(),
+            Method::NormalVis(c) => normal::render(
+                device.clone(),
+                scene.clone(),
+                config.sampler,
+                config.color,
+                &mut film,
+                &c,
+                &options,
+            ),
         }
         let toc = std::time::Instant::now();
         log::info!("Completed in {:.1}ms", (toc - tic).as_secs_f64() * 1e3);

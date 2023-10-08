@@ -176,18 +176,26 @@ impl MeshAggregate {
         let accel = device.create_accel(AccelOption::default());
         let mut at_cnt = 0;
         let mut mesh_id_to_area_samplers = HashMap::new();
+        let mut require_update_normals = false;
+        let mut require_update_tangents = false;
+        let mut require_update_uvs = false;
+        let mut require_update_samplers = false;
         for (i, mesh) in meshes.iter().enumerate() {
-            mesh_vertices.emplace_buffer(i, &mesh.vertices);
-            mesh_indices.emplace_buffer(i, &mesh.indices);
+            mesh_vertices.emplace_buffer_async(i, &mesh.vertices);
+            mesh_indices.emplace_buffer_async(i, &mesh.indices);
             if mesh.has_normals {
-                mesh_normals.emplace_buffer(i, mesh.normals.as_ref().unwrap());
+                mesh_normals.emplace_buffer_async(i, mesh.normals.as_ref().unwrap());
+                require_update_normals = true;
             }
             if mesh.has_tangents {
-                mesh_tangents.emplace_buffer(i, mesh.tangents.as_ref().unwrap());
-                mesh_bitangent_signs.emplace_buffer(i, mesh.bitangent_signs.as_ref().unwrap());
+                mesh_tangents.emplace_buffer_async(i, mesh.tangents.as_ref().unwrap());
+                mesh_bitangent_signs
+                    .emplace_buffer_async(i, mesh.bitangent_signs.as_ref().unwrap());
+                require_update_tangents = true;
             }
             if mesh.has_uvs {
-                mesh_uvs.emplace_buffer(i, mesh.uvs.as_ref().unwrap());
+                mesh_uvs.emplace_buffer_async(i, mesh.uvs.as_ref().unwrap());
+                require_update_uvs = true;
             }
             let accel_mesh = device.create_mesh(
                 mesh.vertices.view(..),
@@ -197,11 +205,27 @@ impl MeshAggregate {
             accel_mesh.build(AccelBuildRequest::ForceBuild);
             accel_meshes.push(accel_mesh);
             if let Some(at) = &mesh.area_sampler {
-                mesh_area_samplers.emplace_buffer(at_cnt, &at.0);
-                mesh_area_samplers.emplace_buffer(at_cnt + 1, &at.1);
+                mesh_area_samplers.emplace_buffer_async(at_cnt, &at.0);
+                mesh_area_samplers.emplace_buffer_async(at_cnt + 1, &at.1);
                 mesh_id_to_area_samplers.insert(i as u32, at_cnt as u32);
                 at_cnt += 2;
+                require_update_samplers = true;
             }
+        }
+        mesh_vertices.update();
+        mesh_indices.update();
+        if require_update_normals {
+            mesh_normals.update();
+        }
+        if require_update_tangents {
+            mesh_tangents.update();
+            mesh_bitangent_signs.update();
+        }
+        if require_update_uvs {
+            mesh_uvs.update();
+        }
+        if require_update_samplers {
+            mesh_area_samplers.update();
         }
         for i in 0..instances.len() {
             let inst = &instances[i];
@@ -285,7 +309,7 @@ impl MeshAggregate {
             let t0 = transform.transform_vector(Expr::<Float3>::from(tangents.read(prim_id3 + 0)));
             let t1 = transform.transform_vector(Expr::<Float3>::from(tangents.read(prim_id3 + 1)));
             let t2 = transform.transform_vector(Expr::<Float3>::from(tangents.read(prim_id3 + 2)));
-          
+
             // let get_sign = |i: u32| {
             //     let j = prim_id3 + i;
             //     let sign = bitangent_signs.read(j / 32);

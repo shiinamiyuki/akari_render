@@ -302,6 +302,11 @@ pub struct ShaderCollection {
     pub(crate) shaders: HashMap<u32, CompiledShader>, // kind -> shader
     pub(crate) shader_data: ByteBuffer,
 }
+impl ShaderCollection {
+    pub fn variant_count(&self) -> usize {
+        self.shaders.len()
+    }
+}
 pub struct Svm {
     pub(crate) device: Device,
     pub(crate) surface_shaders: ShaderCollection,

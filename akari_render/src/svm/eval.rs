@@ -102,7 +102,7 @@ impl<'a> SvmEvaluator<'a> {
 
                 let textures = &self.svm.image_textures.var();
                 let texture = textures.tex2d(tex_idx);
-                let uv = self.si().geometry.uv;
+                let uv = self.si().uv;
                 let rgb = texture.sample(uv).xyz();
                 let colorspace = ColorSpaceId::to_colorspace(img_tex.colorspace);
                 let rgb = rgb_gamma_correction(rgb, colorspace);

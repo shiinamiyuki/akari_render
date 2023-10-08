@@ -8,7 +8,7 @@ pub struct PointNormal {
     pub p: Float3,
     pub n: Float3,
 }
-#[derive(Clone, Copy, Debug, Value)]
+#[derive(Clone, Copy, Debug, Soa, Value)]
 #[repr(C)]
 #[value_new(pub)]
 pub struct Ray {
@@ -119,7 +119,7 @@ impl ShadingTriangle {
     }
 }
 
-#[derive(Clone, Copy, Debug, Value)]
+#[derive(Clone, Copy, Debug, Soa, Value)]
 #[repr(C)]
 #[value_new(pub)]
 pub struct Frame {

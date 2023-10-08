@@ -106,10 +106,9 @@ impl<'a> PathTracerBase<'a> {
     #[tracked]
     pub fn set_si(&self, si: Expr<SurfaceInteraction>, wo: Expr<Float3>) {
         self.si.store(si);
-        let g = si.geometry;
-        *self.p = g.p;
-        *self.ns = g.ns;
-        *self.ng = g.ng;
+        *self.p = si.p;
+        *self.ns = si.ns();
+        *self.ng = si.ng;
         *self.wo = wo;
         let inst_id = si.inst_id;
         let instance = self.scene.meshes.mesh_instances.var().read(inst_id);
@@ -231,6 +230,56 @@ impl<'a> PathTracerBase<'a> {
         }
     }
     #[tracked]
+    pub fn sample_surface_and_shade_direct(
+        &self,
+        direct_lighting: DirectLighting,
+        di_occluded: Expr<bool>,
+        u_bsdf: Expr<Float3>,
+    ) -> BsdfSample {
+        let ctx = BsdfEvalContext {
+            color_repr: self.color_pipeline.color_repr,
+            _marker: PhantomData,
+            ad_mode: ADMode::None,
+        };
+        if self.force_diffuse {
+            let diffuse = Rc::new(DiffuseBsdf {
+                reflectance: Color::one(self.color_pipeline.color_repr)
+                    * FRAC_1_PI.expr()
+                    * 0.8f32.expr(),
+            });
+            let closure = SurfaceClosure {
+                inner: diffuse,
+                frame: **self.si.frame,
+            };
+            if direct_lighting.valid & !di_occluded {
+                let f = closure.evaluate(**self.wo, direct_lighting.wi, **self.swl, &ctx);
+                let pdf = closure.pdf(**self.wo, direct_lighting.wi, **self.swl, &ctx);
+                let w = mis_weight(direct_lighting.pdf, pdf, 1);
+                self.add_radiance(direct_lighting.irradiance * f * w / direct_lighting.pdf);
+            };
+            let sample = closure.sample(**self.wo, u_bsdf.x, u_bsdf.yz(), self.swl, &ctx);
+            sample
+        } else {
+            let svm = &self.scene.svm;
+            svm.dispatch_surface(
+                **self.instance.surface,
+                self.color_pipeline,
+                **self.si,
+                **self.swl,
+                |closure| {
+                    if direct_lighting.valid & !di_occluded {
+                        let f = closure.evaluate(**self.wo, direct_lighting.wi, **self.swl, &ctx);
+                        let pdf = closure.pdf(**self.wo, direct_lighting.wi, **self.swl, &ctx);
+                        let w = mis_weight(direct_lighting.pdf, pdf, 1);
+                        self.add_radiance(direct_lighting.irradiance * f * w / direct_lighting.pdf);
+                    };
+                    let sample = closure.sample(**self.wo, u_bsdf.x, u_bsdf.yz(), self.swl, &ctx);
+                    sample
+                },
+            )
+        }
+    }
+    #[tracked]
     pub fn run_megakernel(&self, ray: Expr<Ray>, sampler: &dyn Sampler) {
         let ray = ray.var();
 
@@ -258,61 +307,11 @@ impl<'a> PathTracerBase<'a> {
                 let shadow_ray = direct_lighting.shadow_ray;
                 *di_occluded = self.scene.occlude(shadow_ray);
             }
-            let bsdf_sample = {
-                let ctx = BsdfEvalContext {
-                    color_repr: self.color_pipeline.color_repr,
-                    _marker: PhantomData,
-                    ad_mode: ADMode::None,
-                };
-                if self.force_diffuse {
-                    let u_bsdf = sampler.next_3d();
-                    let diffuse = Rc::new(DiffuseBsdf {
-                        reflectance: Color::one(self.color_pipeline.color_repr)
-                            * FRAC_1_PI.expr()
-                            * 0.8f32.expr(),
-                    });
-                    let closure = SurfaceClosure {
-                        inner: diffuse,
-                        frame: **self.si.frame,
-                    };
-                    if direct_lighting.valid & !di_occluded {
-                        let f = closure.evaluate(**self.wo, direct_lighting.wi, **self.swl, &ctx);
-                        let pdf = closure.pdf(**self.wo, direct_lighting.wi, **self.swl, &ctx);
-                        let w = mis_weight(direct_lighting.pdf, pdf, 1);
-                        self.add_radiance(direct_lighting.irradiance * f * w / direct_lighting.pdf);
-                    };
-                    let sample = closure.sample(**self.wo, u_bsdf.x, u_bsdf.yz(), self.swl, &ctx);
-                    sample
-                } else {
-                    let svm = &self.scene.svm;
-                    let u_bsdf = sampler.next_3d();
-                    svm.dispatch_surface(
-                        **self.instance.surface,
-                        self.color_pipeline,
-                        **self.si,
-                        **self.swl,
-                        |closure| {
-                            if direct_lighting.valid & !di_occluded {
-                                let f = closure.evaluate(
-                                    **self.wo,
-                                    direct_lighting.wi,
-                                    **self.swl,
-                                    &ctx,
-                                );
-                                let pdf =
-                                    closure.pdf(**self.wo, direct_lighting.wi, **self.swl, &ctx);
-                                let w = mis_weight(direct_lighting.pdf, pdf, 1);
-                                self.add_radiance(
-                                    direct_lighting.irradiance * f * w / direct_lighting.pdf,
-                                );
-                            };
-                            let sample =
-                                closure.sample(**self.wo, u_bsdf.x, u_bsdf.yz(), self.swl, &ctx);
-                            sample
-                        },
-                    )
-                }
-            };
+            let bsdf_sample = self.sample_surface_and_shade_direct(
+                direct_lighting,
+                **di_occluded,
+                sampler.next_3d(),
+            );
             let f = &bsdf_sample.color;
             if debug_mode() {
                 lc_assert!(f.min().ge(0.0));
@@ -506,6 +505,7 @@ impl Integrator for PathTracer {
         let kernel =
             self.device.create_kernel::<fn(u32, Int2)>(&track!(
                 |spp_per_pass: Expr<u32>, pixel_offset: Expr<Int2>| {
+                    set_block_size([16, 16, 1]);
                     let p = dispatch_id().xy();
                     let sampler = sampler_creator.create(p);
                     let sampler = sampler.as_ref();

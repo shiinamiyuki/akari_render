@@ -259,15 +259,16 @@ impl Scene {
         let p = shading_triangle.p(bary);
         let uv = shading_triangle.uv(bary);
         let frame = shading_triangle.ortho_frame(bary);
-        let geometry = SurfaceLocalGeometry::from_comps_expr(SurfaceLocalGeometryComps {
-            p,
+        SurfaceInteraction::from_comps_expr(SurfaceInteractionComps {
+            inst_id,
+            prim_id,
+            bary,
             ng: shading_triangle.ng,
-            ns: frame.n,
+            p,
             uv,
-            tangent: frame.t,
-            bitangent: frame.s,
-        });
-        SurfaceInteraction::new_expr(inst_id, prim_id, bary, geometry, frame, true.expr())
+            frame,
+            valid: true.expr(),
+        })
     }
     #[tracked]
     pub fn intersect(&self, ray: Expr<Ray>) -> Expr<SurfaceInteraction> {

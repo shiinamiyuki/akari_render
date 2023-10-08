@@ -343,15 +343,13 @@ impl SceneLoader {
             camera,
             ..
         } = self;
-        log::info!(
-            "Shader variant count: {}",
-            surface_shader_compiler.variant_count()
-        );
+
         let svm = Arc::new(Svm {
             device: device.clone(),
             surface_shaders: surface_shader_compiler.upload(&device),
             image_textures: texture_heap,
         });
+        log::info!("Shader variant count: {}", svm.surface_shaders.variant_count());
         let lights = lights.build();
         let light_distribution = Box::new(WeightedLightDistribution::new(
             device.clone(),

@@ -12,10 +12,11 @@ use crate::sampler::mcmc::{
 };
 use crate::sampling::sample_gaussian;
 use crate::util::distribution::resample_with_f64;
-use crate::{color::*, film::*, sampler::*, scene::*, util::distribution::AliasTable, *};
+use crate::{color::*, film::*, sampler::*, scene::*, *};
 
 use super::mcmc::{Config, Method};
-#[derive(Clone, Copy, Value, Debug)]
+pub type PssBuffer = SoaBuffer<PssSample>;
+#[derive(Clone, Copy, Value, Debug, Soa)]
 #[repr(C, align(16))]
 #[value_new(pub)]
 pub struct PssSample {
@@ -50,7 +51,7 @@ pub struct MarkovState {
 }
 struct RenderState {
     rng_states: Buffer<Pcg32>,
-    samples: Buffer<PssSample>,
+    samples: PssBuffer,
     states: Buffer<MarkovState>,
     cur_colors: ColorBuffer,
     b_init: f64,
@@ -59,7 +60,7 @@ struct RenderState {
 
 pub struct LazyMcmcSampler<'a> {
     pub base: &'a IndependentSampler,
-    pub samples: &'a Buffer<PssSample>,
+    pub samples: &'a PssBuffer,
     pub offset: Expr<u32>,
     pub cur_dim: Var<u32>,
     pub mcmc_dim: Expr<u32>,
@@ -68,7 +69,7 @@ pub struct LazyMcmcSampler<'a> {
 impl<'a> LazyMcmcSampler<'a> {
     pub fn new(
         base: &'a IndependentSampler,
-        samples: &'a Buffer<PssSample>,
+        samples: &'a PssBuffer,
         offset: Expr<u32>,
         mcmc_dim: Expr<u32>,
         mutator: Option<Mutator>,
@@ -92,7 +93,7 @@ impl<'a> Sampler for LazyMcmcSampler<'a> {
                 m.mutate_one(self.samples, self.offset, **self.cur_dim, self.base)
                     .cur
             } else {
-                self.samples.read(self.offset + **self.cur_dim).cur
+                self.samples.var().read(self.offset + **self.cur_dim).cur
             };
             *self.cur_dim += 1;
             ret
@@ -129,7 +130,7 @@ impl Mutator {
     #[tracked]
     pub fn mutate_one(
         &self,
-        samples: &Buffer<PssSample>,
+        samples: &PssBuffer,
         offset: Expr<u32>,
         i: Expr<u32>, // dim
         rng: &IndependentSampler,
@@ -250,7 +251,7 @@ impl McmcOpt {
         scene: &Arc<Scene>,
         filter: PixelFilter,
         eval: &Evaluators,
-        samples: &Buffer<PssSample>,
+        samples: &PssBuffer,
         independent: &IndependentSampler,
         chain_id: Expr<u32>,
         mutator: Option<Mutator>,
@@ -303,9 +304,10 @@ impl McmcOpt {
             .create_buffer_from_fn(self.n_bootstrap, |_| 0.0f32);
         let sample_buffer = self
             .device
-            .create_buffer(self.sample_dimension() * self.n_chains);
+            .create_soa_buffer(self.sample_dimension() * self.n_chains);
         {
-            let pss_samples = sample_buffer.len() * std::mem::size_of::<PssSample>();
+            let pss_samples =
+                self.sample_dimension() * self.n_chains * std::mem::size_of::<PssSample>();
             let states = self.n_chains * std::mem::size_of::<MarkovState>();
             log::info!(
                 "Mcmc memory consumption {:.2}MiB: PSS samples: {:.2}MiB, Markov states: {:.2}MiB",
@@ -345,7 +347,7 @@ impl McmcOpt {
                 let sampler = IndependentSampler::from_pcg32(seed.var());
                 let dim = (self.sample_dimension() as u32).expr();
                 for_range(0u32.expr()..dim, |j| {
-                    sample_buffer.write(
+                    sample_buffer.var().write(
                         i * dim + j,
                         PssSample::new_expr(sampler.next_1d(), 0.0, 0, 0),
                     );

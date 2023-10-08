@@ -51,7 +51,7 @@ impl Light for AreaLightExpr {
         ctx: &LightEvalContext<'_>,
     ) -> Color {
         let emission = self.emission(-ray.d, si, swl, ctx);
-        let ns = si.geometry.ns;
+        let ns = si.ns();
         select(
             ns.dot(ray.d).lt(0.0),
             emission,
@@ -80,24 +80,18 @@ impl Light for AreaLightExpr {
         let p = shading_triangle.p(bary);
         let uv = shading_triangle.uv(bary);
         let frame = shading_triangle.ortho_frame(bary);
-        let n = frame.n;
-        let geometry = SurfaceLocalGeometry::from_comps_expr(SurfaceLocalGeometryComps {
-            p,
-            ng: shading_triangle.ng,
-            ns: n,
-            tangent: frame.t,
-            bitangent: frame.s,
-            uv,
-        });
 
         let si = SurfaceInteraction::from_comps_expr(SurfaceInteractionComps {
             inst_id: self.instance_id,
             prim_id,
             bary,
-            geometry,
+            ng: shading_triangle.ng,
+            uv,
             frame,
+            p,
             valid: true.expr(),
         });
+        let n = frame.n;
         let wi = p - pn.p;
         if wi.length_squared() == 0.0 {
             LightSample {

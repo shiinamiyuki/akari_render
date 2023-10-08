@@ -1,8 +1,18 @@
 use std::sync::Arc;
 
-use super::{Integrator, RenderOptions};
-
+use super::{Integrator, RenderSession};
 use crate::{color::*, film::*, sampler::*, scene::*, *};
+use serde::{Deserialize, Serialize};
+#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
+#[serde(default)]
+pub struct Config {
+    pub spp: u32,
+}
+impl Default for Config {
+    fn default() -> Self {
+        Self { spp: 256 }
+    }
+}
 pub struct NormalVis {
     device: Device,
     pub spp: u32,
@@ -18,9 +28,9 @@ impl Integrator for NormalVis {
         &self,
         scene: Arc<Scene>,
         sampler: SamplerConfig,
-        color_repr: ColorRepr,
+        color_pipeline: ColorPipeline,
         film: &mut Film,
-        _options: &RenderOptions,
+        options: &RenderSession,
     ) {
         let resolution = scene.camera.resolution();
         log::info!(
@@ -34,27 +44,31 @@ impl Integrator for NormalVis {
         assert_eq!(resolution.y, film.resolution().y);
         let sampler_creator =
             IndependentSamplerCreator::new(self.device.clone(), scene.camera.resolution(), 0);
-        let kernel = self.device.create_kernel::<(u32,)>(&|_spp: Expr<u32>| {
-            let p = dispatch_id().xy();
-            let sampler = sampler_creator.create(p);
-            let sampler = sampler.as_ref();
-            sampler.start();
-            let (ray, ray_color, ray_w) =
-                scene
-                    .camera
-                    .generate_ray(film.filter(), p, sampler, color_repr);
-            let si = scene.intersect(ray);
-            // cpu_dbg!(ray);
-            let color = if_!(si.valid(), {
-                let ns = si.geometry().ng();
-                // cpu_dbg!(Uint2::expr(si.inst_id(), si.prim_id()));
-                Color::Rgb(ns * 0.5 + 0.5, color_repr.rgb_colorspace().unwrap()) * ray_color
-                // Color::Rgb(Float3::expr(si.bary().x,si.bary().y, 1.0))
-            }, else {
-                Color::zero(color_repr)
-            });
-            film.add_sample(p.cast_f32(), &color, ray_w);
-        });
+        let kernel = self
+            .device
+            .create_kernel::<fn(u32)>(track!(&|_spp: Expr<u32>| {
+                let p = dispatch_id().xy();
+                let sampler = sampler_creator.create(p);
+                let sampler = sampler.as_ref();
+                let color_repr = color_pipeline.color_repr;
+                let swl = sample_wavelengths(color_repr, sampler);
+                sampler.start();
+                let (ray, ray_color, ray_w) =
+                    scene
+                        .camera
+                        .generate_ray(film.filter(), p, sampler, color_repr, swl);
+                let si = scene.intersect(ray);
+                // cpu_dbg!(ray);
+                let color = if si.valid {
+                    let ns = si.ns();
+                    // cpu_dbg!(Uint2::expr(si.inst_id(), si.prim_id()));
+                    Color::Rgb(ns * 0.5 + 0.5, color_repr.rgb_colorspace().unwrap()) * ray_color
+                    // Color::Rgb(Float3::expr(si.bary().x,si.bary().y, 1.0))
+                } else {
+                    Color::zero(color_repr)
+                };
+                film.add_sample(p.cast_f32(), &color, swl, ray_w);
+            }));
         let stream = self.device.default_stream();
         stream.with_scope(|s| {
             let mut cmds = vec![];
@@ -65,4 +79,16 @@ impl Integrator for NormalVis {
             s.synchronize();
         });
     }
+}
+pub fn render(
+    device: Device,
+    scene: Arc<Scene>,
+    sampler: SamplerConfig,
+    color_pipeline: ColorPipeline,
+    film: &mut Film,
+    config: &Config,
+    options: &RenderSession,
+) {
+    let pt = NormalVis::new(device.clone(), config.spp);
+    pt.render(scene, sampler, color_pipeline, film, options);
 }
