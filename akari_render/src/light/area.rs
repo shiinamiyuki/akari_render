@@ -89,6 +89,7 @@ impl Light for AreaLightExpr {
             uv,
             frame,
             p,
+            surface: self.surface,
             valid: true.expr(),
         });
         let n = frame.n;

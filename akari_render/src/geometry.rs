@@ -1,6 +1,6 @@
 use std::f32::consts::PI;
 
-use crate::*;
+use crate::{*, svm::ShaderRef};
 #[derive(Clone, Copy, Debug, Value)]
 #[repr(C)]
 #[value_new(pub)]
@@ -80,10 +80,8 @@ pub struct ShadingTriangle {
     pub t0: Expr<Float3>,
     pub t1: Expr<Float3>,
     pub t2: Expr<Float3>,
-    // pub b0: Expr<f32>,
-    // pub b1: Expr<f32>,
-    // pub b2: Expr<f32>,
     pub ng: Expr<Float3>,
+    pub surface:Expr<ShaderRef>,
 }
 
 impl ShadingTriangle {

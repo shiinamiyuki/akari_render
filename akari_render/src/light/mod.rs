@@ -21,13 +21,12 @@ pub struct LightSample {
 }
 #[derive(Clone, Copy, Value)]
 #[repr(C)]
-#[value_new(pub)]
 pub struct FlatLightSample {
     pub li: FlatColor,
-    pub pdf: f32,
     pub wi: Float3,
-    pub shadow_ray: Ray,
     pub n: Float3,
+    pub shadow_ray: Ray,
+    pub pdf: f32,
     pub valid: bool,
 }
 pub struct LightEvalContext<'a> {

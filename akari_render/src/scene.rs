@@ -6,7 +6,8 @@ use luisa::rtx::{CommittedHit, Hit};
 use crate::color::{Color, ColorPipeline, ColorRepr, FlatColor, SampledWavelengths};
 
 use crate::light::{
-    FlatLightSample, FlatLightSampleExpr, LightAggregate, LightEvalContext, LightEvaluator,
+    FlatLightSample, FlatLightSampleComps, FlatLightSampleExpr, LightAggregate, LightEvalContext,
+    LightEvaluator,
 };
 
 use crate::svm::surface::{
@@ -92,14 +93,14 @@ impl Scene {
                     surface_eval,
                 };
                 let sample = self.lights.sample_direct(pn, u.x, u.yz(), swl, &ctx);
-                FlatLightSample::new_expr(
-                    sample.li.flatten(),
-                    sample.pdf,
-                    sample.wi,
-                    sample.shadow_ray,
-                    sample.n,
-                    sample.valid,
-                )
+                FlatLightSample::from_comps_expr(FlatLightSampleComps {
+                    li: sample.li.flatten(),
+                    wi: sample.wi,
+                    pdf: sample.pdf,
+                    valid: sample.valid,
+                    shadow_ray: sample.shadow_ray,
+                    n: sample.n,
+                })
             })
         };
         let pdf = {
@@ -270,6 +271,7 @@ impl Scene {
             uv,
             frame,
             valid: true.expr(),
+            surface: shading_triangle.surface,
         })
     }
     #[tracked]
@@ -277,7 +279,10 @@ impl Scene {
         let ro: Expr<[f32; 3]> = ray.o.into();
         let rd: Expr<[f32; 3]> = ray.d.into();
         let rtx_ray = rtx::Ray::new_expr(ro, ray.t_min, rd, ray.t_max);
-        self.meshes.accel.var().trace_closest_masked(rtx_ray, 255u32.expr())
+        self.meshes
+            .accel
+            .var()
+            .trace_closest_masked(rtx_ray, 255u32.expr())
     }
     #[tracked]
     pub fn _trace_closest_rq(&self, ray: Expr<Ray>) -> Expr<CommittedHit> {

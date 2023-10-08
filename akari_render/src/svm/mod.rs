@@ -254,7 +254,7 @@ impl SvmNode {
     }
 }
 
-#[derive(Clone, Copy, Debug, Value)]
+#[derive(Clone, Copy, Debug, Soa, Value)]
 #[repr(C)]
 pub struct ShaderRef {
     pub shader_kind: u32,

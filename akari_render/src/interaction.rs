@@ -1,5 +1,6 @@
 use crate::{
     geometry::{Frame, ShadingTriangle},
+    svm::ShaderRef,
     *,
 };
 
@@ -20,10 +21,11 @@ pub struct SurfaceInteraction {
     pub bary: Float2,
     pub uv: Float2,
     pub inst_id: u32,
-    pub prim_id: u32,    
+    pub prim_id: u32,
+    pub surface: ShaderRef,
     pub valid: bool,
 }
-impl SurfaceInteractionExpr{
+impl SurfaceInteractionExpr {
     pub fn ns(&self) -> Expr<Float3> {
         self.frame.n
     }

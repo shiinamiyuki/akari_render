@@ -309,19 +309,6 @@ impl MeshAggregate {
             let t0 = transform.transform_vector(Expr::<Float3>::from(tangents.read(prim_id3 + 0)));
             let t1 = transform.transform_vector(Expr::<Float3>::from(tangents.read(prim_id3 + 1)));
             let t2 = transform.transform_vector(Expr::<Float3>::from(tangents.read(prim_id3 + 2)));
-
-            // let get_sign = |i: u32| {
-            //     let j = prim_id3 + i;
-            //     let sign = bitangent_signs.read(j / 32);
-            //     let sign = (sign >> (j % 32)) & 1;
-            //     select(sign.eq(0), 1.0f32.expr(), -1.0f32.expr())
-            // };
-            // let s0 = get_sign(0u32);
-            // let s1 = get_sign(1u32);
-            // let s2 = get_sign(2u32);
-            // let b0 = ng.cross(t0).normalize() * s0;
-            // let b1 = ng.cross(t1).normalize() * s1;
-            // let b2 = ng.cross(t2).normalize() * s2;
             let all_good = t0.is_finite().all() & t1.is_finite().all() & t2.is_finite().all();
             if !all_good {
                 make_default()
@@ -344,6 +331,7 @@ impl MeshAggregate {
             t0,
             t1,
             t2,
+            surface: inst.surface,
             ng,
         }
     }
