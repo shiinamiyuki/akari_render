@@ -3,7 +3,7 @@ use crate::{
     interaction::*,
     light::*,
     sampling::uniform_sample_triangle,
-    svm::{surface::SURFACE_EVAL_EMISSION, ShaderRef},
+    svm::{surface::Surface, ShaderRef},
     util::distribution::{AliasTableEntry, BindlessAliasTableVar},
 };
 #[derive(Clone, Copy, Value)]
@@ -23,20 +23,10 @@ impl AreaLightExpr {
         swl: Expr<SampledWavelengths>,
         ctx: &LightEvalContext<'_>,
     ) -> Color {
-        let emission = Color::from_flat(
-            ctx.color_repr(),
-            ctx.surface_eval
-                .evaluate_ex(
-                    self.surface,
-                    si,
-                    wo,
-                    Expr::<Float3>::zeroed(),
-                    swl,
-                    SURFACE_EVAL_EMISSION.expr(),
-                )
-                .emission,
-        );
-        emission
+        ctx.svm
+            .dispatch_surface(self.surface, ctx.color_pipeline, si, swl, |closure| {
+                closure.emission(wo, swl, ctx.surface_eval_ctx)
+            })
     }
 }
 impl Light for AreaLightExpr {

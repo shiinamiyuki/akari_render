@@ -659,7 +659,7 @@ impl Integrator for McmcOpt {
             resolution.y,
             &self.config
         );
-        let evaluators = scene.evaluators(color_pipeline, ADMode::None);
+    
         assert_eq!(resolution.x, film.resolution().x);
         assert_eq!(resolution.y, film.resolution().y);
         if self.config.direct_spp > 0 {

@@ -53,7 +53,7 @@ pub trait Integrator {
 
 // pub mod gpt;
 pub mod mcmc;
-pub mod mcmc_opt;
+// pub mod mcmc_opt;
 pub mod wfpt;
 // pub mod mcmc_s;
 pub mod normal;
@@ -72,8 +72,8 @@ pub enum Method {
     // Mcmc(mcmc::Config),
     // #[serde(rename = "mcmc_s")]
     // McmcSinglePath(mcmc_s::Config),
-    #[serde(rename = "mcmc_opt")]
-    McmcOpt(mcmc::Config),
+    // #[serde(rename = "mcmc_opt")]
+    // McmcOpt(mcmc::Config),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -167,15 +167,15 @@ pub fn render(device: Device, scene: Arc<Scene>, task: &RenderTask, options: Ren
             //     &c,
             //     &options,
             // ),
-            Method::McmcOpt(c) => mcmc_opt::render(
-                device.clone(),
-                scene.clone(),
-                config.sampler,
-                config.color,
-                &mut film,
-                &c,
-                &options,
-            ),
+            // Method::McmcOpt(c) => mcmc_opt::render(
+            //     device.clone(),
+            //     scene.clone(),
+            //     config.sampler,
+            //     config.color,
+            //     &mut film,
+            //     &c,
+            //     &options,
+            // ),
             Method::NormalVis(c) => normal::render(
                 device.clone(),
                 scene.clone(),
