@@ -27,12 +27,12 @@ impl Scene {
         inst_id: Expr<u32>,
         prim_id: Expr<u32>,
         bary: Expr<Float2>,
-    ) -> Expr<SurfaceInteraction> {
+    ) -> SurfaceInteraction {
         let shading_triangle = self.meshes.shading_triangle(inst_id, prim_id);
         let p = shading_triangle.p(bary);
         let uv = shading_triangle.uv(bary);
         let frame = shading_triangle.ortho_frame(bary);
-        SurfaceInteraction::from_comps_expr(SurfaceInteractionComps {
+        SurfaceInteraction {
             inst_id,
             prim_id,
             bary,
@@ -42,7 +42,7 @@ impl Scene {
             frame,
             valid: true.expr(),
             surface: shading_triangle.surface,
-        })
+        }
     }
     #[tracked]
     pub fn _trace_closest(&self, ray: Expr<Ray>) -> Expr<Hit> {
@@ -75,7 +75,7 @@ impl Scene {
         )
     }
     #[tracked]
-    pub fn intersect(&self, ray: Expr<Ray>) -> Expr<SurfaceInteraction> {
+    pub fn intersect(&self, ray: Expr<Ray>) -> SurfaceInteraction {
         if !self.use_rq {
             let hit = self._trace_closest(ray);
             if !hit.miss() {
@@ -84,9 +84,7 @@ impl Scene {
                 let bary = Float2::expr(hit.u, hit.v);
                 self.si_from_hitinfo(inst_id, prim_id, bary)
             } else {
-                let si = Var::<SurfaceInteraction>::zeroed();
-                *si.valid = false.expr();
-                **si
+                SurfaceInteraction::invalid()
             }
         } else {
             let hit = self._trace_closest_rq(ray);
@@ -96,9 +94,7 @@ impl Scene {
                 let bary = hit.bary;
                 self.si_from_hitinfo(inst_id, prim_id, bary)
             } else {
-                let si = Var::<SurfaceInteraction>::zeroed();
-                *si.valid = false.expr();
-                **si
+                SurfaceInteraction::invalid()
             }
         }
     }

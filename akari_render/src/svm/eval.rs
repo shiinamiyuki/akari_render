@@ -10,7 +10,7 @@ use crate::svm::{surface::*, *};
 #[derive(Clone, Copy)]
 pub enum SvmEvalInput {
     Surface {
-        si: Expr<SurfaceInteraction>,
+        si: SurfaceInteraction,
         swl: Expr<SampledWavelengths>,
     },
     // Volume {},
@@ -52,7 +52,7 @@ impl<'a> SvmEvaluator<'a> {
             SvmEvalInput::Surface { swl, .. } => *swl,
         }
     }
-    pub fn si(&self) -> Expr<SurfaceInteraction> {
+    pub fn si(&self) -> SurfaceInteraction {
         match &self.input {
             SvmEvalInput::Surface { si, .. } => *si,
         }
@@ -184,7 +184,7 @@ impl Svm {
         &self,
         shader_ref: Expr<ShaderRef>,
         color_pipeline: ColorPipeline,
-        si: Expr<SurfaceInteraction>,
+        si: SurfaceInteraction,
         swl: Expr<SampledWavelengths>,
         f: impl Fn(&SurfaceClosure) -> R,
     ) -> R {

@@ -19,7 +19,7 @@ impl AreaLightExpr {
     fn emission(
         &self,
         wo: Expr<Float3>,
-        si: Expr<SurfaceInteraction>,
+        si: SurfaceInteraction,
         swl: Expr<SampledWavelengths>,
         ctx: &LightEvalContext<'_>,
     ) -> Color {
@@ -36,7 +36,7 @@ impl Light for AreaLightExpr {
     fn le(
         &self,
         ray: Expr<Ray>,
-        si: Expr<SurfaceInteraction>,
+        si: SurfaceInteraction,
         swl: Expr<SampledWavelengths>,
         ctx: &LightEvalContext<'_>,
     ) -> Color {
@@ -71,7 +71,7 @@ impl Light for AreaLightExpr {
         let uv = shading_triangle.uv(bary);
         let frame = shading_triangle.ortho_frame(bary);
 
-        let si = SurfaceInteraction::from_comps_expr(SurfaceInteractionComps {
+        let si = SurfaceInteraction {
             inst_id: self.instance_id,
             prim_id,
             bary,
@@ -81,7 +81,7 @@ impl Light for AreaLightExpr {
             p,
             surface: self.surface,
             valid: true.expr(),
-        });
+        };
         let n = frame.n;
         let wi = p - pn.p;
         if wi.length_squared() == 0.0 {
@@ -124,7 +124,7 @@ impl Light for AreaLightExpr {
     #[tracked]
     fn pdf_direct(
         &self,
-        si: Expr<SurfaceInteraction>,
+        si: SurfaceInteraction,
         pn: Expr<PointNormal>,
         ctx: &LightEvalContext<'_>,
     ) -> Expr<f32> {

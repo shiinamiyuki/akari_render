@@ -12,21 +12,34 @@ pub struct SurfacePoint {
     pub n: Float3,
 }
 
-#[derive(Clone, Copy, Debug, Soa, Value)]
+#[derive(Clone, Copy, Aggregate)]
 #[repr(C)]
 pub struct SurfaceInteraction {
-    pub frame: Frame,
-    pub p: Float3,
-    pub ng: Float3,
-    pub bary: Float2,
-    pub uv: Float2,
-    pub inst_id: u32,
-    pub prim_id: u32,
-    pub surface: ShaderRef,
-    pub valid: bool,
+    pub frame: Expr<Frame>,
+    pub p: Expr<Float3>,
+    pub ng: Expr<Float3>,
+    pub bary: Expr<Float2>,
+    pub uv: Expr<Float2>,
+    pub inst_id: Expr<u32>,
+    pub prim_id: Expr<u32>,
+    pub surface: Expr<ShaderRef>,
+    pub valid: Expr<bool>,
 }
-impl SurfaceInteractionExpr {
+impl SurfaceInteraction {
     pub fn ns(&self) -> Expr<Float3> {
         self.frame.n
+    }
+    pub fn invalid() -> Self {
+        Self {
+            frame: Expr::<Frame>::zeroed(),
+            p: Expr::<Float3>::zeroed(),
+            ng: Expr::<Float3>::zeroed(),
+            bary: Expr::<Float2>::zeroed(),
+            uv: Expr::<Float2>::zeroed(),
+            inst_id: Expr::<u32>::zeroed(),
+            prim_id: Expr::<u32>::zeroed(),
+            surface: Expr::<ShaderRef>::zeroed(),
+            valid: false.expr(),
+        }
     }
 }

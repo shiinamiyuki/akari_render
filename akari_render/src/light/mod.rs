@@ -36,7 +36,7 @@ pub trait Light {
     fn le(
         &self,
         ray: Expr<Ray>,
-        si: Expr<SurfaceInteraction>,
+        si: SurfaceInteraction,
         swl: Expr<SampledWavelengths>,
         ctx: &LightEvalContext<'_>,
     ) -> Color;
@@ -50,7 +50,7 @@ pub trait Light {
     ) -> LightSample;
     fn pdf_direct(
         &self,
-        si: Expr<SurfaceInteraction>,
+        si: SurfaceInteraction,
         pn: Expr<PointNormal>,
         ctx: &LightEvalContext<'_>,
     ) -> Expr<f32>;
@@ -90,7 +90,7 @@ pub struct LightAggregate {
     pub meshes: Arc<MeshAggregate>,
 }
 impl LightAggregate {
-    pub fn light(&self, si: Expr<SurfaceInteraction>) -> PolymorphicRef<(), dyn Light> {
+    pub fn light(&self, si: SurfaceInteraction) -> PolymorphicRef<(), dyn Light> {
         let inst_id = si.inst_id;
         let instance = self.meshes.mesh_instances.var().read(inst_id);
         let light = self.lights.get(instance.light);
@@ -99,7 +99,7 @@ impl LightAggregate {
     pub fn le(
         &self,
         ray: Expr<Ray>,
-        si: Expr<SurfaceInteraction>,
+        si: SurfaceInteraction,
         swl: Expr<SampledWavelengths>,
         ctx: &LightEvalContext<'_>,
     ) -> Color {
@@ -132,7 +132,7 @@ impl LightAggregate {
     #[tracked]
     pub fn pdf_direct(
         &self,
-        si: Expr<SurfaceInteraction>,
+        si: SurfaceInteraction,
         pn: Expr<PointNormal>,
         ctx: &LightEvalContext<'_>,
     ) -> Expr<f32> {

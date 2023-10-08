@@ -87,7 +87,7 @@ impl<'a> PathTracerBase<'a> {
     pub fn mul_beta(&self, r: Color) {
         self.beta.store(self.beta.load() * r);
     }
-    pub fn sample_light(&self, si: Expr<SurfaceInteraction>, u: Expr<Float3>) -> DirectLighting {
+    pub fn sample_light(&self, si: SurfaceInteraction, u: Expr<Float3>) -> DirectLighting {
         if self.use_nee {
             track!({
                 if !self.indirect_only || self.depth.load().gt(1) {
@@ -155,7 +155,7 @@ impl<'a> PathTracerBase<'a> {
     #[tracked]
     pub fn handle_surface_light(
         &self,
-        si: Expr<SurfaceInteraction>,
+        si: SurfaceInteraction,
         ray: Expr<Ray>,
     ) -> (Color, Expr<f32>) {
         let instance = self.scene.meshes.mesh_instances.read(si.inst_id);
@@ -194,7 +194,7 @@ impl<'a> PathTracerBase<'a> {
     #[tracked]
     pub fn sample_surface_and_shade_direct(
         &self,
-        si: Expr<SurfaceInteraction>,
+        si: SurfaceInteraction,
         wo: Expr<Float3>,
         direct_lighting: DirectLighting,
         di_occluded: Expr<bool>,
