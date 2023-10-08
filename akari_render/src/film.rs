@@ -196,10 +196,10 @@ impl Film {
                 let rgb: Expr<Float3> = color.to_rgb(RgbColorSpace::SRgb);
                 (0..nvalues).for_each(|c| {
                     let v = rgb[c as i32];
-                    let v = select(v.is_nan(), 0.0f32.expr(), v);
-                    pixels.atomic_fetch_add(i * nvalues as u32 + c as u32, v);
+                    let j = i * nvalues as u32 + c as u32;
+                    pixels.write(j, pixels.read(j) + v);
                 });
-                weights.atomic_fetch_add(i, weight);
+                weights.write(i, weights.read(i) + weight);
             }
             _ => todo!(),
         }

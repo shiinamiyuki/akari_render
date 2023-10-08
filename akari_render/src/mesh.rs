@@ -141,10 +141,10 @@ impl MeshBuffer {
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Value)]
 pub struct MeshInstance {
-    pub geom_id: u32,
     pub transform: AffineTransform,
     pub light: TagIndex,
     pub surface: ShaderRef,
+    pub geom_id: u32,
     pub has_normals: bool,
     pub has_uvs: bool,
     pub has_tangents: bool,
@@ -232,7 +232,7 @@ impl MeshAggregate {
             let geom_id = inst.geom_id as usize;
             assert_eq!(inst.has_normals, meshes[geom_id].has_normals);
             assert_eq!(inst.has_uvs, meshes[geom_id].has_uvs);
-            accel.push_mesh(&accel_meshes[geom_id], inst.transform.m, u32::MAX, true);
+            accel.push_mesh(&accel_meshes[geom_id], inst.transform.m, 255, true);
         }
         accel.build(AccelBuildRequest::ForceBuild);
         let mesh_instances = device.create_buffer_from_slice(instances);

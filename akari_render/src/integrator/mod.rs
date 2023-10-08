@@ -92,9 +92,7 @@ impl Default for FilmConfig {
         }
     }
 }
-fn defaultcolor() -> String {
-    "srgb".to_string()
-}
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct RenderConfig {
     pub method: Method,

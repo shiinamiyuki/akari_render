@@ -312,6 +312,7 @@ impl<'a> PathTracerBase<'a> {
                 **di_occluded,
                 sampler.next_3d(),
             );
+            
             let f = &bsdf_sample.color;
             if debug_mode() {
                 lc_assert!(f.min().ge(0.0));

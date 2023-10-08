@@ -1,6 +1,8 @@
 use std::marker::PhantomData;
 use std::sync::Arc;
 
+use luisa::rtx::{CommittedHit, Hit};
+
 use crate::color::{Color, ColorPipeline, ColorRepr, FlatColor, SampledWavelengths};
 
 use crate::light::{
@@ -271,12 +273,36 @@ impl Scene {
         })
     }
     #[tracked]
-    pub fn intersect(&self, ray: Expr<Ray>) -> Expr<SurfaceInteraction> {
+    pub fn _trace_closest(&self, ray: Expr<Ray>) -> Expr<Hit> {
         let ro: Expr<[f32; 3]> = ray.o.into();
         let rd: Expr<[f32; 3]> = ray.d.into();
         let rtx_ray = rtx::Ray::new_expr(ro, ray.t_min, rd, ray.t_max);
+        self.meshes.accel.var().trace_closest_masked(rtx_ray, 255u32.expr())
+    }
+    #[tracked]
+    pub fn _trace_closest_rq(&self, ray: Expr<Ray>) -> Expr<CommittedHit> {
+        let ro: Expr<[f32; 3]> = ray.o.into();
+        let rd: Expr<[f32; 3]> = ray.d.into();
+        let rtx_ray = rtx::Ray::new_expr(ro, ray.t_min, rd, ray.t_max);
+        self.meshes.accel.var().query_all(
+            rtx_ray,
+            u32::MAX,
+            rtx::RayQuery {
+                on_triangle_hit: |candidate: rtx::TriangleCandidate| {
+                    if (candidate.inst.ne(ray.exclude0.x) | candidate.prim.ne(ray.exclude0.y))
+                        & (candidate.inst.ne(ray.exclude1.x) | candidate.prim.ne(ray.exclude1.y))
+                    {
+                        candidate.commit();
+                    }
+                },
+                on_procedural_hit: |_| {},
+            },
+        )
+    }
+    #[tracked]
+    pub fn intersect(&self, ray: Expr<Ray>) -> Expr<SurfaceInteraction> {
         if !self.use_rq {
-            let hit = self.meshes.accel.var().trace_closest(rtx_ray);
+            let hit = self._trace_closest(ray);
             if !hit.miss() {
                 let inst_id = hit.inst_id;
                 let prim_id = hit.prim_id;
@@ -288,22 +314,7 @@ impl Scene {
                 **si
             }
         } else {
-            let hit = self.meshes.accel.var().query_all(
-                rtx_ray,
-                u32::MAX,
-                rtx::RayQuery {
-                    on_triangle_hit: |candidate: rtx::TriangleCandidate| {
-                        if (candidate.inst.ne(ray.exclude0.x) | candidate.prim.ne(ray.exclude0.y))
-                            & (candidate.inst.ne(ray.exclude1.x)
-                                | candidate.prim.ne(ray.exclude1.y))
-                        {
-                            candidate.commit();
-                        }
-                    },
-                    on_procedural_hit: |_| {},
-                },
-            );
-
+            let hit = self._trace_closest_rq(ray);
             if hit.triangle_hit() {
                 let inst_id = hit.inst_id;
                 let prim_id = hit.prim_id;

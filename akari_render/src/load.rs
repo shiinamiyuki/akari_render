@@ -46,7 +46,7 @@ where
 {
     match buffer {
         node::Buffer::External(path) => {
-            log::info!("Loading buffer: {}", path);
+            log::debug!("Loading buffer: {}", path);
             let mut file = file_resolver
                 .resolve(&Path::new(path))
                 .unwrap_or_else(|| panic!("Failed to resolve file: {}", path));
@@ -404,7 +404,7 @@ impl SceneLoader {
         for (id, geometry) in &graph.geometries {
             match geometry {
                 node::Geometry::Mesh(mesh) => {
-                    log::info!("Loading mesh: {}", id.id);
+                    log::debug!("Loading mesh: {}", id.id);
                     let vertices = load_buffer::<[f32; 3]>(&file_resolver, &mesh.vertices);
                     let normals = load_buffer::<[f32; 3]>(&file_resolver, &mesh.normals);
                     let indices = load_buffer::<[u32; 3]>(&file_resolver, &mesh.indices);
@@ -450,7 +450,7 @@ impl SceneLoader {
             .map(|path_s| {
                 let path = PathBuf::from(&path_s);
                 let path = path.canonicalize().unwrap();
-                log::info!("Loading image: {}", path.display());
+                log::debug!("Loading image: {}", path.display());
                 let file = file_resolver.resolve(&path).unwrap_or_else(|| {
                     panic!("Failed to resolve file: {}", path.display().to_string())
                 });

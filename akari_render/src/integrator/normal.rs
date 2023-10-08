@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 
 use super::{Integrator, RenderSession};
 use crate::{color::*, film::*, sampler::*, scene::*, *};
@@ -30,7 +30,7 @@ impl Integrator for NormalVis {
         sampler: SamplerConfig,
         color_pipeline: ColorPipeline,
         film: &mut Film,
-        options: &RenderSession,
+        _options: &RenderSession,
     ) {
         let resolution = scene.camera.resolution();
         log::info!(
@@ -39,45 +39,54 @@ impl Integrator for NormalVis {
             resolution.y,
             self.spp
         );
-        let npixels = resolution.x as usize * resolution.y as usize;
         assert_eq!(resolution.x, film.resolution().x);
         assert_eq!(resolution.y, film.resolution().y);
-        let sampler_creator =
-            IndependentSamplerCreator::new(self.device.clone(), scene.camera.resolution(), 0);
+        let sampler_creator = sampler.creator(self.device.clone(), &scene, self.spp);
         let kernel = self
             .device
-            .create_kernel::<fn(u32)>(track!(&|_spp: Expr<u32>| {
+            .create_kernel::<fn(u32)>(track!(&|spp: Expr<u32>| {
                 let p = dispatch_id().xy();
                 let sampler = sampler_creator.create(p);
                 let sampler = sampler.as_ref();
                 let color_repr = color_pipeline.color_repr;
-                let swl = sample_wavelengths(color_repr, sampler);
-                sampler.start();
-                let (ray, ray_color, ray_w) =
-                    scene
-                        .camera
-                        .generate_ray(film.filter(), p, sampler, color_repr, swl);
-                let si = scene.intersect(ray);
-                // cpu_dbg!(ray);
-                let color = if si.valid {
-                    let ns = si.ns();
-                    // cpu_dbg!(Uint2::expr(si.inst_id(), si.prim_id()));
-                    Color::Rgb(ns * 0.5 + 0.5, color_repr.rgb_colorspace().unwrap()) * ray_color
-                    // Color::Rgb(Float3::expr(si.bary().x,si.bary().y, 1.0))
-                } else {
-                    Color::zero(color_repr)
-                };
-                film.add_sample(p.cast_f32(), &color, swl, ray_w);
+                for _ in 0u32.expr()..spp {
+                    let swl = sample_wavelengths(color_repr, sampler);
+                    sampler.start();
+                    let (ray, ray_color, ray_w) =
+                        scene
+                            .camera
+                            .generate_ray(film.filter(), p, sampler, color_repr, swl);
+                    let si = scene.intersect(ray);
+
+                    let color = if si.valid {
+                        let ns = si.ns();
+                        Color::Rgb(ns * 0.5 + 0.5, color_repr.rgb_colorspace().unwrap()) * ray_color
+                    } else {
+                        Color::zero(color_repr)
+                    };
+                    // let color = if !hit.miss() {
+                    //     let rgb = Float3::expr(1.0, hit.u, hit.v);
+                    //     Color::Rgb(rgb, color_repr.rgb_colorspace().unwrap()) * ray_color
+                    // } else {
+                    //     Color::zero(color_repr)
+                    // };
+                    // let color = {
+                    //     let rgb = ray.d * 0.5 + 0.5;
+                    //     Color::Rgb(rgb, color_repr.rgb_colorspace().unwrap()) * ray_color
+                    // };
+                    film.add_sample(p.cast_f32(), &color, swl, ray_w);
+                }
             }));
-        let stream = self.device.default_stream();
+        let stream = self.device.create_stream(StreamTag::Graphics);
+        let clk = Instant::now();
         stream.with_scope(|s| {
             let mut cmds = vec![];
-            for _ in 0..self.spp {
-                cmds.push(kernel.dispatch_async([resolution.x, resolution.y, 1], &self.spp));
-            }
+            cmds.push(kernel.dispatch_async([resolution.x, resolution.y, 1], &self.spp));
             s.submit(cmds);
             s.synchronize();
         });
+        let elapsed = clk.elapsed().as_secs_f64();
+        log::info!("Rendered in {:.2}ms", elapsed * 1000.0);
     }
 }
 pub fn render(
