@@ -134,7 +134,8 @@ impl SceneLoader {
 
             let geom_id = instance.geom_id as usize;
             let area = self.mesh_total_area(geom_id);
-            let transform: glam::Mat3 = glam::Mat3::from_mat4(glam::Mat4::from(instance.transform.m));
+            let transform: glam::Mat3 =
+                glam::Mat3::from_mat4(glam::Mat4::from(instance.transform.m));
             let det = transform.determinant();
             // dbg!(power, area, det, strength);
             return power * area * det.abs() * strength;
@@ -300,7 +301,7 @@ impl SceneLoader {
                     AreaLight {
                         light_id: light_id as u32,
                         instance_id: i as u32,
-                        area_sampling_index: u32::MAX,
+                        geom_id: geom_id as u32,
                         surface: *surface_shader,
                     },
                 );
@@ -325,15 +326,6 @@ impl SceneLoader {
             &self.mesh_buffers.iter().collect::<Vec<_>>(),
             &instances,
         ));
-        for i in 0..area_light_count {
-            let area = self
-                .lights
-                .get_mut(light_ids_to_lights[i])
-                .downcast_mut::<AreaLight>()
-                .unwrap();
-            let instance = &instances[area.instance_id as usize];
-            area.area_sampling_index = mesh_aggregate.mesh_id_to_area_samplers[&instance.geom_id];
-        }
         let light_weights = lights.iter().map(|(_, power)| *power).collect::<Vec<_>>();
         let Self {
             device,
@@ -349,7 +341,10 @@ impl SceneLoader {
             surface_shaders: surface_shader_compiler.upload(&device),
             image_textures: texture_heap,
         });
-        log::info!("Shader variant count: {}", svm.surface_shaders.variant_count());
+        log::info!(
+            "Shader variant count: {}",
+            svm.surface_shaders.variant_count()
+        );
         let lights = lights.build();
         let light_distribution = Box::new(WeightedLightDistribution::new(
             device.clone(),

@@ -1,6 +1,9 @@
+use std::collections::HashMap;
+use std::hash::Hash;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
+use luisa::resource::IoTexel;
 use luisa::rtx::{CommittedHit, Hit};
 
 use crate::color::{Color, ColorPipeline, ColorRepr, FlatColor, SampledWavelengths};
@@ -10,6 +13,71 @@ use crate::light::{LightAggregate, LightEvalContext};
 use crate::svm::{ShaderRef, Svm};
 use crate::{camera::Camera, geometry::*, interaction::*, mesh::*, *};
 
+pub struct ResourceHeap<K: Hash + Eq> {
+    device: Device,
+    bindless: BindlessArray,
+    tex2ds: HashMap<K, u32>,
+    tex3ds: HashMap<K, u32>,
+    buffers: HashMap<K, u32>,
+}
+
+impl<K: Hash + Eq> ResourceHeap<K> {
+    pub fn new(device: Device, count: usize) -> Self {
+        let bindless = device.create_bindless_array(count);
+        Self {
+            device,
+            bindless,
+            tex2ds: HashMap::new(),
+            tex3ds: HashMap::new(),
+            buffers: HashMap::new(),
+        }
+    }
+    pub fn push_buffer<T: Value>(&mut self, key: K, buffer: &Buffer<T>) {
+        assert!(!self.buffers.contains_key(&key));
+        let index = self.buffers.len();
+        self.bindless.emplace_buffer_async(index, buffer);
+    }
+    pub fn get_buffer_index(&self, key: &K) -> Option<u32> {
+        self.buffers.get(key).copied()
+    }
+    pub fn push_tex2d<T: IoTexel>(&mut self, key: K, tex: &Tex2d<T>, sampler: TextureSampler) {
+        assert!(!self.tex2ds.contains_key(&key));
+        let index = self.tex2ds.len();
+        self.bindless.emplace_tex2d_async(index, tex, sampler);
+    }
+    pub fn get_tex2d_index(&self, key: &K) -> Option<u32> {
+        self.tex2ds.get(key).copied()
+    }
+    pub fn push_tex3d<T: IoTexel>(&mut self, key: K, tex: &Tex3d<T>, sampler: TextureSampler) {
+        assert!(!self.tex3ds.contains_key(&key));
+        let index = self.tex3ds.len();
+        self.bindless.emplace_tex3d_async(index, tex, sampler);
+    }
+    pub fn commit(&mut self) {
+        self.bindless.update();
+    }
+    pub fn bindless(&self) -> &BindlessArray {
+        &self.bindless
+    }
+    pub fn reset(&mut self) {
+        for i in 0..self.tex2ds.len() {
+            self.bindless.remove_tex2d_async(i);
+        }
+        for i in 0..self.tex3ds.len() {
+            self.bindless.remove_tex3d_async(i);
+        }
+        for i in 0..self.buffers.len() {
+            self.bindless.remove_buffer_async(i);
+        }
+        if !self.tex2ds.is_empty() || !self.tex3ds.is_empty() || !self.buffers.is_empty() {
+            self.bindless.update();
+        }
+        self.tex2ds.clear();
+        self.tex3ds.clear();
+        self.buffers.clear();
+    }
+}
+
 pub struct Scene {
     pub svm: Arc<Svm>,
     pub lights: LightAggregate,
@@ -18,6 +86,8 @@ pub struct Scene {
     pub device: Device,
     pub use_rq: bool,
     pub printer: Printer,
+    // pub heap: ResourceHeap<String>,
+    // pub tmp_heap: ResourceHeap<String>,
     // pub env_map: Buffer<TagIndex>,
 }
 

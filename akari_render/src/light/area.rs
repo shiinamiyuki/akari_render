@@ -12,7 +12,7 @@ pub struct AreaLight {
     pub light_id: u32,
     pub instance_id: u32,
     pub surface: ShaderRef,
-    pub area_sampling_index: u32,
+    pub geom_id: u32,
 }
 
 impl AreaLightExpr {
@@ -58,10 +58,7 @@ impl Light for AreaLightExpr {
         ctx: &LightEvalContext<'_>,
     ) -> LightSample {
         let meshes = ctx.meshes;
-        let area_samplers = meshes.mesh_area_samplers.var();
-        let at_entries = area_samplers.buffer::<AliasTableEntry>(self.area_sampling_index);
-        let at_pdf = area_samplers.buffer::<f32>(self.area_sampling_index + 1);
-        let at = BindlessAliasTableVar(at_entries, at_pdf);
+        let at = meshes.mesh_area_samplers(self.geom_id);
         let (prim_id, pdf, _) = at.sample_and_remap(u_select);
         // let (prim_id, pdf) = (0u32.expr(), 1.0f32.expr());
         let shading_triangle = meshes.shading_triangle(self.instance_id, prim_id);
@@ -130,10 +127,7 @@ impl Light for AreaLightExpr {
     ) -> Expr<f32> {
         let prim_id = si.prim_id;
         let meshes = ctx.meshes;
-        let area_samplers = meshes.mesh_area_samplers.var();
-        let at_entries = area_samplers.buffer::<AliasTableEntry>(self.area_sampling_index);
-        let at_pdf = area_samplers.buffer::<f32>(self.area_sampling_index + 1);
-        let at = BindlessAliasTableVar(at_entries, at_pdf);
+        let at = meshes.mesh_area_samplers(self.geom_id);
         if debug_mode() {
             lc_assert!(si.inst_id.eq(self.instance_id));
         }
