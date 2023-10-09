@@ -1,6 +1,6 @@
 use std::f32::consts::PI;
 
-use crate::{*, svm::ShaderRef};
+use crate::{svm::ShaderRef, *};
 #[derive(Clone, Copy, Debug, Value)]
 #[repr(C)]
 #[value_new(pub)]
@@ -81,7 +81,7 @@ pub struct ShadingTriangle {
     pub t1: Expr<Float3>,
     pub t2: Expr<Float3>,
     pub ng: Expr<Float3>,
-    pub surface:Expr<ShaderRef>,
+    pub surface: Expr<ShaderRef>,
 }
 
 impl ShadingTriangle {
@@ -226,29 +226,19 @@ impl FrameExpr {
 #[value_new(pub)]
 pub struct AffineTransform {
     pub m: Mat4,
-    pub m_inv: Mat4,
-    pub m3: Mat3,
-    pub m3_inv: Mat3,
     pub close_to_identity: bool,
 }
 impl AffineTransform {
     pub fn from_matrix(m: &glam::Mat4) -> Self {
         let close_to_identity = m.abs_diff_eq(glam::Mat4::IDENTITY, 1e-4);
-        let m3 = glam::Mat3::from_mat4(*m);
         Self {
             m: (*m).into(),
-            m_inv: m.inverse().into(),
-            m3: m3.into(),
-            m3_inv: m3.inverse().into(),
             close_to_identity,
         }
     }
     pub fn inverse(&self) -> Self {
         Self {
-            m: self.m_inv,
-            m_inv: self.m,
-            m3: self.m3_inv,
-            m3_inv: self.m3,
+            m: glam::Mat4::from(self.m).inverse().into(),
             close_to_identity: self.close_to_identity,
         }
     }
@@ -271,7 +261,7 @@ impl AffineTransformExpr {
         if self.close_to_identity {
             v
         } else {
-            self.m3 * v
+            (self.m * v.extend(0.0)).xyz()
         }
     }
     #[tracked]
@@ -280,17 +270,12 @@ impl AffineTransformExpr {
         if self.close_to_identity {
             n
         } else {
-            self.m3_inv.transpose() * n
+            let m3 = Mat3::expr(self.m[0].xyz(), self.m[1].xyz(), self.m[2].xyz());
+            m3.inverse().transpose() * n
         }
     }
     pub fn inverse(&self) -> Expr<AffineTransform> {
-        AffineTransform::new_expr(
-            self.m_inv,
-            self.m,
-            self.m3_inv,
-            self.m3,
-            self.close_to_identity,
-        )
+        AffineTransform::new_expr(self.m.inverse(), self.close_to_identity)
     }
 }
 #[tracked]

@@ -134,7 +134,7 @@ impl SceneLoader {
 
             let geom_id = instance.geom_id as usize;
             let area = self.mesh_total_area(geom_id);
-            let transform: glam::Mat3 = instance.transform.m3.into();
+            let transform: glam::Mat3 = glam::Mat3::from_mat4(glam::Mat4::from(instance.transform.m));
             let det = transform.determinant();
             // dbg!(power, area, det, strength);
             return power * area * det.abs() * strength;
