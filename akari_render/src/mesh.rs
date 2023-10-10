@@ -152,9 +152,14 @@ pub struct MeshInstance {
 }
 pub struct MeshAggregate {
     pub heap: BindlessArray,
-    pub mesh_instances: Buffer<MeshInstance>,
     pub accel_meshes: Vec<rtx::Mesh>,
     pub accel: rtx::Accel,
+}
+#[derive(Clone, Copy, Debug)]
+#[repr(u32)]
+pub enum MeshAggregateHeaderBuffers {
+    MeshInstances = 0,
+    Total,
 }
 #[derive(Clone, Copy, Debug)]
 #[repr(u32)]
@@ -171,33 +176,46 @@ pub enum MeshBufferIndex {
 impl MeshAggregate {
     pub fn new(device: Device, meshes: &[&MeshBuffer], instances: &[MeshInstance]) -> Self {
         let count = meshes.len();
-        let heap = device.create_bindless_array(count * MeshBufferIndex::Total as usize);
+        let heap = device.create_bindless_array(
+            MeshAggregateHeaderBuffers::Total as usize
+                + count * MeshBufferIndex::Total as usize,
+        );
         let mut accel_meshes = Vec::with_capacity(meshes.len());
         let accel = device.create_accel(AccelOption::default());
         for (i, mesh) in meshes.iter().enumerate() {
             heap.emplace_buffer(
-                i * MeshBufferIndex::Total as usize + MeshBufferIndex::Vertex as usize,
+                MeshAggregateHeaderBuffers::Total as usize
+                    + i * MeshBufferIndex::Total as usize
+                    + MeshBufferIndex::Vertex as usize,
                 &mesh.vertices,
             );
             heap.emplace_buffer(
-                i * MeshBufferIndex::Total as usize + MeshBufferIndex::Index as usize,
+                MeshAggregateHeaderBuffers::Total as usize
+                    + i * MeshBufferIndex::Total as usize
+                    + MeshBufferIndex::Index as usize,
                 &mesh.indices,
             );
             if mesh.has_normals {
                 heap.emplace_buffer(
-                    i * MeshBufferIndex::Total as usize + MeshBufferIndex::Normal as usize,
+                    MeshAggregateHeaderBuffers::Total as usize
+                        + i * MeshBufferIndex::Total as usize
+                        + MeshBufferIndex::Normal as usize,
                     mesh.normals.as_ref().unwrap(),
                 );
             }
             if mesh.has_tangents {
                 heap.emplace_buffer(
-                    i * MeshBufferIndex::Total as usize + MeshBufferIndex::Tangent as usize,
+                    MeshAggregateHeaderBuffers::Total as usize
+                        + i * MeshBufferIndex::Total as usize
+                        + MeshBufferIndex::Tangent as usize,
                     mesh.tangents.as_ref().unwrap(),
                 );
             }
             if mesh.has_uvs {
                 heap.emplace_buffer(
-                    i * MeshBufferIndex::Total as usize + MeshBufferIndex::Uv as usize,
+                    MeshAggregateHeaderBuffers::Total as usize
+                        + i * MeshBufferIndex::Total as usize
+                        + MeshBufferIndex::Uv as usize,
                     mesh.uvs.as_ref().unwrap(),
                 );
             }
@@ -210,15 +228,24 @@ impl MeshAggregate {
             accel_meshes.push(accel_mesh);
             if let Some(at) = &mesh.area_sampler {
                 heap.emplace_buffer(
-                    i * MeshBufferIndex::Total as usize + MeshBufferIndex::MeshSampler0 as usize,
+                    MeshAggregateHeaderBuffers::Total as usize
+                        + i * MeshBufferIndex::Total as usize
+                        + MeshBufferIndex::MeshSampler0 as usize,
                     &at.0,
                 );
                 heap.emplace_buffer(
-                    i * MeshBufferIndex::Total as usize + MeshBufferIndex::MeshSampler1 as usize,
+                    MeshAggregateHeaderBuffers::Total as usize
+                        + i * MeshBufferIndex::Total as usize
+                        + MeshBufferIndex::MeshSampler1 as usize,
                     &at.1,
                 );
             }
         }
+        let mesh_instances = device.create_buffer_from_slice(instances);
+        heap.emplace_buffer_async(
+            MeshAggregateHeaderBuffers::MeshInstances as usize,
+            &mesh_instances,
+        );
         heap.update();
         for i in 0..instances.len() {
             let inst = &instances[i];
@@ -228,53 +255,76 @@ impl MeshAggregate {
             accel.push_mesh(&accel_meshes[geom_id], inst.transform.m, 255, true);
         }
         accel.build(AccelBuildRequest::ForceBuild);
-        let mesh_instances = device.create_buffer_from_slice(instances);
+
         Self {
             heap,
             accel_meshes,
-            mesh_instances,
             accel,
         }
     }
     #[tracked]
     pub fn mesh_vertices(&self, geom_id: Expr<u32>) -> BindlessBufferVar<[f32; 3]> {
-        self.heap
-            .buffer(MeshBufferIndex::Vertex as u32 + geom_id * MeshBufferIndex::Total as u32)
+        self.heap.buffer(
+            MeshAggregateHeaderBuffers::Total as u32
+                + MeshBufferIndex::Vertex as u32
+                + geom_id * MeshBufferIndex::Total as u32,
+        )
     }
     #[tracked]
     pub fn mesh_indices(&self, geom_id: Expr<u32>) -> BindlessBufferVar<[u32; 3]> {
-        self.heap
-            .buffer(MeshBufferIndex::Index as u32 + geom_id * MeshBufferIndex::Total as u32)
+        self.heap.buffer(
+            MeshAggregateHeaderBuffers::Total as u32
+                + MeshBufferIndex::Index as u32
+                + geom_id * MeshBufferIndex::Total as u32,
+        )
     }
     #[tracked]
     pub fn mesh_normals(&self, geom_id: Expr<u32>) -> BindlessBufferVar<[f32; 3]> {
-        self.heap
-            .buffer(MeshBufferIndex::Normal as u32 + geom_id * MeshBufferIndex::Total as u32)
+        self.heap.buffer(
+            MeshAggregateHeaderBuffers::Total as u32
+                + MeshBufferIndex::Normal as u32
+                + geom_id * MeshBufferIndex::Total as u32,
+        )
     }
     #[tracked]
     pub fn mesh_tangents(&self, geom_id: Expr<u32>) -> BindlessBufferVar<[f32; 3]> {
-        self.heap
-            .buffer(MeshBufferIndex::Tangent as u32 + geom_id * MeshBufferIndex::Total as u32)
+        self.heap.buffer(
+            MeshAggregateHeaderBuffers::Total as u32
+                + MeshBufferIndex::Tangent as u32
+                + geom_id * MeshBufferIndex::Total as u32,
+        )
     }
     #[tracked]
     pub fn mesh_uvs(&self, geom_id: Expr<u32>) -> BindlessBufferVar<[f32; 2]> {
-        self.heap
-            .buffer(MeshBufferIndex::Uv as u32 + geom_id * MeshBufferIndex::Total as u32)
+        self.heap.buffer(
+            MeshAggregateHeaderBuffers::Total as u32
+                + MeshBufferIndex::Uv as u32
+                + geom_id * MeshBufferIndex::Total as u32,
+        )
     }
     #[tracked]
     pub fn mesh_area_samplers(&self, geom_id: Expr<u32>) -> BindlessAliasTableVar {
-        let b0 = self
-            .heap
-            .buffer(MeshBufferIndex::MeshSampler0 as u32 + geom_id * MeshBufferIndex::Total as u32);
-        let b1 = self
-            .heap
-            .buffer(MeshBufferIndex::MeshSampler1 as u32 + geom_id * MeshBufferIndex::Total as u32);
+        let b0 = self.heap.buffer(
+            MeshAggregateHeaderBuffers::Total as u32
+                + MeshBufferIndex::MeshSampler0 as u32
+                + geom_id * MeshBufferIndex::Total as u32,
+        );
+        let b1 = self.heap.buffer(
+            MeshAggregateHeaderBuffers::Total as u32
+                + MeshBufferIndex::MeshSampler1 as u32
+                + geom_id * MeshBufferIndex::Total as u32,
+        );
         BindlessAliasTableVar(b0, b1)
+    }
+    #[tracked]
+    pub fn mesh_instances(&self) -> BindlessBufferVar<MeshInstance> {
+        self.heap
+            .buffer(MeshAggregateHeaderBuffers::MeshInstances as u32)
     }
 
     #[tracked]
     pub fn triangle(&self, inst_id: Expr<u32>, prim_id: Expr<u32>) -> Triangle {
-        let inst = self.mesh_instances.read(inst_id);
+        let inst = self.mesh_instances().read(inst_id);
         let transform = inst.transform;
         let geom_id = inst.geom_id;
         let vertices = self.mesh_vertices(geom_id);
@@ -287,7 +337,7 @@ impl MeshAggregate {
     }
     #[tracked]
     pub fn shading_triangle(&self, inst_id: Expr<u32>, prim_id: Expr<u32>) -> ShadingTriangle {
-        let inst = self.mesh_instances.read(inst_id);
+        let inst = self.mesh_instances().read(inst_id);
         let geom_id = inst.geom_id;
         let vertices = self.mesh_vertices(geom_id);
         let indices = self.mesh_indices(geom_id);

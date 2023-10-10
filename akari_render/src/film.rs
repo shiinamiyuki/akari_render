@@ -64,14 +64,13 @@ impl FilmColorRepr {
 
 pub struct Film {
     device: Device,
-    pub(crate) pixels: Buffer<f32>,
-    pub(crate) weights: Buffer<f32>,
-    pub(crate) splat: Buffer<f32>,
+    /// | pixels | splat | weights |
+    pub(crate) data: Buffer<f32>,
     repr: FilmColorRepr,
     resolution: Uint2,
     splat_scale: f32,
     filter: PixelFilter,
-    copy_to_rgba_image: Kernel<fn(Tex2d<Float4>, f32, bool)>,
+    copy_to_rgba_image: Option<Kernel<fn(Tex2d<Float4>, f32, bool)>>,
 }
 
 impl Film {
@@ -84,6 +83,12 @@ impl Film {
     pub fn filter(&self) -> PixelFilter {
         self.filter
     }
+    pub fn splat_offset(&self) -> u32 {
+        self.resolution.x * self.resolution.y * self.repr.nvalues() as u32
+    }
+    pub fn weight_offset(&self) -> u32 {
+        self.splat_offset() + self.resolution.x * self.resolution.y * self.repr.nvalues() as u32
+    }
     #[tracked]
     pub fn new(
         device: Device,
@@ -92,30 +97,34 @@ impl Film {
         filter: PixelFilter,
     ) -> Self {
         let nvalues = repr.nvalues();
-        let pixels =
-            device.create_buffer::<f32>(resolution.x as usize * resolution.y as usize * nvalues);
-        let splat =
-            device.create_buffer::<f32>(resolution.x as usize * resolution.y as usize * nvalues);
-        let weights = device.create_buffer::<f32>(resolution.x as usize * resolution.y as usize);
-        let copy_to_rgba_image = Kernel::<fn(Tex2d<Float4>, f32, bool)>::new(
-            &device,
+        let data = device.create_buffer::<f32>(
+            resolution.x as usize * resolution.y as usize * (1 + 2 * nvalues),
+        );
+        let mut film = Self {
+            device: device.clone(),
+            data,
+            repr,
+            resolution,
+            filter,
+            splat_scale: 1.0,
+            copy_to_rgba_image: None,
+        };
+        let copy_to_rgba_image = device.create_kernel_async::<fn(Tex2d<Float4>, f32, bool)>(
             &|image: Tex2dVar<Float4>, splat_scale: Expr<f32>, hdr: Expr<bool>| {
                 let p = dispatch_id().xy();
                 let i = p.x + p.y * resolution.x;
-                let pixels = pixels.var();
-                let splat = splat.var();
-                let weights = weights.var();
-                let nvalues = repr.nvalues();
+                let data = film.data.var();
+                let nvalues = repr.nvalues() as u32;
                 match repr {
                     FilmColorRepr::SRgb => {
-                        let s_r = splat.read(i * nvalues as u32 + 0) * splat_scale;
-                        let s_g = splat.read(i * nvalues as u32 + 1) * splat_scale;
-                        let s_b = splat.read(i * nvalues as u32 + 2) * splat_scale;
+                        let s_r = data.read(film.splat_offset() + i * nvalues + 0) * splat_scale;
+                        let s_g = data.read(film.splat_offset() + i * nvalues + 1) * splat_scale;
+                        let s_b = data.read(film.splat_offset() + i * nvalues + 2) * splat_scale;
 
-                        let r = pixels.read(i * nvalues as u32 + 0);
-                        let g = pixels.read(i * nvalues as u32 + 1);
-                        let b = pixels.read(i * nvalues as u32 + 2);
-                        let w = weights.read(i);
+                        let r = data.read(i * nvalues + 0);
+                        let g = data.read(i * nvalues + 1);
+                        let b = data.read(i * nvalues + 2);
+                        let w = data.read(film.weight_offset() + i);
                         let rgb = Float3::expr(r, g, b) / select(w.eq(0.0), 1.0f32.expr(), w);
                         let rgb = rgb + Float3::expr(s_r, s_g, s_b);
                         let rgb = if_!(hdr, { rgb }, else, { linear_to_srgb(rgb) });
@@ -125,17 +134,7 @@ impl Film {
                 }
             },
         );
-        let film = Self {
-            device,
-            splat,
-            pixels,
-            weights,
-            repr,
-            resolution,
-            filter,
-            splat_scale: 1.0,
-            copy_to_rgba_image,
-        };
+        film.copy_to_rgba_image = Some(copy_to_rgba_image);
         film.clear();
         film
     }
@@ -160,7 +159,7 @@ impl Film {
         _swl: Expr<SampledWavelengths>,
         weight: Expr<f32>,
     ) {
-        let splat = self.splat.var();
+        let data = self.data.var();
         let i = self.linear_index(p);
         let nvalues = self.repr.nvalues();
         let color = color.remove_nan() * weight;
@@ -171,7 +170,10 @@ impl Film {
                     track!({
                         let v = rgb[c as i32];
                         let v = select(v.is_nan(), 0.0f32.expr(), v);
-                        splat.atomic_fetch_add(i * nvalues as u32 + c as u32, v);
+                        data.atomic_fetch_add(
+                            self.splat_offset() + i * nvalues as u32 + c as u32,
+                            v,
+                        );
                     });
                 }
             }
@@ -187,8 +189,7 @@ impl Film {
         weight: Expr<f32>,
     ) {
         let color = color.remove_nan() * weight;
-        let pixels = self.pixels.var();
-        let weights = self.weights.var();
+        let data = self.data.var();
         let i = self.linear_index(p);
         let nvalues = self.repr.nvalues();
         match self.repr {
@@ -197,65 +198,26 @@ impl Film {
                 (0..nvalues).for_each(|c| {
                     let v = rgb[c as i32];
                     let j = i * nvalues as u32 + c as u32;
-                    pixels.write(j, pixels.read(j) + v);
+                    data.write(j, data.read(j) + v);
                 });
-                weights.write(i, weights.read(i) + weight);
+                data.write(
+                    self.weight_offset() + i,
+                    data.read(self.weight_offset() + i) + weight,
+                );
             }
             _ => todo!(),
         }
     }
     #[tracked]
     pub fn clear(&self) {
-        self.pixels.view(..).fill(0.0);
-        self.weights.view(..).fill(0.0);
+        self.data.view(..).fill(0.0);
     }
-    /// merge the content of `other` into `self`
-    /// `self` and `other` must have the same resolution
-    /// The splat buffer of `other` will be converted using `self.splat_scale`
-    #[tracked]
-    pub fn merge(&self, other: &Self) {
-        assert_eq!(self.repr, other.repr);
-        assert_eq!(self.resolution, other.resolution);
-        Kernel::<fn(f32, f32)>::new(
-            &self.device,
-            &|self_splat_scale: Expr<f32>, other_splat_scale: Expr<f32>| {
-                let p = dispatch_id().xy();
-                let i = p.x + p.y * self.resolution.x;
-                let pixels = self.pixels.var();
-                let splat = self.splat.var();
-                let weights = self.weights.var();
-                let nvalues = self.repr.nvalues();
-                let w = other.weights.var().read(i);
-                weights.atomic_fetch_add(i, w);
-                escape!({
-                    for c in 0..nvalues {
-                        track!({
-                            // merge splat
-                            let s = safe_div(
-                                other.splat.var().read(i * nvalues as u32 + c as u32),
-                                self_splat_scale,
-                            ) * other_splat_scale;
-                            splat.atomic_fetch_add(i * nvalues as u32 + c as u32, s);
 
-                            // merge pixels
-                            let p = other.pixels.var().read(i * nvalues as u32 + c as u32);
-                            pixels.atomic_fetch_add(i * nvalues as u32 + c as u32, p * w);
-                        });
-                    }
-                });
-            },
-        )
-        .dispatch(
-            [self.resolution.x, self.resolution.y, 1],
-            &self.splat_scale,
-            &other.splat_scale,
-        );
-    }
     pub fn copy_to_rgba_image(&self, image: &Tex2d<Float4>, hdr: bool) {
         assert_eq!(image.width(), self.resolution.x);
         assert_eq!(image.height(), self.resolution.y);
 
-        self.copy_to_rgba_image.dispatch(
+        self.copy_to_rgba_image.as_ref().unwrap().dispatch(
             [self.resolution.x, self.resolution.y, 1],
             image,
             &self.splat_scale,

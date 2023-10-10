@@ -250,7 +250,7 @@ impl McmcOpt {
         &self,
         scene: &Arc<Scene>,
         filter: PixelFilter,
-        eval: &Evaluators,
+        color_pipeline: ColorPipeline,
         samples: &PssBuffer,
         independent: &IndependentSampler,
         chain_id: Expr<u32>,
@@ -279,12 +279,15 @@ impl McmcOpt {
         let res = scene.camera.resolution().expr();
         let p = sampler.next_2d() * res.cast_f32();
         let p = p.cast_i32().clamp(0, res.cast_i32() - 1);
-        let swl = sample_wavelengths(eval.color_repr(), &sampler).var();
-        let (ray, ray_color, ray_w) =
-            scene
-                .camera
-                .generate_ray(filter, p.cast_u32(), &sampler, eval.color_repr(), **swl);
-        let l = self.pt.radiance(scene, eval, ray, swl, &sampler) * ray_color * ray_w;
+        let swl = sample_wavelengths(color_pipeline.color_repr, &sampler).var();
+        let (ray, ray_color, ray_w) = scene.camera.generate_ray(
+            filter,
+            p.cast_u32(),
+            &sampler,
+            color_pipeline.color_repr,
+            **swl,
+        );
+        let l = self.pt.radiance(scene, color_pipeline, ray, swl, &sampler) * ray_color * ray_w;
         (
             p.cast_u32(),
             l,
@@ -297,7 +300,12 @@ impl McmcOpt {
         color.max().clamp(0.0f32.expr(), 1e5f32.expr())
         // 1.0f32.expr()
     }
-    fn bootstrap(&self, scene: &Arc<Scene>, filter: PixelFilter, eval: &Evaluators) -> RenderState {
+    fn bootstrap(
+        &self,
+        scene: &Arc<Scene>,
+        filter: PixelFilter,
+        color_pipeline: ColorPipeline,
+    ) -> RenderState {
         let seeds = init_pcg32_buffer_with_seed(self.device.clone(), self.n_bootstrap, 0);
         let fs = self
             .device
@@ -322,8 +330,16 @@ impl McmcOpt {
                 let seed = seeds.var().read(i);
                 let sampler = IndependentSampler::from_pcg32(seed.var());
                 // DON'T WRITE INTO sample_buffer
-                let (_p, _l, _swl, f, _) =
-                    self.evaluate(scene, filter, eval, &sample_buffer, &sampler, i, None, true);
+                let (_p, _l, _swl, f, _) = self.evaluate(
+                    scene,
+                    filter,
+                    color_pipeline,
+                    &sample_buffer,
+                    &sampler,
+                    i,
+                    None,
+                    true,
+                );
                 fs.var().write(i, f);
             })
             .dispatch([self.n_bootstrap as u32, 1, 1]);
@@ -337,7 +353,11 @@ impl McmcOpt {
         );
         let resampled = self.device.create_buffer_from_slice(&resampled);
         let states = self.device.create_buffer(self.n_chains);
-        let cur_colors = ColorBuffer::new(self.device.clone(), self.n_chains, eval.color_repr());
+        let cur_colors = ColorBuffer::new(
+            self.device.clone(),
+            self.n_chains,
+            color_pipeline.color_repr,
+        );
 
         self.device
             .create_kernel::<fn()>(&track!(|| {
@@ -356,7 +376,7 @@ impl McmcOpt {
                 let (p, l, swl, f, _) = self.evaluate(
                     scene,
                     filter,
-                    eval,
+                    color_pipeline,
                     &sample_buffer,
                     &sampler,
                     i,
@@ -382,7 +402,7 @@ impl McmcOpt {
     fn mutate_chain(
         &self,
         scene: &Arc<Scene>,
-        eval: &Evaluators,
+        color_pipeline: ColorPipeline,
         render_state: &RenderState,
         film: &Film,
         contribution: Expr<f32>,
@@ -414,7 +434,7 @@ impl McmcOpt {
                 let (proposal_p, proposal_color, proposal_swl, f, proposal_dim) = self.evaluate(
                     scene,
                     film.filter(),
-                    eval,
+                    color_pipeline,
                     &render_state.samples,
                     &rng,
                     **state.chain_id,
@@ -483,7 +503,7 @@ impl McmcOpt {
     fn advance_chain(
         &self,
         scene: &Arc<Scene>,
-        eval: &Evaluators,
+        color_pipeline: ColorPipeline,
         render_state: &RenderState,
         film: &Film,
         mutations_per_chain: Expr<u32>,
@@ -513,7 +533,7 @@ impl McmcOpt {
             };
             self.mutate_chain(
                 scene,
-                eval,
+                color_pipeline,
                 render_state,
                 film,
                 contribution,
@@ -534,7 +554,7 @@ impl McmcOpt {
     fn render_loop(
         &self,
         scene: &Arc<Scene>,
-        eval: &Evaluators,
+        color_pipeline: ColorPipeline,
         state: &RenderState,
         film: &mut Film,
         session: &RenderSession,
@@ -554,7 +574,14 @@ impl McmcOpt {
                 } else {
                     set_block_size([256, 1, 1]);
                 }
-                self.advance_chain(scene, eval, state, film, mutations_per_chain, contribution)
+                self.advance_chain(
+                    scene,
+                    color_pipeline,
+                    state,
+                    film,
+                    mutations_per_chain,
+                    contribution,
+                )
             },
         );
         let reconstruct = |film: &mut Film, spp: u32| {
@@ -659,7 +686,7 @@ impl Integrator for McmcOpt {
             resolution.y,
             &self.config
         );
-    
+
         assert_eq!(resolution.x, film.resolution().x);
         assert_eq!(resolution.y, film.resolution().y);
         if self.config.direct_spp > 0 {
@@ -687,8 +714,8 @@ impl Integrator for McmcOpt {
                 &Default::default(),
             );
         }
-        let render_state = self.bootstrap(&scene, film.filter(), &evaluators);
-        self.render_loop(&scene, &evaluators, &render_state, film, options);
+        let render_state = self.bootstrap(&scene, film.filter(), color_pipeline);
+        self.render_loop(&scene, color_pipeline, &render_state, film, options);
     }
 }
 

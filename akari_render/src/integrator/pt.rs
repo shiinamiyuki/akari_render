@@ -158,7 +158,7 @@ impl<'a> PathTracerBase<'a> {
         si: SurfaceInteraction,
         ray: Expr<Ray>,
     ) -> (Color, Expr<f32>) {
-        let instance = self.scene.meshes.mesh_instances.read(si.inst_id);
+        let instance = self.scene.meshes.mesh_instances().read(si.inst_id);
         let depth = **self.depth;
 
         if instance.light.valid() & (!self.indirect_only | depth.gt(1)) {
@@ -485,7 +485,8 @@ impl Integrator for PathTracer {
                             swl,
                         );
                         let swl = swl.var();
-                        let l = self.radiance(&scene, color_pipeline, ray, swl, sampler) * ray_color;
+                        let l =
+                            self.radiance(&scene, color_pipeline, ray, swl, sampler) * ray_color;
                         film.add_sample(p.cast_f32(), &l, **swl, ray_w);
                     });
                 }

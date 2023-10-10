@@ -92,7 +92,7 @@ pub struct LightAggregate {
 impl LightAggregate {
     pub fn light(&self, si: SurfaceInteraction) -> PolymorphicRef<(), dyn Light> {
         let inst_id = si.inst_id;
-        let instance = self.meshes.mesh_instances.var().read(inst_id);
+        let instance = self.meshes.mesh_instances().read(inst_id);
         let light = self.lights.get(instance.light);
         light
     }
