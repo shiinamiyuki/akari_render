@@ -25,7 +25,7 @@ impl Surface for DisneyDiffuseBsdf {
         &self,
         wo: Expr<Float3>,
         wi: Expr<Float3>,
-        swl: Expr<SampledWavelengths>,
+        _swl: Expr<SampledWavelengths>,
         ctx: &BsdfEvalContext,
     ) -> Color {
         if Frame::same_hemisphere(wo, wi) {
@@ -55,24 +55,17 @@ impl Surface for DisneyDiffuseBsdf {
         }
     }
     #[tracked]
-    fn sample(
+    fn sample_wi(
         &self,
         wo: Expr<Float3>,
         _u_select: Expr<f32>,
         u_sample: Expr<Float2>,
-        swl: Var<SampledWavelengths>,
-        ctx: &BsdfEvalContext,
-    ) -> BsdfSample {
+        _swl: Var<SampledWavelengths>,
+        _ctx: &BsdfEvalContext,
+    ) -> (Expr<Float3>, Expr<bool>) {
         let wi = cos_sample_hemisphere(u_sample);
         let wi = select(Frame::same_hemisphere(wo, wi), wi, -wi);
-        let pdf = Frame::abs_cos_theta(wi) * FRAC_1_PI;
-        let color = self.evaluate(wo, wi, **swl, ctx);
-        BsdfSample {
-            wi,
-            pdf,
-            color,
-            valid: true.expr(),
-        }
+        (wi, true.expr())
     }
     #[tracked]
     fn pdf(

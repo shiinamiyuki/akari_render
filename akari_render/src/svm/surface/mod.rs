@@ -36,14 +36,14 @@ pub trait Surface {
         swl: Expr<SampledWavelengths>,
         ctx: &BsdfEvalContext,
     ) -> Color;
-    fn sample(
+    fn sample_wi(
         &self,
         wo: Expr<Float3>,
         u_select: Expr<f32>,
         u_sample: Expr<Float2>,
         swl: Var<SampledWavelengths>,
         ctx: &BsdfEvalContext,
-    ) -> BsdfSample;
+    ) -> (Expr<Float3>, Expr<bool>);
     fn pdf(
         &self,
         wo: Expr<Float3>,
@@ -99,23 +99,18 @@ impl Surface for EmissiveSurface {
         }
     }
 
-    fn sample(
+    fn sample_wi(
         &self,
         wo: Expr<Float3>,
         u_select: Expr<f32>,
         u_sample: Expr<Float2>,
         swl: Var<SampledWavelengths>,
         ctx: &BsdfEvalContext,
-    ) -> BsdfSample {
+    ) -> (Expr<Float3>, Expr<bool>) {
         if let Some(inner) = &self.inner {
-            inner.sample(wo, u_select, u_sample, swl, ctx)
+            inner.sample_wi(wo, u_select, u_sample, swl, ctx)
         } else {
-            BsdfSample {
-                wi: Float3::expr(0.0, 0.0, 0.0),
-                pdf: 0.0f32.expr(),
-                color: Color::zero(ctx.color_repr),
-                valid: false.expr(),
-            }
+            (Expr::<Float3>::zeroed(), false.expr())
         }
     }
 
@@ -187,17 +182,15 @@ impl Surface for ScaledBsdf {
         self.inner.evaluate(wo, wi, swl, ctx) * self.weight
     }
 
-    fn sample(
+    fn sample_wi(
         &self,
         wo: Expr<Float3>,
         u_select: Expr<f32>,
         u_sample: Expr<Float2>,
         swl: Var<SampledWavelengths>,
         ctx: &BsdfEvalContext,
-    ) -> BsdfSample {
-        let mut sample = self.inner.sample(wo, u_select, u_sample, swl, ctx);
-        sample.color = sample.color * self.weight;
-        sample
+    ) -> (Expr<Float3>, Expr<bool>) {
+        self.inner.sample_wi(wo, u_select, u_sample, swl, ctx)
     }
 
     fn pdf(
@@ -280,63 +273,23 @@ impl Surface for BsdfMixture {
         }
     }
     #[tracked]
-    fn sample(
+    fn sample_wi(
         &self,
         wo: Expr<Float3>,
         u_select: Expr<f32>,
         u_sample: Expr<Float2>,
         swl: Var<SampledWavelengths>,
         ctx: &BsdfEvalContext,
-    ) -> BsdfSample {
+    ) -> (Expr<Float3>, Expr<bool>) {
         let frac: Expr<f32> = (self.frac)(wo, ctx);
         let (which, remapped) =
             weighted_discrete_choice2_and_remap(frac, 1u32.expr(), 0u32.expr(), u_select);
         let zero_f = Color::zero(ctx.color_repr);
         let zero_pdf = 0.0f32.expr();
         if which.eq(0) {
-            let mut sample = self.bsdf_a.sample(wo, remapped, u_sample, swl, ctx);
-            let (f_b, pdf_b) = {
-                if frac.gt(Self::EPS) {
-                    let f_b = self.bsdf_b.evaluate(wo, sample.wi, **swl, ctx);
-                    let pdf_b = self.bsdf_b.pdf(wo, sample.wi, **swl, ctx);
-                    (f_b, pdf_b)
-                } else {
-                    (zero_f, zero_pdf)
-                }
-            };
-            // cpu_dbg!(Float2::expr(sample.pdf, pdf_b));
-            match self.mode {
-                BsdfBlendMode::Addictive => {
-                    sample.color = sample.color + f_b;
-                }
-                BsdfBlendMode::Mix => {
-                    sample.color = sample.color * (1.0 - frac) + f_b * frac;
-                }
-            }
-
-            sample.pdf = sample.pdf * (1.0 - frac) + pdf_b * frac;
-            sample
+            self.bsdf_a.sample_wi(wo, remapped, u_sample, swl, ctx)
         } else {
-            let mut sample = self.bsdf_b.sample(wo, remapped, u_sample, swl, ctx);
-            let (f_a, pdf_a) = {
-                if frac.lt(1.0 - Self::EPS) {
-                    let f_a = self.bsdf_a.evaluate(wo, sample.wi, **swl, ctx);
-                    let pdf_a = self.bsdf_a.pdf(wo, sample.wi, **swl, ctx);
-                    (f_a, pdf_a)
-                } else {
-                    (zero_f, zero_pdf)
-                }
-            };
-            match self.mode {
-                BsdfBlendMode::Addictive => {
-                    sample.color = sample.color + f_a;
-                }
-                BsdfBlendMode::Mix => {
-                    sample.color = f_a * (1.0 - frac) + sample.color * frac;
-                }
-            }
-            sample.pdf = pdf_a * (1.0 - frac) + sample.pdf * frac;
-            sample
+            self.bsdf_b.sample_wi(wo, remapped, u_sample, swl, ctx)
         }
     }
     #[tracked]
@@ -431,22 +384,18 @@ impl Surface for SurfaceClosure {
         self.inner
             .evaluate(self.frame.to_local(wo), self.frame.to_local(wi), swl, ctx)
     }
-
-    fn sample(
+    fn sample_wi(
         &self,
         wo: Expr<Float3>,
         u_select: Expr<f32>,
         u_sample: Expr<Float2>,
         swl: Var<SampledWavelengths>,
         ctx: &BsdfEvalContext,
-    ) -> BsdfSample {
-        let sample = self
-            .inner
-            .sample(self.frame.to_local(wo), u_select, u_sample, swl, ctx);
-        BsdfSample {
-            wi: self.frame.to_world(sample.wi),
-            ..sample
-        }
+    ) -> (Expr<Float3>, Expr<bool>) {
+        let (wi, valid) =
+            self.inner
+                .sample_wi(self.frame.to_local(wo), u_select, u_sample, swl, ctx);
+        (self.frame.to_world(wi), valid)
     }
 
     fn pdf(
@@ -482,6 +431,27 @@ impl Surface for SurfaceClosure {
         ctx: &BsdfEvalContext,
     ) -> Color {
         self.inner.emission(self.frame.to_local(wo), swl, ctx)
+    }
+}
+impl SurfaceClosure {
+    pub fn sample(
+        &self,
+        wo: Expr<Float3>,
+        u_select: Expr<f32>,
+        u_sample: Expr<Float2>,
+        swl: Var<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> BsdfSample {
+        let wo = self.frame.to_local(wo);
+        let (wi, valid) = self.inner.sample_wi(wo, u_select, u_sample, swl, ctx);
+        let color = self.inner.evaluate(wo, wi, **swl, ctx);
+        let pdf = self.inner.pdf(wo, wi, **swl, ctx);
+        BsdfSample {
+            wi: self.frame.to_world(wi),
+            color,
+            valid,
+            pdf,
+        }
     }
 }
 pub trait Fresnel {
@@ -524,23 +494,18 @@ impl Surface for MicrofacetReflection {
         }
     }
     #[tracked]
-    fn sample(
+    fn sample_wi(
         &self,
         wo: Expr<Float3>,
-        _u_select: Expr<f32>,
+        u_select: Expr<f32>,
         u_sample: Expr<Float2>,
         swl: Var<SampledWavelengths>,
         ctx: &BsdfEvalContext,
-    ) -> BsdfSample {
+    ) -> (Expr<Float3>, Expr<bool>) {
         let wh = self.dist.sample_wh(wo, u_sample, ctx.ad_mode);
         let wi = reflect(wo, wh);
         let valid = Frame::same_hemisphere(wo, wi);
-        BsdfSample {
-            color: self.evaluate(wo, wi, **swl, ctx),
-            pdf: self.pdf(wo, wi, **swl, ctx),
-            valid,
-            wi,
-        }
+        (wi, valid)
     }
     #[tracked]
     fn pdf(
@@ -650,26 +615,22 @@ impl Surface for MicrofacetTransmission {
         }
     }
     #[tracked]
-    fn sample(
+    fn sample_wi(
         &self,
         wo: Expr<Float3>,
-        _u_select: Expr<f32>,
+        u_select: Expr<f32>,
         u_sample: Expr<Float2>,
         swl: Var<SampledWavelengths>,
         ctx: &BsdfEvalContext,
-    ) -> BsdfSample {
+    ) -> (Expr<Float3>, Expr<bool>) {
         let wh = self.dist.sample_wh(wo, u_sample, ctx.ad_mode);
         let (refracted, _eta, wi) = refract(wo, wh, self.eta);
         let valid = refracted & !Frame::same_hemisphere(wo, wi);
-        let pdf = self.pdf(wo, wi, **swl, ctx);
-        let valid = valid & pdf.gt(0.0);
-        // lc_assert!(pdf.gt(0.0) | !valid);
-        BsdfSample {
-            pdf,
-            color: self.evaluate(wo, wi, **swl, ctx),
-            wi,
-            valid,
+        if debug_mode() {
+            let pdf = self.pdf(wo, wi, **swl, ctx);
+            lc_assert!(pdf.gt(0.0));
         }
+        (wi, valid)
     }
     #[tracked]
     fn pdf(

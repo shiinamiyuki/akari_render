@@ -30,24 +30,17 @@ impl Surface for DiffuseBsdf {
         }
     }
     #[tracked]
-    fn sample(
+    fn sample_wi(
         &self,
         wo: Expr<Float3>,
         _u_select: Expr<f32>,
         u_sample: Expr<Float2>,
         _swl: Var<SampledWavelengths>,
         _ctx: &BsdfEvalContext,
-    ) -> BsdfSample {
+    ) -> (Expr<Float3>, Expr<bool>) {
         let wi = cos_sample_hemisphere(u_sample);
         let wi = select(Frame::same_hemisphere(wo, wi), wi, -wi);
-        let pdf = Frame::abs_cos_theta(wi) * FRAC_1_PI;
-        let color = &self.reflectance * Frame::abs_cos_theta(wi);
-        BsdfSample {
-            wi,
-            pdf,
-            color,
-            valid: true.expr(),
-        }
+        (wi, true.expr())
     }
     #[tracked]
     fn pdf(
