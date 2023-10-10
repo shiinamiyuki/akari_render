@@ -1,782 +1,1382 @@
 {
-    "bsdfs": {
-        "backWall": {
-            "anisotropic": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "anisotropic_rotation": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "clearcoat": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "clearcoat_roughness": {
-                "type": "Float",
-                "value": 0.029999999329447746
-            },
-            "color": {
-                "type": "srgb",
-                "values": [
-                    0.8676987886428833,
-                    0.8596959114074707,
-                    0.8433891534805298
-                ]
-            },
-            "emission": {
-                "type": "linear",
-                "values": [
-                    0.0,
-                    0.0,
-                    0.0
-                ]
-            },
-            "ior": 1.4500000476837158,
-            "metallic": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "roughness": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "sheen": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "sheen_tint": {
-                "type": "Float",
-                "value": 0.5
-            },
-            "specular_tint": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "subsurface": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "subsurface_color": {
-                "type": "srgb",
-                "values": [
-                    0.0,
-                    0.0,
-                    0.0
-                ]
-            },
-            "subsurface_ior": {
-                "type": "Float",
-                "value": 1.4500000476837158
-            },
-            "subsurface_radius": {
-                "type": "linear",
-                "values": [
-                    1.0,
-                    0.20000000298023224,
-                    0.10000000149011612
-                ]
-            },
-            "transmission": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "type": "principled"
-        },
-        "ceiling": {
-            "anisotropic": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "anisotropic_rotation": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "clearcoat": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "clearcoat_roughness": {
-                "type": "Float",
-                "value": 0.029999999329447746
-            },
-            "color": {
-                "type": "srgb",
-                "values": [
-                    0.8676987886428833,
-                    0.8596959114074707,
-                    0.8433891534805298
-                ]
-            },
-            "emission": {
-                "type": "linear",
-                "values": [
-                    0.0,
-                    0.0,
-                    0.0
-                ]
-            },
-            "ior": 1.4500000476837158,
-            "metallic": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "roughness": {
-                "type": "Float",
-                "value": 0.40824830532073975
-            },
-            "sheen": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "sheen_tint": {
-                "type": "Float",
-                "value": 0.5
-            },
-            "specular": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "specular_tint": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "subsurface": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "subsurface_color": {
-                "type": "srgb",
-                "values": [
-                    0.0,
-                    0.0,
-                    0.0
-                ]
-            },
-            "subsurface_ior": {
-                "type": "Float",
-                "value": 1.4500000476837158
-            },
-            "subsurface_radius": {
-                "type": "linear",
-                "values": [
-                    1.0,
-                    0.20000000298023224,
-                    0.10000000149011612
-                ]
-            },
-            "transmission": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "type": "principled"
-        },
-        "floor": {
-            "anisotropic": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "anisotropic_rotation": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "clearcoat": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "clearcoat_roughness": {
-                "type": "Float",
-                "value": 0.029999999329447746
-            },
-            "color": {
-                "type": "srgb",
-                "values": [
-                    0.8676987886428833,
-                    0.8596959114074707,
-                    0.8433891534805298
-                ]
-            },
-            "emission": {
-                "type": "linear",
-                "values": [
-                    0.0,
-                    0.0,
-                    0.0
-                ]
-            },
-            "ior": 1.4500000476837158,
-            "metallic": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "roughness": {
-                "type": "Float",
-                "value": 0.40824830532073975
-            },
-            "sheen": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "sheen_tint": {
-                "type": "Float",
-                "value": 0.5
-            },
-            "specular": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "specular_tint": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "subsurface": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "subsurface_color": {
-                "type": "srgb",
-                "values": [
-                    0.0,
-                    0.0,
-                    0.0
-                ]
-            },
-            "subsurface_ior": {
-                "type": "Float",
-                "value": 1.4500000476837158
-            },
-            "subsurface_radius": {
-                "type": "linear",
-                "values": [
-                    1.0,
-                    0.20000000298023224,
-                    0.10000000149011612
-                ]
-            },
-            "transmission": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "type": "principled"
-        },
-        "leftWall": {
-            "anisotropic": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "anisotropic_rotation": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "clearcoat": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "clearcoat_roughness": {
-                "type": "Float",
-                "value": 0.029999999329447746
-            },
-            "color": {
-                "type": "srgb",
-                "values": [
-                    0.8152506351470947,
-                    0.2827792763710022,
-                    0.24780049920082092
-                ]
-            },
-            "emission": {
-                "type": "linear",
-                "values": [
-                    0.0,
-                    0.0,
-                    0.0
-                ]
-            },
-            "ior": 1.4500000476837158,
-            "metallic": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "roughness": {
-                "type": "Float",
-                "value": 0.40824830532073975
-            },
-            "sheen": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "sheen_tint": {
-                "type": "Float",
-                "value": 0.5
-            },
-            "specular": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "specular_tint": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "subsurface": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "subsurface_color": {
-                "type": "srgb",
-                "values": [
-                    0.0,
-                    0.0,
-                    0.0
-                ]
-            },
-            "subsurface_ior": {
-                "type": "Float",
-                "value": 1.4500000476837158
-            },
-            "subsurface_radius": {
-                "type": "linear",
-                "values": [
-                    1.0,
-                    0.20000000298023224,
-                    0.10000000149011612
-                ]
-            },
-            "transmission": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "type": "principled"
-        },
-        "light": {
-            "anisotropic": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "anisotropic_rotation": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "clearcoat": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "clearcoat_roughness": {
-                "type": "Float",
-                "value": 0.029999999329447746
-            },
-            "color": {
-                "type": "srgb",
-                "values": [
-                    0.8962438106536865,
-                    0.8962438106536865,
-                    0.8962438106536865
-                ]
-            },
-            "emission": {
-                "type": "linear",
-                "values": [
-                    17.0,
-                    12.0,
-                    4.0
-                ]
-            },
-            "ior":1.4500000476837158,
-            "metallic": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "roughness": {
-                "type": "Float",
-                "value": 0.40824830532073975
-            },
-            "sheen": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "sheen_tint": {
-                "type": "Float",
-                "value": 0.5
-            },
-            "specular": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "specular_tint": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "subsurface": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "subsurface_color": {
-                "type": "srgb",
-                "values": [
-                    0.0,
-                    0.0,
-                    0.0
-                ]
-            },
-            "subsurface_ior": {
-                "type": "Float",
-                "value": 1.4500000476837158
-            },
-            "subsurface_radius": {
-                "type": "linear",
-                "values": [
-                    1.0,
-                    0.20000000298023224,
-                    0.10000000149011612
-                ]
-            },
-            "transmission": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "type": "principled"
-        },
-        "rightWall": {
-            "anisotropic": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "anisotropic_rotation": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "clearcoat": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "clearcoat_roughness": {
-                "type": "Float",
-                "value": 0.029999999329447746
-            },
-            "color": {
-                "type": "srgb",
-                "values": [
-                    0.4100208580493927,
-                    0.701410710811615,
-                    0.33361509442329407
-                ]
-            },
-            "emission": {
-                "type": "linear",
-                "values": [
-                    0.0,
-                    0.0,
-                    0.0
-                ]
-            },
-            "ior": 1.4500000476837158,
-            "metallic": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "roughness": {
-                "type": "Float",
-                "value": 0.40824830532073975
-            },
-            "sheen": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "sheen_tint": {
-                "type": "Float",
-                "value": 0.5
-            },
-            "specular": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "specular_tint": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "subsurface": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "subsurface_color": {
-                "type": "srgb",
-                "values": [
-                    0.0,
-                    0.0,
-                    0.0
-                ]
-            },
-            "subsurface_ior": {
-                "type": "Float",
-                "value": 1.4500000476837158
-            },
-            "subsurface_radius": {
-                "type": "linear",
-                "values": [
-                    1.0,
-                    0.20000000298023224,
-                    0.10000000149011612
-                ]
-            },
-            "transmission": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "type": "principled"
-        },
-        "shortBox": {
-            "anisotropic": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "anisotropic_rotation": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "clearcoat": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "clearcoat_roughness": {
-                "type": "Float",
-                "value": 0.029999999329447746
-            },
-            "color": {
-                "type": "srgb",
-                "values": [
-                    0.8676987886428833,
-                    0.8596959114074707,
-                    0.8433891534805298
-                ]
-            },
-            "emission": {
-                "type": "linear",
-                "values": [
-                    0.0,
-                    0.0,
-                    0.0
-                ]
-            },
-            "ior": 1.4500000476837158,
-            "metallic": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "roughness": {
-                "type": "Float",
-                "value": 0.40824830532073975
-            },
-            "sheen": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "sheen_tint": {
-                "type": "Float",
-                "value": 0.5
-            },
-            "specular": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "specular_tint": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "subsurface": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "subsurface_color": {
-                "type": "srgb",
-                "values": [
-                    0.0,
-                    0.0,
-                    0.0
-                ]
-            },
-            "subsurface_ior": {
-                "type": "Float",
-                "value": 1.4500000476837158
-            },
-            "subsurface_radius": {
-                "type": "linear",
-                "values": [
-                    1.0,
-                    0.20000000298023224,
-                    0.10000000149011612
-                ]
-            },
-            "transmission": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "type": "principled"
-        },
-        "tallBox": {
-            "anisotropic": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "anisotropic_rotation": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "clearcoat": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "clearcoat_roughness": {
-                "type": "Float",
-                "value": 0.029999999329447746
-            },
-            "color": {
-                "type": "srgb",
-                "values": [
-                    0.99,
-                    0.99,
-                    0.99
-                ]
-            },
-            "emission": {
-                "type": "linear",
-                "values": [
-                    0.0,
-                    0.0,
-                    0.0
-                ]
-            },
-            "ior": 1.4500000476837158,
-            "metallic": {
-                "type": "Float",
-                "value": 1.0
-            },
-            "roughness": {
-                "type": "Float",
-                "value": 0.01
-            },
-            "sheen": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "sheen_tint": {
-                "type": "Float",
-                "value": 0.5
-            },
-            "specular": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "specular_tint": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "subsurface": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "subsurface_color": {
-                "type": "srgb",
-                "values": [
-                    0.0,
-                    0.0,
-                    0.0
-                ]
-            },
-            "subsurface_ior": {
-                "type": "Float",
-                "value": 1.4500000476837158
-            },
-            "subsurface_radius": {
-                "type": "linear",
-                "values": [
-                    1.0,
-                    0.20000000298023224,
-                    0.10000000149011612
-                ]
-            },
-            "transmission": {
-                "type": "Float",
-                "value": 0.0
-            },
-            "type": "principled"
-        }
-    },
     "camera": {
-        "focal": 1.0,
-        "fov": 15.0,
-        "lens_radius": 0.0,
-        "res": [
-            1024,
-            1024
-        ],
-        "transform": {
-            "center": [
-                0.0,
-                1.0,
-                0.0
-            ],
-            "eye": [
-                0.0,
-                1.0,
-                9.0
-            ],
-            "up": [
-                0.0,
-                1.0,
-                0.0
-            ]
-        },
-        "type": "perspective"
-    },
-    "lights": [],
-    "shapes": [
-        {
-            "bsdf": "floor",
-            "path": "CornellBox-Original_floor_0.mesh",
-            "transform": null,
-            "type": "mesh"
-        },
-        {
-            "bsdf": "ceiling",
-            "path": "CornellBox-Original_ceiling_1.mesh",
-            "transform": null,
-            "type": "mesh"
-        },
-        {
-            "bsdf": "backWall",
-            "path": "CornellBox-Original_backWall_2.mesh",
-            "transform": null,
-            "type": "mesh"
-        },
-        {
-            "bsdf": "rightWall",
-            "path": "CornellBox-Original_rightWall_3.mesh",
-            "transform": null,
-            "type": "mesh"
-        },
-        {
-            "bsdf": "leftWall",
-            "path": "CornellBox-Original_leftWall_4.mesh",
-            "transform": null,
-            "type": "mesh"
-        },
-        {
-            "bsdf": "shortBox",
-            "path": "CornellBox-Original_leftWall_5.mesh",
-            "transform": null,
-            "type": "mesh"
-        },
-        {
-            "bsdf": "tallBox",
-            "path": "CornellBox-Original_shortBox_6.mesh",
-            "transform": null,
-            "type": "mesh"
-        },
-        {
-            "bsdf": "light",
-            "path": "CornellBox-Original_light_7.mesh",
-            "transform": null,
-            "type": "mesh"
+        "Perspective": {
+            "transform": {
+                "TRS": {
+                    "translation": [
+                        0.0,
+                        -9.0,
+                        1.0
+                    ],
+                    "rotation": [
+                        1.5707963705062866,
+                        0.0,
+                        0.0
+                    ],
+                    "scale": [
+                        1.0,
+                        1.0,
+                        1.0
+                    ],
+                    "coordinate_system": "Blender"
+                }
+            },
+            "fov": 14.152756432007966,
+            "focal_distance": 10.0,
+            "fstop": 2.799999952316284,
+            "sensor_width": 1024,
+            "sensor_height": 1024
         }
-    ]
+    },
+    "instances": {
+        "CornellBox_Original": {
+            "geometry": {
+                "id": "CornellBox_Original_mesh"
+            },
+            "material": {
+                "id": "light_001"
+            },
+            "transform": {
+                "Matrix": [
+                    [
+                        1.0,
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        1.0,
+                        7.549790126404332e-08,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        -7.549790126404332e-08,
+                        1.0,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                    ]
+                ]
+            }
+        },
+        "CornellBox_Original_001": {
+            "geometry": {
+                "id": "CornellBox_Original_001_mesh"
+            },
+            "material": {
+                "id": "floor_001"
+            },
+            "transform": {
+                "Matrix": [
+                    [
+                        1.0,
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        1.0,
+                        7.549790126404332e-08,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        -7.549790126404332e-08,
+                        1.0,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                    ]
+                ]
+            }
+        },
+        "CornellBox_Original_002": {
+            "geometry": {
+                "id": "CornellBox_Original_002_mesh"
+            },
+            "material": {
+                "id": "ceiling_001"
+            },
+            "transform": {
+                "Matrix": [
+                    [
+                        1.0,
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        1.0,
+                        7.549790126404332e-08,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        -7.549790126404332e-08,
+                        1.0,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                    ]
+                ]
+            }
+        },
+        "CornellBox_Original_003": {
+            "geometry": {
+                "id": "CornellBox_Original_003_mesh"
+            },
+            "material": {
+                "id": "backWall_001"
+            },
+            "transform": {
+                "Matrix": [
+                    [
+                        1.0,
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        1.0,
+                        7.549790126404332e-08,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        -7.549790126404332e-08,
+                        1.0,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                    ]
+                ]
+            }
+        },
+        "CornellBox_Original_004": {
+            "geometry": {
+                "id": "CornellBox_Original_004_mesh"
+            },
+            "material": {
+                "id": "rightWall_001"
+            },
+            "transform": {
+                "Matrix": [
+                    [
+                        1.0,
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        1.0,
+                        7.549790126404332e-08,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        -7.549790126404332e-08,
+                        1.0,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                    ]
+                ]
+            }
+        },
+        "CornellBox_Original_005": {
+            "geometry": {
+                "id": "CornellBox_Original_005_mesh"
+            },
+            "material": {
+                "id": "leftWall_001"
+            },
+            "transform": {
+                "Matrix": [
+                    [
+                        1.0,
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        1.0,
+                        7.549790126404332e-08,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        -7.549790126404332e-08,
+                        1.0,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                    ]
+                ]
+            }
+        },
+        "CornellBox_Original_006": {
+            "geometry": {
+                "id": "CornellBox_Original_006_mesh"
+            },
+            "material": {
+                "id": "shortBox_001"
+            },
+            "transform": {
+                "Matrix": [
+                    [
+                        1.0,
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        1.0,
+                        7.549790126404332e-08,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        -7.549790126404332e-08,
+                        1.0,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                    ]
+                ]
+            }
+        },
+        "CornellBox_Original_007": {
+            "geometry": {
+                "id": "CornellBox_Original_007_mesh"
+            },
+            "material": {
+                "id": "tallBox_001"
+            },
+            "transform": {
+                "Matrix": [
+                    [
+                        1.0,
+                        0.0,
+                        0.0,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        1.0,
+                        7.549790126404332e-08,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        -7.549790126404332e-08,
+                        1.0,
+                        0.0
+                    ],
+                    [
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0
+                    ]
+                ]
+            }
+        }
+    },
+    "lights": {},
+    "geometries": {
+        "CornellBox_Original_mesh": {
+            "Mesh": {
+                "vertices": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_mesh.vert"
+                },
+                "indices": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_mesh.ind"
+                },
+                "normals": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_mesh.normal"
+                },
+                "uvs": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_mesh.uv"
+                },
+                "tangents": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_mesh.tangent"
+                },
+                "bitangent_signs": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_mesh.bitangent"
+                }
+            }
+        },
+        "CornellBox_Original_001_mesh": {
+            "Mesh": {
+                "vertices": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_001_mesh.vert"
+                },
+                "indices": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_001_mesh.ind"
+                },
+                "normals": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_001_mesh.normal"
+                },
+                "uvs": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_001_mesh.uv"
+                },
+                "tangents": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_001_mesh.tangent"
+                },
+                "bitangent_signs": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_001_mesh.bitangent"
+                }
+            }
+        },
+        "CornellBox_Original_002_mesh": {
+            "Mesh": {
+                "vertices": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_002_mesh.vert"
+                },
+                "indices": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_002_mesh.ind"
+                },
+                "normals": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_002_mesh.normal"
+                },
+                "uvs": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_002_mesh.uv"
+                },
+                "tangents": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_002_mesh.tangent"
+                },
+                "bitangent_signs": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_002_mesh.bitangent"
+                }
+            }
+        },
+        "CornellBox_Original_003_mesh": {
+            "Mesh": {
+                "vertices": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_003_mesh.vert"
+                },
+                "indices": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_003_mesh.ind"
+                },
+                "normals": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_003_mesh.normal"
+                },
+                "uvs": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_003_mesh.uv"
+                },
+                "tangents": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_003_mesh.tangent"
+                },
+                "bitangent_signs": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_003_mesh.bitangent"
+                }
+            }
+        },
+        "CornellBox_Original_004_mesh": {
+            "Mesh": {
+                "vertices": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_004_mesh.vert"
+                },
+                "indices": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_004_mesh.ind"
+                },
+                "normals": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_004_mesh.normal"
+                },
+                "uvs": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_004_mesh.uv"
+                },
+                "tangents": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_004_mesh.tangent"
+                },
+                "bitangent_signs": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_004_mesh.bitangent"
+                }
+            }
+        },
+        "CornellBox_Original_005_mesh": {
+            "Mesh": {
+                "vertices": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_005_mesh.vert"
+                },
+                "indices": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_005_mesh.ind"
+                },
+                "normals": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_005_mesh.normal"
+                },
+                "uvs": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_005_mesh.uv"
+                },
+                "tangents": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_005_mesh.tangent"
+                },
+                "bitangent_signs": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_005_mesh.bitangent"
+                }
+            }
+        },
+        "CornellBox_Original_006_mesh": {
+            "Mesh": {
+                "vertices": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_006_mesh.vert"
+                },
+                "indices": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_006_mesh.ind"
+                },
+                "normals": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_006_mesh.normal"
+                },
+                "uvs": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_006_mesh.uv"
+                },
+                "tangents": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_006_mesh.tangent"
+                },
+                "bitangent_signs": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_006_mesh.bitangent"
+                }
+            }
+        },
+        "CornellBox_Original_007_mesh": {
+            "Mesh": {
+                "vertices": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_007_mesh.vert"
+                },
+                "indices": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_007_mesh.ind"
+                },
+                "normals": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_007_mesh.normal"
+                },
+                "uvs": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_007_mesh.uv"
+                },
+                "tangents": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_007_mesh.tangent"
+                },
+                "bitangent_signs": {
+                    "External": "scenes/cbox/meshes/CornellBox_Original_007_mesh.bitangent"
+                }
+            }
+        }
+    },
+    "materials": {
+        "light_001": {
+            "shader": {
+                "nodes": {
+                    "$tmp_0": {
+                        "Rgb": {
+                            "value": [
+                                0.7799999713897705,
+                                0.7799999713897705,
+                                0.7799999713897705
+                            ],
+                            "colorspace": "srgb"
+                        }
+                    },
+                    "$tmp_1": {
+                        "SpectralUplift": {
+                            "id": "$tmp_0"
+                        }
+                    },
+                    "$tmp_2": {
+                        "Float": 0.8999999761581421
+                    },
+                    "$tmp_3": {
+                        "Float": 0.0
+                    },
+                    "$tmp_4": {
+                        "Float": 0.0
+                    },
+                    "$tmp_5": {
+                        "Float": 0.0
+                    },
+                    "$tmp_6": {
+                        "Rgb": {
+                            "value": [
+                                17.0,
+                                12.0,
+                                4.0
+                            ],
+                            "colorspace": "srgb"
+                        }
+                    },
+                    "$tmp_7": {
+                        "SpectralUplift": {
+                            "id": "$tmp_6"
+                        }
+                    },
+                    "$tmp_8": {
+                        "Float": 1.0
+                    },
+                    "$tmp_9": {
+                        "Float": 0.0
+                    },
+                    "$tmp_10": {
+                        "Float": 0.029999999329447746
+                    },
+                    "$tmp_11": {
+                        "Float": 0.0
+                    },
+                    "$tmp_12": {
+                        "Float": 1.0
+                    },
+                    "Principled_BSDF": {
+                        "PrincipledBsdf": {
+                            "color": {
+                                "id": "$tmp_1"
+                            },
+                            "roughness": {
+                                "id": "$tmp_2"
+                            },
+                            "metallic": {
+                                "id": "$tmp_3"
+                            },
+                            "specular": {
+                                "id": "$tmp_4"
+                            },
+                            "specular_tint": {
+                                "id": "$tmp_5"
+                            },
+                            "emission": {
+                                "id": "$tmp_7"
+                            },
+                            "emission_strength": {
+                                "id": "$tmp_8"
+                            },
+                            "clearcoat": {
+                                "id": "$tmp_9"
+                            },
+                            "clearcoat_roughness": {
+                                "id": "$tmp_10"
+                            },
+                            "transmission": {
+                                "id": "$tmp_11"
+                            },
+                            "ior": {
+                                "id": "$tmp_12"
+                            }
+                        }
+                    },
+                    "Material_Output": {
+                        "OutputSurface": {
+                            "surface": {
+                                "id": "Principled_BSDF"
+                            }
+                        }
+                    }
+                },
+                "out": {
+                    "id": "Material_Output"
+                }
+            }
+        },
+        "floor_001": {
+            "shader": {
+                "nodes": {
+                    "$tmp_0": {
+                        "Rgb": {
+                            "value": [
+                                0.7250000238418579,
+                                0.7099999785423279,
+                                0.6800000071525574
+                            ],
+                            "colorspace": "srgb"
+                        }
+                    },
+                    "$tmp_1": {
+                        "SpectralUplift": {
+                            "id": "$tmp_0"
+                        }
+                    },
+                    "$tmp_2": {
+                        "Float": 0.8999999761581421
+                    },
+                    "$tmp_3": {
+                        "Float": 0.0
+                    },
+                    "$tmp_4": {
+                        "Float": 0.0
+                    },
+                    "$tmp_5": {
+                        "Float": 0.0
+                    },
+                    "$tmp_6": {
+                        "Rgb": {
+                            "value": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "colorspace": "srgb"
+                        }
+                    },
+                    "$tmp_7": {
+                        "SpectralUplift": {
+                            "id": "$tmp_6"
+                        }
+                    },
+                    "$tmp_8": {
+                        "Float": 1.0
+                    },
+                    "$tmp_9": {
+                        "Float": 0.0
+                    },
+                    "$tmp_10": {
+                        "Float": 0.029999999329447746
+                    },
+                    "$tmp_11": {
+                        "Float": 0.0
+                    },
+                    "$tmp_12": {
+                        "Float": 1.0
+                    },
+                    "Principled_BSDF_0": {
+                        "PrincipledBsdf": {
+                            "color": {
+                                "id": "$tmp_1"
+                            },
+                            "roughness": {
+                                "id": "$tmp_2"
+                            },
+                            "metallic": {
+                                "id": "$tmp_3"
+                            },
+                            "specular": {
+                                "id": "$tmp_4"
+                            },
+                            "specular_tint": {
+                                "id": "$tmp_5"
+                            },
+                            "emission": {
+                                "id": "$tmp_7"
+                            },
+                            "emission_strength": {
+                                "id": "$tmp_8"
+                            },
+                            "clearcoat": {
+                                "id": "$tmp_9"
+                            },
+                            "clearcoat_roughness": {
+                                "id": "$tmp_10"
+                            },
+                            "transmission": {
+                                "id": "$tmp_11"
+                            },
+                            "ior": {
+                                "id": "$tmp_12"
+                            }
+                        }
+                    },
+                    "Material_Output_0": {
+                        "OutputSurface": {
+                            "surface": {
+                                "id": "Principled_BSDF_0"
+                            }
+                        }
+                    }
+                },
+                "out": {
+                    "id": "Material_Output_0"
+                }
+            }
+        },
+        "ceiling_001": {
+            "shader": {
+                "nodes": {
+                    "$tmp_0": {
+                        "Rgb": {
+                            "value": [
+                                0.7250000238418579,
+                                0.7099999785423279,
+                                0.6800000071525574
+                            ],
+                            "colorspace": "srgb"
+                        }
+                    },
+                    "$tmp_1": {
+                        "SpectralUplift": {
+                            "id": "$tmp_0"
+                        }
+                    },
+                    "$tmp_2": {
+                        "Float": 0.8999999761581421
+                    },
+                    "$tmp_3": {
+                        "Float": 0.0
+                    },
+                    "$tmp_4": {
+                        "Float": 0.0
+                    },
+                    "$tmp_5": {
+                        "Float": 0.0
+                    },
+                    "$tmp_6": {
+                        "Rgb": {
+                            "value": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "colorspace": "srgb"
+                        }
+                    },
+                    "$tmp_7": {
+                        "SpectralUplift": {
+                            "id": "$tmp_6"
+                        }
+                    },
+                    "$tmp_8": {
+                        "Float": 1.0
+                    },
+                    "$tmp_9": {
+                        "Float": 0.0
+                    },
+                    "$tmp_10": {
+                        "Float": 0.029999999329447746
+                    },
+                    "$tmp_11": {
+                        "Float": 0.0
+                    },
+                    "$tmp_12": {
+                        "Float": 1.0
+                    },
+                    "Principled_BSDF_1": {
+                        "PrincipledBsdf": {
+                            "color": {
+                                "id": "$tmp_1"
+                            },
+                            "roughness": {
+                                "id": "$tmp_2"
+                            },
+                            "metallic": {
+                                "id": "$tmp_3"
+                            },
+                            "specular": {
+                                "id": "$tmp_4"
+                            },
+                            "specular_tint": {
+                                "id": "$tmp_5"
+                            },
+                            "emission": {
+                                "id": "$tmp_7"
+                            },
+                            "emission_strength": {
+                                "id": "$tmp_8"
+                            },
+                            "clearcoat": {
+                                "id": "$tmp_9"
+                            },
+                            "clearcoat_roughness": {
+                                "id": "$tmp_10"
+                            },
+                            "transmission": {
+                                "id": "$tmp_11"
+                            },
+                            "ior": {
+                                "id": "$tmp_12"
+                            }
+                        }
+                    },
+                    "Material_Output_1": {
+                        "OutputSurface": {
+                            "surface": {
+                                "id": "Principled_BSDF_1"
+                            }
+                        }
+                    }
+                },
+                "out": {
+                    "id": "Material_Output_1"
+                }
+            }
+        },
+        "backWall_001": {
+            "shader": {
+                "nodes": {
+                    "$tmp_0": {
+                        "Rgb": {
+                            "value": [
+                                0.7250000238418579,
+                                0.7099999785423279,
+                                0.6800000071525574
+                            ],
+                            "colorspace": "srgb"
+                        }
+                    },
+                    "$tmp_1": {
+                        "SpectralUplift": {
+                            "id": "$tmp_0"
+                        }
+                    },
+                    "$tmp_2": {
+                        "Float": 0.8999999761581421
+                    },
+                    "$tmp_3": {
+                        "Float": 0.0
+                    },
+                    "$tmp_4": {
+                        "Float": 0.0
+                    },
+                    "$tmp_5": {
+                        "Float": 0.0
+                    },
+                    "$tmp_6": {
+                        "Rgb": {
+                            "value": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "colorspace": "srgb"
+                        }
+                    },
+                    "$tmp_7": {
+                        "SpectralUplift": {
+                            "id": "$tmp_6"
+                        }
+                    },
+                    "$tmp_8": {
+                        "Float": 1.0
+                    },
+                    "$tmp_9": {
+                        "Float": 0.0
+                    },
+                    "$tmp_10": {
+                        "Float": 0.029999999329447746
+                    },
+                    "$tmp_11": {
+                        "Float": 0.0
+                    },
+                    "$tmp_12": {
+                        "Float": 1.0
+                    },
+                    "Principled_BSDF_2": {
+                        "PrincipledBsdf": {
+                            "color": {
+                                "id": "$tmp_1"
+                            },
+                            "roughness": {
+                                "id": "$tmp_2"
+                            },
+                            "metallic": {
+                                "id": "$tmp_3"
+                            },
+                            "specular": {
+                                "id": "$tmp_4"
+                            },
+                            "specular_tint": {
+                                "id": "$tmp_5"
+                            },
+                            "emission": {
+                                "id": "$tmp_7"
+                            },
+                            "emission_strength": {
+                                "id": "$tmp_8"
+                            },
+                            "clearcoat": {
+                                "id": "$tmp_9"
+                            },
+                            "clearcoat_roughness": {
+                                "id": "$tmp_10"
+                            },
+                            "transmission": {
+                                "id": "$tmp_11"
+                            },
+                            "ior": {
+                                "id": "$tmp_12"
+                            }
+                        }
+                    },
+                    "Material_Output_2": {
+                        "OutputSurface": {
+                            "surface": {
+                                "id": "Principled_BSDF_2"
+                            }
+                        }
+                    }
+                },
+                "out": {
+                    "id": "Material_Output_2"
+                }
+            }
+        },
+        "rightWall_001": {
+            "shader": {
+                "nodes": {
+                    "$tmp_0": {
+                        "Rgb": {
+                            "value": [
+                                0.14000000059604645,
+                                0.44999998807907104,
+                                0.09099999815225601
+                            ],
+                            "colorspace": "srgb"
+                        }
+                    },
+                    "$tmp_1": {
+                        "SpectralUplift": {
+                            "id": "$tmp_0"
+                        }
+                    },
+                    "$tmp_2": {
+                        "Float": 0.8999999761581421
+                    },
+                    "$tmp_3": {
+                        "Float": 0.0
+                    },
+                    "$tmp_4": {
+                        "Float": 0.0
+                    },
+                    "$tmp_5": {
+                        "Float": 0.0
+                    },
+                    "$tmp_6": {
+                        "Rgb": {
+                            "value": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "colorspace": "srgb"
+                        }
+                    },
+                    "$tmp_7": {
+                        "SpectralUplift": {
+                            "id": "$tmp_6"
+                        }
+                    },
+                    "$tmp_8": {
+                        "Float": 1.0
+                    },
+                    "$tmp_9": {
+                        "Float": 0.0
+                    },
+                    "$tmp_10": {
+                        "Float": 0.029999999329447746
+                    },
+                    "$tmp_11": {
+                        "Float": 0.0
+                    },
+                    "$tmp_12": {
+                        "Float": 1.5
+                    },
+                    "Principled_BSDF_3": {
+                        "PrincipledBsdf": {
+                            "color": {
+                                "id": "$tmp_1"
+                            },
+                            "roughness": {
+                                "id": "$tmp_2"
+                            },
+                            "metallic": {
+                                "id": "$tmp_3"
+                            },
+                            "specular": {
+                                "id": "$tmp_4"
+                            },
+                            "specular_tint": {
+                                "id": "$tmp_5"
+                            },
+                            "emission": {
+                                "id": "$tmp_7"
+                            },
+                            "emission_strength": {
+                                "id": "$tmp_8"
+                            },
+                            "clearcoat": {
+                                "id": "$tmp_9"
+                            },
+                            "clearcoat_roughness": {
+                                "id": "$tmp_10"
+                            },
+                            "transmission": {
+                                "id": "$tmp_11"
+                            },
+                            "ior": {
+                                "id": "$tmp_12"
+                            }
+                        }
+                    },
+                    "Material_Output_3": {
+                        "OutputSurface": {
+                            "surface": {
+                                "id": "Principled_BSDF_3"
+                            }
+                        }
+                    }
+                },
+                "out": {
+                    "id": "Material_Output_3"
+                }
+            }
+        },
+        "leftWall_001": {
+            "shader": {
+                "nodes": {
+                    "$tmp_0": {
+                        "Rgb": {
+                            "value": [
+                                0.6299999952316284,
+                                0.06499999761581421,
+                                0.05000000074505806
+                            ],
+                            "colorspace": "srgb"
+                        }
+                    },
+                    "$tmp_1": {
+                        "SpectralUplift": {
+                            "id": "$tmp_0"
+                        }
+                    },
+                    "$tmp_2": {
+                        "Float": 0.8999999761581421
+                    },
+                    "$tmp_3": {
+                        "Float": 0.0
+                    },
+                    "$tmp_4": {
+                        "Float": 0.0
+                    },
+                    "$tmp_5": {
+                        "Float": 0.0
+                    },
+                    "$tmp_6": {
+                        "Rgb": {
+                            "value": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "colorspace": "srgb"
+                        }
+                    },
+                    "$tmp_7": {
+                        "SpectralUplift": {
+                            "id": "$tmp_6"
+                        }
+                    },
+                    "$tmp_8": {
+                        "Float": 1.0
+                    },
+                    "$tmp_9": {
+                        "Float": 0.0
+                    },
+                    "$tmp_10": {
+                        "Float": 0.029999999329447746
+                    },
+                    "$tmp_11": {
+                        "Float": 0.0
+                    },
+                    "$tmp_12": {
+                        "Float": 1.5
+                    },
+                    "Principled_BSDF_4": {
+                        "PrincipledBsdf": {
+                            "color": {
+                                "id": "$tmp_1"
+                            },
+                            "roughness": {
+                                "id": "$tmp_2"
+                            },
+                            "metallic": {
+                                "id": "$tmp_3"
+                            },
+                            "specular": {
+                                "id": "$tmp_4"
+                            },
+                            "specular_tint": {
+                                "id": "$tmp_5"
+                            },
+                            "emission": {
+                                "id": "$tmp_7"
+                            },
+                            "emission_strength": {
+                                "id": "$tmp_8"
+                            },
+                            "clearcoat": {
+                                "id": "$tmp_9"
+                            },
+                            "clearcoat_roughness": {
+                                "id": "$tmp_10"
+                            },
+                            "transmission": {
+                                "id": "$tmp_11"
+                            },
+                            "ior": {
+                                "id": "$tmp_12"
+                            }
+                        }
+                    },
+                    "Material_Output_4": {
+                        "OutputSurface": {
+                            "surface": {
+                                "id": "Principled_BSDF_4"
+                            }
+                        }
+                    }
+                },
+                "out": {
+                    "id": "Material_Output_4"
+                }
+            }
+        },
+        "shortBox_001": {
+            "shader": {
+                "nodes": {
+                    "$tmp_0": {
+                        "Rgb": {
+                            "value": [
+                                0.7250000238418579,
+                                0.7099999785423279,
+                                0.6800000071525574
+                            ],
+                            "colorspace": "srgb"
+                        }
+                    },
+                    "$tmp_1": {
+                        "SpectralUplift": {
+                            "id": "$tmp_0"
+                        }
+                    },
+                    "$tmp_2": {
+                        "Float": 0.8999999761581421
+                    },
+                    "$tmp_3": {
+                        "Float": 0.0
+                    },
+                    "$tmp_4": {
+                        "Float": 0.0
+                    },
+                    "$tmp_5": {
+                        "Float": 0.0
+                    },
+                    "$tmp_6": {
+                        "Rgb": {
+                            "value": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "colorspace": "srgb"
+                        }
+                    },
+                    "$tmp_7": {
+                        "SpectralUplift": {
+                            "id": "$tmp_6"
+                        }
+                    },
+                    "$tmp_8": {
+                        "Float": 1.0
+                    },
+                    "$tmp_9": {
+                        "Float": 0.0
+                    },
+                    "$tmp_10": {
+                        "Float": 0.029999999329447746
+                    },
+                    "$tmp_11": {
+                        "Float": 0.0
+                    },
+                    "$tmp_12": {
+                        "Float": 1.0
+                    },
+                    "Principled_BSDF_5": {
+                        "PrincipledBsdf": {
+                            "color": {
+                                "id": "$tmp_1"
+                            },
+                            "roughness": {
+                                "id": "$tmp_2"
+                            },
+                            "metallic": {
+                                "id": "$tmp_3"
+                            },
+                            "specular": {
+                                "id": "$tmp_4"
+                            },
+                            "specular_tint": {
+                                "id": "$tmp_5"
+                            },
+                            "emission": {
+                                "id": "$tmp_7"
+                            },
+                            "emission_strength": {
+                                "id": "$tmp_8"
+                            },
+                            "clearcoat": {
+                                "id": "$tmp_9"
+                            },
+                            "clearcoat_roughness": {
+                                "id": "$tmp_10"
+                            },
+                            "transmission": {
+                                "id": "$tmp_11"
+                            },
+                            "ior": {
+                                "id": "$tmp_12"
+                            }
+                        }
+                    },
+                    "Material_Output_5": {
+                        "OutputSurface": {
+                            "surface": {
+                                "id": "Principled_BSDF_5"
+                            }
+                        }
+                    }
+                },
+                "out": {
+                    "id": "Material_Output_5"
+                }
+            }
+        },
+        "tallBox_001": {
+            "shader": {
+                "nodes": {
+                    "$tmp_0": {
+                        "Rgb": {
+                            "value": [
+                                0.7250000238418579,
+                                0.7099999785423279,
+                                0.6800000071525574
+                            ],
+                            "colorspace": "srgb"
+                        }
+                    },
+                    "$tmp_1": {
+                        "SpectralUplift": {
+                            "id": "$tmp_0"
+                        }
+                    },
+                    "$tmp_2": {
+                        "Float": 0.08110232651233673
+                    },
+                    "$tmp_3": {
+                        "Float": 1.0
+                    },
+                    "$tmp_4": {
+                        "Float": 0.0
+                    },
+                    "$tmp_5": {
+                        "Float": 0.0
+                    },
+                    "$tmp_6": {
+                        "Rgb": {
+                            "value": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "colorspace": "srgb"
+                        }
+                    },
+                    "$tmp_7": {
+                        "SpectralUplift": {
+                            "id": "$tmp_6"
+                        }
+                    },
+                    "$tmp_8": {
+                        "Float": 1.0
+                    },
+                    "$tmp_9": {
+                        "Float": 0.0
+                    },
+                    "$tmp_10": {
+                        "Float": 0.029999999329447746
+                    },
+                    "$tmp_11": {
+                        "Float": 0.0
+                    },
+                    "$tmp_12": {
+                        "Float": 1.0
+                    },
+                    "Principled_BSDF_6": {
+                        "PrincipledBsdf": {
+                            "color": {
+                                "id": "$tmp_1"
+                            },
+                            "roughness": {
+                                "id": "$tmp_2"
+                            },
+                            "metallic": {
+                                "id": "$tmp_3"
+                            },
+                            "specular": {
+                                "id": "$tmp_4"
+                            },
+                            "specular_tint": {
+                                "id": "$tmp_5"
+                            },
+                            "emission": {
+                                "id": "$tmp_7"
+                            },
+                            "emission_strength": {
+                                "id": "$tmp_8"
+                            },
+                            "clearcoat": {
+                                "id": "$tmp_9"
+                            },
+                            "clearcoat_roughness": {
+                                "id": "$tmp_10"
+                            },
+                            "transmission": {
+                                "id": "$tmp_11"
+                            },
+                            "ior": {
+                                "id": "$tmp_12"
+                            }
+                        }
+                    },
+                    "Material_Output_6": {
+                        "OutputSurface": {
+                            "surface": {
+                                "id": "Principled_BSDF_6"
+                            }
+                        }
+                    }
+                },
+                "out": {
+                    "id": "Material_Output_6"
+                }
+            }
+        }
+    }
 }
