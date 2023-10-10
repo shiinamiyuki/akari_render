@@ -54,7 +54,7 @@ pub trait Integrator {
 // pub mod gpt;
 pub mod mcmc;
 pub mod mcmc_opt;
-// pub mod wfpt;
+pub mod wfpt;
 // pub mod mcmc_s;
 pub mod normal;
 pub mod pt;

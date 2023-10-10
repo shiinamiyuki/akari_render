@@ -45,16 +45,20 @@ impl Default for Config {
         }
     }
 }
-
-struct Status;
-impl Status {
-    const TERMINATED: u32 = 0;
+#[repr(u32)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum KernelState {
+    Terminated = 0,
+    ShaderSurface
 }
 #[derive(Clone, Copy, Debug, Soa, Value)]
 #[repr(C)]
 struct PathState {
-    si: SurfaceInteraction,
+    p: Float3,
+    bary: Float2,
     prev_ng: Float3,
+    inst_id: u32,
+    prim_id: u32,
     depth: u32,
     prev_bsdf_pdf: f32,
     spp: u32,
@@ -152,7 +156,7 @@ impl WavefrontPathTracer {
         };
         let status = states.status.read(tid);
         // only generate new camera rays if the current path is terminated
-        if status != Status::TERMINATED {
+        if status != KernelState::Terminated as u32 {
             return;
         };
     }
@@ -166,10 +170,12 @@ impl WavefrontPathTracer {
         let rays = self.rays.var();
         let states = self.states.var();
         let ray = rays.read(tid);
-        let si = self.scene.intersect(ray);
-        let state = states.read(tid).var();
-        *state.si = si;
-        states.write(tid, state);
+        let (hit, inst_id, prim_id, bary) = self.scene.intersect_hit_info(ray);
+        if hit {
+            states.bary.write(tid, bary);
+        } else {
+            states.status.write(tid, KernelState::Terminated as u32);
+        }
     }
     fn direct_lighting(&self) {}
     fn test_shadow(&self) {}

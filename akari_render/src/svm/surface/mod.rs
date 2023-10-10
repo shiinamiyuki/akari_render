@@ -1,18 +1,16 @@
 use std::rc::Rc;
 
-use crate::color::{ColorRepr, FlatColor, SampledWavelengths};
+use crate::color::{ColorRepr, ColorVar, FlatColor, SampledWavelengths};
 use crate::geometry::{face_forward, reflect, refract};
 use crate::microfacet::MicrofacetDistribution;
 use crate::sampling::weighted_discrete_choice2_and_remap;
 use crate::svm::eval::SvmEvaluator;
 use crate::{color::Color, geometry::Frame, interaction::SurfaceInteraction, *};
 
-use super::ShaderRef;
-
-pub struct BsdfEvalContext<'a> {
+#[derive(Clone, Copy, Debug)]
+pub struct BsdfEvalContext {
     pub color_repr: ColorRepr,
     pub ad_mode: ADMode,
-    pub _marker: std::marker::PhantomData<&'a ()>,
 }
 
 pub mod diffuse;
@@ -29,14 +27,14 @@ pub struct BsdfSample {
 
 pub trait Surface {
     // return f(wo, wi) * abs_cos_theta(wi)
-    fn evaluate(
+    fn evaluate_impl(
         &self,
         wo: Expr<Float3>,
         wi: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
         ctx: &BsdfEvalContext,
     ) -> Color;
-    fn sample_wi(
+    fn sample_wi_impl(
         &self,
         wo: Expr<Float3>,
         u_select: Expr<f32>,
@@ -44,31 +42,103 @@ pub trait Surface {
         swl: Var<SampledWavelengths>,
         ctx: &BsdfEvalContext,
     ) -> (Expr<Float3>, Expr<bool>);
-    fn pdf(
+    fn pdf_impl(
         &self,
         wo: Expr<Float3>,
         wi: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
         ctx: &BsdfEvalContext,
     ) -> Expr<f32>;
-    fn albedo(
+    fn albedo_impl(
         &self,
         wo: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
         ctx: &BsdfEvalContext,
     ) -> Color;
-    fn roughness(
+    fn roughness_impl(
         &self,
         wo: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
         ctx: &BsdfEvalContext,
     ) -> Expr<f32>;
-    fn emission(
+    fn emission_impl(
         &self,
         wo: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
         ctx: &BsdfEvalContext,
     ) -> Color;
+
+    /// wrappers
+
+    fn evaluate(
+        &self,
+        wo: Expr<Float3>,
+        wi: Expr<Float3>,
+        swl: Expr<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> Color {
+        let ret = ColorVar::zero(ctx.color_repr);
+        outline(|| ret.store(self.evaluate_impl(wo, wi, swl, ctx)));
+        ret.load()
+    }
+    fn sample_wi(
+        &self,
+        wo: Expr<Float3>,
+        u_select: Expr<f32>,
+        u_sample: Expr<Float2>,
+        swl: Var<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> (Expr<Float3>, Expr<bool>) {
+        let wi = Var::<Float3>::zeroed();
+        let valid = Var::<bool>::zeroed();
+        outline(|| {
+            let (wi_, valid_) = self.sample_wi_impl(wo, u_select, u_sample, swl, ctx);
+            wi.store(wi_);
+            valid.store(valid_);
+        });
+        (wi.load(), valid.load())
+    }
+    fn pdf(
+        &self,
+        wo: Expr<Float3>,
+        wi: Expr<Float3>,
+        swl: Expr<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> Expr<f32> {
+        let ret = Var::<f32>::zeroed();
+        outline(|| ret.store(self.pdf_impl(wo, wi, swl, ctx)));
+        ret.load()
+    }
+    fn albedo(
+        &self,
+        wo: Expr<Float3>,
+        swl: Expr<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> Color {
+        let ret = ColorVar::zero(ctx.color_repr);
+        outline(|| ret.store(self.albedo_impl(wo, swl, ctx)));
+        ret.load()
+    }
+    fn roughness(
+        &self,
+        wo: Expr<Float3>,
+        swl: Expr<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> Expr<f32> {
+        let ret = Var::<f32>::zeroed();
+        outline(|| ret.store(self.roughness_impl(wo, swl, ctx)));
+        ret.load()
+    }
+    fn emission(
+        &self,
+        wo: Expr<Float3>,
+        swl: Expr<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> Color {
+        let ret = ColorVar::zero(ctx.color_repr);
+        outline(|| ret.store(self.emission_impl(wo, swl, ctx)));
+        ret.load()
+    }
 }
 
 pub trait SurfaceShader {
@@ -85,7 +155,7 @@ pub struct EmissiveSurface {
     pub emission: Color,
 }
 impl Surface for EmissiveSurface {
-    fn evaluate(
+    fn evaluate_impl(
         &self,
         wo: Expr<Float3>,
         wi: Expr<Float3>,
@@ -99,7 +169,7 @@ impl Surface for EmissiveSurface {
         }
     }
 
-    fn sample_wi(
+    fn sample_wi_impl(
         &self,
         wo: Expr<Float3>,
         u_select: Expr<f32>,
@@ -114,7 +184,7 @@ impl Surface for EmissiveSurface {
         }
     }
 
-    fn pdf(
+    fn pdf_impl(
         &self,
         wo: Expr<Float3>,
         wi: Expr<Float3>,
@@ -128,7 +198,7 @@ impl Surface for EmissiveSurface {
         }
     }
 
-    fn albedo(
+    fn albedo_impl(
         &self,
         wo: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
@@ -141,7 +211,7 @@ impl Surface for EmissiveSurface {
         }
     }
 
-    fn roughness(
+    fn roughness_impl(
         &self,
         wo: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
@@ -154,7 +224,7 @@ impl Surface for EmissiveSurface {
         }
     }
 
-    fn emission(
+    fn emission_impl(
         &self,
         wo: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
@@ -172,7 +242,7 @@ pub struct ScaledBsdf {
     pub weight: Expr<f32>,
 }
 impl Surface for ScaledBsdf {
-    fn evaluate(
+    fn evaluate_impl(
         &self,
         wo: Expr<Float3>,
         wi: Expr<Float3>,
@@ -182,7 +252,7 @@ impl Surface for ScaledBsdf {
         self.inner.evaluate(wo, wi, swl, ctx) * self.weight
     }
 
-    fn sample_wi(
+    fn sample_wi_impl(
         &self,
         wo: Expr<Float3>,
         u_select: Expr<f32>,
@@ -193,7 +263,7 @@ impl Surface for ScaledBsdf {
         self.inner.sample_wi(wo, u_select, u_sample, swl, ctx)
     }
 
-    fn pdf(
+    fn pdf_impl(
         &self,
         wo: Expr<Float3>,
         wi: Expr<Float3>,
@@ -203,7 +273,7 @@ impl Surface for ScaledBsdf {
         self.inner.pdf(wo, wi, swl, ctx)
     }
 
-    fn albedo(
+    fn albedo_impl(
         &self,
         wo: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
@@ -212,7 +282,7 @@ impl Surface for ScaledBsdf {
         self.inner.albedo(wo, swl, ctx) * self.weight
     }
 
-    fn roughness(
+    fn roughness_impl(
         &self,
         wo: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
@@ -221,7 +291,7 @@ impl Surface for ScaledBsdf {
         self.inner.roughness(wo, swl, ctx)
     }
 
-    fn emission(
+    fn emission_impl(
         &self,
         wo: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
@@ -242,7 +312,7 @@ impl BsdfMixture {
 
 impl Surface for BsdfMixture {
     #[tracked]
-    fn evaluate(
+    fn evaluate_impl(
         &self,
         wo: Expr<Float3>,
         wi: Expr<Float3>,
@@ -273,7 +343,7 @@ impl Surface for BsdfMixture {
         }
     }
     #[tracked]
-    fn sample_wi(
+    fn sample_wi_impl(
         &self,
         wo: Expr<Float3>,
         u_select: Expr<f32>,
@@ -293,7 +363,7 @@ impl Surface for BsdfMixture {
         }
     }
     #[tracked]
-    fn pdf(
+    fn pdf_impl(
         &self,
         wo: Expr<Float3>,
         wi: Expr<Float3>,
@@ -315,7 +385,7 @@ impl Surface for BsdfMixture {
         pdf_a * (1.0 - frac) + pdf_b * frac
     }
     #[tracked]
-    fn albedo(
+    fn albedo_impl(
         &self,
         wo: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
@@ -333,7 +403,7 @@ impl Surface for BsdfMixture {
         }
     }
     #[tracked]
-    fn roughness(
+    fn roughness_impl(
         &self,
         wo: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
@@ -344,7 +414,7 @@ impl Surface for BsdfMixture {
             + self.bsdf_b.roughness(wo, swl, ctx) * frac
     }
     #[tracked]
-    fn emission(
+    fn emission_impl(
         &self,
         wo: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
@@ -370,7 +440,7 @@ pub struct SurfaceClosure {
 
 impl Surface for SurfaceClosure {
     // return f(wo, wi) * abs_cos_theta(wi)
-    fn evaluate(
+    fn evaluate_impl(
         &self,
         wo: Expr<Float3>,
         wi: Expr<Float3>,
@@ -384,7 +454,7 @@ impl Surface for SurfaceClosure {
         self.inner
             .evaluate(self.frame.to_local(wo), self.frame.to_local(wi), swl, ctx)
     }
-    fn sample_wi(
+    fn sample_wi_impl(
         &self,
         wo: Expr<Float3>,
         u_select: Expr<f32>,
@@ -398,7 +468,7 @@ impl Surface for SurfaceClosure {
         (self.frame.to_world(wi), valid)
     }
 
-    fn pdf(
+    fn pdf_impl(
         &self,
         wo: Expr<Float3>,
         wi: Expr<Float3>,
@@ -408,7 +478,7 @@ impl Surface for SurfaceClosure {
         self.inner
             .pdf(self.frame.to_local(wo), self.frame.to_local(wi), swl, ctx)
     }
-    fn albedo(
+    fn albedo_impl(
         &self,
         wo: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
@@ -416,7 +486,7 @@ impl Surface for SurfaceClosure {
     ) -> Color {
         self.inner.albedo(self.frame.to_local(wo), swl, ctx)
     }
-    fn roughness(
+    fn roughness_impl(
         &self,
         wo: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
@@ -424,7 +494,7 @@ impl Surface for SurfaceClosure {
     ) -> Expr<f32> {
         self.inner.roughness(self.frame.to_local(wo), swl, ctx)
     }
-    fn emission(
+    fn emission_impl(
         &self,
         wo: Expr<Float3>,
         swl: Expr<SampledWavelengths>,
@@ -465,7 +535,7 @@ pub struct MicrofacetReflection {
 
 impl Surface for MicrofacetReflection {
     #[tracked]
-    fn evaluate(
+    fn evaluate_impl(
         &self,
         wo: Expr<Float3>,
         wi: Expr<Float3>,
@@ -494,7 +564,7 @@ impl Surface for MicrofacetReflection {
         }
     }
     #[tracked]
-    fn sample_wi(
+    fn sample_wi_impl(
         &self,
         wo: Expr<Float3>,
         u_select: Expr<f32>,
@@ -508,7 +578,7 @@ impl Surface for MicrofacetReflection {
         (wi, valid)
     }
     #[tracked]
-    fn pdf(
+    fn pdf_impl(
         &self,
         wo: Expr<Float3>,
         wi: Expr<Float3>,
@@ -531,7 +601,7 @@ impl Surface for MicrofacetReflection {
             self.dist.pdf(wo, wh, ctx.ad_mode) / (4.0 * wo.dot(wh).abs())
         }
     }
-    fn albedo(
+    fn albedo_impl(
         &self,
         _wo: Expr<Float3>,
         _swl: Expr<SampledWavelengths>,
@@ -539,7 +609,7 @@ impl Surface for MicrofacetReflection {
     ) -> Color {
         self.color
     }
-    fn roughness(
+    fn roughness_impl(
         &self,
         _wo: Expr<Float3>,
         _swl: Expr<SampledWavelengths>,
@@ -547,7 +617,7 @@ impl Surface for MicrofacetReflection {
     ) -> Expr<f32> {
         self.dist.roughness(ctx.ad_mode)
     }
-    fn emission(
+    fn emission_impl(
         &self,
         _wo: Expr<Float3>,
         _swl: Expr<SampledWavelengths>,
@@ -566,7 +636,7 @@ pub struct MicrofacetTransmission {
 
 impl Surface for MicrofacetTransmission {
     #[tracked]
-    fn evaluate(
+    fn evaluate_impl(
         &self,
         wo: Expr<Float3>,
         wi: Expr<Float3>,
@@ -615,7 +685,7 @@ impl Surface for MicrofacetTransmission {
         }
     }
     #[tracked]
-    fn sample_wi(
+    fn sample_wi_impl(
         &self,
         wo: Expr<Float3>,
         u_select: Expr<f32>,
@@ -633,7 +703,7 @@ impl Surface for MicrofacetTransmission {
         (wi, valid)
     }
     #[tracked]
-    fn pdf(
+    fn pdf_impl(
         &self,
         wo: Expr<Float3>,
         wi: Expr<Float3>,
@@ -666,7 +736,7 @@ impl Surface for MicrofacetTransmission {
             )
         }
     }
-    fn albedo(
+    fn albedo_impl(
         &self,
         _wo: Expr<Float3>,
         _swl: Expr<SampledWavelengths>,
@@ -674,7 +744,7 @@ impl Surface for MicrofacetTransmission {
     ) -> Color {
         self.color
     }
-    fn roughness(
+    fn roughness_impl(
         &self,
         _wo: Expr<Float3>,
         _swl: Expr<SampledWavelengths>,
@@ -682,7 +752,7 @@ impl Surface for MicrofacetTransmission {
     ) -> Expr<f32> {
         self.dist.roughness(ctx.ad_mode)
     }
-    fn emission(
+    fn emission_impl(
         &self,
         _wo: Expr<Float3>,
         _swl: Expr<SampledWavelengths>,

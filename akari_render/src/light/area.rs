@@ -25,7 +25,7 @@ impl AreaLightExpr {
     ) -> Color {
         ctx.svm
             .dispatch_surface(self.surface, ctx.color_pipeline, si, swl, |closure| {
-                closure.emission(wo, swl, ctx.surface_eval_ctx)
+                closure.emission(wo, swl, &ctx.surface_eval_ctx)
             })
     }
 }

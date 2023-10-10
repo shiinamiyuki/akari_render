@@ -34,7 +34,7 @@ mod bsdf_chi2_test {
     fn pdf_histogram(
         device: &Device,
         wo: Float3,
-        sample: impl Fn(Expr<Float3>, Expr<Float3>) -> BsdfSample,
+        sample: impl Fn(Expr<Float3>, Expr<Float3>) -> (Expr<Float3>, Expr<bool>),
         sample_count: usize,
         threads: usize,
         theta_res: u32,
@@ -52,10 +52,10 @@ mod bsdf_chi2_test {
                 let sampler = IndependentSampler::from_pcg32(pcg);
                 for_range(0u32.expr()..samples, |_| {
                     let u = sampler.next_3d();
-                    let s = sample(wo, u);
-                    if s.valid {
+                    let (wi, valid) = sample(wo, u);
+                    if valid {
                         // cpu_dbg!(s.wi);
-                        let (theta, phi) = xyz_to_spherical(s.wi);
+                        let (theta, phi) = xyz_to_spherical(wi);
                         let phi = select(phi.lt(0.0), phi + 2.0 * PI, phi) / (2.0 * PI);
                         let theta = theta / PI;
                         // cpu_dbg!(Float2::expr(phi, theta));
@@ -317,15 +317,14 @@ plt.show()"#
                 wo,
                 |wo, u| {
                     let bsdf = bsdf();
-                    bsdf.sample(
+                    bsdf.sample_wi(
                         wo,
                         u.x,
                         u.yz(),
                         SampledWavelengthsExpr::rgb_wavelengths().var(),
                         &BsdfEvalContext {
                             color_repr: color::ColorRepr::Rgb(color::RgbColorSpace::SRgb),
-                            _marker: PhantomData {},
-                            ad_mode: ADMode::Backward,
+                            ad_mode: ADMode::None,
                         },
                     )
                 },
@@ -347,7 +346,6 @@ plt.show()"#
                         SampledWavelengthsExpr::rgb_wavelengths(),
                         &BsdfEvalContext {
                             color_repr: color::ColorRepr::Rgb(color::RgbColorSpace::SRgb),
-                            _marker: PhantomData {},
                             ad_mode: ADMode::None,
                         },
                     )

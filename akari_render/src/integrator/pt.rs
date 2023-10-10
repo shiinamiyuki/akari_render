@@ -9,7 +9,7 @@ use crate::{
     film::*,
     geometry::*,
     interaction::SurfaceInteraction,
-    light::LightEvalContext,
+    light::{Light, LightEvalContext},
     loop_,
     mesh::MeshInstance,
     sampler::*,
@@ -87,6 +87,19 @@ impl<'a> PathTracerBase<'a> {
     pub fn mul_beta(&self, r: Color) {
         self.beta.store(self.beta.load() * r);
     }
+    pub fn eval_context(&self) -> (LightEvalContext, BsdfEvalContext) {
+        let bsdf = BsdfEvalContext {
+            color_repr: self.color_pipeline.color_repr,
+            ad_mode: ADMode::None,
+        };
+        let light = LightEvalContext {
+            svm: &self.scene.svm,
+            meshes: &self.scene.meshes,
+            surface_eval_ctx: bsdf,
+            color_pipeline: self.color_pipeline,
+        };
+        (light, bsdf)
+    }
     pub fn sample_light(&self, si: SurfaceInteraction, u: Expr<Float3>) -> DirectLighting {
         if self.use_nee {
             track!({
@@ -101,16 +114,7 @@ impl<'a> PathTracerBase<'a> {
                         u.x,
                         u.yz(),
                         **self.swl,
-                        &LightEvalContext {
-                            svm: &self.scene.svm,
-                            meshes: &self.scene.meshes,
-                            surface_eval_ctx: &BsdfEvalContext {
-                                color_repr: self.color_pipeline.color_repr,
-                                _marker: PhantomData,
-                                ad_mode: ADMode::None,
-                            },
-                            color_pipeline: self.color_pipeline,
-                        },
+                        &self.eval_context().0,
                     );
                     if sample.valid {
                         let wi = sample.wi;
@@ -162,16 +166,7 @@ impl<'a> PathTracerBase<'a> {
         let depth = **self.depth;
 
         if instance.light.valid() & (!self.indirect_only | depth.gt(1)) {
-            let light_ctx = LightEvalContext {
-                svm: &self.scene.svm,
-                meshes: &self.scene.meshes,
-                surface_eval_ctx: &BsdfEvalContext {
-                    color_repr: self.color_pipeline.color_repr,
-                    _marker: PhantomData,
-                    ad_mode: ADMode::None,
-                },
-                color_pipeline: self.color_pipeline,
-            };
+            let light_ctx = self.eval_context().0;
             let direct = self.scene.lights.le(ray, si, **self.swl, &light_ctx);
             // cpu_dbg!(direct.flatten());
             if depth.eq(0) | !self.use_nee {
@@ -200,11 +195,7 @@ impl<'a> PathTracerBase<'a> {
         di_occluded: Expr<bool>,
         u_bsdf: Expr<Float3>,
     ) -> BsdfSample {
-        let ctx = BsdfEvalContext {
-            color_repr: self.color_pipeline.color_repr,
-            _marker: PhantomData,
-            ad_mode: ADMode::None,
-        };
+        let ctx = self.eval_context().1;
         if self.force_diffuse {
             let diffuse = Rc::new(DiffuseBsdf {
                 reflectance: Color::one(self.color_pipeline.color_repr)

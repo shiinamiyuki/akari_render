@@ -21,7 +21,7 @@ pub struct DisneyDiffuseBsdf {
 
 impl Surface for DisneyDiffuseBsdf {
     #[tracked]
-    fn evaluate(
+    fn evaluate_impl(
         &self,
         wo: Expr<Float3>,
         wi: Expr<Float3>,
@@ -55,7 +55,7 @@ impl Surface for DisneyDiffuseBsdf {
         }
     }
     #[tracked]
-    fn sample_wi(
+    fn sample_wi_impl(
         &self,
         wo: Expr<Float3>,
         _u_select: Expr<f32>,
@@ -68,7 +68,7 @@ impl Surface for DisneyDiffuseBsdf {
         (wi, true.expr())
     }
     #[tracked]
-    fn pdf(
+    fn pdf_impl(
         &self,
         wo: Expr<Float3>,
         wi: Expr<Float3>,
@@ -81,7 +81,7 @@ impl Surface for DisneyDiffuseBsdf {
             0.0f32.expr(),
         )
     }
-    fn albedo(
+    fn albedo_impl(
         &self,
         _wo: Expr<Float3>,
         _swl: Expr<SampledWavelengths>,
@@ -89,7 +89,7 @@ impl Surface for DisneyDiffuseBsdf {
     ) -> Color {
         self.reflectance
     }
-    fn roughness(
+    fn roughness_impl(
         &self,
         _wo: Expr<Float3>,
         _swl: Expr<SampledWavelengths>,
@@ -97,7 +97,7 @@ impl Surface for DisneyDiffuseBsdf {
     ) -> Expr<f32> {
         self.roughness
     }
-    fn emission(
+    fn emission_impl(
         &self,
         _wo: Expr<Float3>,
         _swl: Expr<SampledWavelengths>,

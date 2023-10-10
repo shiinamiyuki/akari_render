@@ -23,7 +23,7 @@ pub struct LightEvalContext<'a> {
     pub color_pipeline: ColorPipeline,
     pub meshes: &'a MeshAggregate,
     pub svm: &'a Svm,
-    pub surface_eval_ctx: &'a BsdfEvalContext<'a>,
+    pub surface_eval_ctx: BsdfEvalContext,
 }
 impl<'a> LightEvalContext<'a> {
     pub fn color_repr(&self) -> ColorRepr {

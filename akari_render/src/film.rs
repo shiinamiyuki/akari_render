@@ -198,12 +198,9 @@ impl Film {
                 (0..nvalues).for_each(|c| {
                     let v = rgb[c as i32];
                     let j = i * nvalues as u32 + c as u32;
-                    data.write(j, data.read(j) + v);
+                    data.atomic_fetch_add(j, v);
                 });
-                data.write(
-                    self.weight_offset() + i,
-                    data.read(self.weight_offset() + i) + weight,
-                );
+                data.atomic_fetch_add(self.weight_offset() + i, weight);
             }
             _ => todo!(),
         }

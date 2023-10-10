@@ -16,7 +16,7 @@ pub struct DiffuseBsdf {
 
 impl Surface for DiffuseBsdf {
     #[tracked]
-    fn evaluate(
+    fn evaluate_impl(
         &self,
         wo: Expr<Float3>,
         wi: Expr<Float3>,
@@ -30,7 +30,7 @@ impl Surface for DiffuseBsdf {
         }
     }
     #[tracked]
-    fn sample_wi(
+    fn sample_wi_impl(
         &self,
         wo: Expr<Float3>,
         _u_select: Expr<f32>,
@@ -43,7 +43,7 @@ impl Surface for DiffuseBsdf {
         (wi, true.expr())
     }
     #[tracked]
-    fn pdf(
+    fn pdf_impl(
         &self,
         wo: Expr<Float3>,
         wi: Expr<Float3>,
@@ -57,7 +57,7 @@ impl Surface for DiffuseBsdf {
         )
     }
     #[tracked]
-    fn albedo(
+    fn albedo_impl(
         &self,
         _wo: Expr<Float3>,
         _swl: Expr<SampledWavelengths>,
@@ -65,7 +65,7 @@ impl Surface for DiffuseBsdf {
     ) -> Color {
         self.reflectance * PI.expr()
     }
-    fn roughness(
+    fn roughness_impl(
         &self,
         _wo: Expr<Float3>,
         _swl: Expr<color::SampledWavelengths>,
@@ -73,7 +73,7 @@ impl Surface for DiffuseBsdf {
     ) -> Expr<f32> {
         1.0f32.expr()
     }
-    fn emission(
+    fn emission_impl(
         &self,
         _wo: Expr<Float3>,
         _swl: Expr<SampledWavelengths>,

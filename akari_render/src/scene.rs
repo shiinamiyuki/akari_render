@@ -145,6 +145,25 @@ impl Scene {
         )
     }
     #[tracked]
+    pub fn intersect_hit_info(
+        &self,
+        ray: Expr<Ray>,
+    ) -> (Expr<bool>, Expr<u32>, Expr<u32>, Expr<Float2>) {
+        if !self.use_rq {
+            let hit = self._trace_closest(ray);
+            let inst_id = hit.inst_id;
+            let prim_id = hit.prim_id;
+            let bary = Float2::expr(hit.u, hit.v);
+            (!hit.miss(), inst_id, prim_id, bary)
+        } else {
+            let hit = self._trace_closest_rq(ray);
+            let inst_id = hit.inst_id;
+            let prim_id = hit.prim_id;
+            let bary = hit.bary;
+            (hit.triangle_hit(), inst_id, prim_id, bary)
+        }
+    }
+    #[tracked]
     pub fn intersect(&self, ray: Expr<Ray>) -> SurfaceInteraction {
         if !self.use_rq {
             let hit = self._trace_closest(ray);
