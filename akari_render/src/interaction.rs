@@ -1,8 +1,4 @@
-use crate::{
-    geometry::{Frame, ShadingTriangle},
-    svm::ShaderRef,
-    *,
-};
+use crate::{geometry::Frame, svm::ShaderRef, *};
 
 #[derive(Clone, Copy, Debug, Value)]
 #[repr(C)]
@@ -23,6 +19,7 @@ pub struct SurfaceInteraction {
     pub inst_id: Expr<u32>,
     pub prim_id: Expr<u32>,
     pub surface: Expr<ShaderRef>,
+    pub prim_area: Expr<f32>,
     pub valid: Expr<bool>,
 }
 impl SurfaceInteraction {
@@ -39,6 +36,7 @@ impl SurfaceInteraction {
             inst_id: Expr::<u32>::zeroed(),
             prim_id: Expr::<u32>::zeroed(),
             surface: Expr::<ShaderRef>::zeroed(),
+            prim_area: Expr::<f32>::zeroed(),
             valid: false.expr(),
         }
     }

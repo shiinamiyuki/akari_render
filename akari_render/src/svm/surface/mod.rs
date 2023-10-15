@@ -301,6 +301,11 @@ impl Surface for ScaledBsdf {
     }
 }
 pub struct BsdfMixture {
+    /// `frac` controls how two bsdfs are mixed:
+    /// - Under [`BsdfBlendMode::Addictive`], frac is used as a MIS weight
+    /// - Under [`BsdfBlendMode::Mix`], frac is used to linearly interpolate between two bsdfs
+    /// 
+    /// *Note:* if frac depends on wo and mode is [`BsdfBlendMode::Mix`], then the Bsdf is not symmetric
     pub frac: Box<dyn Fn(Expr<Float3>, &BsdfEvalContext) -> Expr<f32>>,
     pub bsdf_a: Rc<dyn Surface>,
     pub bsdf_b: Rc<dyn Surface>,

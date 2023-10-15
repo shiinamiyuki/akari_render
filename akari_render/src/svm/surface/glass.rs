@@ -38,7 +38,7 @@ impl SurfaceShader for SvmGlassBsdf {
             frac: Box::new(move |wo, _| -> Expr<f32> { fr_dielectric(Frame::cos_theta(wo), eta) }),
             bsdf_a: transmission,
             bsdf_b: reflection,
-            mode: BsdfBlendMode::Mix,
+            mode: BsdfBlendMode::Addictive, // we already scaled both component using fresnel, so we can just add them
         });
         fresnel_blend
     }

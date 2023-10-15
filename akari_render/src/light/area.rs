@@ -67,24 +67,12 @@ impl Light for AreaLightExpr {
         let at = meshes.mesh_area_samplers(geometry);
         let (prim_id, pdf, _) = at.sample_and_remap(u_select);
         // let (prim_id, pdf) = (0u32.expr(), 1.0f32.expr());
-        let shading_triangle = meshes.shading_triangle(self.instance_id, prim_id);
-        let bary = uniform_sample_triangle(u_sample);
-        let area = shading_triangle.area();
-        let p = shading_triangle.p(bary);
-        let uv = shading_triangle.uv(bary);
-        let frame = shading_triangle.ortho_frame(bary);
 
-        let si = SurfaceInteraction {
-            inst_id: self.instance_id,
-            prim_id,
-            bary,
-            ng: shading_triangle.ng,
-            uv,
-            frame,
-            p,
-            surface: self.surface,
-            valid: true.expr(),
-        };
+        let bary = uniform_sample_triangle(u_sample);
+        let si = meshes.surface_interaction(self.instance_id, prim_id, bary);
+        let frame = si.frame;
+        let area = si.prim_area;
+        let p = si.p;
         let n = frame.n;
         let wi = p - pn.p;
         if wi.length_squared() == 0.0 {
@@ -142,16 +130,14 @@ impl Light for AreaLightExpr {
         if debug_mode() {
             lc_assert!(si.inst_id.eq(self.instance_id));
         }
-        let shading_triangle = meshes.shading_triangle(si.inst_id, si.prim_id);
-        let area = shading_triangle.area();
+        let area = si.prim_area;
         let prim_pdf = at.pdf(prim_id);
-        let bary = si.bary;
-        let n = shading_triangle.n(bary);
-        let p = shading_triangle.p(bary);
+        let ng = si.ng;
+        let p = si.p;
         let wi = p - pn.p;
         let dist2 = wi.length_squared();
         let wi = wi / dist2.sqrt();
-        let pdf = prim_pdf / area * dist2 / n.dot(-wi).max_(1e-6);
+        let pdf = prim_pdf / area * dist2 / ng.dot(-wi).max_(1e-6);
         pdf
     }
 }

@@ -1,6 +1,6 @@
 use std::{f32::consts::FRAC_1_PI, marker::PhantomData, rc::Rc, sync::Arc, time::Instant};
 
-use luisa::rtx::offset_ray_origin;
+use luisa::{rtx::offset_ray_origin, runtime::KernelBuildOptions};
 use rand::Rng;
 
 use super::{Integrator, RenderSession};
@@ -165,7 +165,11 @@ impl<'a> PathTracerBase<'a> {
 
         if instance.light.valid() & (!self.indirect_only | depth.gt(1)) {
             let light_ctx = self.eval_context().0;
-            let direct = self.scene.lights.le(ray, si, **self.swl, &light_ctx);
+            let direct = if self.force_diffuse {
+                Color::one(self.color_pipeline.color_repr) * 1.5f32.expr()
+            } else {
+                self.scene.lights.le(ray, si, **self.swl, &light_ctx)
+            };
             // cpu_dbg!(direct.flatten());
             if depth.eq(0) | !self.use_nee {
                 (direct, 1.0f32.expr())
@@ -451,36 +455,34 @@ impl Integrator for PathTracer {
         assert_eq!(resolution.x, film.resolution().x);
         assert_eq!(resolution.y, film.resolution().y);
         let sampler_creator = sampler_config.creator(self.device.clone(), &scene, self.spp);
-        let kernel =
-            self.device.create_kernel::<fn(u32, Int2)>(&track!(
-                |spp_per_pass: Expr<u32>, pixel_offset: Expr<Int2>| {
-                    set_block_size([16, 16, 1]);
-                    let p = dispatch_id().xy();
-                    let sampler = sampler_creator.create(p);
-                    let sampler = sampler.as_ref();
-                    for_range(0u32.expr()..spp_per_pass, |_| {
-                        sampler.start();
-                        let ip = p.cast_i32();
-                        let shifted = ip + pixel_offset;
-                        let shifted = shifted
-                            .clamp(0, resolution.expr().cast_i32() - 1)
-                            .cast_u32();
-                        let swl = sample_wavelengths(color_pipeline.color_repr, sampler);
-                        let (ray, ray_color, ray_w) = scene.camera.generate_ray(
-                            &scene,
-                            film.filter(),
-                            shifted,
-                            sampler,
-                            color_pipeline.color_repr,
-                            swl,
-                        );
-                        let swl = swl.var();
-                        let l =
-                            self.radiance(&scene, color_pipeline, ray, swl, sampler) * ray_color;
-                        film.add_sample(p.cast_f32(), &l, **swl, ray_w);
-                    });
-                }
-            ));
+        let kernel = self.device.create_kernel::<fn(u32, Int2)>(
+            &track!(|spp_per_pass: Expr<u32>, pixel_offset: Expr<Int2>| {
+                set_block_size([16, 16, 1]);
+                let p = dispatch_id().xy();
+                let sampler = sampler_creator.create(p);
+                let sampler = sampler.as_ref();
+                for_range(0u32.expr()..spp_per_pass, |_| {
+                    sampler.start();
+                    let ip = p.cast_i32();
+                    let shifted = ip + pixel_offset;
+                    let shifted = shifted
+                        .clamp(0, resolution.expr().cast_i32() - 1)
+                        .cast_u32();
+                    let swl = sample_wavelengths(color_pipeline.color_repr, sampler);
+                    let (ray, ray_color, ray_w) = scene.camera.generate_ray(
+                        &scene,
+                        film.filter(),
+                        shifted,
+                        sampler,
+                        color_pipeline.color_repr,
+                        swl,
+                    );
+                    let swl = swl.var();
+                    let l = self.radiance(&scene, color_pipeline, ray, swl, sampler) * ray_color;
+                    film.add_sample(p.cast_f32(), &l, **swl, ray_w);
+                });
+            }),
+        );
         log::info!(
             "Render kernel as {} arguments, {} captures!",
             kernel.num_arguments(),

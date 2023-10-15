@@ -20,27 +20,13 @@ pub struct Scene {
 }
 
 impl Scene {
-    pub fn si_from_hitinfo(
+    pub fn surface_interaction(
         &self,
         inst_id: Expr<u32>,
         prim_id: Expr<u32>,
         bary: Expr<Float2>,
     ) -> SurfaceInteraction {
-        let shading_triangle = self.meshes.shading_triangle(inst_id, prim_id);
-        let p = shading_triangle.p(bary);
-        let uv = shading_triangle.uv(bary);
-        let frame = shading_triangle.ortho_frame(bary);
-        SurfaceInteraction {
-            inst_id,
-            prim_id,
-            bary,
-            ng: shading_triangle.ng,
-            p,
-            uv,
-            frame,
-            valid: true.expr(),
-            surface: shading_triangle.surface,
-        }
+        self.meshes.surface_interaction(inst_id, prim_id, bary)
     }
     #[tracked]
     pub fn _trace_closest(&self, ray: Expr<Ray>) -> Expr<Hit> {
@@ -99,7 +85,7 @@ impl Scene {
                 let inst_id = hit.inst_id;
                 let prim_id = hit.prim_id;
                 let bary = Float2::expr(hit.u, hit.v);
-                self.si_from_hitinfo(inst_id, prim_id, bary)
+                self.surface_interaction(inst_id, prim_id, bary)
             } else {
                 SurfaceInteraction::invalid()
             }
@@ -109,7 +95,7 @@ impl Scene {
                 let inst_id = hit.inst_id;
                 let prim_id = hit.prim_id;
                 let bary = hit.bary;
-                self.si_from_hitinfo(inst_id, prim_id, bary)
+                self.surface_interaction(inst_id, prim_id, bary)
             } else {
                 SurfaceInteraction::invalid()
             }

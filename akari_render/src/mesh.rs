@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::geometry::ShadingTriangle;
+use crate::geometry::{Frame, FrameExpr};
 use crate::heap::MegaHeap;
+use crate::interaction::SurfaceInteraction;
 use crate::svm::ShaderRef;
 use crate::util::binserde::*;
 use crate::util::distribution::BindlessAliasTableVar;
 use crate::*;
 use crate::{geometry::AffineTransform, util::distribution::AliasTable};
-use luisa::resource::BufferHeap;
 use luisa::rtx::*;
 use serde::{Deserialize, Serialize};
 
@@ -168,6 +168,7 @@ pub struct MeshInstance {
     pub light: TagIndex,
     pub surface: ShaderRef,
     pub geom_id: u32,
+    pub transform_det: f32,
 }
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -237,10 +238,12 @@ impl MeshAggregate {
         }
         let mesh_instances = device.create_buffer_from_fn(instances.len(), |i| {
             let inst = instances[i];
+            let t: glam::Mat4 = inst.transform.m.into();
             MeshInstance {
                 light: inst.light,
                 surface: inst.surface,
                 geom_id: inst.geom_id,
+                transform_det: t.determinant(),
             }
         });
         let mesh_instance_idx = heap.bind_buffer(&mesh_instances);
@@ -305,7 +308,12 @@ impl MeshAggregate {
         self.heap.var().buffer(self.header.mesh_transforms)
     }
     #[tracked]
-    pub fn shading_triangle(&self, inst_id: Expr<u32>, prim_id: Expr<u32>) -> ShadingTriangle {
+    pub fn surface_interaction(
+        &self,
+        inst_id: Expr<u32>,
+        prim_id: Expr<u32>,
+        bary: Expr<Float2>,
+    ) -> SurfaceInteraction {
         let inst: Expr<MeshInstance> = self.mesh_instances().read(inst_id);
         let geom_id = inst.geom_id;
         let geometry = self
@@ -316,70 +324,119 @@ impl MeshAggregate {
         let vertices = self.mesh_vertices(geometry);
         let indices = self.mesh_indices(geometry);
         let i: Expr<Uint3> = indices.read(prim_id).into();
-        let transform = self.mesh_instance_transforms().read(inst_id);
 
-        let v0 = transform.transform_point(Expr::<Float3>::from(vertices.read(i.x)));
-        let v1 = transform.transform_point(Expr::<Float3>::from(vertices.read(i.y)));
-        let v2 = transform.transform_point(Expr::<Float3>::from(vertices.read(i.z)));
+        let (area_local, p_local, ng_local) = {
+            let v0 = Expr::<Float3>::from(vertices.read(i.x));
+            let v1 = Expr::<Float3>::from(vertices.read(i.y));
+            let v2 = Expr::<Float3>::from(vertices.read(i.z));
+            let p = v0 * (1.0 - bary.x - bary.y) + v1 * bary.x + v2 * bary.y;
+            let ng = (v1 - v0).cross(v2 - v0);
+            let len = ng.length();
+            let area = len * 0.5;
+            let ng = ng / len;
+            (area, p, ng)
+        };
         let prim_id3 = prim_id * 3;
-        let (uv0, uv1, uv2) = if geometry.uv_buf_idx != u32::MAX {
+        let uv = if geometry.uv_buf_idx != u32::MAX {
             let uvs = self.mesh_uvs(geometry);
-            let uv0 = uvs.read(prim_id3 + 0).into();
-            let uv1 = uvs.read(prim_id3 + 1).into();
-            let uv2 = uvs.read(prim_id3 + 2).into();
-            (uv0, uv1, uv2)
+            let uv0: Expr<Float2> = uvs.read(prim_id3 + 0).into();
+            let uv1: Expr<Float2> = uvs.read(prim_id3 + 1).into();
+            let uv2: Expr<Float2> = uvs.read(prim_id3 + 2).into();
+            uv0 * (1.0 - bary.x - bary.y) + uv1 * bary.x + uv2 * bary.y
         } else {
             let uv0 = Float2::expr(0.0, 0.0);
             let uv1 = Float2::expr(1.0, 0.0);
             let uv2 = Float2::expr(0.0, 0.1);
-            (uv0, uv1, uv2)
+            uv0 * (1.0 - bary.x - bary.y) + uv1 * bary.x + uv2 * bary.y
         };
-        let ng = (v1 - v0).cross(v2 - v0).normalize();
-        let (n0, n1, n2) = if geometry.normal_buf_idx != u32::MAX {
-            let normals = self.mesh_normals(geometry);
-            let n0 = transform.transform_normal(Expr::<Float3>::from(normals.read(prim_id3 + 0)));
-            let n1 = transform.transform_normal(Expr::<Float3>::from(normals.read(prim_id3 + 1)));
-            let n2 = transform.transform_normal(Expr::<Float3>::from(normals.read(prim_id3 + 2)));
-            (n0, n1, n2)
-        } else {
-            (ng, ng, ng)
-        };
-        let make_default = || {
-            let t0 = (v1 - v0).normalize();
-            let t1 = (v2 - v1).normalize();
-            let t2 = (v0 - v2).normalize();
-            (t0, t1, t2)
-        };
-        let (t0, t1, t2) = if geometry.tangent_buf_idx != u32::MAX {
-            let tangents = self.mesh_tangents(geometry);
-            // let bitangent_signs = self.mesh_bitangent_signs.buffer(geom_id);
-            let t0 = transform.transform_vector(Expr::<Float3>::from(tangents.read(prim_id3 + 0)));
-            let t1 = transform.transform_vector(Expr::<Float3>::from(tangents.read(prim_id3 + 1)));
-            let t2 = transform.transform_vector(Expr::<Float3>::from(tangents.read(prim_id3 + 2)));
-            let all_good = t0.is_finite().all() & t1.is_finite().all() & t2.is_finite().all();
-            if !all_good {
-                make_default()
+
+        let tt_local = {
+            let t0 = Var::<Float3>::zeroed();
+            let t1 = Var::<Float3>::zeroed();
+            let t2 = Var::<Float3>::zeroed();
+            let use_default = false.var();
+            let t = Var::<Float3>::zeroed();
+            if geometry.tangent_buf_idx != u32::MAX {
+                let tangents = self.mesh_tangents(geometry);
+                *t0 = Expr::<Float3>::from(tangents.read(prim_id3 + 0));
+                *t1 = Expr::<Float3>::from(tangents.read(prim_id3 + 1));
+                *t2 = Expr::<Float3>::from(tangents.read(prim_id3 + 2));
+                let all_good = t0.is_finite().all() & t1.is_finite().all() & t2.is_finite().all();
+                if !all_good {
+                    *use_default = true;
+                } else {
+                    *t = t0 * (1.0 - bary.x - bary.y) + t1 * bary.x + t2 * bary.y;
+                }
             } else {
-                (t0, t1, t2)
-            }
-        } else {
-            make_default()
+                *use_default = true;
+            };
+            if **use_default {
+                let v0 = Expr::<Float3>::from(vertices.read(i.x));
+                let v1 = Expr::<Float3>::from(vertices.read(i.y));
+                let v2 = Expr::<Float3>::from(vertices.read(i.z));
+
+                let t0 = (v1 - v0).normalize();
+                let t1 = (v2 - v1).normalize();
+                let t2 = (v0 - v2).normalize();
+                *t = t0 * (1.0 - bary.x - bary.y) + t1 * bary.x + t2 * bary.y;
+            };
+            **t
         };
-        ShadingTriangle {
-            v0,
-            v1,
-            v2,
-            uv0,
-            uv1,
-            uv2,
-            n0,
-            n1,
-            n2,
-            t0,
-            t1,
-            t2,
-            surface: inst.surface,
+
+        let ns_local = if geometry.normal_buf_idx != u32::MAX {
+            let normals = self.mesh_normals(geometry);
+            let n0 = Expr::<Float3>::from(normals.read(prim_id3 + 0));
+            let n1 = Expr::<Float3>::from(normals.read(prim_id3 + 1));
+            let n2 = Expr::<Float3>::from(normals.read(prim_id3 + 2));
+            n0 * (1.0 - bary.x - bary.y) + n1 * bary.x + n2 * bary.y
+        } else {
+            ng_local
+        };
+        // apply transform
+        lc_comment_lineno!("MeshAggregate::surface_inteaction apply transform");
+        let (area, p, ng, ns, tt) = {
+            let transform = self.mesh_instance_transforms().read(inst_id);
+            // let close_to_identity = transform.close_to_identity;
+            let m = transform.m;
+            let t = m[3].xyz();
+            let m = Mat3::from_elems_expr([m[0].xyz(), m[1].xyz(), m[2].xyz()]);
+            let p = m * p_local + t;
+            let tt = m * tt_local;
+
+            let area = area_local * inst.transform_det / (m * ng_local).length();
+
+            // let area = {
+            //     let v0 = Expr::<Float3>::from(vertices.read(i.x));
+            //     let v1 = Expr::<Float3>::from(vertices.read(i.y));
+            //     let v2 = Expr::<Float3>::from(vertices.read(i.z));
+            //     let e0 = m * (v1 - v0);
+            //     let e1 = m * (v2 - v0);
+            //     e0.cross(e1).length() * 0.5
+            // };
+            let m_inv_t = m.transpose().inverse();
+            let ng = (m_inv_t * ng_local).normalize();
+            let ns = (m_inv_t * ns_local).normalize();
+            (area, p, ng, ns, tt)
+        };
+        let ss = ns.cross(tt);
+        let frame = if ss.length_squared() > 0.0 {
+            let ss = ss.normalize();
+            let tt = ss.cross(ns).normalize();
+            Frame::new_expr(ns, tt, ss)
+        } else {
+            FrameExpr::from_n(ns)
+        };
+        SurfaceInteraction {
+            frame,
+            p,
             ng,
+            bary,
+            uv,
+            inst_id,
+            prim_id,
+            surface: inst.surface,
+            prim_area: area,
+            valid: true.expr(),
         }
     }
 }

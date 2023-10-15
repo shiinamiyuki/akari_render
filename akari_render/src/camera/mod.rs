@@ -76,6 +76,7 @@ impl Camera for PerspectiveCamera {
         color_repr: ColorRepr,
         _swl: Expr<SampledWavelengths>,
     ) -> (Expr<Ray>, Color, Expr<f32>) {
+        lc_comment_lineno!("Camera::generate_ray begin");
         let camera = scene
             .heap
             .var()
@@ -99,6 +100,7 @@ impl Camera for PerspectiveCamera {
         *ray.o = camera.c2w.transform_point(ray.o);
         *ray.d = camera.c2w.transform_vector(ray.d);
         // cpu_dbg!(ray);
+        lc_comment_lineno!("Camera::generate_ray end");
         (**ray, Color::one(color_repr), w)
     }
 }

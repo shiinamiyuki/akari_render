@@ -4,7 +4,6 @@ use crate::geometry::Frame;
 use crate::microfacet::TrowbridgeReitzDistribution;
 use crate::sampling::cos_sample_hemisphere;
 use crate::svm::{surface::*, SvmPrincipledBsdf};
-use crate::*;
 use std::f32::consts::FRAC_1_PI;
 
 use super::{BsdfEvalContext, FresnelSchlick, MicrofacetTransmission, SurfaceShader};
