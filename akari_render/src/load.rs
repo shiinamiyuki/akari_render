@@ -1,8 +1,9 @@
 use crate::{
     camera::{Camera, PerspectiveCamera},
     geometry::AffineTransform,
+    heap::MegaHeap,
     light::{area::AreaLight, Light, LightAggregate, WeightedLightDistribution},
-    mesh::{MeshAggregate, MeshBuffer, MeshInstance, TriangleMesh},
+    mesh::{MeshAggregate, MeshBuffer, MeshInstanceHost, TriangleMesh},
     node::{shader::Node, CoordinateSystem, Material, Ref, ShaderGraph},
     scene::Scene,
     svm::{
@@ -27,7 +28,6 @@ pub struct SceneLoader {
     device: Device,
     images: HashMap<String, image::DynamicImage>,
     textures: Vec<Tex2d<Float4>>,
-    texture_heap: BindlessArray,
     node_to_mesh: HashMap<Ref<node::Geometry>, (usize, Arc<TriangleMesh>)>,
     meshes: Vec<Arc<TriangleMesh>>,
     mesh_areas: RefCell<Vec<Vec<f32>>>,
@@ -38,6 +38,7 @@ pub struct SceneLoader {
     lights: PolymorphicBuilder<(), dyn Light>,
     nodes_to_surface_shader: HashMap<Ref<Material>, ShaderRef>,
     path_sampler_to_idx: HashMap<(String, TextureSampler), usize>,
+    heap: Arc<MegaHeap>,
 }
 
 fn load_buffer<T>(file_resolver: &dyn FileResolver, buffer: &node::Buffer) -> Vec<T>
@@ -101,7 +102,7 @@ impl SceneLoader {
     }
     fn estimate_surface_emission_power(
         &self,
-        instance: &MeshInstance,
+        instance: &MeshInstanceHost,
         surface: &ShaderGraph,
     ) -> f32 {
         let out = &surface[&surface.out];
@@ -194,6 +195,7 @@ impl SceneLoader {
                 let height = cam.sensor_height;
                 let cam = Arc::new(PerspectiveCamera::new(
                     self.device.clone(),
+                    &self.heap,
                     Uint2::new(width, height),
                     transform,
                     fov,
@@ -204,7 +206,7 @@ impl SceneLoader {
             }
         }
     }
-    fn load_instance(&self, instance: &node::Instance) -> (Ref<Material>, MeshInstance) {
+    fn load_instance(&self, instance: &node::Instance) -> (Ref<Material>, MeshInstanceHost) {
         let mat = &instance.material;
         let surface = self.nodes_to_surface_shader[mat];
         let transform = self.load_transform(&instance.transform, false);
@@ -216,7 +218,7 @@ impl SceneLoader {
                 let mesh_buffer = &self.mesh_buffers[geom_id];
                 (
                     mat.clone(),
-                    MeshInstance {
+                    MeshInstanceHost {
                         geom_id: geom_id as u32,
                         transform,
                         light: TagIndex::INVALID,
@@ -323,6 +325,7 @@ impl SceneLoader {
         );
         let mesh_aggregate = Arc::new(MeshAggregate::new(
             self.device.clone(),
+            &self.heap,
             &self.mesh_buffers.iter().collect::<Vec<_>>(),
             &instances,
         ));
@@ -331,15 +334,14 @@ impl SceneLoader {
             device,
             lights,
             surface_shader_compiler,
-            texture_heap,
             camera,
+            heap,
             ..
         } = self;
-
         let svm = Arc::new(Svm {
             device: device.clone(),
             surface_shaders: surface_shader_compiler.upload(&device),
-            image_textures: texture_heap,
+            heap: heap.clone(),
         });
         log::info!(
             "Shader variant count: {}",
@@ -357,6 +359,7 @@ impl SceneLoader {
             meshes: mesh_aggregate.clone(),
         };
         let printer = Printer::new(&device, 1024 * 1024 * 64);
+        heap.commit();
         Scene {
             svm,
             lights: light_aggregate,
@@ -365,6 +368,7 @@ impl SceneLoader {
             device,
             use_rq: false,
             printer, // env_map: todo!(),
+            heap,
         }
     }
     fn preload(device: Device, graph: node::Scene) -> Self {
@@ -459,9 +463,10 @@ impl SceneLoader {
             })
             .collect::<HashMap<_, _>>();
         log::info!("Loaded {} images", images.len());
-        let orded_image_paths = images.keys().collect::<Vec<_>>();
+        let mut ordered_image_paths = images.keys().collect::<Vec<_>>();
+        ordered_image_paths.sort();
         let textures = {
-            orded_image_paths
+            ordered_image_paths
                 .iter()
                 .map(|path| {
                     let img = &images[*path];
@@ -474,32 +479,26 @@ impl SceneLoader {
                 })
                 .collect::<Vec<_>>()
         };
-        let path_to_texture_idx = orded_image_paths
+        let heap = MegaHeap::new(device.clone(), 131072);
+        let path_to_texture_idx = ordered_image_paths
             .into_iter()
             .enumerate()
             .map(|(i, path)| (path.clone(), i))
             .collect::<HashMap<_, _>>();
-        let (texture_heap, path_sampler_to_idx) = {
+        let path_sampler_to_idx = {
             let mut path_sampler_to_idx = HashMap::new();
-            let mut to_be_commited_to_heap = vec![];
             for (path, sampler) in &path_samplers {
                 let key = (path.clone(), sampler.clone());
                 if let None = path_sampler_to_idx.get(&key) {
-                    let idx = to_be_commited_to_heap.len();
-                    to_be_commited_to_heap.push((path.clone(), sampler.clone()));
-                    path_sampler_to_idx.insert(key, idx);
+                    let idx = path_to_texture_idx[path];
+                    let idx = heap.bind_tex2d(&textures[idx], *sampler);
+                    path_sampler_to_idx.insert(key, idx as usize);
                 }
             }
-            let texture_heap = device.create_bindless_array(to_be_commited_to_heap.len().max(1));
-            for (i, (path, sampler)) in to_be_commited_to_heap.into_iter().enumerate() {
-                let idx = path_to_texture_idx[&path];
-                texture_heap.emplace_tex2d_async(i, &textures[idx], sampler);
-            }
-            if !path_sampler_to_idx.is_empty() {
-                texture_heap.update();
-            }
-            (texture_heap, path_sampler_to_idx)
+
+            path_sampler_to_idx
         };
+        // heap.commit();
         log::info!(
             "Texture Heap contains total {} (texture, sampler) tuples",
             path_sampler_to_idx.len()
@@ -512,7 +511,7 @@ impl SceneLoader {
             mesh_buffers,
             graph,
             camera: None,
-            texture_heap,
+            heap: Arc::new(heap),
             textures,
             surface_shader_compiler: CompilerDriver::new(),
             nodes_to_surface_shader: HashMap::new(),

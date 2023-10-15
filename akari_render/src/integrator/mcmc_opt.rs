@@ -3,7 +3,7 @@ use std::io::BufWriter;
 use std::sync::Arc;
 use std::time::Instant;
 
-use luisa::lang::debug::is_cpu_backend;
+use luisa::lang::debug::{comment, is_cpu_backend};
 
 use super::pt::{self, PathTracer};
 use super::{Integrator, IntermediateStats, RenderSession, RenderStats};
@@ -15,7 +15,7 @@ use crate::util::distribution::resample_with_f64;
 use crate::{color::*, film::*, sampler::*, scene::*, *};
 
 use super::mcmc::{Config, Method};
-pub type PssBuffer = SoaBuffer<PssSample>;
+pub type PssBuffer = Buffer<PssSample>;
 #[derive(Clone, Copy, Value, Debug, Soa)]
 #[repr(C, align(16))]
 #[value_new(pub)]
@@ -146,77 +146,82 @@ impl Mutator {
                 let kelemen_mutate_size_low = 1.0 / 1024.0f32;
                 let kelemen_mutate_size_high = 1.0 / 64.0f32;
                 let kelemen_log_ratio = -(kelemen_mutate_size_high / kelemen_mutate_size_low).ln();
-                let u = rng.next_1d();
-                let sample = samples.var().read(offset + i).var();
-                if sample.last_modified.lt(self.last_large_iter) {
-                    *sample.cur = rng.next_1d();
-                    *sample.last_modified = self.last_large_iter;
-                };
+                let ret = Var::<PssSample>::zeroed();
+                maybe_outline(|| {
+                    let sample = samples.var().read(offset + i).var();
+                    comment("mcmc mutate_one");
+                    let u = rng.next_1d();
+                    if sample.last_modified.lt(self.last_large_iter) {
+                        *sample.cur = rng.next_1d();
+                        *sample.last_modified = self.last_large_iter;
+                    };
 
-                *sample.backup = sample.cur;
-                *sample.modified_backup = sample.last_modified;
-                if self.is_large_step {
-                    *sample.cur = u;
-                } else {
-                    let is_cur_dim_under_image_mutation =
-                        image_mutation_size.is_some() & self.is_image_mutation;
-                    let should_cur_dim_be_mutated = !is_cur_dim_under_image_mutation | i.lt(2);
-                    let target_iter = if should_cur_dim_be_mutated {
-                        self.cur_iter
+                    *sample.backup = sample.cur;
+                    *sample.modified_backup = sample.last_modified;
+                    if self.is_large_step {
+                        *sample.cur = u;
                     } else {
-                        self.cur_iter - 1
-                    };
-                    lc_assert!(target_iter.ge(sample.last_modified));
-                    let n_small = target_iter - sample.last_modified;
-                    if exponential_mutation {
-                        let x = sample.cur.var();
-                        for_range(0u32.expr()..n_small, |_| {
-                            let u = rng.next_1d();
-                            if u.lt(1.0 - image_mutation_prob) {
-                                let u = u / (1.0 - image_mutation_prob);
-                                let record = KelemenMutationRecord::new_expr(
-                                    **x,
-                                    u,
-                                    kelemen_mutate_size_low,
-                                    kelemen_mutate_size_high,
-                                    kelemen_log_ratio,
-                                    0.0,
-                                )
-                                .var();
-                                KELEMEN_MUTATE.call(record);
-                                x.store(**record.mutated);
+                        let is_cur_dim_under_image_mutation =
+                            image_mutation_size.is_some() & self.is_image_mutation;
+                        let should_cur_dim_be_mutated = !is_cur_dim_under_image_mutation | i.lt(2);
+                        let target_iter = if should_cur_dim_be_mutated {
+                            self.cur_iter
+                        } else {
+                            self.cur_iter - 1
+                        };
+                        lc_assert!(target_iter.ge(sample.last_modified));
+                        let n_small = target_iter - sample.last_modified;
+                        if exponential_mutation {
+                            let x = sample.cur.var();
+                            for_range(0u32.expr()..n_small, |_| {
+                                let u = rng.next_1d();
+                                if u.lt(1.0 - image_mutation_prob) {
+                                    let u = u / (1.0 - image_mutation_prob);
+                                    let record = KelemenMutationRecord::new_expr(
+                                        **x,
+                                        u,
+                                        kelemen_mutate_size_low,
+                                        kelemen_mutate_size_high,
+                                        kelemen_log_ratio,
+                                        0.0,
+                                    )
+                                    .var();
+                                    KELEMEN_MUTATE.call(record);
+                                    x.store(**record.mutated);
+                                };
+                            });
+                            *sample.cur = x;
+                        } else {
+                            if n_small.gt(0) {
+                                // let tmp1 = (-2.0 * (1.0 - rng.next_1d()).ln()).sqrt();
+                                // let dv = tmp1 * (2.0 * PI * rng.next_1d()).cos();
+                                let dv = sample_gaussian(u);
+                                let new = sample.cur
+                                    + dv * small_sigma
+                                        * ((1.0 - image_mutation_prob) * n_small.cast_f32()).sqrt();
+                                let new = new - new.floor();
+                                let new = select(new.is_finite(), new, 0.0f32.expr());
+                                *sample.cur = new;
                             };
-                        });
-                        *sample.cur = x;
-                    } else {
-                        if n_small.gt(0) {
-                            // let tmp1 = (-2.0 * (1.0 - rng.next_1d()).ln()).sqrt();
-                            // let dv = tmp1 * (2.0 * PI * rng.next_1d()).cos();
-                            let dv = sample_gaussian(u);
-                            let new = sample.cur
-                                + dv * small_sigma
-                                    * ((1.0 - image_mutation_prob) * n_small.cast_f32()).sqrt();
-                            let new = new - new.floor();
-                            let new = select(new.is_finite(), new, 0.0f32.expr());
-                            *sample.cur = new;
                         };
+                        if image_mutation_size.is_some() {
+                            if self.is_image_mutation & i.lt(2) {
+                                let new = mutate_image_space_single(
+                                    **sample.cur,
+                                    rng,
+                                    image_mutation_size.unwrap().expr(),
+                                    self.res,
+                                    i,
+                                );
+                                *sample.cur = new;
+                            };
+                        }
                     };
-                    if image_mutation_size.is_some() {
-                        if self.is_image_mutation & i.lt(2) {
-                            let new = mutate_image_space_single(
-                                **sample.cur,
-                                rng,
-                                image_mutation_size.unwrap().expr(),
-                                self.res,
-                                i,
-                            );
-                            *sample.cur = new;
-                        };
-                    }
-                };
-                *sample.last_modified = self.cur_iter;
-                samples.var().write(offset + i, **sample);
-                **sample
+                    *sample.last_modified = self.cur_iter;
+                    samples.var().write(offset + i, **sample);
+                    *ret = sample;
+                });
+                **ret
             }
         }
     }
@@ -281,6 +286,7 @@ impl McmcOpt {
         let p = p.cast_i32().clamp(0, res.cast_i32() - 1);
         let swl = sample_wavelengths(color_pipeline.color_repr, &sampler).var();
         let (ray, ray_color, ray_w) = scene.camera.generate_ray(
+            &scene,
             filter,
             p.cast_u32(),
             &sampler,
@@ -312,7 +318,7 @@ impl McmcOpt {
             .create_buffer_from_fn(self.n_bootstrap, |_| 0.0f32);
         let sample_buffer = self
             .device
-            .create_soa_buffer(self.sample_dimension() * self.n_chains);
+            .create_buffer(self.sample_dimension() * self.n_chains);
         {
             let pss_samples =
                 self.sample_dimension() * self.n_chains * std::mem::size_of::<PssSample>();
@@ -583,6 +589,11 @@ impl McmcOpt {
                     contribution,
                 )
             },
+        );
+        log::info!(
+            "Render kernel as {} arguments, {} captures!",
+            kernel.num_arguments(),
+            kernel.num_capture_arguments()
         );
         let reconstruct = |film: &mut Film, spp: u32| {
             let states = state.states.copy_to_vec();

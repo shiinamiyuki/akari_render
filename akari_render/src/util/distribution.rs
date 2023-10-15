@@ -13,7 +13,7 @@ pub struct AliasTableEntry {
     pub t: f32,
 }
 
-pub struct AliasTable(pub Buffer<AliasTableEntry>, pub Buffer<f32>, Buffer<u32>);
+pub struct AliasTable(pub Buffer<AliasTableEntry>, pub Buffer<f32>);
 pub struct BindlessAliasTableVar(
     pub BindlessBufferVar<AliasTableEntry>,
     pub BindlessBufferVar<f32>,
@@ -73,22 +73,13 @@ impl AliasTable {
         Self(
             device.create_buffer_from_slice(&table),
             device.create_buffer_from_fn(prob.len(), |i| weights[i] / sum),
-            device.create_buffer_from_slice(&[table.len() as u32]),
         )
     }
     pub fn pdf(&self, i: Expr<u32>) -> Expr<f32> {
         self.1.var().read(i)
     }
     pub fn sample_and_remap(&self, u: Expr<f32>) -> (Expr<u32>, Expr<f32>, Expr<f32>) {
-        // let idx = (u.x * self.0.var().len().cast_f32()).cast_u32();
-        // let idx = idx.min(self.0.var().len() - 1);
-        // let entry = self.0.var().read(idx);
-        // let idx = select(u.y.ge(entry.t()), entry.j(), idx);
-        // let pdf = self.1.var().read(idx);
-        // (idx, pdf)
-        // lc_assert!((self.0.len() as u32).expr().eq(self.0.var().len_expr().as_u32()));
-        // let (idx, u) = uniform_discrete_choice_and_remap((self.0.len() as u32).expr(), u);
-        let (idx, u) = uniform_discrete_choice_and_remap(self.2.read(0), u);
+        let (idx, u) = uniform_discrete_choice_and_remap((self.0.len() as u32).expr(), u);
         let entry = self.0.var().read(idx);
         let (idx, u) = weighted_discrete_choice2_and_remap(entry.t, idx, entry.j, u);
         let pdf = self.1.var().read(idx);

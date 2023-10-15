@@ -2,6 +2,7 @@ use crate::{
     geometry::*,
     interaction::*,
     light::*,
+    mesh::MeshHeader,
     sampling::uniform_sample_triangle,
     svm::{surface::Surface, ShaderRef},
     util::distribution::{AliasTableEntry, BindlessAliasTableVar},
@@ -58,7 +59,12 @@ impl Light for AreaLightExpr {
         ctx: &LightEvalContext<'_>,
     ) -> LightSample {
         let meshes = ctx.meshes;
-        let at = meshes.mesh_area_samplers(self.geom_id);
+        let geometry = meshes
+            .heap
+            .var()
+            .buffer::<MeshHeader>(meshes.header.mesh_headers)
+            .read(self.geom_id);
+        let at = meshes.mesh_area_samplers(geometry);
         let (prim_id, pdf, _) = at.sample_and_remap(u_select);
         // let (prim_id, pdf) = (0u32.expr(), 1.0f32.expr());
         let shading_triangle = meshes.shading_triangle(self.instance_id, prim_id);
@@ -127,7 +133,12 @@ impl Light for AreaLightExpr {
     ) -> Expr<f32> {
         let prim_id = si.prim_id;
         let meshes = ctx.meshes;
-        let at = meshes.mesh_area_samplers(self.geom_id);
+        let geometry = meshes
+            .heap
+            .var()
+            .buffer::<MeshHeader>(meshes.header.mesh_headers)
+            .read(self.geom_id);
+        let at = meshes.mesh_area_samplers(geometry);
         if debug_mode() {
             lc_assert!(si.inst_id.eq(self.instance_id));
         }

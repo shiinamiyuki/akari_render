@@ -3,7 +3,7 @@ use std::{
     fmt::{Display, Write},
     hash::Hash,
     sync::Arc,
-    time::{Duration, Instant},
+    time::Instant,
 };
 
 use parking_lot::{Mutex, RwLock};

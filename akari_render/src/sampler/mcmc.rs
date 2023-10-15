@@ -186,16 +186,20 @@ pub fn mutate_image_space_single(
     res: Expr<Float2>,
     dim: Expr<u32>,
 ) -> Expr<f32> {
-    let u = sampler.next_1d();
-    let (u, add) = if u.lt(0.5) {
-        (u * 2.0, true.expr())
-    } else {
-        ((u - 0.5) * 2.0, false.expr())
-    };
-    let offset = u * mutation_size;
-    let offset = select(add, offset, -offset);
-    let new = cur + offset / select(dim.eq(0), res.x, res.y);
-    new - new.floor()
+    let ret = 0.0f32.var();
+    maybe_outline(|| {
+        let u = sampler.next_1d();
+        let (u, add) = if u.lt(0.5) {
+            (u * 2.0, true.expr())
+        } else {
+            ((u - 0.5) * 2.0, false.expr())
+        };
+        let offset = u * mutation_size;
+        let offset = select(add, offset, -offset);
+        let new = cur + offset / select(dim.eq(0), res.x, res.y);
+        *ret = new - new.floor();
+    });
+    **ret
 }
 // // mutates the image space coordinate within range [0, mutation_size]
 // fn mutate_image_space(

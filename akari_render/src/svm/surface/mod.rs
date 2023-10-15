@@ -78,7 +78,7 @@ pub trait Surface {
         ctx: &BsdfEvalContext,
     ) -> Color {
         let ret = ColorVar::zero(ctx.color_repr);
-        outline(|| ret.store(self.evaluate_impl(wo, wi, swl, ctx)));
+        maybe_outline(|| ret.store(self.evaluate_impl(wo, wi, swl, ctx)));
         ret.load()
     }
     fn sample_wi(
@@ -91,7 +91,7 @@ pub trait Surface {
     ) -> (Expr<Float3>, Expr<bool>) {
         let wi = Var::<Float3>::zeroed();
         let valid = Var::<bool>::zeroed();
-        outline(|| {
+        maybe_outline(|| {
             let (wi_, valid_) = self.sample_wi_impl(wo, u_select, u_sample, swl, ctx);
             wi.store(wi_);
             valid.store(valid_);
@@ -106,7 +106,7 @@ pub trait Surface {
         ctx: &BsdfEvalContext,
     ) -> Expr<f32> {
         let ret = Var::<f32>::zeroed();
-        outline(|| ret.store(self.pdf_impl(wo, wi, swl, ctx)));
+        maybe_outline(|| ret.store(self.pdf_impl(wo, wi, swl, ctx)));
         ret.load()
     }
     fn albedo(
@@ -116,7 +116,7 @@ pub trait Surface {
         ctx: &BsdfEvalContext,
     ) -> Color {
         let ret = ColorVar::zero(ctx.color_repr);
-        outline(|| ret.store(self.albedo_impl(wo, swl, ctx)));
+        maybe_outline(|| ret.store(self.albedo_impl(wo, swl, ctx)));
         ret.load()
     }
     fn roughness(
@@ -126,7 +126,7 @@ pub trait Surface {
         ctx: &BsdfEvalContext,
     ) -> Expr<f32> {
         let ret = Var::<f32>::zeroed();
-        outline(|| ret.store(self.roughness_impl(wo, swl, ctx)));
+        maybe_outline(|| ret.store(self.roughness_impl(wo, swl, ctx)));
         ret.load()
     }
     fn emission(
@@ -136,7 +136,7 @@ pub trait Surface {
         ctx: &BsdfEvalContext,
     ) -> Color {
         let ret = ColorVar::zero(ctx.color_repr);
-        outline(|| ret.store(self.emission_impl(wo, swl, ctx)));
+        maybe_outline(|| ret.store(self.emission_impl(wo, swl, ctx)));
         ret.load()
     }
 }
@@ -354,8 +354,6 @@ impl Surface for BsdfMixture {
         let frac: Expr<f32> = (self.frac)(wo, ctx);
         let (which, remapped) =
             weighted_discrete_choice2_and_remap(frac, 1u32.expr(), 0u32.expr(), u_select);
-        let zero_f = Color::zero(ctx.color_repr);
-        let zero_pdf = 0.0f32.expr();
         if which.eq(0) {
             self.bsdf_a.sample_wi(wo, remapped, u_sample, swl, ctx)
         } else {
@@ -504,6 +502,7 @@ impl Surface for SurfaceClosure {
     }
 }
 impl SurfaceClosure {
+    #[tracked]
     pub fn sample(
         &self,
         wo: Expr<Float3>,
@@ -519,7 +518,7 @@ impl SurfaceClosure {
         BsdfSample {
             wi: self.frame.to_world(wi),
             color,
-            valid,
+            valid: valid & pdf.gt(0.0),
             pdf,
         }
     }
@@ -567,9 +566,9 @@ impl Surface for MicrofacetReflection {
     fn sample_wi_impl(
         &self,
         wo: Expr<Float3>,
-        u_select: Expr<f32>,
+        _u_select: Expr<f32>,
         u_sample: Expr<Float2>,
-        swl: Var<SampledWavelengths>,
+        _swl: Var<SampledWavelengths>,
         ctx: &BsdfEvalContext,
     ) -> (Expr<Float3>, Expr<bool>) {
         let wh = self.dist.sample_wh(wo, u_sample, ctx.ad_mode);
@@ -688,7 +687,7 @@ impl Surface for MicrofacetTransmission {
     fn sample_wi_impl(
         &self,
         wo: Expr<Float3>,
-        u_select: Expr<f32>,
+        _u_select: Expr<f32>,
         u_sample: Expr<Float2>,
         swl: Var<SampledWavelengths>,
         ctx: &BsdfEvalContext,
@@ -698,7 +697,7 @@ impl Surface for MicrofacetTransmission {
         let valid = refracted & !Frame::same_hemisphere(wo, wi);
         if debug_mode() {
             let pdf = self.pdf(wo, wi, **swl, ctx);
-            lc_assert!(pdf.gt(0.0));
+            lc_assert!(pdf.ge(0.0));
         }
         (wi, valid)
     }

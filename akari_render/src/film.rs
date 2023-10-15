@@ -63,6 +63,7 @@ impl FilmColorRepr {
 }
 
 pub struct Film {
+    #[allow(dead_code)]
     device: Device,
     /// | pixels | splat | weights |
     pub(crate) data: Buffer<f32>,

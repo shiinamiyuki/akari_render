@@ -9,9 +9,7 @@ use crate::{
     film::*,
     geometry::*,
     interaction::SurfaceInteraction,
-    light::{Light, LightEvalContext},
-    loop_,
-    mesh::MeshInstance,
+    light::LightEvalContext,
     sampler::*,
     scene::*,
     svm::surface::{diffuse::DiffuseBsdf, *},
@@ -469,6 +467,7 @@ impl Integrator for PathTracer {
                             .cast_u32();
                         let swl = sample_wavelengths(color_pipeline.color_repr, sampler);
                         let (ray, ray_color, ray_w) = scene.camera.generate_ray(
+                            &scene,
                             film.filter(),
                             shifted,
                             sampler,
@@ -482,6 +481,11 @@ impl Integrator for PathTracer {
                     });
                 }
             ));
+        log::info!(
+            "Render kernel as {} arguments, {} captures!",
+            kernel.num_arguments(),
+            kernel.num_capture_arguments()
+        );
         let mut cnt = 0;
         let progress = util::create_progess_bar(self.spp as usize, "spp");
         let mut acc_time = 0.0;

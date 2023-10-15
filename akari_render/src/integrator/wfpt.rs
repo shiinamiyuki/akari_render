@@ -1,20 +1,7 @@
 use std::fmt::Display;
 
 use super::*;
-use crate::{
-    color::*,
-    film::*,
-    geometry::*,
-    interaction::SurfaceInteraction,
-    loop_,
-    mesh::MeshInstance,
-    sampler::*,
-    scene::*,
-    svm::surface::{diffuse::DiffuseBsdf, *},
-    util::profile::DispatchProfiler,
-    *,
-};
-use pt::PathTracerBase;
+use crate::{color::*, geometry::*, util::profile::DispatchProfiler};
 use serde::{Deserialize, Serialize};
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, Value)]
 #[serde(default)]
@@ -49,7 +36,7 @@ impl Default for Config {
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum KernelState {
     Terminated = 0,
-    ShaderSurface
+    ShaderSurface,
 }
 #[derive(Clone, Copy, Debug, Soa, Value)]
 #[repr(C)]

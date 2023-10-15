@@ -52,10 +52,14 @@ impl Integrator for NormalVis {
                 for _ in 0u32.expr()..spp {
                     let swl = sample_wavelengths(color_repr, sampler);
                     sampler.start();
-                    let (ray, ray_color, ray_w) =
-                        scene
-                            .camera
-                            .generate_ray(film.filter(), p, sampler, color_repr, swl);
+                    let (ray, ray_color, ray_w) = scene.camera.generate_ray(
+                        &scene,
+                        film.filter(),
+                        p,
+                        sampler,
+                        color_repr,
+                        swl,
+                    );
                     let si = scene.intersect(ray);
 
                     let color = if si.valid {

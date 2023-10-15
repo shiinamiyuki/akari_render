@@ -6,6 +6,7 @@ use crate::{
     interaction::SurfaceInteraction,
 };
 
+pub mod noise;
 use super::*;
 
 pub fn rgb_to_target_colorspace(

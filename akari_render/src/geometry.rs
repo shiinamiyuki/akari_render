@@ -57,13 +57,6 @@ impl SphereExpr {
         }
     }
 }
-#[derive(Clone, Copy, Aggregate)]
-#[repr(C)]
-pub struct Triangle {
-    pub v0: Expr<Float3>,
-    pub v1: Expr<Float3>,
-    pub v2: Expr<Float3>,
-}
 
 #[derive(Clone, Copy, Aggregate)]
 #[repr(C)]

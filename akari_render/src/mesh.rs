@@ -1,6 +1,8 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
-use crate::geometry::{ShadingTriangle, Triangle};
+use crate::geometry::ShadingTriangle;
+use crate::heap::MegaHeap;
 use crate::svm::ShaderRef;
 use crate::util::binserde::*;
 use crate::util::distribution::BindlessAliasTableVar;
@@ -140,8 +142,8 @@ impl MeshBuffer {
     }
 }
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Value)]
-pub struct MeshInstance {
+#[derive(Clone, Copy, Debug)]
+pub struct MeshInstanceHost {
     pub transform: AffineTransform,
     pub light: TagIndex,
     pub surface: ShaderRef,
@@ -150,75 +152,65 @@ pub struct MeshInstance {
     pub has_uvs: bool,
     pub has_tangents: bool,
 }
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Value)]
+pub struct MeshHeader {
+    pub vertex_buf_idx: u32,
+    pub index_buf_idx: u32,
+    pub normal_buf_idx: u32,
+    pub tangent_buf_idx: u32,
+    pub uv_buf_idx: u32,
+    pub area_sampler: u32,
+}
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Value)]
+pub struct MeshInstance {
+    pub light: TagIndex,
+    pub surface: ShaderRef,
+    pub geom_id: u32,
+}
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct MeshAggregateHeader {
+    pub mesh_instances: u32,
+    pub mesh_transforms: u32,
+    pub mesh_headers: u32,
+}
 pub struct MeshAggregate {
-    pub heap: BindlessArray,
+    pub heap: Arc<MegaHeap>,
     pub accel_meshes: Vec<rtx::Mesh>,
     pub accel: rtx::Accel,
-}
-#[derive(Clone, Copy, Debug)]
-#[repr(u32)]
-pub enum MeshAggregateHeaderBuffers {
-    MeshInstances = 0,
-    Total,
-}
-#[derive(Clone, Copy, Debug)]
-#[repr(u32)]
-pub enum MeshBufferIndex {
-    Vertex = 0,
-    Index,
-    Uv,
-    Normal,
-    Tangent,
-    MeshSampler0,
-    MeshSampler1,
-    Total,
+    pub header: MeshAggregateHeader,
 }
 impl MeshAggregate {
-    pub fn new(device: Device, meshes: &[&MeshBuffer], instances: &[MeshInstance]) -> Self {
-        let count = meshes.len();
-        let heap = device.create_bindless_array(
-            MeshAggregateHeaderBuffers::Total as usize
-                + count * MeshBufferIndex::Total as usize,
-        );
+    pub fn new(
+        device: Device,
+        heap: &Arc<MegaHeap>,
+        meshes: &[&MeshBuffer],
+        instances: &[MeshInstanceHost],
+    ) -> Self {
         let mut accel_meshes = Vec::with_capacity(meshes.len());
         let accel = device.create_accel(AccelOption::default());
+        let mut mesh_headers = vec![];
         for (i, mesh) in meshes.iter().enumerate() {
-            heap.emplace_buffer(
-                MeshAggregateHeaderBuffers::Total as usize
-                    + i * MeshBufferIndex::Total as usize
-                    + MeshBufferIndex::Vertex as usize,
-                &mesh.vertices,
-            );
-            heap.emplace_buffer(
-                MeshAggregateHeaderBuffers::Total as usize
-                    + i * MeshBufferIndex::Total as usize
-                    + MeshBufferIndex::Index as usize,
-                &mesh.indices,
-            );
-            if mesh.has_normals {
-                heap.emplace_buffer(
-                    MeshAggregateHeaderBuffers::Total as usize
-                        + i * MeshBufferIndex::Total as usize
-                        + MeshBufferIndex::Normal as usize,
-                    mesh.normals.as_ref().unwrap(),
-                );
-            }
-            if mesh.has_tangents {
-                heap.emplace_buffer(
-                    MeshAggregateHeaderBuffers::Total as usize
-                        + i * MeshBufferIndex::Total as usize
-                        + MeshBufferIndex::Tangent as usize,
-                    mesh.tangents.as_ref().unwrap(),
-                );
-            }
-            if mesh.has_uvs {
-                heap.emplace_buffer(
-                    MeshAggregateHeaderBuffers::Total as usize
-                        + i * MeshBufferIndex::Total as usize
-                        + MeshBufferIndex::Uv as usize,
-                    mesh.uvs.as_ref().unwrap(),
-                );
-            }
+            let vertex_buf_idx = heap.bind_buffer(&mesh.vertices);
+            let index_buf_idx = heap.bind_buffer(&mesh.indices);
+            let normal_buf_idx = if mesh.has_normals {
+                heap.bind_buffer(mesh.normals.as_ref().unwrap())
+            } else {
+                u32::MAX
+            };
+            let tangent_buf_idx = if mesh.has_tangents {
+                heap.bind_buffer(mesh.tangents.as_ref().unwrap())
+            } else {
+                u32::MAX
+            };
+
+            let uv_buf_idx = if mesh.has_uvs {
+                heap.bind_buffer(mesh.uvs.as_ref().unwrap())
+            } else {
+                u32::MAX
+            };
             let accel_mesh = device.create_mesh(
                 mesh.vertices.view(..),
                 mesh.indices.view(..),
@@ -226,27 +218,37 @@ impl MeshAggregate {
             );
             accel_mesh.build(AccelBuildRequest::ForceBuild);
             accel_meshes.push(accel_mesh);
-            if let Some(at) = &mesh.area_sampler {
-                heap.emplace_buffer(
-                    MeshAggregateHeaderBuffers::Total as usize
-                        + i * MeshBufferIndex::Total as usize
-                        + MeshBufferIndex::MeshSampler0 as usize,
-                    &at.0,
-                );
-                heap.emplace_buffer(
-                    MeshAggregateHeaderBuffers::Total as usize
-                        + i * MeshBufferIndex::Total as usize
-                        + MeshBufferIndex::MeshSampler1 as usize,
-                    &at.1,
-                );
-            }
+            let area_sampler = if let Some(at) = &mesh.area_sampler {
+                let area_sampler = heap.bind_buffer(&at.0);
+                let at1 = heap.bind_buffer(&at.1);
+                assert_eq!(area_sampler + 1, at1);
+                area_sampler
+            } else {
+                u32::MAX
+            };
+            mesh_headers.push(MeshHeader {
+                vertex_buf_idx,
+                index_buf_idx,
+                normal_buf_idx,
+                tangent_buf_idx,
+                uv_buf_idx,
+                area_sampler,
+            });
         }
-        let mesh_instances = device.create_buffer_from_slice(instances);
-        heap.emplace_buffer_async(
-            MeshAggregateHeaderBuffers::MeshInstances as usize,
-            &mesh_instances,
-        );
-        heap.update();
+        let mesh_instances = device.create_buffer_from_fn(instances.len(), |i| {
+            let inst = instances[i];
+            MeshInstance {
+                light: inst.light,
+                surface: inst.surface,
+                geom_id: inst.geom_id,
+            }
+        });
+        let mesh_instance_idx = heap.bind_buffer(&mesh_instances);
+        let mesh_headers = device.create_buffer_from_slice(&mesh_headers);
+        let mesh_headers_idx = heap.bind_buffer(&mesh_headers);
+        let mesh_transforms =
+            device.create_buffer_from_fn(instances.len(), |i| instances[i].transform);
+        let mesh_transform_idx = heap.bind_buffer(&mesh_transforms);
         for i in 0..instances.len() {
             let inst = &instances[i];
             let geom_id = inst.geom_id as usize;
@@ -257,98 +259,71 @@ impl MeshAggregate {
         accel.build(AccelBuildRequest::ForceBuild);
 
         Self {
-            heap,
+            heap: heap.clone(),
             accel_meshes,
             accel,
+            header: MeshAggregateHeader {
+                mesh_instances: mesh_instance_idx,
+                mesh_transforms: mesh_transform_idx,
+                mesh_headers: mesh_headers_idx,
+            },
         }
     }
+
     #[tracked]
-    pub fn mesh_vertices(&self, geom_id: Expr<u32>) -> BindlessBufferVar<[f32; 3]> {
-        self.heap.buffer(
-            MeshAggregateHeaderBuffers::Total as u32
-                + MeshBufferIndex::Vertex as u32
-                + geom_id * MeshBufferIndex::Total as u32,
-        )
+    pub fn mesh_vertices(&self, mesh_header: Expr<MeshHeader>) -> BindlessBufferVar<[f32; 3]> {
+        self.heap.var().buffer(mesh_header.vertex_buf_idx)
     }
     #[tracked]
-    pub fn mesh_indices(&self, geom_id: Expr<u32>) -> BindlessBufferVar<[u32; 3]> {
-        self.heap.buffer(
-            MeshAggregateHeaderBuffers::Total as u32
-                + MeshBufferIndex::Index as u32
-                + geom_id * MeshBufferIndex::Total as u32,
-        )
+    pub fn mesh_indices(&self, mesh_header: Expr<MeshHeader>) -> BindlessBufferVar<[u32; 3]> {
+        self.heap.var().buffer(mesh_header.index_buf_idx)
     }
     #[tracked]
-    pub fn mesh_normals(&self, geom_id: Expr<u32>) -> BindlessBufferVar<[f32; 3]> {
-        self.heap.buffer(
-            MeshAggregateHeaderBuffers::Total as u32
-                + MeshBufferIndex::Normal as u32
-                + geom_id * MeshBufferIndex::Total as u32,
-        )
+    pub fn mesh_normals(&self, mesh_header: Expr<MeshHeader>) -> BindlessBufferVar<[f32; 3]> {
+        self.heap.var().buffer(mesh_header.normal_buf_idx)
     }
     #[tracked]
-    pub fn mesh_tangents(&self, geom_id: Expr<u32>) -> BindlessBufferVar<[f32; 3]> {
-        self.heap.buffer(
-            MeshAggregateHeaderBuffers::Total as u32
-                + MeshBufferIndex::Tangent as u32
-                + geom_id * MeshBufferIndex::Total as u32,
-        )
+    pub fn mesh_tangents(&self, mesh_header: Expr<MeshHeader>) -> BindlessBufferVar<[f32; 3]> {
+        self.heap.var().buffer(mesh_header.tangent_buf_idx)
     }
     #[tracked]
-    pub fn mesh_uvs(&self, geom_id: Expr<u32>) -> BindlessBufferVar<[f32; 2]> {
-        self.heap.buffer(
-            MeshAggregateHeaderBuffers::Total as u32
-                + MeshBufferIndex::Uv as u32
-                + geom_id * MeshBufferIndex::Total as u32,
-        )
+    pub fn mesh_uvs(&self, mesh_header: Expr<MeshHeader>) -> BindlessBufferVar<[f32; 2]> {
+        self.heap.var().buffer(mesh_header.uv_buf_idx)
     }
     #[tracked]
-    pub fn mesh_area_samplers(&self, geom_id: Expr<u32>) -> BindlessAliasTableVar {
-        let b0 = self.heap.buffer(
-            MeshAggregateHeaderBuffers::Total as u32
-                + MeshBufferIndex::MeshSampler0 as u32
-                + geom_id * MeshBufferIndex::Total as u32,
-        );
-        let b1 = self.heap.buffer(
-            MeshAggregateHeaderBuffers::Total as u32
-                + MeshBufferIndex::MeshSampler1 as u32
-                + geom_id * MeshBufferIndex::Total as u32,
-        );
+    pub fn mesh_area_samplers(&self, mesh_header: Expr<MeshHeader>) -> BindlessAliasTableVar {
+        let b0 = self.heap.var().buffer(mesh_header.area_sampler);
+        let b1 = self.heap.var().buffer(mesh_header.area_sampler + 1);
         BindlessAliasTableVar(b0, b1)
     }
     #[tracked]
     pub fn mesh_instances(&self) -> BindlessBufferVar<MeshInstance> {
-        self.heap
-            .buffer(MeshAggregateHeaderBuffers::MeshInstances as u32)
+        self.heap.var().buffer(self.header.mesh_instances)
     }
-
     #[tracked]
-    pub fn triangle(&self, inst_id: Expr<u32>, prim_id: Expr<u32>) -> Triangle {
-        let inst = self.mesh_instances().read(inst_id);
-        let transform = inst.transform;
-        let geom_id = inst.geom_id;
-        let vertices = self.mesh_vertices(geom_id);
-        let indices = self.mesh_indices(geom_id);
-        let i: Expr<Uint3> = indices.read(prim_id).into();
-        let v0 = transform.transform_point(Expr::<Float3>::from(vertices.read(i.x)));
-        let v1 = transform.transform_point(Expr::<Float3>::from(vertices.read(i.y)));
-        let v2 = transform.transform_point(Expr::<Float3>::from(vertices.read(i.z)));
-        Triangle { v0, v1, v2 }
+    pub fn mesh_instance_transforms(&self) -> BindlessBufferVar<AffineTransform> {
+        self.heap.var().buffer(self.header.mesh_transforms)
     }
     #[tracked]
     pub fn shading_triangle(&self, inst_id: Expr<u32>, prim_id: Expr<u32>) -> ShadingTriangle {
-        let inst = self.mesh_instances().read(inst_id);
+        let inst: Expr<MeshInstance> = self.mesh_instances().read(inst_id);
         let geom_id = inst.geom_id;
-        let vertices = self.mesh_vertices(geom_id);
-        let indices = self.mesh_indices(geom_id);
+        let geometry = self
+            .heap
+            .var()
+            .buffer::<MeshHeader>(self.header.mesh_headers)
+            .read(geom_id);
+        let vertices = self.mesh_vertices(geometry);
+        let indices = self.mesh_indices(geometry);
         let i: Expr<Uint3> = indices.read(prim_id).into();
-        let transform = inst.transform;
+        let transform = self.mesh_instance_transforms().read(inst_id);
+
         let v0 = transform.transform_point(Expr::<Float3>::from(vertices.read(i.x)));
         let v1 = transform.transform_point(Expr::<Float3>::from(vertices.read(i.y)));
         let v2 = transform.transform_point(Expr::<Float3>::from(vertices.read(i.z)));
         let prim_id3 = prim_id * 3;
-        let (uv0, uv1, uv2) = if inst.has_uvs {
-            let uvs = self.mesh_uvs(geom_id);
+        let (uv0, uv1, uv2) = if geometry.uv_buf_idx != u32::MAX {
+            let uvs = self.mesh_uvs(geometry);
             let uv0 = uvs.read(prim_id3 + 0).into();
             let uv1 = uvs.read(prim_id3 + 1).into();
             let uv2 = uvs.read(prim_id3 + 2).into();
@@ -360,8 +335,8 @@ impl MeshAggregate {
             (uv0, uv1, uv2)
         };
         let ng = (v1 - v0).cross(v2 - v0).normalize();
-        let (n0, n1, n2) = if inst.has_normals {
-            let normals = self.mesh_normals(geom_id);
+        let (n0, n1, n2) = if geometry.normal_buf_idx != u32::MAX {
+            let normals = self.mesh_normals(geometry);
             let n0 = transform.transform_normal(Expr::<Float3>::from(normals.read(prim_id3 + 0)));
             let n1 = transform.transform_normal(Expr::<Float3>::from(normals.read(prim_id3 + 1)));
             let n2 = transform.transform_normal(Expr::<Float3>::from(normals.read(prim_id3 + 2)));
@@ -375,8 +350,8 @@ impl MeshAggregate {
             let t2 = (v0 - v2).normalize();
             (t0, t1, t2)
         };
-        let (t0, t1, t2) = if inst.has_tangents {
-            let tangents = self.mesh_tangents(geom_id);
+        let (t0, t1, t2) = if geometry.tangent_buf_idx != u32::MAX {
+            let tangents = self.mesh_tangents(geometry);
             // let bitangent_signs = self.mesh_bitangent_signs.buffer(geom_id);
             let t0 = transform.transform_vector(Expr::<Float3>::from(tangents.read(prim_id3 + 0)));
             let t1 = transform.transform_vector(Expr::<Float3>::from(tangents.read(prim_id3 + 1)));

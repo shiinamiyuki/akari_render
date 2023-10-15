@@ -41,6 +41,7 @@ pub mod ext;
 pub mod film;
 pub mod geometry;
 pub mod gui;
+pub mod heap;
 pub mod integrator;
 pub mod interaction;
 pub mod light;
@@ -63,6 +64,19 @@ pub enum ADMode {
     None,
     Forward,
     Backward,
+}
+pub fn maybe_outline(f:impl Fn()) {
+    let should_not_outline = match env::var("AKR_NO_OUTLINE") {
+        Ok(x) => {
+            x == "1"
+        }
+        _ => false,
+    };
+    if !should_not_outline {
+        outline(f);
+    } else {
+        f();
+    }
 }
 
 pub fn debug_mode() -> bool {

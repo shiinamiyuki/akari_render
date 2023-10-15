@@ -1,10 +1,13 @@
-use crate::{color::*, film::PixelFilter, geometry::*, sampler::*, *};
+use crate::{
+    color::*, film::PixelFilter, geometry::*, heap::MegaHeap, sampler::*, scene::Scene, *,
+};
 
 pub trait Camera: Send + Sync {
     fn set_resolution(&mut self, resolution: Uint2);
     fn resolution(&self) -> Uint2;
     fn generate_ray(
         &self,
+        scene: &Scene,
         filter: PixelFilter,
         pixel: Expr<Uint2>,
         sampler: &dyn Sampler,
@@ -13,6 +16,7 @@ pub trait Camera: Send + Sync {
     ) -> (Expr<Ray>, Color, Expr<f32>);
 }
 pub struct PerspectiveCamera {
+    data_buf_index: u32,
     data: Buffer<PerspectiveCameraData>,
     resolution: Uint2,
     device: Device,
@@ -24,14 +28,16 @@ pub struct PerspectiveCamera {
 impl PerspectiveCamera {
     pub fn new(
         device: Device,
+        heap: &MegaHeap,
         resolution: Uint2,
         transform: AffineTransform,
         fov: f32,
         lens_radius: f32,
         focal_length: f32,
     ) -> Self {
-        let data = device.create_buffer(1);
+        let (data, data_buf_index) = heap.alloc_buffer::<PerspectiveCameraData>(1);
         let mut camera = Self {
+            data_buf_index,
             data,
             resolution,
             device,
@@ -63,13 +69,18 @@ impl Camera for PerspectiveCamera {
     #[tracked]
     fn generate_ray(
         &self,
+        scene: &Scene,
         filter: PixelFilter,
         pixel: Expr<Uint2>,
         sampler: &dyn Sampler,
         color_repr: ColorRepr,
         _swl: Expr<SampledWavelengths>,
     ) -> (Expr<Ray>, Color, Expr<f32>) {
-        let camera = self.data.var().read(0);
+        let camera = scene
+            .heap
+            .var()
+            .buffer::<PerspectiveCameraData>(self.data_buf_index)
+            .read(0);
         let fpixel = pixel.cast_f32() + Float2::expr(0.5, 0.5);
         let (offset, w) = filter.sample(sampler.next_2d());
         let p_film = fpixel + offset;

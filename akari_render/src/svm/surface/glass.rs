@@ -1,10 +1,12 @@
 use std::rc::Rc;
 
-use super::{BsdfBlendMode, SurfaceClosure, BsdfEvalContext, SurfaceShader, MicrofacetTransmission};
-use crate::color::*;
+use super::{BsdfBlendMode, MicrofacetTransmission, SurfaceShader};
+
 use crate::geometry::Frame;
 use crate::microfacet::TrowbridgeReitzDistribution;
-use crate::svm::surface::{Surface, fr_dielectric, BsdfMixture, FresnelDielectric, MicrofacetReflection};
+use crate::svm::surface::{
+    fr_dielectric, BsdfMixture, FresnelDielectric, MicrofacetReflection, Surface,
+};
 use crate::svm::SvmGlassBsdf;
 use crate::*;
 

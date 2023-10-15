@@ -1,10 +1,10 @@
 use std::{
     alloc::Layout,
     collections::{hash_map::DefaultHasher, HashMap},
-    hash::{Hash, Hasher},
+    hash::{Hash, Hasher}, sync::Arc,
 };
 
-use crate::{util::round_to, *};
+use crate::{heap::MegaHeap, util::round_to, *};
 use luisa::runtime::api::Shader;
 use sha2::{Digest, Sha256};
 
@@ -310,5 +310,5 @@ impl ShaderCollection {
 pub struct Svm {
     pub(crate) device: Device,
     pub(crate) surface_shaders: ShaderCollection,
-    pub(crate) image_textures: BindlessArray,
+    pub(crate) heap: Arc<MegaHeap>,
 }
