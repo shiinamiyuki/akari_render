@@ -1,4 +1,4 @@
-use std::any::{Any, TypeId};
+use std::any::Any;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -180,6 +180,50 @@ impl<'a> SvmEvaluator<'a> {
     }
 }
 impl Svm {
+    pub fn dispatch_surface_single_kind<R: Aggregate>(
+        &self,
+        kind: u32,
+        shader_ref: Expr<ShaderRef>,
+        color_pipeline: ColorPipeline,
+        si: SurfaceInteraction,
+        swl: Expr<SampledWavelengths>,
+        f: impl Fn(&SurfaceClosure) -> R,
+    ) -> R {
+        let input = SvmEvalInput::Surface { si, swl };
+        let mut kinds = self
+            .surface_shaders
+            .shaders
+            .keys()
+            .copied()
+            .collect::<Vec<_>>();
+        kinds.sort();
+        let mut sw = switch::<R>(shader_ref.shader_kind.cast_i32());
+        if debug_mode() {
+            lc_assert!(kind.eq(shader_ref.shader_kind));
+        }
+        sw = sw.case(kind as i32, || {
+            let eval = SvmEvaluator::new(
+                self,
+                color_pipeline,
+                &self.surface_shaders.shaders[&kind],
+                shader_ref,
+                self.surface_shaders.shader_data.var(),
+                input,
+            );
+            let bsdf = eval
+                .eval_shader()
+                .downcast_ref::<Rc<dyn Surface>>()
+                .unwrap()
+                .clone();
+            let closure = SurfaceClosure {
+                inner: bsdf,
+                frame: si.frame,
+            };
+            f(&closure)
+        });
+        sw.finish()
+    }
+
     pub fn dispatch_surface<R: Aggregate>(
         &self,
         shader_ref: Expr<ShaderRef>,

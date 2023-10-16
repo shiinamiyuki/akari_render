@@ -52,7 +52,7 @@ impl Integrator for NormalVis {
                 for _ in 0u32.expr()..spp {
                     let swl = sample_wavelengths(color_repr, sampler);
                     sampler.start();
-                    let (ray, ray_color, ray_w) = scene.camera.generate_ray(
+                    let (ray, ray_w) = scene.camera.generate_ray(
                         &scene,
                         film.filter(),
                         p,
@@ -64,7 +64,7 @@ impl Integrator for NormalVis {
 
                     let color = if si.valid {
                         let ns = si.ns();
-                        Color::Rgb(ns * 0.5 + 0.5, color_repr.rgb_colorspace().unwrap()) * ray_color
+                        Color::Rgb(ns * 0.5 + 0.5, color_repr.rgb_colorspace().unwrap())
                     } else {
                         Color::zero(color_repr)
                     };

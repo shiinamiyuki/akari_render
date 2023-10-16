@@ -293,7 +293,7 @@ impl SamplerCreator for IndependentSamplerCreator {
         })
     }
 }
-
+#[allow(dead_code)]
 pub struct Pmj02BnSamplerCreator {
     device: Device,
     pmj02bn_samples: Arc<Buffer<u32>>,

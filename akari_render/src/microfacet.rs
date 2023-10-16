@@ -254,7 +254,7 @@ impl MicrofacetDistribution for TrowbridgeReitzDistribution {
 mod test {
     use std::env::current_exe;
 
-    use crate::sampler::{init_pcg32_buffer, IndependentSampler, Pcg32, Sampler};
+    use crate::sampler::{init_pcg32_buffer, IndependentSampler, Sampler};
 
     use super::*;
 

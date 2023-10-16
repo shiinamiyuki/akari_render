@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    color::{Color, ColorPipeline, ColorRepr, FlatColor, SampledWavelengths},
+    color::{Color, ColorPipeline, ColorRepr, SampledWavelengths},
     geometry::{PointNormal, Ray},
     interaction::SurfaceInteraction,
     mesh::MeshAggregate,

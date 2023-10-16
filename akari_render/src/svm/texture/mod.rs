@@ -1,9 +1,7 @@
 use crate::{
     color::{
-        aces_to_srgb_with_cat_mat, srgb_to_aces_with_cat_mat, srgb_to_linear, Color, ColorSpaceId,
-        FlatColor, RgbColorSpace, SampledWavelengths,
+        aces_to_srgb_with_cat_mat, srgb_to_aces_with_cat_mat, srgb_to_linear, Color, RgbColorSpace, SampledWavelengths,
     },
-    interaction::SurfaceInteraction,
 };
 
 pub mod noise;
@@ -34,7 +32,7 @@ pub fn rgb_to_target_colorspace(
 pub fn spectral_uplift(
     rgb: Expr<Float3>,
     colorspace: RgbColorSpace,
-    swl: Expr<SampledWavelengths>,
+    _swl: Expr<SampledWavelengths>,
     color_repr: ColorRepr,
 ) -> Color {
     match color_repr {

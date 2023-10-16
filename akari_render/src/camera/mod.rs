@@ -13,7 +13,7 @@ pub trait Camera: Send + Sync {
         sampler: &dyn Sampler,
         color_repr: ColorRepr,
         swl: Expr<SampledWavelengths>,
-    ) -> (Expr<Ray>, Color, Expr<f32>);
+    ) -> (Expr<Ray>, Expr<f32>);
 }
 pub struct PerspectiveCamera {
     data_buf_index: u32,
@@ -73,10 +73,9 @@ impl Camera for PerspectiveCamera {
         filter: PixelFilter,
         pixel: Expr<Uint2>,
         sampler: &dyn Sampler,
-        color_repr: ColorRepr,
+        _color_repr: ColorRepr,
         _swl: Expr<SampledWavelengths>,
-    ) -> (Expr<Ray>, Color, Expr<f32>) {
-        lc_comment_lineno!("Camera::generate_ray begin");
+    ) -> (Expr<Ray>, Expr<f32>) {
         let camera = scene
             .heap
             .var()
@@ -100,8 +99,7 @@ impl Camera for PerspectiveCamera {
         *ray.o = camera.c2w.transform_point(ray.o);
         *ray.d = camera.c2w.transform_vector(ray.d);
         // cpu_dbg!(ray);
-        lc_comment_lineno!("Camera::generate_ray end");
-        (**ray, Color::one(color_repr), w)
+        (**ray, w)
     }
 }
 #[derive(Clone, Copy, Debug, Value)]

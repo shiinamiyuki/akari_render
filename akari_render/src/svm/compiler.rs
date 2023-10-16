@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap};
 
 use super::*;
 use crate::{
@@ -8,7 +8,6 @@ use crate::{
         shader::{Node, NodeSorter},
         Ref, ShaderGraph,
     },
-    *,
 };
 #[derive(Clone, Copy)]
 pub struct SvmCompileContext<'a> {
@@ -258,11 +257,11 @@ impl<'a> Compiler<'a> {
                 })
             }
             Node::MixBsdf {
-                first,
-                second,
-                factor,
+                first: _,
+                second: _,
+                factor: _,
             } => todo!(),
-            Node::ExtractElement { node, field } => todo!(),
+            Node::ExtractElement { node: _, field: _ } => todo!(),
             Node::OutputSurface { surface } => {
                 let surface = self.get(&surface);
                 SvmNode::MaterialOutput(SvmMaterialOutput { surface })

@@ -1,6 +1,5 @@
 use crate::{
     sampler::*,
-    sampling::{log_gaussian_pdf, sample_gaussian},
 };
 use lazy_static::lazy_static;
 

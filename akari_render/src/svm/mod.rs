@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::{heap::MegaHeap, util::round_to, *};
-use luisa::runtime::api::Shader;
+
 use sha2::{Digest, Sha256};
 
 use self::surface::{EmissiveSurface, SurfaceShader};
@@ -298,6 +298,7 @@ impl CompiledShader {
 
 pub type ShaderHash = [u8; 32];
 pub struct ShaderCollection {
+    #[allow(dead_code)]
     pub(crate) shader_hash_to_kind: HashMap<ShaderHash, u32>,
     pub(crate) shaders: HashMap<u32, CompiledShader>, // kind -> shader
     pub(crate) shader_data: ByteBuffer,
@@ -308,6 +309,7 @@ impl ShaderCollection {
     }
 }
 pub struct Svm {
+    #[allow(dead_code)]
     pub(crate) device: Device,
     pub(crate) surface_shaders: ShaderCollection,
     pub(crate) heap: Arc<MegaHeap>,

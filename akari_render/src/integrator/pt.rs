@@ -1,6 +1,8 @@
-use std::{f32::consts::FRAC_1_PI, marker::PhantomData, rc::Rc, sync::Arc, time::Instant};
+//! Basic megakernel path tracer
 
-use luisa::{rtx::offset_ray_origin, runtime::KernelBuildOptions};
+use std::{f32::consts::FRAC_1_PI, rc::Rc, sync::Arc, time::Instant};
+
+use luisa::rtx::offset_ray_origin;
 use rand::Rng;
 
 use super::{Integrator, RenderSession};
@@ -32,7 +34,7 @@ pub struct PathTracerBase<'a> {
     pub swl: Var<SampledWavelengths>,
     pub scene: &'a Scene,
 }
-#[derive(Aggregate)]
+#[derive(Aggregate, Copy, Clone)]
 pub struct DirectLighting {
     pub irradiance: Color,
     pub wi: Expr<Float3>,
@@ -151,7 +153,7 @@ impl<'a> PathTracerBase<'a> {
         }
     }
     #[tracked]
-    pub fn hit_envmap(&self, ray: Expr<Ray>) -> (Color, Expr<f32>) {
+    pub fn hit_envmap(&self, _ray: Expr<Ray>) -> (Color, Expr<f32>) {
         (Color::zero(self.color_pipeline.color_repr), 0.0f32.expr())
     }
     #[tracked]
@@ -191,12 +193,12 @@ impl<'a> PathTracerBase<'a> {
     #[tracked]
     pub fn sample_surface_and_shade_direct(
         &self,
+        shader_kind: Option<u32>,
         si: SurfaceInteraction,
         wo: Expr<Float3>,
         direct_lighting: DirectLighting,
-        di_occluded: Expr<bool>,
         u_bsdf: Expr<Float3>,
-    ) -> BsdfSample {
+    ) -> (BsdfSample, Color) {
         let ctx = self.eval_context().1;
         if self.force_diffuse {
             let diffuse = Rc::new(DiffuseBsdf {
@@ -208,26 +210,49 @@ impl<'a> PathTracerBase<'a> {
                 inner: diffuse,
                 frame: si.frame,
             };
-            if direct_lighting.valid & !di_occluded {
+            let direct = if direct_lighting.valid {
                 let f = closure.evaluate(wo, direct_lighting.wi, **self.swl, &ctx);
                 let pdf = closure.pdf(wo, direct_lighting.wi, **self.swl, &ctx);
                 let w = mis_weight(direct_lighting.pdf, pdf, 1);
-                self.add_radiance(direct_lighting.irradiance * f * w / direct_lighting.pdf);
+                direct_lighting.irradiance * f * w / direct_lighting.pdf
+            } else {
+                Color::zero(self.color_pipeline.color_repr)
             };
             let sample = closure.sample(wo, u_bsdf.x, u_bsdf.yz(), self.swl, &ctx);
-            sample
+            (sample, direct)
         } else {
             let svm = &self.scene.svm;
-            svm.dispatch_surface(si.surface, self.color_pipeline, si, **self.swl, |closure| {
-                if direct_lighting.valid & !di_occluded {
+            let sample_and_shade = |closure: &SurfaceClosure| {
+                let direct = if direct_lighting.valid {
                     let f = closure.evaluate(wo, direct_lighting.wi, **self.swl, &ctx);
                     let pdf = closure.pdf(wo, direct_lighting.wi, **self.swl, &ctx);
                     let w = mis_weight(direct_lighting.pdf, pdf, 1);
-                    self.add_radiance(direct_lighting.irradiance * f * w / direct_lighting.pdf);
+                    direct_lighting.irradiance * f * w / direct_lighting.pdf
+                } else {
+                    Color::zero(self.color_pipeline.color_repr)
                 };
+
                 let sample = closure.sample(wo, u_bsdf.x, u_bsdf.yz(), self.swl, &ctx);
-                sample
-            })
+                (sample, direct)
+            };
+            if let Some(shader_kind) = shader_kind {
+                svm.dispatch_surface_single_kind(
+                    shader_kind,
+                    si.surface,
+                    self.color_pipeline,
+                    si,
+                    **self.swl,
+                    sample_and_shade,
+                )
+            } else {
+                svm.dispatch_surface(
+                    si.surface,
+                    self.color_pipeline,
+                    si,
+                    **self.swl,
+                    sample_and_shade,
+                )
+            }
         }
     }
     #[tracked]
@@ -253,19 +278,19 @@ impl<'a> PathTracerBase<'a> {
             *self.depth += 1;
 
             let direct_lighting = self.sample_light(si, sampler.next_3d());
-            let di_occluded = true.var();
-            if direct_lighting.valid {
-                let shadow_ray = direct_lighting.shadow_ray;
-                *di_occluded = self.scene.occlude(shadow_ray);
-            }
-            let bsdf_sample = self.sample_surface_and_shade_direct(
+            let (bsdf_sample, direct) = self.sample_surface_and_shade_direct(
+                None,
                 si,
                 wo,
                 direct_lighting,
-                **di_occluded,
                 sampler.next_3d(),
             );
-
+            if direct_lighting.valid {
+                let shadow_ray = direct_lighting.shadow_ray;
+                if !self.scene.occlude(shadow_ray) {
+                    self.add_radiance(direct);
+                }
+            }
             let f = &bsdf_sample.color;
             if debug_mode() {
                 lc_assert!(f.min().ge(0.0));
@@ -455,34 +480,35 @@ impl Integrator for PathTracer {
         assert_eq!(resolution.x, film.resolution().x);
         assert_eq!(resolution.y, film.resolution().y);
         let sampler_creator = sampler_config.creator(self.device.clone(), &scene, self.spp);
-        let kernel = self.device.create_kernel::<fn(u32, Int2)>(
-            &track!(|spp_per_pass: Expr<u32>, pixel_offset: Expr<Int2>| {
-                set_block_size([16, 16, 1]);
-                let p = dispatch_id().xy();
-                let sampler = sampler_creator.create(p);
-                let sampler = sampler.as_ref();
-                for_range(0u32.expr()..spp_per_pass, |_| {
-                    sampler.start();
-                    let ip = p.cast_i32();
-                    let shifted = ip + pixel_offset;
-                    let shifted = shifted
-                        .clamp(0, resolution.expr().cast_i32() - 1)
-                        .cast_u32();
-                    let swl = sample_wavelengths(color_pipeline.color_repr, sampler);
-                    let (ray, ray_color, ray_w) = scene.camera.generate_ray(
-                        &scene,
-                        film.filter(),
-                        shifted,
-                        sampler,
-                        color_pipeline.color_repr,
-                        swl,
-                    );
-                    let swl = swl.var();
-                    let l = self.radiance(&scene, color_pipeline, ray, swl, sampler) * ray_color;
-                    film.add_sample(p.cast_f32(), &l, **swl, ray_w);
-                });
-            }),
-        );
+        let kernel =
+            self.device.create_kernel::<fn(u32, Int2)>(&track!(
+                |spp_per_pass: Expr<u32>, pixel_offset: Expr<Int2>| {
+                    set_block_size([16, 16, 1]);
+                    let p = dispatch_id().xy();
+                    let sampler = sampler_creator.create(p);
+                    let sampler = sampler.as_ref();
+                    for_range(0u32.expr()..spp_per_pass, |_| {
+                        sampler.start();
+                        let ip = p.cast_i32();
+                        let shifted = ip + pixel_offset;
+                        let shifted = shifted
+                            .clamp(0, resolution.expr().cast_i32() - 1)
+                            .cast_u32();
+                        let swl = sample_wavelengths(color_pipeline.color_repr, sampler);
+                        let (ray, ray_w) = scene.camera.generate_ray(
+                            &scene,
+                            film.filter(),
+                            shifted,
+                            sampler,
+                            color_pipeline.color_repr,
+                            swl,
+                        );
+                        let swl = swl.var();
+                        let l = self.radiance(&scene, color_pipeline, ray, swl, sampler);
+                        film.add_sample(p.cast_f32(), &l, **swl, ray_w);
+                    });
+                }
+            ));
         log::info!(
             "Render kernel as {} arguments, {} captures!",
             kernel.num_arguments(),

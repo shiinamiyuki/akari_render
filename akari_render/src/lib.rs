@@ -2,7 +2,7 @@ use std::env;
 
 use color::ColorRepr;
 use hexf::hexf32;
-use integrator::FilmConfig;
+
 pub use luisa::prelude::{
     cpu_dbg, if_, lc_assert, lc_comment_lineno, lc_unreachable, loop_, outline, track, tracked,
     while_, Aggregate, Soa, Value,

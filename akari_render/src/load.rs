@@ -20,13 +20,15 @@ use std::{
     collections::{HashMap, HashSet},
     f32::consts::PI,
     fs::File,
-    io::{BufReader, Read},
+    io::BufReader,
     path::{Path, PathBuf},
     sync::Arc,
 };
 pub struct SceneLoader {
     device: Device,
+    #[allow(dead_code)]
     images: HashMap<String, image::DynamicImage>,
+    #[allow(dead_code)]
     textures: Vec<Tex2d<Float4>>,
     node_to_mesh: HashMap<Ref<node::Geometry>, (usize, Arc<TriangleMesh>)>,
     meshes: Vec<Arc<TriangleMesh>>,

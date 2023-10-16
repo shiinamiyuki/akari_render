@@ -2,7 +2,6 @@ use std::f32::consts::PI;
 
 use crate::{
     color::{linear_to_srgb, Color, RgbColorSpace, SampledWavelengths},
-    util::safe_div,
     *,
 };
 use serde::{Deserialize, Serialize};

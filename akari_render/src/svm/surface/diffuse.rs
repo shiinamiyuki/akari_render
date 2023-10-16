@@ -2,7 +2,7 @@ use std::f32::consts::{FRAC_1_PI, PI};
 use std::rc::Rc;
 
 use super::BsdfEvalContext;
-use super::{BsdfSample, Surface, SurfaceShader};
+use super::{Surface, SurfaceShader};
 use crate::color::Color;
 use crate::geometry::Frame;
 use crate::sampling::cos_sample_hemisphere;

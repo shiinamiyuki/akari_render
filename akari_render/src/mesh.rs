@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+
 use std::sync::Arc;
 
 use crate::geometry::{Frame, FrameExpr};
@@ -193,7 +193,7 @@ impl MeshAggregate {
         let mut accel_meshes = Vec::with_capacity(meshes.len());
         let accel = device.create_accel(AccelOption::default());
         let mut mesh_headers = vec![];
-        for (i, mesh) in meshes.iter().enumerate() {
+        for (_i, mesh) in meshes.iter().enumerate() {
             let vertex_buf_idx = heap.bind_buffer(&mesh.vertices);
             let index_buf_idx = heap.bind_buffer(&mesh.indices);
             let normal_buf_idx = if mesh.has_normals {

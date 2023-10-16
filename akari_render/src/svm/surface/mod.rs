@@ -1,11 +1,11 @@
 use std::rc::Rc;
 
-use crate::color::{ColorRepr, ColorVar, FlatColor, SampledWavelengths};
+use crate::color::{ColorRepr, ColorVar, SampledWavelengths};
 use crate::geometry::{face_forward, reflect, refract};
 use crate::microfacet::MicrofacetDistribution;
 use crate::sampling::weighted_discrete_choice2_and_remap;
 use crate::svm::eval::SvmEvaluator;
-use crate::{color::Color, geometry::Frame, interaction::SurfaceInteraction, *};
+use crate::{color::Color, geometry::Frame, *};
 
 #[derive(Clone, Copy, Debug)]
 pub struct BsdfEvalContext {
@@ -711,7 +711,7 @@ impl Surface for MicrofacetTransmission {
         &self,
         wo: Expr<Float3>,
         wi: Expr<Float3>,
-        swl: Expr<SampledWavelengths>,
+        _swl: Expr<SampledWavelengths>,
         ctx: &BsdfEvalContext,
     ) -> Expr<f32> {
         let cos_o = Frame::cos_theta(wo);

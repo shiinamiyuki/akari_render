@@ -27,7 +27,7 @@ impl ColorSpaceId {
     }
 }
 
-#[derive(Copy, Clone, Value, Debug)]
+#[derive(Copy, Clone, Value, Soa, Debug)]
 #[repr(C)]
 #[value_new(pub)]
 pub struct SampledWavelengths {
@@ -120,8 +120,21 @@ impl ColorBuffer {
     }
     pub fn write(&self, i: impl IntoIndex, color: Color, swl: Expr<SampledWavelengths>) {
         match self {
-            ColorBuffer::Rgb(b, cs) => b.var().write(i, color.as_rgb()),
+            ColorBuffer::Rgb(b, _cs) => b.var().write(i, color.as_rgb()),
             ColorBuffer::Spectral(b) => b.var().write(i, color.as_sampled_spectrum(swl)),
+        }
+    }
+    pub fn atomic_add(&self, i: impl IntoIndex, color: Color) {
+        match self {
+            ColorBuffer::Rgb(b, _cs) => {
+                let b = b.var();
+                let v = b.atomic_ref(i);
+                let rgb = color.as_rgb();
+                v.x.fetch_add(rgb.x);
+                v.y.fetch_add(rgb.y);
+                v.z.fetch_add(rgb.z);
+            }
+            ColorBuffer::Spectral(b) => todo!(),
         }
     }
     pub fn as_rgb(&self) -> &Buffer<Float3> {
@@ -171,7 +184,7 @@ impl ColorVar {
     pub fn store(&self, color: Color) {
         match self {
             ColorVar::Spectral(s) => s.store(color.as_spectral()),
-            ColorVar::Rgb(v, cs) => v.store(color.as_rgb()),
+            ColorVar::Rgb(v, _cs) => v.store(color.as_rgb()),
         }
     }
 }

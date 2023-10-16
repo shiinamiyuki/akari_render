@@ -1,4 +1,4 @@
-use std::env::{args, args_os, current_exe};
+use std::env::{args, current_exe};
 use std::f32::consts::PI;
 use std::process::exit;
 
@@ -17,17 +17,15 @@ use luisa_compute as luisa;
 mod bsdf_chi2_test {
     use std::{
         fs::{create_dir_all, File},
-        marker::PhantomData,
         rc::Rc,
         sync::Arc,
     };
 
     use akari_render::{
-        color::SampledWavelengths,
         geometry::spherical_to_xyz,
         util::{chi2cdf, integration::adaptive_simpson_2d},
     };
-    use libm::expf;
+    
     use rand::{thread_rng, Rng};
 
     use super::*;

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    color::{Color, ColorPipeline, ColorRepr, RgbColorSpace},
+    color::{ColorPipeline},
     film::*,
     gui::DisplayChannel,
     sampler::SamplerConfig,

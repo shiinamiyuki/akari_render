@@ -7,9 +7,7 @@ use luisa::lang::debug::{comment, is_cpu_backend};
 
 use super::pt::{self, PathTracer};
 use super::{Integrator, IntermediateStats, RenderSession, RenderStats};
-use crate::sampler::mcmc::{
-    mutate_image_space_single, KelemenMutationRecord, KelemenMutationRecordExpr, KELEMEN_MUTATE,
-};
+use crate::sampler::mcmc::{mutate_image_space_single, KelemenMutationRecord, KELEMEN_MUTATE};
 use crate::sampling::sample_gaussian;
 use crate::util::distribution::resample_with_f64;
 use crate::{color::*, film::*, sampler::*, scene::*, *};
@@ -285,7 +283,7 @@ impl McmcOpt {
         let p = sampler.next_2d() * res.cast_f32();
         let p = p.cast_i32().clamp(0, res.cast_i32() - 1);
         let swl = sample_wavelengths(color_pipeline.color_repr, &sampler).var();
-        let (ray, ray_color, ray_w) = scene.camera.generate_ray(
+        let (ray, ray_w) = scene.camera.generate_ray(
             &scene,
             filter,
             p.cast_u32(),
@@ -293,7 +291,7 @@ impl McmcOpt {
             color_pipeline.color_repr,
             **swl,
         );
-        let l = self.pt.radiance(scene, color_pipeline, ray, swl, &sampler) * ray_color * ray_w;
+        let l = self.pt.radiance(scene, color_pipeline, ray, swl, &sampler) * ray_w;
         (
             p.cast_u32(),
             l,

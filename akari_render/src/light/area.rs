@@ -5,7 +5,6 @@ use crate::{
     mesh::MeshHeader,
     sampling::uniform_sample_triangle,
     svm::{surface::Surface, ShaderRef},
-    util::distribution::{AliasTableEntry, BindlessAliasTableVar},
 };
 #[derive(Clone, Copy, Value)]
 #[repr(C)]

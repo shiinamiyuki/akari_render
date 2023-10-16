@@ -74,7 +74,8 @@ impl<K: Hash + Eq + Display + Clone + Send + Sync + 'static> DispatchProfiler<K>
             .unwrap();
         }
     }
-    pub fn profile<R>(&self, key: K, s: &Scope<'_>, f: impl FnOnce() -> R) -> R {
+    pub fn profile<R>(&self, key: impl Into<K>, s: &Scope<'_>, f: impl FnOnce() -> R) -> R {
+        let key = key.into();
         let token = Arc::new(Mutex::new(DispatchToken { start: None }));
         {
             let token = token.clone();
