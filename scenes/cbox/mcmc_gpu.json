@@ -3,9 +3,9 @@
         "spp":4096,
         "n_chains":65536,
         "n_bootstrap":10000000,
-        "direct_spp":0,
+        "direct_spp":1024,
         "max_depth":12,
-        "spp_per_pass":16,
+        "spp_per_pass":64,
         "use_nee":true,
         "type":"mcmc_opt"
     },

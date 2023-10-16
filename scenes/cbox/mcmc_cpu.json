@@ -1,0 +1,23 @@
+{
+    "method":{
+        "spp":1024,
+        "direct_spp":64,
+        "n_bootstrap":1000000,
+        "max_depth":12,
+        "spp_per_pass":1,
+        "use_nee":true,
+        "type":"mcmc_opt"
+    },
+    "sampler":{
+        "type":"pmj02bn",
+        "seed":0
+    },
+    "film":{
+        "filter":{
+            "type":"gaussian",
+            "radius":1.5
+        },
+        "out":"output/mcmc.exr"
+    }
+    
+}

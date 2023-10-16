@@ -1,21 +1,23 @@
 {
     "method": {
-        "spp": 16,
+        "spp": 4096,
         "max_depth": 12,
-        "indirect_only": false,
+        "rr_depth":5,
+        "spp_per_pass": 64,
         "use_nee": true,
+        "force_diffuse":false,
+        "indirect_only":false,
         "type": "pt"
     },
-    "color":"srgb",
-    "sampler":{
-        "type":"pmj02bn",
-        "seed":0
+    "sampler": {
+        "type": "independent",
+        "seed": 0
     },
     "film": {
-        "out": "output/pt.exr",
         "filter": {
             "type": "gaussian",
             "radius": 1.5
-        }
+        },
+        "out": "output/pt.exr"
     }
 }
