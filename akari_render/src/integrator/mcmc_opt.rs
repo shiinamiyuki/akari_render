@@ -589,7 +589,7 @@ impl McmcOpt {
             },
         );
         log::info!(
-            "Render kernel as {} arguments, {} captures!",
+            "Render kernel has {} arguments, {} captures!",
             kernel.num_arguments(),
             kernel.num_capture_arguments()
         );

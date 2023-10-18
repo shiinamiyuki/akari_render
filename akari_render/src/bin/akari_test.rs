@@ -25,7 +25,7 @@ mod bsdf_chi2_test {
         geometry::spherical_to_xyz,
         util::{chi2cdf, integration::adaptive_simpson_2d},
     };
-    
+
     use rand::{thread_rng, Rng};
 
     use super::*;
@@ -338,7 +338,7 @@ plt.show()"#
                 wo,
                 move |wo, wi| {
                     let bsdf = bsdf();
-                    bsdf.pdf(
+                    bsdf.evaluate(
                         wo,
                         wi,
                         SampledWavelengthsExpr::rgb_wavelengths(),
@@ -347,6 +347,7 @@ plt.show()"#
                             ad_mode: ADMode::None,
                         },
                     )
+                    .1
                 },
                 theta_res,
                 phi_res,

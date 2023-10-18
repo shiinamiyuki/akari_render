@@ -368,7 +368,7 @@ impl SceneLoader {
             meshes: mesh_aggregate.clone(),
             camera: camera.unwrap(),
             device,
-            use_rq: false,
+            use_rq: true,
             printer, // env_map: todo!(),
             heap,
         }

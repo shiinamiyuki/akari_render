@@ -167,11 +167,7 @@ impl<'a> PathTracerBase<'a> {
 
         if instance.light.valid() & (!self.indirect_only | depth.gt(1)) {
             let light_ctx = self.eval_context().0;
-            let direct = if self.force_diffuse {
-                Color::one(self.color_pipeline.color_repr) * 1.5f32.expr()
-            } else {
-                self.scene.lights.le(ray, si, **self.swl, &light_ctx)
-            };
+            let direct = self.scene.lights.le(ray, si, **self.swl, &light_ctx);
             // cpu_dbg!(direct.flatten());
             if depth.eq(0) | !self.use_nee {
                 (direct, 1.0f32.expr())
@@ -209,10 +205,10 @@ impl<'a> PathTracerBase<'a> {
             let closure = SurfaceClosure {
                 inner: diffuse,
                 frame: si.frame,
+                ng: si.ng,
             };
             let direct = if direct_lighting.valid {
-                let f = closure.evaluate(wo, direct_lighting.wi, **self.swl, &ctx);
-                let pdf = closure.pdf(wo, direct_lighting.wi, **self.swl, &ctx);
+                let (f, pdf) = closure.evaluate(wo, direct_lighting.wi, **self.swl, &ctx);
                 let w = mis_weight(direct_lighting.pdf, pdf, 1);
                 direct_lighting.irradiance * f * w / direct_lighting.pdf
             } else {
@@ -224,8 +220,7 @@ impl<'a> PathTracerBase<'a> {
             let svm = &self.scene.svm;
             let sample_and_shade = |closure: &SurfaceClosure| {
                 let direct = if direct_lighting.valid {
-                    let f = closure.evaluate(wo, direct_lighting.wi, **self.swl, &ctx);
-                    let pdf = closure.pdf(wo, direct_lighting.wi, **self.swl, &ctx);
+                    let (f, pdf) = closure.evaluate(wo, direct_lighting.wi, **self.swl, &ctx);
                     let w = mis_weight(direct_lighting.pdf, pdf, 1);
                     direct_lighting.irradiance * f * w / direct_lighting.pdf
                 } else {
@@ -510,7 +505,7 @@ impl Integrator for PathTracer {
                 }
             ));
         log::info!(
-            "Render kernel as {} arguments, {} captures!",
+            "Render kernel has {} arguments, {} captures!",
             kernel.num_arguments(),
             kernel.num_capture_arguments()
         );

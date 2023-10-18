@@ -218,6 +218,7 @@ impl Svm {
             let closure = SurfaceClosure {
                 inner: bsdf,
                 frame: si.frame,
+                ng: si.ng,
             };
             f(&closure)
         });
@@ -259,6 +260,7 @@ impl Svm {
                 let closure = SurfaceClosure {
                     inner: bsdf,
                     frame: si.frame,
+                    ng: si.ng,
                 };
                 f(&closure)
             });

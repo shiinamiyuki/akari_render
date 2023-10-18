@@ -26,8 +26,13 @@ impl Surface for DisneyDiffuseBsdf {
         wi: Expr<Float3>,
         _swl: Expr<SampledWavelengths>,
         ctx: &BsdfEvalContext,
-    ) -> Color {
-        if Frame::same_hemisphere(wo, wi) {
+    ) -> (Color, Expr<f32>) {
+        let pdf = select(
+            Frame::same_hemisphere(wo, wi),
+            Frame::abs_cos_theta(wi) * FRAC_1_PI,
+            0.0f32.expr(),
+        );
+        let color = if Frame::same_hemisphere(wo, wi) {
             let fo = schlick_weight(Frame::abs_cos_theta(wo));
             let fi = schlick_weight(Frame::abs_cos_theta(wi));
             let diffuse = {
@@ -51,7 +56,8 @@ impl Surface for DisneyDiffuseBsdf {
             (diffuse + retro) * Frame::abs_cos_theta(wi)
         } else {
             Color::zero(ctx.color_repr)
-        }
+        };
+        (color, pdf)
     }
     #[tracked]
     fn sample_wi_impl(
@@ -65,20 +71,6 @@ impl Surface for DisneyDiffuseBsdf {
         let wi = cos_sample_hemisphere(u_sample);
         let wi = select(Frame::same_hemisphere(wo, wi), wi, -wi);
         (wi, true.expr())
-    }
-    #[tracked]
-    fn pdf_impl(
-        &self,
-        wo: Expr<Float3>,
-        wi: Expr<Float3>,
-        _swl: Expr<SampledWavelengths>,
-        _ctx: &BsdfEvalContext,
-    ) -> Expr<f32> {
-        select(
-            Frame::same_hemisphere(wo, wi),
-            Frame::abs_cos_theta(wi) * FRAC_1_PI,
-            0.0f32.expr(),
-        )
     }
     fn albedo_impl(
         &self,
