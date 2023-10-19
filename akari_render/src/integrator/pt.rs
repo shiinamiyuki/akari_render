@@ -310,7 +310,7 @@ impl<'a> PathTracerBase<'a> {
                 *ray = Ray::new_expr(
                     ro,
                     bsdf_sample.wi,
-                    0.0,
+                    1e-3,
                     1e20,
                     Uint2::expr(si.inst_id, si.prim_id),
                     Uint2::expr(u32::MAX, u32::MAX),

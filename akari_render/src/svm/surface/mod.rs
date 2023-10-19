@@ -397,11 +397,16 @@ pub struct SurfaceClosure {
 }
 impl SurfaceClosure {
     // prevents light leaking
+    // copied from LuisaRender
     #[tracked]
     fn check_wo_wi_valid(&self, wo: Expr<Float3>, wi: Expr<Float3>) -> Expr<bool> {
-        let config_ns = wo.dot(self.frame.n) * wi.dot(self.frame.n);
-        let config_ng = wo.dot(self.ng) * wi.dot(self.ng);
-        config_ng * config_ns > 0.0
+        let sign = |x: Expr<f32>| 1.0f32.expr().copysign(x);
+        let ns = self.frame.n;
+        let ng = self.ng;
+        let flipped = sign(ng.dot(ns));
+
+        (sign(flipped * wo.dot(ns)) * sign(wo.dot(ng)) > 0.0)
+            & (sign(flipped * wi.dot(ns)) * sign(wi.dot(ng)) > 0.0)
     }
 }
 impl Surface for SurfaceClosure {

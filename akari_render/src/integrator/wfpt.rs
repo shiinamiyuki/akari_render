@@ -57,7 +57,6 @@ struct SurfaceInteractionData {
 #[derive(Clone, Copy, Debug, Soa, Value)]
 #[repr(C)]
 struct PathState {
-    sid: u32,
     swl: SampledWavelengths,
     si: SurfaceInteractionData,
     pixel: Uint2,
@@ -90,27 +89,11 @@ enum KernelId {
     GenerateRay = 0,
     Intersect,
     Miss,
-    SortSurface,
     ShadeSurface,
-    /// test shadow can be enqueued in parallel with other kernels
-    /// except ShadeSurface, which can enqueue new TestShadow
     TestShadow,
-
     Total,
 }
-impl Display for KernelId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            KernelId::GenerateRay => write!(f, "raygen"),
-            KernelId::Intersect => write!(f, "intersect"),
-            KernelId::Miss => write!(f, "miss"),
-            KernelId::TestShadow => write!(f, "test_shadow"),
-            KernelId::SortSurface => write!(f, "sort_surface"),
-            KernelId::ShadeSurface => write!(f, "shade_surface"),
-            KernelId::Total => unreachable!(),
-        }
-    }
-}
+
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 enum KernelWorkQueueSortMode {
     AtomicAdd,
@@ -185,32 +168,67 @@ impl KernelWorkQueue {
             lc_assert!(kid.lt(self.num_variants as u32));
         }
         let counter = self.counter.var();
-        let i = counter.atomic_fetch_and(kid, 1);
+        let i = counter.atomic_fetch_add(kid, 1);
         let queues = self.queues.var();
         if self.sort_mode == KernelWorkQueueSortMode::AtomicAdd {
             queues.write(i + (kid * self.max_size as u32), sid);
         }
     }
-
+    #[tracked]
+    fn read_sid(&self, kid: Expr<u32>, offset: Expr<u32>) -> Expr<u32> {
+        if debug_mode() {
+            lc_assert!(kid.lt(self.num_variants as u32));
+        }
+        let queues = self.queues.var();
+        if self.sort_mode == KernelWorkQueueSortMode::AtomicAdd {
+            if debug_mode() {
+                lc_assert!(offset.lt(self.max_size as u32));
+            }
+            queues.read(offset + (kid * self.max_size as u32))
+        } else {
+            let variant_offset = self.offsets.read(kid);
+            if debug_mode() {
+                let max = self.counter.read(kid);
+                lc_assert!(offset.lt(max));
+            }
+            queues.read(variant_offset + offset)
+        }
+    }
+    #[tracked]
+    fn count(&self, kid: Expr<u32>) -> Expr<u32> {
+        if debug_mode() {
+            lc_assert!(kid.lt(self.num_variants as u32));
+        }
+        let counter = self.counter.var();
+        counter.read(kid)
+    }
     #[tracked]
     fn sort_dynamic(&self, kid: Expr<u32>, sid: Expr<u32>) {
         assert_eq!(self.sort_mode, KernelWorkQueueSortMode::CountAndAllocate);
         if debug_mode() {
             lc_assert!(kid.lt(self.num_variants as u32));
         }
-        let offset = self.counter.var().atomic_fetch_and(kid, 1);
+        let offset = self.counter.var().atomic_fetch_add(kid, 1);
         let queues = self.queues.var();
         queues.write(offset, sid);
     }
-    fn reset(&self, kid: u32, scope: &Scope) {
-        scope.submit([self.reset_kernel.dispatch_async([1, 1, 1], &(kid as u32))]);
+    fn reset(&self, kid: u32) -> Command {
+        self.reset_kernel.dispatch_async([1, 1, 1], &(kid as u32))
     }
-    fn compute_offsets(&self, kid: u32, scope: &Scope) {
+    fn compute_offsets(&self) -> Command {
         assert_eq!(self.sort_mode, KernelWorkQueueSortMode::CountAndAllocate);
-        scope.submit([self.alloc_kernel.dispatch_async([1, 1, 1])]);
+        self.alloc_kernel.dispatch_async([1, 1, 1])
     }
 }
 
+struct WavePathKernels {
+    ray_gen: Kernel<fn()>,
+    intersect: Kernel<fn()>,
+    shade_surface: Vec<Kernel<fn()>>,
+    count_surface: Kernel<fn()>,
+    sort_surface: Kernel<fn()>,
+    test_shadow: Kernel<fn()>,
+}
 impl WavePathImpl {
     #[tracked]
     fn init_pt_impl(
@@ -294,12 +312,19 @@ impl WavePathImpl {
     #[tracked]
     fn raygen(&self, film: &Film) {
         let tid = dispatch_id().x;
+        let queue_count = self.work_queue.count((KernelId::GenerateRay as u32).expr());
+        if tid >= queue_count {
+            return;
+        }
         let states = self.states.var();
-        let sid = states.sid.read(tid);
-        if debug_mode() {
-            let spp = states.spp.read(sid);
-            let cfg = self.config_buffer.read(0);
-            lc_assert!(spp.lt(cfg.spp));
+        let sid = self
+            .work_queue
+            .read_sid((KernelId::GenerateRay as u32).expr(), tid);
+
+        let spp = states.spp.read(sid);
+        let cfg = self.config_buffer.read(0);
+        if spp >= cfg.spp {
+            return;
         }
 
         let pixel = states.pixel.read(sid);
@@ -326,8 +351,14 @@ impl WavePathImpl {
     #[tracked]
     fn intersect(&self) {
         let tid = dispatch_id().x;
+        let queue_count = self.work_queue.count((KernelId::Intersect as u32).expr());
+        if tid >= queue_count {
+            return;
+        }
         let states = self.states.var();
-        let sid = states.sid.read(tid);
+        let sid = self
+            .work_queue
+            .read_sid((KernelId::Intersect as u32).expr(), tid);
         let ray = states.ray.read(sid);
         let si = self.scene.intersect(ray);
 
@@ -340,7 +371,7 @@ impl WavePathImpl {
             states.si.uv.write(sid, si.uv);
             states.si.ng.write(sid, si.ng);
             states.si.p.write(sid, si.p);
-            self.work_queue.enqueue(KernelId::SortSurface as u32, sid);
+            self.work_queue.enqueue(KernelId::ShadeSurface as u32, sid);
         } else {
             self.work_queue.enqueue(KernelId::Miss as u32, sid);
         }
@@ -373,11 +404,26 @@ impl WavePathImpl {
         let sampler = self.sampler_creator.create(states.pixel.read(sid));
         sampler
     }
+
+    // fn on_path_terminates(&self, sid: Expr<u32>) {
+    //     let states = self.states.var();
+    //     let swl = states.swl.read(sid);
+    //     let (beta, _) = self.beta.read(sid);
+    //     let (direct, _) = self.direct_li.read(sid);
+    //     let radiance = self.radiance.read(sid);
+    //     let throughput = beta * direct + radiance;
+    //     self.radiance.write(sid, throughput);
+    // }
+
     #[tracked]
-    fn shade_surface(&self, shader_kind: Option<u32>) {
+    fn shade_surface(&self, shader_kind: u32) {
         let tid = dispatch_id().x;
+        let queue_count = self.surface_queue.count(shader_kind.expr());
+        if tid >= queue_count {
+            return;
+        }
         let states = self.states.var();
-        let sid = states.sid.read(tid);
+        let sid = self.work_queue.read_sid(shader_kind.expr(), tid);
         let swl = self.load_swl(sid);
         let prev_bsdf_pdf = states.prev_bsdf_pdf.read(sid);
         let prev_ng = states.prev_ng.read(sid);
@@ -392,7 +438,7 @@ impl WavePathImpl {
         }
         let wo = -states.ray.read(sid).d;
         let (bsdf_sample, direct) =
-            pt.sample_surface_and_shade_direct(shader_kind, si, wo, dl, sampler.next_3d());
+            pt.sample_surface_and_shade_direct(Some(shader_kind), si, wo, dl, sampler.next_3d());
 
         let (beta, _) = self.beta.read(sid);
         self.direct_li.write(sid, direct * beta, **swl);
@@ -408,8 +454,14 @@ impl WavePathImpl {
     #[tracked]
     fn test_shadow(&self) {
         let tid = dispatch_id().x;
+        let queue_count = self.work_queue.count((KernelId::TestShadow as u32).expr());
+        if tid >= queue_count {
+            return;
+        }
         let states = self.states.var();
-        let sid = states.sid.read(tid);
+        let sid = self
+            .work_queue
+            .read_sid((KernelId::TestShadow as u32).expr(), tid);
         let shadow_ray = states.shadow_ray.read(sid);
         let occluded = self.scene.occlude(shadow_ray);
         if !occluded {
@@ -420,13 +472,54 @@ impl WavePathImpl {
     #[tracked]
     fn sort_surcace(&self, counting: bool) {
         let tid = dispatch_id().x;
+        let queue_count = self
+            .work_queue
+            .count((KernelId::ShadeSurface as u32).expr());
+        if tid >= queue_count {
+            return;
+        }
         let states = self.states.var();
-        let sid = states.sid.read(tid);
+        let sid = self
+            .work_queue
+            .read_sid((KernelId::ShadeSurface as u32).expr(), tid);
         let surface = states.si.surface.read(sid);
         if counting {
             self.surface_queue.enqueue_dynamic(surface.shader_kind, sid);
         } else {
             self.surface_queue.sort_dynamic(surface.shader_kind, sid);
+        }
+    }
+    #[tracked]
+    fn compile_kernels(&self, film: &Film) -> WavePathKernels {
+        let ray_gen = self.device.create_kernel_async::<fn()>(&|| {
+            self.raygen(film);
+        });
+        let intersect = self.device.create_kernel_async::<fn()>(&|| {
+            self.intersect();
+        });
+        let surface_variants = self.scene.svm.surface_shaders.variant_count();
+        let shade_surface = (0..surface_variants)
+            .map(|i| {
+                self.device
+                    .create_kernel_async::<fn()>(&|| self.shade_surface(i as u32))
+            })
+            .collect();
+        let sort_surface = self.device.create_kernel_async::<fn()>(&|| {
+            self.sort_surcace(false);
+        });
+        let count_surface = self.device.create_kernel_async::<fn()>(&|| {
+            self.sort_surcace(true);
+        });
+        let test_shadow = self.device.create_kernel_async::<fn()>(&|| {
+            self.test_shadow();
+        });
+        WavePathKernels {
+            ray_gen,
+            intersect,
+            shade_surface,
+            sort_surface,
+            count_surface,
+            test_shadow,
         }
     }
     fn render_loop(&self, film: &Film) {
@@ -445,12 +538,54 @@ impl WavePathImpl {
             max_wf_sz = npixels as u32;
         }
         let stream = self.device.create_stream(StreamTag::Graphics);
-        let schedule_kernels = |pixel_offset: u32, wf_sz: u32| {
+        let kernels = self.compile_kernels(film);
+        let profiler = DispatchProfiler::<&'static str>::new();
+        let schedule_kernels = |pixel_offset: u32, wf_sz: u32, spp_per_pass: u32| {
             assert!(wf_sz < max_wf_sz);
             assert!(pixel_offset + wf_sz <= npixels as u32);
+            let scope = stream.scope();
+            for _spp in 0..spp_per_pass {
+                for _depth in 0..=self.config.max_depth {
+                    profiler.profile("Generate Ray", &scope, || {
+                        scope.submit([
+                            kernels.ray_gen.dispatch_async([wf_sz, 1, 1]),
+                            self.work_queue.reset(KernelId::GenerateRay as u32),
+                        ]);
+                    });
+                    profiler.profile("Intersect", &scope, || {
+                        scope.submit([
+                            kernels.intersect.dispatch_async([wf_sz, 1, 1]),
+                            self.work_queue.reset(KernelId::Intersect as u32),
+                        ]);
+                    });
+                    profiler.profile("Shade Surface", &scope, || {
+                        let mut cmds = vec![kernels.count_surface.dispatch_async([wf_sz, 1, 1])];
+                        cmds.push(self.surface_queue.compute_offsets());
+                        cmds.push(kernels.sort_surface.dispatch_async([wf_sz, 1, 1]));
+                        for (_i, k) in kernels.shade_surface.iter().enumerate() {
+                            cmds.push(k.dispatch_async([wf_sz, 1, 1]));
+                        }
+                        cmds.push(self.work_queue.reset(KernelId::ShadeSurface as u32));
+                        scope.submit(cmds);
+                    });
+                    profiler.profile("Test Shadow", &scope, || {
+                        scope.submit([
+                            kernels.test_shadow.dispatch_async([wf_sz, 1, 1]),
+                            self.work_queue.reset(KernelId::TestShadow as u32),
+                        ]);
+                    });
+                }
+                let mut queue_counter = vec![0u32; KernelId::Total as usize];
+                scope
+                    .submit([self.work_queue.counter.copy_to_async(&mut queue_counter)])
+                    .synchronize();
+                dbg!(&queue_counter);
+                let active_paths = queue_counter[KernelId::GenerateRay as usize];
+                if active_paths == 0 {
+                    break;
+                }
+            }
         };
-        
-        let profiler = DispatchProfiler::<KernelId>::new();
     }
 }
 
