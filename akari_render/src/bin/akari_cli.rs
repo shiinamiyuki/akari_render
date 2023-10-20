@@ -1,9 +1,9 @@
 use akari_render::{
     gui::DisplayWindow,
     integrator::{render, RenderSession, RenderTask},
+    luisa,
 };
 use clap::{arg, builder::BoolishValueParser, Arg, ArgAction, Command};
-use luisa_compute as luisa;
 use std::{env::current_exe, fs::File, process::exit};
 
 fn main() {

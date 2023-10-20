@@ -18,44 +18,9 @@ pub struct TriangleMesh {
     pub vertices: Vec<[f32; 3]>,
     pub normals: Vec<[f32; 3]>,
     pub tangents: Vec<[f32; 3]>,
-    pub bitangent_signs: Vec<u32>, // bitmasks, 0 for 1, 1 for -1
+    // pub bitangent_signs: Vec<u32>, // bitmasks, 0 for 1, 1 for -1
     pub uvs: Vec<[f32; 2]>,
     pub indices: Vec<[u32; 3]>,
-}
-impl Encode for TriangleMesh {
-    fn encode<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
-        self.name.encode(writer)?;
-        self.vertices.encode(writer)?;
-        self.normals.encode(writer)?;
-        self.tangents.encode(writer)?;
-        self.bitangent_signs.encode(writer)?;
-        self.uvs.encode(writer)?;
-        self.indices.encode(writer)?;
-        Ok(())
-    }
-}
-impl Decode for TriangleMesh {
-    fn decode<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self>
-    where
-        Self: Sized,
-    {
-        let name = Decode::decode(reader)?;
-        let vertices = Decode::decode(reader)?;
-        let normals = Decode::decode(reader)?;
-        let tangents = Decode::decode(reader)?;
-        let bitangent_signs = Decode::decode(reader)?;
-        let uvs = Decode::decode(reader)?;
-        let indices = Decode::decode(reader)?;
-        Ok(Self {
-            name,
-            vertices,
-            tangents,
-            bitangent_signs,
-            uvs,
-            indices,
-            normals,
-        })
-    }
 }
 
 impl TriangleMesh {
@@ -76,7 +41,7 @@ pub struct MeshBuffer {
     pub vertices: Buffer<[f32; 3]>,
     pub normals: Option<Buffer<[f32; 3]>>,
     pub tangents: Option<Buffer<[f32; 3]>>,
-    pub bitangent_signs: Option<Buffer<u32>>,
+    // pub bitangent_signs: Option<Buffer<u32>>,
     pub uvs: Option<Buffer<[f32; 2]>>,
     pub indices: Buffer<[u32; 3]>,
     pub area_sampler: Option<AliasTable>,
@@ -94,10 +59,10 @@ impl MeshBuffer {
         }
         if !mesh.tangents.is_empty() {
             assert_eq!(mesh.indices.len() * 3, mesh.tangents.len());
-            assert_eq!(
-                (mesh.indices.len() * 3 + 31) / 32,
-                mesh.bitangent_signs.len()
-            );
+            // assert_eq!(
+            //     (mesh.indices.len() * 3 + 31) / 32,
+            //     mesh.bitangent_signs.len()
+            // );
         }
         let vertices = device.create_buffer_from_slice(&mesh.vertices);
         let normals = if mesh.normals.is_empty() {
@@ -110,11 +75,11 @@ impl MeshBuffer {
         } else {
             Some(device.create_buffer_from_slice(&mesh.tangents))
         };
-        let bitangent_signs = if mesh.bitangent_signs.is_empty() {
-            None
-        } else {
-            Some(device.create_buffer_from_slice(&mesh.bitangent_signs))
-        };
+        // let bitangent_signs = if mesh.bitangent_signs.is_empty() {
+        //     None
+        // } else {
+        //     Some(device.create_buffer_from_slice(&mesh.bitangent_signs))
+        // };
         let indices = device.create_buffer_from_slice(&mesh.indices);
         let uvs = if mesh.uvs.is_empty() {
             None
@@ -126,7 +91,7 @@ impl MeshBuffer {
             vertices,
             normals,
             tangents,
-            bitangent_signs,
+            // bitangent_signs,
             uvs,
             indices,
             area_sampler: None,

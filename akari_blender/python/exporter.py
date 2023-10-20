@@ -10,7 +10,20 @@ from enum import Enum, auto
 import json
 import os
 import struct
+from ctypes import *
 
+AKARI_BLENDER_DLL = cdll.LoadLibrary(os.path.join(os.path.dirname(__file__), os.environ['AKARI_BLENDER_PATH']))
+
+def check_blender_version():
+    # only supports blender 3.6.x and above
+    if bpy.app.version[0] < 3:
+        print("Blender version must be 3.0 or above")
+        sys.exit(1)
+    if bpy.app.version[1] < 6:
+        print("Blender version must be 3.6 or above")
+        sys.exit(1)
+
+check_blender_version()
 
 def dbg(*args, **kwargs):
     print(f"Debug {sys._getframe().f_back.f_lineno}: ", end="")
@@ -424,6 +437,62 @@ class SceneExporter:
         else:
             # only compute normals
             m.calc_normals_split()
+
+        V = m.vertices
+        F = m.loop_triangles
+        print(f"    #V: {len(V)} #F: {len(F)}")
+        mesh_out_path = os.path.join(MESH_DIR, f"{name}")
+
+        export_mesh_args = {
+            'out_path': mesh_out_path,
+            "loop_tri_ptr":m.loop_triangles[0].as_pointer(),
+            'vertex_ptr':m.vertices[0].as_pointer(),
+            'uv_ptr':m.uv_layers[0].uv[0].as_pointer() if has_uv else 0,
+            'mesh_ptr':m.as_pointer(),
+            'num_vertices':len(V),
+            'num_triangles':len(F),
+        }
+        AKARI_BLENDER_DLL.export_blender_mesh(json.dumps(export_mesh_args).encode('utf-8'))
+
+        exported_mesh = {}
+
+        exported_mesh["vertices"] = make_external_buffer(
+            path_join(MESH_DIR, f"{name}.vert")
+        )
+        exported_mesh["indices"] = make_external_buffer(
+            path_join(MESH_DIR, f"{name}.ind")
+        )
+        exported_mesh["normals"] = make_external_buffer(
+            path_join(MESH_DIR, f"{name}.normal")
+        )
+        if has_uv:
+            exported_mesh["uvs"] = make_external_buffer(
+                path_join(MESH_DIR, f"{name}.uv")
+            )
+            exported_mesh["tangents"] = make_external_buffer(
+                path_join(MESH_DIR, f"{name}.tangent")
+            )
+            exported_mesh["bitangent_signs"] = make_external_buffer(
+                path_join(MESH_DIR, f"{name}.bitangent")
+            )
+        else:
+            exported_mesh["uvs"] = None
+            exported_mesh["tangents"] = None
+            exported_mesh["bitangent_signs"] = None
+        self.exported_geometries[name] = {"Mesh": exported_mesh}
+
+    def export_mesh_data_slow(self, m, name, has_uv):
+        bm = bmesh.new()
+        bm.from_mesh(m)
+        bmesh.ops.triangulate(bm, faces=bm.faces[:])
+        bm.to_mesh(m)
+        bm.free()
+        m.calc_loop_triangles()
+        if has_uv:
+            m.calc_tangents()
+        else:
+            # only compute normals
+            m.calc_normals_split()
         V = m.vertices
         F = m.loop_triangles
         print(f"    #V: {len(V)} #F: {len(F)}")
@@ -496,13 +565,10 @@ class SceneExporter:
             exported_mesh["tangents"] = make_external_buffer(
                 path_join(MESH_DIR, f"{name}.tangent")
             )
-            exported_mesh["bitangent_signs"] = make_external_buffer(
-                path_join(MESH_DIR, f"{name}.bitangent")
-            )
         else:
             exported_mesh["uvs"] = None
             exported_mesh["tangents"] = None
-            exported_mesh["bitangent_signs"] = None
+            # exported_mesh["bitangent_signs"] = None
         self.exported_geometries[name] = {"Mesh": exported_mesh}
 
     def convert_matrix_to_list(self, mat):

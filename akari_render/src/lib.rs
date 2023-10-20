@@ -33,6 +33,7 @@ pub use luisa::{
 };
 pub use luisa_compute as luisa;
 pub use rayon::prelude::*;
+pub use rayon;
 pub mod camera;
 pub mod color;
 pub mod cpp_ext;

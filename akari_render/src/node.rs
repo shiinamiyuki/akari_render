@@ -108,7 +108,7 @@ pub struct Mesh {
     pub indices: Buffer,
     pub uvs: Option<Buffer>,
     pub tangents: Option<Buffer>,
-    pub bitangent_signs: Option<Buffer>,
+    // pub bitangent_signs: Option<Buffer>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

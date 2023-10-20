@@ -419,11 +419,11 @@ impl SceneLoader {
                         .as_ref()
                         .map(|b| load_buffer::<[f32; 3]>(&file_resolver, b))
                         .unwrap_or(vec![]);
-                    let bitangent_signs = mesh
-                        .bitangent_signs
-                        .as_ref()
-                        .map(|b| load_buffer::<u32>(&file_resolver, b))
-                        .unwrap_or(vec![]);
+                    // let bitangent_signs: Vec<u32> = mesh
+                    //     .bitangent_signs
+                    //     .as_ref()
+                    //     .map(|b| load_buffer::<u32>(&file_resolver, b))
+                    //     .unwrap_or(vec![]);
                     let mesh = Arc::new(TriangleMesh {
                         name: id.id.clone(),
                         vertices,
@@ -431,7 +431,7 @@ impl SceneLoader {
                         indices,
                         uvs,
                         tangents,
-                        bitangent_signs,
+                        // bitangent_signs,
                     });
                     let mesh_buffer = MeshBuffer::new(device.clone(), &mesh);
                     let geom_id = mesh_buffers.len();

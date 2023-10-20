@@ -34,6 +34,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "akari_blender"
+version = "0.1.0"
+dependencies = [
+ "akari_render",
+ "clap 4.2.7",
+ "cmake",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "akari_data"
 version = "0.1.0"
 
