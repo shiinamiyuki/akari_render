@@ -1,7 +1,6 @@
 use akari_render::rayon;
 use akari_render::util::binserde::*;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::ffi::c_char;
 
 #[derive(Serialize, Deserialize)]

@@ -85,4 +85,7 @@ fn main() {
         eprintln!("Blender exited with error code {}", ec);
         process::exit(1);
     }
+    {
+        std::fs::remove_file(format!("{}/__exporter.py", output)).unwrap();
+    }
 }

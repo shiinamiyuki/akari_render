@@ -70,3 +70,111 @@ pub fn xxhash32_3(p: Expr<Uint3>) -> Expr<u32> {
 pub fn xxhash32_4(p: Expr<Uint4>) -> Expr<u32> {
     XXHASH_32_4.call(p)
 }
+
+/// Hash functions in an attempt to match the behavior of Blender's Cycles.
+pub mod blender {
+    use super::*;
+    #[tracked]
+    fn uint_to_float_excl(n: Expr<u32>) -> Expr<f32> {
+        n.as_f32() * (1.0f32 / 4294967296.0)
+    }
+    #[tracked]
+    fn rot(x: impl AsExpr<Value = u32>, k: impl AsExpr<Value = u32>) -> Expr<u32> {
+        let x = x.as_expr();
+        let k = k.as_expr();
+        (x << k) | (x >> (32 - k))
+    }
+    #[tracked]
+    fn mix(a: Var<u32>, b: Var<u32>, c: Var<u32>) {
+        *a -= c;
+        *a ^= rot(c, 4);
+        *c += b;
+        *b -= a;
+        *b ^= rot(a, 6);
+        *a += c;
+        *c -= b;
+        *c ^= rot(b, 8);
+        *b += a;
+        *a -= c;
+        *a ^= rot(c, 16);
+        *c += b;
+        *b -= a;
+        *b ^= rot(a, 19);
+        *a += c;
+        *c -= b;
+        *c ^= rot(b, 4);
+        *b += a;
+    }
+    #[tracked]
+    pub fn final_(a: Var<u32>, b: Var<u32>, c: Var<u32>) {
+        *c ^= b;
+        *c -= rot(b, 14);
+        *a ^= c;
+        *a -= rot(c, 11);
+        *b ^= a;
+        *b -= rot(a, 25);
+        *c ^= b;
+        *c -= rot(b, 16);
+        *a ^= c;
+        *a -= rot(c, 4);
+        *b ^= a;
+        *b -= rot(a, 14);
+        *c ^= b;
+        *c -= rot(b, 24);
+    }
+    #[tracked]
+    pub fn hash_uint(kx: Expr<u32>) -> Expr<u32> {
+        let init: u32 = 0xdeadbeefu32 + (1u32 << 2) + 13u32;
+        let a = init.var();
+        let b = init.var();
+        let c = init.var();
+        outline(|| {
+            *a += kx;
+            final_(a, b, c);
+        });
+        c.load()
+    }
+    #[tracked]
+    pub fn hash_uint2(k: Expr<Uint2>) -> Expr<u32> {
+        let init: u32 = 0xdeadbeefu32 + (2u32 << 2) + 13u32;
+        let a = init.var();
+        let b = init.var();
+        let c = init.var();
+        outline(|| {
+            *a += k.y;
+            *b += k.x;
+            final_(a, b, c);
+        });
+        c.load()
+    }
+    #[tracked]
+    pub fn hash_uint3(k: Expr<Uint3>) -> Expr<u32> {
+        let init: u32 = 0xdeadbeefu32 + (3u32 << 2) + 13u32;
+        let a = init.var();
+        let b = init.var();
+        let c = init.var();
+        outline(|| {
+            *a += k.x;
+            *b += k.y;
+            *c += k.z;
+            final_(a, b, c);
+        });
+        c.load()
+    }
+    #[tracked]
+    pub fn hash_uint4(k: Expr<Uint4>) -> Expr<u32> {
+        let init: u32 = 0xdeadbeefu32 + (4u32 << 2) + 13u32;
+        let a = init.var();
+        let b = init.var();
+        let c = init.var();
+        outline(|| {
+            *a += k.x;
+            *b += k.y;
+            *c += k.z;
+            mix(a, b, c);
+            *a += k.w;
+            final_(a, b, c);
+        });
+        c.load()
+    }
+}

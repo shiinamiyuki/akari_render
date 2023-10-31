@@ -108,7 +108,6 @@ impl<'a> PathTracerBase<'a> {
                     let ng = si.ng;
                     let pn = PointNormal::new_expr(p, ng);
 
-                    // let sample = eval.light.sample(pn, u, **self.swl);
                     let sample = self.scene.lights.sample_direct(
                         pn,
                         u.x,
@@ -399,9 +398,9 @@ impl VertexType {
 #[repr(C)]
 pub struct ReconnectionVertex {
     pub bary: Float2,
-    pub direct: [f32; 3],
+    pub direct: FlatColor,
     pub direct_wi: [f32; 3],
-    pub indirect: [f32; 3],
+    pub indirect: FlatColor,
     pub wo: [f32; 3],
     pub wi: [f32; 3],
     pub direct_light_pdf: f32,

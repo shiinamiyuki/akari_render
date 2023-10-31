@@ -39,3 +39,6 @@ path = "src/bin/akari_cli.rs"
 name = "akari_test"
 path = "src/bin/akari_test.rs"
 
+
+[lib]
+crate-type =  ["dylib", "rlib"]

@@ -3,6 +3,7 @@ pub mod distribution;
 pub mod hash;
 pub mod integration;
 pub mod profile;
+pub mod lerp;
 use crate::{color::glam_linear_to_srgb, *};
 use glam::Vec4Swizzles;
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};

@@ -1,4 +1,4 @@
-use std::collections::{HashMap};
+use std::collections::HashMap;
 
 use super::*;
 use crate::{
@@ -184,6 +184,9 @@ impl<'a> Compiler<'a> {
                     }),
                 })
             }
+            Node::PerlinNoise { .. } => {
+                todo!()
+            }
             Node::DiffuseBsdf { color } => {
                 let color = self.get(&color);
                 SvmNode::DiffuseBsdf(SvmDiffuseBsdf { reflectance: color })
@@ -267,32 +270,6 @@ impl<'a> Compiler<'a> {
                 SvmNode::MaterialOutput(SvmMaterialOutput { surface })
             }
         };
-
-        // when!(
-        //     nodes::RGBImageTexture,
-        //     |compiler: &mut Compiler, node: &Node| {
-        //         let tex = node
-        //             .proxy::<nodes::RGBImageTexture>(compiler.graph())
-        //             .unwrap();
-        //         let path = tex.in_path.as_value().unwrap().clone().clone();
-        //         let sampler = load::sampler_from_rgb_image_tex_node(&tex);
-        //         let tex_idx = compiler.ctx.images[&(path, sampler)];
-        //         SvmNode::RgbImageTex(SvmRgbImageTex {
-        //             tex_idx: tex_idx as u32,
-        //             colorspace: ColorSpaceId::from_colorspace(tex.in_colorspace.into()),
-        //         })
-        //     }
-        // );
-        // when!(
-        //     nodes::SpectralUplift,
-        //     |compiler: &mut Compiler, node: &Node| {
-        //         let uplift = node
-        //             .proxy::<nodes::SpectralUplift>(compiler.graph())
-        //             .unwrap();
-        //         let rgb = compiler.get(&uplift.in_rgb.as_node().unwrap().from);
-        //         SvmNode::SpectralUplift(SvmSpectralUplift { rgb })
-        //     }
-        // );
 
         let node_ref = self.push(node);
         self.env.insert(node_id.clone(), node_ref);

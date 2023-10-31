@@ -230,6 +230,10 @@ pub mod shader {
             colorspace: RgbColorSpace,
         },
         TexImage(Image),
+        PerlinNoise {
+            dim: u32,
+            scale: Ref<Node>,
+        },
         DiffuseBsdf {
             color: Ref<Node>,
         },
@@ -355,6 +359,9 @@ pub mod shader {
                     self.visit(roughness);
                 }
                 Node::OutputSurface { surface } => self.visit(surface),
+                Node::PerlinNoise { dim: _, scale } => {
+                    self.visit(scale);
+                }
             }
         }
     }

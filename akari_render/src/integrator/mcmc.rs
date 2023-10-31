@@ -1,8 +1,3 @@
-
-
-
-
-
 use super::pt::{self, PathTracer};
 
 

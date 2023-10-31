@@ -1,4 +1,3 @@
-
 use std::sync::Arc;
 
 use crate::geometry::{Frame, FrameExpr};
@@ -59,10 +58,6 @@ impl MeshBuffer {
         }
         if !mesh.tangents.is_empty() {
             assert_eq!(mesh.indices.len() * 3, mesh.tangents.len());
-            // assert_eq!(
-            //     (mesh.indices.len() * 3 + 31) / 32,
-            //     mesh.bitangent_signs.len()
-            // );
         }
         let vertices = device.create_buffer_from_slice(&mesh.vertices);
         let normals = if mesh.normals.is_empty() {
