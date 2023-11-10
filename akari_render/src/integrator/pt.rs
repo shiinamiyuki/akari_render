@@ -2,7 +2,7 @@
 
 use std::{f32::consts::FRAC_1_PI, rc::Rc, sync::Arc, time::Instant};
 
-use luisa::rtx::offset_ray_origin;
+use luisa::{rtx::offset_ray_origin, runtime::KernelBuildOptions};
 use rand::Rng;
 
 use super::{Integrator, RenderSession};
@@ -397,14 +397,14 @@ impl VertexType {
 #[derive(Clone, Copy, Debug, Value)]
 #[repr(C)]
 pub struct ReconnectionVertex {
-    pub bary: Float2,
     pub direct: FlatColor,
-    pub direct_wi: [f32; 3],
     pub indirect: FlatColor,
-    pub wo: [f32; 3],
-    pub wi: [f32; 3],
+    pub bary: Float2,
+    pub direct_wi: [f32; 3],
     pub direct_light_pdf: f32,
+    pub wo: [f32; 3],
     pub inst_id: u32,
+    pub wi: [f32; 3],
     pub prim_id: u32,
     pub prev_bsdf_pdf: f32,
     pub bsdf_pdf: f32,
@@ -420,11 +420,11 @@ impl ReconnectionVertexVar {
 #[derive(Clone, Copy)]
 pub struct ReconnectionShiftMapping {
     pub min_dist: Expr<f32>,
+    pub min_roughness: Expr<f32>,
     pub is_base_path: Expr<bool>,
     pub vertex: Var<ReconnectionVertex>,
     pub jacobian: Var<f32>,
     pub success: Var<bool>,
-    pub min_roughness: Expr<f32>,
 }
 #[derive(Clone, Copy, Value, Debug)]
 #[repr(C)]
@@ -474,35 +474,39 @@ impl Integrator for PathTracer {
         assert_eq!(resolution.x, film.resolution().x);
         assert_eq!(resolution.y, film.resolution().y);
         let sampler_creator = sampler_config.creator(self.device.clone(), &scene, self.spp);
-        let kernel =
-            self.device.create_kernel::<fn(u32, Int2)>(&track!(
-                |spp_per_pass: Expr<u32>, pixel_offset: Expr<Int2>| {
-                    set_block_size([16, 16, 1]);
-                    let p = dispatch_id().xy();
-                    let sampler = sampler_creator.create(p);
-                    let sampler = sampler.as_ref();
-                    for_range(0u32.expr()..spp_per_pass, |_| {
-                        sampler.start();
-                        let ip = p.cast_i32();
-                        let shifted = ip + pixel_offset;
-                        let shifted = shifted
-                            .clamp(0, resolution.expr().cast_i32() - 1)
-                            .cast_u32();
-                        let swl = sample_wavelengths(color_pipeline.color_repr, sampler);
-                        let (ray, ray_w) = scene.camera.generate_ray(
-                            &scene,
-                            film.filter(),
-                            shifted,
-                            sampler,
-                            color_pipeline.color_repr,
-                            swl,
-                        );
-                        let swl = swl.var();
-                        let l = self.radiance(&scene, color_pipeline, ray, swl, sampler);
-                        film.add_sample(p.cast_f32(), &l, **swl, ray_w);
-                    });
-                }
-            ));
+        let kernel = self.device.create_kernel_with_options::<fn(u32, Int2)>(
+            KernelBuildOptions {
+                name: Some("mega_path".into()),
+                time_trace: true,
+                ..Default::default()
+            },
+            &track!(|spp_per_pass: Expr<u32>, pixel_offset: Expr<Int2>| {
+                set_block_size([16, 16, 1]);
+                let p = dispatch_id().xy();
+                let sampler = sampler_creator.create(p);
+                let sampler = sampler.as_ref();
+                for_range(0u32.expr()..spp_per_pass, |_| {
+                    sampler.start();
+                    let ip = p.cast_i32();
+                    let shifted = ip + pixel_offset;
+                    let shifted = shifted
+                        .clamp(0, resolution.expr().cast_i32() - 1)
+                        .cast_u32();
+                    let swl = sample_wavelengths(color_pipeline.color_repr, sampler);
+                    let (ray, ray_w) = scene.camera.generate_ray(
+                        &scene,
+                        film.filter(),
+                        shifted,
+                        sampler,
+                        color_pipeline.color_repr,
+                        swl,
+                    );
+                    let swl = swl.var();
+                    let l = self.radiance(&scene, color_pipeline, ray, swl, sampler);
+                    film.add_sample(p.cast_f32(), &l, **swl, ray_w);
+                });
+            }),
+        );
         log::info!(
             "Render kernel has {} arguments, {} captures!",
             kernel.num_arguments(),

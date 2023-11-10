@@ -13,7 +13,10 @@ image = "0.24.3"
 indicatif = "0.17.3"
 lazy_static = "1.4"
 log = "0.4.17"
-luisa_compute = { path = "../../luisa-compute-rs/luisa_compute", features = ["glam"]}
+luisa_compute = { path = "../../luisa-compute-rs/luisa_compute", features = [
+    "glam",
+    "oidn",
+] }
 akari_data = { path = "../akari_data" }
 # luisa_compute = { git = "https://github.com/LuisaGroup/luisa-compute-rs.git"}
 parking_lot = "0.12"
@@ -28,7 +31,7 @@ glam = "0.24.0"
 
 [build-dependencies]
 cmake = "0.1.50"
-serde = { version = "1"}
+serde = { version = "1" }
 serde_json = "1"
 
 [[bin]]
@@ -41,4 +44,4 @@ path = "src/bin/akari_test.rs"
 
 
 [lib]
-crate-type =  ["dylib", "rlib"]
+crate-type = ["dylib", "rlib"]

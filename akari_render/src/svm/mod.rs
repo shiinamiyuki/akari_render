@@ -31,6 +31,7 @@ fn type_id_u64<T: 'static>() -> u64 {
     std::any::TypeId::of::<T>().hash(&mut hasher);
     hasher.finish()
 }
+
 #[derive(Clone, Copy, Debug, Value)]
 #[repr(C)]
 pub struct SvmFloat {

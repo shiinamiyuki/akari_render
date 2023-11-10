@@ -9,6 +9,8 @@ resolver = "2"
 
 [profile.dev]
 incremental = true
+opt-level = 1
+debug = true
 
 [profile.release]
 incremental = true
