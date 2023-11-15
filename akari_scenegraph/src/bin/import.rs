@@ -2,8 +2,8 @@ use clap::{arg, builder::BoolishValueParser, Arg, ArgAction, Command};
 use std::{env::current_exe, path::PathBuf, process};
 
 fn find_blender() -> PathBuf {
-    let blender_major_version = 3;
-    let blender_minor_version = 6;
+    let blender_major_version = 4;
+    let blender_minor_version = 0;
     match std::env::var("BLENDER_PATH") {
         Ok(path) if !path.is_empty() => PathBuf::from(path),
         _ => {

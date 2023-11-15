@@ -2,8 +2,8 @@ pub mod binserde;
 pub mod distribution;
 pub mod hash;
 pub mod integration;
-pub mod profile;
 pub mod lerp;
+pub mod profile;
 use crate::{color::glam_linear_to_srgb, *};
 use glam::Vec4Swizzles;
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
@@ -53,32 +53,7 @@ pub fn create_progess_bar(count: usize, what: &str) -> ProgressBarWrapper {
         ProgressBarWrapper { inner: None }
     }
 }
-pub trait FileResolver {
-    fn resolve(&self, path: &Path) -> Option<std::fs::File>;
-}
 
-pub struct LocalFileResolver {
-    pub(crate) paths: Vec<PathBuf>,
-}
-impl LocalFileResolver {
-    pub fn new(paths: Vec<PathBuf>) -> Self {
-        Self { paths }
-    }
-}
-
-impl FileResolver for LocalFileResolver {
-    fn resolve(&self, path: &std::path::Path) -> Option<std::fs::File> {
-        if let Ok(f) = std::fs::File::open(path) {
-            return Some(f);
-        }
-        for p in &self.paths {
-            if let Ok(f) = std::fs::File::open(p.join(path)) {
-                return Some(f);
-            }
-        }
-        None
-    }
-}
 pub fn write_image(color: &Tex2d<Float4>, path: &str) {
     if path.ends_with(".exr") {
         write_image_hdr(color, path)
@@ -312,7 +287,7 @@ impl CompensatedSumExpr {
 }
 impl CompensatedSumVar {
     #[tracked]
-    pub fn update(&self, v:Expr<f32>) {
+    pub fn update(&self, v: Expr<f32>) {
         *self.self_ = (**self.self_).update(v);
     }
 }

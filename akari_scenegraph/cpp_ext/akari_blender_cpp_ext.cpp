@@ -2,9 +2,9 @@
 #include <stdlib.h>
 #include <algorithm>
 
-/// this code is strictly for Blender 3.6
+/// this code is strictly for Blender 4.0
 
-namespace copied_from_blender_3_6
+namespace copied_from_blender_4_0
 {
     int CustomData_get_active_layer_index(const CustomData *data, const eCustomDataType type)
     {
@@ -54,14 +54,14 @@ namespace copied_from_blender_3_6
     }
     const int *BKE_mesh_corner_verts(const Mesh *mesh)
     {
-        return (const int *)CustomData_get_layer_named(&mesh->ldata, CD_PROP_INT32, ".corner_vert");
+        return (const int *)CustomData_get_layer_named(&mesh->loop_data, CD_PROP_INT32, ".corner_vert");
     }
 
 }
 
 extern "C" void get_mesh_triangle_indices(const Mesh *mesh, const MLoopTri *tri, size_t count, int *out)
 {
-    const int *corner_verts = copied_from_blender_3_6::BKE_mesh_corner_verts(mesh);
+    const int *corner_verts = copied_from_blender_4_0::BKE_mesh_corner_verts(mesh);
     for (size_t i = 0; i < count; i++)
     {
         out[i * 3 + 0] = corner_verts[tri[i].tri[0]];
@@ -72,7 +72,7 @@ extern "C" void get_mesh_triangle_indices(const Mesh *mesh, const MLoopTri *tri,
 
 extern "C" void get_mesh_tangents(const Mesh *mesh, const MLoopTri *tri, size_t count, float *out)
 {
-    auto layer = reinterpret_cast<const std::array<float, 4> *>(copied_from_blender_3_6::CustomData_get_layer(&mesh->ldata, CD_MLOOPTANGENT));
+    auto layer = reinterpret_cast<const std::array<float, 4> *>(copied_from_blender_4_0::CustomData_get_layer(&mesh->loop_data, CD_MLOOPTANGENT));
     if (!layer)
     {
         std::fill(out, out + 9 * count, 0.0f);
@@ -92,7 +92,7 @@ extern "C" void get_mesh_tangents(const Mesh *mesh, const MLoopTri *tri, size_t 
 
 extern "C" void get_mesh_split_normals(const Mesh *mesh, const MLoopTri *tri, size_t count, float *out)
 {
-    auto layer = reinterpret_cast<const std::array<float, 3> *>(copied_from_blender_3_6::CustomData_get_layer(&mesh->ldata, CD_NORMAL));
+    auto layer = reinterpret_cast<const std::array<float, 3> *>(copied_from_blender_4_0::CustomData_get_layer(&mesh->loop_data, CD_NORMAL));
 
     if (!layer)
     {

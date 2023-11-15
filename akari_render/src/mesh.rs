@@ -4,39 +4,13 @@ use crate::geometry::{Frame, FrameExpr};
 use crate::heap::MegaHeap;
 use crate::interaction::SurfaceInteraction;
 use crate::svm::ShaderRef;
-use crate::util::binserde::*;
 use crate::util::distribution::BindlessAliasTableVar;
 use crate::*;
 use crate::{geometry::AffineTransform, util::distribution::AliasTable};
 use luisa::rtx::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone)]
-pub struct TriangleMesh {
-    pub name: String,
-    pub vertices: Vec<[f32; 3]>,
-    pub normals: Vec<[f32; 3]>,
-    pub tangents: Vec<[f32; 3]>,
-    // pub bitangent_signs: Vec<u32>, // bitmasks, 0 for 1, 1 for -1
-    pub uvs: Vec<[f32; 2]>,
-    pub indices: Vec<[u32; 3]>,
-}
-
-impl TriangleMesh {
-    pub fn areas(&self) -> Vec<f32> {
-        self.indices
-            .par_iter()
-            .map(|i| {
-                let v0 = glam::Vec3::from(self.vertices[i[0] as usize]);
-                let v1 = glam::Vec3::from(self.vertices[i[1] as usize]);
-                let v2 = glam::Vec3::from(self.vertices[i[2] as usize]);
-                (v1 - v0).cross(v2 - v0).length() / 2.0
-            })
-            .collect()
-    }
-}
-
-pub struct MeshBuffer {
+pub struct Mesh {
     pub vertices: Buffer<[f32; 3]>,
     pub normals: Option<Buffer<[f32; 3]>>,
     pub tangents: Option<Buffer<[f32; 3]>>,
@@ -48,39 +22,39 @@ pub struct MeshBuffer {
     pub has_uvs: bool,
     pub has_tangents: bool,
 }
-impl MeshBuffer {
-    pub fn new(device: Device, mesh: &TriangleMesh) -> Self {
-        if !mesh.normals.is_empty() {
-            assert_eq!(mesh.indices.len() * 3, mesh.normals.len());
+pub struct MeshBuildArgs<'a> {
+    pub vertices: &'a [[f32; 3]],
+    pub normals: Option<&'a [[f32; 3]]>,
+    pub tangents: Option<&'a [[f32; 3]]>,
+    // pub bitangent_signs: &'a [u32],
+    pub uvs: Option<&'a [[f32; 2]]>,
+    pub indices: &'a [[u32; 3]],
+}
+impl Mesh {
+    pub fn new(device: Device, args: MeshBuildArgs<'_>) -> Self {
+        if let Some(normals) = &args.normals {
+            assert_eq!(args.indices.len() * 3, normals.len());
         }
-        if !mesh.uvs.is_empty() {
-            assert_eq!(mesh.indices.len() * 3, mesh.uvs.len());
+        if let Some(uvs) = &args.uvs {
+            assert_eq!(args.indices.len() * 3, uvs.len());
         }
-        if !mesh.tangents.is_empty() {
-            assert_eq!(mesh.indices.len() * 3, mesh.tangents.len());
+        if let Some(tangents) = &args.tangents {
+            assert_eq!(args.indices.len() * 3, tangents.len());
         }
-        let vertices = device.create_buffer_from_slice(&mesh.vertices);
-        let normals = if mesh.normals.is_empty() {
-            None
-        } else {
-            Some(device.create_buffer_from_slice(&mesh.normals))
-        };
-        let tangents = if mesh.tangents.is_empty() {
-            None
-        } else {
-            Some(device.create_buffer_from_slice(&mesh.tangents))
-        };
+        let vertices = device.create_buffer_from_slice(&args.vertices);
+        let normals = args
+            .normals
+            .map(|normals| device.create_buffer_from_slice(normals));
+        let tangents = args
+            .tangents
+            .map(|tangents| device.create_buffer_from_slice(tangents));
         // let bitangent_signs = if mesh.bitangent_signs.is_empty() {
         //     None
         // } else {
         //     Some(device.create_buffer_from_slice(&mesh.bitangent_signs))
         // };
-        let indices = device.create_buffer_from_slice(&mesh.indices);
-        let uvs = if mesh.uvs.is_empty() {
-            None
-        } else {
-            Some(device.create_buffer_from_slice(&mesh.uvs))
-        };
+        let indices = device.create_buffer_from_slice(&args.indices);
+        let uvs = args.uvs.map(|uvs| device.create_buffer_from_slice(uvs));
 
         let m = Self {
             vertices,
@@ -90,11 +64,11 @@ impl MeshBuffer {
             uvs,
             indices,
             area_sampler: None,
-            has_normals: !mesh.normals.is_empty(),
-            has_uvs: !mesh.uvs.is_empty(),
-            has_tangents: !mesh.tangents.is_empty(),
+            has_normals: args.normals.is_some(),
+            has_uvs: args.uvs.is_some(),
+            has_tangents: args.tangents.is_some(),
         };
-        assert!(!m.has_uvs || m.has_tangents, "mesh has uvs but no tangents");
+        // assert!(!m.has_uvs || m.has_tangents, "mesh has uvs but no tangents");
         m
     }
     pub fn build_area_sampler(&mut self, device: Device, areas: &[f32]) {
@@ -147,7 +121,7 @@ impl MeshAggregate {
     pub fn new(
         device: Device,
         heap: &Arc<MegaHeap>,
-        meshes: &[&MeshBuffer],
+        meshes: &[&Mesh],
         instances: &[MeshInstanceHost],
     ) -> Self {
         let mut accel_meshes = Vec::with_capacity(meshes.len());

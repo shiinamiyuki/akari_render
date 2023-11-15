@@ -4,7 +4,7 @@ use super::*;
 use crate::{
     color::ColorSpaceId,
     load::sampler_from_rgb_image_tex_node,
-    node::{
+    scenegraph::{
         shader::{Node, NodeSorter},
         Ref, ShaderGraph,
     },
@@ -179,7 +179,7 @@ impl<'a> Compiler<'a> {
                 SvmNode::RgbImageTex(SvmRgbImageTex {
                     tex_idx: tex_idx as u32,
                     colorspace: ColorSpaceId::from_colorspace(match colorspace {
-                        node::ColorSpace::Rgb(rgb) => *rgb,
+                        scenegraph::ColorSpace::Rgb(rgb) => *rgb,
                         _ => panic!("not implemented"),
                     }),
                 })

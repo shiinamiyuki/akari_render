@@ -9,4 +9,4 @@ edition = "2021"
 
 
 [lib]
-crate-type = ["dylib", "rlib"]
+crate-type = ["dylib"]

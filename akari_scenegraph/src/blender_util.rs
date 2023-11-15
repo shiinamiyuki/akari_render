@@ -1,5 +1,4 @@
-use akari_render::rayon;
-use akari_render::util::binserde::*;
+use crate::*;
 use serde::{Deserialize, Serialize};
 use std::ffi::c_char;
 
@@ -27,14 +26,6 @@ extern "C" {
     // extern "C" void get_mesh_split_normals(const Mesh *mesh, const MLoopTri *tri, size_t count, float *out)
     fn get_mesh_split_normals(mesh_ptr: u64, tri_ptr: u64, count: usize, out: *mut f32);
 
-}
-
-fn write_buffer<T>(path: &str, data: &[T])
-where
-    [T]: Encode,
-{
-    let mut file = std::fs::File::create(path).unwrap();
-    Encode::encode(data, &mut file).unwrap();
 }
 
 #[no_mangle]
@@ -90,9 +81,9 @@ pub unsafe extern "cdecl" fn export_blender_mesh(json_args: *const c_char) {
             );
         });
     });
-    write_buffer(&format!("{}.vert", out_path), &vertices);
-    write_buffer(&format!("{}.ind", out_path), &indices);
-    write_buffer(&format!("{}.uv", out_path), &uvs);
-    write_buffer(&format!("{}.normal", out_path), &normals);
-    write_buffer(&format!("{}.tangent", out_path), &tangents);
+    write_binary(format!("{}.vert", out_path), &vertices).unwrap();
+    write_binary(format!("{}.ind", out_path), &indices).unwrap();
+    write_binary(format!("{}.uv", out_path), &uvs).unwrap();
+    write_binary(format!("{}.normal", out_path), &normals).unwrap();
+    write_binary(format!("{}.tangent", out_path), &tangents).unwrap();
 }

@@ -18,6 +18,7 @@ luisa_compute = { path = "../../luisa-compute-rs/luisa_compute", features = [
     "oidn",
 ] }
 akari_data = { path = "../akari_data" }
+akari_scenegraph = { path = "../akari_scenegraph" }
 # luisa_compute = { git = "https://github.com/LuisaGroup/luisa-compute-rs.git"}
 parking_lot = "0.12"
 rand = "0.8.5"
@@ -44,4 +45,4 @@ path = "src/bin/akari_test.rs"
 
 
 [lib]
-crate-type = ["dylib", "rlib"]
+crate-type = ["dylib"]

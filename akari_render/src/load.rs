@@ -3,16 +3,16 @@ use crate::{
     geometry::AffineTransform,
     heap::MegaHeap,
     light::{area::AreaLight, Light, LightAggregate, WeightedLightDistribution},
-    mesh::{MeshAggregate, MeshBuffer, MeshInstanceHost, TriangleMesh},
-    node::{shader::Node, CoordinateSystem, Material, Ref, ShaderGraph},
+    mesh::{Mesh, MeshAggregate, MeshBuildArgs, MeshInstanceHost},
     scene::Scene,
     svm::{
         compiler::{CompilerDriver, SvmCompileContext},
         ShaderRef, Svm,
     },
-    util::{binserde::Decode, FileResolver, LocalFileResolver},
     *,
 };
+use akari_scenegraph as scenegraph;
+use akari_scenegraph::{CoordinateSystem, Geometry, Material, NodeRef, ShaderGraph, ShaderNode};
 use image::io::Reader as ImageReader;
 
 use std::{
@@ -24,67 +24,60 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
+#[derive(Clone, PartialEq, Eq, Hash)]
+struct ImageKey {
+    buffer: NodeRef<scenegraph::Buffer>,
+    format: scenegraph::ImageFormat,
+    extension: scenegraph::ImageExtenisionMode,
+    interpolation: scenegraph::ImageInterpolationMode,
+}
 pub struct SceneLoader {
     device: Device,
     #[allow(dead_code)]
     images: HashMap<String, image::DynamicImage>,
     #[allow(dead_code)]
     textures: Vec<Tex2d<Float4>>,
-    node_to_mesh: HashMap<Ref<node::Geometry>, (usize, Arc<TriangleMesh>)>,
-    meshes: Vec<Arc<TriangleMesh>>,
+    node_to_geom_id: HashMap<NodeRef<Geometry>, usize>,
     mesh_areas: RefCell<Vec<Vec<f32>>>,
-    mesh_buffers: Vec<MeshBuffer>,
-    graph: node::Scene,
+    mesh_buffers: Vec<Mesh>,
+    graph: scenegraph::Scene,
     camera: Option<Arc<dyn Camera>>,
     surface_shader_compiler: CompilerDriver,
     lights: PolymorphicBuilder<(), dyn Light>,
-    nodes_to_surface_shader: HashMap<Ref<Material>, ShaderRef>,
+    nodes_to_surface_shader: HashMap<NodeRef<Material>, ShaderRef>,
     path_sampler_to_idx: HashMap<(String, TextureSampler), usize>,
     heap: Arc<MegaHeap>,
 }
 
-fn load_buffer<T>(file_resolver: &dyn FileResolver, buffer: &node::Buffer) -> Vec<T>
-where
-    Vec<T>: Decode,
-{
-    match buffer {
-        node::Buffer::External(path) => {
-            log::debug!("Loading buffer: {}", path);
-            let mut file = file_resolver
-                .resolve(&Path::new(path))
-                .unwrap_or_else(|| panic!("Failed to resolve file: {}", path));
-            Vec::<T>::decode(&mut file).unwrap()
-        }
-        node::Buffer::Internal(data) => {
-            let mut data = data.as_slice();
-            Vec::<T>::decode(&mut data).unwrap()
-        }
-    }
-}
 #[deny(dead_code)]
 impl SceneLoader {
     pub fn load_from_path<P: AsRef<Path>>(device: Device, path: P) -> Arc<Scene> {
-        log::info!("Loading scene: {}", path.as_ref().display());
-        let graph = load_scene_graph(&path);
+        let abs_path = path.as_ref().canonicalize().unwrap();
+        log::info!("Loading scene: {}", abs_path.display());
+        let mut graph = load_scene_graph(&path);
         log::info!("Loaded scene graph");
+        let parent_path = abs_path.parent().unwrap();
+        graph.embed(parent_path).unwrap();
         let loader = Self::preload(device, graph);
         let scene = Arc::new(loader.do_load());
-        log::info!("Loaded scene: {}", path.as_ref().display());
+        log::info!("Loaded scene: {}", abs_path.display());
         scene
     }
     fn estimate_emission_tex_intensity_fast(
         &self,
-        emission: &Ref<Node>,
+        emission: &NodeRef<ShaderNode>,
         shader_graph: &ShaderGraph,
     ) -> Option<f32> {
         let emission = &shader_graph[emission];
         match emission {
-            Node::SpectralUplift(rgb) => {
+            ShaderNode::SpectralUplift { rgb } => {
                 self.estimate_emission_tex_intensity_fast(rgb, shader_graph)
             }
-            Node::Float(x) => return Some(*x),
-            Node::Float3(x) => return Some(x.iter().copied().reduce(|a, b| a.max(b)).unwrap()),
-            Node::Rgb { value: rgb, .. } => {
+            ShaderNode::Float { value: x } => return Some(*x),
+            ShaderNode::Float3 { value: x } => {
+                return Some(x.iter().copied().reduce(|a, b| a.max(b)).unwrap())
+            }
+            ShaderNode::Rgb { value: rgb, .. } => {
                 Some(rgb.iter().copied().reduce(|a, b| a.max(b)).unwrap())
             }
             _ => return None,
@@ -107,18 +100,18 @@ impl SceneLoader {
         instance: &MeshInstanceHost,
         surface: &ShaderGraph,
     ) -> f32 {
-        let out = &surface[&surface.out];
+        let out = &surface[&surface.output];
         let out = match out {
-            Node::OutputSurface { surface: out } => &surface[out],
+            ShaderNode::Output { node: out } => &surface[out],
             _ => unreachable!(),
         };
         let (emission, strength) = match out {
-            Node::PrincipledBsdf {
+            ShaderNode::PrincipledBsdf {
                 emission,
                 emission_strength,
                 ..
             } => (Some(emission), Some(emission_strength)),
-            Node::Emission {
+            ShaderNode::Emission {
                 color: emission,
                 strength,
             } => (Some(emission), Some(strength)),
@@ -146,9 +139,13 @@ impl SceneLoader {
         0.0
     }
 
-    fn load_transform(&self, transform: &node::Transform, is_camera: bool) -> AffineTransform {
+    fn load_transform(
+        &self,
+        transform: &scenegraph::Transform,
+        is_camera: bool,
+    ) -> AffineTransform {
         match transform {
-            node::Transform::TRS(trs) => {
+            scenegraph::Transform::TRS(trs) => {
                 let coord_sys = trs.coordinate_system;
 
                 let mut m = glam::Mat4::IDENTITY;
@@ -179,15 +176,15 @@ impl SceneLoader {
                 }
                 AffineTransform::from_matrix(&m)
             }
-            node::Transform::Matrix(m) => {
+            scenegraph::Transform::Matrix(m) => {
                 let m = glam::Mat4::from_cols_array_2d(m).transpose();
                 AffineTransform::from_matrix(&m)
             }
         }
     }
-    fn load_camera(&self, camera: &node::Camera) -> Arc<dyn Camera> {
+    fn load_camera(&self, camera: &scenegraph::Camera) -> Arc<dyn Camera> {
         match camera {
-            node::Camera::Perspective(cam) => {
+            scenegraph::Camera::Perspective(cam) => {
                 let transform = self.load_transform(&cam.transform, true);
                 let fov = cam.fov.to_radians();
                 let focal_distance = cam.focal_distance;
@@ -208,15 +205,18 @@ impl SceneLoader {
             }
         }
     }
-    fn load_instance(&self, instance: &node::Instance) -> (Ref<Material>, MeshInstanceHost) {
+    fn load_instance(
+        &self,
+        instance: &scenegraph::Instance,
+    ) -> (NodeRef<Material>, MeshInstanceHost) {
         let mat = &instance.material;
         let surface = self.nodes_to_surface_shader[mat];
         let transform = self.load_transform(&instance.transform, false);
         let geometry_node_id = &instance.geometry;
         let geometry_node = &self.graph.geometries[geometry_node_id];
         match geometry_node {
-            node::Geometry::Mesh(_) => {
-                let geom_id = self.node_to_mesh[geometry_node_id].0;
+            scenegraph::Geometry::Mesh(_) => {
+                let geom_id = self.node_to_geom_id[geometry_node_id].0;
                 let mesh_buffer = &self.mesh_buffers[geom_id];
                 (
                     mat.clone(),
@@ -322,7 +322,7 @@ impl SceneLoader {
         }
         log::info!(
             "Building accel for {} meshes, {} instances",
-            self.meshes.len(),
+            self.mesh_buffers.len(),
             instances.len()
         );
         let mesh_aggregate = Arc::new(MeshAggregate::new(
@@ -360,7 +360,6 @@ impl SceneLoader {
             light_ids_to_lights: device.create_buffer_from_slice(&light_ids_to_lights),
             meshes: mesh_aggregate.clone(),
         };
-        let printer = Printer::new(&device, 1024 * 1024 * 64);
         heap.commit();
         Scene {
             svm,
@@ -369,17 +368,15 @@ impl SceneLoader {
             camera: camera.unwrap(),
             device,
             use_rq: true,
-            printer, // env_map: todo!(),
+            // env_map: todo!(),
             heap,
         }
     }
-    fn preload(device: Device, graph: node::Scene) -> Self {
+    fn preload(device: Device, graph: scenegraph::Scene) -> Self {
         let mut node_to_mesh = HashMap::new();
-        let mut images_to_load: HashSet<String> = HashSet::new();
-        let file_resolver = LocalFileResolver::new(vec![]);
+        let mut images_to_load: HashSet<ImageKey> = HashSet::new();
         let mut meshes = vec![];
-        let mut mesh_buffers = vec![];
-        let mut path_samplers: HashSet<(String, TextureSampler)> = HashSet::new();
+        let mut texture_and_sampler_pair: HashSet<(ImageKey, TextureSampler)> = HashSet::new();
         // let mut instance_nodes = vec![];
 
         let image_nodes = {
@@ -387,7 +384,7 @@ impl SceneLoader {
             for (_, mat) in &graph.materials {
                 for (_, n) in &mat.shader.nodes {
                     match n {
-                        Node::TexImage(tex) => images.push(tex.clone()),
+                        ShaderNode::TexImage { image: tex } => images.push(tex.clone()),
                         _ => {}
                     }
                 }
@@ -396,47 +393,54 @@ impl SceneLoader {
         };
 
         for tex in &image_nodes {
-            let path = &tex.path;
+            let buf = tex.data.clone();
             let sampler = sampler_from_rgb_image_tex_node(tex);
-            path_samplers.insert((path.clone(), sampler));
-            images_to_load.insert(path.clone());
+
+            let key = ImageKey {
+                buffer: buf,
+                interpolation: tex.interpolation,
+                extension: tex.extension,
+                format: tex.format,
+            };
+            images_to_load.insert(key.clone());
+            texture_and_sampler_pair.insert((key, sampler));
         }
 
         for (id, geometry) in &graph.geometries {
             match geometry {
-                node::Geometry::Mesh(mesh) => {
+                scenegraph::Geometry::Mesh(mesh) => {
                     log::debug!("Loading mesh: {}", id.id);
-                    let vertices = load_buffer::<[f32; 3]>(&file_resolver, &mesh.vertices);
-                    let normals = load_buffer::<[f32; 3]>(&file_resolver, &mesh.normals);
-                    let indices = load_buffer::<[u32; 3]>(&file_resolver, &mesh.indices);
+                    let vertices = graph.buffers[&mesh.vertices].as_slice::<[f32; 3]>();
+                    let normals = mesh
+                        .normals
+                        .as_ref()
+                        .map(|b| graph.buffers[b].as_slice::<[f32; 3]>());
+                    let indices = graph.buffers[&mesh.indices].as_slice::<[u32; 3]>();
                     let uvs = mesh
                         .uvs
                         .as_ref()
-                        .map(|b| load_buffer::<[f32; 2]>(&file_resolver, b))
-                        .unwrap_or(vec![]);
+                        .map(|b| graph.buffers[b].as_slice::<[f32; 2]>());
                     let tangents = mesh
                         .tangents
                         .as_ref()
-                        .map(|b| load_buffer::<[f32; 3]>(&file_resolver, b))
-                        .unwrap_or(vec![]);
+                        .map(|b| graph.buffers[b].as_slice::<[f32; 3]>());
                     // let bitangent_signs: Vec<u32> = mesh
                     //     .bitangent_signs
                     //     .as_ref()
                     //     .map(|b| load_buffer::<u32>(&file_resolver, b))
                     //     .unwrap_or(vec![]);
-                    let mesh = Arc::new(TriangleMesh {
-                        name: id.id.clone(),
-                        vertices,
-                        normals,
-                        indices,
-                        uvs,
-                        tangents,
-                        // bitangent_signs,
-                    });
-                    let mesh_buffer = MeshBuffer::new(device.clone(), &mesh);
-                    let geom_id = mesh_buffers.len();
-                    mesh_buffers.push(mesh_buffer);
-                    meshes.push(mesh.clone());
+                    let mesh_buffer = Mesh::new(
+                        device.clone(),
+                        MeshBuildArgs {
+                            vertices,
+                            normals,
+                            indices,
+                            uvs,
+                            tangents,
+                        },
+                    );
+                    let geom_id = meshes.len();
+                    meshes.push(mesh_buffer);
                     node_to_mesh.insert(id.clone(), (geom_id, mesh));
                 }
             }
@@ -446,27 +450,28 @@ impl SceneLoader {
             meshes.len(),
             images_to_load.len()
         );
-        let images = images_to_load
+        let images_to_load = images_to_load.into_iter().collect::<Vec<_>>();
+        let images: HashMap<ImageKey, image::DynamicImage> = images_to_load
             .into_par_iter()
-            .map(|path_s| {
-                let path = PathBuf::from(&path_s);
-                let path = path.canonicalize().unwrap();
-                log::debug!("Loading image: {}", path.display());
-                let file = file_resolver.resolve(&path).unwrap_or_else(|| {
-                    panic!("Failed to resolve file: {}", path.display().to_string())
-                });
-                let img = ImageReader::new(BufReader::new(file))
-                    .with_guessed_format()
-                    .unwrap()
-                    .decode()
-                    .unwrap()
-                    .flipv();
-                (path_s, img)
+            .map(|key| {
+                let buf = &graph.buffers[&key.buffer];
+                let data = buf.as_binary_data();
+                let cursor = std::io::Cursor::new(data);
+                let format = match key.format {
+                    scenegraph::ImageFormat::Png => image::ImageFormat::Png,
+                    scenegraph::ImageFormat::Jpeg => image::ImageFormat::Jpeg,
+                    scenegraph::ImageFormat::Tiff => image::ImageFormat::Tiff,
+                    scenegraph::ImageFormat::OpenExr => image::ImageFormat::OpenExr,
+                };
+                let mut reader = ImageReader::new(cursor);
+                reader.set_format(format);
+                let img = reader.decode().unwrap().flipv();
+                (key, img)
             })
             .collect::<HashMap<_, _>>();
         log::info!("Loaded {} images", images.len());
         let mut ordered_image_paths = images.keys().collect::<Vec<_>>();
-        ordered_image_paths.sort();
+        ordered_image_paths.sort_by(|a, b| a.buffer.cmp(&b.buffer));
         let textures = {
             ordered_image_paths
                 .iter()
@@ -489,7 +494,7 @@ impl SceneLoader {
             .collect::<HashMap<_, _>>();
         let path_sampler_to_idx = {
             let mut path_sampler_to_idx = HashMap::new();
-            for (path, sampler) in &path_samplers {
+            for (path, sampler) in &texture_and_sampler_pair {
                 let key = (path.clone(), sampler.clone());
                 if let None = path_sampler_to_idx.get(&key) {
                     let idx = path_to_texture_idx[path];
@@ -508,9 +513,8 @@ impl SceneLoader {
         Self {
             device: device.clone(),
             images,
-            node_to_mesh,
-            meshes,
-            mesh_buffers,
+            node_to_geom_id: node_to_mesh,
+            mesh_buffers: meshes,
             graph,
             camera: None,
             heap: Arc::new(heap),
@@ -524,7 +528,7 @@ impl SceneLoader {
     }
 }
 
-pub fn load_scene_graph<P: AsRef<Path>>(path: P) -> node::Scene {
+pub fn load_scene_graph<P: AsRef<Path>>(path: P) -> scenegraph::Scene {
     let path = path.as_ref();
     let file = File::open(path).unwrap();
     serde_json::from_reader(file).unwrap()
@@ -534,20 +538,20 @@ pub fn load_from_path<P: AsRef<Path>>(device: Device, path: P) -> Arc<Scene> {
     SceneLoader::load_from_path(device, path)
 }
 
-pub(crate) fn sampler_from_rgb_image_tex_node(tex: &node::Image) -> TextureSampler {
+pub(crate) fn sampler_from_rgb_image_tex_node(tex: &scenegraph::Image) -> TextureSampler {
     let extension = tex.extension;
     let interp = tex.interpolation;
     let sampler = TextureSampler {
         address: match extension {
-            node::ImageExtenisionMode::Repeat => SamplerAddress::Repeat,
-            node::ImageExtenisionMode::Clip => SamplerAddress::Zero,
-            node::ImageExtenisionMode::Mirror => SamplerAddress::Mirror,
-            node::ImageExtenisionMode::Extend => SamplerAddress::Edge,
+            scenegraph::ImageExtenisionMode::Repeat => SamplerAddress::Repeat,
+            scenegraph::ImageExtenisionMode::Clip => SamplerAddress::Zero,
+            scenegraph::ImageExtenisionMode::Mirror => SamplerAddress::Mirror,
+            scenegraph::ImageExtenisionMode::Extend => SamplerAddress::Edge,
         },
         filter: match interp {
-            node::ImageInterpolationMode::Linear => SamplerFilter::LinearLinear,
-            node::ImageInterpolationMode::Nearest => SamplerFilter::LinearPoint,
-            node::ImageInterpolationMode::Cubic => {
+            scenegraph::ImageInterpolationMode::Linear => SamplerFilter::LinearLinear,
+            scenegraph::ImageInterpolationMode::Nearest => SamplerFilter::LinearPoint,
+            scenegraph::ImageInterpolationMode::Cubic => {
                 log::warn!(
                     "Cubic interpolation is not supported, falling back to linear interpolation"
                 );
