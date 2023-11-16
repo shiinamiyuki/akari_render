@@ -203,6 +203,8 @@ pub enum ImageFormat {
     Tiff,
     #[serde(rename = "exr")]
     OpenExr,
+    #[serde(rename = "float")]
+    Float,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -212,6 +214,9 @@ pub struct Image {
     pub colorspace: ColorSpace,
     pub extension: ImageExtenisionMode,
     pub interpolation: ImageInterpolationMode,
+    pub width: u32,
+    pub height: u32,
+    pub channels: u32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

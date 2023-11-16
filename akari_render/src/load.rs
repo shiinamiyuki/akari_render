@@ -14,29 +14,32 @@ use crate::{
 use akari_scenegraph as scenegraph;
 use akari_scenegraph::{CoordinateSystem, Geometry, Material, NodeRef, ShaderGraph, ShaderNode};
 use image::io::Reader as ImageReader;
+use luisa::runtime::api::denoiser_ext::Image;
 
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
     f32::consts::PI,
     fs::File,
-    io::BufReader,
-    path::{Path, PathBuf},
+    path::Path,
     sync::Arc,
 };
 #[derive(Clone, PartialEq, Eq, Hash)]
-struct ImageKey {
+pub struct ImageKey {
     buffer: NodeRef<scenegraph::Buffer>,
     format: scenegraph::ImageFormat,
     extension: scenegraph::ImageExtenisionMode,
     interpolation: scenegraph::ImageInterpolationMode,
+    width: u32,
+    height: u32,
+    channels: u32,
 }
 pub struct SceneLoader {
     device: Device,
     #[allow(dead_code)]
-    images: HashMap<String, image::DynamicImage>,
+    images: HashMap<ImageKey, Arc<Tex2d<Float4>>>,
     #[allow(dead_code)]
-    textures: Vec<Tex2d<Float4>>,
+    textures: Vec<Arc<Tex2d<Float4>>>,
     node_to_geom_id: HashMap<NodeRef<Geometry>, usize>,
     mesh_areas: RefCell<Vec<Vec<f32>>>,
     mesh_buffers: Vec<Mesh>,
@@ -45,7 +48,7 @@ pub struct SceneLoader {
     surface_shader_compiler: CompilerDriver,
     lights: PolymorphicBuilder<(), dyn Light>,
     nodes_to_surface_shader: HashMap<NodeRef<Material>, ShaderRef>,
-    path_sampler_to_idx: HashMap<(String, TextureSampler), usize>,
+    image_key_sampler_to_idx: HashMap<(ImageKey, TextureSampler), usize>,
     heap: Arc<MegaHeap>,
 }
 
@@ -84,11 +87,12 @@ impl SceneLoader {
         }
     }
     fn compute_mesh_area(&self, geom_id: usize) {
-        let mut mesh_areas = self.mesh_areas.borrow_mut();
-        if !mesh_areas[geom_id].is_empty() {
-            return;
-        }
-        mesh_areas[geom_id] = self.meshes[geom_id].areas();
+        todo!("this is incorrect, need to accound for transform")
+        // let mut mesh_areas = self.mesh_areas.borrow_mut();
+        // if !mesh_areas[geom_id].is_empty() {
+        //     return;
+        // }
+        // mesh_areas[geom_id] = self.meshes[geom_id].areas();
     }
     fn mesh_total_area(&self, geom_id: usize) -> f32 {
         self.compute_mesh_area(geom_id);
@@ -216,7 +220,7 @@ impl SceneLoader {
         let geometry_node = &self.graph.geometries[geometry_node_id];
         match geometry_node {
             scenegraph::Geometry::Mesh(_) => {
-                let geom_id = self.node_to_geom_id[geometry_node_id].0;
+                let geom_id = self.node_to_geom_id[geometry_node_id];
                 let mesh_buffer = &self.mesh_buffers[geom_id];
                 (
                     mat.clone(),
@@ -241,7 +245,7 @@ impl SceneLoader {
         for (mat_id, mat) in &self.graph.materials {
             let shader = &mat.shader;
             let shader = self.surface_shader_compiler.compile(SvmCompileContext {
-                images: &self.path_sampler_to_idx,
+                images: &self.image_key_sampler_to_idx,
                 graph: &shader,
             });
             self.nodes_to_surface_shader.insert(mat_id.clone(), shader);
@@ -373,7 +377,7 @@ impl SceneLoader {
         }
     }
     fn preload(device: Device, graph: scenegraph::Scene) -> Self {
-        let mut node_to_mesh = HashMap::new();
+        let mut node_to_geom_id = HashMap::new();
         let mut images_to_load: HashSet<ImageKey> = HashSet::new();
         let mut meshes = vec![];
         let mut texture_and_sampler_pair: HashSet<(ImageKey, TextureSampler)> = HashSet::new();
@@ -401,6 +405,9 @@ impl SceneLoader {
                 interpolation: tex.interpolation,
                 extension: tex.extension,
                 format: tex.format,
+                width: tex.width,
+                height: tex.height,
+                channels: tex.channels,
             };
             images_to_load.insert(key.clone());
             texture_and_sampler_pair.insert((key, sampler));
@@ -429,7 +436,7 @@ impl SceneLoader {
                     //     .as_ref()
                     //     .map(|b| load_buffer::<u32>(&file_resolver, b))
                     //     .unwrap_or(vec![]);
-                    let mesh_buffer = Mesh::new(
+                    let mesh = Mesh::new(
                         device.clone(),
                         MeshBuildArgs {
                             vertices,
@@ -440,8 +447,8 @@ impl SceneLoader {
                         },
                     );
                     let geom_id = meshes.len();
-                    meshes.push(mesh_buffer);
-                    node_to_mesh.insert(id.clone(), (geom_id, mesh));
+                    meshes.push(mesh);
+                    node_to_geom_id.insert(id.clone(), geom_id);
                 }
             }
         }
@@ -451,22 +458,79 @@ impl SceneLoader {
             images_to_load.len()
         );
         let images_to_load = images_to_load.into_iter().collect::<Vec<_>>();
-        let images: HashMap<ImageKey, image::DynamicImage> = images_to_load
+        let images: HashMap<ImageKey, Arc<Tex2d<Float4>>> = images_to_load
             .into_par_iter()
             .map(|key| {
                 let buf = &graph.buffers[&key.buffer];
                 let data = buf.as_binary_data();
-                let cursor = std::io::Cursor::new(data);
-                let format = match key.format {
-                    scenegraph::ImageFormat::Png => image::ImageFormat::Png,
-                    scenegraph::ImageFormat::Jpeg => image::ImageFormat::Jpeg,
-                    scenegraph::ImageFormat::Tiff => image::ImageFormat::Tiff,
-                    scenegraph::ImageFormat::OpenExr => image::ImageFormat::OpenExr,
+
+                assert!(
+                    key.channels <= 4,
+                    "Invalid number of channels: {}",
+                    key.channels
+                );
+                let tex = if key.format == scenegraph::ImageFormat::Float {
+                    assert_eq!(
+                        data.len(),
+                        key.width as usize * key.height as usize * key.channels as usize * 4
+                    );
+                    let mut rgbaf32 = vec![];
+                    let img_data = if key.channels != 4 {
+                        let data = unsafe {
+                            std::slice::from_raw_parts(data.as_ptr() as *const f32, data.len() / 4)
+                        };
+                        rgbaf32.reserve(data.len() * 4);
+                        for i in 0..(data.len() / key.channels as usize) {
+                            for c in 0..key.channels {
+                                rgbaf32.push(data[i * key.channels as usize + c as usize]);
+                            }
+                            for c in key.channels..4 {
+                                rgbaf32.push(0.0);
+                            }
+                        }
+                        rgbaf32.as_slice()
+                    } else {
+                        unsafe {
+                            std::slice::from_raw_parts(data.as_ptr() as *const f32, data.len() / 4)
+                        }
+                    };
+                    let tex = device.create_tex2d::<Float4>(
+                        PixelStorage::Float4,
+                        key.width,
+                        key.height,
+                        1,
+                    );
+                    tex.view(0).copy_from(img_data);
+                    tex
+                } else {
+                    let cursor = std::io::Cursor::new(data);
+                    let format = match key.format {
+                        scenegraph::ImageFormat::Png => image::ImageFormat::Png,
+                        scenegraph::ImageFormat::Jpeg => image::ImageFormat::Jpeg,
+                        scenegraph::ImageFormat::Tiff => image::ImageFormat::Tiff,
+                        scenegraph::ImageFormat::OpenExr => image::ImageFormat::OpenExr,
+                        _ => unreachable!(),
+                    };
+                    let mut reader = ImageReader::new(cursor);
+                    reader.set_format(format);
+                    let img = reader.decode().unwrap().flipv();
+                    if key.format != scenegraph::ImageFormat::OpenExr {
+                        let img = img.to_rgba8();
+                        let tex =
+                            device.create_tex2d(PixelStorage::Byte4, img.width(), img.height(), 1);
+                        let pixels = img.pixels().map(|p| p.0).collect::<Vec<_>>();
+                        tex.view(0).copy_from(&pixels);
+                        tex
+                    } else {
+                        let img = img.to_rgba32f();
+                        let tex =
+                            device.create_tex2d(PixelStorage::Float4, img.width(), img.height(), 1);
+                        let pixels = img.pixels().map(|p| p.0).collect::<Vec<_>>();
+                        tex.view(0).copy_from(&pixels);
+                        tex
+                    }
                 };
-                let mut reader = ImageReader::new(cursor);
-                reader.set_format(format);
-                let img = reader.decode().unwrap().flipv();
-                (key, img)
+                (key, Arc::new(tex))
             })
             .collect::<HashMap<_, _>>();
         log::info!("Loaded {} images", images.len());
@@ -475,15 +539,7 @@ impl SceneLoader {
         let textures = {
             ordered_image_paths
                 .iter()
-                .map(|path| {
-                    let img = &images[*path];
-                    let img = img.to_rgba8();
-                    let tex =
-                        device.create_tex2d(PixelStorage::Byte4, img.width(), img.height(), 1);
-                    let pixels = img.pixels().map(|p| p.0).collect::<Vec<_>>();
-                    tex.view(0).copy_from(&pixels);
-                    tex
-                })
+                .map(|path| images[path].clone())
                 .collect::<Vec<_>>()
         };
         let heap = MegaHeap::new(device.clone(), 131072);
@@ -491,29 +547,29 @@ impl SceneLoader {
             .into_iter()
             .enumerate()
             .map(|(i, path)| (path.clone(), i))
-            .collect::<HashMap<_, _>>();
-        let path_sampler_to_idx = {
-            let mut path_sampler_to_idx = HashMap::new();
+            .collect::<HashMap<ImageKey, usize>>();
+        let image_key_sampler_to_idx = {
+            let mut image_key_sampler_to_idx = HashMap::new();
             for (path, sampler) in &texture_and_sampler_pair {
-                let key = (path.clone(), sampler.clone());
-                if let None = path_sampler_to_idx.get(&key) {
+                let key: (ImageKey, TextureSampler) = (path.clone(), sampler.clone());
+                if let None = image_key_sampler_to_idx.get(&key) {
                     let idx = path_to_texture_idx[path];
                     let idx = heap.bind_tex2d(&textures[idx], *sampler);
-                    path_sampler_to_idx.insert(key, idx as usize);
+                    image_key_sampler_to_idx.insert(key, idx as usize);
                 }
             }
 
-            path_sampler_to_idx
+            image_key_sampler_to_idx
         };
         // heap.commit();
         log::info!(
             "Texture Heap contains total {} (texture, sampler) tuples",
-            path_sampler_to_idx.len()
+            image_key_sampler_to_idx.len()
         );
         Self {
             device: device.clone(),
             images,
-            node_to_geom_id: node_to_mesh,
+            node_to_geom_id,
             mesh_buffers: meshes,
             graph,
             camera: None,
@@ -523,7 +579,7 @@ impl SceneLoader {
             nodes_to_surface_shader: HashMap::new(),
             mesh_areas: RefCell::new(vec![]),
             lights: PolymorphicBuilder::new(device.clone()),
-            path_sampler_to_idx,
+            image_key_sampler_to_idx,
         }
     }
 }

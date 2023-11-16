@@ -1,17 +1,11 @@
 use std::collections::HashMap;
 
 use super::*;
-use crate::{
-    color::ColorSpaceId,
-    load::sampler_from_rgb_image_tex_node,
-    scenegraph::{
-        shader::{Node, NodeSorter},
-        Ref, ShaderGraph,
-    },
-};
+use crate::{color::ColorSpaceId, load::{sampler_from_rgb_image_tex_node, ImageKey}};
+use akari_scenegraph::{shader::ShaderNode, NodeRef, ShaderGraph};
 #[derive(Clone, Copy)]
 pub struct SvmCompileContext<'a> {
-    pub images: &'a HashMap<(String, TextureSampler), usize>,
+    pub images: &'a HashMap<(ImageKey, TextureSampler), usize>,
     pub graph: &'a ShaderGraph,
 }
 pub struct CompilerDriver {
