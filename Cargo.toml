@@ -2,7 +2,7 @@
 members = [
     "akari_render",
     "akari_data",
-    "akari_blender"
+    "akari_scenegraph"
 ]
 resolver = "2"
 
