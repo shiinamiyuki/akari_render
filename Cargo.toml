@@ -11,6 +11,8 @@ resolver = "2"
 incremental = true
 opt-level = 1
 debug = true
+lto = "off"
 
 [profile.release]
 incremental = true
+lto = "off"
