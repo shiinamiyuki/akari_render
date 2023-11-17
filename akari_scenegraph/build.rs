@@ -1,10 +1,12 @@
 fn main() {
-    println!("cargo:rerun-if-changed=blender_src_path");
+    println!("cargo:rerun-if-changed=blender_src_path.txt");
     let blender_src_path = std::fs::read("blender_src_path.txt")
         .expect("blender_src_path.txt file not found")
         .into_iter()
         .map(|b| b as char)
-        .collect::<String>();
+        .collect::<String>()
+        .trim()
+        .to_string();
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=cpp_ext");
     let out = cmake::Config::new("cpp_ext")
