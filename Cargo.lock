@@ -34,6 +34,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "akari_api"
+version = "0.1.0"
+dependencies = [
+ "akari_render",
+]
+
+[[package]]
 name = "akari_data"
 version = "0.1.0"
 

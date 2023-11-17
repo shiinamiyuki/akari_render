@@ -15,8 +15,8 @@ base64 = "0.21"
 [build-dependencies]
 cmake = "0.1"
 
-[lib]
-crate-type = ["dylib"]
+# [lib]
+# crate-type = ["dylib"]
 
 
 [[bin]]
