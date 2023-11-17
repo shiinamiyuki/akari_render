@@ -164,7 +164,7 @@ impl Buffer {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ColorSpace {
     #[serde(rename = "srgb")]
     SRgb,

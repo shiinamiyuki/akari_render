@@ -209,37 +209,37 @@ impl MeshAggregate {
 
     #[tracked]
     pub fn mesh_vertices(&self, mesh_header: Expr<MeshHeader>) -> BindlessBufferVar<[f32; 3]> {
-        self.heap.var().buffer(mesh_header.vertex_buf_idx)
+        self.heap.buffer(mesh_header.vertex_buf_idx)
     }
     #[tracked]
     pub fn mesh_indices(&self, mesh_header: Expr<MeshHeader>) -> BindlessBufferVar<[u32; 3]> {
-        self.heap.var().buffer(mesh_header.index_buf_idx)
+        self.heap.buffer(mesh_header.index_buf_idx)
     }
     #[tracked]
     pub fn mesh_normals(&self, mesh_header: Expr<MeshHeader>) -> BindlessBufferVar<[f32; 3]> {
-        self.heap.var().buffer(mesh_header.normal_buf_idx)
+        self.heap.buffer(mesh_header.normal_buf_idx)
     }
     #[tracked]
     pub fn mesh_tangents(&self, mesh_header: Expr<MeshHeader>) -> BindlessBufferVar<[f32; 3]> {
-        self.heap.var().buffer(mesh_header.tangent_buf_idx)
+        self.heap.buffer(mesh_header.tangent_buf_idx)
     }
     #[tracked]
     pub fn mesh_uvs(&self, mesh_header: Expr<MeshHeader>) -> BindlessBufferVar<[f32; 2]> {
-        self.heap.var().buffer(mesh_header.uv_buf_idx)
+        self.heap.buffer(mesh_header.uv_buf_idx)
     }
     #[tracked]
     pub fn mesh_area_samplers(&self, mesh_header: Expr<MeshHeader>) -> BindlessAliasTableVar {
-        let b0 = self.heap.var().buffer(mesh_header.area_sampler);
-        let b1 = self.heap.var().buffer(mesh_header.area_sampler + 1);
+        let b0 = self.heap.buffer(mesh_header.area_sampler);
+        let b1 = self.heap.buffer(mesh_header.area_sampler + 1);
         BindlessAliasTableVar(b0, b1)
     }
     #[tracked]
     pub fn mesh_instances(&self) -> BindlessBufferVar<MeshInstance> {
-        self.heap.var().buffer(self.header.mesh_instances)
+        self.heap.buffer(self.header.mesh_instances)
     }
     #[tracked]
     pub fn mesh_instance_transforms(&self) -> BindlessBufferVar<AffineTransform> {
-        self.heap.var().buffer(self.header.mesh_transforms)
+        self.heap.buffer(self.header.mesh_transforms)
     }
     #[tracked]
     pub fn surface_interaction(
@@ -252,7 +252,6 @@ impl MeshAggregate {
         let geom_id = inst.geom_id;
         let geometry = self
             .heap
-            .var()
             .buffer::<MeshHeader>(self.header.mesh_headers)
             .read(geom_id);
         let vertices = self.mesh_vertices(geometry);

@@ -1,16 +1,19 @@
 use std::collections::HashMap;
 
 use super::*;
-use crate::{color::ColorSpaceId, load::{sampler_from_rgb_image_tex_node, ImageKey}};
-use akari_scenegraph::{shader::ShaderNode, NodeRef, ShaderGraph};
+use crate::{
+    color::{ColorSpaceId, RgbColorSpace},
+    load::{sampler_from_rgb_image_tex_node, ImageKey},
+    util::ByteVecBuilder,
+};
+use akari_scenegraph::{shader::ShaderNode, NodeRef, ShaderGraph, ShaderKind};
 #[derive(Clone, Copy)]
 pub struct SvmCompileContext<'a> {
     pub images: &'a HashMap<(ImageKey, TextureSampler), usize>,
     pub graph: &'a ShaderGraph,
 }
 pub struct CompilerDriver {
-    shader_hash_to_kind: HashMap<ShaderHash, u32>,
-    shaders: HashMap<ShaderHash, CompiledShader>,
+    shaders: HashMap<ShaderBytecode, u32>,
     shader_data: Vec<u8>,
 }
 
@@ -18,65 +21,26 @@ impl CompilerDriver {
     pub fn variant_count(&self) -> u32 {
         self.shaders.len() as u32
     }
-    fn push_data<T: Value>(&mut self, data: T) -> usize {
-        let layout = Layout::new::<T>();
-        let size = layout.size();
-        let align = layout.align();
-        if self.shader_data.len() % align != 0 {
-            self.shader_data.resize(
-                self.shader_data.len() + align - self.shader_data.len() % align,
-                0,
-            );
-            assert_eq!(self.shader_data.len() % align, 0);
-        }
-        let offset = self.shader_data.len();
-        self.shader_data.resize(offset + size, 0);
-        unsafe {
-            let ptr = self.shader_data.as_mut_ptr().add(offset);
-            std::ptr::copy_nonoverlapping(&data as *const T as *const u8, ptr, size);
-        }
-        offset
-    }
     fn push_shader(&mut self, shader: CompiledShader) -> ShaderRef {
-        let expected_offsets = &shader.node_offset;
-        let mut base_offset = 0;
-        assert!(shader.nodes.len() > 0);
-        // dbg!(&shader.nodes);
-        for (i, node) in shader.nodes.iter().enumerate() {
-            let offset = match node {
-                SvmNode::Float(n) => self.push_data(*n),
-                SvmNode::Float3(n) => self.push_data(*n),
-                SvmNode::MakeFloat3(n) => self.push_data(*n),
-                SvmNode::RgbTex(n) => self.push_data(*n),
-                SvmNode::RgbImageTex(n) => self.push_data(*n),
-                SvmNode::SpectralUplift(n) => self.push_data(*n),
-                SvmNode::Emission(n) => self.push_data(*n),
-                SvmNode::DiffuseBsdf(n) => self.push_data(*n),
-                SvmNode::GlassBsdf(n) => self.push_data(*n),
-                SvmNode::PrincipledBsdf(n) => self.push_data(*n),
-                SvmNode::MaterialOutput(n) => self.push_data(*n),
-            };
-            if i != 0 {
-                assert_eq!(offset - base_offset, expected_offsets[i]);
-            } else {
-                base_offset = offset;
-            }
-        }
-        let size = self.shader_data.len() - base_offset;
-        assert_eq!(size, shader.size);
-
-        let kind = if self.shaders.contains_key(&shader.hash) {
-            self.shader_hash_to_kind[&shader.hash]
+        let CompiledShader { bytecode, data } = shader;
+        let kind = if self.shaders.contains_key(&bytecode) {
+            self.shaders[&bytecode]
         } else {
             let kind = self.shaders.len() as u32;
-            self.shader_hash_to_kind.insert(shader.hash, kind);
-            self.shaders.insert(shader.hash, shader);
+            self.shaders.insert(bytecode, kind);
             kind
         };
+        assert!(self.shader_data.len() % 16 == 0);
+        let base_offset = self.shader_data.len();
+        self.shader_data.extend_from_slice(&data);
+        {
+            // align to 16 bytes
+            let padding = 16 - (self.shader_data.len() % 16);
+            self.shader_data.extend_from_slice(&vec![0; padding]);
+        }
         ShaderRef {
             shader_kind: kind,
-            offset: base_offset.try_into().unwrap(),
-            size: size.try_into().unwrap(),
+            data_offset: base_offset.try_into().unwrap(),
         }
     }
     pub fn compile(&mut self, ctx: SvmCompileContext<'_>) -> ShaderRef {
@@ -87,44 +51,34 @@ impl CompilerDriver {
     pub fn new() -> Self {
         Self {
             shaders: HashMap::new(),
-            shader_hash_to_kind: HashMap::new(),
             shader_data: Vec::with_capacity(65536),
         }
     }
     pub fn upload(self, device: &Device) -> ShaderCollection {
         let Self {
             shader_data,
-            shader_hash_to_kind,
             shaders,
         } = self;
-        assert_eq!(shader_hash_to_kind.len(), shaders.len());
+
         let data = device.create_byte_buffer(shader_data.len());
         data.copy_from(&shader_data[..]);
-        let shaders = shaders
-            .into_iter()
-            .map(|(hash, shader)| (shader_hash_to_kind[&hash], shader))
+        let kind_to_shader = shaders
+            .iter()
+            .map(|(k, v)| (v.clone(), (*k).clone()))
             .collect::<HashMap<_, _>>();
         ShaderCollection {
-            shader_hash_to_kind,
-            shaders,
+            shader_to_kind: shaders,
+            kind_to_shader,
             shader_data: data,
         }
     }
 }
 
-pub(crate) fn shader_hash(nodes: &[SvmNode]) -> ShaderHash {
-    let mut hasher = Sha256::new();
-    for node in nodes {
-        node.hash(&mut hasher);
-    }
-    let result = hasher.finalize();
-    result.into()
-}
-
 struct Compiler<'a> {
     ctx: SvmCompileContext<'a>,
-    env: HashMap<Ref<Node>, SvmNodeRef>,
-    program: Vec<SvmNode>,
+    env: HashMap<NodeRef<ShaderNode>, SvmNodeRef>,
+    bytecode: Vec<SvmNode>,
+    data: ByteVecBuilder,
 }
 
 impl<'a> Compiler<'a> {
@@ -132,64 +86,85 @@ impl<'a> Compiler<'a> {
         Self {
             ctx,
             env: HashMap::new(),
-            program: vec![],
+            bytecode: vec![],
+            data: ByteVecBuilder::new(),
         }
     }
     fn push(&mut self, node: SvmNode) -> SvmNodeRef {
-        let index = self.program.len();
-        self.program.push(node);
+        let index = self.bytecode.len();
+        self.bytecode.push(node);
         SvmNodeRef {
             index: index as u32,
         }
     }
-    fn push_float(&mut self, value: f32) -> SvmNodeRef {
-        self.push(SvmNode::Float(SvmFloat { value }))
+    fn push_data<T: Value>(&mut self, value: T) -> SvmConst<T> {
+        let offset = self.data.push(value);
+        SvmConst {
+            offset: offset as u32,
+            marker: std::marker::PhantomData,
+        }
     }
-
-    fn compile_node(&mut self, node_id: &Ref<Node>) {
+    fn compile_node(&mut self, node_id: &NodeRef<ShaderNode>) -> SvmNodeRef {
+        let node = self.env.get(node_id);
+        if let Some(node) = node {
+            return *node;
+        }
+        self._compile_node(node_id);
+        self.env[node_id]
+    }
+    fn _compile_node(&mut self, node_id: &NodeRef<ShaderNode>) {
         let graph = self.ctx.graph;
         let node = &graph.nodes[node_id];
         let node = match node {
-            Node::Float(v) => SvmNode::Float(SvmFloat { value: *v as f32 }),
-            Node::Float3(v) => SvmNode::Float3(SvmFloat3 { value: *v }),
-            Node::Rgb { value, colorspace } => {
-                let data = SvmNode::MakeFloat3(SvmMakeFloat3 {
-                    x: self.push_float(value[0]),
-                    y: self.push_float(value[1]),
-                    z: self.push_float(value[2]),
-                });
-                let data = self.push(data);
+            ShaderNode::Float { value } => {
+                let node = self.push_data(*value);
+                SvmNode::Float(node)
+            }
+            ShaderNode::Float3 { value } => {
+                let node = self.push_data(Float3::new(value[0], value[1], value[2]));
+                SvmNode::Float3(node)
+            }
+            ShaderNode::Rgb { value, colorspace } => {
+                let data = self.push_data(Float3::new(value[0], value[1], value[2]));
+                let data = self.push(SvmNode::Float3(data));
                 SvmNode::RgbTex(SvmRgbTex {
                     rgb: data,
-                    colorspace: ColorSpaceId::from_colorspace(*colorspace),
+                    colorspace: ColorSpaceId::from_colorspace((*colorspace).into()),
                 })
             }
-            Node::Float4(_) => todo!(),
-            Node::TexImage(img) => {
-                let colorspace = &img.colorspace;
-                let path = &img.path;
-                let sampler = sampler_from_rgb_image_tex_node(img);
-                let tex_idx = self.ctx.images[&(path.clone(), sampler)];
+            ShaderNode::Float4 { .. } => todo!(),
+            ShaderNode::TexImage { image } => {
+                let colorspace = &image.colorspace;
+                let data = &image.data;
+                let sampler = sampler_from_rgb_image_tex_node(image);
+                let key = ImageKey {
+                    buffer: data.clone(),
+                    format: image.format,
+                    extension: image.extension,
+                    interpolation: image.interpolation,
+                    width: image.width,
+                    height: image.height,
+                    channels: image.channels,
+                };
+                let tex_idx = self.ctx.images[&(key, sampler)] as u32;
+                let tex_idx = self.push_data(tex_idx);
                 SvmNode::RgbImageTex(SvmRgbImageTex {
-                    tex_idx: tex_idx as u32,
-                    colorspace: ColorSpaceId::from_colorspace(match colorspace {
-                        scenegraph::ColorSpace::Rgb(rgb) => *rgb,
-                        _ => panic!("not implemented"),
-                    }),
+                    tex_idx,
+                    colorspace: ColorSpaceId::from_colorspace((*colorspace).into()),
                 })
             }
-            Node::PerlinNoise { .. } => {
+            ShaderNode::PerlinNoise { .. } => {
                 todo!()
             }
-            Node::DiffuseBsdf { color } => {
-                let color = self.get(&color);
+            ShaderNode::DiffuseBsdf { color } => {
+                let color = self.compile_node(&color);
                 SvmNode::DiffuseBsdf(SvmDiffuseBsdf { reflectance: color })
             }
-            Node::SpectralUplift(rgb) => {
-                let rgb = self.get(&rgb);
+            ShaderNode::SpectralUplift { rgb } => {
+                let rgb = self.compile_node(&rgb);
                 SvmNode::SpectralUplift(SvmSpectralUplift { rgb })
             }
-            Node::PrincipledBsdf {
+            ShaderNode::PrincipledBsdf {
                 color,
                 metallic,
                 roughness,
@@ -201,18 +176,19 @@ impl<'a> Compiler<'a> {
                 transmission,
                 emission,
                 emission_strength,
+                preference: _,
             } => {
-                let color = self.get(color);
-                let metallic = self.get(metallic);
-                let roughness = self.get(roughness);
-                let specular = self.get(specular);
-                let specular_tint = self.get(specular_tint);
-                let clearcoat = self.get(clearcoat);
-                let clearcoat_roughness = self.get(clearcoat_roughness);
-                let transmission = self.get(transmission);
-                let emission = self.get(emission);
-                let emission_strength = self.get(emission_strength);
-                let ior = self.get(ior);
+                let color = self.compile_node(color);
+                let metallic = self.compile_node(metallic);
+                let roughness = self.compile_node(roughness);
+                let specular = self.compile_node(specular);
+                let specular_tint = self.compile_node(specular_tint);
+                let clearcoat = self.compile_node(clearcoat);
+                let clearcoat_roughness = self.compile_node(clearcoat_roughness);
+                let transmission = self.compile_node(transmission);
+                let emission = self.compile_node(emission);
+                let emission_strength = self.compile_node(emission_strength);
+                let ior = self.compile_node(ior);
                 SvmNode::PrincipledBsdf(SvmPrincipledBsdf {
                     color,
                     metallic,
@@ -227,25 +203,25 @@ impl<'a> Compiler<'a> {
                     emission_strength,
                 })
             }
-            Node::Emission {
+            ShaderNode::Emission {
                 color: emission,
                 strength,
             } => {
-                let emission = self.get(&emission);
-                let strength = self.get(&strength);
+                let emission = self.compile_node(&emission);
+                let strength = self.compile_node(&strength);
                 SvmNode::Emission(SvmEmission {
                     color: emission,
                     strength,
                 })
             }
-            Node::GlassBsdf {
+            ShaderNode::GlassBsdf {
                 color,
                 ior,
                 roughness,
             } => {
-                let color = self.get(color);
-                let ior = self.get(ior);
-                let roughness = self.get(&roughness);
+                let color = self.compile_node(color);
+                let ior = self.compile_node(ior);
+                let roughness = self.compile_node(&roughness);
                 SvmNode::GlassBsdf(SvmGlassBsdf {
                     kr: color,
                     kt: color,
@@ -253,33 +229,35 @@ impl<'a> Compiler<'a> {
                     roughness,
                 })
             }
-            Node::MixBsdf {
+            ShaderNode::MixBsdf {
                 first: _,
                 second: _,
                 factor: _,
             } => todo!(),
-            Node::ExtractElement { node: _, field: _ } => todo!(),
-            Node::OutputSurface { surface } => {
-                let surface = self.get(&surface);
-                SvmNode::MaterialOutput(SvmMaterialOutput { surface })
-            }
+            ShaderNode::Extract { node: _, field: _ } => todo!(),
+            ShaderNode::Output { node } => match self.ctx.graph.kind {
+                ShaderKind::Surface => {
+                    let surface = self.compile_node(&node);
+                    SvmNode::MaterialOutput(SvmMaterialOutput { surface })
+                }
+                _ => {
+                    todo!()
+                }
+            },
+            ShaderNode::Math { op, first, second } => todo!(),
         };
 
         let node_ref = self.push(node);
         self.env.insert(node_id.clone(), node_ref);
     }
 
-    fn get(&self, node: &Ref<Node>) -> SvmNodeRef {
-        self.env[node]
-    }
-
     fn compile(ctx: SvmCompileContext<'a>) -> CompiledShader {
         let mut compiler = Self::new(ctx);
-        let sorted = NodeSorter::sort(ctx.graph);
-        for node in sorted {
-            compiler.compile_node(&node);
+        compiler.compile_node(&ctx.graph.output);
+        dbg!(&compiler.bytecode);
+        CompiledShader {
+            bytecode: ShaderBytecode::new(compiler.bytecode),
+            data: compiler.data.finish(),
         }
-        // dbg!(&compiler.program);
-        CompiledShader::new(compiler.program)
     }
 }

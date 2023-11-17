@@ -118,7 +118,7 @@ pub fn init_pcg32_buffer(device: Device, count: usize) -> Buffer<Pcg32> {
     let seeds = device.create_buffer_from_fn(count, |_| rng.gen::<u64>());
     Kernel::<fn()>::new(&device, &|| {
         let i = dispatch_id().x;
-        let seed = seeds.var().read(i);
+        let seed = seeds.read(i);
         let pcg = Pcg32Var::new_seq_offset(i.cast_u64(), seed);
         buffer.write(i, pcg.load());
     })
@@ -132,7 +132,7 @@ pub fn init_pcg32_buffer_with_seed(device: Device, count: usize, seed: u64) -> B
     let seeds = device.create_buffer_from_fn(count, |_| rng.gen::<u64>());
     Kernel::<fn()>::new(&device, &|| {
         let i = dispatch_id().x;
-        let seed = seeds.var().read(i);
+        let seed = seeds.read(i);
         let pcg = Pcg32Var::new_seq_offset(i.cast_u64(), seed);
         buffer.write(i, pcg.load());
     })
@@ -329,8 +329,8 @@ pub fn pmj02bn_sample(
     sample_index = sample_index % pmj02bn::N_PMJ02BN_SAMPLES as u32;
     let i = pmj02bn::N_PMJ02BN_SAMPLES as u32 * set_index + sample_index;
     Float2::expr(
-        pmj02bn_samples.var().read(i * 2).cast_f32() * hexf32!("0x1p-32"),
-        pmj02bn_samples.var().read(i * 2 + 1).cast_f32() * hexf32!("0x1p-32"),
+        pmj02bn_samples.read(i * 2).cast_f32() * hexf32!("0x1p-32"),
+        pmj02bn_samples.read(i * 2 + 1).cast_f32() * hexf32!("0x1p-32"),
     )
 }
 impl Pmj02BnSamplerCreator {

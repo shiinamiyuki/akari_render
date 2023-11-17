@@ -26,13 +26,13 @@ use std::{
 };
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ImageKey {
-    buffer: NodeRef<scenegraph::Buffer>,
-    format: scenegraph::ImageFormat,
-    extension: scenegraph::ImageExtenisionMode,
-    interpolation: scenegraph::ImageInterpolationMode,
-    width: u32,
-    height: u32,
-    channels: u32,
+    pub buffer: NodeRef<scenegraph::Buffer>,
+    pub format: scenegraph::ImageFormat,
+    pub extension: scenegraph::ImageExtenisionMode,
+    pub interpolation: scenegraph::ImageInterpolationMode,
+    pub width: u32,
+    pub height: u32,
+    pub channels: u32,
 }
 pub struct SceneLoader {
     device: Device,

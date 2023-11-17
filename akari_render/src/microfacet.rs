@@ -269,8 +269,7 @@ mod test {
             &device,
             &track!(|wo: Expr<Float3>, alpha: Expr<Float2>| {
                 let i = dispatch_id().x;
-                let sampler = IndependentSampler::from_pcg32(seeds.var().read(i).var());
-                let out = out.var();
+                let sampler = IndependentSampler::from_pcg32(seeds.read(i).var());
                 let dist = TrowbridgeReitzDistribution::from_alpha(alpha, false);
                 for_range(0u32.expr()..n_iters.expr(), |_| {
                     let wh = dist.sample_wh(wo, sampler.next_2d(), ADMode::None);

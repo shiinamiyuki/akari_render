@@ -332,3 +332,29 @@ mod test {
         }
     }
 }
+
+pub struct ByteVecBuilder {
+    buffer: Vec<u8>,
+}
+impl ByteVecBuilder {
+    pub fn new() -> Self {
+        Self { buffer: Vec::new() }
+    }
+    pub fn push<T: Copy>(&mut self, value: T) -> usize {
+        let size = std::mem::size_of::<T>();
+        let align = std::mem::align_of::<T>();
+        let offset = round_to(self.buffer.len(), align);
+        self.buffer.resize(offset + size, 0);
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                &value as *const T,
+                self.buffer.as_mut_ptr().add(offset) as *mut T,
+                1,
+            );
+        }
+        offset
+    }
+    pub fn finish(self) -> Vec<u8> {
+        self.buffer
+    }
+}

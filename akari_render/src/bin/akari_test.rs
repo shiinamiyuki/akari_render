@@ -46,7 +46,7 @@ mod bsdf_chi2_test {
         let kernel = device.create_kernel::<fn(Float3, u32)>(&track!(
             |wo: Expr<Float3>, samples: Expr<u32>| {
                 let i = dispatch_id().x;
-                let pcg = rngs.var().read(i).var();
+                let pcg = rngs.read(i).var();
                 let sampler = IndependentSampler::from_pcg32(pcg);
                 for_range(0u32.expr()..samples, |_| {
                     let u = sampler.next_3d();
@@ -458,7 +458,7 @@ mod invert {
         let printer = Printer::new(&device, 32768);
         let kernel = device.create_kernel::<fn()>(&track!(|| {
             let i = dispatch_id().x;
-            let sampler = IndependentSampler::from_pcg32(rngs.var().read(i).var());
+            let sampler = IndependentSampler::from_pcg32(rngs.read(i).var());
             for_range(0..samples, |_| {
                 let u = sampler.next_2d();
                 let w = sample(u);

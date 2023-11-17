@@ -149,7 +149,7 @@ impl Default for Config {
 //         self.device
 //             .create_kernel::<fn()>(&|| {
 //                 let i = dispatch_id().x;
-//                 let seed = seeds.var().read(i);
+//                 let seed = seeds.read(i);
 //                 let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seed));
 //                 let sample = VLArrayVar::<f32>::zero(self.sample_dimension());
 //                 for_range(const_(0)..sample.len().cast_i32(), |i| {
@@ -158,7 +158,7 @@ impl Default for Config {
 //                 });
 //                 let sample = PrimarySample { values: sample };
 //                 let (_p, _l, _swl, f) = self.evaluate(scene, filter, eval, &sampler, sample);
-//                 fs.var().write(i, f);
+//                 fs.write(i, f);
 //             })
 //             .dispatch([self.n_bootstrap as u32, 1, 1]);
 
@@ -178,8 +178,8 @@ impl Default for Config {
 //         self.device
 //             .create_kernel::<fn()>(&|| {
 //                 let i = dispatch_id().x;
-//                 let seed_idx = resampled.var().read(i);
-//                 let seed = seeds.var().read(seed_idx);
+//                 let seed_idx = resampled.read(i);
+//                 let seed = seeds.read(seed_idx);
 //                 let sampler = IndependentSampler::from_pcg32(var!(Pcg32, seed));
 //                 let sample = VLArrayVar::<f32>::zero(self.sample_dimension());
 //                 for_range(const_(0)..sample.len().cast_i32(), |i| {
@@ -197,14 +197,14 @@ impl Default for Config {
 
 //                 let sample = PrimarySample { values: sample };
 //                 let (p, l, swl, f) = self.evaluate(scene, filter, eval, &sampler, sample);
-//                 // cpu_dbg!(Float2::expr(f, fs.var().read(seed_idx)));
+//                 // cpu_dbg!(Float2::expr(f, fs.read(seed_idx)));
 //                 let sigma = match &self.method {
 //                     Method::Kelemen { small_sigma, .. } => *small_sigma,
 //                     _ => todo!(),
 //                 };
 //                 cur_colors.write(i, l, swl);
 //                 let state = MarkovStateExpr::new(i, p, f, 0.0, 0, 0, 0, sigma);
-//                 states.var().write(i, state);
+//                 states.write(i, state);
 //             })
 //             .dispatch([self.n_chains as u32, 1, 1]);
 
@@ -326,7 +326,7 @@ impl Default for Config {
 //         let i = dispatch_id().x;
 //         let markov_states = render_state.states.var();
 //         let sampler =
-//             IndependentSampler::from_pcg32(var!(Pcg32, render_state.rng_states.var().read(i)));
+//             IndependentSampler::from_pcg32(var!(Pcg32, render_state.rng_states.read(i)));
 //         let state = var!(MarkovState, markov_states.read(i));
 //         let sample = {
 //             let dim = self.sample_dimension();
@@ -334,7 +334,7 @@ impl Default for Config {
 //             lc_assert!(i.eq(state.chain_id().load()));
 //             for_range(const_(0)..const_(dim as i32), |j| {
 //                 let j = j.cast_u32();
-//                 sample.write(j, render_state.samples.var().read(i * dim as u32 + j));
+//                 sample.write(j, render_state.samples.read(i * dim as u32 + j));
 //             });
 //             PrimarySample { values: sample }
 //         };
@@ -367,7 +367,7 @@ impl Default for Config {
 //         render_state
 //             .cur_colors
 //             .write(i, cur_color_v.load(), *cur_swl_v);
-//         render_state.rng_states.var().write(i, sampler.state.load());
+//         render_state.rng_states.write(i, sampler.state.load());
 //         markov_states.write(i, state.load());
 //     }
 

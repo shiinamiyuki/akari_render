@@ -91,7 +91,7 @@ impl<'a> Sampler for LazyMcmcSampler<'a> {
                 m.mutate_one(self.samples, self.offset, **self.cur_dim, self.base)
                     .cur
             } else {
-                self.samples.var().read(self.offset + **self.cur_dim).cur
+                self.samples.read(self.offset + **self.cur_dim).cur
             };
             *self.cur_dim += 1;
             ret
@@ -146,7 +146,7 @@ impl Mutator {
                 let kelemen_log_ratio = -(kelemen_mutate_size_high / kelemen_mutate_size_low).ln();
                 let ret = Var::<PssSample>::zeroed();
                 maybe_outline(|| {
-                    let sample = samples.var().read(offset + i).var();
+                    let sample = samples.read(offset + i).var();
                     comment("mcmc mutate_one");
                     let u = rng.next_1d();
                     if sample.last_modified.lt(self.last_large_iter) {
@@ -216,7 +216,7 @@ impl Mutator {
                         }
                     };
                     *sample.last_modified = self.cur_iter;
-                    samples.var().write(offset + i, **sample);
+                    samples.write(offset + i, **sample);
                     *ret = sample;
                 });
                 **ret
@@ -331,7 +331,7 @@ impl McmcOpt {
         self.device
             .create_kernel::<fn()>(&|| {
                 let i = dispatch_id().x;
-                let seed = seeds.var().read(i);
+                let seed = seeds.read(i);
                 let sampler = IndependentSampler::from_pcg32(seed.var());
                 // DON'T WRITE INTO sample_buffer
                 let (_p, _l, _swl, f, _) = self.evaluate(
@@ -344,7 +344,7 @@ impl McmcOpt {
                     None,
                     true,
                 );
-                fs.var().write(i, f);
+                fs.write(i, f);
             })
             .dispatch([self.n_bootstrap as u32, 1, 1]);
 
@@ -366,12 +366,12 @@ impl McmcOpt {
         self.device
             .create_kernel::<fn()>(&track!(|| {
                 let i = dispatch_id().x;
-                let seed_idx = resampled.var().read(i);
-                let seed = seeds.var().read(seed_idx);
+                let seed_idx = resampled.read(i);
+                let seed = seeds.read(seed_idx);
                 let sampler = IndependentSampler::from_pcg32(seed.var());
                 let dim = (self.sample_dimension() as u32).expr();
                 for_range(0u32.expr()..dim, |j| {
-                    sample_buffer.var().write(
+                    sample_buffer.write(
                         i * dim + j,
                         PssSample::new_expr(sampler.next_1d(), 0.0, 0, 0),
                     );
@@ -389,7 +389,7 @@ impl McmcOpt {
                 );
                 cur_colors.write(i, l, swl);
                 let state = MarkovState::new_expr(p, i, f, 0.0, 0, 0, 0, 0, 0);
-                states.var().write(i, state);
+                states.write(i, state);
             }))
             .dispatch([self.n_chains as u32, 1, 1]);
         let rng_states = init_pcg32_buffer_with_seed(self.device.clone(), self.n_chains, 1);
@@ -490,10 +490,10 @@ impl McmcOpt {
                     *state.cur_iter -= 1;
                     let dim = proposal_dim.min_(self.sample_dimension() as u32);
                     for_range(0u32.expr()..dim, |i| {
-                        let sample = render_state.samples.var().read(offset + i).var();
+                        let sample = render_state.samples.read(offset + i).var();
                         *sample.cur = sample.backup;
                         *sample.last_modified = sample.modified_backup;
-                        render_state.samples.var().write(offset + i, **sample);
+                        render_state.samples.write(offset + i, **sample);
                     });
                 };
                 if !is_large_step {
@@ -515,7 +515,7 @@ impl McmcOpt {
     ) {
         let i = dispatch_id().x;
         let markov_states = render_state.states.var();
-        let sampler = IndependentSampler::from_pcg32(render_state.rng_states.var().read(i).var());
+        let sampler = IndependentSampler::from_pcg32(render_state.rng_states.read(i).var());
         let state = markov_states.read(i).var();
         let (cur_color, cur_swl) = render_state.cur_colors.read(i);
         let cur_color_v = ColorVar::new(cur_color);
@@ -526,7 +526,7 @@ impl McmcOpt {
                 // cpu_dbg!(i);
                 let dim = self.sample_dimension();
                 for_range(0u32.expr()..(dim as u32).expr(), |j| {
-                    let sample = render_state.samples.var().read(i * dim as u32 + j).var();
+                    let sample = render_state.samples.read(i * dim as u32 + j).var();
                     if sample.last_modified.lt(state.last_large_iter) {
                         *sample.cur = sampler.next_1d();
                     };
@@ -551,7 +551,7 @@ impl McmcOpt {
         render_state
             .cur_colors
             .write(i, cur_color_v.load(), **cur_swl_v);
-        render_state.rng_states.var().write(i, sampler.state.load());
+        render_state.rng_states.write(i, sampler.state.load());
         markov_states.write(i, state.load());
     }
 

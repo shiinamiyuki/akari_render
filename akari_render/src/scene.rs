@@ -34,7 +34,6 @@ impl Scene {
         let rtx_ray = rtx::Ray::new_expr(ro, ray.t_min, rd, ray.t_max);
         self.meshes
             .accel
-            .var()
             .trace_closest_masked(rtx_ray, 255u32.expr())
     }
     #[tracked]
@@ -42,7 +41,7 @@ impl Scene {
         let ro: Expr<[f32; 3]> = ray.o.into();
         let rd: Expr<[f32; 3]> = ray.d.into();
         let rtx_ray = rtx::Ray::new_expr(ro, ray.t_min, rd, ray.t_max);
-        self.meshes.accel.var().query_all(
+        self.meshes.accel.query_all(
             rtx_ray,
             u32::MAX,
             rtx::RayQuery {
@@ -106,9 +105,9 @@ impl Scene {
         let rd: Expr<[f32; 3]> = ray.d.into();
         let rtx_ray = rtx::Ray::new_expr(ro, ray.t_min, rd, ray.t_max);
         if !self.use_rq {
-            self.meshes.accel.var().trace_any(rtx_ray)
+            self.meshes.accel.trace_any(rtx_ray)
         } else {
-            let hit = self.meshes.accel.var().query_any(
+            let hit = self.meshes.accel.query_any(
                 rtx_ray,
                 u32::MAX,
                 rtx::RayQuery {

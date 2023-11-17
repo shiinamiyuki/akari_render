@@ -76,13 +76,13 @@ impl AliasTable {
         )
     }
     pub fn pdf(&self, i: Expr<u32>) -> Expr<f32> {
-        self.1.var().read(i)
+        self.1.read(i)
     }
     pub fn sample_and_remap(&self, u: Expr<f32>) -> (Expr<u32>, Expr<f32>, Expr<f32>) {
         let (idx, u) = uniform_discrete_choice_and_remap((self.0.len() as u32).expr(), u);
-        let entry = self.0.var().read(idx);
+        let entry = self.0.read(idx);
         let (idx, u) = weighted_discrete_choice2_and_remap(entry.t, idx, entry.j, u);
-        let pdf = self.1.var().read(idx);
+        let pdf = self.1.read(idx);
         (idx, pdf, u)
     }
 }

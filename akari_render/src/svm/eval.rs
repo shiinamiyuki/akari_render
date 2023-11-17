@@ -18,7 +18,7 @@ pub enum SvmEvalInput {
 pub struct SvmEvaluator<'a> {
     pub color_pipeline: ColorPipeline,
     svm: &'a Svm,
-    shader: &'a CompiledShader,
+    shader: &'a ShaderBytecode,
     env: HashMap<SvmNodeRef, Box<dyn Any>>,
     shader_data: ByteBufferVar,
     shader_ref: Expr<ShaderRef>,
@@ -29,7 +29,7 @@ impl<'a> SvmEvaluator<'a> {
     pub fn new(
         svm: &'a Svm,
         color_pipeline: ColorPipeline,
-        shader: &'a CompiledShader,
+        shader: &'a ShaderBytecode,
         shader_ref: Expr<ShaderRef>,
         shader_data: ByteBufferVar,
         input: SvmEvalInput,
@@ -57,15 +57,12 @@ impl<'a> SvmEvaluator<'a> {
             SvmEvalInput::Surface { si, .. } => *si,
         }
     }
-    fn node_offset(&self, index: u32) -> u32 {
-        self.shader.node_offset[index as usize] as u32
-    }
+
     #[tracked]
-    fn get_node_expr<T: Value>(&self, index: u32) -> Expr<T> {
-        let offset = self.node_offset(index);
+    fn read_data<T: Value>(&self, cst: SvmConst<T>) -> Expr<T> {
         unsafe {
             self.shader_data
-                .read_as::<T>(offset + self.shader_ref.offset)
+                .read_as::<T>(cst.offset + self.shader_ref.data_offset)
         }
     }
     #[tracked]
@@ -73,12 +70,12 @@ impl<'a> SvmEvaluator<'a> {
         let idx = node.index as usize;
         let node = &self.shader.nodes[idx];
         match node {
-            svm::SvmNode::Float(_) => {
-                let value = self.get_node_expr::<SvmFloat>(idx as u32).value;
+            svm::SvmNode::Float(v) => {
+                let value = self.read_data(*v);
                 Box::new(value)
             }
-            svm::SvmNode::Float3(_) => {
-                let value: Expr<Float3> = self.get_node_expr::<SvmFloat3>(idx as u32).value.into();
+            svm::SvmNode::Float3(v) => {
+                let value = self.read_data(*v);
                 Box::new(value)
             }
             svm::SvmNode::MakeFloat3(mk_f3) => {
@@ -98,7 +95,7 @@ impl<'a> SvmEvaluator<'a> {
                 ))
             }
             svm::SvmNode::RgbImageTex(img_tex) => {
-                let tex_idx = self.get_node_expr::<SvmRgbImageTex>(idx as u32).tex_idx;
+                let tex_idx = self.read_data(img_tex.tex_idx);
 
                 let heap = &self.svm.heap.var();
                 let texture = heap.tex2d(tex_idx);
@@ -192,7 +189,7 @@ impl Svm {
         let input = SvmEvalInput::Surface { si, swl };
         let mut kinds = self
             .surface_shaders
-            .shaders
+            .kind_to_shader
             .keys()
             .copied()
             .collect::<Vec<_>>();
@@ -205,7 +202,7 @@ impl Svm {
             let eval = SvmEvaluator::new(
                 self,
                 color_pipeline,
-                &self.surface_shaders.shaders[&kind],
+                &self.surface_shaders.kind_to_shader[&kind],
                 shader_ref,
                 self.surface_shaders.shader_data.var(),
                 input,
@@ -236,7 +233,7 @@ impl Svm {
         let input = SvmEvalInput::Surface { si, swl };
         let mut kinds = self
             .surface_shaders
-            .shaders
+            .kind_to_shader
             .keys()
             .copied()
             .collect::<Vec<_>>();
@@ -247,7 +244,7 @@ impl Svm {
                 let eval = SvmEvaluator::new(
                     self,
                     color_pipeline,
-                    &self.surface_shaders.shaders[&k],
+                    &self.surface_shaders.kind_to_shader[&k],
                     shader_ref,
                     self.surface_shaders.shader_data.var(),
                     input,

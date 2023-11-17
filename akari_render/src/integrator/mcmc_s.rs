@@ -553,7 +553,7 @@ impl SinglePathMcmc {
             .create_buffer(self.sample_dimension(self.config.max_depth) as usize * self.n_chains);
         let bootstrap_kernel = self.device.create_kernel::<fn()>(&track!(|| {
             let i = dispatch_id().x;
-            let seed = seeds.var().read(i);
+            let seed = seeds.read(i);
             let sampler = IndependentSampler::from_pcg32(seed.var());
 
             let depth = self.sample_depth(&sampler);
@@ -574,7 +574,7 @@ impl SinglePathMcmc {
                 depth,
                 true,
             );
-            fs.var().write(i, f);
+            fs.write(i, f);
         }));
         let t = Instant::now();
         bootstrap_kernel.dispatch([self.n_bootstrap as u32, 1, 1]);
@@ -600,8 +600,8 @@ impl SinglePathMcmc {
         self.device
             .create_kernel::<fn()>(&track!(|| {
                 let i = dispatch_id().x;
-                let seed_idx = resampled.var().read(i);
-                let seed = seeds.var().read(seed_idx);
+                let seed_idx = resampled.read(i);
+                let seed = seeds.read(seed_idx);
                 let sampler = IndependentSampler::from_pcg32(seed.var());
 
                 let depth = self.sample_depth(&sampler);
@@ -619,13 +619,13 @@ impl SinglePathMcmc {
                     false,
                 );
 
-                // cpu_dbg!(Float2::expr(f, fs.var().read(seed_idx)));
+                // cpu_dbg!(Float2::expr(f, fs.read(seed_idx)));
                 let sigma = match &self.method {
                     Method::Kelemen { small_sigma, .. } => *small_sigma,
                 };
                 cur_colors.write(i, l, swl);
                 let state = MarkovState::new_expr(i, p, f, 0.0, 0, 0, 0, sigma, depth);
-                states.var().write(i, state);
+                states.write(i, state);
             }))
             .dispatch([self.n_chains as u32, 1, 1]);
 
@@ -789,7 +789,7 @@ impl SinglePathMcmc {
         render_state
             .cur_colors
             .write(i, cur_color_v.load(), **cur_swl_v);
-        render_state.rng_states.var().write(i, sampler.state.load());
+        render_state.rng_states.write(i, sampler.state.load());
         markov_states.write(i, state.load());
     }
 

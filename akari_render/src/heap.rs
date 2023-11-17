@@ -1,7 +1,7 @@
 use crate::*;
 use luisa::resource::IoTexel;
 use parking_lot::Mutex;
-use std::sync::atomic::{AtomicBool, AtomicUsize};
+use std::{sync::atomic::{AtomicBool, AtomicUsize}, ops::Deref};
 
 /// *One heap to rule them all.*
 pub struct MegaHeap {
@@ -136,5 +136,11 @@ impl MegaHeap {
             "MegaHeap is dirty"
         );
         self.bindless.var()
+    }
+}
+impl Deref for MegaHeap {
+    type Target = BindlessArrayVar;
+    fn deref(&self) -> &Self::Target {
+        self.bindless.deref()
     }
 }

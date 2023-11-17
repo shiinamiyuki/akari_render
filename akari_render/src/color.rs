@@ -7,6 +7,15 @@ pub enum RgbColorSpace {
     #[serde(rename = "aces")]
     ACEScg,
 }
+impl From<akari_scenegraph::ColorSpace> for RgbColorSpace {
+    fn from(colorspace: akari_scenegraph::ColorSpace) -> Self {
+        match colorspace {
+            akari_scenegraph::ColorSpace::SRgb => RgbColorSpace::SRgb,
+            akari_scenegraph::ColorSpace::ACEScg => RgbColorSpace::ACEScg,
+            _ => panic!("invalid colorspace {:?}", colorspace),
+        }
+    }
+}
 pub struct ColorSpaceId;
 impl ColorSpaceId {
     pub const NONE: u32 = 0;
@@ -109,19 +118,19 @@ impl ColorBuffer {
     pub fn read(&self, i: impl IntoIndex) -> (Color, Expr<SampledWavelengths>) {
         match self {
             ColorBuffer::Rgb(b, cs) => (
-                Color::Rgb(b.var().read(i), *cs),
+                Color::Rgb(b.read(i), *cs),
                 SampledWavelengthsExpr::rgb_wavelengths(),
             ),
             ColorBuffer::Spectral(b) => {
-                let c = b.var().read(i);
+                let c = b.read(i);
                 (Color::Spectral(c.samples), c.wavelengths)
             }
         }
     }
     pub fn write(&self, i: impl IntoIndex, color: Color, swl: Expr<SampledWavelengths>) {
         match self {
-            ColorBuffer::Rgb(b, _cs) => b.var().write(i, color.as_rgb()),
-            ColorBuffer::Spectral(b) => b.var().write(i, color.as_sampled_spectrum(swl)),
+            ColorBuffer::Rgb(b, _cs) => b.write(i, color.as_rgb()),
+            ColorBuffer::Spectral(b) => b.write(i, color.as_sampled_spectrum(swl)),
         }
     }
     pub fn atomic_add(&self, i: impl IntoIndex, color: Color) {
