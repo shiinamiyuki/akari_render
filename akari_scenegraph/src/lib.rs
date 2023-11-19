@@ -22,6 +22,14 @@ pub struct NodeRef<T> {
     #[serde(skip)]
     phantom: std::marker::PhantomData<T>,
 }
+impl<T>NodeRef<T> {
+    pub fn new(id: String) -> Self {
+        Self {
+            id,
+            phantom: std::marker::PhantomData,
+        }
+    }
+}
 impl<T> PartialEq for NodeRef<T> {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
