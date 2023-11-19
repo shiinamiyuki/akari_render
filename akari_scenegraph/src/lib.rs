@@ -22,7 +22,7 @@ pub struct NodeRef<T> {
     #[serde(skip)]
     phantom: std::marker::PhantomData<T>,
 }
-impl<T>NodeRef<T> {
+impl<T> NodeRef<T> {
     pub fn new(id: String) -> Self {
         Self {
             id,
@@ -159,16 +159,15 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Collection<T> {
         })
     }
 }
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub struct ExtStridedSlice {
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct ExtSlice {
     ptr: u64,
     len: u64,
-    stride: u64,
 }
-impl ExtStridedSlice {
+impl ExtSlice {
     #[inline]
-    pub fn new(ptr: u64, len: u64, stride: u64) -> Self {
-        Self { ptr, len, stride }
+    pub fn new(ptr: u64, len: u64) -> Self {
+        Self { ptr, len }
     }
     #[inline]
     pub fn as_ptr<T>(&self) -> *const T {
@@ -183,21 +182,28 @@ impl ExtStridedSlice {
         self.len as usize
     }
     #[inline]
-    pub fn stride(&self) -> usize {
-        self.stride as usize
-    }
-    #[inline]
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
     #[inline]
-    pub unsafe fn get<T>(&self, index: usize) -> *const T {
-        debug_assert!(index < self.len());
-        self.as_ptr::<T>().add(index * self.stride())
+    pub unsafe fn as_slice(&self) -> &[u8] {
+        std::slice::from_raw_parts(self.ptr as *const u8, self.len as usize)
     }
     #[inline]
-    pub unsafe fn get_mut<T>(&self, index: usize) -> *mut T {
-        debug_assert!(index < self.len());
-        self.as_mut_ptr::<T>().add(index * self.stride())
+    pub unsafe fn as_mut_slice(&self) -> &mut [u8] {
+        std::slice::from_raw_parts_mut(self.ptr as *mut u8, self.len as usize)
+    }
+}
+
+// ExtSlice cannot be serialized/deserialized, we will implement Serialize/Deserialize
+// but it will just panic if it is ever used
+impl Serialize for ExtSlice {
+    fn serialize<S: serde::Serializer>(&self, _serializer: S) -> Result<S::Ok, S::Error> {
+        panic!("ExtSlice cannot be serialized");
+    }
+}
+impl<'de> Deserialize<'de> for ExtSlice {
+    fn deserialize<D: serde::Deserializer<'de>>(_deserializer: D) -> Result<Self, D::Error> {
+        panic!("ExtSlice cannot be deserialized");
     }
 }

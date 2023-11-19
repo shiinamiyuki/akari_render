@@ -14,7 +14,7 @@ use crate::{
 use akari_scenegraph as scenegraph;
 use akari_scenegraph::{CoordinateSystem, Geometry, Material, NodeRef, ShaderGraph, ShaderNode};
 use image::io::Reader as ImageReader;
-use luisa::runtime::api::denoiser_ext::Image;
+use scene_graph::{MmapScene, SceneView};
 
 use std::{
     cell::RefCell,
@@ -26,7 +26,7 @@ use std::{
 };
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ImageKey {
-    pub buffer: NodeRef<scenegraph::Buffer>,
+    pub buffer: NodeRef<scenegraph::BufferView>,
     pub format: scenegraph::ImageFormat,
     pub extension: scenegraph::ImageExtenisionMode,
     pub interpolation: scenegraph::ImageInterpolationMode,
@@ -43,7 +43,7 @@ pub struct SceneLoader {
     node_to_geom_id: HashMap<NodeRef<Geometry>, usize>,
     mesh_areas: RefCell<Vec<Vec<f32>>>,
     mesh_buffers: Vec<Mesh>,
-    graph: scenegraph::Scene,
+    scene_view: Box<dyn SceneView + Sync>,
     camera: Option<Arc<dyn Camera>>,
     surface_shader_compiler: CompilerDriver,
     lights: PolymorphicBuilder<(), dyn Light>,
@@ -57,11 +57,9 @@ impl SceneLoader {
     pub fn load_from_path<P: AsRef<Path>>(device: Device, path: P) -> Arc<Scene> {
         let abs_path = path.as_ref().canonicalize().unwrap();
         log::info!("Loading scene: {}", abs_path.display());
-        let mut graph = load_scene_graph(&path);
+        let scene_view = MmapScene::open(&abs_path).unwrap();
         log::info!("Loaded scene graph");
-        let parent_path = abs_path.parent().unwrap();
-        graph.load(parent_path).unwrap();
-        let loader = Self::preload(device, graph);
+        let loader = Self::preload(device, Box::new(scene_view));
         let scene = Arc::new(loader.do_load());
         log::info!("Loaded scene: {}", abs_path.display());
         scene
@@ -217,7 +215,7 @@ impl SceneLoader {
         let surface = self.nodes_to_surface_shader[mat];
         let transform = self.load_transform(&instance.transform, false);
         let geometry_node_id = &instance.geometry;
-        let geometry_node = &self.graph.geometries[geometry_node_id];
+        let geometry_node = &self.scene_view.scene().geometries[geometry_node_id];
         match geometry_node {
             scenegraph::Geometry::Mesh(_) => {
                 let geom_id = self.node_to_geom_id[geometry_node_id];
@@ -242,7 +240,7 @@ impl SceneLoader {
         self.mesh_areas
             .borrow_mut()
             .resize(self.mesh_buffers.len(), vec![]);
-        for (mat_id, mat) in &self.graph.materials {
+        for (mat_id, mat) in &self.scene_view.scene().materials {
             let shader = &mat.shader;
             let shader = self.surface_shader_compiler.compile(SvmCompileContext {
                 images: &self.image_key_sampler_to_idx,
@@ -265,10 +263,10 @@ impl SceneLoader {
         let mut instance_surfaces = vec![];
         let mut instance_nodes = vec![];
         {
-            let camera = self.load_camera(self.graph.camera.as_ref().unwrap());
+            let camera = self.load_camera(self.scene_view.scene().camera.as_ref().unwrap());
             self.camera = Some(camera);
         }
-        for (id, instance_node) in &self.graph.instances {
+        for (id, instance_node) in &self.scene_view.scene().instances {
             let (surface, instance) = self.load_instance(instance_node);
             instances.push(instance);
             instance_surfaces.push(surface);
@@ -280,7 +278,7 @@ impl SceneLoader {
         for (i, inst) in instances.iter_mut().enumerate() {
             let power = self.estimate_surface_emission_power(
                 inst,
-                &self.graph.materials[&instance_surfaces[i]].shader,
+                &self.scene_view.scene().materials[&instance_surfaces[i]].shader,
             );
             if 0.0 < power && power <= 1e-4 {
                 log::warn!(
@@ -289,7 +287,7 @@ impl SceneLoader {
                     power
                 );
             }
-            let instance_node = &self.graph.instances[&instance_nodes[i]];
+            let instance_node = &self.scene_view.scene().instances[&instance_nodes[i]];
             if power > 1e-4 {
                 let light_id = lights.len();
                 lights.push((i, power));
@@ -376,7 +374,7 @@ impl SceneLoader {
             heap,
         }
     }
-    fn preload(device: Device, graph: scenegraph::Scene) -> Self {
+    fn preload(device: Device, scene_view: Box<dyn SceneView + Sync>) -> Self {
         let mut node_to_geom_id = HashMap::new();
         let mut images_to_load: HashSet<ImageKey> = HashSet::new();
         let mut meshes = vec![];
@@ -385,7 +383,7 @@ impl SceneLoader {
 
         let image_nodes = {
             let mut images = vec![];
-            for (_, mat) in &graph.materials {
+            for (_, mat) in &scene_view.scene().materials {
                 for (_, n) in &mat.shader.nodes {
                     match n {
                         ShaderNode::TexImage { image: tex } => images.push(tex.clone()),
@@ -413,42 +411,46 @@ impl SceneLoader {
             texture_and_sampler_pair.insert((key, sampler));
         }
 
-        for (id, geometry) in &graph.geometries {
+        for (id, geometry) in &scene_view.scene().geometries {
             match geometry {
                 scenegraph::Geometry::Mesh(mesh) => {
                     log::debug!("Loading mesh: {}", id.id);
-                    let vertices = graph.buffers[&mesh.vertices].as_slice::<[f32; 3]>();
-                    let normals = mesh
-                        .normals
-                        .as_ref()
-                        .map(|b| graph.buffers[b].as_slice::<[f32; 3]>());
-                    let indices = graph.buffers[&mesh.indices].as_slice::<[u32; 3]>();
-                    let uvs = mesh
-                        .uvs
-                        .as_ref()
-                        .map(|b| graph.buffers[b].as_slice::<[f32; 2]>());
-                    let tangents = mesh
-                        .tangents
-                        .as_ref()
-                        .map(|b| graph.buffers[b].as_slice::<[f32; 3]>());
-                    // let bitangent_signs: Vec<u32> = mesh
-                    //     .bitangent_signs
-                    //     .as_ref()
-                    //     .map(|b| load_buffer::<u32>(&file_resolver, b))
-                    //     .unwrap_or(vec![]);
-                    let mesh = Mesh::new(
-                        device.clone(),
-                        MeshBuildArgs {
-                            vertices,
-                            normals,
-                            indices,
-                            uvs,
-                            tangents,
-                        },
-                    );
-                    let geom_id = meshes.len();
-                    meshes.push(mesh);
-                    node_to_geom_id.insert(id.clone(), geom_id);
+                    unsafe {
+                        macro_rules! load_slice {
+                            ($s:expr, $t:ty) => {{
+                                let slice = scene_view.buffer_view_as_slice($s);
+                                assert_eq!(
+                                    slice.len() % std::mem::size_of::<$t>(),
+                                    0,
+                                    "Invalid slice length"
+                                );
+                                let slice = std::slice::from_raw_parts(
+                                    slice.as_ptr() as *const $t,
+                                    slice.len() / std::mem::size_of::<$t>(),
+                                );
+                                slice
+                            }};
+                        }
+                        let vertices = load_slice!(&mesh.vertices, [f32; 3]);
+                        let normals = mesh.normals.as_ref().map(|n| load_slice!(n, [f32; 3]));
+                        let indices = load_slice!(&mesh.indices, [u32; 3]);
+                        let uvs = mesh.uvs.as_ref().map(|uvs| load_slice!(uvs, [f32; 2]));
+                        let tangents = mesh.tangents.as_ref().map(|t| load_slice!(t, [f32; 3]));
+
+                        let mesh = Mesh::new(
+                            device.clone(),
+                            MeshBuildArgs {
+                                vertices,
+                                normals,
+                                indices,
+                                uvs,
+                                tangents,
+                            },
+                        );
+                        let geom_id = meshes.len();
+                        meshes.push(mesh);
+                        node_to_geom_id.insert(id.clone(), geom_id);
+                    }
                 }
             }
         }
@@ -461,8 +463,7 @@ impl SceneLoader {
         let images: HashMap<ImageKey, Arc<Tex2d<Float4>>> = images_to_load
             .into_par_iter()
             .map(|key| {
-                let buf = &graph.buffers[&key.buffer];
-                let data = buf.as_binary_data();
+                let data = scene_view.buffer_view_as_slice(&key.buffer);
 
                 assert!(
                     key.channels <= 4,
@@ -571,7 +572,7 @@ impl SceneLoader {
             images,
             node_to_geom_id,
             mesh_buffers: meshes,
-            graph,
+            scene_view,
             camera: None,
             heap: Arc::new(heap),
             textures,

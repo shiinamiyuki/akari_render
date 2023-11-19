@@ -358,3 +358,11 @@ impl ByteVecBuilder {
         self.buffer
     }
 }
+
+pub fn with_current_dir<T>(path: &Path, f: impl FnOnce() -> T) -> T {
+    let old_dir = std::env::current_dir().unwrap();
+    std::env::set_current_dir(path).unwrap();
+    let ret = f();
+    std::env::set_current_dir(old_dir).unwrap();
+    ret
+}

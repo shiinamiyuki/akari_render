@@ -1,6 +1,11 @@
-use std::{collections::HashMap, sync::atomic::AtomicU64};
+use std::{
+    collections::HashMap,
+    path::PathBuf,
+    sync::{atomic::AtomicU64, Arc},
+};
 
 use base64::Engine;
+use memmap2::Mmap;
 use rayon::prelude::*;
 
 use crate::{shader::ShaderGraph, *};
@@ -83,6 +88,9 @@ pub enum Buffer {
     EmbeddedBase64 { data: String, length: u64 },
     #[serde(rename = "path")]
     Path { path: String, length: u64 },
+    // for internal use only, cannot be transformed into other variants directly
+    #[serde(rename = "__unused_slice")]
+    Slice { slice: ExtSlice },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -97,30 +105,23 @@ impl Buffer {
             Buffer::EmbeddedBinary { data } => data.len(),
             Buffer::EmbeddedBase64 { length, .. } => *length as usize,
             Buffer::Path { length, .. } => *length as usize,
+            Buffer::Slice { slice } => slice.len(),
         }
     }
-    pub fn as_binary_data(&self) -> &[u8] {
+    pub unsafe fn as_binary_data(&self) -> &[u8] {
         match self {
             Buffer::EmbeddedBinary { data } => data,
+            Buffer::Slice { slice } => unsafe { slice.as_slice() },
             _ => {
                 panic!("Please embed the buffer before converting to binary")
             }
         }
     }
-    pub fn as_slice<T: Copy>(&self) -> &[T] {
-        match self {
-            Buffer::EmbeddedBinary { data } => {
-                assert_eq!(data.len() % std::mem::size_of::<T>(), 0);
-                let len = data.len();
-                let ptr = data.as_ptr();
-                unsafe {
-                    std::slice::from_raw_parts(ptr as *const T, len / std::mem::size_of::<T>())
-                }
-            }
-            _ => {
-                panic!("Please embed the buffer before converting to binary")
-            }
-        }
+    pub unsafe fn as_slice<T: Copy>(&self) -> &[T] {
+        let data = self.as_binary_data();
+        let len = data.len();
+        let ptr = data.as_ptr();
+        unsafe { std::slice::from_raw_parts(ptr as *const T, len / std::mem::size_of::<T>()) }
     }
     pub fn embed(&mut self) -> std::io::Result<()> {
         match self {
@@ -144,6 +145,7 @@ impl Buffer {
                 }
                 *self = Buffer::EmbeddedBinary { data };
             }
+            Buffer::Slice { .. } => {}
         }
         Ok(())
     }
@@ -171,6 +173,9 @@ impl Buffer {
                 std::fs::copy(from_path, path)?;
                 *length
             }
+            Buffer::Slice { .. } => {
+                panic!("Please convert slice to binary before embedding");
+            }
         };
         *self = Buffer::Path {
             path: path.to_str().unwrap().to_string(),
@@ -182,19 +187,20 @@ impl Buffer {
         match self {
             Buffer::EmbeddedBinary { .. } => {}
             Buffer::EmbeddedBase64 { data, length } => {
-                *self = Buffer::EmbeddedBinary {
-                    data: {
-                        let mut buffer = Vec::new();
-                        base64::engine::general_purpose::STANDARD_NO_PAD
-                            .decode_vec(data, &mut buffer)
-                            .unwrap();
-                        buffer
-                    },
+                let data = {
+                    let mut buffer = Vec::new();
+                    base64::engine::general_purpose::STANDARD_NO_PAD
+                        .decode_vec(data, &mut buffer)
+                        .unwrap();
+                    buffer
                 };
+                assert_eq!(data.len() as u64, *length);
+                *self = Buffer::EmbeddedBinary { data };
             }
             Buffer::Path { .. } => {
                 panic!("Please embed the buffer before converting to binary")
             }
+            Buffer::Slice { .. } => {}
         }
     }
     pub fn into_base64_inplace(&mut self) {
@@ -214,6 +220,9 @@ impl Buffer {
             Buffer::EmbeddedBase64 { .. } => {}
             Buffer::Path { .. } => {
                 panic!("Please embed the buffer before converting to base64")
+            }
+            Buffer::Slice { .. } => {
+                panic!("Please convert slice to binary manually");
             }
         }
     }
@@ -436,7 +445,7 @@ impl Scene {
     }
     /// compact buffers into one
     /// requires all buffers to be embedded
-    pub fn compact(&mut self, name: Option<String>) -> std::io::Result<()> {
+    pub unsafe fn compact(&mut self, name: Option<String>) -> std::io::Result<()> {
         let total_len = AtomicU64::new(0);
         self.buffers
             .par_iter_mut()
@@ -472,11 +481,130 @@ impl Scene {
             .par_iter_mut()
             .for_each(|(_, buffer_view)| {
                 let offset = buf_ref_to_offset[&buffer_view.buffer];
-                buffer_view.offset = offset;
+                buffer_view.offset += offset;
                 buffer_view.buffer = buffer.clone();
             });
         Ok(())
     }
 }
-/// A scene that is memory-mapped to disk.
-pub struct MmapScene {}
+/// Represents a loaded scene.
+pub trait SceneView {
+    fn buffer_as_slice(&self, buffer: &NodeRef<Buffer>) -> &[u8];
+    fn buffer_view_as_slice(&self, buffer_view: &NodeRef<BufferView>) -> &[u8];
+    fn scene(&self) -> &Scene;
+}
+
+/// A scene that is backed by memory.
+/// It requires all buffers to be embedded/slice
+pub struct MemoryScene {
+    pub scene: Scene,
+}
+impl MemoryScene {
+    pub unsafe fn new(mut scene: Scene) -> std::io::Result<Self> {
+        scene.embed()?;
+        scene.buffers.par_iter_mut().for_each(|(_, buffer)| {
+            buffer.into_binary_inplace();
+        });
+        Ok(Self { scene })
+    }
+}
+impl SceneView for MemoryScene {
+    fn buffer_as_slice(&self, buffer: &NodeRef<Buffer>) -> &[u8] {
+        let buffer = &self.scene.buffers[buffer];
+        unsafe { buffer.as_binary_data() }
+    }
+    fn buffer_view_as_slice(&self, buffer_view: &NodeRef<BufferView>) -> &[u8] {
+        let buffer = &self.scene.buffer_views[buffer_view].buffer;
+        match &self.scene.buffers[buffer] {
+            Buffer::Slice { slice } => unsafe { slice.as_slice() },
+            Buffer::EmbeddedBinary { data } => data.as_slice(),
+            _ => panic!(),
+        }
+    }
+    fn scene(&self) -> &Scene {
+        &self.scene
+    }
+}
+/// A scene that is backed by memory mapped files.
+pub struct MmapScene {
+    pub scene: Scene,
+    pub mapped_buffers: HashMap<NodeRef<Buffer>, Arc<Mmap>>,
+    pub path_to_mmap: HashMap<PathBuf, Arc<Mmap>>,
+}
+impl MmapScene {
+    pub fn open(path: impl AsRef<Path>) -> std::io::Result<Self> {
+        let abs_path = std::fs::canonicalize(path)?;
+        let parent = abs_path.parent().unwrap();
+        let scene_json = std::fs::read_to_string(&abs_path)?;
+        let mut scene: Scene = serde_json::from_str(&scene_json)?;
+        let mut mapped_buffers = HashMap::new();
+        let mut path_to_mmap = HashMap::<PathBuf, Arc<Mmap>>::new();
+        with_current_dir(parent, || -> std::io::Result<Self> {
+            for (r, b) in scene.buffers.inner_mut() {
+                match b {
+                    Buffer::Path { path, length } => {
+                        let path = std::fs::canonicalize(path)?;
+                        let mmap = if let Some(mmap) = path_to_mmap.get(&path) {
+                            mmap.clone()
+                        } else {
+                            let file = std::fs::File::open(&path)?;
+                            let mmap = unsafe { Arc::new(Mmap::map(&file)?) };
+                            path_to_mmap.insert(path.clone(), mmap.clone());
+                            mmap
+                        };
+                        if *length != mmap.len() as u64 {
+                            return Err(std::io::Error::new(
+                                std::io::ErrorKind::InvalidData,
+                                format!(
+                                    "buffer size mismatch: expected {}, got {}",
+                                    length,
+                                    mmap.len()
+                                ),
+                            ));
+                        }
+                        *b = Buffer::Slice {
+                            slice: ExtSlice::new(mmap.as_ptr() as u64, mmap.len() as u64),
+                        };
+                        mapped_buffers.insert(r.clone(), mmap);
+                    }
+                    _ => {}
+                }
+
+                b.into_binary_inplace();
+            }
+            Ok(Self {
+                scene,
+                mapped_buffers,
+                path_to_mmap,
+            })
+        })
+    }
+}
+impl SceneView for MmapScene {
+    fn buffer_as_slice(&self, buffer: &NodeRef<Buffer>) -> &[u8] {
+        match &self.scene.buffers[buffer] {
+            Buffer::Slice { slice } => unsafe { slice.as_slice() },
+            Buffer::EmbeddedBinary { data } => data.as_slice(),
+            _ => panic!("buffer is not mapped"),
+        }
+    }
+    fn buffer_view_as_slice(&self, buffer_view: &NodeRef<BufferView>) -> &[u8] {
+        let buffer = &self.scene.buffer_views[buffer_view].buffer;
+        let offset = self.scene.buffer_views[buffer_view].offset;
+        let length = self.scene.buffer_views[buffer_view].length;
+        let buffer = self.buffer_as_slice(buffer);
+        &buffer[offset..offset + length]
+    }
+    fn scene(&self) -> &Scene {
+        &self.scene
+    }
+}
+
+fn with_current_dir<T>(path: impl AsRef<Path>, f: impl FnOnce() -> T) -> T {
+    let path = path.as_ref();
+    let old_dir = std::env::current_dir().unwrap();
+    std::env::set_current_dir(path).unwrap();
+    let ret = f();
+    std::env::set_current_dir(old_dir).unwrap();
+    ret
+}
