@@ -60,7 +60,7 @@ impl SceneLoader {
         let mut graph = load_scene_graph(&path);
         log::info!("Loaded scene graph");
         let parent_path = abs_path.parent().unwrap();
-        graph.embed(parent_path).unwrap();
+        graph.load(parent_path).unwrap();
         let loader = Self::preload(device, graph);
         let scene = Arc::new(loader.do_load());
         log::info!("Loaded scene: {}", abs_path.display());
@@ -265,7 +265,7 @@ impl SceneLoader {
         let mut instance_surfaces = vec![];
         let mut instance_nodes = vec![];
         {
-            let camera = self.load_camera(&self.graph.camera);
+            let camera = self.load_camera(self.graph.camera.as_ref().unwrap());
             self.camera = Some(camera);
         }
         for (id, instance_node) in &self.graph.instances {

@@ -16,15 +16,6 @@ pub mod shader;
 pub use scene::*;
 pub use shader::*;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct BufferHeader {
-    pub magic: [u8; 16],
-    pub version: u32,
-    pub length: u64,
-}
-impl BufferHeader {
-    pub const MAGIC: [u8; 16] = *b"akari_scenegraph";
-}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NodeRef<T> {
     pub id: String,
@@ -89,6 +80,43 @@ where
             map.serialize_entry(&key.id, value)?;
         }
         map.end()
+    }
+}
+impl<T> Collection<T> {
+    pub fn new() -> Self {
+        Self(BTreeMap::new())
+    }
+    /// creates a new node reference that can be pushed into the collection
+    pub fn new_ref(&self, hint: Option<String>) -> NodeRef<T> {
+        let node_name = hint.unwrap_or_else(|| "node".to_string());
+        let mut i = 0;
+        let mut node_name = NodeRef {
+            id: node_name,
+            phantom: std::marker::PhantomData,
+        };
+        while self.contains_key(&node_name) {
+            node_name.id = format!("{}.{}", node_name.id, i);
+            i += 1;
+        }
+        node_name
+    }
+    pub fn insert(&mut self, key: NodeRef<T>, value: T) {
+        if self.contains_key(&key) {
+            panic!("key already exists");
+        }
+        self.0.insert(key, value);
+    }
+    pub fn update(&mut self, key: NodeRef<T>, value: T) {
+        if !self.contains_key(&key) {
+            panic!("key does not exist");
+        }
+        self.0.insert(key, value);
+    }
+    pub fn inner(&self) -> &BTreeMap<NodeRef<T>, T> {
+        &self.0
+    }
+    pub fn inner_mut(&mut self) -> &mut BTreeMap<NodeRef<T>, T> {
+        &mut self.0
     }
 }
 struct CollectionVisitor<T> {
@@ -165,68 +193,3 @@ impl ExtStridedSlice {
         self.as_mut_ptr::<T>().add(index * self.stride())
     }
 }
-pub fn write_binary<P: AsRef<Path>, T>(path: P, data: &[T]) -> std::io::Result<()>
-where
-    T: Copy + Sized,
-{
-    let mut file = File::create(path)?;
-    let header = BufferHeader {
-        magic: BufferHeader::MAGIC,
-        version: VERSION,
-        length: std::mem::size_of::<T>() as u64 * data.len() as u64,
-    };
-    unsafe {
-        file.write_all(std::slice::from_raw_parts(
-            &header as *const BufferHeader as *const u8,
-            std::mem::size_of::<BufferHeader>(),
-        ))?;
-        file.write_all(std::slice::from_raw_parts(
-            data.as_ptr() as *const u8,
-            std::mem::size_of::<T>() * data.len(),
-        ))?;
-    }
-    Ok(())
-}
-
-pub fn read_binary<P: AsRef<Path>, T>(path: P) -> std::io::Result<Vec<T>>
-where
-    T: Copy + Sized,
-{
-    let path = path.as_ref();
-    let mut file = File::open(path)?;
-    let mut header = MaybeUninit::<BufferHeader>::uninit();
-    unsafe {
-        file.read_exact(std::slice::from_raw_parts_mut(
-            header.as_mut_ptr() as *mut u8,
-            std::mem::size_of::<BufferHeader>(),
-        ))?;
-        let header = header.assume_init();
-        if header.magic != BufferHeader::MAGIC {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "invalid magic",
-            ));
-        }
-        if header.version != VERSION {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "invalid version",
-            ));
-        }
-        if header.length % std::mem::size_of::<T>() as u64 != 0 {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "invalid length",
-            ));
-        }
-        let cnt = header.length as usize / std::mem::size_of::<T>();
-        let mut data = vec![MaybeUninit::<T>::uninit(); cnt];
-        file.read_exact(std::slice::from_raw_parts_mut(
-            data.as_mut_ptr() as *mut u8,
-            std::mem::size_of::<T>() * cnt,
-        ))?;
-        Ok(std::mem::transmute::<_, Vec<T>>(data))
-    }
-}
-
-pub const VERSION: u32 = 1000;

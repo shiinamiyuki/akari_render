@@ -262,7 +262,7 @@ impl MeshAggregate {
             let v0 = Expr::<Float3>::from(vertices.read(i.x));
             let v1 = Expr::<Float3>::from(vertices.read(i.y));
             let v2 = Expr::<Float3>::from(vertices.read(i.z));
-            let p = v0 * (1.0 - bary.x - bary.y) + v1 * bary.x + v2 * bary.y;
+            let p = bary.interpolate(v0, v1, v2);
             let ng = (v1 - v0).cross(v2 - v0);
             let len = ng.length();
             let area = len * 0.5;
@@ -275,12 +275,12 @@ impl MeshAggregate {
             let uv0: Expr<Float2> = uvs.read(prim_id3 + 0).into();
             let uv1: Expr<Float2> = uvs.read(prim_id3 + 1).into();
             let uv2: Expr<Float2> = uvs.read(prim_id3 + 2).into();
-            uv0 * (1.0 - bary.x - bary.y) + uv1 * bary.x + uv2 * bary.y
+            bary.interpolate(uv0, uv1, uv2)
         } else {
             let uv0 = Float2::expr(0.0, 0.0);
             let uv1 = Float2::expr(1.0, 0.0);
             let uv2 = Float2::expr(0.0, 0.1);
-            uv0 * (1.0 - bary.x - bary.y) + uv1 * bary.x + uv2 * bary.y
+            bary.interpolate(uv0, uv1, uv2)
         };
 
         let tt_local = {
@@ -298,7 +298,7 @@ impl MeshAggregate {
                 if !all_good {
                     *use_default = true;
                 } else {
-                    *t = t0 * (1.0 - bary.x - bary.y) + t1 * bary.x + t2 * bary.y;
+                    *t = bary.interpolate(**t0, **t1, **t2);
                 }
             } else {
                 *use_default = true;
@@ -311,7 +311,7 @@ impl MeshAggregate {
                 let t0 = (v1 - v0).normalize();
                 let t1 = (v2 - v1).normalize();
                 let t2 = (v0 - v2).normalize();
-                *t = t0 * (1.0 - bary.x - bary.y) + t1 * bary.x + t2 * bary.y;
+                *t = bary.interpolate(t0, t1, t2);
             };
             **t
         };
@@ -321,7 +321,7 @@ impl MeshAggregate {
             let n0 = Expr::<Float3>::from(normals.read(prim_id3 + 0));
             let n1 = Expr::<Float3>::from(normals.read(prim_id3 + 1));
             let n2 = Expr::<Float3>::from(normals.read(prim_id3 + 2));
-            n0 * (1.0 - bary.x - bary.y) + n1 * bary.x + n2 * bary.y
+            bary.interpolate(n0, n1, n2)
         } else {
             ng_local
         };

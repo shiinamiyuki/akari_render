@@ -72,11 +72,11 @@ fn main() {
     let exe_path = current_exe().unwrap();
     let exe_dir = exe_path.parent().unwrap();
     let akari_blender_dll_path = if cfg!(target_os = "windows") {
-        exe_dir.join("akari_blender.dll")
+        exe_dir.join("akari_api.dll")
     } else {
-        exe_dir.join("libakari_blender.so")
+        exe_dir.join("libakari_api.so")
     };
-    cmd.env("AKARI_BLENDER_PATH", akari_blender_dll_path);
+    cmd.env("AKARI_API_PATH", akari_blender_dll_path);
     if force {
         cmd.arg("--force");
     }

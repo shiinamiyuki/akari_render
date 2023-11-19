@@ -12,7 +12,7 @@ import os
 import struct
 from ctypes import *
 
-AKARI_BLENDER_DLL = cdll.LoadLibrary(os.path.join(os.path.dirname(__file__), os.environ['AKARI_BLENDER_PATH']))
+AKARI_API_PATH = cdll.LoadLibrary(os.path.join(os.path.dirname(__file__), os.environ['AKARI_BLENDER_PATH']))
 
 def check_blender_version():
     # only supports blender 3.6.x and above
@@ -452,7 +452,7 @@ class SceneExporter:
             'num_vertices':len(V),
             'num_triangles':len(F),
         }
-        AKARI_BLENDER_DLL.export_blender_mesh(json.dumps(export_mesh_args).encode('utf-8'))
+        AKARI_API_PATH.export_blender_mesh(json.dumps(export_mesh_args).encode('utf-8'))
 
         exported_mesh = {}
 

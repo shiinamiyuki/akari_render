@@ -1,4 +1,4 @@
-use luisa::rtx::{CommittedHit, Hit};
+use luisa::rtx::{AccelTraceOptions, CommittedHit, SurfaceHit};
 use std::sync::Arc;
 
 use crate::heap::MegaHeap;
@@ -19,6 +19,12 @@ pub struct Scene {
 }
 
 impl Scene {
+    pub fn trace_options(&self) -> AccelTraceOptions {
+        AccelTraceOptions {
+            mask: 0xff.expr(),
+            ..Default::default()
+        }
+    }
     pub fn surface_interaction(
         &self,
         inst_id: Expr<u32>,
@@ -28,33 +34,28 @@ impl Scene {
         self.meshes.surface_interaction(inst_id, prim_id, bary)
     }
     #[tracked]
-    pub fn _trace_closest(&self, ray: Expr<Ray>) -> Expr<Hit> {
+    pub fn _trace_closest(&self, ray: Expr<Ray>) -> Expr<SurfaceHit> {
         let ro: Expr<[f32; 3]> = ray.o.into();
         let rd: Expr<[f32; 3]> = ray.d.into();
         let rtx_ray = rtx::Ray::new_expr(ro, ray.t_min, rd, ray.t_max);
-        self.meshes
-            .accel
-            .trace_closest_masked(rtx_ray, 255u32.expr())
+        self.meshes.accel.intersect(rtx_ray, self.trace_options())
     }
     #[tracked]
     pub fn _trace_closest_rq(&self, ray: Expr<Ray>) -> Expr<CommittedHit> {
         let ro: Expr<[f32; 3]> = ray.o.into();
         let rd: Expr<[f32; 3]> = ray.d.into();
         let rtx_ray = rtx::Ray::new_expr(ro, ray.t_min, rd, ray.t_max);
-        self.meshes.accel.query_all(
-            rtx_ray,
-            u32::MAX,
-            rtx::RayQuery {
-                on_triangle_hit: |candidate: rtx::TriangleCandidate| {
-                    if (candidate.inst.ne(ray.exclude0.x) | candidate.prim.ne(ray.exclude0.y))
-                        & (candidate.inst.ne(ray.exclude1.x) | candidate.prim.ne(ray.exclude1.y))
-                    {
-                        candidate.commit();
-                    }
-                },
-                on_procedural_hit: |_| {},
-            },
-        )
+        self.meshes
+            .accel
+            .traverse(rtx_ray, self.trace_options())
+            .on_surface_hit(|candidate: rtx::SurfaceCandidate| {
+                if (candidate.inst.ne(ray.exclude0.x) | candidate.prim.ne(ray.exclude0.y))
+                    & (candidate.inst.ne(ray.exclude1.x) | candidate.prim.ne(ray.exclude1.y))
+                {
+                    candidate.commit();
+                }
+            })
+            .trace()
     }
     #[tracked]
     pub fn intersect_hit_info(
@@ -63,15 +64,15 @@ impl Scene {
     ) -> (Expr<bool>, Expr<u32>, Expr<u32>, Expr<Float2>) {
         if !self.use_rq {
             let hit = self._trace_closest(ray);
-            let inst_id = hit.inst_id;
-            let prim_id = hit.prim_id;
-            let bary = Float2::expr(hit.u, hit.v);
+            let inst_id = hit.inst;
+            let prim_id = hit.prim;
+            let bary = hit.triangle_barycentric_coord();
             (!hit.miss(), inst_id, prim_id, bary)
         } else {
             let hit = self._trace_closest_rq(ray);
-            let inst_id = hit.inst_id;
-            let prim_id = hit.prim_id;
-            let bary = hit.bary;
+            let inst_id = hit.inst;
+            let prim_id = hit.prim;
+            let bary = hit.triangle_barycentric_coord();
             (hit.triangle_hit(), inst_id, prim_id, bary)
         }
     }
@@ -80,9 +81,9 @@ impl Scene {
         if !self.use_rq {
             let hit = self._trace_closest(ray);
             if !hit.miss() {
-                let inst_id = hit.inst_id;
-                let prim_id = hit.prim_id;
-                let bary = Float2::expr(hit.u, hit.v);
+                let inst_id = hit.inst;
+                let prim_id = hit.prim;
+                let bary = hit.triangle_barycentric_coord();
                 self.surface_interaction(inst_id, prim_id, bary)
             } else {
                 SurfaceInteraction::invalid()
@@ -90,9 +91,9 @@ impl Scene {
         } else {
             let hit = self._trace_closest_rq(ray);
             if hit.triangle_hit() {
-                let inst_id = hit.inst_id;
-                let prim_id = hit.prim_id;
-                let bary = hit.bary;
+                let inst_id = hit.inst;
+                let prim_id = hit.prim;
+                let bary = hit.triangle_barycentric_coord();
                 self.surface_interaction(inst_id, prim_id, bary)
             } else {
                 SurfaceInteraction::invalid()
@@ -105,23 +106,22 @@ impl Scene {
         let rd: Expr<[f32; 3]> = ray.d.into();
         let rtx_ray = rtx::Ray::new_expr(ro, ray.t_min, rd, ray.t_max);
         if !self.use_rq {
-            self.meshes.accel.trace_any(rtx_ray)
+            self.meshes
+                .accel
+                .intersect_any(rtx_ray, self.trace_options())
         } else {
-            let hit = self.meshes.accel.query_any(
-                rtx_ray,
-                u32::MAX,
-                rtx::RayQuery {
-                    on_triangle_hit: |candidate: rtx::TriangleCandidate| {
-                        if (candidate.inst.ne(ray.exclude0.x) | candidate.prim.ne(ray.exclude0.y))
-                            & (candidate.inst.ne(ray.exclude1.x)
-                                | candidate.prim.ne(ray.exclude1.y))
-                        {
-                            candidate.commit();
-                        }
-                    },
-                    on_procedural_hit: |_| {},
-                },
-            );
+            let hit = self
+                .meshes
+                .accel
+                .traverse_any(rtx_ray, self.trace_options())
+                .on_surface_hit(|candidate: rtx::SurfaceCandidate| {
+                    if (candidate.inst.ne(ray.exclude0.x) | candidate.prim.ne(ray.exclude0.y))
+                        & (candidate.inst.ne(ray.exclude1.x) | candidate.prim.ne(ray.exclude1.y))
+                    {
+                        candidate.commit();
+                    }
+                })
+                .trace();
             !hit.miss()
         }
     }

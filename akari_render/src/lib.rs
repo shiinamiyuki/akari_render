@@ -3,6 +3,7 @@ use std::env;
 use color::ColorRepr;
 use hexf::hexf32;
 
+pub use akari_scenegraph as scene_graph;
 pub use luisa::prelude::{
     cpu_dbg, if_, lc_assert, lc_comment_lineno, lc_unreachable, loop_, outline, track, tracked,
     while_, Aggregate, Soa, Value,
@@ -26,14 +27,15 @@ pub use luisa::{
         Buffer, BufferVar, BufferView, ByteBuffer, ByteBufferVar, ByteBufferView, PixelStorage,
         SamplerAddress, SamplerFilter, Tex2d, Tex2dVar, Tex2dView, Tex3d, Tex3dVar, Tex3dView,
     },
-    rtx,
+    rtx::{self, TriangleInterpolate},
     runtime::{
         api::StreamTag, Callable, Command, Device, DynCallable, Kernel, Scope, Stream, Swapchain,
     },
 };
 pub use luisa_compute as luisa;
-pub use rayon::prelude::*;
 pub use rayon;
+pub use rayon::prelude::*;
+pub mod api;
 pub mod camera;
 pub mod color;
 pub mod cpp_ext;
@@ -65,11 +67,9 @@ pub enum ADMode {
     Forward,
     Backward,
 }
-pub fn maybe_outline(f:impl Fn()) {
+pub fn maybe_outline(f: impl Fn()) {
     let should_not_outline = match env::var("AKR_NO_OUTLINE") {
-        Ok(x) => {
-            x == "1"
-        }
+        Ok(x) => x == "1",
         _ => false,
     };
     if !should_not_outline {

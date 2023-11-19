@@ -18,7 +18,6 @@ cmake = "0.1"
 # [lib]
 # crate-type = ["dylib"]
 
-
 [[bin]]
-name = "akari_import"
+name = "akari-import"
 path = "src/bin/import.rs"

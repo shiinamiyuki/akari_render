@@ -36,11 +36,11 @@ serde = { version = "1" }
 serde_json = "1"
 
 [[bin]]
-name = "akari_cli"
+name = "akari-cli"
 path = "src/bin/akari_cli.rs"
 
 [[bin]]
-name = "akari_test"
+name = "akari-test"
 path = "src/bin/akari_test.rs"
 
 

@@ -477,7 +477,6 @@ impl Integrator for PathTracer {
         let kernel = self.device.create_kernel_with_options::<fn(u32, Int2)>(
             KernelBuildOptions {
                 name: Some("mega_path".into()),
-                time_trace: true,
                 ..Default::default()
             },
             &track!(|spp_per_pass: Expr<u32>, pixel_offset: Expr<Int2>| {
