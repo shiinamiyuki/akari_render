@@ -44,5 +44,5 @@ name = "akari-test"
 path = "src/bin/akari_test.rs"
 
 
-[lib]
-crate-type = ["dylib"]
+# [lib]
+# crate-type = ["dylib"]

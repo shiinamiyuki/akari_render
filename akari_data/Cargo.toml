@@ -8,5 +8,5 @@ edition = "2021"
 [dependencies]
 
 
-[lib]
-crate-type = ["dylib"]
+# [lib]
+# crate-type = ["dylib"]

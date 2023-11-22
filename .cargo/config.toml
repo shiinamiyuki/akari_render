@@ -1,6 +1,0 @@
-[target.x86_64-pc-windows-msvc]
-# remove if you want ouse the default linker
-linker = "rust-lld.exe"
-
-[build]
-rustflags = ["-C", "prefer-dynamic"]
