@@ -103,7 +103,7 @@ impl<T> Collection<T> {
             phantom: std::marker::PhantomData,
         };
         while self.contains_key(&node_name) {
-            node_name.id = format!("{}.{}", node_name.id, i);
+            node_name.id = format!("{}_{}", node_name.id, i);
             i += 1;
         }
         node_name
@@ -159,7 +159,11 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Collection<T> {
         })
     }
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+
+/// A slice that is serialized as a pointer and length
+/// This is useful for passing slices to C libraries/Python
+/// However, saving the serialized data to a file will not work
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ExtSlice {
     ptr: u64,
     len: u64,
@@ -192,18 +196,5 @@ impl ExtSlice {
     #[inline]
     pub unsafe fn as_mut_slice(&self) -> &mut [u8] {
         std::slice::from_raw_parts_mut(self.ptr as *mut u8, self.len as usize)
-    }
-}
-
-// ExtSlice cannot be serialized/deserialized, we will implement Serialize/Deserialize
-// but it will just panic if it is ever used
-impl Serialize for ExtSlice {
-    fn serialize<S: serde::Serializer>(&self, _serializer: S) -> Result<S::Ok, S::Error> {
-        panic!("ExtSlice cannot be serialized");
-    }
-}
-impl<'de> Deserialize<'de> for ExtSlice {
-    fn deserialize<D: serde::Deserializer<'de>>(_deserializer: D) -> Result<Self, D::Error> {
-        panic!("ExtSlice cannot be deserialized");
     }
 }

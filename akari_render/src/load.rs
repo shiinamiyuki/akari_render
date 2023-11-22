@@ -485,7 +485,7 @@ impl SceneLoader {
                             for c in 0..key.channels {
                                 rgbaf32.push(data[i * key.channels as usize + c as usize]);
                             }
-                            for c in key.channels..4 {
+                            for _ in key.channels..4 {
                                 rgbaf32.push(0.0);
                             }
                         }

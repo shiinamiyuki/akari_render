@@ -335,7 +335,7 @@ impl Scene {
         Ok(())
     }
     pub fn add_buffer(&mut self, name: Option<String>, buffer: Buffer) -> NodeRef<Buffer> {
-        let name = name.unwrap_or_else(|| format!("$buf:{}", self.buffers.len()));
+        let name = name.unwrap_or_else(|| format!("buf_{}", self.buffers.len()));
         let node_ref = self.buffers.new_ref(Some(name));
         self.buffers.insert(node_ref.clone(), buffer);
         node_ref
@@ -357,7 +357,7 @@ impl Scene {
         length: usize,
     ) -> NodeRef<BufferView> {
         self.check_valid_buffer(&buffer);
-        let name = name.unwrap_or_else(|| format!("$buf_view:{}", self.buffer_views.len()));
+        let name = name.unwrap_or_else(|| format!("buf_view_{}", self.buffer_views.len()));
         let node_ref = self.buffer_views.new_ref(Some(name));
         self.buffer_views.insert(
             node_ref.clone(),
@@ -389,7 +389,7 @@ impl Scene {
         if let Some(tangents) = tangents.as_ref() {
             self.check_valid_buffer(tangents);
         }
-        let name = name.unwrap_or_else(|| format!("$mesh:{}", self.geometries.len()));
+        let name = name.unwrap_or_else(|| format!("mesh_{}", self.geometries.len()));
         let node_ref = self.geometries.new_ref(Some(name));
         let vertices = self.add_buffer_view_full(None, vertices);
         let indices = self.add_buffer_view_full(None, indices);
@@ -408,7 +408,19 @@ impl Scene {
         );
         node_ref
     }
-    pub fn save_json(
+    pub fn add_material(&mut self, name: Option<String>, material: Material) -> NodeRef<Material> {
+        let name = name.unwrap_or_else(|| format!("mat_{}", self.materials.len()));
+        let node_ref = self.materials.new_ref(Some(name));
+        self.materials.insert(node_ref.clone(), material);
+        node_ref
+    }
+    pub fn add_instance(&mut self, name: Option<String>, instance: Instance) -> NodeRef<Instance> {
+        let name = name.unwrap_or_else(|| format!("instance_{}", self.instances.len()));
+        let node_ref = self.instances.new_ref(Some(name));
+        self.instances.insert(node_ref.clone(), instance);
+        node_ref
+    }
+    pub fn write_to_file(
         &mut self,
         path: impl AsRef<Path>,
         buffer_in_separate_dir: bool,
@@ -445,7 +457,7 @@ impl Scene {
     }
     /// compact buffers into one
     /// requires all buffers to be embedded
-    pub unsafe fn compact(&mut self, name: Option<String>) -> std::io::Result<()> {
+    pub unsafe fn compact(&mut self, name: String) -> std::io::Result<()> {
         let total_len = AtomicU64::new(0);
         self.buffers
             .par_iter_mut()
@@ -475,7 +487,7 @@ impl Scene {
         // remove all buffers
         self.buffers.clear();
         let buffer = Buffer::from_vec(data);
-        let buffer = self.add_buffer(name, buffer);
+        let buffer = self.add_buffer(Some(name), buffer);
         // now update all buffer views
         self.buffer_views
             .par_iter_mut()
@@ -528,7 +540,6 @@ impl SceneView for MemoryScene {
 /// A scene that is backed by memory mapped files.
 pub struct MmapScene {
     pub scene: Scene,
-    pub mapped_buffers: HashMap<NodeRef<Buffer>, Arc<Mmap>>,
     pub path_to_mmap: HashMap<PathBuf, Arc<Mmap>>,
 }
 impl MmapScene {
@@ -537,10 +548,9 @@ impl MmapScene {
         let parent = abs_path.parent().unwrap();
         let scene_json = std::fs::read_to_string(&abs_path)?;
         let mut scene: Scene = serde_json::from_str(&scene_json)?;
-        let mut mapped_buffers = HashMap::new();
         let mut path_to_mmap = HashMap::<PathBuf, Arc<Mmap>>::new();
         with_current_dir(parent, || -> std::io::Result<Self> {
-            for (r, b) in scene.buffers.inner_mut() {
+            for (_, b) in scene.buffers.inner_mut() {
                 match b {
                     Buffer::Path { path, length } => {
                         let path = std::fs::canonicalize(path)?;
@@ -565,7 +575,6 @@ impl MmapScene {
                         *b = Buffer::Slice {
                             slice: ExtSlice::new(mmap.as_ptr() as u64, mmap.len() as u64),
                         };
-                        mapped_buffers.insert(r.clone(), mmap);
                     }
                     _ => {}
                 }
@@ -574,7 +583,6 @@ impl MmapScene {
             }
             Ok(Self {
                 scene,
-                mapped_buffers,
                 path_to_mmap,
             })
         })

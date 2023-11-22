@@ -31,17 +31,18 @@ extern "C" {
 
 }
 
-pub fn import_blender_mesh(scene: &mut Scene, args: ImportMeshArgs) {
+pub fn import_blender_mesh(scene: &mut Scene, args: ImportMeshArgs) -> NodeRef<Geometry> {
     let mesh_ptr = args.mesh_ptr;
     let loop_tri_ptr = args.loop_tri_ptr;
     let mut vertices = vec![[0.0f32; 3]; args.num_vertices];
     let mut indices = vec![[u32::MAX; 3]; args.num_triangles];
-    let mut uvs = vec![[0.0f32; 2]; args.num_triangles * 3];
-    let mut normals = vec![[0.0f32; 3]; args.num_triangles * 3];
-    let mut tangents = vec![[0.0f32; 3]; args.num_triangles * 3];
+    let mut uvs = vec![];
+    let mut normals = vec![];
+    let mut tangents = vec![];
 
     rayon::scope(|s| unsafe {
         if args.has_uvs {
+            uvs = vec![[0.0f32; 2]; args.num_triangles * 3];
             s.spawn(|_| {
                 std::ptr::copy(args.uv_ptr as *const [f32; 2], uvs.as_mut_ptr(), uvs.len());
             });
@@ -62,6 +63,7 @@ pub fn import_blender_mesh(scene: &mut Scene, args: ImportMeshArgs) {
             );
         });
         if args.has_normals {
+            normals = vec![[0.0f32; 3]; args.num_triangles * 3];
             s.spawn(|_| {
                 get_mesh_split_normals(
                     mesh_ptr,
@@ -72,6 +74,7 @@ pub fn import_blender_mesh(scene: &mut Scene, args: ImportMeshArgs) {
             });
         }
         if args.has_tangents {
+            tangents = vec![[0.0f32; 3]; args.num_triangles * 3];
             s.spawn(|_| {
                 get_mesh_tangents(
                     mesh_ptr,
@@ -84,10 +87,35 @@ pub fn import_blender_mesh(scene: &mut Scene, args: ImportMeshArgs) {
     });
     let vertices = Buffer::from_vec(vertices);
     let indices = Buffer::from_vec(indices);
-    let uvs = Buffer::from_vec(uvs);
-    // write_binary(format!("{}.vert", out_path), &vertices).unwrap();
-    // write_binary(format!("{}.ind", out_path), &indices).unwrap();
-    // write_binary(format!("{}.uv", out_path), &uvs).unwrap();
-    // write_binary(format!("{}.normal", out_path), &normals).unwrap();
-    // write_binary(format!("{}.tangent", out_path), &tangents).unwrap();
+
+    let name = &args.name;
+    let vertices = scene.add_buffer(Some(format!("{name}.vert")), vertices);
+    let indices = scene.add_buffer(Some(format!("{name}.ind")), indices);
+    let uvs = if !uvs.is_empty() {
+        let uvs = Buffer::from_vec(uvs);
+        Some(scene.add_buffer(Some(format!("{name}.uv")), uvs))
+    } else {
+        None
+    };
+    let normals = if !normals.is_empty() {
+        let normals = Buffer::from_vec(normals);
+        Some(scene.add_buffer(Some(format!("{name}.norm")), normals))
+    } else {
+        None
+    };
+    let tangents = if !tangents.is_empty() {
+        let tangents = Buffer::from_vec(tangents);
+        Some(scene.add_buffer(Some(format!("{name}.tang")), tangents))
+    } else {
+        None
+    };
+    let mesh = scene.add_mesh(
+        Some(name.clone()),
+        vertices,
+        indices,
+        normals,
+        uvs,
+        tangents,
+    );
+    mesh
 }

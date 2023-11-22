@@ -1,6 +1,6 @@
 use std::sync::{atomic::AtomicBool, Arc};
 
-use luisa::{runtime::{Swapchain}};
+use luisa::runtime::Swapchain;
 use winit::{
     event::{Event as WinitEvent, WindowEvent},
     event_loop::EventLoop,

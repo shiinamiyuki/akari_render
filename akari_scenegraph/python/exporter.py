@@ -12,15 +12,19 @@ import os
 import struct
 from ctypes import *
 
-AKARI_API_PATH = cdll.LoadLibrary(os.path.join(os.path.dirname(__file__), os.environ['AKARI_BLENDER_PATH']))
+AKARI_API = cdll.LoadLibrary(os.environ['AKARI_API_PATH'])
+
+def invoke_akari_api(args):
+    ptr = AKARI_API.py_akari_import(json.dumps(args).encode('utf-8'))
+    ret = string_at(ptr).decode('utf-8')
+    ret = json.loads(ret)
+    AKARI_API.py_akari_free_string(ptr)
+    return ret
 
 def check_blender_version():
-    # only supports blender 3.6.x and above
-    if bpy.app.version[0] < 3:
-        print("Blender version must be 3.0 or above")
-        sys.exit(1)
-    if bpy.app.version[1] < 6:
-        print("Blender version must be 3.6 or above")
+    # only supports blender 4.0
+    if bpy.app.version[0] != 4:
+        print("Only supports blender 4.0")
         sys.exit(1)
 
 check_blender_version()
@@ -441,10 +445,9 @@ class SceneExporter:
         V = m.vertices
         F = m.loop_triangles
         print(f"    #V: {len(V)} #F: {len(F)}")
-        mesh_out_path = os.path.join(MESH_DIR, f"{name}")
 
         export_mesh_args = {
-            'out_path': mesh_out_path,
+            'name': name,
             "loop_tri_ptr":m.loop_triangles[0].as_pointer(),
             'vertex_ptr':m.vertices[0].as_pointer(),
             'uv_ptr':m.uv_layers[0].uv[0].as_pointer() if has_uv else 0,
@@ -452,124 +455,10 @@ class SceneExporter:
             'num_vertices':len(V),
             'num_triangles':len(F),
         }
-        AKARI_API_PATH.export_blender_mesh(json.dumps(export_mesh_args).encode('utf-8'))
+        exported_mesh = AKARI_API.export_blender_mesh(json.dumps(export_mesh_args).encode('utf-8'))
 
-        exported_mesh = {}
-
-        exported_mesh["vertices"] = make_external_buffer(
-            path_join(MESH_DIR, f"{name}.vert")
-        )
-        exported_mesh["indices"] = make_external_buffer(
-            path_join(MESH_DIR, f"{name}.ind")
-        )
-        exported_mesh["normals"] = make_external_buffer(
-            path_join(MESH_DIR, f"{name}.normal")
-        )
-        if has_uv:
-            exported_mesh["uvs"] = make_external_buffer(
-                path_join(MESH_DIR, f"{name}.uv")
-            )
-            exported_mesh["tangents"] = make_external_buffer(
-                path_join(MESH_DIR, f"{name}.tangent")
-            )
-            exported_mesh["bitangent_signs"] = make_external_buffer(
-                path_join(MESH_DIR, f"{name}.bitangent")
-            )
-        else:
-            exported_mesh["uvs"] = None
-            exported_mesh["tangents"] = None
-            exported_mesh["bitangent_signs"] = None
-        self.exported_geometries[name] = {"Mesh": exported_mesh}
-
-    def export_mesh_data_slow(self, m, name, has_uv):
-        bm = bmesh.new()
-        bm.from_mesh(m)
-        bmesh.ops.triangulate(bm, faces=bm.faces[:])
-        bm.to_mesh(m)
-        bm.free()
-        m.calc_loop_triangles()
-        if has_uv:
-            m.calc_tangents()
-        else:
-            # only compute normals
-            m.calc_normals_split()
-        V = m.vertices
-        F = m.loop_triangles
-        print(f"    #V: {len(V)} #F: {len(F)}")
-        vert_buffer = open(os.path.join(MESH_DIR, f"{name}.vert"), "wb")
-        ind_buffer = open(os.path.join(MESH_DIR, f"{name}.ind"), "wb")
-        if has_uv:
-            uv_buffer = open(os.path.join(MESH_DIR, f"{name}.uv"), "wb")
-            tangent_buffer = open(os.path.join(MESH_DIR, f"{name}.tangent"), "wb")
-            bitangent_buffer = open(os.path.join(MESH_DIR, f"{name}.bitangent"), "wb")
-        normal_buffer = open(os.path.join(MESH_DIR, f"{name}.normal"), "wb")
-        bit_counter = 0
-        packed_bits = 0
-        vert_buffer.write(struct.pack("Q", len(V)))
-        ind_buffer.write(struct.pack("Q", len(F)))
-        normal_buffer.write(struct.pack("Q", len(F) * 3))
-        if has_uv:
-            uv_buffer.write(struct.pack("Q", len(F) * 3))
-            tangent_buffer.write(struct.pack("Q", len(F) * 3))
-            bitangent_buffer.write(struct.pack("Q", (len(F) * 3 + 31) // 32))
-        for v in V:
-            vert_buffer.write(struct.pack("fff", *v.co))
-        for f in F:
-            indices = f.vertices
-            ind_buffer.write(struct.pack("III", indices[0], indices[1], indices[2]))
-            normals = f.split_normals
-            for n in normals:
-                normal_buffer.write(struct.pack("fff", *n))
-            for loop_index in f.loops:
-                if has_uv:
-                    uv = m.uv_layers[0].uv[loop_index].vector
-                    uv_buffer.write(struct.pack("ff", uv[0], uv[1]))
-                    tangent = m.loops[loop_index].tangent
-                    tangent_buffer.write(struct.pack("fff", *tangent))
-                    bitangent_sign = m.loops[loop_index].bitangent_sign
-                    if bitangent_sign < 0:
-                        bitangent_sign = 1
-                    else:
-                        bitangent_sign = 0
-                    packed_bits |= bitangent_sign << bit_counter
-                    bit_counter += 1
-                    if bit_counter == 32:
-                        bitangent_buffer.write(struct.pack("I", packed_bits))
-                        packed_bits = 0
-                        bit_counter = 0
-        if bit_counter != 0 and has_uv:
-            bitangent_buffer.write(struct.pack("I", packed_bits))
-        vert_buffer.close()
-        ind_buffer.close()
-        if has_uv:
-            uv_buffer.close()
-            tangent_buffer.close()
-            bitangent_buffer.close()
-        normal_buffer.close()
-
-        exported_mesh = {}
-
-        exported_mesh["vertices"] = make_external_buffer(
-            path_join(MESH_DIR, f"{name}.vert")
-        )
-        exported_mesh["indices"] = make_external_buffer(
-            path_join(MESH_DIR, f"{name}.ind")
-        )
-        exported_mesh["normals"] = make_external_buffer(
-            path_join(MESH_DIR, f"{name}.normal")
-        )
-        if has_uv:
-            exported_mesh["uvs"] = make_external_buffer(
-                path_join(MESH_DIR, f"{name}.uv")
-            )
-            exported_mesh["tangents"] = make_external_buffer(
-                path_join(MESH_DIR, f"{name}.tangent")
-            )
-        else:
-            exported_mesh["uvs"] = None
-            exported_mesh["tangents"] = None
-            # exported_mesh["bitangent_signs"] = None
-        self.exported_geometries[name] = {"Mesh": exported_mesh}
+       
+        # self.exported_geometries[name] = {"Mesh": exported_mesh}
 
     def convert_matrix_to_list(self, mat):
         l = [[x for x in row] for row in mat.row]
