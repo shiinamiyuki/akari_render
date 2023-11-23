@@ -22,6 +22,8 @@ If you are using < Windows 10, please upgrade to Windows 10 or above.
 - CMake > 3.23
 - Ninja
 - Blender 4.0 source code
+- Clone [LuisaCompute](https://github.com/LuisaGroup/luisa-compute-rs) besides this repo
+  
 If you intend to run the renderer on cpu, the following runtime requirement must be satisified
 - clang++ in PATH
 - llvm dynamic library of the same version. For Windows users, it is the `LLVM-C.dll`.
