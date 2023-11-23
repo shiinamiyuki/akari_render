@@ -21,16 +21,15 @@ AkariRender is a CPU/GPU physically based renderer written in Rust and powered b
 If you are using < Windows 10, please upgrade to Windows 10 or above.
 - CMake > 3.23
 - Ninja
-- Blender 4.0 source code
-- Clone [LuisaCompute](https://github.com/LuisaGroup/luisa-compute-rs) besides this repo
+- Clone Blender 4.0 source code from `blender-v4.0-release` branch
+- Put path to blender source in `blender_src_path.txt`
+- Clone [LuisaCompute](https://github.com/LuisaGroup/luisa-compute-rs) alongside this repo
   
-If you intend to run the renderer on cpu, the following runtime requirement must be satisified
+If you intend to run the renderer on cpu, the following runtime requirement must be satisified:
 - clang++ in PATH
 - llvm dynamic library of the same version. For Windows users, it is the `LLVM-C.dll`.
 
-## Build & Run
-Put the path to Blender 4.0 source in `akari_scenegraph/blender_src_path.txt`
+## Run
 ```
-cargo build --relase
-cargo run --release --bin akari_cli -- -d (cpu|cuda|dx|metal) -s scenes/cbox/scene.json -m scenes/cbox/test.json
+cargo run --release --bin akari-cli -- -d (cpu|cuda|dx|metal) -s scenes/cbox/scene.json -m scenes/cbox/test.json
 ```
