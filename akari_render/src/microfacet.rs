@@ -4,11 +4,11 @@ use lazy_static::lazy_static;
 use std::f32::consts::PI;
 
 pub trait MicrofacetDistribution {
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn g1(&self, w: Expr<Float3>, ad_mode: ADMode) -> Expr<f32> {
         1.0 / (1.0 + self.lambda(w, ad_mode))
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn g(&self, wo: Expr<Float3>, wi: Expr<Float3>, ad_mode: ADMode) -> Expr<f32> {
         1.0 / (1.0 + self.lambda(wo, ad_mode) + self.lambda(wi, ad_mode))
     }
@@ -27,7 +27,7 @@ pub struct TrowbridgeReitzDistribution {
 }
 impl TrowbridgeReitzDistribution {
     pub const MIN_ALPHA: f32 = 1e-4;
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn from_alpha(alpha: Expr<Float2>, sample_visible: bool) -> Self {
         Self {
             alpha: alpha.max_(Self::MIN_ALPHA),
@@ -40,7 +40,7 @@ impl TrowbridgeReitzDistribution {
         Self::from_alpha(alpha, sample_visible)
     }
 }
-#[tracked]
+#[tracked(crate = "luisa")]
 fn tr_d_impl_(wh: Expr<Float3>, alpha: Expr<Float2>) -> Expr<f32> {
     let tan2_theta = Frame::tan2_theta(wh);
     let cos4_theta = Frame::cos2_theta(wh).sqr();
@@ -54,7 +54,7 @@ fn tr_d_impl_(wh: Expr<Float3>, alpha: Expr<Float2>) -> Expr<f32> {
         1.0 / inv_d,
     )
 }
-#[tracked]
+#[tracked(crate = "luisa")]
 fn tr_lambda_impl_(w: Expr<Float3>, alpha: Expr<Float2>) -> Expr<f32> {
     let abs_tan_theta = Frame::tan_theta(w).abs();
     let alpha2 = Frame::cos2_phi(w) * alpha.x.sqr() + Frame::sin2_phi(w) * alpha.y.sqr();
@@ -62,7 +62,7 @@ fn tr_lambda_impl_(w: Expr<Float3>, alpha: Expr<Float2>) -> Expr<f32> {
     let l = (-1.0 + (1.0 + alpha2_tan2_theta).sqrt()) * 0.5;
     select(!abs_tan_theta.is_finite(), 0.0f32.expr(), l)
 }
-#[tracked]
+#[tracked(crate = "luisa")]
 fn tr_sample_impl_(alpha: Expr<Float2>, u: Expr<Float2>) -> Expr<Float3> {
     let (phi, cos_theta) = if alpha.x.eq(alpha.y) {
         let phi = 2.0 * PI * u.y;
@@ -245,7 +245,7 @@ impl MicrofacetDistribution for TrowbridgeReitzDistribution {
         };
         pdf
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn roughness(&self, _ad_mode: ADMode) -> Expr<f32> {
         self.roughness
     }

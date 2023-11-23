@@ -12,7 +12,6 @@ use akari_render::svm::surface::*;
 use akari_render::svm::surface::diffuse::DiffuseBsdf;
 use akari_render::*;
 use luisa::init_logger;
-use luisa_compute as luisa;
 
 mod bsdf_chi2_test {
     use std::{
@@ -306,7 +305,7 @@ plt.show()"#
                 };
                 Float3::new(
                     r * phi.cos(),
-                    (1.0 - r * r).sqrt() * sign as f32,
+                    (1.0f32 - r * r).sqrt() * sign as f32,
                     r * phi.sin(),
                 )
             };
@@ -455,7 +454,6 @@ mod invert {
         let rngs = init_pcg32_buffer_with_seed(device.clone(), count, 0);
         let bads = device.create_buffer::<u32>(count);
         bads.fill(0);
-        let printer = Printer::new(&device, 32768);
         let kernel = device.create_kernel::<fn()>(&track!(|| {
             let i = dispatch_id().x;
             let sampler = IndependentSampler::from_pcg32(rngs.read(i).var());
@@ -464,17 +462,15 @@ mod invert {
                 let w = sample(u);
                 let u2 = invert(w);
                 let bad = (u2 - u).length().gt(0.01);
-                if_!(bad, {
+                if bad {
                     bads.var().atomic_fetch_add(i, 1);
-                    lc_info!(printer, "bad: u: {:?} u2:{:?} w:{:?}", u, u2, w);
-                });
+                    device_log!("bad: u: {} u2:{} w:{}", u, u2, w);
+                };
             });
         }));
         let stream = device.default_stream();
         stream.with_scope(|s| {
-            s.reset_printer(&printer)
-                .submit([kernel.dispatch_async([count as u32, 1, 1])])
-                .print(&printer);
+            s.submit([kernel.dispatch_async([count as u32, 1, 1])]);
         });
 
         let bads = bads.copy_to_vec();

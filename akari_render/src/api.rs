@@ -9,6 +9,7 @@ use scene_graph::{
 use serde::*;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
+#[serde(crate = "serde")]
 pub enum SceneImportApi {
     Init { name: String },
     Finalize,
@@ -19,6 +20,7 @@ pub enum SceneImportApi {
     WriteScene { path: String, compact: bool },
 }
 #[derive(Clone, Serialize, Deserialize, Debug)]
+#[serde(crate = "serde")]
 pub enum SceneImportApiResult {
     None,
     Bool { value: bool },

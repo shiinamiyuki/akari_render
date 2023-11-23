@@ -1,11 +1,11 @@
 use super::pt::{self, PathTracer};
 
-
-use crate::{*};
+use crate::*;
 
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[serde(crate = "serde")]
 #[serde(tag = "type")]
 pub enum Method {
     #[serde(rename = "kelemen")]
@@ -41,6 +41,7 @@ pub struct Mcmc {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
+#[serde(crate = "serde")]
 #[serde(default)]
 pub struct Config {
     pub spp: u32,

@@ -1,6 +1,8 @@
 use crate::{sampler::Sampler, *};
 use serde::{Deserialize, Serialize};
 #[derive(Clone, Copy, Aggregate, Serialize, Deserialize, PartialEq, Eq, Debug)]
+#[luisa(crate = "luisa")]
+#[serde(crate = "serde")]
 pub enum RgbColorSpace {
     #[serde(rename = "srgb")]
     SRgb,
@@ -38,6 +40,7 @@ impl ColorSpaceId {
 
 #[derive(Copy, Clone, Value, Soa, Debug)]
 #[repr(C)]
+#[luisa(crate = "luisa")]
 #[value_new(pub)]
 pub struct SampledWavelengths {
     pub wavelengths: Float4,
@@ -65,6 +68,7 @@ pub fn sample_wavelengths(
 }
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(crate = "serde")]
 #[serde(tag = "type")]
 pub enum ColorRepr {
     #[serde(rename = "rgb")]
@@ -82,11 +86,13 @@ impl ColorRepr {
 }
 
 #[derive(Aggregate, Clone, Copy)]
+#[luisa(crate = "luisa")]
 pub enum Color {
     Rgb(Expr<Float3>, RgbColorSpace),
     Spectral(Expr<Float4>),
 }
 #[derive(Aggregate, Clone, Copy)]
+#[luisa(crate = "luisa")]
 pub enum ColorVar {
     Rgb(Var<Float3>, RgbColorSpace),
     Spectral(Var<Float4>),
@@ -97,6 +103,7 @@ pub type FlatColor = Float4;
 pub type FlatColorExpr = Expr<Float4>;
 
 #[derive(Copy, Clone, Value, Debug)]
+#[luisa(crate = "luisa")]
 #[repr(C)]
 #[value_new(pub)]
 pub struct SampledSpectrum {
@@ -210,7 +217,7 @@ impl Color {
             Color::Spectral(_) => todo!(),
         }
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn to_rgb(&self, colorspace: RgbColorSpace) -> Expr<Float3> {
         match self {
             Color::Rgb(rgb, cs) => {
@@ -331,7 +338,7 @@ impl Color {
 impl std::ops::Mul<Expr<f32>> for &Color {
     type Output = Color;
 
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn mul(self, rhs: Expr<f32>) -> Self::Output {
         match self {
             Color::Spectral(s) => Color::Spectral(*s * rhs),
@@ -341,7 +348,7 @@ impl std::ops::Mul<Expr<f32>> for &Color {
 }
 impl std::ops::Div<Expr<f32>> for &Color {
     type Output = Color;
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn div(self, rhs: Expr<f32>) -> Self::Output {
         match self {
             Color::Spectral(s) => Color::Spectral(*s / rhs),
@@ -351,7 +358,7 @@ impl std::ops::Div<Expr<f32>> for &Color {
 }
 impl std::ops::Mul<Expr<f32>> for Color {
     type Output = Self;
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn mul(self, rhs: Expr<f32>) -> Self::Output {
         &self * rhs
     }
@@ -400,7 +407,7 @@ impl std::ops::Sub<Color> for Color {
 }
 impl std::ops::Mul<&Color> for &Color {
     type Output = Color;
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn mul(self, rhs: &Color) -> Self::Output {
         assert_eq!(self.repr(), rhs.repr());
         match (self, rhs) {
@@ -415,7 +422,7 @@ impl std::ops::Mul<&Color> for &Color {
 }
 impl std::ops::Add<&Color> for &Color {
     type Output = Color;
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn add(self, rhs: &Color) -> Self::Output {
         assert_eq!(self.repr(), rhs.repr());
         match (self, rhs) {
@@ -430,7 +437,7 @@ impl std::ops::Add<&Color> for &Color {
 }
 impl std::ops::Sub<&Color> for &Color {
     type Output = Color;
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn sub(self, rhs: &Color) -> Self::Output {
         assert_eq!(self.repr(), rhs.repr());
         match (self, rhs) {
@@ -443,12 +450,12 @@ impl std::ops::Sub<&Color> for &Color {
         }
     }
 }
-#[tracked]
+#[tracked(crate = "luisa")]
 pub fn srgb_to_linear(rgb: Expr<Float3>) -> Expr<Float3> {
     rgb.le(0.04045)
         .select(rgb / 12.92, ((rgb + 0.055) / 1.055).powf(2.4))
 }
-#[tracked]
+#[tracked(crate = "luisa")]
 pub fn linear_to_srgb(rgb: Expr<Float3>) -> Expr<Float3> {
     rgb.le(0.0031308)
         .select(rgb * 12.92, rgb.powf(1.0f32 / 2.4) * 1.055 - 0.055)
@@ -553,6 +560,7 @@ pub fn aces_cg_to_aces_2065_1_mat() -> glam::Mat3 {
     .transpose()
 }
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[serde(crate = "serde")]
 pub struct ColorPipeline {
     pub color_repr: ColorRepr,
     pub rgb_colorspace: RgbColorSpace,

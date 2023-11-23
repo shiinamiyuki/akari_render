@@ -33,14 +33,14 @@ impl Scene {
     ) -> SurfaceInteraction {
         self.meshes.surface_interaction(inst_id, prim_id, bary)
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn _trace_closest(&self, ray: Expr<Ray>) -> Expr<SurfaceHit> {
         let ro: Expr<[f32; 3]> = ray.o.into();
         let rd: Expr<[f32; 3]> = ray.d.into();
         let rtx_ray = rtx::Ray::new_expr(ro, ray.t_min, rd, ray.t_max);
         self.meshes.accel.intersect(rtx_ray, self.trace_options())
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn _trace_closest_rq(&self, ray: Expr<Ray>) -> Expr<CommittedHit> {
         let ro: Expr<[f32; 3]> = ray.o.into();
         let rd: Expr<[f32; 3]> = ray.d.into();
@@ -57,7 +57,7 @@ impl Scene {
             })
             .trace()
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn intersect_hit_info(
         &self,
         ray: Expr<Ray>,
@@ -76,7 +76,7 @@ impl Scene {
             (hit.triangle_hit(), inst_id, prim_id, bary)
         }
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn intersect(&self, ray: Expr<Ray>) -> SurfaceInteraction {
         if !self.use_rq {
             let hit = self._trace_closest(ray);
@@ -100,7 +100,7 @@ impl Scene {
             }
         }
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn occlude(&self, ray: Expr<Ray>) -> Expr<bool> {
         let ro: Expr<[f32; 3]> = ray.o.into();
         let rd: Expr<[f32; 3]> = ray.d.into();

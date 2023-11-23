@@ -1,5 +1,5 @@
 use crate::*;
-#[tracked]
+#[tracked(crate = "luisa")]
 pub fn nd_lerp(dim: usize, corners: &[Expr<f32>], pos: &[Expr<f32>]) -> Expr<f32> {
     assert_eq!(corners.len(), 1 << dim);
     assert_eq!(pos.len(), dim);

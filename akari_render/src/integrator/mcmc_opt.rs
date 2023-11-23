@@ -15,6 +15,7 @@ use crate::{color::*, film::*, sampler::*, scene::*, *};
 use super::mcmc::{Config, Method};
 pub type PssBuffer = Buffer<PssSample>;
 #[derive(Clone, Copy, Value, Debug, Soa)]
+#[luisa(crate = "luisa")]
 #[repr(C, align(16))]
 #[value_new(pub)]
 pub struct PssSample {
@@ -34,6 +35,7 @@ pub struct McmcOpt {
 }
 
 #[derive(Clone, Copy, Debug, Value)]
+#[luisa(crate = "luisa")]
 #[repr(C)]
 #[value_new(pub)]
 pub struct MarkovState {
@@ -84,7 +86,7 @@ impl<'a> LazyMcmcSampler<'a> {
 }
 
 impl<'a> Sampler for LazyMcmcSampler<'a> {
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn next_1d(&self) -> Expr<f32> {
         if self.cur_dim.load().lt(self.mcmc_dim) {
             let ret = if let Some(m) = &self.mutator {
@@ -125,7 +127,7 @@ pub struct Mutator {
     pub res: Expr<Float2>,
 }
 impl Mutator {
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn mutate_one(
         &self,
         samples: &PssBuffer,
@@ -248,7 +250,7 @@ impl McmcOpt {
             config,
         }
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn evaluate(
         &self,
         scene: &Arc<Scene>,
@@ -402,7 +404,7 @@ impl McmcOpt {
             b_init_cnt: self.n_bootstrap,
         }
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn mutate_chain(
         &self,
         scene: &Arc<Scene>,
@@ -503,7 +505,7 @@ impl McmcOpt {
             _ => todo!(),
         }
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn advance_chain(
         &self,
         scene: &Arc<Scene>,

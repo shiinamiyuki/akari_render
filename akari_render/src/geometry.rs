@@ -3,12 +3,14 @@ use std::f32::consts::PI;
 use crate::*;
 #[derive(Clone, Copy, Debug, Value)]
 #[repr(C)]
+#[luisa(crate = "luisa")]
 #[value_new(pub)]
 pub struct PointNormal {
     pub p: Float3,
     pub n: Float3,
 }
 #[derive(Clone, Copy, Debug, Soa, Value)]
+#[luisa(crate = "luisa")]
 #[repr(C)]
 #[value_new(pub)]
 pub struct Ray {
@@ -21,19 +23,20 @@ pub struct Ray {
 }
 
 impl RayExpr {
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn at(&self, t: Expr<f32>) -> Expr<Float3> {
         self.o + self.d * t
     }
 }
 #[derive(Clone, Copy, Debug, Value)]
+#[luisa(crate = "luisa")]
 #[repr(C)]
 pub struct Sphere {
     pub center: Float3,
     pub radius: f32,
 }
 impl SphereExpr {
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn intersect(&self, ray: Expr<Ray>) -> (Expr<bool>, Expr<f32>) {
         let a = ray.d.length_squared();
         let oc = ray.o - self.center;
@@ -78,15 +81,15 @@ impl SphereExpr {
 // }
 
 // impl ShadingTriangle {
-//     #[tracked]
+//     #[tracked(crate="luisa")]
 //     pub fn p(&self, bary: Expr<Float2>) -> Expr<Float3> {
 //         (1.0 - bary.x - bary.y) * self.v0 + bary.x * self.v1 + bary.y * self.v2
 //     }
-//     #[tracked]
+//     #[tracked(crate="luisa")]
 //     pub fn n(&self, bary: Expr<Float2>) -> Expr<Float3> {
 //         ((1.0 - bary.x - bary.y) * self.n0 + bary.x * self.n1 + bary.y * self.n2).normalize()
 //     }
-//     #[tracked]
+//     #[tracked(crate="luisa")]
 //     pub fn ortho_frame(&self, bary: Expr<Float2>) -> Expr<Frame> {
 //         let n = self.n(bary);
 //         let t =
@@ -100,17 +103,18 @@ impl SphereExpr {
 //             FrameExpr::from_n(n)
 //         }
 //     }
-//     #[tracked]
+//     #[tracked(crate="luisa")]
 //     pub fn uv(&self, bary: Expr<Float2>) -> Expr<Float2> {
 //         (1.0 - bary.x - bary.y) * self.uv0 + bary.x * self.uv1 + bary.y * self.uv2
 //     }
-//     #[tracked]
+//     #[tracked(crate="luisa")]
 //     pub fn area(&self) -> Expr<f32> {
 //         0.5 * (self.v1 - self.v0).cross(self.v2 - self.v0).length()
 //     }
 // }
 
 #[derive(Clone, Copy, Debug, Soa, Value)]
+#[luisa(crate = "luisa")]
 #[repr(C)]
 #[value_new(pub)]
 pub struct Frame {
@@ -121,45 +125,45 @@ pub struct Frame {
 
 impl Frame {
     #[inline]
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn cos_theta(w: Expr<Float3>) -> Expr<f32> {
         w.y
     }
     #[inline]
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn cos2_theta(w: Expr<Float3>) -> Expr<f32> {
         let c = w.y;
         c * c
     }
     #[inline]
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn abs_cos_theta(w: Expr<Float3>) -> Expr<f32> {
         Self::cos_theta(w).abs()
     }
     #[inline]
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn sin_theta(w: Expr<Float3>) -> Expr<f32> {
         let c2 = Self::cos2_theta(w);
         (1.0 - c2).max_(0.0).sqrt()
     }
     #[inline]
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn sin2_theta(w: Expr<Float3>) -> Expr<f32> {
         let c2 = Self::cos2_theta(w);
         (1.0 - c2).max_(0.0)
     }
     #[inline]
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn tan2_theta(w: Expr<Float3>) -> Expr<f32> {
         Self::sin2_theta(w) / Self::cos2_theta(w)
     }
     #[inline]
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn tan_theta(w: Expr<Float3>) -> Expr<f32> {
         Self::sin_theta(w) / Self::cos_theta(w)
     }
     #[inline]
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn sin_phi(w: Expr<Float3>) -> Expr<f32> {
         let sin_theta = Self::sin_theta(w);
         select(
@@ -169,17 +173,17 @@ impl Frame {
         )
     }
     #[inline]
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn sin2_phi(w: Expr<Float3>) -> Expr<f32> {
         Self::sin_phi(w).sqr()
     }
     #[inline]
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn cos2_phi(w: Expr<Float3>) -> Expr<f32> {
         Self::cos_phi(w).sqr()
     }
     #[inline]
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn cos_phi(w: Expr<Float3>) -> Expr<f32> {
         let sin_theta = Self::sin_theta(w);
         select(
@@ -189,13 +193,13 @@ impl Frame {
         )
     }
     #[inline]
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn same_hemisphere(w1: Expr<Float3>, w2: Expr<Float3>) -> Expr<bool> {
         (w1.y * w2.y) >= (0.0)
     }
 }
 impl FrameExpr {
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn from_n(n: Expr<Float3>) -> Expr<Frame> {
         let t = if n.x.abs().gt(n.y.abs()) {
             Float3::expr(-n.z, 0.0, n.x) / (n.x * n.x + n.z * n.z).sqrt()
@@ -205,16 +209,17 @@ impl FrameExpr {
         let s = n.cross(t);
         Frame::new_expr(n, s, t)
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn to_world(&self, v: Expr<Float3>) -> Expr<Float3> {
         self.s * v.x + self.n * v.y + self.t * v.z
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn to_local(&self, v: Expr<Float3>) -> Expr<Float3> {
         Float3::expr(self.s.dot(v), self.n.dot(v), self.t.dot(v))
     }
 }
 #[derive(Clone, Copy, Debug, Value)]
+#[luisa(crate = "luisa")]
 #[repr(C)]
 #[value_new(pub)]
 pub struct AffineTransform {
@@ -237,7 +242,7 @@ impl AffineTransform {
     }
 }
 impl AffineTransformExpr {
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn transform_point(&self, p: impl AsExpr<Value = Float3>) -> Expr<Float3> {
         let p = p.as_expr();
         if self.close_to_identity {
@@ -248,7 +253,7 @@ impl AffineTransformExpr {
             q.xyz() / q.w
         }
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn transform_vector(&self, v: impl AsExpr<Value = Float3>) -> Expr<Float3> {
         let v = v.as_expr();
         if self.close_to_identity {
@@ -257,7 +262,7 @@ impl AffineTransformExpr {
             (self.m * v.extend(0.0)).xyz()
         }
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn transform_normal(&self, n: impl AsExpr<Value = Float3>) -> Expr<Float3> {
         let n = n.as_expr();
         if self.close_to_identity {
@@ -271,7 +276,7 @@ impl AffineTransformExpr {
         AffineTransform::new_expr(self.m.inverse(), self.close_to_identity)
     }
 }
-#[tracked]
+#[tracked(crate = "luisa")]
 pub fn face_forward(
     v: impl AsExpr<Value = Float3>,
     n: impl AsExpr<Value = Float3>,
@@ -281,13 +286,13 @@ pub fn face_forward(
     select(v.dot(n) < 0.0, -v, v)
 }
 
-#[tracked]
+#[tracked(crate = "luisa")]
 pub fn reflect(w: impl AsExpr<Value = Float3>, n: impl AsExpr<Value = Float3>) -> Expr<Float3> {
     let w = w.as_expr();
     let n = n.as_expr();
     -w + 2.0 * w.dot(n) * n
 }
-#[tracked]
+#[tracked(crate = "luisa")]
 pub fn refract(
     w: Expr<Float3>,
     n: Expr<Float3>,
@@ -320,7 +325,7 @@ pub fn refract(
     //   *wt = -wi / eta + (cosTheta_i / eta - cosTheta_t) * Vector3f(n);
 }
 
-#[tracked]
+#[tracked(crate = "luisa")]
 pub fn spherical_to_xyz2(
     cos_theta: Expr<f32>,
     sin_theta: Expr<f32>,
@@ -328,21 +333,21 @@ pub fn spherical_to_xyz2(
 ) -> Expr<Float3> {
     Float3::expr(sin_theta * phi.cos(), cos_theta, sin_theta * phi.sin())
 }
-#[tracked]
+#[tracked(crate = "luisa")]
 pub fn spherical_to_xyz(theta: Expr<f32>, phi: Expr<f32>) -> Expr<Float3> {
     let sin_theta = theta.sin();
     Float3::expr(sin_theta * phi.cos(), theta.cos(), sin_theta * phi.sin())
 }
 
 /// let (theta, phi) = xyz_to_spherical(v);
-#[tracked]
+#[tracked(crate = "luisa")]
 pub fn xyz_to_spherical(v: Expr<Float3>) -> (Expr<f32>, Expr<f32>) {
     let phi = v.z.atan2(v.x);
     let theta = v.y.acos();
     (theta, phi)
 }
 
-#[tracked]
+#[tracked(crate = "luisa")]
 pub fn invert_phi(v: Expr<Float3>) -> Expr<f32> {
     let phi = v.z.atan2(v.x);
     (phi / (2.0 * PI)).fract()

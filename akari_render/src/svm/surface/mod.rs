@@ -18,6 +18,7 @@ pub mod glass;
 pub mod principled;
 
 #[derive(Clone, Aggregate)]
+#[luisa(crate = "luisa")]
 pub struct BsdfSample {
     pub wi: Expr<Float3>,
     pub pdf: Expr<f32>,
@@ -290,7 +291,7 @@ impl BsdfMixture {
 }
 
 impl Surface for BsdfMixture {
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn evaluate_impl(
         &self,
         wo: Expr<Float3>,
@@ -322,7 +323,7 @@ impl Surface for BsdfMixture {
         }
     }
 
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn sample_wi_impl(
         &self,
         wo: Expr<Float3>,
@@ -341,7 +342,7 @@ impl Surface for BsdfMixture {
         }
     }
 
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn albedo_impl(
         &self,
         wo: Expr<Float3>,
@@ -359,7 +360,7 @@ impl Surface for BsdfMixture {
             }
         }
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn roughness_impl(
         &self,
         wo: Expr<Float3>,
@@ -370,7 +371,7 @@ impl Surface for BsdfMixture {
         self.bsdf_a.roughness(wo, swl, ctx) * (1.0 - frac)
             + self.bsdf_b.roughness(wo, swl, ctx) * frac
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn emission_impl(
         &self,
         wo: Expr<Float3>,
@@ -398,7 +399,7 @@ pub struct SurfaceClosure {
 impl SurfaceClosure {
     // prevents light leaking
     // copied from LuisaRender
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn check_wo_wi_valid(&self, wo: Expr<Float3>, wi: Expr<Float3>) -> Expr<bool> {
         let sign = |x: Expr<f32>| 1.0f32.expr().copysign(x);
         let ns = self.frame.n;
@@ -411,7 +412,7 @@ impl SurfaceClosure {
 }
 impl Surface for SurfaceClosure {
     // return f(wo, wi) * abs_cos_theta(wi)
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn evaluate_impl(
         &self,
         wo: Expr<Float3>,
@@ -431,7 +432,7 @@ impl Surface for SurfaceClosure {
                 .evaluate(self.frame.to_local(wo), self.frame.to_local(wi), swl, ctx)
         }
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn sample_wi_impl(
         &self,
         wo: Expr<Float3>,
@@ -474,7 +475,7 @@ impl Surface for SurfaceClosure {
     }
 }
 impl SurfaceClosure {
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn sample(
         &self,
         wo: Expr<Float3>,
@@ -508,7 +509,7 @@ pub struct MicrofacetReflection {
 }
 
 impl Surface for MicrofacetReflection {
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn evaluate_impl(
         &self,
         wo: Expr<Float3>,
@@ -538,7 +539,7 @@ impl Surface for MicrofacetReflection {
             (f, pdf)
         }
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn sample_wi_impl(
         &self,
         wo: Expr<Float3>,
@@ -587,7 +588,7 @@ pub struct MicrofacetTransmission {
 }
 
 impl Surface for MicrofacetTransmission {
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn evaluate_impl(
         &self,
         wo: Expr<Float3>,
@@ -640,7 +641,7 @@ impl Surface for MicrofacetTransmission {
         }
     }
 
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn sample_wi_impl(
         &self,
         wo: Expr<Float3>,
@@ -681,7 +682,7 @@ impl Surface for MicrofacetTransmission {
     }
 }
 
-#[tracked]
+#[tracked(crate = "luisa")]
 pub fn fr_dielectric(cos_theta_i: Expr<f32>, eta: Expr<f32>) -> Expr<f32> {
     let cos_theta_i = cos_theta_i.clamp(-1.0.expr(), 1.0.expr());
     let eta = select(cos_theta_i.gt(0.0), eta, 1.0 / eta);
@@ -710,7 +711,7 @@ pub fn fr_dielectric(cos_theta_i: Expr<f32>, eta: Expr<f32>) -> Expr<f32> {
     //     Expr<f32> r_perp = (cosTheta_i - eta * cosTheta_t) / (cosTheta_i + eta * cosTheta_t);
     //     return (Sqr(r_parl) + Sqr(r_perp)) / 2;
 }
-#[tracked]
+#[tracked(crate = "luisa")]
 pub fn fr_schlick(f0: Color, cos_theta_i: Expr<f32>) -> Color {
     let cos_theta_i = cos_theta_i.clamp(-1.0.expr(), 1.0.expr()).abs();
     let pow5 = |x: Expr<f32>| x.sqr().sqr() * x;
@@ -731,7 +732,7 @@ pub struct FresnelDielectric {
     pub eta: Expr<f32>, //eta = eta_t / eta_i
 }
 impl Fresnel for FresnelDielectric {
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn evaluate(&self, cos_theta_i: Expr<f32>, ctx: &BsdfEvalContext) -> Color {
         Color::one(ctx.color_repr) * fr_dielectric(cos_theta_i, self.eta)
     }

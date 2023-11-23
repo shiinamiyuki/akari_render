@@ -7,8 +7,8 @@ use crate::svm::ShaderRef;
 use crate::util::distribution::BindlessAliasTableVar;
 use crate::*;
 use crate::{geometry::AffineTransform, util::distribution::AliasTable};
+use akari_common::luisa::lc_comment_lineno;
 use luisa::rtx::*;
-use serde::{Deserialize, Serialize};
 
 pub struct Mesh {
     pub vertices: Buffer<[f32; 3]>,
@@ -88,6 +88,7 @@ pub struct MeshInstanceHost {
 }
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Value)]
+#[luisa(crate = "luisa")]
 pub struct MeshHeader {
     pub vertex_buf_idx: u32,
     pub index_buf_idx: u32,
@@ -98,6 +99,7 @@ pub struct MeshHeader {
 }
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Value)]
+#[luisa(crate = "luisa")]
 pub struct MeshInstance {
     pub light: TagIndex,
     pub surface: ShaderRef,
@@ -207,41 +209,41 @@ impl MeshAggregate {
         }
     }
 
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn mesh_vertices(&self, mesh_header: Expr<MeshHeader>) -> BindlessBufferVar<[f32; 3]> {
         self.heap.buffer(mesh_header.vertex_buf_idx)
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn mesh_indices(&self, mesh_header: Expr<MeshHeader>) -> BindlessBufferVar<[u32; 3]> {
         self.heap.buffer(mesh_header.index_buf_idx)
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn mesh_normals(&self, mesh_header: Expr<MeshHeader>) -> BindlessBufferVar<[f32; 3]> {
         self.heap.buffer(mesh_header.normal_buf_idx)
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn mesh_tangents(&self, mesh_header: Expr<MeshHeader>) -> BindlessBufferVar<[f32; 3]> {
         self.heap.buffer(mesh_header.tangent_buf_idx)
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn mesh_uvs(&self, mesh_header: Expr<MeshHeader>) -> BindlessBufferVar<[f32; 2]> {
         self.heap.buffer(mesh_header.uv_buf_idx)
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn mesh_area_samplers(&self, mesh_header: Expr<MeshHeader>) -> BindlessAliasTableVar {
         let b0 = self.heap.buffer(mesh_header.area_sampler);
         let b1 = self.heap.buffer(mesh_header.area_sampler + 1);
         BindlessAliasTableVar(b0, b1)
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn mesh_instances(&self) -> BindlessBufferVar<MeshInstance> {
         self.heap.buffer(self.header.mesh_instances)
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn mesh_instance_transforms(&self) -> BindlessBufferVar<AffineTransform> {
         self.heap.buffer(self.header.mesh_transforms)
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn surface_interaction(
         &self,
         inst_id: Expr<u32>,
@@ -326,7 +328,10 @@ impl MeshAggregate {
             ng_local
         };
         // apply transform
-        lc_comment_lineno!("MeshAggregate::surface_inteaction apply transform");
+        lc_comment_lineno!(
+            crate = [luisa],
+            "MeshAggregate::surface_inteaction apply transform"
+        );
         let (area, p, ng, ns, tt) = {
             let transform = self.mesh_instance_transforms().read(inst_id);
             // let close_to_identity = transform.close_to_identity;

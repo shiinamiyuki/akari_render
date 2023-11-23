@@ -3,12 +3,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    color::{ColorPipeline},
-    film::*,
-    gui::DisplayChannel,
-    sampler::SamplerConfig,
-    scene::*,
-    *,
+    color::ColorPipeline, film::*, gui::DisplayChannel, sampler::SamplerConfig, scene::*, *,
 };
 
 #[derive(Clone)]
@@ -29,6 +24,7 @@ impl Default for RenderSession {
     }
 }
 #[derive(Default, Clone, Serialize, Deserialize)]
+#[serde(crate = "serde")]
 #[serde(default)]
 pub struct IntermediateStats {
     pub path: String,
@@ -36,6 +32,7 @@ pub struct IntermediateStats {
     pub spp: u32,
 }
 #[derive(Default, Clone, Serialize, Deserialize)]
+#[serde(crate = "serde")]
 #[serde(default)]
 pub struct RenderStats {
     pub intermediate: Vec<IntermediateStats>,
@@ -60,6 +57,7 @@ pub mod normal;
 pub mod pt;
 
 #[derive(Clone, Serialize, Deserialize)]
+#[serde(crate = "serde")]
 #[serde(tag = "type")]
 pub enum Method {
     #[serde(rename = "normal")]
@@ -77,6 +75,7 @@ pub enum Method {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(crate = "serde")]
 #[serde(default)]
 pub struct FilmConfig {
     pub out: String,
@@ -94,6 +93,7 @@ impl Default for FilmConfig {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
+#[serde(crate = "serde")]
 pub struct RenderConfig {
     pub method: Method,
     #[serde(default)]
@@ -103,6 +103,7 @@ pub struct RenderConfig {
     pub film: FilmConfig,
 }
 #[derive(Clone, Serialize, Deserialize)]
+#[serde(crate = "serde")]
 #[serde(untagged)]
 pub enum RenderTask {
     Single(RenderConfig),

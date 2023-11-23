@@ -7,6 +7,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(crate = "serde")]
 #[serde(tag = "type")]
 pub enum FilmColorRepr {
     #[serde(rename = "srgb")]
@@ -18,6 +19,7 @@ pub enum FilmColorRepr {
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[serde(crate = "serde")]
 #[serde(tag = "type")]
 pub enum PixelFilter {
     #[serde(rename = "box")]
@@ -26,7 +28,7 @@ pub enum PixelFilter {
     Gaussian { radius: f32 },
 }
 impl PixelFilter {
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn sample(&self, u: Expr<Float2>) -> (Expr<Float2>, Expr<f32>) {
         match self {
             PixelFilter::Box => (u * 0.5 - 0.5, 1.0f32.expr()),
@@ -89,7 +91,7 @@ impl Film {
     pub fn weight_offset(&self) -> u32 {
         self.splat_offset() + self.resolution.x * self.resolution.y * self.repr.nvalues() as u32
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn new(
         device: Device,
         resolution: Uint2,
@@ -109,31 +111,35 @@ impl Film {
             splat_scale: 1.0,
             copy_to_rgba_image: None,
         };
-        let copy_to_rgba_image = device.create_kernel_async::<fn(Tex2d<Float4>, f32, bool)>(
-            &|image: Tex2dVar<Float4>, splat_scale: Expr<f32>, hdr: Expr<bool>| {
-                let p = dispatch_id().xy();
-                let i = p.x + p.y * resolution.x;
-                let data = film.data.var();
-                let nvalues = repr.nvalues() as u32;
-                match repr {
-                    FilmColorRepr::SRgb => {
-                        let s_r = data.read(film.splat_offset() + i * nvalues + 0) * splat_scale;
-                        let s_g = data.read(film.splat_offset() + i * nvalues + 1) * splat_scale;
-                        let s_b = data.read(film.splat_offset() + i * nvalues + 2) * splat_scale;
+        let copy_to_rgba_image =
+            device.create_kernel_async::<fn(Tex2d<Float4>, f32, bool)>(track!(
+                &|image: Tex2dVar<Float4>, splat_scale: Expr<f32>, hdr: Expr<bool>| {
+                    let p = dispatch_id().xy();
+                    let i = p.x + p.y * resolution.x;
+                    let data = film.data.var();
+                    let nvalues = repr.nvalues() as u32;
+                    match repr {
+                        FilmColorRepr::SRgb => {
+                            let s_r =
+                                data.read(film.splat_offset() + i * nvalues + 0) * splat_scale;
+                            let s_g =
+                                data.read(film.splat_offset() + i * nvalues + 1) * splat_scale;
+                            let s_b =
+                                data.read(film.splat_offset() + i * nvalues + 2) * splat_scale;
 
-                        let r = data.read(i * nvalues + 0);
-                        let g = data.read(i * nvalues + 1);
-                        let b = data.read(i * nvalues + 2);
-                        let w = data.read(film.weight_offset() + i);
-                        let rgb = Float3::expr(r, g, b) / select(w.eq(0.0), 1.0f32.expr(), w);
-                        let rgb = rgb + Float3::expr(s_r, s_g, s_b);
-                        let rgb = if_!(hdr, { rgb }, else, { linear_to_srgb(rgb) });
-                        image.write(p, Float4::expr(rgb.x, rgb.y, rgb.z, 1.0f32));
+                            let r = data.read(i * nvalues + 0);
+                            let g = data.read(i * nvalues + 1);
+                            let b = data.read(i * nvalues + 2);
+                            let w = data.read(film.weight_offset() + i);
+                            let rgb = Float3::expr(r, g, b) / select(w.eq(0.0), 1.0f32.expr(), w);
+                            let rgb = rgb + Float3::expr(s_r, s_g, s_b);
+                            let rgb = if hdr { rgb } else { linear_to_srgb(rgb) };
+                            image.write(p, Float4::expr(rgb.x, rgb.y, rgb.z, 1.0f32));
+                        }
+                        _ => todo!(),
                     }
-                    _ => todo!(),
                 }
-            },
-        );
+            ));
         film.copy_to_rgba_image = Some(copy_to_rgba_image);
         film.clear();
         film
@@ -141,7 +147,7 @@ impl Film {
     pub fn set_splat_scale(&mut self, scale: f32) {
         self.splat_scale = scale;
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn linear_index(&self, p: Expr<Float2>) -> Expr<u32> {
         let resolution = self.resolution.expr();
         let ip = p.floor().cast_i32();
@@ -180,7 +186,7 @@ impl Film {
             _ => todo!(),
         }
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn add_sample(
         &self,
         p: Expr<Float2>,
@@ -205,7 +211,7 @@ impl Film {
             _ => todo!(),
         }
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn clear(&self) {
         self.data.view(..).fill(0.0);
     }

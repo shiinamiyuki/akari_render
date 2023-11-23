@@ -35,6 +35,7 @@ pub struct PathTracerBase<'a> {
     pub scene: &'a Scene,
 }
 #[derive(Aggregate, Copy, Clone)]
+#[luisa(crate = "luisa")]
 pub struct DirectLighting {
     pub irradiance: Color,
     pub wi: Expr<Float3>,
@@ -140,7 +141,7 @@ impl<'a> PathTracerBase<'a> {
             DirectLighting::invalid(self.color_pipeline)
         }
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn continue_prob(&self) -> (Expr<bool>, Expr<f32>) {
         let depth = **self.depth;
         let beta = self.beta.load();
@@ -151,11 +152,11 @@ impl<'a> PathTracerBase<'a> {
             (false.expr(), 1.0f32.expr())
         }
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn hit_envmap(&self, _ray: Expr<Ray>) -> (Color, Expr<f32>) {
         (Color::zero(self.color_pipeline.color_repr), 0.0f32.expr())
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn handle_surface_light(
         &self,
         si: SurfaceInteraction,
@@ -185,7 +186,7 @@ impl<'a> PathTracerBase<'a> {
             (Color::zero(self.color_pipeline.color_repr), 0.0f32.expr())
         }
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn sample_surface_and_shade_direct(
         &self,
         shader_kind: Option<u32>,
@@ -249,7 +250,7 @@ impl<'a> PathTracerBase<'a> {
             }
         }
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn run_megakernel(&self, ray: Expr<Ray>, sampler: &dyn Sampler) {
         let ray = ray.var();
 
@@ -333,6 +334,7 @@ pub struct PathTracer {
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug)]
+#[serde(crate = "serde")]
 #[serde(default)]
 pub struct Config {
     pub spp: u32,
@@ -395,6 +397,7 @@ impl VertexType {
     pub const INTERIOR: u32 = 3;
 }
 #[derive(Clone, Copy, Debug, Value)]
+#[luisa(crate = "luisa")]
 #[repr(C)]
 pub struct ReconnectionVertex {
     pub direct: FlatColor,
@@ -427,6 +430,7 @@ pub struct ReconnectionShiftMapping {
     pub success: Var<bool>,
 }
 #[derive(Clone, Copy, Value, Debug)]
+#[luisa(crate = "luisa")]
 #[repr(C)]
 pub struct DenoiseFeatures {
     pub albedo: Float3,

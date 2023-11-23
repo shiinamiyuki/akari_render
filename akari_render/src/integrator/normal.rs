@@ -4,6 +4,7 @@ use super::{Integrator, RenderSession};
 use crate::{color::*, film::*, sampler::*, scene::*, *};
 use serde::{Deserialize, Serialize};
 #[derive(Clone, Copy, Serialize, Deserialize, Debug)]
+#[serde(crate = "serde")]
 #[serde(default)]
 pub struct Config {
     pub spp: u32,

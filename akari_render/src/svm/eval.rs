@@ -58,14 +58,14 @@ impl<'a> SvmEvaluator<'a> {
         }
     }
 
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn read_data<T: Value>(&self, cst: SvmConst<T>) -> Expr<T> {
         unsafe {
             self.shader_data
                 .read_as::<T>(cst.offset + self.shader_ref.data_offset)
         }
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn do_eval(&mut self, node: SvmNodeRef) -> Box<dyn Any> {
         let idx = node.index as usize;
         let node = &self.shader.nodes[idx];

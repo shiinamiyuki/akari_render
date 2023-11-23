@@ -131,7 +131,7 @@ impl<'a, F> Sampler for McmcSampler<'a, F>
 where
     F: Fn(Expr<u32>) -> Expr<u32>,
 {
-    #[tracked]
+    #[tracked(crate="luisa")]
     fn next_1d(&self) -> Expr<f32> {
         if self.cur_dim.load().lt(self.mcmc_dim) {
             let ret = self.samples.read((self.get_index)(**self.cur_dim));
@@ -193,7 +193,7 @@ impl Mutator {
             samples.write(sample_idx, x);
         });
     }
-    #[tracked]
+    #[tracked(crate="luisa")]
     pub fn mutate_one(
         &self,
         samples: &Buffer<f32>,
@@ -277,7 +277,7 @@ pub struct PathVertex {
 impl<'a> PathTracerBase<'a> {
     /// Sample a path prefix with length `target_depth - 1`
     /// and two final vertices with NEE and BSDF sampling respectively.
-    #[tracked]
+    #[tracked(crate="luisa")]
     pub fn run_at_depth(&self, ray: Expr<Ray>, target_depth: Expr<u32>, sampler: &dyn Sampler) {
         let ray: Var<Ray> = ray.var();
         let u_light = Var::<Float3>::zeroed();
@@ -345,7 +345,7 @@ impl<'a> PathTracerBase<'a> {
             }
         }
     }
-    // #[tracked]
+    // #[tracked(crate="luisa")]
     // pub fn run_at_depth_replayed(
     //     &self,
     //     ray: Expr<Ray>,
@@ -433,7 +433,7 @@ impl SinglePathMcmc {
     fn sample_dimension(&self, depth: u32) -> u32 {
         4 + (1 + depth) * 3 + 3 + 1
     }
-    #[tracked]
+    #[tracked(crate="luisa")]
     fn sample_dimension_device(&self, depth: Expr<u32>) -> Expr<u32> {
         4 + (1 + depth) * 3 + 3 + 1
     }
@@ -454,12 +454,12 @@ impl SinglePathMcmc {
             config,
         }
     }
-    #[tracked]
+    #[tracked(crate="luisa")]
     pub fn scalar_contribution(color: &Color) -> Expr<f32> {
         color.max().clamp(0.0f32.expr(), 1e5f32.expr())
         // 1.0f32.expr()
     }
-    #[tracked]
+    #[tracked(crate="luisa")]
     fn evaluate(
         &self,
         scene: &Arc<Scene>,
@@ -511,7 +511,7 @@ impl SinglePathMcmc {
 
     // layout:
     // [[f32 x 8] x 2] x dims] x (n_chains / 8)
-    #[tracked]
+    #[tracked(crate="luisa")]
     fn _sample_index_aosoa(
         &self,
         chain_id: Expr<u32>,
@@ -536,7 +536,7 @@ impl SinglePathMcmc {
     fn normalization_factor_correction(&self) -> f32 {
         (self.max_depth - self.min_depth + 1) as f32
     }
-    #[tracked]
+    #[tracked(crate="luisa")]
     fn sample_depth(&self, sampler: &dyn Sampler) -> Expr<u32> {
         let range = self.max_depth + 1 - self.min_depth;
         (self.min_depth + (sampler.next_1d() * range as f32).cast_u32())
@@ -639,7 +639,7 @@ impl SinglePathMcmc {
             b_init_cnt: self.n_bootstrap,
         }
     }
-    #[tracked]
+    #[tracked(crate="luisa")]
     fn mutate_chain(
         &self,
         scene: &Arc<Scene>,

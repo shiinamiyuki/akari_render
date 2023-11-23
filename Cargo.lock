@@ -44,17 +44,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "akari_data"
-version = "0.1.0"
-
-[[package]]
-name = "akari_render"
+name = "akari_common"
 version = "0.1.0"
 dependencies = [
- "akari_data",
- "akari_scenegraph",
+ "base64",
  "clap 4.4.8",
- "cmake",
  "exr",
  "glam",
  "hexf",
@@ -64,12 +58,30 @@ dependencies = [
  "libm",
  "log",
  "luisa_compute",
+ "memmap2 0.9.0",
  "parking_lot",
  "rand",
  "rayon",
  "serde",
  "serde_json",
  "sha2",
+ "winit",
+]
+
+[[package]]
+name = "akari_data"
+version = "0.1.0"
+
+[[package]]
+name = "akari_render"
+version = "0.1.0"
+dependencies = [
+ "akari_common",
+ "akari_data",
+ "akari_scenegraph",
+ "cmake",
+ "serde",
+ "serde_json",
  "winit",
 ]
 

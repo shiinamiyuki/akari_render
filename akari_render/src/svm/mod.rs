@@ -1,13 +1,10 @@
 use std::{
-    alloc::Layout,
     collections::{hash_map::DefaultHasher, HashMap},
     hash::{Hash, Hasher},
     sync::Arc,
 };
 
-use crate::{heap::MegaHeap, util::round_to, *};
-
-use sha2::{Digest, Sha256};
+use crate::{heap::MegaHeap, *};
 
 use self::surface::{EmissiveSurface, SurfaceShader};
 pub mod compiler;
@@ -132,6 +129,7 @@ pub enum SvmNode {
     MaterialOutput(SvmMaterialOutput),
 }
 #[derive(Clone, Copy, Debug, Soa, Value)]
+#[luisa(crate = "luisa")]
 #[repr(C)]
 pub struct ShaderRef {
     pub shader_kind: u32,

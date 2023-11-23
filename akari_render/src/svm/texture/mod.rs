@@ -1,7 +1,7 @@
 use crate::color::{
-        aces_to_srgb_with_cat_mat, srgb_to_aces_with_cat_mat, srgb_to_linear, Color, RgbColorSpace, SampledWavelengths,
-    };
-
+    aces_to_srgb_with_cat_mat, srgb_to_aces_with_cat_mat, srgb_to_linear, Color, RgbColorSpace,
+    SampledWavelengths,
+};
 
 pub mod noise;
 use super::*;

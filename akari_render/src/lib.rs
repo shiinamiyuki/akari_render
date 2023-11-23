@@ -1,16 +1,19 @@
 use std::env;
 
+pub use akari_common::luisa;
 use color::ColorRepr;
-use hexf::hexf32;
 
+pub use akari_common::*;
 pub use akari_scenegraph as scene_graph;
+pub(crate) use hexf::hexf32;
+pub(crate) use lazy_static::lazy_static;
 pub use luisa::prelude::{
-    cpu_dbg, if_, lc_assert, lc_comment_lineno, lc_unreachable, loop_, outline, track, tracked,
-    while_, Aggregate, Soa, Value,
+    device_log as _device_log, lc_assert as _lc_assert, outline, track as _track, tracked,
+    Aggregate, Soa, Value,
 };
 pub use luisa::resource::Sampler as TextureSampler;
 pub use luisa::{
-    impl_polymorphic,
+    impl_polymorphic as _impl_polymorphic,
     lang::{
         control_flow::*,
         functions::*,
@@ -20,8 +23,6 @@ pub use luisa::{
         soa::*,
         types::{array::*, core::*, vector::alias::*, vector::swizzle::*, vector::*, *},
     },
-    lc_info,
-    printer::Printer,
     resource::{
         BindlessArray, BindlessArrayVar, BindlessBufferVar, BindlessTex2dVar, BindlessTex3dVar,
         Buffer, BufferVar, BufferView, ByteBuffer, ByteBufferVar, ByteBufferView, PixelStorage,
@@ -32,8 +33,6 @@ pub use luisa::{
         api::StreamTag, Callable, Command, Device, DynCallable, Kernel, Scope, Stream, Swapchain,
     },
 };
-pub use luisa_compute as luisa;
-pub use rayon;
 pub use rayon::prelude::*;
 pub mod api;
 pub mod camera;
@@ -91,4 +90,32 @@ pub fn debug_mode() -> bool {
             }
             _ => false,
         }
+}
+#[macro_export]
+macro_rules! impl_polymorphic {
+    ($trait_:ident, $ty:ty) => {
+        _impl_polymorphic!(crate = [luisa], $trait_, $ty);
+    };
+}
+
+#[macro_export]
+macro_rules! lc_assert {
+    ($arg:expr) => {
+        _lc_assert!(crate = [luisa], $arg)
+    };
+    ($arg:expr, $msg:expr) => {
+        _lc_assert!(crate = [luisa], $arg, $msg)
+    };
+}
+#[macro_export]
+macro_rules! device_log {
+    ($fmt:literal, $($arg:expr),*) => {{
+        _device_log!(crate=[luisa], $fmt, $($arg),*)
+    }};
+}
+#[macro_export]
+macro_rules! track {
+    ($arg:expr) => {
+        _track!(crate="luisa"=> $arg)
+    };
 }

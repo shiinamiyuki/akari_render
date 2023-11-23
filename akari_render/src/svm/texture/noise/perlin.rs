@@ -3,29 +3,29 @@ use crate::{
     *,
 };
 
-#[tracked]
+#[tracked(crate = "luisa")]
 fn fade(t: Expr<f32>) -> Expr<f32> {
     t * t * t * (t * (t * 6.0 - 15.0) + 10.0)
 }
-#[tracked]
+#[tracked(crate = "luisa")]
 fn negate_if(val: Expr<f32>, condition: Expr<bool>) -> Expr<f32> {
     select(condition, -val, val)
 }
 
-#[tracked]
+#[tracked(crate = "luisa")]
 fn grad1(hash: Expr<u32>, x: Expr<f32>) -> Expr<f32> {
     let h = hash & 15;
     let grad = 1.0 + (h & 7).cast_f32();
     negate_if(grad, (h & 8) != 0) * x
 }
-#[tracked]
+#[tracked(crate = "luisa")]
 pub fn grad2(hash: Expr<u32>, x: Expr<f32>, y: Expr<f32>) -> Expr<f32> {
     let h = hash & 7;
     let u = if h < 4 { x } else { y };
     let v = 2.0f32 * (if h < 4 { y } else { x });
     negate_if(u, (h & 1) != 0) + negate_if(v, (h & 2) != 0)
 }
-#[tracked]
+#[tracked(crate = "luisa")]
 fn perlin_1d(x: Expr<f32>) -> Expr<f32> {
     let ix = x.floor().cast_i32();
     let fx = x - ix.cast_f32();
@@ -33,7 +33,7 @@ fn perlin_1d(x: Expr<f32>) -> Expr<f32> {
     grad1(blender::hash_uint(ix.as_u32()), fx)
         .lerp(grad1(blender::hash_uint(ix.as_u32() + 1), fx - 1.0), u)
 }
-#[tracked]
+#[tracked(crate = "luisa")]
 fn perlin_2d(x: Expr<Float2>) -> Expr<f32> {
     let y = x.y;
     let x = x.x;

@@ -2,6 +2,7 @@ use crate::{geometry::Frame, svm::ShaderRef, *};
 
 #[derive(Clone, Copy, Debug, Value)]
 #[repr(C)]
+#[luisa(crate = "luisa")]
 #[value_new(pub)]
 pub struct SurfacePoint {
     pub p: Float3,
@@ -9,6 +10,7 @@ pub struct SurfacePoint {
 }
 
 #[derive(Clone, Copy, Aggregate)]
+#[luisa(crate = "luisa")]
 #[repr(C)]
 pub struct SurfaceInteraction {
     pub frame: Expr<Frame>,

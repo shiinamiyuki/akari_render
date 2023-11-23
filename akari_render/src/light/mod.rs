@@ -11,6 +11,7 @@ use crate::{
 };
 
 #[derive(Clone, Aggregate)]
+#[luisa(crate = "luisa")]
 pub struct LightSample {
     pub li: Color,
     pub pdf: Expr<f32>,
@@ -110,7 +111,7 @@ impl LightAggregate {
         let direct = light.dispatch(|_tag, _key, light| light.le(ray, si, swl, ctx));
         direct
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn sample_direct(
         &self,
         pn: Expr<PointNormal>,
@@ -129,7 +130,7 @@ impl LightAggregate {
         sample.pdf = sample.pdf * light_choice_pdf;
         sample
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn pdf_direct(
         &self,
         si: SurfaceInteraction,

@@ -2,6 +2,8 @@ pub const SPECTRUM_TABLE_RES: usize = 64;
 pub type Rgb2SpectrumTable =
     [[[[[f32; 3]; SPECTRUM_TABLE_RES]; SPECTRUM_TABLE_RES]; SPECTRUM_TABLE_RES]; 3];
 pub type Rgb2SpectrumScale = [f32; SPECTRUM_TABLE_RES];
+use crate::cpp_ext::rgb2spec_opt;
+use crate::*;
 use std::{
     ffi::{CStr, CString},
     io::Read,
@@ -10,8 +12,6 @@ use std::{
     process::exit,
     sync::Arc,
 };
-
-use crate::cpp_ext::rgb2spec_opt;
 pub struct Rgb2SpectrumData {
     pub scale: Rgb2SpectrumScale,
     pub table: Rgb2SpectrumTable,
@@ -78,7 +78,7 @@ macro_rules! rgb2spec_mod {
     ($name:ident) => {
         pub mod $name {
             use super::*;
-            use lazy_static::lazy_static;
+            use crate::lazy_static;
             lazy_static! {
                 pub static ref DATA: Arc<Rgb2SpectrumData> = load_rgb2spec_data(
                     stringify!($name),

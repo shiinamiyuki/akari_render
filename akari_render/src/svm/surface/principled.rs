@@ -8,7 +8,7 @@ use std::f32::consts::FRAC_1_PI;
 
 use super::{BsdfEvalContext, FresnelSchlick, MicrofacetTransmission, SurfaceShader};
 
-#[tracked]
+#[tracked(crate = "luisa")]
 fn schlick_weight(cos_theta: Expr<f32>) -> Expr<f32> {
     let m = (1.0 - cos_theta).clamp(0.0.expr(), 1.0.expr());
     m.sqr().sqr() * m
@@ -19,7 +19,7 @@ pub struct DisneyDiffuseBsdf {
 }
 
 impl Surface for DisneyDiffuseBsdf {
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn evaluate_impl(
         &self,
         wo: Expr<Float3>,
@@ -59,7 +59,7 @@ impl Surface for DisneyDiffuseBsdf {
         };
         (color, pdf)
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn sample_wi_impl(
         &self,
         wo: Expr<Float3>,
@@ -104,7 +104,7 @@ impl Surface for DisneyDiffuseBsdf {
 //     pub eta: Expr<f32>,
 // }
 // impl Fresnel for DisneyFresnel {
-//     #[tracked]
+//     #[tracked(crate="luisa")]
 //     fn evaluate(&self, cos_theta_i: Expr<f32>, ctx: &BsdfEvalContext) -> Color {
 //         let fr = Color::one(ctx.color_repr) * fr_dielectric(cos_theta_i, self.eta);
 //         let f0 = fr_schlick(self.f0, cos_theta_i);
@@ -112,7 +112,7 @@ impl Surface for DisneyDiffuseBsdf {
 //     }
 // }
 impl SurfaceShader for SvmPrincipledBsdf {
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn closure(&self, svm_eval: &SvmEvaluator<'_>) -> Rc<dyn Surface> {
         let (color, transmission_color) = {
             let color = svm_eval.eval_color(self.color);

@@ -1,7 +1,10 @@
 use crate::*;
 use luisa::resource::IoTexel;
 use parking_lot::Mutex;
-use std::{sync::atomic::{AtomicBool, AtomicUsize}, ops::Deref};
+use std::{
+    ops::Deref,
+    sync::atomic::{AtomicBool, AtomicUsize},
+};
 
 /// *One heap to rule them all.*
 pub struct MegaHeap {

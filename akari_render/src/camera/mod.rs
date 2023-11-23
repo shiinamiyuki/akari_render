@@ -66,7 +66,7 @@ impl Camera for PerspectiveCamera {
     fn resolution(&self) -> Uint2 {
         self.resolution
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn generate_ray(
         &self,
         scene: &Scene,
@@ -103,6 +103,7 @@ impl Camera for PerspectiveCamera {
     }
 }
 #[derive(Clone, Copy, Debug, Value)]
+#[luisa(crate = "luisa")]
 #[repr(C)]
 struct PerspectiveCameraData {
     resolution: Uint2,

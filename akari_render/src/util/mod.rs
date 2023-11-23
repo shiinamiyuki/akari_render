@@ -263,12 +263,13 @@ pub fn mix_bits(v: Expr<u64>) -> Expr<u64> {
     }
     MIX_BITS.call(v)
 }
-#[tracked]
+#[tracked(crate = "luisa")]
 pub fn safe_div(a: Expr<f32>, b: Expr<f32>) -> Expr<f32> {
     select(b.eq(0.0), 0.0f32.expr(), a / b)
 }
 
 #[derive(Clone, Copy, Debug, Value)]
+#[luisa(crate = "luisa")]
 #[repr(C)]
 #[value_new]
 pub struct CompensatedSum {
@@ -276,7 +277,7 @@ pub struct CompensatedSum {
     pub c: f32,
 }
 impl CompensatedSumExpr {
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn update(&self, v: Expr<f32>) -> Expr<CompensatedSum> {
         let y = v - self.c;
         let t = self.sum + y;
@@ -286,7 +287,7 @@ impl CompensatedSumExpr {
     }
 }
 impl CompensatedSumVar {
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn update(&self, v: Expr<f32>) {
         *self.self_ = (**self.self_).update(v);
     }

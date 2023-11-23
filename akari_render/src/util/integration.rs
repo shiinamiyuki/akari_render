@@ -1,5 +1,6 @@
 use crate::*;
 #[derive(Clone, Copy, Value)]
+#[luisa(crate = "luisa")]
 #[repr(C)]
 #[value_new]
 struct WorkItem {
@@ -13,7 +14,7 @@ struct WorkItem {
     eps: f32,
     depth: u32,
 }
-#[tracked]
+#[tracked(crate = "luisa")]
 pub fn adaptive_simpson<U: Value>(
     _device: &Device,
     user_data: Expr<U>,
@@ -102,7 +103,7 @@ pub fn adaptive_simpson<U: Value>(
     **result
 }
 
-#[tracked]
+#[tracked(crate = "luisa")]
 pub fn adaptive_simpson_2d<U: Value>(
     device: &Device,
     user_data: Expr<U>,
@@ -247,7 +248,7 @@ mod test {
         }
     }
     #[test]
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn simpson_integration() {
         let ctx = Context::new(current_exe().unwrap());
         let device = ctx.create_cpu_device();

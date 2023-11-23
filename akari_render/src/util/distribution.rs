@@ -7,6 +7,7 @@ use crate::*;
 
 use crate::sampling::{uniform_discrete_choice_and_remap, weighted_discrete_choice2_and_remap};
 #[derive(Clone, Copy, Debug, Default, Value)]
+#[luisa(crate = "luisa")]
 #[repr(C)]
 pub struct AliasTableEntry {
     pub j: u32,

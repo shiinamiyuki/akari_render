@@ -71,6 +71,7 @@ impl SampleStream {
 }
 
 #[derive(Clone, Copy, Debug, Value)]
+#[luisa(crate = "luisa")]
 #[repr(C)]
 #[value_new(pub)]
 pub struct Pcg32 {
@@ -83,7 +84,7 @@ impl Pcg32 {
     pub const PCG32_MULT: u64 = 0x5851f42d4c957f2du64;
 }
 impl Pcg32Var {
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn set_seq_offset(seq: Expr<u64>, seed: Expr<u64>) -> Var<Pcg32> {
         let pcg = Pcg32::new_expr(0, (seq << 1u64) | 1u64).var();
         pcg.gen_u32();
@@ -111,7 +112,7 @@ impl Pcg32Var {
         PCG_GEN_U32.call(self.self_)
     }
 }
-#[tracked]
+#[tracked(crate = "luisa")]
 pub fn init_pcg32_buffer(device: Device, count: usize) -> Buffer<Pcg32> {
     let buffer = device.create_buffer(count);
     let mut rng = thread_rng();
@@ -125,7 +126,7 @@ pub fn init_pcg32_buffer(device: Device, count: usize) -> Buffer<Pcg32> {
     .dispatch([count.try_into().unwrap(), 1, 1]);
     buffer
 }
-#[tracked]
+#[tracked(crate = "luisa")]
 pub fn init_pcg32_buffer_with_seed(device: Device, count: usize, seed: u64) -> Buffer<Pcg32> {
     let buffer = device.create_buffer(count);
     let mut rng = StdRng::seed_from_u64(seed);
@@ -146,7 +147,7 @@ pub struct IndependentSampler {
     forget: Var<bool>,
 }
 impl Drop for IndependentSampler {
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn drop(&mut self) {
         if let Some(states) = self.states.take() {
             if !self.forget {
@@ -166,7 +167,7 @@ impl IndependentSampler {
     }
 }
 impl Sampler for IndependentSampler {
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn next_1d(&self) -> Expr<f32> {
         let n = self.state.gen_u32();
         n.cast_f32() * ((1.0 / u32::MAX as f64) as f32)
@@ -180,17 +181,18 @@ impl Sampler for IndependentSampler {
             forget: (*self.forget).var(),
         })
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn forget(&self) {
         *self.forget = true.expr();
     }
 }
 #[derive(Copy, Clone, Aggregate)]
+#[luisa(crate = "luisa")]
 pub struct PrimarySample {
     pub values: VLArrayVar<f32>,
 }
 impl PrimarySample {
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn clamped(&self) -> Self {
         let values = VLArrayVar::zero(self.values.len());
         for_range(0u64.expr()..values.len_expr(), |i| {
@@ -199,7 +201,7 @@ impl PrimarySample {
         });
         Self { values }
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn new(len: usize, sampler: &dyn Sampler) -> Self {
         let values = VLArrayVar::zero(len);
         for_range(0u64.expr()..values.len_expr(), |i| {
@@ -224,7 +226,7 @@ impl<'a> IndependentReplaySampler<'a> {
 }
 
 impl<'a> Sampler for IndependentReplaySampler<'a> {
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn next_1d(&self) -> Expr<f32> {
         if self
             .cur_dim
@@ -249,6 +251,7 @@ impl<'a> Sampler for IndependentReplaySampler<'a> {
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[serde(crate = "serde")]
 #[serde(tag = "type")]
 pub enum SamplerConfig {
     #[serde(rename = "independent")]
@@ -281,7 +284,7 @@ impl IndependentSamplerCreator {
     }
 }
 impl SamplerCreator for IndependentSamplerCreator {
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn create(&self, pixel: Expr<Uint2>) -> Box<dyn Sampler> {
         let i = pixel.x + pixel.y * self.resolution.x;
         let state = self.states.read(i).var();
@@ -316,7 +319,7 @@ pub fn pmj02bn_sample_host(mut set_index: u32, mut sample_index: u32) -> Float2 
             * hexf64!("0x1p-32")) as f32,
     )
 }
-#[tracked]
+#[tracked(crate = "luisa")]
 pub fn pmj02bn_sample(
     pmj02bn_samples: &Buffer<u32>,
     mut set_index: Expr<u32>,
@@ -478,6 +481,7 @@ fn permute_element(i: Expr<u32>, l: Expr<u32>, w: Expr<u32>, p: Expr<u32>) -> Ex
     PERMUTE_ELEMENT.call(i, l, w, p)
 }
 #[derive(Clone, Copy, Value, Debug)]
+#[luisa(crate = "luisa")]
 #[repr(C)]
 struct Pmj02BnState {
     seed: u32,
@@ -499,7 +503,7 @@ pub struct Pmj02BnSampler {
     next_2d: Arc<DynCallable<fn(Var<Pmj02BnState>) -> Expr<Float2>>>,
 }
 impl Pmj02BnSampler {
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn new(
         device: &Device,
         pmj02bn_samples: Arc<Buffer<u32>>,
@@ -578,7 +582,7 @@ impl Pmj02BnSampler {
     }
 }
 impl Drop for Pmj02BnSampler {
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn drop(&mut self) {
         if !self.forget {
             let i = self.i;
@@ -596,7 +600,7 @@ impl Sampler for Pmj02BnSampler {
         //     self.next_1d(),
         // self.next_1d())
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn start(&self) {
         *self.state.dim = 0u32.expr();
         if self.state.sample_index.eq(u32::MAX) {
@@ -621,13 +625,13 @@ impl Sampler for Pmj02BnSampler {
             next_2d: self.next_2d.clone(),
         })
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn forget(&self) {
         *self.forget = true.expr();
     }
 }
 impl SamplerCreator for Pmj02BnSamplerCreator {
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn create(&self, pixel: Expr<Uint2>) -> Box<dyn Sampler> {
         let i = pixel.x + pixel.y * self.resolution.x;
         Box::new(Pmj02BnSampler::new(

@@ -74,17 +74,17 @@ pub fn xxhash32_4(p: Expr<Uint4>) -> Expr<u32> {
 /// Hash functions in an attempt to match the behavior of Blender's Cycles.
 pub mod blender {
     use super::*;
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn uint_to_float_excl(n: Expr<u32>) -> Expr<f32> {
         n.as_f32() * (1.0f32 / 4294967296.0)
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn rot(x: impl AsExpr<Value = u32>, k: impl AsExpr<Value = u32>) -> Expr<u32> {
         let x = x.as_expr();
         let k = k.as_expr();
         (x << k) | (x >> (32 - k))
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn mix(a: Var<u32>, b: Var<u32>, c: Var<u32>) {
         *a -= c;
         *a ^= rot(c, 4);
@@ -105,7 +105,7 @@ pub mod blender {
         *c ^= rot(b, 4);
         *b += a;
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn final_(a: Var<u32>, b: Var<u32>, c: Var<u32>) {
         *c ^= b;
         *c -= rot(b, 14);
@@ -122,7 +122,7 @@ pub mod blender {
         *c ^= b;
         *c -= rot(b, 24);
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn hash_uint(kx: Expr<u32>) -> Expr<u32> {
         let init: u32 = 0xdeadbeefu32 + (1u32 << 2) + 13u32;
         let a = init.var();
@@ -134,7 +134,7 @@ pub mod blender {
         });
         c.load()
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn hash_uint2(k: Expr<Uint2>) -> Expr<u32> {
         let init: u32 = 0xdeadbeefu32 + (2u32 << 2) + 13u32;
         let a = init.var();
@@ -147,7 +147,7 @@ pub mod blender {
         });
         c.load()
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn hash_uint3(k: Expr<Uint3>) -> Expr<u32> {
         let init: u32 = 0xdeadbeefu32 + (3u32 << 2) + 13u32;
         let a = init.var();
@@ -161,7 +161,7 @@ pub mod blender {
         });
         c.load()
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     pub fn hash_uint4(k: Expr<Uint4>) -> Expr<u32> {
         let init: u32 = 0xdeadbeefu32 + (4u32 << 2) + 13u32;
         let a = init.var();

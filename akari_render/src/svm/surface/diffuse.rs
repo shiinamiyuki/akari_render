@@ -15,7 +15,7 @@ pub struct DiffuseBsdf {
 }
 
 impl Surface for DiffuseBsdf {
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn evaluate_impl(
         &self,
         wo: Expr<Float3>,
@@ -35,7 +35,7 @@ impl Surface for DiffuseBsdf {
         };
         (color, pdf)
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn sample_wi_impl(
         &self,
         wo: Expr<Float3>,
@@ -49,7 +49,7 @@ impl Surface for DiffuseBsdf {
         (wi, true.expr())
     }
 
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn albedo_impl(
         &self,
         _wo: Expr<Float3>,

@@ -7,6 +7,7 @@ use crate::{
     svm::{surface::Surface, ShaderRef},
 };
 #[derive(Clone, Copy, Value)]
+#[luisa(crate = "luisa")]
 #[repr(C)]
 pub struct AreaLight {
     pub light_id: u32,
@@ -48,7 +49,7 @@ impl Light for AreaLightExpr {
             Color::zero(ctx.color_repr()),
         )
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn sample_direct(
         &self,
         pn: Expr<PointNormal>,
@@ -111,7 +112,7 @@ impl Light for AreaLightExpr {
             }
         }
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn pdf_direct(
         &self,
         si: SurfaceInteraction,

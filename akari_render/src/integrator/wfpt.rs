@@ -1,10 +1,9 @@
-use std::fmt::Display;
-
 use super::{pt::PathTracerBase, *};
 use crate::{
     color::*,
     geometry::*,
     interaction::SurfaceInteraction,
+    luisa,
     sampler::{Sampler, SamplerCreator},
     svm::ShaderRef,
     util::profile::DispatchProfiler,
@@ -12,6 +11,8 @@ use crate::{
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, Value)]
+#[luisa(crate = "luisa")]
+#[serde(crate = "serde")]
 #[serde(default)]
 #[repr(C)]
 pub struct Config {
@@ -42,6 +43,7 @@ impl Default for Config {
 }
 
 #[derive(Clone, Copy, Debug, Soa, Value)]
+#[luisa(crate = "luisa")]
 #[repr(C)]
 struct SurfaceInteractionData {
     pub frame: Frame,
@@ -55,6 +57,7 @@ struct SurfaceInteractionData {
     pub prim_area: f32,
 }
 #[derive(Clone, Copy, Debug, Soa, Value)]
+#[luisa(crate = "luisa")]
 #[repr(C)]
 struct PathState {
     swl: SampledWavelengths,
@@ -156,13 +159,13 @@ impl KernelWorkQueue {
             sort_mode,
         }
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn enqueue(&self, kid: u32, sid: Expr<u32>) {
         assert!(kid < self.num_variants);
         self.enqueue_dynamic(kid.expr(), sid)
     }
 
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn enqueue_dynamic(&self, kid: Expr<u32>, sid: Expr<u32>) {
         if debug_mode() {
             lc_assert!(kid.lt(self.num_variants as u32));
@@ -174,7 +177,7 @@ impl KernelWorkQueue {
             queues.write(i + (kid * self.max_size as u32), sid);
         }
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn read_sid(&self, kid: Expr<u32>, offset: Expr<u32>) -> Expr<u32> {
         if debug_mode() {
             lc_assert!(kid.lt(self.num_variants as u32));
@@ -194,7 +197,7 @@ impl KernelWorkQueue {
             queues.read(variant_offset + offset)
         }
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn count(&self, kid: Expr<u32>) -> Expr<u32> {
         if debug_mode() {
             lc_assert!(kid.lt(self.num_variants as u32));
@@ -202,7 +205,7 @@ impl KernelWorkQueue {
         let counter = self.counter.var();
         counter.read(kid)
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn sort_dynamic(&self, kid: Expr<u32>, sid: Expr<u32>) {
         assert_eq!(self.sort_mode, KernelWorkQueueSortMode::CountAndAllocate);
         if debug_mode() {
@@ -230,7 +233,7 @@ struct WavePathKernels {
     test_shadow: Kernel<fn()>,
 }
 impl WavePathImpl {
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn init_pt_impl(
         &self,
         swl: Var<SampledWavelengths>,
@@ -309,7 +312,7 @@ impl WavePathImpl {
      * Generate new camera rays
      * If the current path is terminated, generate new camera rays
      */
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn raygen(&self, film: &Film) {
         let tid = dispatch_id().x;
         let queue_count = self.work_queue.count((KernelId::GenerateRay as u32).expr());
@@ -348,7 +351,7 @@ impl WavePathImpl {
     /**
      * Intersect rays with the scene
      */
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn intersect(&self) {
         let tid = dispatch_id().x;
         let queue_count = self.work_queue.count((KernelId::Intersect as u32).expr());
@@ -415,7 +418,7 @@ impl WavePathImpl {
     //     self.radiance.write(sid, throughput);
     // }
 
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn shade_surface(&self, shader_kind: u32) {
         let tid = dispatch_id().x;
         let queue_count = self.surface_queue.count(shader_kind.expr());
@@ -451,7 +454,7 @@ impl WavePathImpl {
         }
     }
 
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn test_shadow(&self) {
         let tid = dispatch_id().x;
         let queue_count = self.work_queue.count((KernelId::TestShadow as u32).expr());
@@ -469,7 +472,7 @@ impl WavePathImpl {
             self.radiance.atomic_add(sid, direct);
         }
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn sort_surcace(&self, counting: bool) {
         let tid = dispatch_id().x;
         let queue_count = self
@@ -489,7 +492,7 @@ impl WavePathImpl {
             self.surface_queue.sort_dynamic(surface.shader_kind, sid);
         }
     }
-    #[tracked]
+    #[tracked(crate = "luisa")]
     fn compile_kernels(&self, film: &Film) -> WavePathKernels {
         let ray_gen = self.device.create_kernel_async::<fn()>(&|| {
             self.raygen(film);

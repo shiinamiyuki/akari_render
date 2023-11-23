@@ -1,6 +1,4 @@
-use crate::{
-    sampler::*,
-};
+use crate::sampler::*;
 use lazy_static::lazy_static;
 
 // use super::IndependentSampler;
@@ -92,6 +90,7 @@ use lazy_static::lazy_static;
 //     }
 // }
 #[derive(Clone, Copy, Value, Debug)]
+#[luisa(crate = "luisa")]
 #[repr(C)]
 #[value_new(pub)]
 pub struct KelemenMutationRecord {
@@ -177,7 +176,7 @@ lazy_static! {
 //     pub res: Expr<Float2>,
 //     pub image_mutation: Expr<bool>,
 // }
-#[tracked]
+#[tracked(crate = "luisa")]
 pub fn mutate_image_space_single(
     cur: Expr<f32>,
     sampler: &IndependentSampler,
