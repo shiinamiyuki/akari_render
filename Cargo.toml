@@ -11,11 +11,10 @@ resolver = "2"
 
 
 [profile.dev]
-opt-level = 1
+opt-level = 2
 incremental = true
 debug = true
 lto = "off"
 
 [profile.release]
-incremental = true
-lto = "off"
+lto = "thin"

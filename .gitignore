@@ -22,3 +22,4 @@ output/
 .idea/
 .cargo/
 test_output/
+crates/akari_scenegraph/src/akari_blender_cpp_ext.rs
