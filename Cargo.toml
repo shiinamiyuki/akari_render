@@ -1,9 +1,11 @@
 [workspace]
 members = [
-    "akari_render",
-    "akari_data",
-    "akari_scenegraph",
-    "akari_api"
+    "crates/akari_render",
+    "crates/akari_data",
+    "crates/akari_scenegraph",
+    "crates/akari_api",
+    "crates/akari_common",
+    "crates/akari_integrator",
 ]
 resolver = "2"
 
@@ -15,4 +17,5 @@ debug = true
 lto = "off"
 
 [profile.release]
-
+incremental = true
+lto = "off"

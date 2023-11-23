@@ -1,0 +1,12 @@
+cmake_minimum_required(VERSION 3.15)
+project(akari_cpp_ext)
+set(CMAKE_CXX_STANDARD 17)
+if(WIN32)
+    if(MSVC)
+        #set(CMAKE_CXX_FLAGS /std:c++17 /MP /arch:AVX2 /WX)
+    endif()
+else()
+    set(CMAKE_CXX_FLAGS "-lstdc++ -pthread ${CMAKE_CXX_FLAGS}")
+endif()
+
+add_library(akari_cpp_ext STATIC akari_cpp_ext.cpp akari_cpp_ext.h rgb2spec_opt.cpp)

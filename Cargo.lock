@@ -37,6 +37,7 @@ dependencies = [
 name = "akari_api"
 version = "0.1.0"
 dependencies = [
+ "akari_integrator",
  "akari_render",
  "clap 4.4.8",
  "serde",
@@ -71,6 +72,13 @@ dependencies = [
 [[package]]
 name = "akari_data"
 version = "0.1.0"
+
+[[package]]
+name = "akari_integrator"
+version = "0.1.0"
+dependencies = [
+ "akari_render",
+]
 
 [[package]]
 name = "akari_render"
