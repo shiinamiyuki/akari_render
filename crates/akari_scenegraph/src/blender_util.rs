@@ -14,21 +14,29 @@ pub struct ImportMeshArgs {
     pub has_normals: bool,
     pub has_tangents: bool,
     pub has_uvs: bool,
+    pub has_multi_materials: bool,
 }
 #[derive(Clone, Copy)]
 #[repr(C)]
 struct MLoopTri([u32; 3]);
 #[link(name = "akari_blender_cpp_ext")]
 extern "C" {
-    // extern "C" void get_mesh_triangle_indices(const Mesh *mesh, const MLoopTri *tri, size_t count, int *out)
+    /// extern "C" void get_mesh_triangle_indices(const Mesh *mesh, const MLoopTri *tri, size_t count, int *out)
+    ///
     fn get_mesh_triangle_indices(mesh_ptr: u64, tri_ptr: u64, count: usize, out: *mut u32);
 
-    // extern "C" void get_mesh_tangents(const Mesh *mesh,  const MLoopTri *tri, size_t count, float *out)
+    /// extern "C" void get_mesh_tangents(const Mesh *mesh,  const MLoopTri *tri, size_t count, float *out)
+    ///
     fn get_mesh_tangents(mesh_ptr: u64, tri_ptr: u64, count: usize, out: *mut f32);
 
-    // extern "C" void get_mesh_split_normals(const Mesh *mesh, const MLoopTri *tri, size_t count, float *out)
+    /// extern "C" void get_mesh_split_normals(const Mesh *mesh, const MLoopTri *tri, size_t count, float *out)
+    ///
     fn get_mesh_split_normals(mesh_ptr: u64, tri_ptr: u64, count: usize, out: *mut f32);
 
+    /// extern "C" void get_mesh_material_indices(const Mesh *mesh, const MLoopTri *tri, size_t count, int *out)
+    ///
+    /// call MeshLoopTriangle.material_index to initialize the cache
+    fn get_mesh_material_indices(mesh_ptr: u64, tri_ptr: u64, count: usize, out: *mut u32);
 }
 
 pub fn import_blender_mesh(scene: &mut Scene, args: ImportMeshArgs) -> NodeRef<Geometry> {
@@ -39,6 +47,7 @@ pub fn import_blender_mesh(scene: &mut Scene, args: ImportMeshArgs) -> NodeRef<G
     let mut uvs = vec![];
     let mut normals = vec![];
     let mut tangents = vec![];
+    let mut materials = vec![0u32];
 
     rayon::scope(|s| unsafe {
         if args.has_uvs {
@@ -84,6 +93,17 @@ pub fn import_blender_mesh(scene: &mut Scene, args: ImportMeshArgs) -> NodeRef<G
                 );
             });
         }
+        if args.has_multi_materials {
+            materials = vec![0u32; args.num_triangles];
+            s.spawn(|_| {
+                get_mesh_material_indices(
+                    mesh_ptr,
+                    loop_tri_ptr,
+                    args.num_triangles,
+                    materials.as_mut_ptr(),
+                );
+            });
+        }
     });
     let vertices = Buffer::from_vec(vertices);
     let indices = Buffer::from_vec(indices);
@@ -109,6 +129,8 @@ pub fn import_blender_mesh(scene: &mut Scene, args: ImportMeshArgs) -> NodeRef<G
     } else {
         None
     };
+    let materials = Buffer::from_vec(materials);
+    let materials = scene.add_buffer(Some(format!("{name}.mat")), materials);
     let mesh = scene.add_mesh(
         Some(name.clone()),
         vertices,
@@ -116,6 +138,7 @@ pub fn import_blender_mesh(scene: &mut Scene, args: ImportMeshArgs) -> NodeRef<G
         normals,
         uvs,
         tangents,
+        materials,
     );
     mesh
 }

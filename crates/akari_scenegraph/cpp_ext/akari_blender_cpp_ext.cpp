@@ -1,4 +1,5 @@
 #include "DNA_mesh_types.h"
+#include "BKE_mesh_types.hh"
 #include <stdlib.h>
 #include <algorithm>
 
@@ -57,6 +58,12 @@ namespace copied_from_blender_4_0
         return (const int *)CustomData_get_layer_named(&mesh->loop_data, CD_PROP_INT32, ".corner_vert");
     }
 
+    const int *BKE_mesh_material_indices(const Mesh *mesh)
+    {
+        return (const int *)CustomData_get_layer_named(
+            &mesh->face_data, CD_PROP_INT32, "material_index");
+    }
+
 }
 
 extern "C" void get_mesh_triangle_indices(const Mesh *mesh, const MLoopTri *tri, size_t count, int *out)
@@ -107,5 +114,15 @@ extern "C" void get_mesh_split_normals(const Mesh *mesh, const MLoopTri *tri, si
             std::memcpy(out + i * 9 + 3, layer + tri[i].tri[1], sizeof(float) * 3);
             std::memcpy(out + i * 9 + 6, layer + tri[i].tri[2], sizeof(float) * 3);
         }
+    }
+}
+extern "C" void get_mesh_material_indices(const Mesh *mesh, const MLoopTri *tri, size_t count, int *out)
+{
+    const auto &faces = mesh->runtime->looptri_faces_cache.data();
+    const int *material_indices = copied_from_blender_4_0::BKE_mesh_material_indices(mesh);
+    for (size_t i = 0; i < count; i++)
+    {
+        auto face = faces[i];
+        out[i] = material_indices[face];
     }
 }

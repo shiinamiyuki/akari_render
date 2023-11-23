@@ -17,6 +17,7 @@ pub struct Mesh {
     // pub bitangent_signs: Option<Buffer<u32>>,
     pub uvs: Option<Buffer<[f32; 2]>>,
     pub indices: Buffer<[u32; 3]>,
+    pub materials: Buffer<u32>,
     pub area_sampler: Option<AliasTable>,
     pub has_normals: bool,
     pub has_uvs: bool,
@@ -29,6 +30,7 @@ pub struct MeshBuildArgs<'a> {
     // pub bitangent_signs: &'a [u32],
     pub uvs: Option<&'a [[f32; 2]]>,
     pub indices: &'a [[u32; 3]],
+    pub materials: &'a [u32],
 }
 impl Mesh {
     pub fn new(device: Device, args: MeshBuildArgs<'_>) -> Self {
@@ -41,6 +43,7 @@ impl Mesh {
         if let Some(tangents) = &args.tangents {
             assert_eq!(args.indices.len() * 3, tangents.len());
         }
+        assert!(args.materials.len() == 1 || args.materials.len() == args.indices.len());
         let vertices = device.create_buffer_from_slice(&args.vertices);
         let normals = args
             .normals
@@ -55,7 +58,7 @@ impl Mesh {
         // };
         let indices = device.create_buffer_from_slice(&args.indices);
         let uvs = args.uvs.map(|uvs| device.create_buffer_from_slice(uvs));
-
+        let materials = device.create_buffer_from_slice(args.materials);
         let m = Self {
             vertices,
             normals,
@@ -67,6 +70,7 @@ impl Mesh {
             has_normals: args.normals.is_some(),
             has_uvs: args.uvs.is_some(),
             has_tangents: args.tangents.is_some(),
+            materials,
         };
         // assert!(!m.has_uvs || m.has_tangents, "mesh has uvs but no tangents");
         m
@@ -75,16 +79,36 @@ impl Mesh {
         self.area_sampler = Some(AliasTable::new(device, areas));
     }
 }
+#[repr(transparent)]
+pub struct MeshInstanceFlags;
+impl MeshInstanceFlags {
+    pub const HAS_NORMALS: u32 = 1 << 0;
+    pub const HAS_UVS: u32 = 1 << 1;
+    pub const HAS_TANGENTS: u32 = 1 << 2;
+    pub const HAS_MULTI_MATERIALS: u32 = 1 << 3;
+}
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct MeshInstanceHost {
     pub transform: AffineTransform,
     pub light: TagIndex,
-    pub surface: ShaderRef,
+    pub materials: Vec<u32>,
     pub geom_id: u32,
-    pub has_normals: bool,
-    pub has_uvs: bool,
-    pub has_tangents: bool,
+    pub flags: u32,
+}
+impl MeshInstanceHost {
+    pub fn has_normals(&self) -> bool {
+        self.flags & MeshInstanceFlags::HAS_NORMALS != 0
+    }
+    pub fn has_uvs(&self) -> bool {
+        self.flags & MeshInstanceFlags::HAS_UVS != 0
+    }
+    pub fn has_tangents(&self) -> bool {
+        self.flags & MeshInstanceFlags::HAS_TANGENTS != 0
+    }
+    pub fn has_multi_materials(&self) -> bool {
+        self.flags & MeshInstanceFlags::HAS_MULTI_MATERIALS != 0
+    }
 }
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Value)]
@@ -102,9 +126,10 @@ pub struct MeshHeader {
 #[luisa(crate = "luisa")]
 pub struct MeshInstance {
     pub light: TagIndex,
-    pub surface: ShaderRef,
+    pub material_buffer_idx: u32,
     pub geom_id: u32,
     pub transform_det: f32,
+    pub flags: u32,
 }
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -173,13 +198,14 @@ impl MeshAggregate {
             });
         }
         let mesh_instances = device.create_buffer_from_fn(instances.len(), |i| {
-            let inst = instances[i];
+            let inst = &instances[i];
             let t: glam::Mat4 = inst.transform.m.into();
             MeshInstance {
                 light: inst.light,
-                surface: inst.surface,
+                material_buffer_idx: todo!(), //inst.surface,
                 geom_id: inst.geom_id,
                 transform_det: t.determinant(),
+                flags: todo!(),
             }
         });
         let mesh_instance_idx = heap.bind_buffer(&mesh_instances);
@@ -191,8 +217,8 @@ impl MeshAggregate {
         for i in 0..instances.len() {
             let inst = &instances[i];
             let geom_id = inst.geom_id as usize;
-            assert_eq!(inst.has_normals, meshes[geom_id].has_normals);
-            assert_eq!(inst.has_uvs, meshes[geom_id].has_uvs);
+            assert_eq!(inst.has_normals(), meshes[geom_id].has_normals);
+            assert_eq!(inst.has_uvs(), meshes[geom_id].has_uvs);
             accel.push_mesh(&accel_meshes[geom_id], inst.transform.m, 255, true);
         }
         accel.build(AccelBuildRequest::ForceBuild);
@@ -372,7 +398,7 @@ impl MeshAggregate {
             uv,
             inst_id,
             prim_id,
-            surface: inst.surface,
+            surface: todo!(),
             prim_area: area,
             valid: true.expr(),
         }

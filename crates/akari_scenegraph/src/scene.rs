@@ -60,7 +60,7 @@ pub enum Light {
 pub struct Instance {
     pub geometry: NodeRef<Geometry>,
     pub transform: Transform,
-    pub material: NodeRef<Material>,
+    pub materials: Vec<NodeRef<Material>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -302,6 +302,7 @@ pub struct Mesh {
     pub normals: Option<NodeRef<BufferView>>,
     pub uvs: Option<NodeRef<BufferView>>,
     pub tangents: Option<NodeRef<BufferView>>,
+    pub materials: NodeRef<BufferView>,
     // pub bitangent_signs: Option<Buffer>,
 }
 
@@ -377,9 +378,11 @@ impl Scene {
         normals: Option<NodeRef<Buffer>>,
         uvs: Option<NodeRef<Buffer>>,
         tangents: Option<NodeRef<Buffer>>,
+        materials: NodeRef<Buffer>,
     ) -> NodeRef<Geometry> {
         self.check_valid_buffer(&vertices);
         self.check_valid_buffer(&indices);
+        self.check_valid_buffer(&materials);
         if let Some(normals) = normals.as_ref() {
             self.check_valid_buffer(normals);
         }
@@ -396,6 +399,7 @@ impl Scene {
         let normals = normals.map(|n| self.add_buffer_view_full(None, n));
         let uvs = uvs.map(|n| self.add_buffer_view_full(None, n));
         let tangents = tangents.map(|n| self.add_buffer_view_full(None, n));
+        let materials = self.add_buffer_view_full(None, materials);
         self.geometries.insert(
             node_ref.clone(),
             Geometry::Mesh(Mesh {
@@ -404,6 +408,7 @@ impl Scene {
                 normals,
                 uvs,
                 tangents,
+                materials,
             }),
         );
         node_ref

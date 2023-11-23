@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use super::*;
 use crate::{
-    color::{ColorSpaceId, RgbColorSpace},
+    color::ColorSpaceId,
     load::{sampler_from_rgb_image_tex_node, ImageKey},
     util::ByteVecBuilder,
 };

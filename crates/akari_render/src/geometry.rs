@@ -61,58 +61,6 @@ impl SphereExpr {
     }
 }
 
-// #[derive(Clone, Copy, Aggregate)]
-// #[repr(C)]
-// pub struct ShadingTriangle {
-//     pub v0: Expr<Float3>,
-//     pub v1: Expr<Float3>,
-//     pub v2: Expr<Float3>,
-//     pub uv0: Expr<Float2>,
-//     pub uv1: Expr<Float2>,
-//     pub uv2: Expr<Float2>,
-//     pub n0: Expr<Float3>,
-//     pub n1: Expr<Float3>,
-//     pub n2: Expr<Float3>,
-//     pub t0: Expr<Float3>,
-//     pub t1: Expr<Float3>,
-//     pub t2: Expr<Float3>,
-//     pub ng: Expr<Float3>,
-//     pub surface: Expr<ShaderRef>,
-// }
-
-// impl ShadingTriangle {
-//     #[tracked(crate="luisa")]
-//     pub fn p(&self, bary: Expr<Float2>) -> Expr<Float3> {
-//         (1.0 - bary.x - bary.y) * self.v0 + bary.x * self.v1 + bary.y * self.v2
-//     }
-//     #[tracked(crate="luisa")]
-//     pub fn n(&self, bary: Expr<Float2>) -> Expr<Float3> {
-//         ((1.0 - bary.x - bary.y) * self.n0 + bary.x * self.n1 + bary.y * self.n2).normalize()
-//     }
-//     #[tracked(crate="luisa")]
-//     pub fn ortho_frame(&self, bary: Expr<Float2>) -> Expr<Frame> {
-//         let n = self.n(bary);
-//         let t =
-//             ((1.0 - bary.x - bary.y) * self.t0 + bary.x * self.t1 + bary.y * self.t2).normalize();
-//         let s = n.cross(t);
-//         if s.length_squared() > 0.0 {
-//             let s = s.normalize();
-//             let t = s.cross(n).normalize();
-//             Frame::new_expr(n, t, s)
-//         } else {
-//             FrameExpr::from_n(n)
-//         }
-//     }
-//     #[tracked(crate="luisa")]
-//     pub fn uv(&self, bary: Expr<Float2>) -> Expr<Float2> {
-//         (1.0 - bary.x - bary.y) * self.uv0 + bary.x * self.uv1 + bary.y * self.uv2
-//     }
-//     #[tracked(crate="luisa")]
-//     pub fn area(&self) -> Expr<f32> {
-//         0.5 * (self.v1 - self.v0).cross(self.v2 - self.v0).length()
-//     }
-// }
-
 #[derive(Clone, Copy, Debug, Soa, Value)]
 #[luisa(crate = "luisa")]
 #[repr(C)]

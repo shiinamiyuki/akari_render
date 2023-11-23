@@ -3,7 +3,7 @@ use crate::{
     geometry::AffineTransform,
     heap::MegaHeap,
     light::{area::AreaLight, Light, LightAggregate, WeightedLightDistribution},
-    mesh::{Mesh, MeshAggregate, MeshBuildArgs, MeshInstanceHost},
+    mesh::{Mesh, MeshAggregate, MeshBuildArgs, MeshInstanceFlags, MeshInstanceHost},
     scene::Scene,
     svm::{
         compiler::{CompilerDriver, SvmCompileContext},
@@ -211,30 +211,39 @@ impl SceneLoader {
         &self,
         instance: &scenegraph::Instance,
     ) -> (NodeRef<Material>, MeshInstanceHost) {
-        let mat = &instance.material;
-        let surface = self.nodes_to_surface_shader[mat];
-        let transform = self.load_transform(&instance.transform, false);
-        let geometry_node_id = &instance.geometry;
-        let geometry_node = &self.scene_view.scene().geometries[geometry_node_id];
-        match geometry_node {
-            scenegraph::Geometry::Mesh(_) => {
-                let geom_id = self.node_to_geom_id[geometry_node_id];
-                let mesh_buffer = &self.mesh_buffers[geom_id];
-                (
-                    mat.clone(),
-                    MeshInstanceHost {
-                        geom_id: geom_id as u32,
-                        transform,
-                        light: TagIndex::INVALID,
-                        surface,
-                        has_normals: mesh_buffer.has_normals,
-                        has_uvs: mesh_buffer.has_uvs,
-                        has_tangents: mesh_buffer.has_tangents,
-                    },
-                )
-            }
-            _ => todo!(),
-        }
+        todo!()
+        // let mat = &instance.materials;
+        // let surface = self.nodes_to_surface_shader[mat];
+        // let transform = self.load_transform(&instance.transform, false);
+        // let geometry_node_id = &instance.geometry;
+        // let geometry_node = &self.scene_view.scene().geometries[geometry_node_id];
+        // match geometry_node {
+        //     scenegraph::Geometry::Mesh(_) => {
+        //         let geom_id = self.node_to_geom_id[geometry_node_id];
+        //         let mesh_buffer = &self.mesh_buffers[geom_id];
+        //         let mut flags: u32 = 0;
+        //         if mesh_buffer.has_normals {
+        //             flags |= MeshInstanceFlags::HAS_NORMALS;
+        //         }
+        //         if mesh_buffer.has_uvs {
+        //             flags |= MeshInstanceFlags::HAS_UVS;
+        //         }
+        //         if mesh_buffer.has_tangents {
+        //             flags |= MeshInstanceFlags::HAS_TANGENTS;
+        //         }
+        //         (
+        //             mat.clone(),
+        //             MeshInstanceHost {
+        //                 geom_id: geom_id as u32,
+        //                 transform,
+        //                 light: TagIndex::INVALID,
+        //                 materials:todo!,
+        //                 flags,
+        //             },
+        //         )
+        //     }
+        //     _ => todo!(),
+        // }
     }
     fn do_load(mut self) -> Scene {
         self.mesh_areas
@@ -301,7 +310,7 @@ impl SceneLoader {
                         &self.mesh_areas.borrow()[geom_id],
                     );
                 }
-                let surface_shader = &self.nodes_to_surface_shader[&instance_node.material];
+                let surface_shader:&ShaderRef = todo!();//&self.nodes_to_surface_shader[&instance_node.materials];
                 let light_ref = self.lights.push(
                     (),
                     AreaLight {
@@ -436,7 +445,7 @@ impl SceneLoader {
                         let indices = load_slice!(&mesh.indices, [u32; 3]);
                         let uvs = mesh.uvs.as_ref().map(|uvs| load_slice!(uvs, [f32; 2]));
                         let tangents = mesh.tangents.as_ref().map(|t| load_slice!(t, [f32; 3]));
-
+                        let materials = load_slice!(&mesh.materials, u32);
                         let mesh = Mesh::new(
                             device.clone(),
                             MeshBuildArgs {
@@ -445,6 +454,7 @@ impl SceneLoader {
                                 indices,
                                 uvs,
                                 tangents,
+                                materials,
                             },
                         );
                         let geom_id = meshes.len();

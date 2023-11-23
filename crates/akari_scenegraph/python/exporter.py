@@ -454,8 +454,9 @@ class SceneExporter:
             'mesh_ptr':m.as_pointer(),
             'num_vertices':len(V),
             'num_triangles':len(F),
+            'has_uv':has_uv,
         }
-        exported_mesh = AKARI_API.export_blender_mesh(json.dumps(export_mesh_args).encode('utf-8'))
+        exported_mesh = AKARI_API.invoke_akari_api(json.dumps(export_mesh_args).encode('utf-8'))
 
        
         # self.exported_geometries[name] = {"Mesh": exported_mesh}
