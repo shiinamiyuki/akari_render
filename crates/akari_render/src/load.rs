@@ -3,7 +3,7 @@ use crate::{
     geometry::AffineTransform,
     heap::MegaHeap,
     light::{area::AreaLight, Light, LightAggregate, WeightedLightDistribution},
-    mesh::{Mesh, MeshAggregate, MeshBuildArgs, MeshInstanceFlags, MeshInstanceHost},
+    mesh::{Mesh, MeshAggregate, MeshInstanceFlags, MeshInstanceHost, MeshRef},
     scene::Scene,
     svm::{
         compiler::{CompilerDriver, SvmCompileContext},
@@ -310,7 +310,7 @@ impl SceneLoader {
                         &self.mesh_areas.borrow()[geom_id],
                     );
                 }
-                let surface_shader:&ShaderRef = todo!();//&self.nodes_to_surface_shader[&instance_node.materials];
+                let surface_shader: &ShaderRef = todo!(); //&self.nodes_to_surface_shader[&instance_node.materials];
                 let light_ref = self.lights.push(
                     (),
                     AreaLight {
@@ -448,14 +448,7 @@ impl SceneLoader {
                         let materials = load_slice!(&mesh.materials, u32);
                         let mesh = Mesh::new(
                             device.clone(),
-                            MeshBuildArgs {
-                                vertices,
-                                normals,
-                                indices,
-                                uvs,
-                                tangents,
-                                materials,
-                            },
+                            MeshRef::new(vertices, normals, indices, materials, uvs, tangents),
                         );
                         let geom_id = meshes.len();
                         meshes.push(mesh);

@@ -23,7 +23,8 @@ pub struct Mesh {
     pub has_uvs: bool,
     pub has_tangents: bool,
 }
-pub struct MeshBuildArgs<'a> {
+
+pub struct MeshRef<'a> {
     pub vertices: &'a [[f32; 3]],
     pub normals: Option<&'a [[f32; 3]]>,
     pub tangents: Option<&'a [[f32; 3]]>,
@@ -31,9 +32,81 @@ pub struct MeshBuildArgs<'a> {
     pub uvs: Option<&'a [[f32; 2]]>,
     pub indices: &'a [[u32; 3]],
     pub materials: &'a [u32],
+
+    pub generated_tangents: Option<Vec<[f32; 3]>>,
+    pub aabb: (glam::Vec3, glam::Vec3),
+    pub inv_aabb_size: glam::Vec3,
 }
+impl<'a> mikktspace::Geometry for MeshRef<'a> {
+    fn num_faces(&self) -> usize {
+        self.indices.len()
+    }
+
+    fn num_vertices_of_face(&self, _face: usize) -> usize {
+        3
+    }
+
+    fn position(&self, face: usize, vert: usize) -> [f32; 3] {
+        self.vertices[self.indices[face][vert] as usize]
+    }
+
+    fn normal(&self, face: usize, vert: usize) -> [f32; 3] {
+        if let Some(normals) = &self.normals {
+            normals[self.indices[face][vert] as usize]
+        } else {
+            let p0: glam::Vec3 = self.vertices[self.indices[face][0] as usize].into();
+            let p1: glam::Vec3 = self.vertices[self.indices[face][1] as usize].into();
+            let p2: glam::Vec3 = self.vertices[self.indices[face][2] as usize].into();
+            let v0 = p1 - p0;
+            let v1 = p2 - p0;
+            v0.cross(v1).normalize().into()
+        }
+    }
+
+    fn tex_coord(&self, face: usize, vert: usize) -> [f32; 2] {
+        if let Some(uvs) = &self.uvs {
+            uvs[self.indices[face][vert] as usize]
+        } else {
+            let p: glam::Vec3 = self.position(face, vert).into();
+            let center = (self.aabb.0 + self.aabb.1) * 0.5;
+            let p = (p + center) * self.inv_aabb_size;
+            todo!()
+        }
+    }
+}
+impl<'a> MeshRef<'a> {
+    pub fn new(
+        vertices: &'a [[f32; 3]],
+        normals: Option<&'a [[f32; 3]]>,
+        indices: &'a [[u32; 3]],
+        materials: &'a [u32],
+        uvs: Option<&'a [[f32; 2]]>,
+        tangents: Option<&'a [[f32; 3]]>,
+    ) -> Self {
+        let mut aabb = (glam::Vec3::splat(std::f32::MAX), glam::Vec3::splat(std::f32::MIN));
+        for v in vertices {
+            aabb.0 = aabb.0.min(glam::Vec3::from(*v));
+            aabb.1 = aabb.1.max(glam::Vec3::from(*v));
+        }
+        let inv_aabb_size = 1.0 / (aabb.1 - aabb.0);
+        Self {
+            vertices,
+            normals,
+            tangents,
+            // bitangent_signs,
+            uvs,
+            indices,
+            materials,
+            generated_tangents: None,
+            aabb,
+            inv_aabb_size,
+        }
+    }
+    pub fn compute_tangents(&mut self) {}
+}
+
 impl Mesh {
-    pub fn new(device: Device, args: MeshBuildArgs<'_>) -> Self {
+    pub fn new(device: Device, args: MeshRef<'_>) -> Self {
         if let Some(normals) = &args.normals {
             assert_eq!(args.indices.len() * 3, normals.len());
         }

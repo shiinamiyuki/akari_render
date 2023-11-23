@@ -95,56 +95,6 @@ lazy_static! {
         Callable::<fn(Expr<Float3>, Expr<Float2>) -> Expr<f32>>::new_static(|w, alpha| {
             tr_lambda_impl_(w, alpha)
         });
-    static ref TR_SAMPLE_11: Callable<fn(Expr<f32>, Expr<Float2>) -> Expr<Float2>> =
-        Callable::<fn(Expr<f32>, Expr<Float2>) -> Expr<Float2>>::new_static(track!(
-            |cos_theta, u| {
-                if cos_theta.lt(0.99999) {
-                    let sin_theta = (1.0 - cos_theta.sqr()).max_(0.0).sqrt();
-                    let tan_theta = sin_theta / cos_theta;
-                    let a = 1.0 / tan_theta;
-                    let g1 = 2.0 / (1.0 + (1.0 + 1.0 / a.sqr()).sqrt());
-
-                    let a = 2.0 * u.x / g1 - 1.0;
-                    let tmp = (1.0 / (a.sqr() - 1.0)).min_(1e10f32);
-                    let b = tan_theta;
-                    let d = ((b * tmp).sqr() - (a.sqr() - b.sqr()) * tmp)
-                        .max_(0.0)
-                        .sqrt();
-                    let slope_x_1 = b * tmp - d;
-                    let slope_x_2 = b * tmp + d;
-                    let slope_x = select(
-                        a.lt(0.0) | (slope_x_2 * tan_theta).gt(1.0),
-                        slope_x_1,
-                        slope_x_2,
-                    );
-
-                    let s = select(u.y.gt(0.5), 1.0f32.expr(), (-1.0f32).expr());
-                    let u2 = select(u.y.gt(0.5), 2.0 * (u.y - 0.5), 2.0 * (0.5 - u.y));
-                    let z = (u2 * (u2 * (u2 * 0.27385 - 0.73369) + 0.46341))
-                        / (u2 * (u2 * (u2 * 0.093073 + 0.309420) - 1.000000) + 0.597999);
-                    let slope_y = s * z * (1.0 + slope_x.sqr()).sqrt();
-                    Float2::expr(slope_x, slope_y)
-                } else {
-                    let r = (u.x / (1.0 - u.x)).sqrt();
-                    let phi = 2.0 * PI * u.y;
-                    Float2::expr(r * phi.cos(), r * phi.sin())
-                }
-            }
-        ));
-    static ref TR_SAMPLE: Callable<fn(Expr<Float3>, Expr<Float2>, Expr<Float2>) -> Expr<Float3>> =
-        Callable::<fn(Expr<Float3>, Expr<Float2>, Expr<Float2>) -> Expr<Float3>>::new_static(
-            track!(|wi, alpha, u| {
-                let wi_stretched = Float3::expr(alpha.x * wi.x, wi.y, alpha.y * wi.z).normalize();
-                let slope = TR_SAMPLE_11.call(Frame::cos_theta(wi_stretched), u);
-
-                let slope = Float2::expr(
-                    Frame::cos_phi(wi_stretched) * slope.x - Frame::sin_phi(wi_stretched) * slope.y,
-                    Frame::sin_phi(wi_stretched) * slope.x + Frame::cos_phi(wi_stretched) * slope.y,
-                );
-                let slope = alpha * slope;
-                Float3::expr(-slope.x, 1.0, -slope.y).normalize()
-            })
-        );
 }
 impl MicrofacetDistribution for TrowbridgeReitzDistribution {
     fn d(&self, wh: Expr<Float3>, ad_mode: ADMode) -> Expr<f32> {
@@ -166,17 +116,6 @@ impl MicrofacetDistribution for TrowbridgeReitzDistribution {
     fn sample_wh(&self, _wo: Expr<Float3>, u: Expr<Float2>, ad_mode: ADMode) -> Expr<Float3> {
         if self.sample_visible {
             todo!("untested");
-            // let s = select(
-            //     Frame::cos_theta(wo).gt(0.0),
-            //     1.0f32.expr(),
-            //     (-1.0f32).expr(),
-            // );
-            // let wh = if self.ad_mode != ADMode::Backward {
-            //     TR_SAMPLE.call(s * wo, self.alpha, u)
-            // } else {
-            //     tr_sample_impl_(s * wo, self.alpha, u)
-            // };
-            // s * wh
         } else {
             lazy_static! {
                 static ref SAMPLE: Callable<fn(Expr<Float2>, Expr<Float2>) -> Expr<Float3>> =

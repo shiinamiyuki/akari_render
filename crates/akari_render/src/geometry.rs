@@ -75,12 +75,12 @@ impl Frame {
     #[inline]
     #[tracked(crate = "luisa")]
     pub fn cos_theta(w: Expr<Float3>) -> Expr<f32> {
-        w.y
+        w.z
     }
     #[inline]
     #[tracked(crate = "luisa")]
     pub fn cos2_theta(w: Expr<Float3>) -> Expr<f32> {
-        let c = w.y;
+        let c = Self::cos_theta(w);
         c * c
     }
     #[inline]
@@ -137,13 +137,13 @@ impl Frame {
         select(
             sin_theta.eq(0.0),
             1.0f32.expr(),
-            (w.z / sin_theta).clamp(-1.0.expr(), 1.0.expr()),
+            (w.y / sin_theta).clamp(-1.0.expr(), 1.0.expr()),
         )
     }
     #[inline]
     #[tracked(crate = "luisa")]
     pub fn same_hemisphere(w1: Expr<Float3>, w2: Expr<Float3>) -> Expr<bool> {
-        (w1.y * w2.y) >= (0.0)
+        (w1.z * w2.z) >= (0.0)
     }
 }
 impl FrameExpr {
@@ -155,15 +155,15 @@ impl FrameExpr {
             Float3::expr(0.0, n.z, -n.y) / (n.y * n.y + n.z * n.z).sqrt()
         };
         let s = n.cross(t);
-        Frame::new_expr(n, s, t)
+        Frame::new_expr(n, t, s)
     }
     #[tracked(crate = "luisa")]
     pub fn to_world(&self, v: Expr<Float3>) -> Expr<Float3> {
-        self.s * v.x + self.n * v.y + self.t * v.z
+        self.t * v.x + self.s * v.y + self.n * v.z
     }
     #[tracked(crate = "luisa")]
     pub fn to_local(&self, v: Expr<Float3>) -> Expr<Float3> {
-        Float3::expr(self.s.dot(v), self.n.dot(v), self.t.dot(v))
+        Float3::expr(self.t.dot(v), self.s.dot(v), self.n.dot(v))
     }
 }
 #[derive(Clone, Copy, Debug, Value)]
@@ -279,24 +279,24 @@ pub fn spherical_to_xyz2(
     sin_theta: Expr<f32>,
     phi: Expr<f32>,
 ) -> Expr<Float3> {
-    Float3::expr(sin_theta * phi.cos(), cos_theta, sin_theta * phi.sin())
+    Float3::expr(sin_theta * phi.cos(), sin_theta * phi.sin(), cos_theta)
 }
 #[tracked(crate = "luisa")]
 pub fn spherical_to_xyz(theta: Expr<f32>, phi: Expr<f32>) -> Expr<Float3> {
     let sin_theta = theta.sin();
-    Float3::expr(sin_theta * phi.cos(), theta.cos(), sin_theta * phi.sin())
+    Float3::expr(sin_theta * phi.cos(), sin_theta * phi.sin(), theta.cos())
 }
 
 /// let (theta, phi) = xyz_to_spherical(v);
 #[tracked(crate = "luisa")]
 pub fn xyz_to_spherical(v: Expr<Float3>) -> (Expr<f32>, Expr<f32>) {
-    let phi = v.z.atan2(v.x);
-    let theta = v.y.acos();
+    let phi = v.y.atan2(v.x);
+    let theta = v.z.acos();
     (theta, phi)
 }
 
 #[tracked(crate = "luisa")]
 pub fn invert_phi(v: Expr<Float3>) -> Expr<f32> {
-    let phi = v.z.atan2(v.x);
+    let phi = v.y.atan2(v.x);
     (phi / (2.0 * PI)).fract()
 }

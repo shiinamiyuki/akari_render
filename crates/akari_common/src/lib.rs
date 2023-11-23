@@ -14,3 +14,4 @@ pub use rayon;
 pub use serde;
 pub use serde_json;
 pub use sha2;
+pub use bevy_mikktspace as mikktspace;

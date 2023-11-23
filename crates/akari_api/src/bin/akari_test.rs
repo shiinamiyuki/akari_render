@@ -55,11 +55,7 @@ mod bsdf_chi2_test {
                         let (theta, phi) = xyz_to_spherical(wi);
                         let phi = select(phi.lt(0.0), phi + 2.0 * PI, phi) / (2.0 * PI);
                         let theta = theta / PI;
-                        // cpu_dbg!(Float2::expr(phi, theta));
-                        // cpu_dbg!(Float4::expr(s.wi.x, s.wi.y, s.wi.z, s.wi.y.acos()));
-                        // cpu_dbg!(Float2::expr(theta / PI, s.wi.y.acos() / PI));
-                        // lc_assert!(phi.ge(0.0) & phi.le(1.0001));
-                        // lc_assert!(theta.ge(0.0) & theta.le(1.0001));
+
                         let bin_theta = (theta * theta_res as f32).cast_u32().min_(theta_res - 1);
                         let bin_phi = (phi * phi_res as f32).cast_u32().min_(phi_res - 1);
                         let bin_idx = bin_theta * phi_res + bin_phi;
