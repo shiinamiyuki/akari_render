@@ -44,7 +44,6 @@ pub mod film;
 pub mod geometry;
 pub mod gui;
 pub mod heap;
-pub mod integrator;
 pub mod interaction;
 pub mod light;
 pub mod load;

@@ -1,10 +1,7 @@
-use akari_render::serde_json;
+use akari_integrator::{render, RenderSession, RenderTask};
 use akari_render::clap;
-use akari_render::{
-    gui::DisplayWindow,
-    integrator::{render, RenderSession, RenderTask},
-    luisa,
-};
+use akari_render::serde_json;
+use akari_render::{gui::DisplayWindow, luisa};
 use clap::{arg, builder::BoolishValueParser, Arg, ArgAction, Command};
 use std::{env::current_exe, fs::File, process::exit};
 
