@@ -4,7 +4,7 @@ use crate::*;
 use scene_graph::{
     blender_util::{self, ImportMeshArgs},
     scene::Geometry,
-    Camera, Instance, Material, NodeRef,
+    Buffer, Camera, Image, Instance, Material, NodeRef,
 };
 use serde::*;
 
@@ -17,6 +17,7 @@ pub enum SceneImportApi {
     ImportMaterial { name: String, mat: Material },
     ImportInstance { name: String, instance: Instance },
     ImportCamera { camera: Camera },
+    ImportBuffer { name: String, buffer: Buffer },
     WriteScene { path: String, compact: bool },
 }
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -24,6 +25,7 @@ pub enum SceneImportApi {
 pub enum SceneImportApiResult {
     None,
     Bool { value: bool },
+    Buffer { value: NodeRef<Buffer> },
     Geometry { value: NodeRef<Geometry> },
     Material { value: NodeRef<Material> },
     Instance { value: NodeRef<Instance> },
@@ -57,6 +59,11 @@ pub fn import(api: SceneImportApi) -> SceneImportApiResult {
         SceneImportApi::Finalize => {
             SCENE_IMPORT_CONTEXT.with(|ctx| {
                 *ctx.borrow_mut() = None;
+            });
+        }
+        SceneImportApi::ImportBuffer { name, buffer } => {
+            return with_scene_import_context(|ctx| SceneImportApiResult::Buffer {
+                value: ctx.scene.add_buffer(Some(name), buffer),
             });
         }
         SceneImportApi::ImportMesh { args } => {

@@ -91,6 +91,26 @@ pub fn write_image_hdr(color: &Tex2d<Float4>, path: &str) {
     )
     .unwrap();
 }
+pub fn write_image_hdr_compressed(color: &Tex2d<Float4>, path: &str) {
+    let color_buf = color.view(0).copy_to_vec::<Float4>();
+    let parent_dir = std::path::Path::new(path).parent().unwrap();
+    std::fs::create_dir_all(parent_dir).unwrap();
+    use exr::prelude::*;
+    let colors = |x: usize, y: usize| {
+        let i = x + y * color.width() as usize;
+        let pixel: glam::Vec4 = color_buf[i].into();
+        (pixel.x, pixel.y, pixel.z)
+    };
+    let channels = SpecificChannels::rgb(|Vec2(x, y)| colors(x, y));
+    Image::from_encoded_channels(
+        (color.width() as usize, color.height() as usize),
+        Encoding::SMALL_LOSSLESS,
+        channels,
+    )
+    .write()
+    .to_file(path)
+    .unwrap();
+}
 
 pub fn erf_inv(x: Expr<f32>) -> Expr<f32> {
     lazy_static! {

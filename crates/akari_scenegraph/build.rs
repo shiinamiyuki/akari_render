@@ -21,4 +21,12 @@ fn main() {
     }
     println!("cargo:rustc-link-search=native={}/build", out.display());
     println!("cargo:rustc-link-lib=static=akari_blender_cpp_ext");
+    bindgen::builder()
+        .header("cpp_ext/akari_blender_cpp_ext.h")
+        .clang_args(&["-x", "c++"])
+        .allowlist_function("get_.*")
+        .generate()
+        .unwrap()
+        .write_to_file("src/akari_blender_cpp_ext.rs")
+        .unwrap();
 }

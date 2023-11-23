@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::geometry::{Frame, FrameExpr};
+use crate::geometry::{map_to_sphere_host, Frame, FrameExpr};
 use crate::heap::MegaHeap;
 use crate::interaction::SurfaceInteraction;
 use crate::svm::ShaderRef;
@@ -70,8 +70,12 @@ impl<'a> mikktspace::Geometry for MeshRef<'a> {
             let p: glam::Vec3 = self.position(face, vert).into();
             let center = (self.aabb.0 + self.aabb.1) * 0.5;
             let p = (p + center) * self.inv_aabb_size;
-            todo!()
+            map_to_sphere_host(p).into()
         }
+    }
+    fn set_tangent_encoded(&mut self, tangent: [f32; 4], face: usize, vert: usize) {
+        let tangents = self.generated_tangents.as_mut().unwrap();
+        tangents[self.indices[face][vert] as usize] = std::array::from_fn(|i| tangent[i] as f32);
     }
 }
 impl<'a> MeshRef<'a> {
@@ -83,7 +87,10 @@ impl<'a> MeshRef<'a> {
         uvs: Option<&'a [[f32; 2]]>,
         tangents: Option<&'a [[f32; 3]]>,
     ) -> Self {
-        let mut aabb = (glam::Vec3::splat(std::f32::MAX), glam::Vec3::splat(std::f32::MIN));
+        let mut aabb = (
+            glam::Vec3::splat(std::f32::MAX),
+            glam::Vec3::splat(std::f32::MIN),
+        );
         for v in vertices {
             aabb.0 = aabb.0.min(glam::Vec3::from(*v));
             aabb.1 = aabb.1.max(glam::Vec3::from(*v));
@@ -93,7 +100,6 @@ impl<'a> MeshRef<'a> {
             vertices,
             normals,
             tangents,
-            // bitangent_signs,
             uvs,
             indices,
             materials,
@@ -102,7 +108,17 @@ impl<'a> MeshRef<'a> {
             inv_aabb_size,
         }
     }
-    pub fn compute_tangents(&mut self) {}
+    pub fn tangents(&self) -> &[[f32; 3]] {
+        self.tangents
+            .or(self.generated_tangents.as_ref().map(|t| t.as_slice()))
+            .unwrap()
+    }
+    pub fn compute_tangents(&mut self) {
+        self.generated_tangents = Some(vec![[0.0f32; 3]; self.vertices.len()]);
+        if !mikktspace::generate_tangents(self) {
+            log::warn!("failed to generate tangents for mesh");
+        }
+    }
 }
 
 impl Mesh {

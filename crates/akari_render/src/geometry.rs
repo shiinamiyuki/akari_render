@@ -1,4 +1,4 @@
-use std::f32::consts::PI;
+use std::f32::consts::{FRAC_1_PI, PI};
 
 use crate::*;
 #[derive(Clone, Copy, Debug, Value)]
@@ -299,4 +299,40 @@ pub fn xyz_to_spherical(v: Expr<Float3>) -> (Expr<f32>, Expr<f32>) {
 pub fn invert_phi(v: Expr<Float3>) -> Expr<f32> {
     let phi = v.y.atan2(v.x);
     (phi / (2.0 * PI)).fract()
+}
+
+pub fn map_to_sphere_host(p: glam::Vec3) -> glam::Vec2 {
+    let l = p.length_squared();
+    let u;
+    let v;
+    if l > 0.0 {
+        if p.x == 0.0 && p.y == 0.0 {
+            u = 0.0;
+        } else {
+            u = (0.5 - p.x.atan2(p.y)) * FRAC_1_2PI;
+        }
+        v = 1.0 - (p.z / l.sqrt()).clamp(-1.0, 1.0).acos() * FRAC_1_PI;
+    } else {
+        u = 0.0;
+        v = 0.0;
+    }
+    glam::Vec2::new(u, v)
+}
+#[tracked(crate = "luisa")]
+pub fn map_to_sphere(p: Expr<Float3>) -> Expr<Float2> {
+    let l = p.length_squared();
+    let u = 0.0f32.var();
+    let v = 0.0f32.var();
+    if l > 0.0 {
+        if p.x == 0.0 && p.y == 0.0 {
+            *u = 0.0;
+        } else {
+            *u = (0.5 - p.x.atan2(p.y)) * FRAC_1_2PI;
+        }
+        *v = 1.0 - (p.z / l.sqrt()).clamp(-1.0f32.expr(), 1.0f32.expr()).acos() * FRAC_1_PI;
+    } else {
+        *u = 0.0;
+        *v = 0.0;
+    }
+    Float2::expr(u, v)
 }

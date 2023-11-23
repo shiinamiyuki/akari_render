@@ -12,14 +12,16 @@ import os
 import struct
 from ctypes import *
 
-AKARI_API = cdll.LoadLibrary(os.environ['AKARI_API_PATH'])
+AKARI_API = cdll.LoadLibrary(os.environ["AKARI_API_PATH"])
+
 
 def invoke_akari_api(args):
-    ptr = AKARI_API.py_akari_import(json.dumps(args).encode('utf-8'))
-    ret = string_at(ptr).decode('utf-8')
+    ptr = AKARI_API.py_akari_import(json.dumps(args).encode("utf-8"))
+    ret = string_at(ptr).decode("utf-8")
     ret = json.loads(ret)
     AKARI_API.py_akari_free_string(ptr)
     return ret
+
 
 def check_blender_version():
     # only supports blender 4.0
@@ -27,7 +29,9 @@ def check_blender_version():
         print("Only supports blender 4.0")
         sys.exit(1)
 
+
 check_blender_version()
+
 
 def dbg(*args, **kwargs):
     print(f"Debug {sys._getframe().f_back.f_lineno}: ", end="")
@@ -51,16 +55,7 @@ def path_join(a, b):
 D = bpy.data
 C = bpy.context
 depsgraph = C.evaluated_depsgraph_get()
-bpy.ops.object.mode_set(mode="OBJECT")
-# select one object to activate edit mode
-for obj in C.scene.objects:
-    first_obj = C.scene.objects[0]
-    if first_obj.type == "MESH":
-        first_obj.select_set(True)
-        C.view_layer.objects.active = first_obj
-        break
 
-bpy.ops.object.select_all(action="DESELECT")
 
 argv = sys.argv
 print(argv)
@@ -124,30 +119,6 @@ class UniqueName:
         self.m[m] = gened_name
         dbg(name, gened_name)
         return gened_name
-
-
-def compute_uv_map(obj):
-    # compute uv mapping using smart uv project
-    bpy.ops.object.mode_set(mode="OBJECT")
-    bpy.ops.object.select_all(action="DESELECT")
-    obj.select_set(True)
-    C.view_layer.objects.active = obj
-    bpy.ops.object.mode_set(mode="EDIT")
-    bpy.ops.mesh.select_all(action="SELECT")
-    bpy.ops.uv.smart_project()
-    bpy.ops.object.mode_set(mode="OBJECT")
-    obj.select_set(False)
-
-
-def is_uv_map_valid(obj):
-    if len(obj.data.uv_layers) == 0:
-        return False
-    layer = obj.data.uv_layers[0]
-    for uv in layer.uv:
-        v = uv.vector
-        if v[0] != 0.0 or v[1] != 0.0:
-            return True
-    return False
 
 
 VISITED = UniqueName()
@@ -430,36 +401,37 @@ class SceneExporter:
         return out
 
     def export_mesh_data(self, m, name, has_uv):
-        bm = bmesh.new()
-        bm.from_mesh(m)
-        bmesh.ops.triangulate(bm, faces=bm.faces[:])
-        bm.to_mesh(m)
-        bm.free()
+        # bm = bmesh.new()
+        # bm.from_mesh(m)
+        # bmesh.ops.triangulate(bm, faces=bm.faces[:])
+        # bm.to_mesh(m)
+        # bm.free()
         m.calc_loop_triangles()
-        if has_uv:
-            m.calc_tangents()
-        else:
-            # only compute normals
-            m.calc_normals_split()
 
         V = m.vertices
         F = m.loop_triangles
         print(f"    #V: {len(V)} #F: {len(F)}")
 
         export_mesh_args = {
-            'name': name,
-            "loop_tri_ptr":m.loop_triangles[0].as_pointer(),
-            'vertex_ptr':m.vertices[0].as_pointer(),
-            'uv_ptr':m.uv_layers[0].uv[0].as_pointer() if has_uv else 0,
-            'mesh_ptr':m.as_pointer(),
-            'num_vertices':len(V),
-            'num_triangles':len(F),
-            'has_uv':has_uv,
+            "name": name,
+            "loop_tri_ptr": m.loop_triangles[0].as_pointer(),
+            "vertex_ptr": m.vertices[0].as_pointer(),
+            "uv_ptr": m.uv_layers[0].uv[0].as_pointer() if has_uv else 0,
+            "mesh_ptr": m.as_pointer(),
+            "num_vertices": len(V),
+            "num_triangles": len(F),
         }
-        exported_mesh = AKARI_API.invoke_akari_api(json.dumps(export_mesh_args).encode('utf-8'))
+        exported_mesh = invoke_akari_api(
+            json.dumps(
+                {
+                    "ImportMesh": {
+                        "args": export_mesh_args,
+                    }
+                }
+            ).encode("utf-8")
+        )
 
-       
-        # self.exported_geometries[name] = {"Mesh": exported_mesh}
+        self.exported_geometries[name] = exported_mesh["Geometry"]["value"]
 
     def convert_matrix_to_list(self, mat):
         l = [[x for x in row] for row in mat.row]
@@ -481,22 +453,6 @@ class SceneExporter:
             len(m.uv_layers) <= 1
         ), f"Only one uv layer is supported but found {len(m.uv_layers)}"
         has_uv = len(m.uv_layers) == 1
-        if has_uv:
-            if not is_uv_map_valid(obj):
-                print(f"Mesh `{obj.name}` has invalid uv map")
-                has_uv = False
-        if not has_uv:
-            print(f"Mesh `{obj.name}` has no uv map")
-            print(f"Try to compute uv map for `{obj.name}`")
-            try:
-                compute_uv_map(obj)
-                has_uv = True
-            except Exception as e:
-                print(f"Failed to compute uv map for `{obj.name}`")
-                print(f"Reason: {e}")
-                print("Continue without uv map")
-        else:
-            print(f"Mesh `{obj.name}` has uv map")
         eval_obj = obj.evaluated_get(depsgraph)
         m = eval_obj.to_mesh()
         self.export_mesh_data(m, f"{name}_mesh", has_uv)
@@ -552,19 +508,7 @@ class SceneExporter:
         name = VISITED.get(self.scene)
         camera = self.export_camera()
         print(f"Exporting Scene `{self.scene.name}` -> {name}")
-        # seperate meshes by material
-        print("Seperating meshes by material")
-        for obj in self.visible_objects():
-            if obj.type == "MESH":
-                bpy.ops.object.mode_set(mode="OBJECT")
-                bpy.ops.object.select_all(action="DESELECT")
-                obj.select_set(True)
-                bpy.ops.object.mode_set(mode="EDIT")
-                # Seperate by material
-                bpy.ops.mesh.separate(type="MATERIAL")
-                bpy.ops.object.mode_set(mode="OBJECT")
-                obj.select_set(False)
-        bpy.ops.object.select_all(action="DESELECT")
+
         for obj in self.visible_objects():
             if obj.type == "MESH":
                 self.export_mesh(obj)

@@ -15,6 +15,8 @@ pub mod shader;
 
 pub use scene::*;
 pub use shader::*;
+#[allow(non_snake_case)]
+mod akari_blender_cpp_ext;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NodeRef<T> {
