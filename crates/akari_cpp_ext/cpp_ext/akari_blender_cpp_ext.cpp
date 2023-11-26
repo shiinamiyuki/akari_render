@@ -54,6 +54,7 @@ const int *BKE_mesh_material_indices(const Mesh *mesh) {
 
 }// namespace copied_from_blender_4_0
 
+namespace blender_util {
 extern "C" void get_mesh_triangle_indices(const TheadPoolContext &ctx, const Mesh *mesh, const MLoopTri *tri, size_t count, uint32_t *out) {
     const int *corner_verts = copied_from_blender_4_0::BKE_mesh_corner_verts(mesh);
     ctx.parallel_for(count, [&](size_t i) {
@@ -98,3 +99,4 @@ extern "C" void get_mesh_material_indices(const TheadPoolContext &ctx, const Mes
         out[i] = material_indices[face];
     });
 }
+}// namespace blender

@@ -2,7 +2,7 @@ use std::cell::RefCell;
 
 use crate::*;
 use scene_graph::{
-    blender_util::{self, ImportMeshArgs},
+    blender::{self, ImportMeshArgs},
     scene::Geometry,
     Buffer, Camera, Image, Instance, Material, NodeRef,
 };
@@ -68,7 +68,7 @@ pub fn import(api: SceneImportApi) -> SceneImportApiResult {
         }
         SceneImportApi::ImportMesh { args } => {
             return with_scene_import_context(|ctx| SceneImportApiResult::Geometry {
-                value: blender_util::import_blender_mesh(&mut ctx.scene, args),
+                value: blender::import_blender_mesh(&mut ctx.scene, args),
             });
         }
         SceneImportApi::ImportMaterial { name, mat } => {

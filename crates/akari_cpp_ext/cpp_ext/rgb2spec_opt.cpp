@@ -836,7 +836,7 @@ void ParallelFor(int64_t start, int64_t end, std::function<void(int64_t, int64_t
     while (!loop.Finished())
         threadPool->WorkOrWait(&lock);
 }
-extern "C" int rgb2spec_opt(int argc, char **argv)
+extern "C" int rgb2spec_opt(int argc, const char *const*argv)
 {
     if (argc < 3)
     {

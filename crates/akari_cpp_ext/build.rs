@@ -24,9 +24,11 @@ fn main() {
     bindgen::builder()
         .header("cpp_ext/akari_blender_cpp_ext.h")
         .clang_args(&["-x", "c++"])
-        .allowlist_function("get_.*")
+        .allowlist_file("cpp_ext/akari_blender_cpp_ext.h")
+        // .allowlist_function("get_.*")
+        .enable_cxx_namespaces()
         .generate()
         .unwrap()
-        .write_to_file("src/akari_blender_cpp_ext.rs")
+        .write_to_file("src/binding.rs")
         .unwrap();
 }

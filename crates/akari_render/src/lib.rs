@@ -33,11 +33,11 @@ pub use luisa::{
         api::StreamTag, Callable, Command, Device, DynCallable, Kernel, Scope, Stream, Swapchain,
     },
 };
+pub(crate) use akari_cpp_ext as cpp_ext;
 pub use rayon::prelude::*;
 pub mod api;
 pub mod camera;
 pub mod color;
-pub mod cpp_ext;
 pub mod data;
 pub mod ext;
 pub mod film;

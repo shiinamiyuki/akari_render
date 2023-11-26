@@ -71,6 +71,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "akari_cpp_ext"
+version = "0.1.0"
+dependencies = [
+ "akari_common",
+ "bindgen",
+ "cmake",
+]
+
+[[package]]
 name = "akari_data"
 version = "0.1.0"
 
@@ -86,6 +95,7 @@ name = "akari_render"
 version = "0.1.0"
 dependencies = [
  "akari_common",
+ "akari_cpp_ext",
  "akari_data",
  "akari_scenegraph",
  "cmake",
@@ -99,6 +109,7 @@ name = "akari_scenegraph"
 version = "0.1.0"
 dependencies = [
  "akari_common",
+ "akari_cpp_ext",
  "bindgen",
  "cmake",
 ]
@@ -1177,12 +1188,6 @@ name = "luisa_compute_sys"
 version = "0.1.1-alpha.1"
 dependencies = [
  "cmake",
- "lazy_static",
- "libc",
- "luisa_compute_api_types",
- "luisa_compute_backend",
- "luisa_compute_ir",
- "parking_lot",
 ]
 
 [[package]]

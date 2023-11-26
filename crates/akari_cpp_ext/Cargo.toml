@@ -1,5 +1,5 @@
 [package]
-name = "akari_scenegraph"
+name = "akari_cpp_ext"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,15 +7,7 @@ edition = "2021"
 
 [dependencies]
 akari_common = { path = "../akari_common" }
-akari_cpp_ext = { path = "../akari_cpp_ext" }
 
 [build-dependencies]
 cmake = "0.1"
 bindgen = "0.69.1"
-
-# [lib]
-# crate-type = ["dylib"]
-
-[[bin]]
-name = "akari-import"
-path = "src/bin/import.rs"

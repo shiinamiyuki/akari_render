@@ -26,6 +26,7 @@ struct TheadPoolContext {
         }
     }
 };
+namespace blender_util {
 extern "C" {
 void get_mesh_triangle_indices(const TheadPoolContext &ctx, const Mesh *mesh,
                                const MLoopTri *tri, size_t count,
@@ -38,3 +39,10 @@ void get_mesh_material_indices(const TheadPoolContext &ctx, const Mesh *mesh,
                                const MLoopTri *tri, size_t count,
                                uint32_t *out);
 }
+}// namespace blender_util
+
+namespace spectral {
+extern "C" {
+int rgb2spec_opt(int argc, const char *const *argv);
+}
+}// namespace spectral

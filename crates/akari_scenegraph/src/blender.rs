@@ -19,34 +19,14 @@ pub struct ImportMeshArgs {
 #[derive(Clone, Copy)]
 #[repr(C)]
 struct MLoopTri([u32; 3]);
-use akari_blender_cpp_ext::{
-    get_mesh_material_indices, get_mesh_split_normals, get_mesh_tangents,
-    get_mesh_triangle_indices, TheadPoolContext,
+use cpp_ext::{
+    blender_util::{
+        get_mesh_material_indices, get_mesh_split_normals, get_mesh_tangents,
+        get_mesh_triangle_indices,
+    },
+    TheadPoolContext,
 };
 
-impl TheadPoolContext {
-    fn new<'a>(s: &rayon::Scope<'a>) -> Self {
-        unsafe extern "C" fn spawn<'a>(
-            context: *const c_void,
-            func: Option<unsafe extern "C" fn(arg1: *mut c_void)>,
-            data: *mut c_void,
-        ) {
-            let s = context as *const rayon::Scope<'a>;
-            let s = &*s;
-            let data = data as u64;
-            s.spawn(move |_| {
-                func.unwrap()(data as *mut c_void);
-            });
-        }
-        Self {
-            num_threads: rayon::current_num_threads(),
-            context: s as *const rayon::Scope<'a> as *const c_void,
-            _spawn: Some(spawn),
-        }
-    }
-}
-unsafe impl Send for TheadPoolContext {}
-unsafe impl Sync for TheadPoolContext {}
 pub fn import_blender_mesh(scene: &mut Scene, args: ImportMeshArgs) -> NodeRef<Geometry> {
     let mesh_ptr = args.mesh_ptr;
     let loop_tri_ptr = args.loop_tri_ptr;

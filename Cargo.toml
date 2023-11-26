@@ -6,6 +6,7 @@ members = [
     "crates/akari_api",
     "crates/akari_common",
     "crates/akari_integrator",
+    "crates/akari_cpp_ext"
 ]
 resolver = "2"
 

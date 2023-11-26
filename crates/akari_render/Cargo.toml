@@ -9,6 +9,7 @@ version = "0.1.0"
 akari_common = { path = "../akari_common" }
 akari_data = { path = "../akari_data" }
 akari_scenegraph = { path = "../akari_scenegraph" }
+akari_cpp_ext = { path = "../akari_cpp_ext" }
 winit = "0.28"
 
 

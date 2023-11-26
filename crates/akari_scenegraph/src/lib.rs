@@ -8,16 +8,15 @@ use std::{
 };
 
 pub(crate) use akari_common::{base64, memmap2, rayon, serde, serde_json};
+pub(crate) use akari_cpp_ext as cpp_ext;
 use serde::{de::*, ser::*};
 pub(crate) use serde::{Deserialize, Serialize};
-pub mod blender_util;
+pub mod blender;
 pub mod scene;
 pub mod shader;
 
 pub use scene::*;
 pub use shader::*;
-#[allow(non_snake_case)]
-mod akari_blender_cpp_ext;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(crate = "serde")]

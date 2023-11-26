@@ -2,7 +2,7 @@ pub const SPECTRUM_TABLE_RES: usize = 64;
 pub type Rgb2SpectrumTable =
     [[[[[f32; 3]; SPECTRUM_TABLE_RES]; SPECTRUM_TABLE_RES]; SPECTRUM_TABLE_RES]; 3];
 pub type Rgb2SpectrumScale = [f32; SPECTRUM_TABLE_RES];
-use crate::cpp_ext::rgb2spec_opt;
+use crate::cpp_ext::spectral::rgb2spec_opt;
 use crate::*;
 use std::{
     ffi::{CStr, CString},
