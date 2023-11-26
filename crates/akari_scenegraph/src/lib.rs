@@ -7,8 +7,9 @@ use std::{
     path::Path,
 };
 
-use serde::{de::Visitor, ser::SerializeMap, Deserialize, Serialize};
-
+pub(crate) use akari_common::{base64, memmap2, rayon, serde, serde_json};
+use serde::{de::*, ser::*};
+pub(crate) use serde::{Deserialize, Serialize};
 pub mod blender_util;
 pub mod scene;
 pub mod shader;
@@ -19,6 +20,7 @@ pub use shader::*;
 mod akari_blender_cpp_ext;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(crate = "serde")]
 pub struct NodeRef<T> {
     pub id: String,
     #[serde(skip)]
@@ -166,6 +168,7 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Collection<T> {
 /// This is useful for passing slices to C libraries/Python
 /// However, saving the serialized data to a file will not work
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(crate = "serde")]
 pub struct ExtSlice {
     ptr: u64,
     len: u64,
@@ -200,3 +203,6 @@ impl ExtSlice {
         std::slice::from_raw_parts_mut(self.ptr as *mut u8, self.len as usize)
     }
 }
+
+/// Python script that **exports** blender scenes to akari scenes
+pub const BLENDER_EXPORTER_SRC: &str = include_str!("../python/exporter.py");

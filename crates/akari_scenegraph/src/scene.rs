@@ -4,17 +4,19 @@ use std::{
     sync::{atomic::AtomicU64, Arc},
 };
 
-use base64::Engine;
-use memmap2::Mmap;
+use crate::base64::Engine;
+use crate::memmap2::Mmap;
 use rayon::prelude::*;
 
 use crate::{shader::ShaderGraph, *};
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(crate = "serde")]
 pub enum CoordinateSystem {
     Akari,
     Blender,
 }
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[serde(crate = "serde")]
 pub struct TRS {
     pub translation: [f32; 3],
     pub rotation: [f32; 3],
@@ -23,6 +25,7 @@ pub struct TRS {
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[serde(crate = "serde")]
 #[serde(tag = "type")]
 pub enum Transform {
     #[serde(rename = "trs")]
@@ -32,6 +35,7 @@ pub enum Transform {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(crate = "serde")]
 pub struct PerspectiveCamera {
     pub transform: Transform,
     pub fov: f32,
@@ -42,14 +46,17 @@ pub struct PerspectiveCamera {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(crate = "serde")]
 #[serde(tag = "type")]
 pub enum Camera {
     #[serde(rename = "perspective")]
     Perspective(PerspectiveCamera),
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(crate = "serde")]
 pub struct PointLight {}
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(crate = "serde")]
 #[serde(tag = "type")]
 pub enum Light {
     #[serde(rename = "point")]
@@ -57,6 +64,7 @@ pub enum Light {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(crate = "serde")]
 pub struct Instance {
     pub geometry: NodeRef<Geometry>,
     pub transform: Transform,
@@ -64,11 +72,13 @@ pub struct Instance {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(crate = "serde")]
 pub struct Material {
     pub shader: ShaderGraph,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(crate = "serde")]
 pub struct Scene {
     pub camera: Option<Camera>,
     pub instances: Collection<Instance>,
@@ -80,6 +90,7 @@ pub struct Scene {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(crate = "serde")]
 #[serde(tag = "type")]
 pub enum Buffer {
     #[serde(rename = "binary")]
@@ -94,6 +105,7 @@ pub enum Buffer {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(crate = "serde")]
 pub struct BufferView {
     pub buffer: NodeRef<Buffer>,
     pub offset: usize,
@@ -240,7 +252,7 @@ impl Buffer {
     }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]#[serde(crate = "serde")]
 pub enum ColorSpace {
     #[serde(rename = "srgb")]
     SRgb,
@@ -249,7 +261,7 @@ pub enum ColorSpace {
     #[serde(rename = "spectral")]
     Spectral,
 }
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]#[serde(crate = "serde")]
 pub enum ImageExtenisionMode {
     #[serde(rename = "repeat")]
     Repeat,
@@ -260,7 +272,7 @@ pub enum ImageExtenisionMode {
     #[serde(rename = "extend")]
     Extend,
 }
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]#[serde(crate = "serde")]
 pub enum ImageInterpolationMode {
     #[serde(rename = "nearest")]
     Nearest,
@@ -269,7 +281,7 @@ pub enum ImageInterpolationMode {
     #[serde(rename = "cubic")]
     Cubic,
 }
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]#[serde(crate = "serde")]
 pub enum ImageFormat {
     #[serde(rename = "png")]
     Png,
@@ -283,7 +295,7 @@ pub enum ImageFormat {
     Float,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]#[serde(crate = "serde")]
 pub struct Image {
     pub data: NodeRef<BufferView>,
     pub format: ImageFormat,
@@ -295,7 +307,7 @@ pub struct Image {
     pub channels: u32,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]#[serde(crate = "serde")]
 pub struct Mesh {
     pub vertices: NodeRef<BufferView>,
     pub indices: NodeRef<BufferView>,
@@ -306,7 +318,7 @@ pub struct Mesh {
     // pub bitangent_signs: Option<Buffer>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]#[serde(crate = "serde")]
 #[serde(tag = "type")]
 pub enum Geometry {
     #[serde(rename = "mesh")]

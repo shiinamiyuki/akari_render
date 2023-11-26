@@ -5,6 +5,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(crate = "serde")]
 pub struct ImportMeshArgs {
     pub vertex_ptr: u64,
     pub loop_tri_ptr: u64,

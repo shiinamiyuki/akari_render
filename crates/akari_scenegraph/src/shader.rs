@@ -7,6 +7,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(crate = "serde")]
 pub enum ShaderKind {
     #[serde(rename = "surface")]
     Surface,
@@ -19,6 +20,7 @@ pub enum ShaderKind {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(crate = "serde")]
 pub struct ShaderGraph {
     pub nodes: Collection<ShaderNode>,
     pub output: NodeRef<ShaderNode>,
@@ -32,6 +34,7 @@ impl<'a> Index<&'a NodeRef<ShaderNode>> for ShaderGraph {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(crate = "serde")]
 pub enum MathOp {
     #[serde(rename = "add")]
     Add,
@@ -45,6 +48,7 @@ pub enum MathOp {
     Pow,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(crate = "serde")]
 pub enum BsdfPreference {
     #[serde(rename = "mix")]
     LinearMix, //linear mix of lobes
@@ -53,6 +57,7 @@ pub enum BsdfPreference {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(crate = "serde")]
 #[serde(tag = "type")]
 pub enum ShaderNode {
     #[serde(rename = "float")]

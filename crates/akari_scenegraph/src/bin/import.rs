@@ -1,4 +1,4 @@
-use clap::{arg, builder::BoolishValueParser, Arg, ArgAction, Command};
+use akari_common::clap::{arg, builder::BoolishValueParser, Arg, ArgAction, Command};
 use std::{env::current_exe, path::PathBuf, process};
 
 fn find_blender() -> PathBuf {
