@@ -24,7 +24,7 @@ use cpp_ext::{
         get_mesh_material_indices, get_mesh_split_normals, get_mesh_tangents,
         get_mesh_triangle_indices,
     },
-    TheadPoolContext,
+    RayonScope,
 };
 
 pub fn import_blender_mesh(scene: &mut Scene, args: ImportMeshArgs) -> NodeRef<Geometry> {
@@ -56,7 +56,7 @@ pub fn import_blender_mesh(scene: &mut Scene, args: ImportMeshArgs) -> NodeRef<G
             );
         });
         s.spawn(|s| {
-            let ctx = TheadPoolContext::new(s);
+            let ctx = RayonScope::new(s);
             get_mesh_triangle_indices(
                 &ctx,
                 mesh_ptr as *const _,
@@ -68,7 +68,7 @@ pub fn import_blender_mesh(scene: &mut Scene, args: ImportMeshArgs) -> NodeRef<G
         {
             normals = vec![[0.0f32; 3]; args.num_triangles * 3];
             s.spawn(|s| {
-                let ctx = TheadPoolContext::new(s);
+                let ctx = RayonScope::new(s);
                 if !get_mesh_split_normals(
                     &ctx,
                     mesh_ptr as *const _,
@@ -83,7 +83,7 @@ pub fn import_blender_mesh(scene: &mut Scene, args: ImportMeshArgs) -> NodeRef<G
         {
             tangents = vec![[0.0f32; 3]; args.num_triangles * 3];
             s.spawn(|s| {
-                let ctx = TheadPoolContext::new(s);
+                let ctx = RayonScope::new(s);
                 if !get_mesh_tangents(
                     &ctx,
                     mesh_ptr as *const _,
@@ -98,7 +98,7 @@ pub fn import_blender_mesh(scene: &mut Scene, args: ImportMeshArgs) -> NodeRef<G
         if args.has_multi_materials {
             materials = vec![0u32; args.num_triangles];
             s.spawn(|s| {
-                let ctx = TheadPoolContext::new(s);
+                let ctx = RayonScope::new(s);
                 get_mesh_material_indices(
                     &ctx,
                     mesh_ptr as *const _,

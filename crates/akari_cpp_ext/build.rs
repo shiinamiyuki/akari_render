@@ -1,8 +1,8 @@
 fn main() {
     println!("cargo:rerun-if-changed=../../blender_src_path.txt");
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=cpp_ext");
-    let out = cmake::Config::new("cpp_ext")
+    println!("cargo:rerun-if-changed=./cpp_ext");
+    let out = cmake::Config::new("./cpp_ext")
         .generator("Ninja")
         .define("CMAKE_BUILD_TYPE", "Release")
         .no_build_target(true)
@@ -15,7 +15,7 @@ fn main() {
     println!("cargo:rustc-link-lib=static=akari_blender_cpp_ext");
     bindgen::builder()
         .header("cpp_ext/akari_blender_cpp_ext.h")
-        .clang_args(&["-x", "c++"])
+        .clang_args(&["-x", "c++", "-std=c++20"])
         .allowlist_file("cpp_ext/akari_blender_cpp_ext.h")
         .enable_cxx_namespaces()
         .generate()

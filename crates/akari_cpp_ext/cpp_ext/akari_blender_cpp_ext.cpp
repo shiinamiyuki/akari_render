@@ -1,7 +1,5 @@
 #include "DNA_mesh_types.h"
 #include "BKE_mesh_types.hh"
-#include <stdlib.h>
-#include <algorithm>
 #include "akari_blender_cpp_ext.h"
 /// this code is strictly for Blender 4.0
 
@@ -55,7 +53,7 @@ const int *BKE_mesh_material_indices(const Mesh *mesh) {
 }// namespace copied_from_blender_4_0
 
 namespace blender_util {
-extern "C" void get_mesh_triangle_indices(const TheadPoolContext &ctx, const Mesh *mesh, const MLoopTri *tri, size_t count, uint32_t *out) {
+extern "C" void get_mesh_triangle_indices(const RayonScope &ctx, const Mesh *mesh, const MLoopTri *tri, size_t count, uint32_t *out) {
     const int *corner_verts = copied_from_blender_4_0::BKE_mesh_corner_verts(mesh);
     ctx.parallel_for(count, [&](size_t i) {
         out[i * 3 + 0] = corner_verts[tri[i].tri[0]];
@@ -63,7 +61,7 @@ extern "C" void get_mesh_triangle_indices(const TheadPoolContext &ctx, const Mes
         out[i * 3 + 2] = corner_verts[tri[i].tri[2]]; });
 }
 
-extern "C" bool get_mesh_tangents(const TheadPoolContext &ctx, const Mesh *mesh, const MLoopTri *tri, size_t count, float *out) {
+extern "C" bool get_mesh_tangents(const RayonScope &ctx, const Mesh *mesh, const MLoopTri *tri, size_t count, float *out) {
     const auto layer = static_cast<const std::array<float, 4> *>(copied_from_blender_4_0::CustomData_get_layer(&mesh->loop_data, CD_MLOOPTANGENT));
     if (!layer) {
         return false;
@@ -77,7 +75,7 @@ extern "C" bool get_mesh_tangents(const TheadPoolContext &ctx, const Mesh *mesh,
     }
 }
 
-extern "C" bool get_mesh_split_normals(const TheadPoolContext &ctx, const Mesh *mesh, const MLoopTri *tri, size_t count, float *out) {
+extern "C" bool get_mesh_split_normals(const RayonScope &ctx, const Mesh *mesh, const MLoopTri *tri, size_t count, float *out) {
     const auto layer = static_cast<const std::array<float, 3> *>(copied_from_blender_4_0::CustomData_get_layer(&mesh->loop_data, CD_NORMAL));
 
     if (!layer) {
@@ -91,7 +89,7 @@ extern "C" bool get_mesh_split_normals(const TheadPoolContext &ctx, const Mesh *
         return true;
     }
 }
-extern "C" void get_mesh_material_indices(const TheadPoolContext &ctx, const Mesh *mesh, const MLoopTri *tri, size_t count, uint32_t *out) {
+extern "C" void get_mesh_material_indices(const RayonScope &ctx, const Mesh *mesh, const MLoopTri *tri, size_t count, uint32_t *out) {
     const auto &faces = mesh->runtime->looptri_faces_cache.data();
     const int *material_indices = copied_from_blender_4_0::BKE_mesh_material_indices(mesh);
     ctx.parallel_for(count, [&](size_t i) {

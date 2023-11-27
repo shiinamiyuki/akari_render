@@ -1,14 +1,14 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.20)
 
 project(akari_blender_cpp_ext)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 file(READ "../../../blender_src_path.txt" BLENDER_SRC_PATH)
 if(WIN32)
     if(MSVC)
-        # set(CMAKE_CXX_FLAGS /std:c++17 /MP /arch:AVX2 /WX)
+        set(CMAKE_CXX_FLAGS "/arch:AVX2 /WX /GR- /D_HAS_EXCEPTIONS=0 /EHsc ${CMAKE_CXX_FLAGS}")
     endif()
 else()
-    set(CMAKE_CXX_FLAGS "-lstdc++ -pthread ${CMAKE_CXX_FLAGS}")
+    set(CMAKE_CXX_FLAGS "-lstdc++ -pthread -mavx2 -fno-rtti -fno-exceptions ${CMAKE_CXX_FLAGS}")
 endif()
 
 add_library(akari_blender_cpp_ext akari_blender_cpp_ext.cpp rgb2spec_opt.cpp)
