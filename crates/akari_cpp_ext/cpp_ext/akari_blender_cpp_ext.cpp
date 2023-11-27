@@ -12,7 +12,7 @@ int CustomData_get_active_layer_index(const CustomData *data, const eCustomDataT
 }
 
 const void *CustomData_get_layer(const CustomData *data, const eCustomDataType type) {
-    int layer_index = CustomData_get_active_layer_index(data, type);
+    const int layer_index = CustomData_get_active_layer_index(data, type);
     if (layer_index == -1) {
         return nullptr;
     }
@@ -37,7 +37,7 @@ int CustomData_get_named_layer_index(const CustomData *data,
 const void *CustomData_get_layer_named(const CustomData *data,
                                        const eCustomDataType type,
                                        const char *name) {
-    int layer_index = CustomData_get_named_layer_index(data, type, name);
+    const int layer_index = CustomData_get_named_layer_index(data, type, name);
     if (layer_index == -1) {
         return nullptr;
     }
@@ -64,7 +64,7 @@ extern "C" void get_mesh_triangle_indices(const TheadPoolContext &ctx, const Mes
 }
 
 extern "C" bool get_mesh_tangents(const TheadPoolContext &ctx, const Mesh *mesh, const MLoopTri *tri, size_t count, float *out) {
-    auto layer = reinterpret_cast<const std::array<float, 4> *>(copied_from_blender_4_0::CustomData_get_layer(&mesh->loop_data, CD_MLOOPTANGENT));
+    const auto layer = static_cast<const std::array<float, 4> *>(copied_from_blender_4_0::CustomData_get_layer(&mesh->loop_data, CD_MLOOPTANGENT));
     if (!layer) {
         return false;
     } else {
@@ -78,7 +78,7 @@ extern "C" bool get_mesh_tangents(const TheadPoolContext &ctx, const Mesh *mesh,
 }
 
 extern "C" bool get_mesh_split_normals(const TheadPoolContext &ctx, const Mesh *mesh, const MLoopTri *tri, size_t count, float *out) {
-    auto layer = reinterpret_cast<const std::array<float, 3> *>(copied_from_blender_4_0::CustomData_get_layer(&mesh->loop_data, CD_NORMAL));
+    const auto layer = static_cast<const std::array<float, 3> *>(copied_from_blender_4_0::CustomData_get_layer(&mesh->loop_data, CD_NORMAL));
 
     if (!layer) {
         return false;
@@ -95,7 +95,7 @@ extern "C" void get_mesh_material_indices(const TheadPoolContext &ctx, const Mes
     const auto &faces = mesh->runtime->looptri_faces_cache.data();
     const int *material_indices = copied_from_blender_4_0::BKE_mesh_material_indices(mesh);
     ctx.parallel_for(count, [&](size_t i) {
-        auto face = faces[i];
+        const auto face = faces[i];
         out[i] = material_indices[face];
     });
 }

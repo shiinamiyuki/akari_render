@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.15)
 
 project(akari_blender_cpp_ext)
 set(CMAKE_CXX_STANDARD 17)
-
+file(READ "../../../blender_src_path.txt" BLENDER_SRC_PATH)
 if(WIN32)
     if(MSVC)
         # set(CMAKE_CXX_FLAGS /std:c++17 /MP /arch:AVX2 /WX)

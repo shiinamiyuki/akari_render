@@ -1,18 +1,10 @@
 fn main() {
     println!("cargo:rerun-if-changed=../../blender_src_path.txt");
-    let blender_src_path = std::fs::read("../../blender_src_path.txt")
-        .expect("blender_src_path.txt file not found")
-        .into_iter()
-        .map(|b| b as char)
-        .collect::<String>()
-        .trim()
-        .to_string();
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=cpp_ext");
     let out = cmake::Config::new("cpp_ext")
         .generator("Ninja")
         .define("CMAKE_BUILD_TYPE", "Release")
-        .define("BLENDER_SRC_PATH", blender_src_path)
         .no_build_target(true)
         .build();
     dbg!(out.display());
@@ -25,7 +17,6 @@ fn main() {
         .header("cpp_ext/akari_blender_cpp_ext.h")
         .clang_args(&["-x", "c++"])
         .allowlist_file("cpp_ext/akari_blender_cpp_ext.h")
-        // .allowlist_function("get_.*")
         .enable_cxx_namespaces()
         .generate()
         .unwrap()
