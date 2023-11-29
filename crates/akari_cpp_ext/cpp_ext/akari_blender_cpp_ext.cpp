@@ -53,20 +53,21 @@ const int *BKE_mesh_material_indices(const Mesh *mesh) {
 }// namespace copied_from_blender_4_0
 
 namespace blender_util {
-extern "C" void get_mesh_triangle_indices(const RayonScope &ctx, const Mesh *mesh, const MLoopTri *tri, size_t count, uint32_t *out) {
+extern "C" void get_mesh_triangle_indices(const ParallelForContext &ctx, const Mesh *mesh, const MLoopTri *tri, size_t count, uint32_t *out) {
     const int *corner_verts = copied_from_blender_4_0::BKE_mesh_corner_verts(mesh);
-    ctx.parallel_for(count, [&](size_t i) {
+    AKR_ASSERT(corner_verts);
+    ctx.parallel_for(count, 1024, [&](size_t i) noexcept {
         out[i * 3 + 0] = corner_verts[tri[i].tri[0]];
         out[i * 3 + 1] = corner_verts[tri[i].tri[1]];
         out[i * 3 + 2] = corner_verts[tri[i].tri[2]]; });
 }
 
-extern "C" bool get_mesh_tangents(const RayonScope &ctx, const Mesh *mesh, const MLoopTri *tri, size_t count, float *out) {
+extern "C" bool get_mesh_tangents(const ParallelForContext &ctx, const Mesh *mesh, const MLoopTri *tri, size_t count, float *out) {
     const auto layer = static_cast<const std::array<float, 4> *>(copied_from_blender_4_0::CustomData_get_layer(&mesh->loop_data, CD_MLOOPTANGENT));
     if (!layer) {
         return false;
     } else {
-        ctx.parallel_for(count, [&](size_t i) {
+        ctx.parallel_for(count, 1024, [&](size_t i) noexcept {
             std::memcpy(out + i * 9 + 0, layer + tri[i].tri[0], sizeof(float) * 3);
             std::memcpy(out + i * 9 + 3, layer + tri[i].tri[1], sizeof(float) * 3);
             std::memcpy(out + i * 9 + 6, layer + tri[i].tri[2], sizeof(float) * 3);
@@ -75,13 +76,13 @@ extern "C" bool get_mesh_tangents(const RayonScope &ctx, const Mesh *mesh, const
     }
 }
 
-extern "C" bool get_mesh_split_normals(const RayonScope &ctx, const Mesh *mesh, const MLoopTri *tri, size_t count, float *out) {
+extern "C" bool get_mesh_split_normals(const ParallelForContext &ctx, const Mesh *mesh, const MLoopTri *tri, size_t count, float *out) {
     const auto layer = static_cast<const std::array<float, 3> *>(copied_from_blender_4_0::CustomData_get_layer(&mesh->loop_data, CD_NORMAL));
 
     if (!layer) {
         return false;
     } else {
-        ctx.parallel_for(count, [&](size_t i) {
+        ctx.parallel_for(count, 1024, [&](size_t i) noexcept {
             std::memcpy(out + i * 9 + 0, layer + tri[i].tri[0], sizeof(float) * 3);
             std::memcpy(out + i * 9 + 3, layer + tri[i].tri[1], sizeof(float) * 3);
             std::memcpy(out + i * 9 + 6, layer + tri[i].tri[2], sizeof(float) * 3);
@@ -89,12 +90,13 @@ extern "C" bool get_mesh_split_normals(const RayonScope &ctx, const Mesh *mesh, 
         return true;
     }
 }
-extern "C" void get_mesh_material_indices(const RayonScope &ctx, const Mesh *mesh, const MLoopTri *tri, size_t count, uint32_t *out) {
+extern "C" void get_mesh_material_indices(const ParallelForContext &ctx, const Mesh *mesh, const MLoopTri *tri, size_t count, uint32_t *out) {
     const auto &faces = mesh->runtime->looptri_faces_cache.data();
     const int *material_indices = copied_from_blender_4_0::BKE_mesh_material_indices(mesh);
-    ctx.parallel_for(count, [&](size_t i) {
+    AKR_ASSERT(material_indices);
+    ctx.parallel_for(count, 1024, [&](size_t i) noexcept {
         const auto face = faces[i];
         out[i] = material_indices[face];
     });
 }
-}// namespace blender
+}// namespace blender_util

@@ -41,7 +41,7 @@ impl<T> PartialEq for NodeRef<T> {
 impl<T> Eq for NodeRef<T> {}
 impl<T> PartialOrd for NodeRef<T> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.id.partial_cmp(&other.id)
+        Some(self.id.cmp(&other.id))
     }
 }
 impl<T> Ord for NodeRef<T> {
@@ -91,6 +91,11 @@ where
             map.serialize_entry(&key.id, value)?;
         }
         map.end()
+    }
+}
+impl<T> Default for Collection<T> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 impl<T> Collection<T> {

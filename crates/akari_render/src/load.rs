@@ -108,11 +108,9 @@ impl SceneLoader {
             _ => unreachable!(),
         };
         let (emission, strength) = match out {
-            ShaderNode::PrincipledBsdf {
-                emission,
-                emission_strength,
-                ..
-            } => (Some(emission), Some(emission_strength)),
+            ShaderNode::PrincipledBsdf { bsdf } => {
+                (Some(&bsdf.emission_color), Some(&bsdf.emission_strength))
+            }
             ShaderNode::Emission {
                 color: emission,
                 strength,

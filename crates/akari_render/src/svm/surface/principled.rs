@@ -115,25 +115,25 @@ impl SurfaceShader for SvmPrincipledBsdf {
     #[tracked(crate = "luisa")]
     fn closure(&self, svm_eval: &SvmEvaluator<'_>) -> Rc<dyn Surface> {
         let (color, transmission_color) = {
-            let color = svm_eval.eval_color(self.color);
+            let color = svm_eval.eval_color(self.base_color);
             let transmission_color = color;
             (color, transmission_color)
         };
         let lum = color.lum();
         let color_tint = select(lum.eq(0.0), color, color / lum);
-        let emission = svm_eval.eval_color(self.emission);
+        let emission = svm_eval.eval_color(self.emission_color);
         let metallic = svm_eval.eval_float(self.metallic);
         let roughness = svm_eval.eval_float(self.roughness);
-        let eta = svm_eval.eval_float(self.eta);
-        let transmission = svm_eval.eval_float(self.transmission);
+        let eta = svm_eval.eval_float(self.ior);
+        let transmission = svm_eval.eval_float(self.transmission_weight);
         let diffuse = Rc::new(DisneyDiffuseBsdf {
             reflectance: color,
             roughness,
         });
-        let specular = svm_eval.eval_float(self.specular);
+        let specular = svm_eval.eval_float(self.sheen_weight);
         let specular_tint = svm_eval.eval_float(self.specular_tint);
-        let clearcoat = svm_eval.eval_float(self.clearcoat);
-        let clearcoat_roughness = svm_eval.eval_float(self.clearcoat_roughness);
+        let clearcoat = svm_eval.eval_float(self.coat_weight);
+        let clearcoat_roughness = svm_eval.eval_float(self.coat_roughness);
         let specular_brdf = {
             let f0 = (Color::one(svm_eval.color_repr()).lerp(color_tint, specular_tint)
                 * specular
@@ -163,7 +163,7 @@ impl SurfaceShader for SvmPrincipledBsdf {
                 )),
             })
         };
-        let dieletric = {
+        let dielectric = {
             let kr = color;
             let kt = transmission_color;
             let fresnel = Box::new(FresnelDielectric { eta });
@@ -185,7 +185,7 @@ impl SurfaceShader for SvmPrincipledBsdf {
                 )),
                 eta,
             });
-            let dieletric = Rc::new(BsdfMixture {
+            let dielectric = Rc::new(BsdfMixture {
                 frac: Box::new(move |wo, _| -> Expr<f32> {
                     fr_dielectric(Frame::cos_theta(wo), eta)
                 }),
@@ -193,12 +193,12 @@ impl SurfaceShader for SvmPrincipledBsdf {
                 bsdf_b: reflection,
                 mode: BsdfBlendMode::Mix,
             });
-            dieletric
+            dielectric
         };
         let bsdf = Rc::new(BsdfMixture {
             frac: Box::new(move |_, _| -> Expr<f32> { transmission }),
             bsdf_a: diffuse,
-            bsdf_b: dieletric,
+            bsdf_b: dielectric,
             mode: BsdfBlendMode::Mix,
         });
 

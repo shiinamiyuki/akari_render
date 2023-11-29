@@ -9,12 +9,14 @@ use crate::memmap2::Mmap;
 use rayon::prelude::*;
 
 use crate::{shader::ShaderGraph, *};
+
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(crate = "serde")]
 pub enum CoordinateSystem {
     Akari,
     Blender,
 }
+
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 #[serde(crate = "serde")]
 pub struct TRS {
@@ -26,7 +28,7 @@ pub struct TRS {
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 #[serde(crate = "serde")]
-#[serde(tag = "type")]
+#[serde(tag = "type", content = "data")]
 pub enum Transform {
     #[serde(rename = "trs")]
     TRS(TRS),
@@ -47,17 +49,19 @@ pub struct PerspectiveCamera {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(crate = "serde")]
-#[serde(tag = "type")]
+#[serde(tag = "type", content = "data")]
 pub enum Camera {
     #[serde(rename = "perspective")]
     Perspective(PerspectiveCamera),
 }
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(crate = "serde")]
 pub struct PointLight {}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(crate = "serde")]
-#[serde(tag = "type")]
+#[serde(tag = "type", content = "data")]
 pub enum Light {
     #[serde(rename = "point")]
     Point(PointLight),
@@ -111,6 +115,7 @@ pub struct BufferView {
     pub offset: usize,
     pub length: usize,
 }
+
 impl Buffer {
     pub fn len(&self) -> usize {
         match self {
@@ -252,7 +257,8 @@ impl Buffer {
     }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]#[serde(crate = "serde")]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(crate = "serde")]
 pub enum ColorSpace {
     #[serde(rename = "srgb")]
     SRgb,
@@ -261,7 +267,9 @@ pub enum ColorSpace {
     #[serde(rename = "spectral")]
     Spectral,
 }
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]#[serde(crate = "serde")]
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(crate = "serde")]
 pub enum ImageExtenisionMode {
     #[serde(rename = "repeat")]
     Repeat,
@@ -272,7 +280,9 @@ pub enum ImageExtenisionMode {
     #[serde(rename = "extend")]
     Extend,
 }
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]#[serde(crate = "serde")]
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(crate = "serde")]
 pub enum ImageInterpolationMode {
     #[serde(rename = "nearest")]
     Nearest,
@@ -281,7 +291,9 @@ pub enum ImageInterpolationMode {
     #[serde(rename = "cubic")]
     Cubic,
 }
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]#[serde(crate = "serde")]
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(crate = "serde")]
 pub enum ImageFormat {
     #[serde(rename = "png")]
     Png,
@@ -295,7 +307,8 @@ pub enum ImageFormat {
     Float,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]#[serde(crate = "serde")]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(crate = "serde")]
 pub struct Image {
     pub data: NodeRef<BufferView>,
     pub format: ImageFormat,
@@ -307,7 +320,8 @@ pub struct Image {
     pub channels: u32,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]#[serde(crate = "serde")]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(crate = "serde")]
 pub struct Mesh {
     pub vertices: NodeRef<BufferView>,
     pub indices: NodeRef<BufferView>,
@@ -315,10 +329,10 @@ pub struct Mesh {
     pub uvs: Option<NodeRef<BufferView>>,
     pub tangents: Option<NodeRef<BufferView>>,
     pub materials: NodeRef<BufferView>,
-    // pub bitangent_signs: Option<Buffer>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]#[serde(crate = "serde")]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(crate = "serde")]
 #[serde(tag = "type")]
 pub enum Geometry {
     #[serde(rename = "mesh")]
@@ -451,14 +465,12 @@ impl Scene {
         } else {
             parent_dir.to_owned()
         };
+        dbg!(&buffer_dir);
         for (r, b) in self.buffers.inner_mut() {
             let filename = format!("{}.bin", r.id);
             // check if filename is valid
 
             let path = buffer_dir.join(&filename);
-            let path = std::fs::canonicalize(path).map_err(|e| {
-                std::io::Error::new(e.kind(), format!("invalid filename: {}", filename))
-            })?;
             if !path.starts_with(&buffer_dir) {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidInput,
@@ -516,6 +528,7 @@ impl Scene {
         Ok(())
     }
 }
+
 /// Represents a loaded scene.
 pub trait SceneView {
     fn buffer_as_slice(&self, buffer: &NodeRef<Buffer>) -> &[u8];
@@ -528,6 +541,7 @@ pub trait SceneView {
 pub struct MemoryScene {
     pub scene: Scene,
 }
+
 impl MemoryScene {
     pub unsafe fn new(mut scene: Scene) -> std::io::Result<Self> {
         scene.embed()?;
@@ -537,6 +551,7 @@ impl MemoryScene {
         Ok(Self { scene })
     }
 }
+
 impl SceneView for MemoryScene {
     fn buffer_as_slice(&self, buffer: &NodeRef<Buffer>) -> &[u8] {
         let buffer = &self.scene.buffers[buffer];
@@ -554,11 +569,13 @@ impl SceneView for MemoryScene {
         &self.scene
     }
 }
+
 /// A scene that is backed by memory mapped files.
 pub struct MmapScene {
     pub scene: Scene,
     pub path_to_mmap: HashMap<PathBuf, Arc<Mmap>>,
 }
+
 impl MmapScene {
     pub fn open(path: impl AsRef<Path>) -> std::io::Result<Self> {
         let abs_path = std::fs::canonicalize(path)?;
@@ -605,6 +622,7 @@ impl MmapScene {
         })
     }
 }
+
 impl SceneView for MmapScene {
     fn buffer_as_slice(&self, buffer: &NodeRef<Buffer>) -> &[u8] {
         match &self.scene.buffers[buffer] {

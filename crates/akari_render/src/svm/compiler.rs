@@ -164,42 +164,59 @@ impl<'a> Compiler<'a> {
                 let rgb = self.compile_node(&rgb);
                 SvmNode::SpectralUplift(SvmSpectralUplift { rgb })
             }
-            ShaderNode::PrincipledBsdf {
-                color,
-                metallic,
-                roughness,
-                specular,
-                specular_tint,
-                clearcoat,
-                clearcoat_roughness,
-                ior,
-                transmission,
-                emission,
-                emission_strength,
-                preference: _,
-            } => {
-                let color = self.compile_node(color);
-                let metallic = self.compile_node(metallic);
-                let roughness = self.compile_node(roughness);
-                let specular = self.compile_node(specular);
-                let specular_tint = self.compile_node(specular_tint);
-                let clearcoat = self.compile_node(clearcoat);
-                let clearcoat_roughness = self.compile_node(clearcoat_roughness);
-                let transmission = self.compile_node(transmission);
-                let emission = self.compile_node(emission);
-                let emission_strength = self.compile_node(emission_strength);
-                let ior = self.compile_node(ior);
+            ShaderNode::PrincipledBsdf { bsdf } => {
+                let base_color = self.compile_node(&bsdf.base_color);
+                let metallic = self.compile_node(&bsdf.metallic);
+                let roughness = self.compile_node(&bsdf.roughness);
+                let ior = self.compile_node(&bsdf.ior);
+                let alpha = self.compile_node(&bsdf.alpha);
+                let normal = self.compile_node(&bsdf.normal);
+                let subsurface_weight = self.compile_node(&bsdf.subsurface_weight);
+                let subsurface_radius = self.compile_node(&bsdf.subsurface_radius);
+                let subsurface_scale = self.compile_node(&bsdf.subsurface_scale);
+                let subsurface_ior = self.compile_node(&bsdf.subsurface_ior);
+                let subsurface_anisotropy = self.compile_node(&bsdf.subsurface_anisotropy);
+                let specular_ior_level = self.compile_node(&bsdf.specular_ior_level);
+                let specular_tint = self.compile_node(&bsdf.specular_tint);
+                let anisotropic = self.compile_node(&bsdf.anisotropic);
+                let anisotropic_rotation = self.compile_node(&bsdf.anisotropic_rotation);
+                let tangent = self.compile_node(&bsdf.tangent);
+                let transmission_weight = self.compile_node(&bsdf.transmission_weight);
+                let sheen_weight = self.compile_node(&bsdf.sheen_weight);
+                let sheen_tint = self.compile_node(&bsdf.sheen_tint);
+                let coat_weight = self.compile_node(&bsdf.coat_weight);
+                let coat_roughness = self.compile_node(&bsdf.coat_roughness);
+                let coat_ior = self.compile_node(&bsdf.coat_ior);
+                let coat_tint = self.compile_node(&bsdf.coat_tint);
+                let coat_normal = self.compile_node(&bsdf.coat_normal);
+                let emission_color = self.compile_node(&bsdf.emission_color);
+                let emission_strength = self.compile_node(&bsdf.emission_strength);
                 SvmNode::PrincipledBsdf(SvmPrincipledBsdf {
-                    color,
+                    base_color,
                     metallic,
                     roughness,
-                    specular,
+                    ior,
+                    alpha,
+                    normal,
+                    subsurface_weight,
+                    subsurface_radius,
+                    subsurface_scale,
+                    subsurface_ior,
+                    subsurface_anisotropy,
+                    specular_ior_level,
                     specular_tint,
-                    clearcoat,
-                    clearcoat_roughness,
-                    eta: ior,
-                    transmission,
-                    emission,
+                    anisotropic,
+                    anisotropic_rotation,
+                    tangent,
+                    transmission_weight,
+                    sheen_weight,
+                    sheen_tint,
+                    coat_weight,
+                    coat_roughness,
+                    coat_ior,
+                    coat_tint,
+                    coat_normal,
+                    emission_color,
                     emission_strength,
                 })
             }

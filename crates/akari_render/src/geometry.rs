@@ -198,7 +198,7 @@ impl AffineTransform {
 
 impl AffineTransformExpr {
     #[tracked(crate = "luisa")]
-    pub fn transform_point(&self, p: impl AsExpr<Value=Float3>) -> Expr<Float3> {
+    pub fn transform_point(&self, p: impl AsExpr<Value = Float3>) -> Expr<Float3> {
         let p = p.as_expr();
         if self.close_to_identity {
             p
@@ -209,7 +209,7 @@ impl AffineTransformExpr {
         }
     }
     #[tracked(crate = "luisa")]
-    pub fn transform_vector(&self, v: impl AsExpr<Value=Float3>) -> Expr<Float3> {
+    pub fn transform_vector(&self, v: impl AsExpr<Value = Float3>) -> Expr<Float3> {
         let v = v.as_expr();
         if self.close_to_identity {
             v
@@ -218,7 +218,7 @@ impl AffineTransformExpr {
         }
     }
     #[tracked(crate = "luisa")]
-    pub fn transform_normal(&self, n: impl AsExpr<Value=Float3>) -> Expr<Float3> {
+    pub fn transform_normal(&self, n: impl AsExpr<Value = Float3>) -> Expr<Float3> {
         let n = n.as_expr();
         if self.close_to_identity {
             n
@@ -234,8 +234,8 @@ impl AffineTransformExpr {
 
 #[tracked(crate = "luisa")]
 pub fn face_forward(
-    v: impl AsExpr<Value=Float3>,
-    n: impl AsExpr<Value=Float3>,
+    v: impl AsExpr<Value = Float3>,
+    n: impl AsExpr<Value = Float3>,
 ) -> Expr<Float3> {
     let v = v.as_expr();
     let n = n.as_expr();
@@ -243,7 +243,7 @@ pub fn face_forward(
 }
 
 #[tracked(crate = "luisa")]
-pub fn reflect(w: impl AsExpr<Value=Float3>, n: impl AsExpr<Value=Float3>) -> Expr<Float3> {
+pub fn reflect(w: impl AsExpr<Value = Float3>, n: impl AsExpr<Value = Float3>) -> Expr<Float3> {
     let w = w.as_expr();
     let n = n.as_expr();
     -w + 2.0 * w.dot(n) * n

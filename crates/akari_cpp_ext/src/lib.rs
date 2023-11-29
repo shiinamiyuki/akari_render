@@ -1,34 +1,41 @@
 #[allow(non_snake_case)]
 pub mod binding;
 
+use crate::binding::root::ParallelForFn;
 pub(crate) use akari_common::rayon;
-pub use binding::root::{
-    RayonScope, MLoopTri, Mesh, blender_util, spectral,
-};
+pub use binding::root::{blender_util, spectral, MLoopTri, Mesh, ParallelForContext};
 use std::ffi::c_void;
+use std::sync::atomic::AtomicUsize;
 
-impl RayonScope {
-    pub fn new<'a>(s: &rayon::Scope<'a>) -> Self {
-        unsafe extern "C" fn spawn<'a>(
-            context: *const c_void,
-            func: Option<unsafe extern "C" fn(context:*const c_void, data: *mut c_void)>,
-            data: *mut c_void,
+impl ParallelForContext {
+    pub fn new() -> Self {
+        unsafe extern "C" fn parallel_for_impl(
+            count: usize,
+            f: ParallelForFn,
+            userdata: *const c_void,
         ) {
-            let s = context as *const rayon::Scope<'a>;
-            let s = &*s;
-            let data = data as u64;
-            s.spawn(move |s| {
-                func.unwrap()(s as *const _ as *const c_void, data as *mut c_void);
+            let userdata = userdata as u64;
+            let num_threads = rayon::current_num_threads();
+            let cnt = AtomicUsize::new(0);
+            let f = f.unwrap();
+            rayon::scope(|s| {
+                for _ in 0..num_threads {
+                    let cnt = &cnt;
+                    s.spawn(move |_| {
+                        let userdata = userdata as *const c_void;
+                        loop {
+                            let i = cnt.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            if i >= count {
+                                break;
+                            }
+                            f(userdata, i);
+                        }
+                    });
+                }
             });
         }
         Self {
-            num_threads: rayon::current_num_threads(),
-            context: s as *const rayon::Scope<'a> as *const c_void,
-            _spawn: Some(spawn),
+            _parallel_for: Some(parallel_for_impl),
         }
     }
 }
-
-unsafe impl Send for RayonScope {}
-
-unsafe impl Sync for RayonScope {}

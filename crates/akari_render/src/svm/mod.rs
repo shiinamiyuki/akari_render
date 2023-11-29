@@ -1,3 +1,4 @@
+use akari_scenegraph::{NodeRef, ShaderNode};
 use std::{
     collections::{hash_map::DefaultHasher, HashMap},
     hash::{Hash, Hasher},
@@ -95,16 +96,31 @@ impl SurfaceShader for SvmEmission {
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 #[repr(C)]
 pub struct SvmPrincipledBsdf {
-    pub color: SvmNodeRef,
+    pub base_color: SvmNodeRef,
     pub metallic: SvmNodeRef,
     pub roughness: SvmNodeRef,
-    pub specular: SvmNodeRef,
+    pub ior: SvmNodeRef,
+    pub alpha: SvmNodeRef,
+    pub normal: SvmNodeRef,
+    pub subsurface_weight: SvmNodeRef,
+    pub subsurface_radius: SvmNodeRef,
+    pub subsurface_scale: SvmNodeRef,
+    pub subsurface_ior: SvmNodeRef,
+    pub subsurface_anisotropy: SvmNodeRef,
+    pub specular_ior_level: SvmNodeRef,
     pub specular_tint: SvmNodeRef,
-    pub clearcoat: SvmNodeRef,
-    pub clearcoat_roughness: SvmNodeRef,
-    pub eta: SvmNodeRef,
-    pub transmission: SvmNodeRef,
-    pub emission: SvmNodeRef,
+    pub anisotropic: SvmNodeRef,
+    pub anisotropic_rotation: SvmNodeRef,
+    pub tangent: SvmNodeRef,
+    pub transmission_weight: SvmNodeRef,
+    pub sheen_weight: SvmNodeRef,
+    pub sheen_tint: SvmNodeRef,
+    pub coat_weight: SvmNodeRef,
+    pub coat_roughness: SvmNodeRef,
+    pub coat_ior: SvmNodeRef,
+    pub coat_tint: SvmNodeRef,
+    pub coat_normal: SvmNodeRef,
+    pub emission_color: SvmNodeRef,
     pub emission_strength: SvmNodeRef,
 }
 

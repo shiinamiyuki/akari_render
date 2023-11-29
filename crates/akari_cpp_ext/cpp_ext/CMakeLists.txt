@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(akari_blender_cpp_ext)
+project(akari_cpp_ext)
 set(CMAKE_CXX_STANDARD 20)
 file(READ "../../../blender_src_path.txt" BLENDER_SRC_PATH)
 if(WIN32)

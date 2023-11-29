@@ -4,6 +4,7 @@ pub use akari_common::luisa;
 use color::ColorRepr;
 
 pub use akari_common::*;
+pub(crate) use akari_cpp_ext as cpp_ext;
 pub use akari_scenegraph as scene_graph;
 pub(crate) use hexf::hexf32;
 pub(crate) use lazy_static::lazy_static;
@@ -33,7 +34,6 @@ pub use luisa::{
         api::StreamTag, Callable, Command, Device, DynCallable, Kernel, Scope, Stream, Swapchain,
     },
 };
-pub(crate) use akari_cpp_ext as cpp_ext;
 pub use rayon::prelude::*;
 pub mod api;
 pub mod camera;

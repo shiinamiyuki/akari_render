@@ -11,12 +11,19 @@ import json
 import os
 import struct
 from ctypes import *
+import time
 
 AKARI_API = cdll.LoadLibrary(os.environ["AKARI_API_PATH"])
+py_akari_import = AKARI_API.py_akari_import
+py_akari_import.restype = c_ulonglong
+py_akari_free_string = AKARI_API.py_akari_free_string
+py_akari_free_string.argtypes = (c_ulonglong,)
 
 
 def invoke_akari_api(args):
-    ptr = AKARI_API.py_akari_import(json.dumps(args).encode("utf-8"))
+    # print(args)
+    args = json.dumps(args, indent=1).encode("utf-8")
+    ptr = py_akari_import(args, c_ulonglong(len(args)))
     ret = string_at(ptr).decode("utf-8")
     ret = json.loads(ret)
     AKARI_API.py_akari_free_string(ptr)
@@ -56,7 +63,6 @@ D = bpy.data
 C = bpy.context
 depsgraph = C.evaluated_depsgraph_get()
 
-
 argv = sys.argv
 print(argv)
 argv_offset = argv.index("--") + 2
@@ -82,7 +88,7 @@ else:
                 print("Force export")
             if update_mesh_only:
                 print("Update mesh only")
-akr_file = open(os.path.join(OUT_DIR, "scene.json"), "w")
+akr_file = os.path.join(OUT_DIR, "scene.json")
 MESH_DIR = path_join(OUT_DIR, "meshes")
 TEXTURE_DIR = path_join(OUT_DIR, "textures")
 if not os.path.exists(MESH_DIR):
@@ -112,13 +118,13 @@ class UniqueName:
 
         if name not in self.names:
             self.names[name] = 0
-            gened_name = name
+            generated_name = name
         else:
-            gened_name = f"{name}_{self.names[name]}"
+            generated_name = f"{name}_{self.names[name]}"
             self.names[name] += 1
-        self.m[m] = gened_name
-        dbg(name, gened_name)
-        return gened_name
+        self.m[m] = generated_name
+        dbg(name, generated_name)
+        return generated_name
 
 
 VISITED = UniqueName()
@@ -198,33 +204,41 @@ class MaterialExporter:
         assert not connected or len(s.links) == 1
         if not connected:
             if (
-                isinstance(s, T.NodeSocketFloatFactor)
-                or isinstance(s, T.NodeSocketFloat)
-                or isinstance(s, T.NodeSocketFloatPercentage)
-                or isinstance(s, T.NodeSocketFloatDistance)
-                or isinstance(s, T.NodeSocketFloatAngle)
-                or isinstance(s, T.NodeSocketFloatUnsigned)
+                    isinstance(s, T.NodeSocketFloatFactor)
+                    or isinstance(s, T.NodeSocketFloat)
+                    or isinstance(s, T.NodeSocketFloatPercentage)
+                    or isinstance(s, T.NodeSocketFloatDistance)
+                    or isinstance(s, T.NodeSocketFloatAngle)
+                    or isinstance(s, T.NodeSocketFloatUnsigned)
             ):
                 assert (
-                    node_ty == PrimitiveNodeType.FLOAT
-                ), f"Epxected {PrimitiveNodeType.FLOAT} but got {node_ty}"
-                return self.push_node({"Float": s.default_value})
+                        node_ty == PrimitiveNodeType.FLOAT
+                ), f"Expected {PrimitiveNodeType.FLOAT} but got {node_ty}"
+                return self.push_node({"value": s.default_value, 'type': 'float'})
             elif isinstance(s, T.NodeSocketColor):
                 r = s.default_value[0]
                 g = s.default_value[1]
                 b = s.default_value[2]
                 assert (
-                    node_ty == PrimitiveNodeType.RGB
-                    or node_ty == PrimitiveNodeType.SPECTRUM
-                ), f"Epxected {PrimitiveNodeType.RGB} or {PrimitiveNodeType.SPECTRUM} but got {node_ty}"
+                        node_ty == PrimitiveNodeType.RGB
+                        or node_ty == PrimitiveNodeType.SPECTRUM
+                ), f"Expected {PrimitiveNodeType.RGB} or {PrimitiveNodeType.SPECTRUM} but got {node_ty}"
                 rgb = self.push_node(
-                    {"Rgb": {"value": [r, g, b], "colorspace": "srgb"}}
+                    {"type": "rgb", "value": [r, g, b], "colorspace": "srgb"}
                 )
                 if node_ty == PrimitiveNodeType.RGB:
                     return rgb
                 else:
-                    uplift = self.push_node({"SpectralUplift": rgb})
+                    uplift = self.push_node({"rgb": rgb, 'type': 'spectral_uplift'})
                     return uplift
+            elif isinstance(s, T.NodeSocketVector):
+                x = s.default_value[0]
+                y = s.default_value[1]
+                z = s.default_value[2]
+                assert (
+                        node_ty == PrimitiveNodeType.FLOAT3
+                ), f"Expected {PrimitiveNodeType.FLOAT3} but got {node_ty}"
+                return self.push_node({"type": "float3", "value": [x, y, z]})
             else:
                 raise RuntimeError(f"Unsupported socket type `{s}`")
         else:
@@ -240,10 +254,9 @@ class MaterialExporter:
             else:
                 input_node = self.push_node(
                     {
-                        "ExtractElement": {
-                            "node": VISITED.get(from_node),
-                            "field": akr_key,
-                        }
+                        "type": "extract",
+                        "node": VISITED.get(from_node),
+                        "field": akr_key,
                     }
                 )
             if isinstance(input_ty, PrimitiveNodeType):
@@ -272,38 +285,54 @@ class MaterialExporter:
             mat[akr_key] = self.get_node_input(node, blender_key, node_ty, akr_key)
 
         if isinstance(node, T.ShaderNodeBsdfPrincipled):
-            input("Base Color", "color", PrimitiveNodeType.SPECTRUM)
+            input("Base Color", "base_color", PrimitiveNodeType.SPECTRUM)
             input("Roughness", "roughness", PrimitiveNodeType.FLOAT)
             input("Metallic", "metallic", PrimitiveNodeType.FLOAT)
-            input("Specular", "specular", PrimitiveNodeType.FLOAT)
-            input("Specular Tint", "specular_tint", PrimitiveNodeType.FLOAT)
-            input("Emission", "emission", PrimitiveNodeType.SPECTRUM)
+            input("Specular IOR Level", "specular_ior_level", PrimitiveNodeType.FLOAT)
+            input("Specular Tint", "specular_tint", PrimitiveNodeType.SPECTRUM)
+            input("Emission Color", "emission_color", PrimitiveNodeType.SPECTRUM)
             input("Emission Strength", "emission_strength", PrimitiveNodeType.FLOAT)
-            input("Clearcoat", "clearcoat", PrimitiveNodeType.FLOAT)
-            input("Clearcoat Roughness", "clearcoat_roughness", PrimitiveNodeType.FLOAT)
-            input("Transmission", "transmission", PrimitiveNodeType.FLOAT)
+            input("Coat Weight", "coat_weight", PrimitiveNodeType.FLOAT)
+            input("Coat Roughness", "coat_roughness", PrimitiveNodeType.FLOAT)
+            input('Coat Normal', 'coat_normal', PrimitiveNodeType.FLOAT3)
+            input('Coat IOR', 'coat_ior', PrimitiveNodeType.FLOAT)
+            input('Coat Tint', 'coat_tint', PrimitiveNodeType.SPECTRUM)
+            input("Transmission Weight", "transmission_weight", PrimitiveNodeType.FLOAT)
             input("IOR", "ior", PrimitiveNodeType.FLOAT)
-            mat = {"PrincipledBsdf": mat}
+            input('Sheen Weight', 'sheen_weight', PrimitiveNodeType.FLOAT)
+            input('Sheen Tint', 'sheen_tint', PrimitiveNodeType.SPECTRUM)
+            input('Subsurface Weight', 'subsurface_weight', PrimitiveNodeType.FLOAT)
+            input('Subsurface Radius', 'subsurface_radius', PrimitiveNodeType.FLOAT3)
+            input('Subsurface Scale', 'subsurface_scale', PrimitiveNodeType.FLOAT)
+            input('Subsurface IOR', 'subsurface_ior', PrimitiveNodeType.FLOAT)
+            input('Subsurface Anisotropy', 'subsurface_anisotropy', PrimitiveNodeType.FLOAT)
+            input('Anisotropic Rotation', 'anisotropic_rotation', PrimitiveNodeType.FLOAT)
+            input('Anisotropic', 'anisotropic', PrimitiveNodeType.FLOAT)
+            input('Alpha', 'alpha', PrimitiveNodeType.FLOAT)
+            input('Normal', 'normal', PrimitiveNodeType.FLOAT3)
+            input('Tangent', 'tangent', PrimitiveNodeType.FLOAT3)
+            mat['type'] = 'principled'
+            mat['preference'] = 'mix'
             node_ty = PrimitiveNodeType.BSDF
         elif isinstance(node, T.ShaderNodeOutputMaterial):
             assert self.output_node is None, "Multiple output node"
-            input("Surface", "surface", PrimitiveNodeType.BSDF)
-            mat = {"OutputSurface": mat}
+            input("Surface", "node", PrimitiveNodeType.BSDF)
+            mat['type'] = 'output'
             self.output_node = name
         elif isinstance(node, T.ShaderNodeBsdfGlass):
             input("Color", "color", PrimitiveNodeType.SPECTRUM)
             input("Roughness", "roughness", PrimitiveNodeType.FLOAT)
             input("IOR", "ior", PrimitiveNodeType.FLOAT)
-            mat = {"GlassBsdf": mat}
+            mat['type'] = 'glass'
             node_ty = PrimitiveNodeType.BSDF
         elif isinstance(node, T.ShaderNodeBsdfDiffuse):
             input("Color", "color", PrimitiveNodeType.SPECTRUM)
-            mat = {"DiffuseBsdf": mat}
+            mat['type'] = 'diffuse'
             node_ty = PrimitiveNodeType.BSDF
         elif isinstance(node, T.ShaderNodeEmission):
             input("Color", "color", PrimitiveNodeType.SPECTRUM)
             input("Strength", "strength", PrimitiveNodeType.FLOAT)
-            mat = {"Emission": mat}
+            mat['type'] = 'emission'
             node_ty = PrimitiveNodeType.BSDF
         elif isinstance(node, T.ShaderNodeTexImage):
             extension = {
@@ -326,7 +355,8 @@ class MaterialExporter:
             filepath = os.path.normpath(os.path.join(BLEND_FILE_DIR, filepath))
             filepath = filepath.replace("\\", "/")
             mat = {
-                "TexImage": {
+                'type': 'image',
+                "image": {
                     "path": filepath,
                     "extension": extension,
                     "interpolation": interpolation,
@@ -377,9 +407,6 @@ def make_ref(id):
 class SceneExporter:
     def __init__(self, scene):
         self.scene = scene
-        self.exported_instances = dict()
-        self.exported_geometries = dict()
-        self.exported_materials = dict()
         self.material_cache = dict()
         self.image_cache = dict()
 
@@ -391,12 +418,18 @@ class SceneExporter:
             return self.material_cache[m]
         exporter = MaterialExporter()
         out = exporter.export_material(m)
-        self.exported_materials[out] = {
-            "shader": {
-                "nodes": exporter.shader_graph,
-                "out": {"id": exporter.output_node},
+        out = invoke_akari_api({
+            "ImportMaterial": {
+                "name": out,
+                "mat": {
+                    "shader": {
+                        "nodes": exporter.shader_graph,
+                        "output": {"id": exporter.output_node},
+                        "kind": "surface"
+                    }
+                }
             }
-        }
+        })['Material']['value']
         self.material_cache[m] = out
         return out
 
@@ -420,18 +453,15 @@ class SceneExporter:
             "mesh_ptr": m.as_pointer(),
             "num_vertices": len(V),
             "num_triangles": len(F),
+            'has_multi_materials': len(m.materials) > 1,
         }
         exported_mesh = invoke_akari_api(
-            json.dumps(
-                {
-                    "ImportMesh": {
-                        "args": export_mesh_args,
-                    }
+            {
+                "ImportMesh": {
+                    "args": export_mesh_args,
                 }
-            ).encode("utf-8")
+            }
         )
-
-        self.exported_geometries[name] = exported_mesh["Geometry"]["value"]
 
     def convert_matrix_to_list(self, mat):
         l = [[x for x in row] for row in mat.row]
@@ -450,30 +480,35 @@ class SceneExporter:
         # print(self.transfrom_from_object(obj))
         m = obj.data
         assert (
-            len(m.uv_layers) <= 1
+                len(m.uv_layers) <= 1
         ), f"Only one uv layer is supported but found {len(m.uv_layers)}"
         has_uv = len(m.uv_layers) == 1
         eval_obj = obj.evaluated_get(depsgraph)
         m = eval_obj.to_mesh()
         self.export_mesh_data(m, f"{name}_mesh", has_uv)
         assert (
-            len(obj.data.materials) == 1
+                len(obj.data.materials) == 1
         ), f"Mesh `{obj.name}` has {len(obj.data.materials)} materials"
-        mat = self.export_material(obj.data.materials[0])
+        mat = [self.export_material(m) for m in obj.data.materials]
         matrix_world = CONVERT_COORD_SYS_MATRIX @ obj.matrix_world
         print(matrix_world)
         instance = {
             "geometry": make_ref(f"{name}_mesh"),
-            "material": make_ref(f"{mat}"),
-            "transform": {"Matrix": self.convert_matrix_to_list(matrix_world)},
+            "materials": mat,
+            "transform": {"type": "matrix", "data": self.convert_matrix_to_list(matrix_world)},
         }
-        self.exported_instances[name] = instance
+        invoke_akari_api({
+            'ImportInstance': {
+                'name': name,
+                'instance': instance,
+            }
+        })
 
     def transfrom_from_object(self, b_object):
         translate = b_object.location
         rotate = b_object.rotation_euler
         scale = b_object.scale
-        return (translate, rotate, scale)
+        return translate, rotate, scale
 
     def export_camera(self):
         camera = self.scene.camera
@@ -489,12 +524,13 @@ class SceneExporter:
         res_x = render_settings.resolution_x
         res_y = render_settings.resolution_y
         exported_camera["transform"] = {
-            "TRS": {
+            "data": {
                 "translation": [x for x in trs[0]],
                 "rotation": [x for x in trs[1]],
                 "scale": [x for x in trs[2]],
                 "coordinate_system": "Blender",
-            }
+            },
+            "type": "trs"
         }
         exported_camera["fov"] = fov
         if dof is not None:
@@ -502,33 +538,40 @@ class SceneExporter:
             exported_camera["fstop"] = dof.aperture_fstop
         exported_camera["sensor_width"] = res_x
         exported_camera["sensor_height"] = res_y
-        return {"Perspective": exported_camera}
+        return {"data": exported_camera, "type": "perspective"}
 
     def export(self):
         name = VISITED.get(self.scene)
         camera = self.export_camera()
+        invoke_akari_api({
+            'ImportCamera': {
+                'camera': camera,
+            }
+        })
         print(f"Exporting Scene `{self.scene.name}` -> {name}")
 
         for obj in self.visible_objects():
             if obj.type == "MESH":
                 self.export_mesh(obj)
-        scene = {
-            "camera": camera,
-            "instances": self.exported_instances,
-            "lights": {},
-            "geometries": self.exported_geometries,
-            "materials": self.exported_materials,
-        }
-        json.dump(scene, akr_file, indent=4)
 
 
 def export_scene(scene):
+    invoke_akari_api({
+        'Init': {
+            'name': scene.name,
+        }
+    })
     exporter = SceneExporter(scene)
     exporter.export()
+    invoke_akari_api({
+        'WriteScene': {
+            'path': akr_file,
+            'compact': True
+        }
+    })
 
 
 export_scene(C.scene)
-akr_file.close()
 print("Export finished")
 if save_modified_blend:
     print("Saving modified blend file")

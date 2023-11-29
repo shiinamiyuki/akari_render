@@ -20,6 +20,7 @@ pub enum SceneImportApi {
     ImportBuffer { name: String, buffer: Buffer },
     WriteScene { path: String, compact: bool },
 }
+
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(crate = "serde")]
 pub enum SceneImportApiResult {
@@ -46,6 +47,7 @@ fn with_scene_import_context<T>(f: impl FnOnce(&mut SceneImportContext) -> T) ->
         f(ctx)
     })
 }
+
 pub fn import(api: SceneImportApi) -> SceneImportApiResult {
     match api {
         SceneImportApi::Init { name } => {

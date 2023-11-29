@@ -55,7 +55,37 @@ pub enum BsdfPreference {
     #[serde(rename = "pfmc")]
     PositionFreeMc, //layered material via position-free monte carlo
 }
-
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(crate = "serde")]
+pub struct PrincipledBsdf {
+    pub base_color: NodeRef<ShaderNode>,
+    pub metallic: NodeRef<ShaderNode>,
+    pub roughness: NodeRef<ShaderNode>,
+    pub ior: NodeRef<ShaderNode>,
+    pub alpha: NodeRef<ShaderNode>,
+    pub normal: NodeRef<ShaderNode>,
+    pub subsurface_weight: NodeRef<ShaderNode>,
+    pub subsurface_radius: NodeRef<ShaderNode>,
+    pub subsurface_scale: NodeRef<ShaderNode>,
+    pub subsurface_ior: NodeRef<ShaderNode>,
+    pub subsurface_anisotropy: NodeRef<ShaderNode>,
+    pub specular_ior_level: NodeRef<ShaderNode>,
+    pub specular_tint: NodeRef<ShaderNode>,
+    pub anisotropic: NodeRef<ShaderNode>,
+    pub anisotropic_rotation: NodeRef<ShaderNode>,
+    pub tangent: NodeRef<ShaderNode>,
+    pub transmission_weight: NodeRef<ShaderNode>,
+    pub sheen_weight: NodeRef<ShaderNode>,
+    pub sheen_tint: NodeRef<ShaderNode>,
+    pub coat_weight: NodeRef<ShaderNode>,
+    pub coat_roughness: NodeRef<ShaderNode>,
+    pub coat_ior: NodeRef<ShaderNode>,
+    pub coat_tint: NodeRef<ShaderNode>,
+    pub coat_normal: NodeRef<ShaderNode>,
+    pub emission_color: NodeRef<ShaderNode>,
+    pub emission_strength: NodeRef<ShaderNode>,
+    pub preference: BsdfPreference,
+}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(crate = "serde")]
 #[serde(tag = "type")]
@@ -96,18 +126,8 @@ pub enum ShaderNode {
     SpectralUplift { rgb: NodeRef<ShaderNode> },
     #[serde(rename = "principled")]
     PrincipledBsdf {
-        color: NodeRef<ShaderNode>,
-        metallic: NodeRef<ShaderNode>,
-        roughness: NodeRef<ShaderNode>,
-        specular: NodeRef<ShaderNode>,
-        specular_tint: NodeRef<ShaderNode>,
-        clearcoat: NodeRef<ShaderNode>,
-        clearcoat_roughness: NodeRef<ShaderNode>,
-        ior: NodeRef<ShaderNode>,
-        transmission: NodeRef<ShaderNode>,
-        emission: NodeRef<ShaderNode>,
-        emission_strength: NodeRef<ShaderNode>,
-        preference: BsdfPreference,
+        #[serde(flatten)]
+        bsdf: Box<PrincipledBsdf>,
     },
     #[serde(rename = "emission")]
     Emission {
@@ -163,32 +183,35 @@ pub trait NodeVisitor: Sized {
             ShaderNode::SpectralUplift { rgb } => {
                 graph.visit_mut(self, &rgb);
             }
-            ShaderNode::PrincipledBsdf {
-                color,
-                metallic,
-                roughness,
-                specular,
-                specular_tint,
-                clearcoat,
-                clearcoat_roughness,
-                ior,
-                transmission,
-                emission,
-                emission_strength,
-                preference: _,
-            } => {
-                graph.visit_mut(self, &color);
-                graph.visit_mut(self, &metallic);
-                graph.visit_mut(self, &roughness);
-                graph.visit_mut(self, &specular);
-                graph.visit_mut(self, &specular_tint);
-                graph.visit_mut(self, &clearcoat);
-                graph.visit_mut(self, &clearcoat_roughness);
-                graph.visit_mut(self, &ior);
-                graph.visit_mut(self, &transmission);
-                graph.visit_mut(self, &emission);
-                graph.visit_mut(self, &emission_strength);
+            ShaderNode::PrincipledBsdf { bsdf } => {
+                graph.visit_mut(self, &bsdf.base_color);
+                graph.visit_mut(self, &bsdf.metallic);
+                graph.visit_mut(self, &bsdf.roughness);
+                graph.visit_mut(self, &bsdf.ior);
+                graph.visit_mut(self, &bsdf.alpha);
+                graph.visit_mut(self, &bsdf.normal);
+                graph.visit_mut(self, &bsdf.subsurface_weight);
+                graph.visit_mut(self, &bsdf.subsurface_radius);
+                graph.visit_mut(self, &bsdf.subsurface_scale);
+                graph.visit_mut(self, &bsdf.subsurface_ior);
+                graph.visit_mut(self, &bsdf.subsurface_anisotropy);
+                graph.visit_mut(self, &bsdf.specular_ior_level);
+                graph.visit_mut(self, &bsdf.specular_tint);
+                graph.visit_mut(self, &bsdf.anisotropic);
+                graph.visit_mut(self, &bsdf.anisotropic_rotation);
+                graph.visit_mut(self, &bsdf.tangent);
+                graph.visit_mut(self, &bsdf.transmission_weight);
+                graph.visit_mut(self, &bsdf.sheen_weight);
+                graph.visit_mut(self, &bsdf.sheen_tint);
+                graph.visit_mut(self, &bsdf.coat_weight);
+                graph.visit_mut(self, &bsdf.coat_roughness);
+                graph.visit_mut(self, &bsdf.coat_ior);
+                graph.visit_mut(self, &bsdf.coat_tint);
+                graph.visit_mut(self, &bsdf.coat_normal);
+                graph.visit_mut(self, &bsdf.emission_color);
+                graph.visit_mut(self, &bsdf.emission_strength);
             }
+
             ShaderNode::Emission { color, strength } => {
                 graph.visit_mut(self, &color);
                 graph.visit_mut(self, &strength);
