@@ -208,40 +208,42 @@ impl SceneLoader {
     fn load_instance(
         &self,
         instance: &scenegraph::Instance,
-    ) -> (NodeRef<Material>, MeshInstanceHost) {
-        todo!()
-        // let mat = &instance.materials;
-        // let surface = self.nodes_to_surface_shader[mat];
-        // let transform = self.load_transform(&instance.transform, false);
-        // let geometry_node_id = &instance.geometry;
-        // let geometry_node = &self.scene_view.scene().geometries[geometry_node_id];
-        // match geometry_node {
-        //     scenegraph::Geometry::Mesh(_) => {
-        //         let geom_id = self.node_to_geom_id[geometry_node_id];
-        //         let mesh_buffer = &self.mesh_buffers[geom_id];
-        //         let mut flags: u32 = 0;
-        //         if mesh_buffer.has_normals {
-        //             flags |= MeshInstanceFlags::HAS_NORMALS;
-        //         }
-        //         if mesh_buffer.has_uvs {
-        //             flags |= MeshInstanceFlags::HAS_UVS;
-        //         }
-        //         if mesh_buffer.has_tangents {
-        //             flags |= MeshInstanceFlags::HAS_TANGENTS;
-        //         }
-        //         (
-        //             mat.clone(),
-        //             MeshInstanceHost {
-        //                 geom_id: geom_id as u32,
-        //                 transform,
-        //                 light: TagIndex::INVALID,
-        //                 materials:todo!,
-        //                 flags,
-        //             },
-        //         )
-        //     }
-        //     _ => todo!(),
-        // }
+    ) -> (Vec<NodeRef<Material>>, MeshInstanceHost) {
+        let mat = &instance.materials;
+        let surfaces = mat
+            .iter()
+            .map(|mat| self.nodes_to_surface_shader[mat])
+            .collect::<Vec<_>>();
+        let transform = self.load_transform(&instance.transform, false);
+        let geometry_node_id = &instance.geometry;
+        let geometry_node = &self.scene_view.scene().geometries[geometry_node_id];
+        match geometry_node {
+            scenegraph::Geometry::Mesh(_) => {
+                let geom_id = self.node_to_geom_id[geometry_node_id];
+                let mesh_buffer = &self.mesh_buffers[geom_id];
+                let mut flags: u32 = 0;
+                if mesh_buffer.has_normals {
+                    flags |= MeshInstanceFlags::HAS_NORMALS;
+                }
+                if mesh_buffer.has_uvs {
+                    flags |= MeshInstanceFlags::HAS_UVS;
+                }
+                if mesh_buffer.has_tangents {
+                    flags |= MeshInstanceFlags::HAS_TANGENTS;
+                }
+                (
+                    mat.clone(),
+                    MeshInstanceHost {
+                        geom_id: geom_id as u32,
+                        transform,
+                        light: TagIndex::INVALID,
+                        materials: surfaces,
+                        flags,
+                    },
+                )
+            }
+            _ => todo!(),
+        }
     }
     fn do_load(mut self) -> Scene {
         self.mesh_areas

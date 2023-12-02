@@ -17,7 +17,7 @@ pub struct Mesh {
     // pub bitangent_signs: Option<Buffer<u32>>,
     pub uvs: Option<Buffer<[f32; 2]>>,
     pub indices: Buffer<[u32; 3]>,
-    pub materials: Buffer<u32>,
+    pub material_slots: Buffer<u32>,
     pub area_sampler: Option<AliasTable>,
     pub has_normals: bool,
     pub has_uvs: bool,
@@ -31,7 +31,7 @@ pub struct MeshRef<'a> {
     // pub bitangent_signs: &'a [u32],
     pub uvs: Option<&'a [[f32; 2]]>,
     pub indices: &'a [[u32; 3]],
-    pub materials: &'a [u32],
+    pub material_slots: &'a [u32],
 
     pub generated_tangents: Option<Vec<[f32; 3]>>,
     pub aabb: (glam::Vec3, glam::Vec3),
@@ -102,7 +102,7 @@ impl<'a> MeshRef<'a> {
             tangents,
             uvs,
             indices,
-            materials,
+            material_slots: materials,
             generated_tangents: None,
             aabb,
             inv_aabb_size,
@@ -132,7 +132,7 @@ impl Mesh {
         if let Some(tangents) = &args.tangents {
             assert_eq!(args.indices.len() * 3, tangents.len());
         }
-        assert!(args.materials.len() == 1 || args.materials.len() == args.indices.len());
+        assert!(args.material_slots.len() == 1 || args.material_slots.len() == args.indices.len());
         let vertices = device.create_buffer_from_slice(&args.vertices);
         let normals = args
             .normals
@@ -147,7 +147,7 @@ impl Mesh {
         // };
         let indices = device.create_buffer_from_slice(&args.indices);
         let uvs = args.uvs.map(|uvs| device.create_buffer_from_slice(uvs));
-        let materials = device.create_buffer_from_slice(args.materials);
+        let materials = device.create_buffer_from_slice(args.material_slots);
         let m = Self {
             vertices,
             normals,
@@ -159,7 +159,7 @@ impl Mesh {
             has_normals: args.normals.is_some(),
             has_uvs: args.uvs.is_some(),
             has_tangents: args.tangents.is_some(),
-            materials,
+            material_slots: materials,
         };
         // assert!(!m.has_uvs || m.has_tangents, "mesh has uvs but no tangents");
         m
@@ -181,7 +181,7 @@ impl MeshInstanceFlags {
 pub struct MeshInstanceHost {
     pub transform: AffineTransform,
     pub light: TagIndex,
-    pub materials: Vec<u32>,
+    pub materials: Vec<ShaderRef>,
     pub geom_id: u32,
     pub flags: u32,
 }
@@ -205,6 +205,7 @@ impl MeshInstanceHost {
 pub struct MeshHeader {
     pub vertex_buf_idx: u32,
     pub index_buf_idx: u32,
+    pub material_slots_buf_idx: u32,
     pub normal_buf_idx: u32,
     pub tangent_buf_idx: u32,
     pub uv_buf_idx: u32,
@@ -246,6 +247,7 @@ impl MeshAggregate {
         for (_i, mesh) in meshes.iter().enumerate() {
             let vertex_buf_idx = heap.bind_buffer(&mesh.vertices);
             let index_buf_idx = heap.bind_buffer(&mesh.indices);
+            let material_slots_buf_idx = heap.bind_buffer(&mesh.material_slots);
             let normal_buf_idx = if mesh.has_normals {
                 heap.bind_buffer(mesh.normals.as_ref().unwrap())
             } else {
@@ -284,9 +286,12 @@ impl MeshAggregate {
                 tangent_buf_idx,
                 uv_buf_idx,
                 area_sampler,
+                material_slots_buf_idx,
             });
         }
         let mesh_instances = device.create_buffer_from_fn(instances.len(), |i| {
+            let materials = device.create_buffer_from_slice(&instances[i].materials);
+            let material_buf_index = heap.bind_buffer(&materials);
             let inst = &instances[i];
             let t: glam::Mat4 = inst.transform.m.into();
             MeshInstance {
@@ -333,6 +338,10 @@ impl MeshAggregate {
         self.heap.buffer(mesh_header.index_buf_idx)
     }
     #[tracked(crate = "luisa")]
+    pub fn mesh_material_slots(&self, mesh_header: Expr<MeshHeader>) -> BindlessBufferVar<u32> {
+        self.heap.buffer(mesh_header.material_slots_buf_idx)
+    }
+    #[tracked(crate = "luisa")]
     pub fn mesh_normals(&self, mesh_header: Expr<MeshHeader>) -> BindlessBufferVar<[f32; 3]> {
         self.heap.buffer(mesh_header.normal_buf_idx)
     }
@@ -373,6 +382,11 @@ impl MeshAggregate {
             .read(geom_id);
         let vertices = self.mesh_vertices(geometry);
         let indices = self.mesh_indices(geometry);
+        let material_slots = self.mesh_material_slots(geometry);
+        let material = self
+            .heap
+            .buffer::<ShaderRef>(inst.material_buffer_idx)
+            .read(material_slots.read(prim_id));
         let i: Expr<Uint3> = indices.read(prim_id).into();
 
         let (area_local, p_local, ng_local) = {
@@ -487,7 +501,7 @@ impl MeshAggregate {
             uv,
             inst_id,
             prim_id,
-            surface: todo!(),
+            surface: material,
             prim_area: area,
             valid: true.expr(),
         }
