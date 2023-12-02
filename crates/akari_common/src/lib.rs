@@ -18,6 +18,7 @@ pub use rayon;
 pub use serde;
 pub use serde_json;
 pub use sha2;
+pub use winit;
 
 pub fn catch_signal(f: impl FnOnce()) {
     fn sigsegv_handler(_: libc::c_int) {

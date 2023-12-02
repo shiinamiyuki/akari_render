@@ -22,7 +22,7 @@ pub struct DisplayWindow {
 
 impl DisplayWindow {
     pub fn new(device: &Device, width: u32, height: u32) -> Self {
-        let event_loop = EventLoop::new();
+        let event_loop = EventLoop::new().unwrap();
         let stream = device.create_stream(StreamTag::Graphics);
         let window = winit::window::WindowBuilder::new()
             .with_title("AkariRender")
@@ -44,38 +44,43 @@ impl DisplayWindow {
             }),
         }
     }
-    pub fn show(self) -> ! {
+    pub fn show(self) {
         let Self {
             event_loop, ctx, ..
         } = self;
-        event_loop.run(move |event, _, control_flow| {
-            control_flow.set_poll();
-            let window = &ctx.window;
-            let stream = &ctx.stream;
-            let sc = &ctx.swapchain;
-            match event {
-                WinitEvent::MainEventsCleared => {
-                    window.request_redraw();
-                }
-                WinitEvent::RedrawRequested(_) => {
-                    if ctx
-                        .has_update
-                        .swap(false, std::sync::atomic::Ordering::Relaxed)
-                    {
-                        stream.with_scope(|s| {
-                            s.present(sc, &ctx.screen);
-                        });
+        event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
+        event_loop
+            .run(move |event, elwt| {
+                let window = &ctx.window;
+                let stream = &ctx.stream;
+                let sc = &ctx.swapchain;
+                match event {
+                    WinitEvent::AboutToWait => {
+                        window.request_redraw();
                     }
+
+                    WinitEvent::WindowEvent { event, window_id } if window_id == window.id() => {
+                        match event {
+                            WindowEvent::CloseRequested => {
+                                elwt.exit();
+                            }
+                            WindowEvent::RedrawRequested => {
+                                if ctx
+                                    .has_update
+                                    .swap(false, std::sync::atomic::Ordering::Relaxed)
+                                {
+                                    stream.with_scope(|s| {
+                                        s.present(sc, &ctx.screen);
+                                    });
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    _ => {}
                 }
-                WinitEvent::WindowEvent {
-                    event: WindowEvent::CloseRequested,
-                    window_id,
-                } if window_id == window.id() => {
-                    control_flow.set_exit();
-                }
-                _ => {}
-            }
-        });
+            })
+            .unwrap();
     }
     pub fn channel(&self) -> DisplayChannel {
         DisplayChannel {
