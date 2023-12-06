@@ -293,17 +293,18 @@ impl SceneLoader {
             self.mesh_buffers.len(),
             instances.len()
         );
-        let mesh_aggregate = Arc::new(MeshAggregate::new(
+        let mut mesh_aggregate = MeshAggregate::new(
             self.device.clone(),
             &self.heap,
             &self.mesh_buffers.iter().collect::<Vec<_>>(),
             &instances,
-        ));
+        );
         self.heap.commit();
 
         let mut lights = vec![];
         let mut light_ids_to_lights = vec![];
         let mut powers = self.device.create_buffer::<f32>(1024);
+
         let esimate_emisson_kernel = self.device.create_kernel::<fn(u32, Buffer<f32>)>(&track!(
             |inst_id: Expr<u32>, powers: BufferVar<f32>| {
                 let i = dispatch_id().x;
@@ -385,9 +386,10 @@ impl SceneLoader {
                     },
                 );
                 light_ids_to_lights.push(light_ref);
-                inst.light = light_ref;
+                mesh_aggregate.set_instance_light(i as u32, light_ref);
             }
         }
+        mesh_aggregate.commit();
         let area_light_count = lights.len();
         assert!(area_light_count == light_ids_to_lights.len());
         log::info!("{} mesh lights found", area_light_count);
@@ -395,7 +397,7 @@ impl SceneLoader {
         {
             // TODO: add other lights
         }
-
+        let mesh_aggregate = Arc::new(mesh_aggregate);
         let light_weights = lights.iter().map(|(_, power)| *power).collect::<Vec<_>>();
         let Self {
             device,

@@ -229,6 +229,8 @@ pub struct MeshAggregate {
     pub accel: rtx::Accel,
     pub header: MeshAggregateHeader,
     instances: Buffer<MeshInstance>,
+    instances_host: Vec<MeshInstance>,
+    dirty: bool,
 }
 impl MeshAggregate {
     pub fn new(
@@ -304,7 +306,7 @@ impl MeshAggregate {
             accel.push_mesh(&accel_meshes[geom_id], inst.transform.m, 255, true);
         }
         accel.build(AccelBuildRequest::ForceBuild);
-
+        let instances_host = mesh_instances.copy_to_vec();
         Self {
             heap: heap.clone(),
             accel_meshes,
@@ -314,21 +316,30 @@ impl MeshAggregate {
                 mesh_transforms: mesh_transform_idx,
                 mesh_headers: mesh_headers_idx,
             },
+            instances_host,
             instances: mesh_instances,
+            dirty: false,
         }
     }
-
-    pub fn set_area_sampler(&self, inst_id: u32, at: AliasTable) {
-        let mut inst = self
-            .instances
-            .view(inst_id as usize..inst_id as usize + 1)
-            .copy_to_vec()[0];
+    pub fn commit(&mut self) {
+        if !self.dirty {
+            return;
+        }
+        self.dirty = false;
+        self.instances.copy_from(&self.instances_host);
+    }
+    pub fn set_area_sampler(&mut self, inst_id: u32, at: AliasTable) {
+        let inst =&mut self.instances_host[inst_id as usize];
         inst.area_sampler_idx = self.heap.bind_buffer(&at.0);
         let pdf_idx = self.heap.bind_buffer(&at.1);
         assert_eq!(inst.area_sampler_idx + 1, pdf_idx);
-        self.instances
-            .view(inst_id as usize..inst_id as usize + 1)
-            .copy_from(&[inst]);
+        self.dirty = true;     
+    }
+
+    pub fn set_instance_light(&mut self, inst_id: u32, light: TagIndex) {
+        let inst =&mut self.instances_host[inst_id as usize];
+        inst.light = light;
+        self.dirty = true;
     }
 
     #[tracked(crate = "luisa")]
