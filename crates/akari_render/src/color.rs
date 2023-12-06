@@ -319,11 +319,20 @@ impl Color {
             ),
         }
     }
-    pub fn lerp(&self, other: Color, fac: Expr<f32>) -> Self {
+    pub fn lerp_f32(&self, other: Color, fac: Expr<f32>) -> Self {
         match (self, other) {
             (Color::Spectral(_s), Color::Spectral(_t)) => todo!(),
             (Color::Rgb(s, cs), Color::Rgb(t, _)) => {
                 Color::Rgb(s.lerp(t, Float3::splat_expr(fac)), *cs)
+            }
+            _ => panic!("cannot lerp spectral and rgb"),
+        }
+    }
+    pub fn lerp(&self, other: Color, fac: Color) -> Self {
+        match (self, other, fac) {
+            (Color::Spectral(_s), Color::Spectral(_t), Color::Spectral(_f)) => todo!(),
+            (Color::Rgb(s, cs), Color::Rgb(t, _), Color::Rgb(f, _)) => {
+                Color::Rgb(s.lerp(t, f), *cs)
             }
             _ => panic!("cannot lerp spectral and rgb"),
         }

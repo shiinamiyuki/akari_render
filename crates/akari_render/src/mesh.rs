@@ -283,11 +283,11 @@ impl MeshAggregate {
             let t: glam::Mat4 = inst.transform.m.into();
             MeshInstance {
                 light: inst.light,
-                material_buffer_idx: todo!(), //inst.surface,
+                material_buffer_idx: material_buf_index,
                 area_sampler_idx: u32::MAX,
                 geom_id: inst.geom_id,
                 transform_det: t.determinant(),
-                flags: todo!(),
+                flags: inst.flags,
             }
         });
         let mesh_instance_idx = heap.bind_buffer(&mesh_instances);
@@ -402,10 +402,17 @@ impl MeshAggregate {
         let vertices = self.mesh_vertices(geometry);
         let indices = self.mesh_indices(geometry);
         let material_slots = self.mesh_material_slots(geometry);
-        let material = self
-            .heap
-            .buffer::<ShaderRef>(inst.material_buffer_idx)
-            .read(material_slots.read(prim_id));
+        let material = if inst.flags & MeshInstanceFlags::HAS_MULTI_MATERIALS != 0 {
+            let material = self
+                .heap
+                .buffer::<ShaderRef>(inst.material_buffer_idx)
+                .read(material_slots.read(prim_id));
+            material
+        } else {
+            self.heap
+                .buffer::<ShaderRef>(inst.material_buffer_idx)
+                .read(0)
+        };
         let i: Expr<Uint3> = indices.read(prim_id).into();
 
         let (area_local, p_local, ng_local) = {

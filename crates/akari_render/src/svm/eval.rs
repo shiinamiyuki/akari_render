@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -60,35 +61,39 @@ impl<'a> SvmEvaluator<'a> {
 
     #[tracked(crate = "luisa")]
     fn read_data<T: Value>(&self, cst: SvmConst<T>) -> Expr<T> {
-        unsafe {
-            self.shader_data
-                .read_as::<T>(cst.offset + self.shader_ref.data_offset)
-        }
+        self.shader_data
+            .read_as::<T>(cst.offset + self.shader_ref.data_offset)
     }
     #[tracked(crate = "luisa")]
     fn do_eval(&mut self, node: SvmNodeRef) -> Box<dyn Any> {
         let idx = node.index as usize;
         let node = &self.shader.nodes[idx];
+        macro_rules! wrap_any {
+            ($v:expr) => {{
+                add_type_name(&$v);
+                Box::new($v) as Box<dyn Any>
+            }};
+        }
         match node {
             svm::SvmNode::Float(v) => {
                 let value = self.read_data(*v);
-                Box::new(value)
+                wrap_any!(value)
             }
             svm::SvmNode::Float3(v) => {
                 let value = self.read_data(*v);
-                Box::new(value)
+                wrap_any!(value)
             }
             svm::SvmNode::MakeFloat3(mk_f3) => {
                 let x = self.eval_float(mk_f3.x);
                 let y = self.eval_float(mk_f3.y);
                 let z = self.eval_float(mk_f3.z);
-                Box::new(Float3::expr(x, y, z))
+                wrap_any!(Float3::expr(x, y, z))
             }
             svm::SvmNode::RgbTex(rgb_tex) => {
                 let rgb = self.eval_float3(rgb_tex.rgb);
 
                 let colorspace = ColorSpaceId::to_colorspace(rgb_tex.colorspace);
-                Box::new(rgb_to_target_colorspace(
+                wrap_any!(rgb_to_target_colorspace(
                     rgb,
                     colorspace,
                     self.color_pipeline.rgb_colorspace,
@@ -106,25 +111,25 @@ impl<'a> SvmEvaluator<'a> {
                 if debug_mode() {
                     lc_assert!(rgb.reduce_min().ge(0.0));
                 }
-                Box::new(rgb)
+                wrap_any!(rgb)
             }
             svm::SvmNode::SpectralUplift(uplift) => {
                 let rgb = self.eval_float3(uplift.rgb);
                 // cpu_dbg!(rgb);
-                Box::new(spectral_uplift(
+                wrap_any!(spectral_uplift(
                     rgb,
                     self.color_pipeline.rgb_colorspace,
                     self.swl(),
                     self.color_repr(),
                 ))
             }
-            svm::SvmNode::Emission(bsdf) => Box::new(bsdf.closure(self)),
-            svm::SvmNode::DiffuseBsdf(bsdf) => Box::new(bsdf.closure(self)),
-            svm::SvmNode::GlassBsdf(bsdf) => Box::new(bsdf.closure(self)),
-            svm::SvmNode::PrincipledBsdf(bsdf) => Box::new(bsdf.closure(self)),
+            svm::SvmNode::Emission(bsdf) => wrap_any!(bsdf.closure(self)),
+            svm::SvmNode::DiffuseBsdf(bsdf) => wrap_any!(bsdf.closure(self)),
+            svm::SvmNode::GlassBsdf(bsdf) => wrap_any!(bsdf.closure(self)),
+            svm::SvmNode::PrincipledBsdf(bsdf) => wrap_any!(bsdf.closure(self)),
             svm::SvmNode::MaterialOutput(out) => {
                 let closure = self.eval_bsdf_closure(out.surface);
-                Box::new(closure.clone())
+                wrap_any!(closure.clone())
             }
         }
     }
@@ -139,8 +144,8 @@ impl<'a> SvmEvaluator<'a> {
             panic!(
                 "Node {:?} evaluated as {:?}, expected {:?}",
                 node,
-                any.type_id(),
-                type_id
+                type_id_to_name(any.type_id()),
+                type_id_to_name(type_id)
             );
         }
         any.downcast_ref::<T>().cloned().unwrap()
@@ -264,4 +269,25 @@ impl Svm {
         }
         sw.finish()
     }
+}
+
+thread_local! {
+    static TYPE_ID_TO_NAME: RefCell<HashMap<std::any::TypeId, &'static str>> = RefCell::new(HashMap::new());
+}
+fn add_type_name<T: 'static>(x: &T) {
+    TYPE_ID_TO_NAME.with(|map| {
+        let mut map = map.borrow_mut();
+        let type_id = std::any::TypeId::of::<T>();
+        let type_name = std::any::type_name::<T>();
+        map.insert(type_id, type_name);
+    });
+}
+
+fn type_id_to_name(type_id: std::any::TypeId) -> String {
+    TYPE_ID_TO_NAME.with(|map| {
+        let map = map.borrow();
+        map.get(&type_id)
+            .map(|x| x.to_string())
+            .unwrap_or(format!("{:?}", type_id))
+    })
 }

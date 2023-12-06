@@ -217,6 +217,9 @@ impl SceneLoader {
                 if mesh_buffer.has_tangents {
                     flags |= MeshInstanceFlags::HAS_TANGENTS;
                 }
+                if mesh_buffer.material_slots.len() > 1 {
+                    flags |= MeshInstanceFlags::HAS_MULTI_MATERIALS;
+                }
                 (
                     mat.clone(),
                     MeshInstanceHost {
@@ -367,7 +370,7 @@ impl SceneLoader {
                     total_power
                 );
             }
-            let instance_node = &self.scene_view.scene().instances[&instance_nodes[i]];
+
             if total_power > 1e-4 {
                 let light_id = lights.len();
                 lights.push((i, total_power));

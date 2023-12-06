@@ -131,14 +131,14 @@ impl SurfaceShader for SvmPrincipledBsdf {
             roughness,
         });
         let specular = svm_eval.eval_float(self.sheen_weight);
-        let specular_tint = svm_eval.eval_float(self.specular_tint);
+        let specular_tint = svm_eval.eval_color(self.specular_tint);
         let clearcoat = svm_eval.eval_float(self.coat_weight);
         let clearcoat_roughness = svm_eval.eval_float(self.coat_roughness);
         let specular_brdf = {
             let f0 = (Color::one(svm_eval.color_repr()).lerp(color_tint, specular_tint)
                 * specular
                 * 0.08.expr())
-            .lerp(color, metallic);
+            .lerp_f32(color, metallic);
             let fresnel = Box::new(FresnelSchlick { f0 });
             Rc::new(MicrofacetReflection {
                 color: Color::one(svm_eval.color_repr()),

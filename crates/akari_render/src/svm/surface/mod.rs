@@ -318,7 +318,7 @@ impl Surface for BsdfMixture {
                 } else {
                     zero
                 };
-                (f_a.lerp(f_b, frac), pdf_a.lerp(pdf_b, frac))
+                (f_a.lerp_f32(f_b, frac), pdf_a.lerp(pdf_b, frac))
             }
         }
     }
