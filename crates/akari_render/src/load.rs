@@ -285,10 +285,21 @@ impl SceneLoader {
         let mut light_ids_to_lights = vec![];
         // now compute light emission power
         for (i, inst) in instances.iter_mut().enumerate() {
-            let power = self.estimate_surface_emission_power(
+            let power_per_mat = instance_surfaces[i].iter().map(|s|self.estimate_surface_emission_power(
                 inst,
-                &self.scene_view.scene().materials[&instance_surfaces[i]].shader,
-            );
+                &self.scene_view.scene().materials[s].shader,
+            )).collect::<Vec<_>>();
+            if power_per_mat.iter().sum::<f32>() <= 1e-6 {
+                continue;
+            }
+            let geom_id = inst.geom_id as usize;
+            let power = {
+                let mesh = &self.mesh_buffers[geom_id];
+                self.device.create_kernel::<fn()>(&track!(||{
+                    let i = dispatch_id().x;
+                    
+                })).dispatch([mesh.indices.len() as u32, 1, 1])
+            };
             if 0.0 < power && power <= 1e-4 {
                 log::warn!(
                     "Light power too low: {:?}, power: {}",
@@ -301,9 +312,9 @@ impl SceneLoader {
                 let light_id = lights.len();
                 lights.push((i, power));
 
-                let geom_id = inst.geom_id as usize;
+                
                 self.compute_mesh_area(geom_id);
-                let mesh = &mut self.mesh_buffers[geom_id];
+                let mesh = &mut self.mesh_buffers[geom_id]; 
                 if mesh.area_sampler.is_none() {
                     mesh.build_area_sampler(
                         self.device.clone(),
@@ -311,9 +322,9 @@ impl SceneLoader {
                     );
                 }
                 let surface_shader: &ShaderRef = todo!(); //&self.nodes_to_surface_shader[&instance_node.materials];
-                let light_ref = self.lights.push(
+                let light_ref = self.lights.push(  
                     (),
-                    AreaLight {
+                    AreaLight {   
                         light_id: light_id as u32,
                         instance_id: i as u32,
                         geom_id: geom_id as u32,

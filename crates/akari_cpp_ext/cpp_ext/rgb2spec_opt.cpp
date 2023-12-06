@@ -21,6 +21,7 @@
 #include <stdexcept>
 #include <thread>
 #include <vector>
+#include "akari_blender_cpp_ext.h"
 
 /**
  * This file contains:
@@ -475,7 +476,7 @@ void init_tables(Gamut gamut)
         break;
 
     default:
-        throw std::runtime_error("init_gamut(): invalid/unsupported gamut.");
+        AKR_PANIC("init_gamut(): invalid/unsupported gamut.");
     }
 
     for (int i = 0; i < CIE_FINE_SAMPLES; ++i)
@@ -572,7 +573,7 @@ double gauss_newton(const double rgb[3], double coeffs[3], int it = 15)
             std::cout << "RGB " << rgb[0] << " " << rgb[1] << " " << rgb[2] << std::endl;
             std::cout << "-> " << coeffs[0] << " " << coeffs[1] << " " << coeffs[2]
                       << std::endl;
-            throw std::runtime_error("LU decomposition failed!");
+            AKR_PANIC("LU decomposition failed!");
         }
 
         double x[3];

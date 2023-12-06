@@ -2,6 +2,8 @@
 #include <cstdint>
 #include <type_traits>
 #include <concepts>
+#include <cstddef>
+#include <algorithm>
 
 #define AKR_ASSERT(x) ([&]() { if (!(x)) { fprintf(stderr, "assertion failed %s\n", #x); abort(); } })()
 struct Mesh;
@@ -37,7 +39,7 @@ void get_mesh_material_indices(const ParallelForContext &ctx, const Mesh *mesh,
                                uint32_t *out);
 }
 }// namespace blender_util
-
+#define AKR_PANIC(msg) ([&]() { fprintf(stderr, "panic: %s\n", msg); abort(); })()
 namespace spectral {
 extern "C" {
 int rgb2spec_opt(int argc, const char *const *argv);
