@@ -1,4 +1,5 @@
 use crate::geometry::{face_forward, spherical_to_xyz2, xyz_to_spherical, Frame};
+use crate::sampling::uniform_sample_disk;
 use crate::*;
 use lazy_static::lazy_static;
 use std::f32::consts::PI;
@@ -83,7 +84,7 @@ fn tr_sample_impl_(alpha: Expr<Float2>, u: Expr<Float2>) -> Expr<Float3> {
     };
     let sin_theta = (1.0 - cos_theta.sqr()).max_(0.0).sqrt();
     let wh = spherical_to_xyz2(cos_theta, sin_theta, phi);
-    let wh = face_forward(wh, Float3::expr(0.0, 1.0, 0.0));
+    let wh = face_forward(wh, Float3::expr(0.0, 0.0, 1.0));
     wh
 }
 lazy_static! {
@@ -112,10 +113,29 @@ impl MicrofacetDistribution for TrowbridgeReitzDistribution {
             tr_lambda_impl_(w, self.alpha)
         }
     }
-
-    fn sample_wh(&self, _wo: Expr<Float3>, u: Expr<Float2>, ad_mode: ADMode) -> Expr<Float3> {
+    #[tracked(crate = "luisa")]
+    fn sample_wh(&self, w: Expr<Float3>, u: Expr<Float2>, ad_mode: ADMode) -> Expr<Float3> {
         if self.sample_visible {
-            todo!("untested");
+            let wh = Var::<Float3>::zeroed();
+            outline(|| {
+                *wh = Float3::expr(self.alpha.x * w.x, self.alpha.y * w.y, w.z).normalize();
+                if wh.z < 0.0 {
+                    *wh = -wh;
+                }
+                let t1 = (wh.z < 0.99999).select(
+                    Float3::expr(0.0, 0.0, 1.0).cross(wh).normalize(),
+                    Float3::expr(1.0, 0.0, 0.0),
+                );
+                let t2 = wh.cross(t1).normalize();
+                let p = uniform_sample_disk(u).var();
+                let h = (1.0f32 - p.x.sqr()).sqrt();
+                *p.y = h.lerp(p.y, (1.0 + wh.z) * 0.5);
+                let pz = (1.0 - p.length_squared()).max_(0.0f32.expr()).sqrt();
+                let nh = p.x * t1 + p.y * t2 + pz * wh;
+                *wh = Float3::expr(self.alpha.x * nh.x, self.alpha.y * nh.y, nh.z.max_(1e-6f32))
+                    .normalize();
+            });
+            **wh
         } else {
             lazy_static! {
                 static ref SAMPLE: Callable<fn(Expr<Float2>, Expr<Float2>) -> Expr<Float3>> =
@@ -209,7 +229,7 @@ mod test {
             &track!(|wo: Expr<Float3>, alpha: Expr<Float2>| {
                 let i = dispatch_id().x;
                 let sampler = IndependentSampler::from_pcg32(seeds.read(i).var());
-                let dist = TrowbridgeReitzDistribution::from_alpha(alpha, false);
+                let dist = TrowbridgeReitzDistribution::from_alpha(alpha, true);
                 for_range(0u32.expr()..n_iters.expr(), |_| {
                     let wh = dist.sample_wh(wo, sampler.next_2d(), ADMode::None);
                     let pdf = dist.pdf(wo, wh, ADMode::None);

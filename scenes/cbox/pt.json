@@ -4,7 +4,7 @@
         "max_depth": 12,
         "rr_depth":5,
         "spp_per_pass": 64,
-        "use_nee": false,
+        "use_nee": true,
         "force_diffuse":false,
         "indirect_only":false,
         "type": "pt"

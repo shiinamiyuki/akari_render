@@ -478,11 +478,7 @@ impl Integrator for PathTracer {
         assert_eq!(resolution.x, film.resolution().x);
         assert_eq!(resolution.y, film.resolution().y);
         let sampler_creator = sampler_config.creator(self.device.clone(), &scene, self.spp);
-        let kernel = self.device.create_kernel_with_options::<fn(u32, Int2)>(
-            KernelBuildOptions {
-                name: Some("mega_path".into()),
-                ..Default::default()
-            },
+        let kernel = self.device.create_kernel::<fn(u32, Int2)>(
             &track!(|spp_per_pass: Expr<u32>, pixel_offset: Expr<Int2>| {
                 set_block_size([16, 16, 1]);
                 let p = dispatch_id().xy();

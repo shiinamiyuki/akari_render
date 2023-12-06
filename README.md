@@ -10,7 +10,7 @@ AkariRender is a CPU/GPU physically based renderer written in Rust and powered b
 
 ## Features
 - Loading Blender scene
-- Cycles shader graph
+- Supports a subset of Cycles shader graph via JIT
 - RGB/Spectral Rendering (WIP)
 - Path Tracing
 - Path Tracing with Metropolis Sampling
@@ -25,8 +25,8 @@ If you are using < Windows 10, please upgrade to Windows 10 or above.
 - Put path to blender source in `blender_src_path.txt`
 - Clone [LuisaCompute](https://github.com/LuisaGroup/luisa-compute-rs) alongside this repo
   
-If you intend to run the renderer on cpu, the following runtime requirement must be satisified:
-- clang++ in PATH
+If you intend to run the renderer on cpu, the following runtime requirement must be satisfied:
+- clang++ in `PATH`
 - llvm dynamic library of the same version. For Windows users, it is the `LLVM-C.dll`.
 
 ## Run

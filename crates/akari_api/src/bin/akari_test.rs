@@ -411,7 +411,7 @@ plt.show()"#
                         fresnel: Box::new(ConstFresnel {}),
                         dist: Box::new(TrowbridgeReitzDistribution::from_roughness(
                             Float2::expr(roughness, roughness),
-                            false,
+                            true,
                         )),
                     })
                 },
@@ -429,7 +429,7 @@ plt.show()"#
                         fresnel: Box::new(ConstFresnel {}),
                         dist: Box::new(TrowbridgeReitzDistribution::from_roughness(
                             Float2::expr(roughness, roughness),
-                            false,
+                            true,
                         )),
                     })
                 },

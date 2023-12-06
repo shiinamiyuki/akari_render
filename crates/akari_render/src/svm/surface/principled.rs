@@ -145,7 +145,7 @@ impl SurfaceShader for SvmPrincipledBsdf {
                 fresnel,
                 dist: Box::new(TrowbridgeReitzDistribution::from_roughness(
                     Float2::expr(roughness, roughness),
-                    false,
+                    true,
                 )),
             })
         };
@@ -159,7 +159,7 @@ impl SurfaceShader for SvmPrincipledBsdf {
                 fresnel,
                 dist: Box::new(TrowbridgeReitzDistribution::from_roughness(
                     Float2::expr(clearcoat_roughness, clearcoat_roughness),
-                    false,
+                    true,
                 )),
             })
         };
@@ -173,7 +173,7 @@ impl SurfaceShader for SvmPrincipledBsdf {
                 fresnel: fresnel.clone(),
                 dist: Box::new(TrowbridgeReitzDistribution::from_roughness(
                     Float2::expr(roughness, roughness),
-                    false,
+                    true,
                 )),
             });
             let transmission = Rc::new(MicrofacetTransmission {
@@ -181,7 +181,7 @@ impl SurfaceShader for SvmPrincipledBsdf {
                 fresnel: fresnel.clone(),
                 dist: Box::new(TrowbridgeReitzDistribution::from_roughness(
                     Float2::expr(roughness, roughness),
-                    false,
+                    true,
                 )),
                 eta,
             });

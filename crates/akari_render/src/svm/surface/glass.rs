@@ -22,7 +22,7 @@ impl SurfaceShader for SvmGlassBsdf {
             fresnel: fresnel.clone(),
             dist: Box::new(TrowbridgeReitzDistribution::from_roughness(
                 Float2::expr(roughness, roughness),
-                false,
+                true,
             )),
         });
         let transmission = Rc::new(MicrofacetTransmission {
@@ -30,7 +30,7 @@ impl SurfaceShader for SvmGlassBsdf {
             fresnel: fresnel.clone(),
             dist: Box::new(TrowbridgeReitzDistribution::from_roughness(
                 Float2::expr(roughness, roughness),
-                false,
+                true,
             )),
             eta,
         });

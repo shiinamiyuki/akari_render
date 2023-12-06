@@ -531,7 +531,7 @@ impl Surface for MicrofacetReflection {
             let wh = wh.normalize();
             let f = self
                 .fresnel
-                .evaluate(wi.dot(face_forward(wh, Float3::expr(0.0, 1.0, 0.0))), ctx);
+                .evaluate(wi.dot(face_forward(wh, Float3::expr(0.0, 0.0, 1.0))), ctx);
             let d = self.dist.d(wh, ctx.ad_mode);
             let g = self.dist.g(wo, wi, ctx.ad_mode);
             let f = &self.color * &f * (0.25 * d * g / (cos_i * cos_o)).abs() * cos_o.abs();
@@ -600,7 +600,7 @@ impl Surface for MicrofacetTransmission {
         let cos_i = Frame::cos_theta(wi);
         let eta = select(cos_o.gt(0.0), self.eta, 1.0 / self.eta);
         let wh = (wo + wi * eta).normalize();
-        let wh = face_forward(wh, Float3::expr(0.0, 1.0, 0.0));
+        let wh = face_forward(wh, Float3::expr(0.0, 0.0, 1.0));
         let backfacing = (wh.dot(wi) * cos_i).lt(0.0) | (wh.dot(wo) * cos_o).lt(0.0);
         if (wh.dot(wo) * wi.dot(wh)).gt(0.0)
             | cos_i.eq(0.0)
