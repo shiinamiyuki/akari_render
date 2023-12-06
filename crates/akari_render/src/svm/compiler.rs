@@ -271,7 +271,7 @@ impl<'a> Compiler<'a> {
     fn compile(ctx: SvmCompileContext<'a>) -> CompiledShader {
         let mut compiler = Self::new(ctx);
         compiler.compile_node(&ctx.graph.output);
-        dbg!(&compiler.bytecode);
+        // dbg!(&compiler.bytecode);
         CompiledShader {
             bytecode: ShaderBytecode::new(compiler.bytecode),
             data: compiler.data.finish(),

@@ -4,13 +4,13 @@
         "max_depth": 12,
         "rr_depth":5,
         "spp_per_pass": 64,
-        "use_nee": true,
+        "use_nee": false,
         "force_diffuse":false,
         "indirect_only":false,
         "type": "pt"
     },
     "sampler": {
-        "type": "independent",
+        "type": "pmj02bn",
         "seed": 0
     },
     "film": {

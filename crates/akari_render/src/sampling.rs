@@ -17,11 +17,11 @@ pub fn invert_uniform_sample_disk(p: Expr<Float2>) -> Expr<Float2> {
 pub fn cos_sample_hemisphere(u: Expr<Float2>) -> Expr<Float3> {
     let d = uniform_sample_disk(u);
     let z = (1.0 - d.x * d.x - d.y * d.y).max_(0.0).sqrt();
-    Float3::expr(d.x, z, d.y)
+    Float3::expr(d.x, d.y, z)
 }
 #[tracked(crate = "luisa")]
 pub fn invert_cos_sample_hemisphere(p: Expr<Float3>) -> Expr<Float2> {
-    let d = Float2::expr(p.x, p.z);
+    let d = Float2::expr(p.x, p.y);
     invert_uniform_sample_disk(d)
 }
 #[tracked(crate = "luisa")]

@@ -1,1382 +1,2905 @@
 {
-    "camera": {
-        "Perspective": {
-            "transform": {
-                "TRS": {
-                    "translation": [
-                        0.0,
-                        -9.0,
-                        1.0
-                    ],
-                    "rotation": [
-                        1.5707963705062866,
-                        0.0,
-                        0.0
-                    ],
-                    "scale": [
-                        1.0,
-                        1.0,
-                        1.0
-                    ],
-                    "coordinate_system": "Blender"
-                }
-            },
-            "fov": 14.152756432007966,
-            "focal_distance": 10.0,
-            "fstop": 2.799999952316284,
-            "sensor_width": 1024,
-            "sensor_height": 1024
+  "camera": {
+    "type": "perspective",
+    "data": {
+      "transform": {
+        "type": "trs",
+        "data": {
+          "translation": [
+            0.0,
+            -9.0,
+            1.0
+          ],
+          "rotation": [
+            1.5707964,
+            0.0,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "coordinate_system": "Blender"
         }
-    },
-    "instances": {
-        "CornellBox_Original": {
-            "geometry": {
-                "id": "CornellBox_Original_mesh"
-            },
-            "material": {
-                "id": "light_001"
-            },
-            "transform": {
-                "Matrix": [
-                    [
-                        1.0,
-                        0.0,
-                        0.0,
-                        0.0
-                    ],
-                    [
-                        0.0,
-                        1.0,
-                        7.549790126404332e-08,
-                        0.0
-                    ],
-                    [
-                        0.0,
-                        -7.549790126404332e-08,
-                        1.0,
-                        0.0
-                    ],
-                    [
-                        0.0,
-                        0.0,
-                        0.0,
-                        1.0
-                    ]
-                ]
-            }
-        },
-        "CornellBox_Original_001": {
-            "geometry": {
-                "id": "CornellBox_Original_001_mesh"
-            },
-            "material": {
-                "id": "floor_001"
-            },
-            "transform": {
-                "Matrix": [
-                    [
-                        1.0,
-                        0.0,
-                        0.0,
-                        0.0
-                    ],
-                    [
-                        0.0,
-                        1.0,
-                        7.549790126404332e-08,
-                        0.0
-                    ],
-                    [
-                        0.0,
-                        -7.549790126404332e-08,
-                        1.0,
-                        0.0
-                    ],
-                    [
-                        0.0,
-                        0.0,
-                        0.0,
-                        1.0
-                    ]
-                ]
-            }
-        },
-        "CornellBox_Original_002": {
-            "geometry": {
-                "id": "CornellBox_Original_002_mesh"
-            },
-            "material": {
-                "id": "ceiling_001"
-            },
-            "transform": {
-                "Matrix": [
-                    [
-                        1.0,
-                        0.0,
-                        0.0,
-                        0.0
-                    ],
-                    [
-                        0.0,
-                        1.0,
-                        7.549790126404332e-08,
-                        0.0
-                    ],
-                    [
-                        0.0,
-                        -7.549790126404332e-08,
-                        1.0,
-                        0.0
-                    ],
-                    [
-                        0.0,
-                        0.0,
-                        0.0,
-                        1.0
-                    ]
-                ]
-            }
-        },
-        "CornellBox_Original_003": {
-            "geometry": {
-                "id": "CornellBox_Original_003_mesh"
-            },
-            "material": {
-                "id": "backWall_001"
-            },
-            "transform": {
-                "Matrix": [
-                    [
-                        1.0,
-                        0.0,
-                        0.0,
-                        0.0
-                    ],
-                    [
-                        0.0,
-                        1.0,
-                        7.549790126404332e-08,
-                        0.0
-                    ],
-                    [
-                        0.0,
-                        -7.549790126404332e-08,
-                        1.0,
-                        0.0
-                    ],
-                    [
-                        0.0,
-                        0.0,
-                        0.0,
-                        1.0
-                    ]
-                ]
-            }
-        },
-        "CornellBox_Original_004": {
-            "geometry": {
-                "id": "CornellBox_Original_004_mesh"
-            },
-            "material": {
-                "id": "rightWall_001"
-            },
-            "transform": {
-                "Matrix": [
-                    [
-                        1.0,
-                        0.0,
-                        0.0,
-                        0.0
-                    ],
-                    [
-                        0.0,
-                        1.0,
-                        7.549790126404332e-08,
-                        0.0
-                    ],
-                    [
-                        0.0,
-                        -7.549790126404332e-08,
-                        1.0,
-                        0.0
-                    ],
-                    [
-                        0.0,
-                        0.0,
-                        0.0,
-                        1.0
-                    ]
-                ]
-            }
-        },
-        "CornellBox_Original_005": {
-            "geometry": {
-                "id": "CornellBox_Original_005_mesh"
-            },
-            "material": {
-                "id": "leftWall_001"
-            },
-            "transform": {
-                "Matrix": [
-                    [
-                        1.0,
-                        0.0,
-                        0.0,
-                        0.0
-                    ],
-                    [
-                        0.0,
-                        1.0,
-                        7.549790126404332e-08,
-                        0.0
-                    ],
-                    [
-                        0.0,
-                        -7.549790126404332e-08,
-                        1.0,
-                        0.0
-                    ],
-                    [
-                        0.0,
-                        0.0,
-                        0.0,
-                        1.0
-                    ]
-                ]
-            }
-        },
-        "CornellBox_Original_006": {
-            "geometry": {
-                "id": "CornellBox_Original_006_mesh"
-            },
-            "material": {
-                "id": "shortBox_001"
-            },
-            "transform": {
-                "Matrix": [
-                    [
-                        1.0,
-                        0.0,
-                        0.0,
-                        0.0
-                    ],
-                    [
-                        0.0,
-                        1.0,
-                        7.549790126404332e-08,
-                        0.0
-                    ],
-                    [
-                        0.0,
-                        -7.549790126404332e-08,
-                        1.0,
-                        0.0
-                    ],
-                    [
-                        0.0,
-                        0.0,
-                        0.0,
-                        1.0
-                    ]
-                ]
-            }
-        },
-        "CornellBox_Original_007": {
-            "geometry": {
-                "id": "CornellBox_Original_007_mesh"
-            },
-            "material": {
-                "id": "tallBox_001"
-            },
-            "transform": {
-                "Matrix": [
-                    [
-                        1.0,
-                        0.0,
-                        0.0,
-                        0.0
-                    ],
-                    [
-                        0.0,
-                        1.0,
-                        7.549790126404332e-08,
-                        0.0
-                    ],
-                    [
-                        0.0,
-                        -7.549790126404332e-08,
-                        1.0,
-                        0.0
-                    ],
-                    [
-                        0.0,
-                        0.0,
-                        0.0,
-                        1.0
-                    ]
-                ]
-            }
-        }
-    },
-    "lights": {},
-    "geometries": {
-        "CornellBox_Original_mesh": {
-            "Mesh": {
-                "vertices": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_mesh.vert"
-                },
-                "indices": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_mesh.ind"
-                },
-                "normals": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_mesh.normal"
-                },
-                "uvs": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_mesh.uv"
-                },
-                "tangents": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_mesh.tangent"
-                },
-                "bitangent_signs": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_mesh.bitangent"
-                }
-            }
-        },
-        "CornellBox_Original_001_mesh": {
-            "Mesh": {
-                "vertices": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_001_mesh.vert"
-                },
-                "indices": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_001_mesh.ind"
-                },
-                "normals": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_001_mesh.normal"
-                },
-                "uvs": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_001_mesh.uv"
-                },
-                "tangents": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_001_mesh.tangent"
-                },
-                "bitangent_signs": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_001_mesh.bitangent"
-                }
-            }
-        },
-        "CornellBox_Original_002_mesh": {
-            "Mesh": {
-                "vertices": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_002_mesh.vert"
-                },
-                "indices": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_002_mesh.ind"
-                },
-                "normals": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_002_mesh.normal"
-                },
-                "uvs": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_002_mesh.uv"
-                },
-                "tangents": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_002_mesh.tangent"
-                },
-                "bitangent_signs": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_002_mesh.bitangent"
-                }
-            }
-        },
-        "CornellBox_Original_003_mesh": {
-            "Mesh": {
-                "vertices": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_003_mesh.vert"
-                },
-                "indices": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_003_mesh.ind"
-                },
-                "normals": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_003_mesh.normal"
-                },
-                "uvs": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_003_mesh.uv"
-                },
-                "tangents": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_003_mesh.tangent"
-                },
-                "bitangent_signs": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_003_mesh.bitangent"
-                }
-            }
-        },
-        "CornellBox_Original_004_mesh": {
-            "Mesh": {
-                "vertices": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_004_mesh.vert"
-                },
-                "indices": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_004_mesh.ind"
-                },
-                "normals": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_004_mesh.normal"
-                },
-                "uvs": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_004_mesh.uv"
-                },
-                "tangents": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_004_mesh.tangent"
-                },
-                "bitangent_signs": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_004_mesh.bitangent"
-                }
-            }
-        },
-        "CornellBox_Original_005_mesh": {
-            "Mesh": {
-                "vertices": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_005_mesh.vert"
-                },
-                "indices": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_005_mesh.ind"
-                },
-                "normals": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_005_mesh.normal"
-                },
-                "uvs": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_005_mesh.uv"
-                },
-                "tangents": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_005_mesh.tangent"
-                },
-                "bitangent_signs": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_005_mesh.bitangent"
-                }
-            }
-        },
-        "CornellBox_Original_006_mesh": {
-            "Mesh": {
-                "vertices": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_006_mesh.vert"
-                },
-                "indices": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_006_mesh.ind"
-                },
-                "normals": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_006_mesh.normal"
-                },
-                "uvs": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_006_mesh.uv"
-                },
-                "tangents": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_006_mesh.tangent"
-                },
-                "bitangent_signs": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_006_mesh.bitangent"
-                }
-            }
-        },
-        "CornellBox_Original_007_mesh": {
-            "Mesh": {
-                "vertices": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_007_mesh.vert"
-                },
-                "indices": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_007_mesh.ind"
-                },
-                "normals": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_007_mesh.normal"
-                },
-                "uvs": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_007_mesh.uv"
-                },
-                "tangents": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_007_mesh.tangent"
-                },
-                "bitangent_signs": {
-                    "External": "scenes/cbox/meshes/CornellBox_Original_007_mesh.bitangent"
-                }
-            }
-        }
-    },
-    "materials": {
-        "light_001": {
-            "shader": {
-                "nodes": {
-                    "$tmp_0": {
-                        "Rgb": {
-                            "value": [
-                                0.7799999713897705,
-                                0.7799999713897705,
-                                0.7799999713897705
-                            ],
-                            "colorspace": "srgb"
-                        }
-                    },
-                    "$tmp_1": {
-                        "SpectralUplift": {
-                            "id": "$tmp_0"
-                        }
-                    },
-                    "$tmp_2": {
-                        "Float": 0.8999999761581421
-                    },
-                    "$tmp_3": {
-                        "Float": 0.0
-                    },
-                    "$tmp_4": {
-                        "Float": 0.0
-                    },
-                    "$tmp_5": {
-                        "Float": 0.0
-                    },
-                    "$tmp_6": {
-                        "Rgb": {
-                            "value": [
-                                17.0,
-                                12.0,
-                                4.0
-                            ],
-                            "colorspace": "srgb"
-                        }
-                    },
-                    "$tmp_7": {
-                        "SpectralUplift": {
-                            "id": "$tmp_6"
-                        }
-                    },
-                    "$tmp_8": {
-                        "Float": 1.0
-                    },
-                    "$tmp_9": {
-                        "Float": 0.0
-                    },
-                    "$tmp_10": {
-                        "Float": 0.029999999329447746
-                    },
-                    "$tmp_11": {
-                        "Float": 0.0
-                    },
-                    "$tmp_12": {
-                        "Float": 1.0
-                    },
-                    "Principled_BSDF": {
-                        "PrincipledBsdf": {
-                            "color": {
-                                "id": "$tmp_1"
-                            },
-                            "roughness": {
-                                "id": "$tmp_2"
-                            },
-                            "metallic": {
-                                "id": "$tmp_3"
-                            },
-                            "specular": {
-                                "id": "$tmp_4"
-                            },
-                            "specular_tint": {
-                                "id": "$tmp_5"
-                            },
-                            "emission": {
-                                "id": "$tmp_7"
-                            },
-                            "emission_strength": {
-                                "id": "$tmp_8"
-                            },
-                            "clearcoat": {
-                                "id": "$tmp_9"
-                            },
-                            "clearcoat_roughness": {
-                                "id": "$tmp_10"
-                            },
-                            "transmission": {
-                                "id": "$tmp_11"
-                            },
-                            "ior": {
-                                "id": "$tmp_12"
-                            }
-                        }
-                    },
-                    "Material_Output": {
-                        "OutputSurface": {
-                            "surface": {
-                                "id": "Principled_BSDF"
-                            }
-                        }
-                    }
-                },
-                "out": {
-                    "id": "Material_Output"
-                }
-            }
-        },
-        "floor_001": {
-            "shader": {
-                "nodes": {
-                    "$tmp_0": {
-                        "Rgb": {
-                            "value": [
-                                0.7250000238418579,
-                                0.7099999785423279,
-                                0.6800000071525574
-                            ],
-                            "colorspace": "srgb"
-                        }
-                    },
-                    "$tmp_1": {
-                        "SpectralUplift": {
-                            "id": "$tmp_0"
-                        }
-                    },
-                    "$tmp_2": {
-                        "Float": 0.8999999761581421
-                    },
-                    "$tmp_3": {
-                        "Float": 0.0
-                    },
-                    "$tmp_4": {
-                        "Float": 0.0
-                    },
-                    "$tmp_5": {
-                        "Float": 0.0
-                    },
-                    "$tmp_6": {
-                        "Rgb": {
-                            "value": [
-                                0.0,
-                                0.0,
-                                0.0
-                            ],
-                            "colorspace": "srgb"
-                        }
-                    },
-                    "$tmp_7": {
-                        "SpectralUplift": {
-                            "id": "$tmp_6"
-                        }
-                    },
-                    "$tmp_8": {
-                        "Float": 1.0
-                    },
-                    "$tmp_9": {
-                        "Float": 0.0
-                    },
-                    "$tmp_10": {
-                        "Float": 0.029999999329447746
-                    },
-                    "$tmp_11": {
-                        "Float": 0.0
-                    },
-                    "$tmp_12": {
-                        "Float": 1.0
-                    },
-                    "Principled_BSDF_0": {
-                        "PrincipledBsdf": {
-                            "color": {
-                                "id": "$tmp_1"
-                            },
-                            "roughness": {
-                                "id": "$tmp_2"
-                            },
-                            "metallic": {
-                                "id": "$tmp_3"
-                            },
-                            "specular": {
-                                "id": "$tmp_4"
-                            },
-                            "specular_tint": {
-                                "id": "$tmp_5"
-                            },
-                            "emission": {
-                                "id": "$tmp_7"
-                            },
-                            "emission_strength": {
-                                "id": "$tmp_8"
-                            },
-                            "clearcoat": {
-                                "id": "$tmp_9"
-                            },
-                            "clearcoat_roughness": {
-                                "id": "$tmp_10"
-                            },
-                            "transmission": {
-                                "id": "$tmp_11"
-                            },
-                            "ior": {
-                                "id": "$tmp_12"
-                            }
-                        }
-                    },
-                    "Material_Output_0": {
-                        "OutputSurface": {
-                            "surface": {
-                                "id": "Principled_BSDF_0"
-                            }
-                        }
-                    }
-                },
-                "out": {
-                    "id": "Material_Output_0"
-                }
-            }
-        },
-        "ceiling_001": {
-            "shader": {
-                "nodes": {
-                    "$tmp_0": {
-                        "Rgb": {
-                            "value": [
-                                0.7250000238418579,
-                                0.7099999785423279,
-                                0.6800000071525574
-                            ],
-                            "colorspace": "srgb"
-                        }
-                    },
-                    "$tmp_1": {
-                        "SpectralUplift": {
-                            "id": "$tmp_0"
-                        }
-                    },
-                    "$tmp_2": {
-                        "Float": 0.8999999761581421
-                    },
-                    "$tmp_3": {
-                        "Float": 0.0
-                    },
-                    "$tmp_4": {
-                        "Float": 0.0
-                    },
-                    "$tmp_5": {
-                        "Float": 0.0
-                    },
-                    "$tmp_6": {
-                        "Rgb": {
-                            "value": [
-                                0.0,
-                                0.0,
-                                0.0
-                            ],
-                            "colorspace": "srgb"
-                        }
-                    },
-                    "$tmp_7": {
-                        "SpectralUplift": {
-                            "id": "$tmp_6"
-                        }
-                    },
-                    "$tmp_8": {
-                        "Float": 1.0
-                    },
-                    "$tmp_9": {
-                        "Float": 0.0
-                    },
-                    "$tmp_10": {
-                        "Float": 0.029999999329447746
-                    },
-                    "$tmp_11": {
-                        "Float": 0.0
-                    },
-                    "$tmp_12": {
-                        "Float": 1.0
-                    },
-                    "Principled_BSDF_1": {
-                        "PrincipledBsdf": {
-                            "color": {
-                                "id": "$tmp_1"
-                            },
-                            "roughness": {
-                                "id": "$tmp_2"
-                            },
-                            "metallic": {
-                                "id": "$tmp_3"
-                            },
-                            "specular": {
-                                "id": "$tmp_4"
-                            },
-                            "specular_tint": {
-                                "id": "$tmp_5"
-                            },
-                            "emission": {
-                                "id": "$tmp_7"
-                            },
-                            "emission_strength": {
-                                "id": "$tmp_8"
-                            },
-                            "clearcoat": {
-                                "id": "$tmp_9"
-                            },
-                            "clearcoat_roughness": {
-                                "id": "$tmp_10"
-                            },
-                            "transmission": {
-                                "id": "$tmp_11"
-                            },
-                            "ior": {
-                                "id": "$tmp_12"
-                            }
-                        }
-                    },
-                    "Material_Output_1": {
-                        "OutputSurface": {
-                            "surface": {
-                                "id": "Principled_BSDF_1"
-                            }
-                        }
-                    }
-                },
-                "out": {
-                    "id": "Material_Output_1"
-                }
-            }
-        },
-        "backWall_001": {
-            "shader": {
-                "nodes": {
-                    "$tmp_0": {
-                        "Rgb": {
-                            "value": [
-                                0.7250000238418579,
-                                0.7099999785423279,
-                                0.6800000071525574
-                            ],
-                            "colorspace": "srgb"
-                        }
-                    },
-                    "$tmp_1": {
-                        "SpectralUplift": {
-                            "id": "$tmp_0"
-                        }
-                    },
-                    "$tmp_2": {
-                        "Float": 0.8999999761581421
-                    },
-                    "$tmp_3": {
-                        "Float": 0.0
-                    },
-                    "$tmp_4": {
-                        "Float": 0.0
-                    },
-                    "$tmp_5": {
-                        "Float": 0.0
-                    },
-                    "$tmp_6": {
-                        "Rgb": {
-                            "value": [
-                                0.0,
-                                0.0,
-                                0.0
-                            ],
-                            "colorspace": "srgb"
-                        }
-                    },
-                    "$tmp_7": {
-                        "SpectralUplift": {
-                            "id": "$tmp_6"
-                        }
-                    },
-                    "$tmp_8": {
-                        "Float": 1.0
-                    },
-                    "$tmp_9": {
-                        "Float": 0.0
-                    },
-                    "$tmp_10": {
-                        "Float": 0.029999999329447746
-                    },
-                    "$tmp_11": {
-                        "Float": 0.0
-                    },
-                    "$tmp_12": {
-                        "Float": 1.0
-                    },
-                    "Principled_BSDF_2": {
-                        "PrincipledBsdf": {
-                            "color": {
-                                "id": "$tmp_1"
-                            },
-                            "roughness": {
-                                "id": "$tmp_2"
-                            },
-                            "metallic": {
-                                "id": "$tmp_3"
-                            },
-                            "specular": {
-                                "id": "$tmp_4"
-                            },
-                            "specular_tint": {
-                                "id": "$tmp_5"
-                            },
-                            "emission": {
-                                "id": "$tmp_7"
-                            },
-                            "emission_strength": {
-                                "id": "$tmp_8"
-                            },
-                            "clearcoat": {
-                                "id": "$tmp_9"
-                            },
-                            "clearcoat_roughness": {
-                                "id": "$tmp_10"
-                            },
-                            "transmission": {
-                                "id": "$tmp_11"
-                            },
-                            "ior": {
-                                "id": "$tmp_12"
-                            }
-                        }
-                    },
-                    "Material_Output_2": {
-                        "OutputSurface": {
-                            "surface": {
-                                "id": "Principled_BSDF_2"
-                            }
-                        }
-                    }
-                },
-                "out": {
-                    "id": "Material_Output_2"
-                }
-            }
-        },
-        "rightWall_001": {
-            "shader": {
-                "nodes": {
-                    "$tmp_0": {
-                        "Rgb": {
-                            "value": [
-                                0.14000000059604645,
-                                0.44999998807907104,
-                                0.09099999815225601
-                            ],
-                            "colorspace": "srgb"
-                        }
-                    },
-                    "$tmp_1": {
-                        "SpectralUplift": {
-                            "id": "$tmp_0"
-                        }
-                    },
-                    "$tmp_2": {
-                        "Float": 0.8999999761581421
-                    },
-                    "$tmp_3": {
-                        "Float": 0.0
-                    },
-                    "$tmp_4": {
-                        "Float": 0.0
-                    },
-                    "$tmp_5": {
-                        "Float": 0.0
-                    },
-                    "$tmp_6": {
-                        "Rgb": {
-                            "value": [
-                                0.0,
-                                0.0,
-                                0.0
-                            ],
-                            "colorspace": "srgb"
-                        }
-                    },
-                    "$tmp_7": {
-                        "SpectralUplift": {
-                            "id": "$tmp_6"
-                        }
-                    },
-                    "$tmp_8": {
-                        "Float": 1.0
-                    },
-                    "$tmp_9": {
-                        "Float": 0.0
-                    },
-                    "$tmp_10": {
-                        "Float": 0.029999999329447746
-                    },
-                    "$tmp_11": {
-                        "Float": 0.0
-                    },
-                    "$tmp_12": {
-                        "Float": 1.5
-                    },
-                    "Principled_BSDF_3": {
-                        "PrincipledBsdf": {
-                            "color": {
-                                "id": "$tmp_1"
-                            },
-                            "roughness": {
-                                "id": "$tmp_2"
-                            },
-                            "metallic": {
-                                "id": "$tmp_3"
-                            },
-                            "specular": {
-                                "id": "$tmp_4"
-                            },
-                            "specular_tint": {
-                                "id": "$tmp_5"
-                            },
-                            "emission": {
-                                "id": "$tmp_7"
-                            },
-                            "emission_strength": {
-                                "id": "$tmp_8"
-                            },
-                            "clearcoat": {
-                                "id": "$tmp_9"
-                            },
-                            "clearcoat_roughness": {
-                                "id": "$tmp_10"
-                            },
-                            "transmission": {
-                                "id": "$tmp_11"
-                            },
-                            "ior": {
-                                "id": "$tmp_12"
-                            }
-                        }
-                    },
-                    "Material_Output_3": {
-                        "OutputSurface": {
-                            "surface": {
-                                "id": "Principled_BSDF_3"
-                            }
-                        }
-                    }
-                },
-                "out": {
-                    "id": "Material_Output_3"
-                }
-            }
-        },
-        "leftWall_001": {
-            "shader": {
-                "nodes": {
-                    "$tmp_0": {
-                        "Rgb": {
-                            "value": [
-                                0.6299999952316284,
-                                0.06499999761581421,
-                                0.05000000074505806
-                            ],
-                            "colorspace": "srgb"
-                        }
-                    },
-                    "$tmp_1": {
-                        "SpectralUplift": {
-                            "id": "$tmp_0"
-                        }
-                    },
-                    "$tmp_2": {
-                        "Float": 0.8999999761581421
-                    },
-                    "$tmp_3": {
-                        "Float": 0.0
-                    },
-                    "$tmp_4": {
-                        "Float": 0.0
-                    },
-                    "$tmp_5": {
-                        "Float": 0.0
-                    },
-                    "$tmp_6": {
-                        "Rgb": {
-                            "value": [
-                                0.0,
-                                0.0,
-                                0.0
-                            ],
-                            "colorspace": "srgb"
-                        }
-                    },
-                    "$tmp_7": {
-                        "SpectralUplift": {
-                            "id": "$tmp_6"
-                        }
-                    },
-                    "$tmp_8": {
-                        "Float": 1.0
-                    },
-                    "$tmp_9": {
-                        "Float": 0.0
-                    },
-                    "$tmp_10": {
-                        "Float": 0.029999999329447746
-                    },
-                    "$tmp_11": {
-                        "Float": 0.0
-                    },
-                    "$tmp_12": {
-                        "Float": 1.5
-                    },
-                    "Principled_BSDF_4": {
-                        "PrincipledBsdf": {
-                            "color": {
-                                "id": "$tmp_1"
-                            },
-                            "roughness": {
-                                "id": "$tmp_2"
-                            },
-                            "metallic": {
-                                "id": "$tmp_3"
-                            },
-                            "specular": {
-                                "id": "$tmp_4"
-                            },
-                            "specular_tint": {
-                                "id": "$tmp_5"
-                            },
-                            "emission": {
-                                "id": "$tmp_7"
-                            },
-                            "emission_strength": {
-                                "id": "$tmp_8"
-                            },
-                            "clearcoat": {
-                                "id": "$tmp_9"
-                            },
-                            "clearcoat_roughness": {
-                                "id": "$tmp_10"
-                            },
-                            "transmission": {
-                                "id": "$tmp_11"
-                            },
-                            "ior": {
-                                "id": "$tmp_12"
-                            }
-                        }
-                    },
-                    "Material_Output_4": {
-                        "OutputSurface": {
-                            "surface": {
-                                "id": "Principled_BSDF_4"
-                            }
-                        }
-                    }
-                },
-                "out": {
-                    "id": "Material_Output_4"
-                }
-            }
-        },
-        "shortBox_001": {
-            "shader": {
-                "nodes": {
-                    "$tmp_0": {
-                        "Rgb": {
-                            "value": [
-                                0.7250000238418579,
-                                0.7099999785423279,
-                                0.6800000071525574
-                            ],
-                            "colorspace": "srgb"
-                        }
-                    },
-                    "$tmp_1": {
-                        "SpectralUplift": {
-                            "id": "$tmp_0"
-                        }
-                    },
-                    "$tmp_2": {
-                        "Float": 0.8999999761581421
-                    },
-                    "$tmp_3": {
-                        "Float": 0.0
-                    },
-                    "$tmp_4": {
-                        "Float": 0.0
-                    },
-                    "$tmp_5": {
-                        "Float": 0.0
-                    },
-                    "$tmp_6": {
-                        "Rgb": {
-                            "value": [
-                                0.0,
-                                0.0,
-                                0.0
-                            ],
-                            "colorspace": "srgb"
-                        }
-                    },
-                    "$tmp_7": {
-                        "SpectralUplift": {
-                            "id": "$tmp_6"
-                        }
-                    },
-                    "$tmp_8": {
-                        "Float": 1.0
-                    },
-                    "$tmp_9": {
-                        "Float": 0.0
-                    },
-                    "$tmp_10": {
-                        "Float": 0.029999999329447746
-                    },
-                    "$tmp_11": {
-                        "Float": 0.0
-                    },
-                    "$tmp_12": {
-                        "Float": 1.0
-                    },
-                    "Principled_BSDF_5": {
-                        "PrincipledBsdf": {
-                            "color": {
-                                "id": "$tmp_1"
-                            },
-                            "roughness": {
-                                "id": "$tmp_2"
-                            },
-                            "metallic": {
-                                "id": "$tmp_3"
-                            },
-                            "specular": {
-                                "id": "$tmp_4"
-                            },
-                            "specular_tint": {
-                                "id": "$tmp_5"
-                            },
-                            "emission": {
-                                "id": "$tmp_7"
-                            },
-                            "emission_strength": {
-                                "id": "$tmp_8"
-                            },
-                            "clearcoat": {
-                                "id": "$tmp_9"
-                            },
-                            "clearcoat_roughness": {
-                                "id": "$tmp_10"
-                            },
-                            "transmission": {
-                                "id": "$tmp_11"
-                            },
-                            "ior": {
-                                "id": "$tmp_12"
-                            }
-                        }
-                    },
-                    "Material_Output_5": {
-                        "OutputSurface": {
-                            "surface": {
-                                "id": "Principled_BSDF_5"
-                            }
-                        }
-                    }
-                },
-                "out": {
-                    "id": "Material_Output_5"
-                }
-            }
-        },
-        "tallBox_001": {
-            "shader": {
-                "nodes": {
-                    "$tmp_0": {
-                        "Rgb": {
-                            "value": [
-                                0.7250000238418579,
-                                0.7099999785423279,
-                                0.6800000071525574
-                            ],
-                            "colorspace": "srgb"
-                        }
-                    },
-                    "$tmp_1": {
-                        "SpectralUplift": {
-                            "id": "$tmp_0"
-                        }
-                    },
-                    "$tmp_2": {
-                        "Float": 0.08110232651233673
-                    },
-                    "$tmp_3": {
-                        "Float": 1.0
-                    },
-                    "$tmp_4": {
-                        "Float": 0.0
-                    },
-                    "$tmp_5": {
-                        "Float": 0.0
-                    },
-                    "$tmp_6": {
-                        "Rgb": {
-                            "value": [
-                                0.0,
-                                0.0,
-                                0.0
-                            ],
-                            "colorspace": "srgb"
-                        }
-                    },
-                    "$tmp_7": {
-                        "SpectralUplift": {
-                            "id": "$tmp_6"
-                        }
-                    },
-                    "$tmp_8": {
-                        "Float": 1.0
-                    },
-                    "$tmp_9": {
-                        "Float": 0.0
-                    },
-                    "$tmp_10": {
-                        "Float": 0.029999999329447746
-                    },
-                    "$tmp_11": {
-                        "Float": 0.0
-                    },
-                    "$tmp_12": {
-                        "Float": 1.0
-                    },
-                    "Principled_BSDF_6": {
-                        "PrincipledBsdf": {
-                            "color": {
-                                "id": "$tmp_1"
-                            },
-                            "roughness": {
-                                "id": "$tmp_2"
-                            },
-                            "metallic": {
-                                "id": "$tmp_3"
-                            },
-                            "specular": {
-                                "id": "$tmp_4"
-                            },
-                            "specular_tint": {
-                                "id": "$tmp_5"
-                            },
-                            "emission": {
-                                "id": "$tmp_7"
-                            },
-                            "emission_strength": {
-                                "id": "$tmp_8"
-                            },
-                            "clearcoat": {
-                                "id": "$tmp_9"
-                            },
-                            "clearcoat_roughness": {
-                                "id": "$tmp_10"
-                            },
-                            "transmission": {
-                                "id": "$tmp_11"
-                            },
-                            "ior": {
-                                "id": "$tmp_12"
-                            }
-                        }
-                    },
-                    "Material_Output_6": {
-                        "OutputSurface": {
-                            "surface": {
-                                "id": "Principled_BSDF_6"
-                            }
-                        }
-                    }
-                },
-                "out": {
-                    "id": "Material_Output_6"
-                }
-            }
-        }
+      },
+      "fov": 14.152757,
+      "focal_distance": 10.0,
+      "fstop": 2.8,
+      "sensor_width": 1024,
+      "sensor_height": 1024
     }
+  },
+  "instances": {
+    "CornellBox_Original": {
+      "geometry": {
+        "id": "CornellBox_Original_mesh"
+      },
+      "transform": {
+        "type": "matrix",
+        "data": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            7.54979e-8,
+            0.0
+          ],
+          [
+            0.0,
+            -7.54979e-8,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "materials": [
+        {
+          "id": "light_001"
+        }
+      ]
+    },
+    "CornellBox_Original_001": {
+      "geometry": {
+        "id": "CornellBox_Original_001_mesh"
+      },
+      "transform": {
+        "type": "matrix",
+        "data": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            7.54979e-8,
+            0.0
+          ],
+          [
+            0.0,
+            -7.54979e-8,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "materials": [
+        {
+          "id": "floor_001"
+        }
+      ]
+    },
+    "CornellBox_Original_002": {
+      "geometry": {
+        "id": "CornellBox_Original_002_mesh"
+      },
+      "transform": {
+        "type": "matrix",
+        "data": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            7.54979e-8,
+            0.0
+          ],
+          [
+            0.0,
+            -7.54979e-8,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "materials": [
+        {
+          "id": "ceiling_001"
+        }
+      ]
+    },
+    "CornellBox_Original_003": {
+      "geometry": {
+        "id": "CornellBox_Original_003_mesh"
+      },
+      "transform": {
+        "type": "matrix",
+        "data": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            7.54979e-8,
+            0.0
+          ],
+          [
+            0.0,
+            -7.54979e-8,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "materials": [
+        {
+          "id": "backWall_001"
+        }
+      ]
+    },
+    "CornellBox_Original_004": {
+      "geometry": {
+        "id": "CornellBox_Original_004_mesh"
+      },
+      "transform": {
+        "type": "matrix",
+        "data": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            7.54979e-8,
+            0.0
+          ],
+          [
+            0.0,
+            -7.54979e-8,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "materials": [
+        {
+          "id": "rightWall_001"
+        }
+      ]
+    },
+    "CornellBox_Original_005": {
+      "geometry": {
+        "id": "CornellBox_Original_005_mesh"
+      },
+      "transform": {
+        "type": "matrix",
+        "data": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            7.54979e-8,
+            0.0
+          ],
+          [
+            0.0,
+            -7.54979e-8,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "materials": [
+        {
+          "id": "leftWall_001"
+        }
+      ]
+    },
+    "CornellBox_Original_006": {
+      "geometry": {
+        "id": "CornellBox_Original_006_mesh"
+      },
+      "transform": {
+        "type": "matrix",
+        "data": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            7.54979e-8,
+            0.0
+          ],
+          [
+            0.0,
+            -7.54979e-8,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "materials": [
+        {
+          "id": "shortBox_001"
+        }
+      ]
+    },
+    "CornellBox_Original_007": {
+      "geometry": {
+        "id": "CornellBox_Original_007_mesh"
+      },
+      "transform": {
+        "type": "matrix",
+        "data": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            7.54979e-8,
+            0.0
+          ],
+          [
+            0.0,
+            -7.54979e-8,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "materials": [
+        {
+          "id": "tallBox_001"
+        }
+      ]
+    }
+  },
+  "geometries": {
+    "CornellBox_Original_001_mesh": {
+      "type": "mesh",
+      "vertices": {
+        "id": "buf_view_4"
+      },
+      "indices": {
+        "id": "buf_view_5"
+      },
+      "normals": null,
+      "uvs": {
+        "id": "buf_view_6"
+      },
+      "tangents": null,
+      "materials": {
+        "id": "buf_view_7"
+      }
+    },
+    "CornellBox_Original_002_mesh": {
+      "type": "mesh",
+      "vertices": {
+        "id": "buf_view_8"
+      },
+      "indices": {
+        "id": "buf_view_9"
+      },
+      "normals": null,
+      "uvs": {
+        "id": "buf_view_10"
+      },
+      "tangents": null,
+      "materials": {
+        "id": "buf_view_11"
+      }
+    },
+    "CornellBox_Original_003_mesh": {
+      "type": "mesh",
+      "vertices": {
+        "id": "buf_view_12"
+      },
+      "indices": {
+        "id": "buf_view_13"
+      },
+      "normals": null,
+      "uvs": {
+        "id": "buf_view_14"
+      },
+      "tangents": null,
+      "materials": {
+        "id": "buf_view_15"
+      }
+    },
+    "CornellBox_Original_004_mesh": {
+      "type": "mesh",
+      "vertices": {
+        "id": "buf_view_16"
+      },
+      "indices": {
+        "id": "buf_view_17"
+      },
+      "normals": null,
+      "uvs": {
+        "id": "buf_view_18"
+      },
+      "tangents": null,
+      "materials": {
+        "id": "buf_view_19"
+      }
+    },
+    "CornellBox_Original_005_mesh": {
+      "type": "mesh",
+      "vertices": {
+        "id": "buf_view_20"
+      },
+      "indices": {
+        "id": "buf_view_21"
+      },
+      "normals": null,
+      "uvs": {
+        "id": "buf_view_22"
+      },
+      "tangents": null,
+      "materials": {
+        "id": "buf_view_23"
+      }
+    },
+    "CornellBox_Original_006_mesh": {
+      "type": "mesh",
+      "vertices": {
+        "id": "buf_view_24"
+      },
+      "indices": {
+        "id": "buf_view_25"
+      },
+      "normals": null,
+      "uvs": {
+        "id": "buf_view_26"
+      },
+      "tangents": null,
+      "materials": {
+        "id": "buf_view_27"
+      }
+    },
+    "CornellBox_Original_007_mesh": {
+      "type": "mesh",
+      "vertices": {
+        "id": "buf_view_28"
+      },
+      "indices": {
+        "id": "buf_view_29"
+      },
+      "normals": null,
+      "uvs": {
+        "id": "buf_view_30"
+      },
+      "tangents": null,
+      "materials": {
+        "id": "buf_view_31"
+      }
+    },
+    "CornellBox_Original_mesh": {
+      "type": "mesh",
+      "vertices": {
+        "id": "buf_view_0"
+      },
+      "indices": {
+        "id": "buf_view_1"
+      },
+      "normals": null,
+      "uvs": {
+        "id": "buf_view_2"
+      },
+      "tangents": null,
+      "materials": {
+        "id": "buf_view_3"
+      }
+    }
+  },
+  "materials": {
+    "backWall_001": {
+      "shader": {
+        "nodes": {
+          "$tmp_0": {
+            "type": "rgb",
+            "value": [
+              0.725,
+              0.71,
+              0.68
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_1": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_0"
+            }
+          },
+          "$tmp_10": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_11": {
+            "type": "float",
+            "value": 0.03
+          },
+          "$tmp_12": {
+            "type": "float3",
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "$tmp_13": {
+            "type": "float",
+            "value": 1.5
+          },
+          "$tmp_14": {
+            "type": "rgb",
+            "value": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_15": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_14"
+            }
+          },
+          "$tmp_16": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_17": {
+            "type": "float",
+            "value": 1.0
+          },
+          "$tmp_18": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_19": {
+            "type": "rgb",
+            "value": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_2": {
+            "type": "float",
+            "value": 0.9
+          },
+          "$tmp_20": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_19"
+            }
+          },
+          "$tmp_21": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_22": {
+            "type": "float3",
+            "value": [
+              1.0,
+              0.2,
+              0.1
+            ]
+          },
+          "$tmp_23": {
+            "type": "float",
+            "value": 0.05
+          },
+          "$tmp_24": {
+            "type": "float",
+            "value": 1.4
+          },
+          "$tmp_25": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_26": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_27": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_28": {
+            "type": "float",
+            "value": 1.0
+          },
+          "$tmp_29": {
+            "type": "float3",
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "$tmp_3": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_30": {
+            "type": "float3",
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "$tmp_4": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_5": {
+            "type": "rgb",
+            "value": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_6": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_5"
+            }
+          },
+          "$tmp_7": {
+            "type": "rgb",
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_8": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_7"
+            }
+          },
+          "$tmp_9": {
+            "type": "float",
+            "value": 1.0
+          },
+          "Material_Output_2": {
+            "type": "output",
+            "node": {
+              "id": "Principled_BSDF_2"
+            }
+          },
+          "Principled_BSDF_2": {
+            "type": "principled",
+            "base_color": {
+              "id": "$tmp_1"
+            },
+            "metallic": {
+              "id": "$tmp_3"
+            },
+            "roughness": {
+              "id": "$tmp_2"
+            },
+            "ior": {
+              "id": "$tmp_17"
+            },
+            "alpha": {
+              "id": "$tmp_28"
+            },
+            "normal": {
+              "id": "$tmp_29"
+            },
+            "subsurface_weight": {
+              "id": "$tmp_21"
+            },
+            "subsurface_radius": {
+              "id": "$tmp_22"
+            },
+            "subsurface_scale": {
+              "id": "$tmp_23"
+            },
+            "subsurface_ior": {
+              "id": "$tmp_24"
+            },
+            "subsurface_anisotropy": {
+              "id": "$tmp_25"
+            },
+            "specular_ior_level": {
+              "id": "$tmp_4"
+            },
+            "specular_tint": {
+              "id": "$tmp_6"
+            },
+            "anisotropic": {
+              "id": "$tmp_27"
+            },
+            "anisotropic_rotation": {
+              "id": "$tmp_26"
+            },
+            "tangent": {
+              "id": "$tmp_30"
+            },
+            "transmission_weight": {
+              "id": "$tmp_16"
+            },
+            "sheen_weight": {
+              "id": "$tmp_18"
+            },
+            "sheen_tint": {
+              "id": "$tmp_20"
+            },
+            "coat_weight": {
+              "id": "$tmp_10"
+            },
+            "coat_roughness": {
+              "id": "$tmp_11"
+            },
+            "coat_ior": {
+              "id": "$tmp_13"
+            },
+            "coat_tint": {
+              "id": "$tmp_15"
+            },
+            "coat_normal": {
+              "id": "$tmp_12"
+            },
+            "emission_color": {
+              "id": "$tmp_8"
+            },
+            "emission_strength": {
+              "id": "$tmp_9"
+            },
+            "preference": "mix"
+          }
+        },
+        "output": {
+          "id": "Material_Output_2"
+        },
+        "kind": "surface"
+      }
+    },
+    "ceiling_001": {
+      "shader": {
+        "nodes": {
+          "$tmp_0": {
+            "type": "rgb",
+            "value": [
+              0.725,
+              0.71,
+              0.68
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_1": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_0"
+            }
+          },
+          "$tmp_10": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_11": {
+            "type": "float",
+            "value": 0.03
+          },
+          "$tmp_12": {
+            "type": "float3",
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "$tmp_13": {
+            "type": "float",
+            "value": 1.5
+          },
+          "$tmp_14": {
+            "type": "rgb",
+            "value": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_15": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_14"
+            }
+          },
+          "$tmp_16": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_17": {
+            "type": "float",
+            "value": 1.0
+          },
+          "$tmp_18": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_19": {
+            "type": "rgb",
+            "value": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_2": {
+            "type": "float",
+            "value": 0.9
+          },
+          "$tmp_20": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_19"
+            }
+          },
+          "$tmp_21": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_22": {
+            "type": "float3",
+            "value": [
+              1.0,
+              0.2,
+              0.1
+            ]
+          },
+          "$tmp_23": {
+            "type": "float",
+            "value": 0.05
+          },
+          "$tmp_24": {
+            "type": "float",
+            "value": 1.4
+          },
+          "$tmp_25": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_26": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_27": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_28": {
+            "type": "float",
+            "value": 1.0
+          },
+          "$tmp_29": {
+            "type": "float3",
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "$tmp_3": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_30": {
+            "type": "float3",
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "$tmp_4": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_5": {
+            "type": "rgb",
+            "value": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_6": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_5"
+            }
+          },
+          "$tmp_7": {
+            "type": "rgb",
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_8": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_7"
+            }
+          },
+          "$tmp_9": {
+            "type": "float",
+            "value": 1.0
+          },
+          "Material_Output_1": {
+            "type": "output",
+            "node": {
+              "id": "Principled_BSDF_1"
+            }
+          },
+          "Principled_BSDF_1": {
+            "type": "principled",
+            "base_color": {
+              "id": "$tmp_1"
+            },
+            "metallic": {
+              "id": "$tmp_3"
+            },
+            "roughness": {
+              "id": "$tmp_2"
+            },
+            "ior": {
+              "id": "$tmp_17"
+            },
+            "alpha": {
+              "id": "$tmp_28"
+            },
+            "normal": {
+              "id": "$tmp_29"
+            },
+            "subsurface_weight": {
+              "id": "$tmp_21"
+            },
+            "subsurface_radius": {
+              "id": "$tmp_22"
+            },
+            "subsurface_scale": {
+              "id": "$tmp_23"
+            },
+            "subsurface_ior": {
+              "id": "$tmp_24"
+            },
+            "subsurface_anisotropy": {
+              "id": "$tmp_25"
+            },
+            "specular_ior_level": {
+              "id": "$tmp_4"
+            },
+            "specular_tint": {
+              "id": "$tmp_6"
+            },
+            "anisotropic": {
+              "id": "$tmp_27"
+            },
+            "anisotropic_rotation": {
+              "id": "$tmp_26"
+            },
+            "tangent": {
+              "id": "$tmp_30"
+            },
+            "transmission_weight": {
+              "id": "$tmp_16"
+            },
+            "sheen_weight": {
+              "id": "$tmp_18"
+            },
+            "sheen_tint": {
+              "id": "$tmp_20"
+            },
+            "coat_weight": {
+              "id": "$tmp_10"
+            },
+            "coat_roughness": {
+              "id": "$tmp_11"
+            },
+            "coat_ior": {
+              "id": "$tmp_13"
+            },
+            "coat_tint": {
+              "id": "$tmp_15"
+            },
+            "coat_normal": {
+              "id": "$tmp_12"
+            },
+            "emission_color": {
+              "id": "$tmp_8"
+            },
+            "emission_strength": {
+              "id": "$tmp_9"
+            },
+            "preference": "mix"
+          }
+        },
+        "output": {
+          "id": "Material_Output_1"
+        },
+        "kind": "surface"
+      }
+    },
+    "floor_001": {
+      "shader": {
+        "nodes": {
+          "$tmp_0": {
+            "type": "rgb",
+            "value": [
+              0.725,
+              0.71,
+              0.68
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_1": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_0"
+            }
+          },
+          "$tmp_10": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_11": {
+            "type": "float",
+            "value": 0.03
+          },
+          "$tmp_12": {
+            "type": "float3",
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "$tmp_13": {
+            "type": "float",
+            "value": 1.5
+          },
+          "$tmp_14": {
+            "type": "rgb",
+            "value": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_15": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_14"
+            }
+          },
+          "$tmp_16": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_17": {
+            "type": "float",
+            "value": 1.0
+          },
+          "$tmp_18": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_19": {
+            "type": "rgb",
+            "value": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_2": {
+            "type": "float",
+            "value": 0.9
+          },
+          "$tmp_20": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_19"
+            }
+          },
+          "$tmp_21": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_22": {
+            "type": "float3",
+            "value": [
+              1.0,
+              0.2,
+              0.1
+            ]
+          },
+          "$tmp_23": {
+            "type": "float",
+            "value": 0.05
+          },
+          "$tmp_24": {
+            "type": "float",
+            "value": 1.4
+          },
+          "$tmp_25": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_26": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_27": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_28": {
+            "type": "float",
+            "value": 1.0
+          },
+          "$tmp_29": {
+            "type": "float3",
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "$tmp_3": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_30": {
+            "type": "float3",
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "$tmp_4": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_5": {
+            "type": "rgb",
+            "value": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_6": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_5"
+            }
+          },
+          "$tmp_7": {
+            "type": "rgb",
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_8": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_7"
+            }
+          },
+          "$tmp_9": {
+            "type": "float",
+            "value": 1.0
+          },
+          "Material_Output_0": {
+            "type": "output",
+            "node": {
+              "id": "Principled_BSDF_0"
+            }
+          },
+          "Principled_BSDF_0": {
+            "type": "principled",
+            "base_color": {
+              "id": "$tmp_1"
+            },
+            "metallic": {
+              "id": "$tmp_3"
+            },
+            "roughness": {
+              "id": "$tmp_2"
+            },
+            "ior": {
+              "id": "$tmp_17"
+            },
+            "alpha": {
+              "id": "$tmp_28"
+            },
+            "normal": {
+              "id": "$tmp_29"
+            },
+            "subsurface_weight": {
+              "id": "$tmp_21"
+            },
+            "subsurface_radius": {
+              "id": "$tmp_22"
+            },
+            "subsurface_scale": {
+              "id": "$tmp_23"
+            },
+            "subsurface_ior": {
+              "id": "$tmp_24"
+            },
+            "subsurface_anisotropy": {
+              "id": "$tmp_25"
+            },
+            "specular_ior_level": {
+              "id": "$tmp_4"
+            },
+            "specular_tint": {
+              "id": "$tmp_6"
+            },
+            "anisotropic": {
+              "id": "$tmp_27"
+            },
+            "anisotropic_rotation": {
+              "id": "$tmp_26"
+            },
+            "tangent": {
+              "id": "$tmp_30"
+            },
+            "transmission_weight": {
+              "id": "$tmp_16"
+            },
+            "sheen_weight": {
+              "id": "$tmp_18"
+            },
+            "sheen_tint": {
+              "id": "$tmp_20"
+            },
+            "coat_weight": {
+              "id": "$tmp_10"
+            },
+            "coat_roughness": {
+              "id": "$tmp_11"
+            },
+            "coat_ior": {
+              "id": "$tmp_13"
+            },
+            "coat_tint": {
+              "id": "$tmp_15"
+            },
+            "coat_normal": {
+              "id": "$tmp_12"
+            },
+            "emission_color": {
+              "id": "$tmp_8"
+            },
+            "emission_strength": {
+              "id": "$tmp_9"
+            },
+            "preference": "mix"
+          }
+        },
+        "output": {
+          "id": "Material_Output_0"
+        },
+        "kind": "surface"
+      }
+    },
+    "leftWall_001": {
+      "shader": {
+        "nodes": {
+          "$tmp_0": {
+            "type": "rgb",
+            "value": [
+              0.63,
+              0.065,
+              0.05
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_1": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_0"
+            }
+          },
+          "$tmp_10": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_11": {
+            "type": "float",
+            "value": 0.03
+          },
+          "$tmp_12": {
+            "type": "float3",
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "$tmp_13": {
+            "type": "float",
+            "value": 1.5
+          },
+          "$tmp_14": {
+            "type": "rgb",
+            "value": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_15": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_14"
+            }
+          },
+          "$tmp_16": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_17": {
+            "type": "float",
+            "value": 1.5
+          },
+          "$tmp_18": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_19": {
+            "type": "rgb",
+            "value": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_2": {
+            "type": "float",
+            "value": 0.9
+          },
+          "$tmp_20": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_19"
+            }
+          },
+          "$tmp_21": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_22": {
+            "type": "float3",
+            "value": [
+              1.0,
+              0.2,
+              0.1
+            ]
+          },
+          "$tmp_23": {
+            "type": "float",
+            "value": 0.05
+          },
+          "$tmp_24": {
+            "type": "float",
+            "value": 1.4
+          },
+          "$tmp_25": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_26": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_27": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_28": {
+            "type": "float",
+            "value": 1.0
+          },
+          "$tmp_29": {
+            "type": "float3",
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "$tmp_3": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_30": {
+            "type": "float3",
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "$tmp_4": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_5": {
+            "type": "rgb",
+            "value": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_6": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_5"
+            }
+          },
+          "$tmp_7": {
+            "type": "rgb",
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_8": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_7"
+            }
+          },
+          "$tmp_9": {
+            "type": "float",
+            "value": 1.0
+          },
+          "Material_Output_4": {
+            "type": "output",
+            "node": {
+              "id": "Principled_BSDF_4"
+            }
+          },
+          "Principled_BSDF_4": {
+            "type": "principled",
+            "base_color": {
+              "id": "$tmp_1"
+            },
+            "metallic": {
+              "id": "$tmp_3"
+            },
+            "roughness": {
+              "id": "$tmp_2"
+            },
+            "ior": {
+              "id": "$tmp_17"
+            },
+            "alpha": {
+              "id": "$tmp_28"
+            },
+            "normal": {
+              "id": "$tmp_29"
+            },
+            "subsurface_weight": {
+              "id": "$tmp_21"
+            },
+            "subsurface_radius": {
+              "id": "$tmp_22"
+            },
+            "subsurface_scale": {
+              "id": "$tmp_23"
+            },
+            "subsurface_ior": {
+              "id": "$tmp_24"
+            },
+            "subsurface_anisotropy": {
+              "id": "$tmp_25"
+            },
+            "specular_ior_level": {
+              "id": "$tmp_4"
+            },
+            "specular_tint": {
+              "id": "$tmp_6"
+            },
+            "anisotropic": {
+              "id": "$tmp_27"
+            },
+            "anisotropic_rotation": {
+              "id": "$tmp_26"
+            },
+            "tangent": {
+              "id": "$tmp_30"
+            },
+            "transmission_weight": {
+              "id": "$tmp_16"
+            },
+            "sheen_weight": {
+              "id": "$tmp_18"
+            },
+            "sheen_tint": {
+              "id": "$tmp_20"
+            },
+            "coat_weight": {
+              "id": "$tmp_10"
+            },
+            "coat_roughness": {
+              "id": "$tmp_11"
+            },
+            "coat_ior": {
+              "id": "$tmp_13"
+            },
+            "coat_tint": {
+              "id": "$tmp_15"
+            },
+            "coat_normal": {
+              "id": "$tmp_12"
+            },
+            "emission_color": {
+              "id": "$tmp_8"
+            },
+            "emission_strength": {
+              "id": "$tmp_9"
+            },
+            "preference": "mix"
+          }
+        },
+        "output": {
+          "id": "Material_Output_4"
+        },
+        "kind": "surface"
+      }
+    },
+    "light_001": {
+      "shader": {
+        "nodes": {
+          "$tmp_0": {
+            "type": "rgb",
+            "value": [
+              0.78,
+              0.78,
+              0.78
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_1": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_0"
+            }
+          },
+          "$tmp_10": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_11": {
+            "type": "float",
+            "value": 0.03
+          },
+          "$tmp_12": {
+            "type": "float3",
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "$tmp_13": {
+            "type": "float",
+            "value": 1.5
+          },
+          "$tmp_14": {
+            "type": "rgb",
+            "value": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_15": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_14"
+            }
+          },
+          "$tmp_16": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_17": {
+            "type": "float",
+            "value": 1.0
+          },
+          "$tmp_18": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_19": {
+            "type": "rgb",
+            "value": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_2": {
+            "type": "float",
+            "value": 0.9
+          },
+          "$tmp_20": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_19"
+            }
+          },
+          "$tmp_21": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_22": {
+            "type": "float3",
+            "value": [
+              1.0,
+              0.2,
+              0.1
+            ]
+          },
+          "$tmp_23": {
+            "type": "float",
+            "value": 0.05
+          },
+          "$tmp_24": {
+            "type": "float",
+            "value": 1.4
+          },
+          "$tmp_25": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_26": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_27": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_28": {
+            "type": "float",
+            "value": 1.0
+          },
+          "$tmp_29": {
+            "type": "float3",
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "$tmp_3": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_30": {
+            "type": "float3",
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "$tmp_4": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_5": {
+            "type": "rgb",
+            "value": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_6": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_5"
+            }
+          },
+          "$tmp_7": {
+            "type": "rgb",
+            "value": [
+              17.0,
+              12.0,
+              4.0
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_8": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_7"
+            }
+          },
+          "$tmp_9": {
+            "type": "float",
+            "value": 1.0
+          },
+          "Material_Output": {
+            "type": "output",
+            "node": {
+              "id": "Principled_BSDF"
+            }
+          },
+          "Principled_BSDF": {
+            "type": "principled",
+            "base_color": {
+              "id": "$tmp_1"
+            },
+            "metallic": {
+              "id": "$tmp_3"
+            },
+            "roughness": {
+              "id": "$tmp_2"
+            },
+            "ior": {
+              "id": "$tmp_17"
+            },
+            "alpha": {
+              "id": "$tmp_28"
+            },
+            "normal": {
+              "id": "$tmp_29"
+            },
+            "subsurface_weight": {
+              "id": "$tmp_21"
+            },
+            "subsurface_radius": {
+              "id": "$tmp_22"
+            },
+            "subsurface_scale": {
+              "id": "$tmp_23"
+            },
+            "subsurface_ior": {
+              "id": "$tmp_24"
+            },
+            "subsurface_anisotropy": {
+              "id": "$tmp_25"
+            },
+            "specular_ior_level": {
+              "id": "$tmp_4"
+            },
+            "specular_tint": {
+              "id": "$tmp_6"
+            },
+            "anisotropic": {
+              "id": "$tmp_27"
+            },
+            "anisotropic_rotation": {
+              "id": "$tmp_26"
+            },
+            "tangent": {
+              "id": "$tmp_30"
+            },
+            "transmission_weight": {
+              "id": "$tmp_16"
+            },
+            "sheen_weight": {
+              "id": "$tmp_18"
+            },
+            "sheen_tint": {
+              "id": "$tmp_20"
+            },
+            "coat_weight": {
+              "id": "$tmp_10"
+            },
+            "coat_roughness": {
+              "id": "$tmp_11"
+            },
+            "coat_ior": {
+              "id": "$tmp_13"
+            },
+            "coat_tint": {
+              "id": "$tmp_15"
+            },
+            "coat_normal": {
+              "id": "$tmp_12"
+            },
+            "emission_color": {
+              "id": "$tmp_8"
+            },
+            "emission_strength": {
+              "id": "$tmp_9"
+            },
+            "preference": "mix"
+          }
+        },
+        "output": {
+          "id": "Material_Output"
+        },
+        "kind": "surface"
+      }
+    },
+    "rightWall_001": {
+      "shader": {
+        "nodes": {
+          "$tmp_0": {
+            "type": "rgb",
+            "value": [
+              0.14,
+              0.45,
+              0.091
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_1": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_0"
+            }
+          },
+          "$tmp_10": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_11": {
+            "type": "float",
+            "value": 0.03
+          },
+          "$tmp_12": {
+            "type": "float3",
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "$tmp_13": {
+            "type": "float",
+            "value": 1.5
+          },
+          "$tmp_14": {
+            "type": "rgb",
+            "value": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_15": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_14"
+            }
+          },
+          "$tmp_16": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_17": {
+            "type": "float",
+            "value": 1.5
+          },
+          "$tmp_18": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_19": {
+            "type": "rgb",
+            "value": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_2": {
+            "type": "float",
+            "value": 0.9
+          },
+          "$tmp_20": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_19"
+            }
+          },
+          "$tmp_21": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_22": {
+            "type": "float3",
+            "value": [
+              1.0,
+              0.2,
+              0.1
+            ]
+          },
+          "$tmp_23": {
+            "type": "float",
+            "value": 0.05
+          },
+          "$tmp_24": {
+            "type": "float",
+            "value": 1.4
+          },
+          "$tmp_25": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_26": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_27": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_28": {
+            "type": "float",
+            "value": 1.0
+          },
+          "$tmp_29": {
+            "type": "float3",
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "$tmp_3": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_30": {
+            "type": "float3",
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "$tmp_4": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_5": {
+            "type": "rgb",
+            "value": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_6": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_5"
+            }
+          },
+          "$tmp_7": {
+            "type": "rgb",
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_8": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_7"
+            }
+          },
+          "$tmp_9": {
+            "type": "float",
+            "value": 1.0
+          },
+          "Material_Output_3": {
+            "type": "output",
+            "node": {
+              "id": "Principled_BSDF_3"
+            }
+          },
+          "Principled_BSDF_3": {
+            "type": "principled",
+            "base_color": {
+              "id": "$tmp_1"
+            },
+            "metallic": {
+              "id": "$tmp_3"
+            },
+            "roughness": {
+              "id": "$tmp_2"
+            },
+            "ior": {
+              "id": "$tmp_17"
+            },
+            "alpha": {
+              "id": "$tmp_28"
+            },
+            "normal": {
+              "id": "$tmp_29"
+            },
+            "subsurface_weight": {
+              "id": "$tmp_21"
+            },
+            "subsurface_radius": {
+              "id": "$tmp_22"
+            },
+            "subsurface_scale": {
+              "id": "$tmp_23"
+            },
+            "subsurface_ior": {
+              "id": "$tmp_24"
+            },
+            "subsurface_anisotropy": {
+              "id": "$tmp_25"
+            },
+            "specular_ior_level": {
+              "id": "$tmp_4"
+            },
+            "specular_tint": {
+              "id": "$tmp_6"
+            },
+            "anisotropic": {
+              "id": "$tmp_27"
+            },
+            "anisotropic_rotation": {
+              "id": "$tmp_26"
+            },
+            "tangent": {
+              "id": "$tmp_30"
+            },
+            "transmission_weight": {
+              "id": "$tmp_16"
+            },
+            "sheen_weight": {
+              "id": "$tmp_18"
+            },
+            "sheen_tint": {
+              "id": "$tmp_20"
+            },
+            "coat_weight": {
+              "id": "$tmp_10"
+            },
+            "coat_roughness": {
+              "id": "$tmp_11"
+            },
+            "coat_ior": {
+              "id": "$tmp_13"
+            },
+            "coat_tint": {
+              "id": "$tmp_15"
+            },
+            "coat_normal": {
+              "id": "$tmp_12"
+            },
+            "emission_color": {
+              "id": "$tmp_8"
+            },
+            "emission_strength": {
+              "id": "$tmp_9"
+            },
+            "preference": "mix"
+          }
+        },
+        "output": {
+          "id": "Material_Output_3"
+        },
+        "kind": "surface"
+      }
+    },
+    "shortBox_001": {
+      "shader": {
+        "nodes": {
+          "$tmp_0": {
+            "type": "rgb",
+            "value": [
+              0.725,
+              0.71,
+              0.68
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_1": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_0"
+            }
+          },
+          "$tmp_10": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_11": {
+            "type": "float",
+            "value": 0.03
+          },
+          "$tmp_12": {
+            "type": "float3",
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "$tmp_13": {
+            "type": "float",
+            "value": 1.5
+          },
+          "$tmp_14": {
+            "type": "rgb",
+            "value": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_15": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_14"
+            }
+          },
+          "$tmp_16": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_17": {
+            "type": "float",
+            "value": 1.0
+          },
+          "$tmp_18": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_19": {
+            "type": "rgb",
+            "value": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_2": {
+            "type": "float",
+            "value": 0.9
+          },
+          "$tmp_20": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_19"
+            }
+          },
+          "$tmp_21": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_22": {
+            "type": "float3",
+            "value": [
+              1.0,
+              0.2,
+              0.1
+            ]
+          },
+          "$tmp_23": {
+            "type": "float",
+            "value": 0.05
+          },
+          "$tmp_24": {
+            "type": "float",
+            "value": 1.4
+          },
+          "$tmp_25": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_26": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_27": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_28": {
+            "type": "float",
+            "value": 1.0
+          },
+          "$tmp_29": {
+            "type": "float3",
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "$tmp_3": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_30": {
+            "type": "float3",
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "$tmp_4": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_5": {
+            "type": "rgb",
+            "value": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_6": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_5"
+            }
+          },
+          "$tmp_7": {
+            "type": "rgb",
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_8": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_7"
+            }
+          },
+          "$tmp_9": {
+            "type": "float",
+            "value": 1.0
+          },
+          "Material_Output_5": {
+            "type": "output",
+            "node": {
+              "id": "Principled_BSDF_5"
+            }
+          },
+          "Principled_BSDF_5": {
+            "type": "principled",
+            "base_color": {
+              "id": "$tmp_1"
+            },
+            "metallic": {
+              "id": "$tmp_3"
+            },
+            "roughness": {
+              "id": "$tmp_2"
+            },
+            "ior": {
+              "id": "$tmp_17"
+            },
+            "alpha": {
+              "id": "$tmp_28"
+            },
+            "normal": {
+              "id": "$tmp_29"
+            },
+            "subsurface_weight": {
+              "id": "$tmp_21"
+            },
+            "subsurface_radius": {
+              "id": "$tmp_22"
+            },
+            "subsurface_scale": {
+              "id": "$tmp_23"
+            },
+            "subsurface_ior": {
+              "id": "$tmp_24"
+            },
+            "subsurface_anisotropy": {
+              "id": "$tmp_25"
+            },
+            "specular_ior_level": {
+              "id": "$tmp_4"
+            },
+            "specular_tint": {
+              "id": "$tmp_6"
+            },
+            "anisotropic": {
+              "id": "$tmp_27"
+            },
+            "anisotropic_rotation": {
+              "id": "$tmp_26"
+            },
+            "tangent": {
+              "id": "$tmp_30"
+            },
+            "transmission_weight": {
+              "id": "$tmp_16"
+            },
+            "sheen_weight": {
+              "id": "$tmp_18"
+            },
+            "sheen_tint": {
+              "id": "$tmp_20"
+            },
+            "coat_weight": {
+              "id": "$tmp_10"
+            },
+            "coat_roughness": {
+              "id": "$tmp_11"
+            },
+            "coat_ior": {
+              "id": "$tmp_13"
+            },
+            "coat_tint": {
+              "id": "$tmp_15"
+            },
+            "coat_normal": {
+              "id": "$tmp_12"
+            },
+            "emission_color": {
+              "id": "$tmp_8"
+            },
+            "emission_strength": {
+              "id": "$tmp_9"
+            },
+            "preference": "mix"
+          }
+        },
+        "output": {
+          "id": "Material_Output_5"
+        },
+        "kind": "surface"
+      }
+    },
+    "tallBox_001": {
+      "shader": {
+        "nodes": {
+          "$tmp_0": {
+            "type": "rgb",
+            "value": [
+              0.725,
+              0.71,
+              0.68
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_1": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_0"
+            }
+          },
+          "$tmp_10": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_11": {
+            "type": "float",
+            "value": 0.03
+          },
+          "$tmp_12": {
+            "type": "float3",
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "$tmp_13": {
+            "type": "float",
+            "value": 1.5
+          },
+          "$tmp_14": {
+            "type": "rgb",
+            "value": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_15": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_14"
+            }
+          },
+          "$tmp_16": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_17": {
+            "type": "float",
+            "value": 1.0
+          },
+          "$tmp_18": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_19": {
+            "type": "rgb",
+            "value": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_2": {
+            "type": "float",
+            "value": 0.08110233
+          },
+          "$tmp_20": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_19"
+            }
+          },
+          "$tmp_21": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_22": {
+            "type": "float3",
+            "value": [
+              1.0,
+              0.2,
+              0.1
+            ]
+          },
+          "$tmp_23": {
+            "type": "float",
+            "value": 0.05
+          },
+          "$tmp_24": {
+            "type": "float",
+            "value": 1.4
+          },
+          "$tmp_25": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_26": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_27": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_28": {
+            "type": "float",
+            "value": 1.0
+          },
+          "$tmp_29": {
+            "type": "float3",
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "$tmp_3": {
+            "type": "float",
+            "value": 1.0
+          },
+          "$tmp_30": {
+            "type": "float3",
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "$tmp_4": {
+            "type": "float",
+            "value": 0.0
+          },
+          "$tmp_5": {
+            "type": "rgb",
+            "value": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_6": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_5"
+            }
+          },
+          "$tmp_7": {
+            "type": "rgb",
+            "value": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "colorspace": "srgb"
+          },
+          "$tmp_8": {
+            "type": "spectral_uplift",
+            "rgb": {
+              "id": "$tmp_7"
+            }
+          },
+          "$tmp_9": {
+            "type": "float",
+            "value": 1.0
+          },
+          "Material_Output_6": {
+            "type": "output",
+            "node": {
+              "id": "Principled_BSDF_6"
+            }
+          },
+          "Principled_BSDF_6": {
+            "type": "principled",
+            "base_color": {
+              "id": "$tmp_1"
+            },
+            "metallic": {
+              "id": "$tmp_3"
+            },
+            "roughness": {
+              "id": "$tmp_2"
+            },
+            "ior": {
+              "id": "$tmp_17"
+            },
+            "alpha": {
+              "id": "$tmp_28"
+            },
+            "normal": {
+              "id": "$tmp_29"
+            },
+            "subsurface_weight": {
+              "id": "$tmp_21"
+            },
+            "subsurface_radius": {
+              "id": "$tmp_22"
+            },
+            "subsurface_scale": {
+              "id": "$tmp_23"
+            },
+            "subsurface_ior": {
+              "id": "$tmp_24"
+            },
+            "subsurface_anisotropy": {
+              "id": "$tmp_25"
+            },
+            "specular_ior_level": {
+              "id": "$tmp_4"
+            },
+            "specular_tint": {
+              "id": "$tmp_6"
+            },
+            "anisotropic": {
+              "id": "$tmp_27"
+            },
+            "anisotropic_rotation": {
+              "id": "$tmp_26"
+            },
+            "tangent": {
+              "id": "$tmp_30"
+            },
+            "transmission_weight": {
+              "id": "$tmp_16"
+            },
+            "sheen_weight": {
+              "id": "$tmp_18"
+            },
+            "sheen_tint": {
+              "id": "$tmp_20"
+            },
+            "coat_weight": {
+              "id": "$tmp_10"
+            },
+            "coat_roughness": {
+              "id": "$tmp_11"
+            },
+            "coat_ior": {
+              "id": "$tmp_13"
+            },
+            "coat_tint": {
+              "id": "$tmp_15"
+            },
+            "coat_normal": {
+              "id": "$tmp_12"
+            },
+            "emission_color": {
+              "id": "$tmp_8"
+            },
+            "emission_strength": {
+              "id": "$tmp_9"
+            },
+            "preference": "mix"
+          }
+        },
+        "output": {
+          "id": "Material_Output_6"
+        },
+        "kind": "surface"
+      }
+    }
+  },
+  "lights": {},
+  "buffers": {
+    "Scene": {
+      "type": "path",
+      "path": "\\\\?\\C:\\Users\\miyuki\\repos\\akari_render\\scenes\\cbox\\Scene.bin",
+      "length": 2096
+    }
+  },
+  "buffer_views": {
+    "buf_view_0": {
+      "buffer": {
+        "id": "Scene"
+      },
+      "offset": 2048,
+      "length": 48
+    },
+    "buf_view_1": {
+      "buffer": {
+        "id": "Scene"
+      },
+      "offset": 1972,
+      "length": 24
+    },
+    "buf_view_10": {
+      "buffer": {
+        "id": "Scene"
+      },
+      "offset": 152,
+      "length": 48
+    },
+    "buf_view_11": {
+      "buffer": {
+        "id": "Scene"
+      },
+      "offset": 148,
+      "length": 4
+    },
+    "buf_view_12": {
+      "buffer": {
+        "id": "Scene"
+      },
+      "offset": 324,
+      "length": 48
+    },
+    "buf_view_13": {
+      "buffer": {
+        "id": "Scene"
+      },
+      "offset": 248,
+      "length": 24
+    },
+    "buf_view_14": {
+      "buffer": {
+        "id": "Scene"
+      },
+      "offset": 276,
+      "length": 48
+    },
+    "buf_view_15": {
+      "buffer": {
+        "id": "Scene"
+      },
+      "offset": 272,
+      "length": 4
+    },
+    "buf_view_16": {
+      "buffer": {
+        "id": "Scene"
+      },
+      "offset": 448,
+      "length": 48
+    },
+    "buf_view_17": {
+      "buffer": {
+        "id": "Scene"
+      },
+      "offset": 372,
+      "length": 24
+    },
+    "buf_view_18": {
+      "buffer": {
+        "id": "Scene"
+      },
+      "offset": 400,
+      "length": 48
+    },
+    "buf_view_19": {
+      "buffer": {
+        "id": "Scene"
+      },
+      "offset": 396,
+      "length": 4
+    },
+    "buf_view_2": {
+      "buffer": {
+        "id": "Scene"
+      },
+      "offset": 2000,
+      "length": 48
+    },
+    "buf_view_20": {
+      "buffer": {
+        "id": "Scene"
+      },
+      "offset": 572,
+      "length": 48
+    },
+    "buf_view_21": {
+      "buffer": {
+        "id": "Scene"
+      },
+      "offset": 496,
+      "length": 24
+    },
+    "buf_view_22": {
+      "buffer": {
+        "id": "Scene"
+      },
+      "offset": 524,
+      "length": 48
+    },
+    "buf_view_23": {
+      "buffer": {
+        "id": "Scene"
+      },
+      "offset": 520,
+      "length": 4
+    },
+    "buf_view_24": {
+      "buffer": {
+        "id": "Scene"
+      },
+      "offset": 1056,
+      "length": 240
+    },
+    "buf_view_25": {
+      "buffer": {
+        "id": "Scene"
+      },
+      "offset": 620,
+      "length": 144
+    },
+    "buf_view_26": {
+      "buffer": {
+        "id": "Scene"
+      },
+      "offset": 768,
+      "length": 288
+    },
+    "buf_view_27": {
+      "buffer": {
+        "id": "Scene"
+      },
+      "offset": 764,
+      "length": 4
+    },
+    "buf_view_28": {
+      "buffer": {
+        "id": "Scene"
+      },
+      "offset": 1732,
+      "length": 240
+    },
+    "buf_view_29": {
+      "buffer": {
+        "id": "Scene"
+      },
+      "offset": 1296,
+      "length": 144
+    },
+    "buf_view_3": {
+      "buffer": {
+        "id": "Scene"
+      },
+      "offset": 1996,
+      "length": 4
+    },
+    "buf_view_30": {
+      "buffer": {
+        "id": "Scene"
+      },
+      "offset": 1444,
+      "length": 288
+    },
+    "buf_view_31": {
+      "buffer": {
+        "id": "Scene"
+      },
+      "offset": 1440,
+      "length": 4
+    },
+    "buf_view_4": {
+      "buffer": {
+        "id": "Scene"
+      },
+      "offset": 76,
+      "length": 48
+    },
+    "buf_view_5": {
+      "buffer": {
+        "id": "Scene"
+      },
+      "offset": 0,
+      "length": 24
+    },
+    "buf_view_6": {
+      "buffer": {
+        "id": "Scene"
+      },
+      "offset": 28,
+      "length": 48
+    },
+    "buf_view_7": {
+      "buffer": {
+        "id": "Scene"
+      },
+      "offset": 24,
+      "length": 4
+    },
+    "buf_view_8": {
+      "buffer": {
+        "id": "Scene"
+      },
+      "offset": 200,
+      "length": 48
+    },
+    "buf_view_9": {
+      "buffer": {
+        "id": "Scene"
+      },
+      "offset": 124,
+      "length": 24
+    }
+  }
 }
