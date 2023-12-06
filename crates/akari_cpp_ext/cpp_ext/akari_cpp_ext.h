@@ -3,7 +3,10 @@
 #include <type_traits>
 #include <concepts>
 #include <cstddef>
+// prevent bindgen exploding
+#ifndef _MSC_VER
 #include <algorithm>
+#endif
 
 #define AKR_ASSERT(x) ([&]() { if (!(x)) { fprintf(stderr, "assertion failed %s\n", #x); abort(); } })()
 struct Mesh;

@@ -21,7 +21,7 @@
 #include <stdexcept>
 #include <thread>
 #include <vector>
-#include "akari_blender_cpp_ext.h"
+#include "akari_cpp_ext.h"
 
 /**
  * This file contains:

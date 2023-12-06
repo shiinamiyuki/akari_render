@@ -12,8 +12,8 @@ else()
     set(CMAKE_CXX_FLAGS "-lstdc++ -pthread -mavx2 -fno-rtti -fno-exceptions ${CMAKE_CXX_FLAGS}")
 endif()
 
-add_library(akari_blender_cpp_ext akari_blender_cpp_ext.cpp rgb2spec_opt.cpp)
-target_include_directories(akari_blender_cpp_ext PUBLIC
+add_library(akari_cpp_ext akari_cpp_ext.cpp rgb2spec_opt.cpp)
+target_include_directories(akari_cpp_ext PUBLIC
     ${BLENDER_SRC_PATH}/source/blender/
     ${BLENDER_SRC_PATH}/source/blender/makesdna/
     ${BLENDER_SRC_PATH}/source/blender/blenlib/

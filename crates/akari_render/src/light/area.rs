@@ -12,7 +12,6 @@ use crate::{
 pub struct AreaLight {
     pub light_id: u32,
     pub instance_id: u32,
-    pub surface: ShaderRef,
     pub geom_id: u32,
 }
 
@@ -25,7 +24,7 @@ impl AreaLightExpr {
         ctx: &LightEvalContext<'_>,
     ) -> Color {
         ctx.svm
-            .dispatch_surface(self.surface, ctx.color_pipeline, si, swl, |closure| {
+            .dispatch_surface(si.surface, ctx.color_pipeline, si, swl, |closure| {
                 closure.emission(wo, swl, &ctx.surface_eval_ctx)
             })
     }
@@ -59,12 +58,7 @@ impl Light for AreaLightExpr {
         ctx: &LightEvalContext<'_>,
     ) -> LightSample {
         let meshes = ctx.meshes;
-        let geometry = meshes
-            .heap
-            .var()
-            .buffer::<MeshHeader>(meshes.header.mesh_headers)
-            .read(self.geom_id);
-        let at = meshes.mesh_area_samplers(geometry);
+        let at = meshes.mesh_area_samplers(self.instance_id);
         let (prim_id, pdf, _) = at.sample_and_remap(u_select);
         // let (prim_id, pdf) = (0u32.expr(), 1.0f32.expr());
 
@@ -121,12 +115,7 @@ impl Light for AreaLightExpr {
     ) -> Expr<f32> {
         let prim_id = si.prim_id;
         let meshes = ctx.meshes;
-        let geometry = meshes
-            .heap
-            .var()
-            .buffer::<MeshHeader>(meshes.header.mesh_headers)
-            .read(self.geom_id);
-        let at = meshes.mesh_area_samplers(geometry);
+        let at = meshes.mesh_area_samplers(self.instance_id);
         if debug_mode() {
             lc_assert!(si.inst_id.eq(self.instance_id));
         }

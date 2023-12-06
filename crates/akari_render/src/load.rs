@@ -1,14 +1,19 @@
 use crate::{
     camera::{Camera, PerspectiveCamera},
+    color::{sample_wavelengths, ColorPipeline},
     geometry::AffineTransform,
     heap::MegaHeap,
     light::{area::AreaLight, Light, LightAggregate, WeightedLightDistribution},
     mesh::{Mesh, MeshAggregate, MeshInstanceFlags, MeshInstanceHost, MeshRef},
+    sampler::{IndependentSampler, Pcg32Var, Sampler},
+    sampling::{cos_sample_hemisphere, uniform_sample_triangle},
     scene::Scene,
     svm::{
         compiler::{CompilerDriver, SvmCompileContext},
+        surface::{BsdfEvalContext, Surface},
         ShaderRef, Svm,
     },
+    util::distribution::AliasTable,
     *,
 };
 use akari_scenegraph as scenegraph;
@@ -45,7 +50,7 @@ pub struct SceneLoader {
     mesh_buffers: Vec<Mesh>,
     scene_view: Box<dyn SceneView + Sync>,
     camera: Option<Arc<dyn Camera>>,
-    surface_shader_compiler: CompilerDriver,
+    surface_shader_compiler: Option<CompilerDriver>,
     lights: PolymorphicBuilder<(), dyn Light>,
     nodes_to_surface_shader: HashMap<NodeRef<Material>, ShaderRef>,
     image_key_sampler_to_idx: HashMap<(ImageKey, TextureSampler), usize>,
@@ -64,6 +69,7 @@ impl SceneLoader {
         log::info!("Loaded scene: {}", abs_path.display());
         scene
     }
+
     fn estimate_emission_tex_intensity_fast(
         &self,
         emission: &NodeRef<ShaderNode>,
@@ -84,24 +90,11 @@ impl SceneLoader {
             _ => return None,
         }
     }
-    fn compute_mesh_area(&self, geom_id: usize) {
-        todo!("this is incorrect, need to accound for transform")
-        // let mut mesh_areas = self.mesh_areas.borrow_mut();
-        // if !mesh_areas[geom_id].is_empty() {
-        //     return;
-        // }
-        // mesh_areas[geom_id] = self.meshes[geom_id].areas();
-    }
-    fn mesh_total_area(&self, geom_id: usize) -> f32 {
-        self.compute_mesh_area(geom_id);
-        let mesh_areas = self.mesh_areas.borrow();
-        mesh_areas[geom_id].par_iter().sum()
-    }
-    fn estimate_surface_emission_power(
+    fn has_potential_surface_emission(
         &self,
         instance: &MeshInstanceHost,
         surface: &ShaderGraph,
-    ) -> f32 {
+    ) -> bool {
         let out = &surface[&surface.output];
         let out = match out {
             ShaderNode::Output { node: out } => &surface[out],
@@ -124,19 +117,12 @@ impl SceneLoader {
             .map(|s| self.estimate_emission_tex_intensity_fast(&s, surface))
             .flatten();
         if let (Some(power), Some(strength)) = (emission, strength) {
-            if power == 0.0 {
-                return 0.0;
+            if power * strength == 0.0 {
+                return false;
             }
-
-            let geom_id = instance.geom_id as usize;
-            let area = self.mesh_total_area(geom_id);
-            let transform: glam::Mat3 =
-                glam::Mat3::from_mat4(glam::Mat4::from(instance.transform.m));
-            let det = transform.determinant();
-            // dbg!(power, area, det, strength);
-            return power * area * det.abs() * strength;
+            return true;
         }
-        0.0
+        true
     }
 
     fn load_transform(
@@ -251,12 +237,29 @@ impl SceneLoader {
             .resize(self.mesh_buffers.len(), vec![]);
         for (mat_id, mat) in &self.scene_view.scene().materials {
             let shader = &mat.shader;
-            let shader = self.surface_shader_compiler.compile(SvmCompileContext {
-                images: &self.image_key_sampler_to_idx,
-                graph: &shader,
-            });
+            let shader =
+                self.surface_shader_compiler
+                    .as_mut()
+                    .unwrap()
+                    .compile(SvmCompileContext {
+                        images: &self.image_key_sampler_to_idx,
+                        graph: &shader,
+                    });
             self.nodes_to_surface_shader.insert(mat_id.clone(), shader);
         }
+        let svm = Arc::new(Svm {
+            device: self.device.clone(),
+            surface_shaders: self
+                .surface_shader_compiler
+                .take()
+                .unwrap()
+                .upload(&self.device),
+            heap: self.heap.clone(),
+        });
+        log::info!(
+            "Shader variant count: {}",
+            svm.surface_shaders().variant_count()
+        );
         // for (light_id, light) in &self.graph.lights {
         //     let surface = &light.in_surface.as_node().unwrap().from;
         //     let shader = self.surface_shader_compiler.compile(
@@ -281,54 +284,101 @@ impl SceneLoader {
             instance_surfaces.push(surface);
             instance_nodes.push(id.clone());
         }
+
+        log::info!(
+            "Building accel for {} meshes, {} instances",
+            self.mesh_buffers.len(),
+            instances.len()
+        );
+        let mesh_aggregate = Arc::new(MeshAggregate::new(
+            self.device.clone(),
+            &self.heap,
+            &self.mesh_buffers.iter().collect::<Vec<_>>(),
+            &instances,
+        ));
+        self.heap.commit();
+
         let mut lights = vec![];
         let mut light_ids_to_lights = vec![];
+        let mut powers = self.device.create_buffer::<f32>(1024);
+        let esimate_emisson_kernel = self.device.create_kernel::<fn(u32, Buffer<f32>)>(&track!(
+            |inst_id: Expr<u32>, powers: BufferVar<f32>| {
+                let i = dispatch_id().x;
+                let rng = Pcg32Var::new_seq(i.as_u64());
+                let color_repr = ColorRepr::Rgb(color::RgbColorSpace::SRgb);
+                let color_pipeline = ColorPipeline {
+                    color_repr,
+                    rgb_colorspace: color::RgbColorSpace::SRgb,
+                };
+                let sampler = IndependentSampler::from_pcg32(rng);
+                let acc = 0.0f32.var();
+                let n_samples = 16;
+                for _ in 0..n_samples {
+                    let bary = uniform_sample_triangle(sampler.next_2d());
+                    let swl = sample_wavelengths(color_repr, &sampler).var();
+                    let si = mesh_aggregate.surface_interaction(inst_id, i, bary);
+                    let bsdf_eval_ctx = BsdfEvalContext {
+                        color_repr,
+                        ad_mode: ADMode::None,
+                    };
+                    let onb = si.frame;
+                    let wo = cos_sample_hemisphere(sampler.next_2d());
+                    let wo = onb.to_world(wo);
+                    svm.dispatch_surface(si.surface, color_pipeline, si, **swl, |closure| {
+                        let emission = closure.emission(wo, **swl, &bsdf_eval_ctx);
+                        *acc += emission.max() / si.prim_area;
+                    })
+                }
+                powers.write(i, acc / n_samples as f32);
+            }
+        ));
         // now compute light emission power
         for (i, inst) in instances.iter_mut().enumerate() {
-            let power_per_mat = instance_surfaces[i].iter().map(|s|self.estimate_surface_emission_power(
-                inst,
-                &self.scene_view.scene().materials[s].shader,
-            )).collect::<Vec<_>>();
-            if power_per_mat.iter().sum::<f32>() <= 1e-6 {
+            let has_potential_emission = instance_surfaces[i]
+                .iter()
+                .map(|s| {
+                    self.has_potential_surface_emission(
+                        inst,
+                        &self.scene_view.scene().materials[s].shader,
+                    )
+                })
+                .collect::<Vec<_>>();
+            if !has_potential_emission.iter().any(|&b| b) {
                 continue;
             }
             let geom_id = inst.geom_id as usize;
-            let power = {
+            let powers = {
                 let mesh = &self.mesh_buffers[geom_id];
-                self.device.create_kernel::<fn()>(&track!(||{
-                    let i = dispatch_id().x;
-                    
-                })).dispatch([mesh.indices.len() as u32, 1, 1])
+                if powers.len() < mesh.indices.len() {
+                    powers = self.device.create_buffer::<f32>(mesh.indices.len());
+                }
+                esimate_emisson_kernel.dispatch(
+                    [mesh.indices.len() as u32, 1, 1],
+                    &(i as u32),
+                    &powers,
+                );
+                powers.copy_to_vec()
             };
-            if 0.0 < power && power <= 1e-4 {
+            let total_power = powers.par_iter().sum::<f32>();
+            if 0.0 < total_power && total_power <= 1e-4 {
                 log::warn!(
                     "Light power too low: {:?}, power: {}",
                     instance_nodes[i],
-                    power
+                    total_power
                 );
             }
             let instance_node = &self.scene_view.scene().instances[&instance_nodes[i]];
-            if power > 1e-4 {
+            if total_power > 1e-4 {
                 let light_id = lights.len();
-                lights.push((i, power));
-
-                
-                self.compute_mesh_area(geom_id);
-                let mesh = &mut self.mesh_buffers[geom_id]; 
-                if mesh.area_sampler.is_none() {
-                    mesh.build_area_sampler(
-                        self.device.clone(),
-                        &self.mesh_areas.borrow()[geom_id],
-                    );
-                }
-                let surface_shader: &ShaderRef = todo!(); //&self.nodes_to_surface_shader[&instance_node.materials];
-                let light_ref = self.lights.push(  
+                lights.push((i, total_power));
+                let at = AliasTable::new(self.device.clone(), &powers);
+                mesh_aggregate.set_area_sampler(i as u32, at);
+                let light_ref = self.lights.push(
                     (),
-                    AreaLight {   
+                    AreaLight {
                         light_id: light_id as u32,
                         instance_id: i as u32,
                         geom_id: geom_id as u32,
-                        surface: *surface_shader,
                     },
                 );
                 light_ids_to_lights.push(light_ref);
@@ -342,35 +392,16 @@ impl SceneLoader {
         {
             // TODO: add other lights
         }
-        log::info!(
-            "Building accel for {} meshes, {} instances",
-            self.mesh_buffers.len(),
-            instances.len()
-        );
-        let mesh_aggregate = Arc::new(MeshAggregate::new(
-            self.device.clone(),
-            &self.heap,
-            &self.mesh_buffers.iter().collect::<Vec<_>>(),
-            &instances,
-        ));
+
         let light_weights = lights.iter().map(|(_, power)| *power).collect::<Vec<_>>();
         let Self {
             device,
             lights,
-            surface_shader_compiler,
             camera,
             heap,
             ..
         } = self;
-        let svm = Arc::new(Svm {
-            device: device.clone(),
-            surface_shaders: surface_shader_compiler.upload(&device),
-            heap: heap.clone(),
-        });
-        log::info!(
-            "Shader variant count: {}",
-            svm.surface_shaders().variant_count()
-        );
+
         let lights = lights.build();
         let light_distribution = Box::new(WeightedLightDistribution::new(
             device.clone(),
@@ -590,7 +621,7 @@ impl SceneLoader {
             camera: None,
             heap: Arc::new(heap),
             textures,
-            surface_shader_compiler: CompilerDriver::new(),
+            surface_shader_compiler: Some(CompilerDriver::new()),
             nodes_to_surface_shader: HashMap::new(),
             mesh_areas: RefCell::new(vec![]),
             lights: PolymorphicBuilder::new(device.clone()),

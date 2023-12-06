@@ -18,7 +18,6 @@ pub struct Mesh {
     pub uvs: Option<Buffer<[f32; 2]>>,
     pub indices: Buffer<[u32; 3]>,
     pub material_slots: Buffer<u32>,
-    pub area_sampler: Option<AliasTable>,
     pub has_normals: bool,
     pub has_uvs: bool,
     pub has_tangents: bool,
@@ -155,7 +154,6 @@ impl Mesh {
             // bitangent_signs,
             uvs,
             indices,
-            area_sampler: None,
             has_normals: args.normals.is_some(),
             has_uvs: args.uvs.is_some(),
             has_tangents: args.tangents.is_some(),
@@ -163,9 +161,6 @@ impl Mesh {
         };
         // assert!(!m.has_uvs || m.has_tangents, "mesh has uvs but no tangents");
         m
-    }
-    pub fn build_area_sampler(&mut self, device: Device, areas: &[f32]) {
-        self.area_sampler = Some(AliasTable::new(device, areas));
     }
 }
 #[repr(transparent)]
@@ -209,7 +204,6 @@ pub struct MeshHeader {
     pub normal_buf_idx: u32,
     pub tangent_buf_idx: u32,
     pub uv_buf_idx: u32,
-    pub area_sampler: u32,
 }
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Value)]
@@ -219,6 +213,7 @@ pub struct MeshInstance {
     pub material_buffer_idx: u32,
     pub geom_id: u32,
     pub transform_det: f32,
+    pub area_sampler_idx: u32,
     pub flags: u32,
 }
 #[repr(C)]
@@ -233,6 +228,7 @@ pub struct MeshAggregate {
     pub accel_meshes: Vec<rtx::Mesh>,
     pub accel: rtx::Accel,
     pub header: MeshAggregateHeader,
+    instances: Buffer<MeshInstance>,
 }
 impl MeshAggregate {
     pub fn new(
@@ -271,21 +267,12 @@ impl MeshAggregate {
             );
             accel_mesh.build(AccelBuildRequest::ForceBuild);
             accel_meshes.push(accel_mesh);
-            let area_sampler = if let Some(at) = &mesh.area_sampler {
-                let area_sampler = heap.bind_buffer(&at.0);
-                let at1 = heap.bind_buffer(&at.1);
-                assert_eq!(area_sampler + 1, at1);
-                area_sampler
-            } else {
-                u32::MAX
-            };
             mesh_headers.push(MeshHeader {
                 vertex_buf_idx,
                 index_buf_idx,
                 normal_buf_idx,
                 tangent_buf_idx,
                 uv_buf_idx,
-                area_sampler,
                 material_slots_buf_idx,
             });
         }
@@ -297,6 +284,7 @@ impl MeshAggregate {
             MeshInstance {
                 light: inst.light,
                 material_buffer_idx: todo!(), //inst.surface,
+                area_sampler_idx: u32::MAX,
                 geom_id: inst.geom_id,
                 transform_det: t.determinant(),
                 flags: todo!(),
@@ -326,7 +314,21 @@ impl MeshAggregate {
                 mesh_transforms: mesh_transform_idx,
                 mesh_headers: mesh_headers_idx,
             },
+            instances: mesh_instances,
         }
+    }
+
+    pub fn set_area_sampler(&self, inst_id: u32, at: AliasTable) {
+        let mut inst = self
+            .instances
+            .view(inst_id as usize..inst_id as usize + 1)
+            .copy_to_vec()[0];
+        inst.area_sampler_idx = self.heap.bind_buffer(&at.0);
+        let pdf_idx = self.heap.bind_buffer(&at.1);
+        assert_eq!(inst.area_sampler_idx + 1, pdf_idx);
+        self.instances
+            .view(inst_id as usize..inst_id as usize + 1)
+            .copy_from(&[inst]);
     }
 
     #[tracked(crate = "luisa")]
@@ -354,9 +356,10 @@ impl MeshAggregate {
         self.heap.buffer(mesh_header.uv_buf_idx)
     }
     #[tracked(crate = "luisa")]
-    pub fn mesh_area_samplers(&self, mesh_header: Expr<MeshHeader>) -> BindlessAliasTableVar {
-        let b0 = self.heap.buffer(mesh_header.area_sampler);
-        let b1 = self.heap.buffer(mesh_header.area_sampler + 1);
+    pub fn mesh_area_samplers(&self, inst_id: Expr<u32>) -> BindlessAliasTableVar {
+        let inst = self.mesh_instances().read(inst_id);
+        let b0 = self.heap.buffer(inst.area_sampler_idx);
+        let b1 = self.heap.buffer(inst.area_sampler_idx + 1);
         BindlessAliasTableVar(b0, b1)
     }
     #[tracked(crate = "luisa")]
@@ -367,6 +370,22 @@ impl MeshAggregate {
     pub fn mesh_instance_transforms(&self) -> BindlessBufferVar<AffineTransform> {
         self.heap.buffer(self.header.mesh_transforms)
     }
+    // // looks like this is not needed
+    // #[tracked(crate = "luisa")]
+    // pub fn material(&self, inst_id: Expr<u32>, prim_id: Expr<u32>) -> Expr<ShaderRef> {
+    //     let inst: Expr<MeshInstance> = self.mesh_instances().read(inst_id);
+    //     let geom_id = inst.geom_id;
+    //     let geometry = self
+    //         .heap
+    //         .buffer::<MeshHeader>(self.header.mesh_headers)
+    //         .read(geom_id);
+    //     let material_slots = self.mesh_material_slots(geometry);
+    //     let material = self
+    //         .heap
+    //         .buffer::<ShaderRef>(inst.material_buffer_idx)
+    //         .read(material_slots.read(prim_id));
+    //     material
+    // }
     #[tracked(crate = "luisa")]
     pub fn surface_interaction(
         &self,

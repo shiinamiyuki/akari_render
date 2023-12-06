@@ -12,11 +12,11 @@ fn main() {
         println!("cargo:rustc-link-lib=stdc++");
     }
     println!("cargo:rustc-link-search=native={}/build", out.display());
-    println!("cargo:rustc-link-lib=static=akari_blender_cpp_ext");
+    println!("cargo:rustc-link-lib=static=akari_cpp_ext");
     bindgen::builder()
-        .header("cpp_ext/akari_blender_cpp_ext.h")
+        .header("cpp_ext/akari_cpp_ext.h")
         .clang_args(&["-x", "c++", "-std=c++20"])
-        .allowlist_file("cpp_ext/akari_blender_cpp_ext.h")
+        .allowlist_file("cpp_ext/akari_cpp_ext.h")
         .enable_cxx_namespaces()
         .generate()
         .unwrap()
