@@ -293,6 +293,7 @@ impl SceneLoader {
             self.mesh_buffers.len(),
             instances.len()
         );
+        self.heap.commit();
         let mut mesh_aggregate = MeshAggregate::new(
             self.device.clone(),
             &self.heap,

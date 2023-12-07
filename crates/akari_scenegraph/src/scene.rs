@@ -301,6 +301,8 @@ pub enum ImageFormat {
     Jpeg,
     #[serde(rename = "tiff")]
     Tiff,
+    #[serde(rename="tga")]
+    Targa,
     #[serde(rename = "exr")]
     OpenExr,
     #[serde(rename = "float")]

@@ -466,7 +466,7 @@ impl MeshAggregate {
                 if !all_good {
                     *use_default = true;
                 } else {
-                    *t = bary.interpolate(**t0, **t1, **t2);
+                    *t = bary.interpolate(**t0, **t1, **t2).normalize();
                 }
             } else {
                 *use_default = true;
@@ -479,7 +479,7 @@ impl MeshAggregate {
                 let t0 = (v1 - v0).normalize();
                 let t1 = (v2 - v1).normalize();
                 let t2 = (v0 - v2).normalize();
-                *t = bary.interpolate(t0, t1, t2);
+                *t = bary.interpolate(t0, t1, t2).normalize();
             };
             **t
         };
