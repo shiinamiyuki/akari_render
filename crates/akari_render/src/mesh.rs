@@ -329,15 +329,15 @@ impl MeshAggregate {
         self.instances.copy_from(&self.instances_host);
     }
     pub fn set_area_sampler(&mut self, inst_id: u32, at: AliasTable) {
-        let inst =&mut self.instances_host[inst_id as usize];
+        let inst = &mut self.instances_host[inst_id as usize];
         inst.area_sampler_idx = self.heap.bind_buffer(&at.0);
         let pdf_idx = self.heap.bind_buffer(&at.1);
         assert_eq!(inst.area_sampler_idx + 1, pdf_idx);
-        self.dirty = true;     
+        self.dirty = true;
     }
 
     pub fn set_instance_light(&mut self, inst_id: u32, light: TagIndex) {
-        let inst =&mut self.instances_host[inst_id as usize];
+        let inst = &mut self.instances_host[inst_id as usize];
         inst.light = light;
         self.dirty = true;
     }
@@ -507,19 +507,12 @@ impl MeshAggregate {
             let p = m * p_local + t;
             let tt = m * tt_local;
 
-            let area = area_local * inst.transform_det / (m * ng_local).length();
+            let c = m * ng_local;
 
-            // let area = {
-            //     let v0 = Expr::<Float3>::from(vertices.read(i.x));
-            //     let v1 = Expr::<Float3>::from(vertices.read(i.y));
-            //     let v2 = Expr::<Float3>::from(vertices.read(i.z));
-            //     let e0 = m * (v1 - v0);
-            //     let e1 = m * (v2 - v0);
-            //     e0.cross(e1).length() * 0.5
-            // };
             let m_inv_t = m.transpose().inverse();
             let ng = (m_inv_t * ng_local).normalize();
             let ns = (m_inv_t * ns_local).normalize();
+            let area = area_local * inst.transform_det / ng.dot(c).abs();
             (area, p, ng, ns, tt)
         };
         let ss = ns.cross(tt);

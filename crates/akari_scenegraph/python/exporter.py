@@ -336,16 +336,16 @@ class MaterialExporter:
             node_ty = PrimitiveNodeType.BSDF
         elif isinstance(node, T.ShaderNodeTexImage):
             extension = {
-                "REPEAT": "Repeat",
-                "EXTEND": "Extend",
-                "CLIP": "Clip",
-                "MIRROR": "Mirror",
+                "REPEAT": "repeat",
+                "EXTEND": "extend",
+                "CLIP": "clip",
+                "MIRROR": "mirror",
             }[node.extension]
             interpolation = {
-                "Closest": "Nearest",
-                "Linear": "Linear",
-                "Cubic": "Linear",
-                "Smart": "Linear",
+                "Closest": "nearest",
+                "Linear": "linear",
+                "Cubic": "linear",
+                "Smart": "linear",
             }[node.interpolation]
             assert node.image.filepath != ""
             filepath = node.image.filepath
@@ -360,7 +360,7 @@ class MaterialExporter:
                     "path": filepath,
                     "extension": extension,
                     "interpolation": interpolation,
-                    "colorspace": {"Rgb": "srgb"},
+                    "colorspace": "srgb",
                 }
             }
             node_ty = PrimitiveNodeType.RGB
