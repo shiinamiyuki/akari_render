@@ -360,8 +360,8 @@ class MaterialExporter:
             format = {
                 "TARGA": "tga",
                 "TARGA_RAW": "tga",
-                "JPEG": "jpg",
-                "JPEG2000": "jpg",
+                "JPEG": "jpeg",
+                "JPEG2000": "jpeg",
                 "PNG": "png",
                 "BMP": "bmp",
                 "OPEN_EXR": "exr",
@@ -547,9 +547,7 @@ class SceneExporter:
         eval_obj = obj.evaluated_get(depsgraph)
         m = eval_obj.to_mesh()
         self.export_mesh_data(m, f"{name}_mesh", has_uv)
-        assert (
-            len(obj.data.materials) == 1
-        ), f"Mesh `{obj.name}` has {len(obj.data.materials)} materials"
+        print( f"Mesh `{obj.name}` has {len(obj.data.materials)} materials")
         mat = [self.export_material(m) for m in obj.data.materials]
         matrix_world = CONVERT_COORD_SYS_MATRIX @ obj.matrix_world
         print(matrix_world)
