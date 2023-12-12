@@ -91,6 +91,9 @@ impl Film {
     pub fn weight_offset(&self) -> u32 {
         self.splat_offset() + self.resolution.x * self.resolution.y * self.repr.nvalues() as u32
     }
+    pub fn repr(&self) -> FilmColorRepr {
+        self.repr
+    }
     #[tracked(crate = "luisa")]
     pub fn new(
         device: Device,
@@ -148,7 +151,7 @@ impl Film {
         self.splat_scale = scale;
     }
     #[tracked(crate = "luisa")]
-    fn linear_index(&self, p: Expr<Float2>) -> Expr<u32> {
+    pub fn linear_index(&self, p: Expr<Float2>) -> Expr<u32> {
         let resolution = self.resolution.expr();
         let ip = p.floor().cast_i32();
         let oob = ip.lt(0).any() | ip.ge(resolution.cast_i32()).any();
