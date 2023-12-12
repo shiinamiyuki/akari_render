@@ -94,6 +94,9 @@ impl Film {
     pub fn repr(&self) -> FilmColorRepr {
         self.repr
     }
+    pub fn data(&self) -> &Buffer<f32> {
+        &self.data
+    }
     #[tracked(crate = "luisa")]
     pub fn new(
         device: Device,
