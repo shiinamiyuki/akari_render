@@ -353,7 +353,82 @@ mod test {
         }
     }
 }
+pub fn morton2d(mut x: u64, mut y: u64) -> u64 {
+    x = (x | (x << 16)) & 0x0000FFFF0000FFFF;
+    x = (x | (x << 8)) & 0x00FF00FF00FF00FF;
+    x = (x | (x << 4)) & 0x0F0F0F0F0F0F0F0F;
+    x = (x | (x << 2)) & 0x3333333333333333;
+    x = (x | (x << 1)) & 0x5555555555555555;
 
+    y = (y | (y << 16)) & 0x0000FFFF0000FFFF;
+    y = (y | (y << 8)) & 0x00FF00FF00FF00FF;
+    y = (y | (y << 4)) & 0x0F0F0F0F0F0F0F0F;
+    y = (y | (y << 2)) & 0x3333333333333333;
+    y = (y | (y << 1)) & 0x5555555555555555;
+    x | (y << 1)
+}
+/// Generate a Hilbert curve of size 2^p
+pub fn generate_hilbert_curve(p: u32) -> Vec<(u32, u32)> {
+    struct HilbertCurve {
+        x: u32,
+        y: u32,
+        pts: Vec<(u32, u32)>,
+        p: u32,
+        n: u32,
+    }
+    #[derive(Debug, Clone, Copy)]
+    enum Dir {
+        North,
+        East,
+        South,
+        West,
+    }
+    impl HilbertCurve {
+        fn new(p: u32) -> Self {
+            Self {
+                x: 0,
+                y: 0,
+                pts: vec![],
+                p,
+                n: 1 << p,
+            }
+        }
+        fn move_(&mut self, dir: Dir) {
+            match dir {
+                Dir::North => {
+                    self.y -= 1;
+                }
+                Dir::East => {
+                    self.x += 1;
+                }
+                Dir::South => {
+                    self.y += 1;
+                }
+                Dir::West => {
+                    self.x -= 1;
+                }
+            }
+        }
+        fn generate(&mut self, order: u32, front: Dir, right: Dir, back: Dir, left: Dir) {
+            if order == 0 {
+                if self.x < self.n && self.y < self.n {
+                    self.pts.push((self.x, self.y));
+                }
+            } else {
+                self.generate(order - 1, left, back, right, front);
+                self.move_(right);
+                self.generate(order - 1, front, right, back, left);
+                self.move_(back);
+                self.generate(order - 1, front, right, back, left);
+                self.move_(left);
+                self.generate(order - 1, right, front, left, back);
+            }
+        }
+    }
+    let mut curve = HilbertCurve::new(p);
+    curve.generate(p, Dir::North, Dir::East, Dir::South, Dir::West);
+    curve.pts
+}
 pub struct ByteVecBuilder {
     buffer: Vec<u8>,
 }

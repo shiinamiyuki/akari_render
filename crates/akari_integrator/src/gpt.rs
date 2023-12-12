@@ -3,16 +3,16 @@ use std::{sync::Arc, time::Instant};
 use crate::{
     color::{Color, ColorRepr, FlatColor},
     film::*,
-    integrator::pt::{self, PathTracer},
+    pt::{self, PathTracer},
     sampler::*,
     scene::*,
     *,
 };
 use serde::{Deserialize, Serialize};
 
-use super::{Integrator, RenderOptions};
+use super::{Integrator, RenderSession};
 #[derive(Clone, Serialize, Deserialize, Debug)]
-#[serde(default)]
+#[serde(default, crate = "serde")]
 pub struct Config {
     pub spp: u32,
     pub max_depth: u32,
@@ -71,7 +71,7 @@ impl Integrator for GradientPathTracer {
         sampler_config: SamplerConfig,
         color_repr: ColorRepr,
         film: &mut Film,
-        _options: &RenderOptions,
+        _options: &RenderSession,
     ) {
         let resolution = scene.camera.resolution();
         log::info!(
@@ -110,7 +110,6 @@ impl Integrator for GradientPathTracer {
 
                 let p = dispatch_id().xy();
                 for_range(const_(0)..spp_per_pass.cast_i32(), |_| {
-
                     let ip = p.cast_i32();
                     let colors = var!([FlatColor; 5]);
                     let weights = var!([f32; 5]);
@@ -162,10 +161,18 @@ impl Integrator for GradientPathTracer {
                     // let x_y_m1_w = weights.read(4);
 
                     if_!(ip.x.gt(0), {
-                        Gx.add_sample(p.cast_f32() - Float2::expr(1.0, 0.0), &(base - x_m1_y), base_w);
+                        Gx.add_sample(
+                            p.cast_f32() - Float2::expr(1.0, 0.0),
+                            &(base - x_m1_y),
+                            base_w,
+                        );
                     });
                     if_!(ip.y.gt(0), {
-                        Gy.add_sample(p.cast_f32() - Float2::expr(0.0, 1.0), &(base - x_y_m1), base_w);
+                        Gy.add_sample(
+                            p.cast_f32() - Float2::expr(0.0, 1.0),
+                            &(base - x_y_m1),
+                            base_w,
+                        );
                     });
                     Gx.add_sample(p.cast_f32(), &(x_p1_y - base), base_w);
                     Gy.add_sample(p.cast_f32(), &(x_y_p1 - base), base_w);
@@ -223,7 +230,8 @@ impl Integrator for GradientPathTracer {
 }
 pub fn render(
     device: Device,
-    scene: Arc<Scene>,sampler: SamplerConfig,
+    scene: Arc<Scene>,
+    sampler: SamplerConfig,
     color_repr: ColorRepr,
     film: &mut Film,
     config: &Config,
