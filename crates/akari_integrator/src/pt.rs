@@ -57,6 +57,12 @@ impl DirectLighting {
     }
 }
 
+#[derive(Aggregate, Copy, Clone)]
+#[luisa(crate = "luisa")]
+pub struct BsdfDenoisingFeatures {
+    pub albedo: Color,
+    pub roughness: Expr<f32>,
+}
 impl<'a> PathTracerBase<'a> {
     pub fn new(
         scene: &'a Scene,
@@ -208,8 +214,23 @@ impl<'a> PathTracerBase<'a> {
         wo: Expr<Float3>,
         direct_lighting: DirectLighting,
         u_bsdf: Expr<Float3>,
-    ) -> (BsdfSample, Color) {
+    ) -> (BsdfSample, BsdfDenoisingFeatures, Color) {
         let ctx = self.eval_context().1;
+
+        let sample_and_shade = |closure: &SurfaceClosure| {
+            let direct = if direct_lighting.valid {
+                let (f, pdf) = closure.evaluate(wo, direct_lighting.wi, **self.swl, &ctx);
+                let w = mis_weight(direct_lighting.pdf, pdf, 1);
+                direct_lighting.irradiance * f * w / direct_lighting.pdf
+            } else {
+                Color::zero(self.color_pipeline.color_repr)
+            };
+
+            let sample = closure.sample(wo, u_bsdf.x, u_bsdf.yz(), self.swl, &ctx);
+            let albedo = closure.albedo(wo, **self.swl, &ctx);
+            let roughness = closure.roughness(wo, **self.swl, &ctx);
+            (sample, BsdfDenoisingFeatures { albedo, roughness }, direct)
+        };
         if self.force_diffuse {
             let diffuse = Rc::new(DiffuseBsdf {
                 reflectance: Color::one(self.color_pipeline.color_repr)
@@ -221,29 +242,9 @@ impl<'a> PathTracerBase<'a> {
                 frame: si.frame,
                 ng: si.ng,
             };
-            let direct = if direct_lighting.valid {
-                let (f, pdf) = closure.evaluate(wo, direct_lighting.wi, **self.swl, &ctx);
-                let w = mis_weight(direct_lighting.pdf, pdf, 1);
-                direct_lighting.irradiance * f * w / direct_lighting.pdf
-            } else {
-                Color::zero(self.color_pipeline.color_repr)
-            };
-            let sample = closure.sample(wo, u_bsdf.x, u_bsdf.yz(), self.swl, &ctx);
-            (sample, direct)
+            sample_and_shade(&closure)
         } else {
             let svm = &self.scene.svm;
-            let sample_and_shade = |closure: &SurfaceClosure| {
-                let direct = if direct_lighting.valid {
-                    let (f, pdf) = closure.evaluate(wo, direct_lighting.wi, **self.swl, &ctx);
-                    let w = mis_weight(direct_lighting.pdf, pdf, 1);
-                    direct_lighting.irradiance * f * w / direct_lighting.pdf
-                } else {
-                    Color::zero(self.color_pipeline.color_repr)
-                };
-
-                let sample = closure.sample(wo, u_bsdf.x, u_bsdf.yz(), self.swl, &ctx);
-                (sample, direct)
-            };
             if let Some(shader_kind) = shader_kind {
                 svm.dispatch_surface_single_kind(
                     shader_kind,
@@ -342,6 +343,23 @@ impl<'a> PathTracerBase<'a> {
             }
             *self.depth += 1;
             let direct_lighting = self.sample_light(si, sampler.next_3d());
+
+            let (bsdf_sample, features, direct) = self.sample_surface_and_shade_direct(
+                None,
+                si,
+                wo,
+                direct_lighting,
+                sampler.next_3d(),
+            );
+            let roughness = features.roughness;
+            let occluded = true.var();
+            if direct_lighting.valid {
+                let shadow_ray = direct_lighting.shadow_ray;
+                *occluded = self.scene.occlude(shadow_ray);
+                if !occluded {
+                    self.add_radiance(direct);
+                }
+            }
             if let Some(sm) = &shift_mapping {
                 // perform reconnection
                 if !sm.is_base_path & sm.vertex.valid() {
@@ -512,21 +530,6 @@ impl<'a> PathTracerBase<'a> {
                     }
                 }
             }
-            let (bsdf_sample, direct) = self.sample_surface_and_shade_direct(
-                None,
-                si,
-                wo,
-                direct_lighting,
-                sampler.next_3d(),
-            );
-            let occluded = true.var();
-            if direct_lighting.valid {
-                let shadow_ray = direct_lighting.shadow_ray;
-                *occluded = self.scene.occlude(shadow_ray);
-                if !occluded {
-                    self.add_radiance(direct);
-                }
-            }
             let f = &bsdf_sample.color;
             if debug_mode() {
                 lc_assert!(f.min().ge(0.0));
@@ -588,7 +591,7 @@ impl<'a> PathTracerBase<'a> {
                 *self.prev_bsdf_pdf = bsdf_sample.pdf;
                 *self.prev_ng = si.ng;
                 *self.prev_p = si.p;
-
+                *self.prev_roughness = roughness;
                 let ro = offset_ray_origin(si.p, face_forward(si.ng, bsdf_sample.wi));
                 *ray = Ray::new_expr(
                     ro,

@@ -135,7 +135,7 @@ impl GradientPathTracer {
                 );
                 *ray_w = ray_w_;
                 let swl = swl.var();
-                let pt = PathTracerBase::new(
+                let mut pt = PathTracerBase::new(
                     scene,
                     color_pipeline,
                     self.max_depth.expr(),
@@ -145,6 +145,7 @@ impl GradientPathTracer {
                     swl,
                 );
                 let shift_mapping = if let Some(sm) = shift_mapping {
+                    pt.need_shift_mapping = true;
                     Some(ReconnectionShiftMapping {
                         is_base_path: is_primary,
                         ..sm
@@ -164,7 +165,7 @@ impl GradientPathTracer {
         };
         let shift_mapping = if self.config.reconnect {
             Some(ReconnectionShiftMapping {
-                min_dist: 0.01f32.expr(),
+                min_dist: 0.03f32.expr(),
                 min_roughness: 0.0f32.expr(),
                 is_base_path: true.expr(),
                 vertex: ReconnectionVertex::var_zeroed(),
@@ -187,38 +188,35 @@ impl GradientPathTracer {
                 Int2::expr(0, -1)
             }
         };
-        state.primal.add_sample(
-            px.cast_f32(),
-            &primary_l,
-            primary_swl,
-            primay_ray_w// * mis_w_primary,
-        );
-        // for i in 0..4u32 {
-        //     let offset = get_offset(i);
-        //     let shift_mapping = shift_mapping.map(|sm| ReconnectionShiftMapping {
-        //         is_base_path: false.expr(),
-        //         success: false.var(),
-        //         jacobian: 0.0f32.var(),
-        //         ..sm
-        //     });
-        //     let (shifted, l, swl, ray_w, jacobian) = trace(false.expr(), offset, shift_mapping);
+        // state.primal.add_sample(
+        //     px.cast_f32(),
+        //     &primary_l,
+        //     primary_swl,
+        //     primay_ray_w, // * mis_w_primary,
+        // );
+        for i in 0..4u32 {
+            let offset = get_offset(i);
+            let shift_mapping = shift_mapping.map(|sm| ReconnectionShiftMapping {
+                is_base_path: false.expr(),
+                success: false.var(),
+                jacobian: 0.0f32.var(),
+                ..sm
+            });
+            let (shifted, l, swl, ray_w, jacobian) = trace(false.expr(), offset, shift_mapping);
 
-        //     let mis_w_primary = 1.0 / (1.0 + jacobian);
-        //     let mis_w_shifted = jacobian / (1.0 + jacobian);
+            let mis_w_primary = 1.0 / (1.0 + jacobian);
+            let mis_w_shifted = jacobian / (1.0 + jacobian);
 
-        //     state.primal.add_sample(
-        //         px.cast_f32(),
-        //         &primary_l,
-        //         primary_swl,
-        //         primay_ray_w// * mis_w_primary,
-        //     );
-        //     // state.primal.add_sample(
-        //     //     shifted.cast_f32(),
-        //     //     &l,
-        //     //     swl,
-        //     //     ray_w * mis_w_shifted,
-        //     // );
-        // }
+            state.primal.add_sample(
+                px.cast_f32(),
+                &primary_l,
+                primary_swl,
+                primay_ray_w * mis_w_primary,
+            );
+            state
+                .primal
+                .add_sample(shifted.cast_f32(), &(l * jacobian), swl, ray_w * mis_w_shifted);
+        }
         sampler_backup.forget();
     }
 }

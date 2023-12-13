@@ -440,7 +440,7 @@ impl WavePathImpl {
             self.work_queue.enqueue(KernelId::TestShadow as u32, sid);
         }
         let wo = -states.ray.read(sid).d;
-        let (bsdf_sample, direct) =
+        let (bsdf_sample, _, direct) =
             pt.sample_surface_and_shade_direct(Some(shader_kind), si, wo, dl, sampler.next_3d());
 
         let (beta, _) = self.beta.read(sid);
