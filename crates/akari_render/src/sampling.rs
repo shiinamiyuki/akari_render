@@ -30,8 +30,17 @@ pub fn cos_hemisphere_pdf(cos_theta: Expr<f32>) -> Expr<f32> {
 }
 #[tracked(crate = "luisa")]
 pub fn uniform_sample_triangle(u: Expr<Float2>) -> Expr<Float2> {
-    let su0 = u.x.sqrt();
-    Float2::expr(1.0 - su0, u.y * su0)
+    // let su0 = u.x.sqrt();
+    // Float2::expr(1.0 - su0, u.y * su0)
+    if u.x < u.y {
+        let b0 = u.x / 2.0;
+        let b1 = u.y - b0;
+        Float2::expr(b0, b1)
+    } else {
+        let b1 = u.y / 2.0;
+        let b0 = u.x - b1;
+        Float2::expr(b0, b1)
+    }
 }
 #[tracked(crate = "luisa")]
 pub fn sample_gaussian(u: Expr<f32>) -> Expr<f32> {

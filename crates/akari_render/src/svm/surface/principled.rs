@@ -122,6 +122,7 @@ impl SurfaceShader for SvmPrincipledBsdf {
         let lum = color.lum();
         let color_tint = select(lum.eq(0.0), color, color / lum);
         let emission = svm_eval.eval_color(self.emission_color);
+        let emission = emission * svm_eval.eval_float(self.emission_strength);
         let metallic = svm_eval.eval_float(self.metallic);
         let roughness = svm_eval.eval_float(self.roughness);
         let eta = svm_eval.eval_float(self.ior);

@@ -2,18 +2,15 @@
 
 use std::{f32::consts::FRAC_1_PI, rc::Rc, sync::Arc, time::Instant};
 
-use luisa::{rtx::offset_ray_origin, runtime::KernelBuildOptions};
-use rand::Rng;
+use luisa::rtx::offset_ray_origin;
 
 use super::{Integrator, RenderSession};
 use crate::{
     color::*,
-    film::*,
     geometry::*,
     interaction::SurfaceInteraction,
     light::LightEvalContext,
     sampler::*,
-    scene::*,
     svm::surface::{diffuse::DiffuseBsdf, *},
     *,
 };
@@ -27,12 +24,17 @@ pub struct PathTracerBase<'a> {
     pub indirect_only: bool,
     pub radiance: ColorVar,
     pub beta: ColorVar,
+    pub reconnect_radiance: ColorVar,
+    pub reconnect_beta: ColorVar,
     pub color_pipeline: ColorPipeline,
     pub depth: Var<u32>,
     pub prev_bsdf_pdf: Var<f32>,
     pub prev_ng: Var<Float3>,
+    pub prev_p: Var<Float3>,
+    pub prev_roughness: Var<f32>,
     pub swl: Var<SampledWavelengths>,
     pub scene: &'a Scene,
+    pub need_shift_mapping: bool,
 }
 #[derive(Aggregate, Copy, Clone)]
 #[luisa(crate = "luisa")]
@@ -72,21 +74,33 @@ impl<'a> PathTracerBase<'a> {
             indirect_only,
             radiance: ColorVar::zero(color_pipeline.color_repr),
             beta: ColorVar::one(color_pipeline.color_repr),
+            reconnect_radiance: ColorVar::zero(color_pipeline.color_repr),
+            reconnect_beta: ColorVar::one(color_pipeline.color_repr),
             scene,
             depth: Var::<u32>::zeroed(),
             prev_bsdf_pdf: Var::<f32>::zeroed(),
             prev_ng: Var::<Float3>::zeroed(),
+            prev_p: Float3::var_zeroed(),
+            prev_roughness: Var::<f32>::zeroed(),
             swl,
             color_pipeline,
             force_diffuse: false,
+            need_shift_mapping: false,
         }
     }
     pub fn add_radiance(&self, r: Color) {
         self.radiance
             .store(self.radiance.load() + self.beta.load() * r);
+        if self.need_shift_mapping {
+            self.reconnect_radiance
+                .store(self.reconnect_radiance.load() + self.reconnect_beta.load() * r);
+        }
     }
     pub fn mul_beta(&self, r: Color) {
         self.beta.store(self.beta.load() * r);
+        if self.need_shift_mapping {
+            self.reconnect_beta.store(self.reconnect_beta.load() * r);
+        }
     }
     pub fn eval_context(&self) -> (LightEvalContext, BsdfEvalContext) {
         let bsdf = BsdfEvalContext {
@@ -252,8 +266,24 @@ impl<'a> PathTracerBase<'a> {
     }
     #[tracked(crate = "luisa")]
     pub fn run_megakernel(&self, ray: Expr<Ray>, sampler: &dyn Sampler) {
+        self.run_pt_hybrid_shift_mapping(ray, sampler, None)
+    }
+    #[tracked(crate = "luisa")]
+    pub fn run_pt_hybrid_shift_mapping(
+        &self,
+        ray: Expr<Ray>,
+        sampler: &dyn Sampler,
+        shift_mapping: Option<ReconnectionShiftMapping>,
+    ) {
+        if let Some(sm) = &shift_mapping {
+            assert!(self.need_shift_mapping);
+            if !sm.is_base_path {
+                *sm.success = false;
+            }
+        }
         let ray = ray.var();
-
+        let found_reconnectible_vertex = false.var();
+        const MIN_RECONNECT_DEPTH: u32 = 1;
         loop {
             let si = self.scene.intersect(**ray);
             if !si.valid {
@@ -261,18 +291,227 @@ impl<'a> PathTracerBase<'a> {
                 self.add_radiance(direct * w);
                 break;
             }
+            if let Some(sm) = &shift_mapping {
+                let sm_vertex = sm.vertex;
+                if sm_vertex.valid() && sm.is_base_path {
+                    *sm_vertex.type_ = VertexType::INTERIOR;
+                }
+            }
             let wo = -ray.d;
             {
                 let (direct, w) = self.handle_surface_light(si, **ray);
                 self.add_radiance(direct * w);
             }
 
-            if self.depth.load() >= self.max_depth {
+            if let Some(sm) = &shift_mapping {
+                let sm_vertex = sm.vertex;
+                let is_last_vertex = self.depth == self.max_depth;
+                let dist = (self.prev_p - si.p).length();
+                let can_connect = dist > sm.min_dist;
+                // handle reconnection vertex hits surface light
+                if (self.depth > MIN_RECONNECT_DEPTH) & can_connect & is_last_vertex {
+                    *found_reconnectible_vertex |= sm_vertex.valid();
+                    if !sm_vertex.valid() & sm.is_base_path {
+                        *sm_vertex = ReconnectionVertex::from_comps_expr(ReconnectionVertexComps {
+                            direct: Expr::<FlatColor>::zeroed(),
+                            indirect: Expr::<FlatColor>::zeroed(),
+                            bary: si.bary,
+                            direct_wi: Expr::<[f32; 3]>::zeroed(),
+                            direct_light_pdf: 0.0f32.expr(),
+                            wo: wo.into(),
+                            inst_id: si.inst_id,
+                            wi: Expr::<[f32; 3]>::zeroed(),
+                            prim_id: si.prim_id,
+                            prev_bsdf_pdf: **self.prev_bsdf_pdf,
+                            bsdf_pdf: 0.0f32.expr(),
+                            dist,
+                            depth: **self.depth,
+                            type_: VertexType::LAST_HIT_LIGHT.expr(),
+                        });
+                    } else if !sm_vertex.valid() & !sm.is_base_path {
+                        // the base path does not have a valid reconnection vertex
+                        // if a connectable vertex is found for shift path, it must be rejected
+                        if can_connect {
+                            break;
+                        }
+                    }
+                }
+            }
+            if self.depth >= self.max_depth {
                 break;
             }
             *self.depth += 1;
-
             let direct_lighting = self.sample_light(si, sampler.next_3d());
+            if let Some(sm) = &shift_mapping {
+                // perform reconnection
+                if !sm.is_base_path & sm.vertex.valid() {
+                    if self.depth > MIN_RECONNECT_DEPTH {
+                        let dist = (self.prev_p - si.p).length();
+                        let can_connect = dist > sm.min_dist;
+                        // a connectable vertex is found for shift path with a smaller depth
+                        // it means that the shift is not reversible, since the smallest connectable depth
+                        // does not agree
+                        if can_connect {
+                            break;
+                        }
+                    }
+                    // yes, we can connect
+                    if sm.vertex.depth == self.depth {
+                        let reconnection_vertex = **sm.vertex;
+                        let vertex_type = reconnection_vertex.type_;
+                        let reconnect_si = self.scene.surface_interaction(
+                            reconnection_vertex.inst_id,
+                            reconnection_vertex.prim_id,
+                            reconnection_vertex.bary,
+                        );
+                        let dist = (reconnect_si.p - si.p).length();
+                        let wi = (reconnect_si.p - si.p).normalize();
+                        let can_connect = dist > sm.min_dist;
+                        // failed to connect, reject
+                        if !can_connect {
+                            break;
+                        }
+                        let vis_ray = Ray::new_expr(
+                            si.p,
+                            wi,
+                            0.0,
+                            dist,
+                            Uint2::expr(si.inst_id, si.prim_id),
+                            Uint2::expr(reconnect_si.inst_id, reconnect_si.prim_id),
+                        );
+                        let occluded = self.scene.occlude(vis_ray);
+                        // visiblity check failed, reject
+                        if occluded {
+                            break;
+                        }
+                        let cos_theta_y2 = reconnect_si.ng.dot(wi).abs();
+                        let cos_theta_x2 = reconnect_si
+                            .ng
+                            .dot(Expr::<Float3>::from(reconnection_vertex.wo))
+                            .abs();
+                        // prevent NaN
+                        if cos_theta_y2 == 0.0 {
+                            break;
+                        }
+                        /*
+                         *
+                         * x_i                 x_{i+1}                               x_{i+2}
+                         *    vertex.prev_pdf          pdf(x_i -> x_{i+1}, x_{i+1} -> x_{i+2}) = pdf_x2
+                         * y_i                 y_{i+1}                               y_{i+2} =x_{i+2}
+                         *    pdf_y1                 pdf(x_i -> x_{i+1}, x_{i+1} -> x_{i+2}) = pdf_y2
+                         */
+                        let (f1, pdf_y1) = self.scene.svm.dispatch_surface(
+                            si.surface,
+                            self.color_pipeline,
+                            si,
+                            **self.swl,
+                            |closure| closure.evaluate(wo, wi, **self.swl, &self.eval_context().1),
+                        );
+                        let (f2, pdf_y2) = if vertex_type == VertexType::LAST_HIT_LIGHT {
+                            // zero
+                            (Color::zero(self.color_pipeline.color_repr), 0.0f32.expr())
+                        } else {
+                            self.scene.svm.dispatch_surface(
+                                reconnect_si.surface,
+                                self.color_pipeline,
+                                reconnect_si,
+                                **self.swl,
+                                |closure| {
+                                    closure.evaluate(
+                                        -wi,
+                                        Expr::<Float3>::from(reconnection_vertex.wi),
+                                        **self.swl,
+                                        &self.eval_context().1,
+                                    )
+                                },
+                            )
+                        };
+                        if pdf_y2 <= 0.0 {
+                            break;
+                        }
+                        let throughput = {
+                            let light_ctx = self.eval_context().0;
+                            let reconnect_instance = self
+                                .scene
+                                .meshes
+                                .mesh_instances()
+                                .read(reconnect_si.inst_id);
+                            let le = if reconnect_instance.light.valid() {
+                                self.scene
+                                    .lights
+                                    .le(vis_ray, reconnect_si, **self.swl, &light_ctx)
+                            } else {
+                                Color::zero(self.color_pipeline.color_repr)
+                            };
+                            let light_pdf = if reconnect_instance.light.valid() {
+                                self.scene.lights.pdf_direct(
+                                    reconnect_si,
+                                    PointNormal::new_expr(si.p, si.ng),
+                                    &light_ctx,
+                                )
+                            } else {
+                                0.0f32.expr()
+                            };
+
+                            let w = if self.use_nee {
+                                mis_weight(pdf_y1, light_pdf, 1)
+                            } else {
+                                1.0f32.expr()
+                            };
+                            let vertex_le = le * w;
+                            let direct_wi = Expr::<Float3>::from(reconnection_vertex.direct_wi);
+                            let direct_f = if (direct_wi != 0.0).any() {
+                                let (f, bsdf_pdf) = self.scene.svm.dispatch_surface(
+                                    reconnect_si.surface,
+                                    self.color_pipeline,
+                                    reconnect_si,
+                                    **self.swl,
+                                    |closure| {
+                                        closure.evaluate(
+                                            -wi,
+                                            direct_wi,
+                                            **self.swl,
+                                            &self.eval_context().1,
+                                        )
+                                    },
+                                );
+                                let w =
+                                    mis_weight(reconnection_vertex.direct_light_pdf, bsdf_pdf, 1);
+                                f * w
+                            } else {
+                                Color::zero(self.color_pipeline.color_repr)
+                            };
+                            f1 / pdf_y1
+                                * (vertex_le
+                                    + direct_f
+                                        * Color::from_flat(
+                                            self.color_pipeline.color_repr,
+                                            reconnection_vertex.direct,
+                                        )
+                                    + f2 * Color::from_flat(
+                                        self.color_pipeline.color_repr,
+                                        reconnection_vertex.indirect,
+                                    ) / pdf_y2)
+                            // is this correct???
+                        };
+                        let pdf_x = if vertex_type == VertexType::LAST_HIT_LIGHT {
+                            reconnection_vertex.prev_bsdf_pdf
+                        } else {
+                            reconnection_vertex.prev_bsdf_pdf * reconnection_vertex.bsdf_pdf
+                        };
+                        let pdf_y = pdf_y1 * pdf_y2;
+                        self.add_radiance(throughput);
+
+                        let jacobian = pdf_y / pdf_x
+                            * (cos_theta_y2 / cos_theta_x2).abs()
+                            * (reconnection_vertex.dist / dist).sqr();
+                        let jacobian = jacobian.is_finite().select(jacobian, 0.0f32.expr());
+                        *sm.success = jacobian > 0.0;
+                        *sm.jacobian = jacobian;
+                        break;
+                    }
+                }
+            }
             let (bsdf_sample, direct) = self.sample_surface_and_shade_direct(
                 None,
                 si,
@@ -280,9 +519,11 @@ impl<'a> PathTracerBase<'a> {
                 direct_lighting,
                 sampler.next_3d(),
             );
+            let occluded = true.var();
             if direct_lighting.valid {
                 let shadow_ray = direct_lighting.shadow_ray;
-                if !self.scene.occlude(shadow_ray) {
+                *occluded = self.scene.occlude(shadow_ray);
+                if !occluded {
                     self.add_radiance(direct);
                 }
             }
@@ -295,6 +536,46 @@ impl<'a> PathTracerBase<'a> {
             }
 
             self.mul_beta(f / bsdf_sample.pdf);
+            if let Some(sm) = &shift_mapping {
+                if self.depth > MIN_RECONNECT_DEPTH {
+                    let reconnect_vertex = sm.vertex;
+                    let dist = (self.prev_p - si.p).length();
+                    let can_connect = dist > sm.min_dist;
+                    *found_reconnectible_vertex |= reconnect_vertex.valid();
+                    if !reconnect_vertex.valid() & sm.is_base_path & can_connect {
+                        *reconnect_vertex =
+                            ReconnectionVertex::from_comps_expr(ReconnectionVertexComps {
+                                direct: if direct_lighting.valid & !occluded {
+                                    direct_lighting.irradiance.flatten() / direct_lighting.pdf
+                                } else {
+                                    Expr::<FlatColor>::zeroed()
+                                },
+                                indirect: Expr::<FlatColor>::zeroed(),
+                                bary: si.bary,
+                                direct_wi: direct_lighting.wi.into(),
+                                direct_light_pdf: direct_lighting.pdf,
+                                wo: wo.into(),
+                                inst_id: si.inst_id,
+                                wi: bsdf_sample.wi.into(),
+                                prim_id: si.prim_id,
+                                prev_bsdf_pdf: **self.prev_bsdf_pdf,
+                                bsdf_pdf: bsdf_sample.pdf,
+                                dist,
+                                depth: self.depth - 1,
+                                type_: VertexType::LAST_NEE.expr(),
+                            });
+                        self.reconnect_beta
+                            .store(Color::one(self.color_pipeline.color_repr));
+                        self.reconnect_radiance
+                            .store(Color::zero(self.color_pipeline.color_repr));
+                    }
+                    if !reconnect_vertex.valid() & !sm.is_base_path & can_connect {
+                        // the base path does not have a valid reconnection vertex
+                        // if a connectable vertex is found for shift path, it must be rejected
+                        break;
+                    }
+                }
+            }
             let (rr_effective, cont_prob) = self.continue_prob();
             if rr_effective {
                 let rr = sampler.next_1d().ge(cont_prob);
@@ -306,6 +587,8 @@ impl<'a> PathTracerBase<'a> {
             {
                 *self.prev_bsdf_pdf = bsdf_sample.pdf;
                 *self.prev_ng = si.ng;
+                *self.prev_p = si.p;
+
                 let ro = offset_ray_origin(si.p, face_forward(si.ng, bsdf_sample.wi));
                 *ray = Ray::new_expr(
                     ro,
@@ -315,6 +598,21 @@ impl<'a> PathTracerBase<'a> {
                     Uint2::expr(si.inst_id, si.prim_id),
                     Uint2::expr(u32::MAX, u32::MAX),
                 );
+            }
+        }
+        if let Some(sm) = &shift_mapping {
+            let reconnect_vertex = sm.vertex;
+            if reconnect_vertex.valid()
+                & (reconnect_vertex.type_ != VertexType::LAST_HIT_LIGHT)
+                & sm.is_base_path
+            {
+                *reconnect_vertex.indirect = self.reconnect_radiance.load().flatten();
+            }
+            if !reconnect_vertex.valid() & !sm.is_base_path {
+                // the base path does not have a valid reconnection vertex
+                // the shift path must be rejected if a connectable vertex is found
+                *sm.success = !found_reconnectible_vertex;
+                *sm.jacobian = found_reconnectible_vertex.select(0.0f32.expr(), 1.0f32.expr());
             }
         }
     }
@@ -478,34 +776,35 @@ impl Integrator for PathTracer {
         assert_eq!(resolution.x, film.resolution().x);
         assert_eq!(resolution.y, film.resolution().y);
         let sampler_creator = sampler_config.creator(self.device.clone(), &scene, self.spp);
-        let kernel = self.device.create_kernel::<fn(u32, Int2)>(
-            &track!(|spp_per_pass: Expr<u32>, pixel_offset: Expr<Int2>| {
-                set_block_size([16, 16, 1]);
-                let p = dispatch_id().xy();
-                let sampler = sampler_creator.create(p);
-                let sampler = sampler.as_ref();
-                for_range(0u32.expr()..spp_per_pass, |_| {
-                    sampler.start();
-                    let ip = p.cast_i32();
-                    let shifted = ip + pixel_offset;
-                    let shifted = shifted
-                        .clamp(0, resolution.expr().cast_i32() - 1)
-                        .cast_u32();
-                    let swl = sample_wavelengths(color_pipeline.color_repr, sampler);
-                    let (ray, ray_w) = scene.camera.generate_ray(
-                        &scene,
-                        film.filter(),
-                        shifted,
-                        sampler,
-                        color_pipeline.color_repr,
-                        swl,
-                    );
-                    let swl = swl.var();
-                    let l = self.radiance(&scene, color_pipeline, ray, swl, sampler);
-                    film.add_sample(p.cast_f32(), &l, **swl, ray_w);
-                });
-            }),
-        );
+        let kernel =
+            self.device.create_kernel::<fn(u32, Int2)>(&track!(
+                |spp_per_pass: Expr<u32>, pixel_offset: Expr<Int2>| {
+                    set_block_size([16, 16, 1]);
+                    let p = dispatch_id().xy();
+                    let sampler = sampler_creator.create(p);
+                    let sampler = sampler.as_ref();
+                    for_range(0u32.expr()..spp_per_pass, |_| {
+                        sampler.start();
+                        let ip = p.cast_i32();
+                        let shifted = ip + pixel_offset;
+                        let shifted = shifted
+                            .clamp(0, resolution.expr().cast_i32() - 1)
+                            .cast_u32();
+                        let swl = sample_wavelengths(color_pipeline.color_repr, sampler);
+                        let (ray, ray_w) = scene.camera.generate_ray(
+                            &scene,
+                            film.filter(),
+                            shifted,
+                            sampler,
+                            color_pipeline.color_repr,
+                            swl,
+                        );
+                        let swl = swl.var();
+                        let l = self.radiance(&scene, color_pipeline, ray, swl, sampler);
+                        film.add_sample(p.cast_f32(), &l, **swl, ray_w);
+                    });
+                }
+            ));
         log::info!(
             "Render kernel has {} arguments, {} captures!",
             kernel.num_arguments(),

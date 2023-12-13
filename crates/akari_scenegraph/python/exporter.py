@@ -497,10 +497,14 @@ class SceneExporter:
         bm.free()
         m.calc_loop_triangles()
         m.calc_normals_split()
+        if has_uv:
+            m.calc_tangents()
 
         V = m.vertices
         F = m.loop_triangles
         print(f"    #V: {len(V)} #F: {len(F)}")
+        # init loop_face_cache
+        _ = m.loop_triangles[0].polygon_index
         if has_uv:
             assert len(m.uv_layers[0].uv) == len(F) * 3
         export_mesh_args = {

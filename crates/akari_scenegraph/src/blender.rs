@@ -37,7 +37,7 @@ pub fn import_blender_mesh(scene: &mut Scene, args: ImportMeshArgs) -> NodeRef<G
     let mut normals;
     let mut tangents;
     let mut materials = vec![0u32];
-    dbg!(&args);
+    // dbg!(&args);
     unsafe {
         if args.uv_ptr != 0 {
             uvs = vec![[0.0f32; 2]; args.num_triangles * 3];

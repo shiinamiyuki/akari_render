@@ -79,14 +79,14 @@ impl Light for AreaLightExpr {
                 valid: false.expr(),
             }
         } else {
-            let emission = self.emission(-wi, si, swl, ctx);
             let dist2 = wi.length_squared();
             let wi = wi / dist2.sqrt();
+            let emission = self.emission(-wi, si, swl, ctx);
             let li = select(wi.dot(n).lt(0.0), emission, Color::zero(ctx.color_repr()));
             let cos_theta_i = n.dot(wi).abs();
             let pdf = pdf / area * dist2 / cos_theta_i;
             let ro = rtx::offset_ray_origin(pn.p, face_forward(pn.n, wi));
-            let dist = (p - ro).length();
+            let dist = dist2.sqrt();
             let shadow_ray = Ray::new_expr(
                 ro,
                 wi,
@@ -126,7 +126,7 @@ impl Light for AreaLightExpr {
         let wi = p - pn.p;
         let dist2 = wi.length_squared();
         let wi = wi / dist2.sqrt();
-        let pdf = prim_pdf / area * dist2 / ng.dot(-wi).max_(1e-6);
+        let pdf = prim_pdf / area * dist2 / ng.dot(wi).abs().max_(1e-6);
         pdf
     }
 }

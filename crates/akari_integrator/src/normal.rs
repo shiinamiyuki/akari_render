@@ -64,7 +64,7 @@ impl Integrator for NormalVis {
                     let si = scene.intersect(ray);
 
                     let color = if si.valid {
-                        let ns = si.ns();
+                        let ns = si.frame.t;
                         Color::Rgb(ns * 0.5 + 0.5, color_repr.rgb_colorspace().unwrap())
                     } else {
                         Color::zero(color_repr)

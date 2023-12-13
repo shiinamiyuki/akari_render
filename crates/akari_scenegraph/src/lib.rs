@@ -25,6 +25,11 @@ pub struct NodeRef<T> {
     #[serde(skip)]
     phantom: std::marker::PhantomData<T>,
 }
+impl<T> std::fmt::Display for NodeRef<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.id)
+    }
+}
 impl<T> NodeRef<T> {
     pub fn new(id: String) -> Self {
         Self {

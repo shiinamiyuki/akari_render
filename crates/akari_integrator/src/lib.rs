@@ -46,7 +46,7 @@ pub trait Integrator {
     );
 }
 
-// pub mod gpt;
+pub mod gpt;
 pub mod mcmc;
 pub mod mcmc_opt;
 pub mod wfpt;
@@ -62,8 +62,8 @@ pub enum Method {
     NormalVis(normal::Config),
     #[serde(rename = "pt")]
     PathTracer(pt::Config),
-    // #[serde(rename = "gpt")]
-    // GradientPathTracer(gpt::Config),
+    #[serde(rename = "gpt")]
+    GradientPathTracer(gpt::Config),
     // #[serde(rename = "mcmc")]
     // Mcmc(mcmc::Config),
     // #[serde(rename = "mcmc_s")]
@@ -139,15 +139,15 @@ pub fn render(device: Device, scene: Arc<Scene>, task: &RenderTask, options: Ren
                 &c,
                 &options,
             ),
-            // Method::GradientPathTracer(c) => gpt::render(
-            //     device.clone(),
-            //     scene.clone(),
-            //     config.sampler,
-            //     color_repr,
-            //     &mut film,
-            //     &c,
-            //     &options,
-            // ),
+            Method::GradientPathTracer(c) => gpt::render(
+                device.clone(),
+                scene.clone(),
+                config.sampler,
+                config.color,
+                &mut film,
+                &c,
+                &options,
+            ),
             // Method::Mcmc(c) => mcmc::render(
             //     device.clone(),
             //     scene.clone(),

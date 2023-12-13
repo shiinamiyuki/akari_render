@@ -57,7 +57,7 @@ pub struct SceneLoader {
     heap: Arc<MegaHeap>,
 }
 
-#[deny(dead_code)]
+// #[deny(dead_code)]
 impl SceneLoader {
     pub fn load_from_path<P: AsRef<Path>>(device: Device, path: P) -> Arc<Scene> {
         let abs_path = path.as_ref().canonicalize().unwrap();
@@ -331,7 +331,8 @@ impl SceneLoader {
                     let wo = onb.to_world(wo);
                     svm.dispatch_surface(si.surface, color_pipeline, si, **swl, |closure| {
                         let emission = closure.emission(wo, **swl, &bsdf_eval_ctx);
-                        *acc += emission.max() / si.prim_area;
+                        device_log!("surface: {}, prim {} emission: {}", si.surface, i, emission.max());
+                        *acc += emission.max() * si.prim_area;
                     })
                 }
                 powers.write(i, acc / n_samples as f32);
@@ -362,9 +363,22 @@ impl SceneLoader {
                     &(i as u32),
                     &powers,
                 );
-                powers.copy_to_vec()
+                powers.view(..mesh.indices.len()).copy_to_vec()
             };
-            let total_power = powers.par_iter().sum::<f32>();
+            let total_power = powers
+                .iter()
+                .enumerate()
+                .map(|(j, x)| {
+                    if !x.is_finite() {
+                        log::error!(
+                            "non-finite power detected at instance {}, prim {}",
+                            &instance_nodes[i],
+                            j
+                        );
+                    }
+                    x
+                })
+                .sum::<f32>();
             if 0.0 < total_power && total_power <= 1e-4 {
                 log::warn!(
                     "Light power too low: {:?}, power: {}",
@@ -376,6 +390,12 @@ impl SceneLoader {
             if total_power > 1e-4 {
                 let light_id = lights.len();
                 lights.push((i, total_power));
+                log::info!(
+                    "Detected mesh light @ Instance {} with power {}",
+                    &instance_nodes[i],
+                    total_power
+                );
+                // dbg!(&powers);
                 let at = AliasTable::new(self.device.clone(), &powers);
                 mesh_aggregate.set_area_sampler(i as u32, at);
                 let light_ref = self.lights.push(
@@ -470,39 +490,39 @@ impl SceneLoader {
 
         for (id, geometry) in &scene_view.scene().geometries {
             match geometry {
-                scenegraph::Geometry::Mesh(mesh) => {
-                    log::debug!("Loading mesh: {}", id.id);
-                    unsafe {
-                        macro_rules! load_slice {
-                            ($s:expr, $t:ty) => {{
-                                let slice = scene_view.buffer_view_as_slice($s);
-                                assert_eq!(
-                                    slice.len() % std::mem::size_of::<$t>(),
-                                    0,
-                                    "Invalid slice length"
-                                );
-                                let slice = std::slice::from_raw_parts(
-                                    slice.as_ptr() as *const $t,
-                                    slice.len() / std::mem::size_of::<$t>(),
-                                );
-                                slice
-                            }};
-                        }
-                        let vertices = load_slice!(&mesh.vertices, [f32; 3]);
-                        let normals = mesh.normals.as_ref().map(|n| load_slice!(n, [f32; 3]));
-                        let indices = load_slice!(&mesh.indices, [u32; 3]);
-                        let uvs = mesh.uvs.as_ref().map(|uvs| load_slice!(uvs, [f32; 2]));
-                        let tangents = mesh.tangents.as_ref().map(|t| load_slice!(t, [f32; 3]));
-                        let materials = load_slice!(&mesh.materials, u32);
-                        let mesh = Mesh::new(
-                            device.clone(),
-                            MeshRef::new(vertices, normals, indices, materials, uvs, tangents),
-                        );
-                        let geom_id = meshes.len();
-                        meshes.push(mesh);
-                        node_to_geom_id.insert(id.clone(), geom_id);
+                scenegraph::Geometry::Mesh(mesh) => unsafe {
+                    macro_rules! load_slice {
+                        ($s:expr, $t:ty) => {{
+                            let slice = scene_view.buffer_view_as_slice($s);
+                            assert_eq!(
+                                slice.len() % std::mem::size_of::<$t>(),
+                                0,
+                                "Invalid slice length"
+                            );
+                            let slice = std::slice::from_raw_parts(
+                                slice.as_ptr() as *const $t,
+                                slice.len() / std::mem::size_of::<$t>(),
+                            );
+                            slice
+                        }};
                     }
-                }
+                    let vertices = load_slice!(&mesh.vertices, [f32; 3]);
+                    let normals = mesh.normals.as_ref().map(|n| load_slice!(n, [f32; 3]));
+                    let indices = load_slice!(&mesh.indices, [u32; 3]);
+                    let uvs = mesh.uvs.as_ref().map(|uvs| load_slice!(uvs, [f32; 2]));
+                    let tangents = mesh.tangents.as_ref().map(|t| load_slice!(t, [f32; 3]));
+                    let materials = load_slice!(&mesh.materials, u32);
+                    if materials.len() > 1 {
+                        dbg!(materials);
+                    }
+                    let mesh = Mesh::new(
+                        device.clone(),
+                        MeshRef::new(vertices, normals, indices, materials, uvs, tangents),
+                    );
+                    let geom_id = meshes.len();
+                    meshes.push(mesh);
+                    node_to_geom_id.insert(id.clone(), geom_id);
+                },
             }
         }
         log::info!(

@@ -64,14 +64,16 @@ impl<'a> mikktspace::Geometry for MeshRef<'a> {
     }
 
     fn tex_coord(&self, face: usize, vert: usize) -> [f32; 2] {
-        if let Some(uvs) = &self.uvs {
-            uvs[self.indices[face][vert] as usize]
-        } else {
-            let p: glam::Vec3 = self.position(face, vert).into();
-            let center = (self.aabb.0 + self.aabb.1) * 0.5;
-            let p = (p + center) * self.inv_aabb_size;
-            map_to_sphere_host(p).into()
-        }
+        // if let Some(uvs) = &self.uvs {
+        //     uvs[self.indices[face][vert] as usize]
+        // } else {
+        //     let p: glam::Vec3 = self.position(face, vert).into();
+        //     let center = (self.aabb.0 + self.aabb.1) * 0.5;
+        //     let p = (p + center) * self.inv_aabb_size;
+        //     map_to_sphere_host(p).into()
+        // }
+        let uvs = self.uvs.unwrap();
+        uvs[self.indices[face][vert] as usize]
     }
     fn set_tangent_encoded(&mut self, tangent: [f32; 4], face: usize, vert: usize) {
         let tangents = self.generated_tangents.as_mut().unwrap();
@@ -114,7 +116,7 @@ impl<'a> MeshRef<'a> {
             .unwrap()
     }
     pub fn compute_tangents(&mut self) {
-        self.generated_tangents = Some(vec![[0.0f32; 3]; self.vertices.len()]);
+        self.generated_tangents = Some(vec![[0.0f32; 3]; 3 * self.indices.len()]);
         if !mikktspace::generate_tangents(self) {
             log::warn!("failed to generate tangents for mesh");
         }
@@ -122,7 +124,7 @@ impl<'a> MeshRef<'a> {
 }
 
 impl Mesh {
-    pub fn new(device: Device, args: MeshRef<'_>) -> Self {
+    pub fn new(device: Device, mut args: MeshRef<'_>) -> Self {
         if let Some(normals) = &args.normals {
             assert_eq!(args.indices.len() * 3, normals.len());
         }
@@ -131,6 +133,10 @@ impl Mesh {
         }
         if let Some(tangents) = &args.tangents {
             assert_eq!(args.indices.len() * 3, tangents.len());
+        } else {
+            if args.uvs.is_some() {
+                args.compute_tangents();
+            }
         }
         assert!(args.material_slots.len() == 1 || args.material_slots.len() == args.indices.len());
         let vertices = device.create_buffer_from_slice(&args.vertices);
@@ -138,8 +144,23 @@ impl Mesh {
             .normals
             .map(|normals| device.create_buffer_from_slice(normals));
         let tangents = args
-            .tangents
-            .map(|tangents| device.create_buffer_from_slice(tangents));
+            .generated_tangents
+            .as_ref()
+            .map(|t| t.as_slice())
+            .or(args.tangents)
+            .map(|tangents| {
+                #[cfg(debug_assertions)]
+                {
+                    for t in tangents {
+                        for x in t {
+                            assert!(x.is_finite());
+                        }
+                    }
+                }
+                device.create_buffer_from_slice(tangents)
+            });
+        assert!(args.uvs.is_none() || tangents.is_some());
+
         // let bitangent_signs = if mesh.bitangent_signs.is_empty() {
         //     None
         // } else {
@@ -183,16 +204,16 @@ pub struct MeshInstanceHost {
 }
 impl MeshInstanceHost {
     pub fn has_normals(&self) -> bool {
-        self.flags & MeshInstanceFlags::HAS_NORMALS != 0
+        (self.flags & MeshInstanceFlags::HAS_NORMALS) != 0
     }
     pub fn has_uvs(&self) -> bool {
-        self.flags & MeshInstanceFlags::HAS_UVS != 0
+        (self.flags & MeshInstanceFlags::HAS_UVS) != 0
     }
     pub fn has_tangents(&self) -> bool {
-        self.flags & MeshInstanceFlags::HAS_TANGENTS != 0
+        (self.flags & MeshInstanceFlags::HAS_TANGENTS) != 0
     }
     pub fn has_multi_materials(&self) -> bool {
-        self.flags & MeshInstanceFlags::HAS_MULTI_MATERIALS != 0
+        (self.flags & MeshInstanceFlags::HAS_MULTI_MATERIALS) != 0
     }
 }
 #[repr(C)]
@@ -284,12 +305,13 @@ impl MeshAggregate {
             let material_buf_index = heap.bind_buffer(&materials);
             let inst = &instances[i];
             let t: glam::Mat4 = inst.transform.m.into();
+            let transform_det = t.determinant();
             MeshInstance {
                 light: inst.light,
                 material_buffer_idx: material_buf_index,
                 area_sampler_idx: u32::MAX,
                 geom_id: inst.geom_id,
-                transform_det: t.determinant(),
+                transform_det,
                 flags: inst.flags,
             }
         });
@@ -414,7 +436,7 @@ impl MeshAggregate {
         let vertices = self.mesh_vertices(geometry);
         let indices = self.mesh_indices(geometry);
         let material_slots = self.mesh_material_slots(geometry);
-        let material = if inst.flags & MeshInstanceFlags::HAS_MULTI_MATERIALS != 0 {
+        let material = if (inst.flags & MeshInstanceFlags::HAS_MULTI_MATERIALS) != 0 {
             let material = self
                 .heap
                 .buffer::<ShaderRef>(inst.material_buffer_idx)
@@ -425,6 +447,7 @@ impl MeshAggregate {
                 .buffer::<ShaderRef>(inst.material_buffer_idx)
                 .read(0)
         };
+    
         let i: Expr<Uint3> = indices.read(prim_id).into();
 
         let v0 = Expr::<Float3>::from(vertices.read(i.x));
@@ -524,7 +547,11 @@ impl MeshAggregate {
             let m_inv_t = m.transpose().inverse();
             let ng = (m_inv_t * ng_local).normalize();
             let ns = (m_inv_t * ns_local).normalize();
-            let area = area_local * inst.transform_det / ng.dot(c).abs();
+
+            let area = ((area_local == 0.0) | (inst.transform_det == 0.0)).select(
+                0.0f32.expr(),
+                area_local * inst.transform_det / ng.dot(c).abs(),
+            );
             (area, p, ng, ns, tt)
         };
         let ss = ns.cross(tt);
