@@ -489,7 +489,6 @@ class SceneExporter:
         return out
 
     def export_mesh_data(self, m, name, has_uv):
-        use_smooth = m. use_auto_smooth
         print('Triangulating mesh')
         bm = bmesh.new()
         bm.from_mesh(m)
@@ -497,8 +496,7 @@ class SceneExporter:
         bm.to_mesh(m)
         bm.free()
         m.calc_loop_triangles()
-        if use_smooth:
-            m.calc_normals_split()
+        m.calc_normals_split()
 
         V = m.vertices
         F = m.loop_triangles

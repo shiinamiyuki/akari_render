@@ -288,6 +288,15 @@ pub fn safe_div(a: Expr<f32>, b: Expr<f32>) -> Expr<f32> {
     select(b.eq(0.0), 0.0f32.expr(), a / b)
 }
 
+#[tracked(crate = "luisa")]
+pub fn difference_of_products(a: Expr<f32>, b: Expr<f32>, c: Expr<f32>, d: Expr<f32>) -> Expr<f32> {
+    let cd = c * d;
+    let diff = a.mul_add(b, -cd);
+    let err = (-c).mul_add(d, cd);
+    diff + err
+}
+
+
 #[derive(Clone, Copy, Debug, Value)]
 #[luisa(crate = "luisa")]
 #[repr(C)]

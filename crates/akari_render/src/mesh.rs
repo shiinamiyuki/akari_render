@@ -4,6 +4,7 @@ use crate::geometry::{map_to_sphere_host, Frame, FrameExpr};
 use crate::heap::MegaHeap;
 use crate::interaction::SurfaceInteraction;
 use crate::svm::ShaderRef;
+use crate::util::difference_of_products;
 use crate::util::distribution::BindlessAliasTableVar;
 use crate::*;
 use crate::{geometry::AffineTransform, util::distribution::AliasTable};
@@ -426,10 +427,10 @@ impl MeshAggregate {
         };
         let i: Expr<Uint3> = indices.read(prim_id).into();
 
+        let v0 = Expr::<Float3>::from(vertices.read(i.x));
+        let v1 = Expr::<Float3>::from(vertices.read(i.y));
+        let v2 = Expr::<Float3>::from(vertices.read(i.z));
         let (area_local, p_local, ng_local) = {
-            let v0 = Expr::<Float3>::from(vertices.read(i.x));
-            let v1 = Expr::<Float3>::from(vertices.read(i.y));
-            let v2 = Expr::<Float3>::from(vertices.read(i.z));
             let p = bary.interpolate(v0, v1, v2);
             let ng = (v1 - v0).cross(v2 - v0);
             let len = ng.length();
@@ -438,19 +439,23 @@ impl MeshAggregate {
             (area, p, ng)
         };
         let prim_id3 = prim_id * 3;
-        let uv = if geometry.uv_buf_idx != u32::MAX {
+        let (uv0, uv1, uv2) = if geometry.uv_buf_idx != u32::MAX {
             let uvs = self.mesh_uvs(geometry);
             let uv0: Expr<Float2> = uvs.read(prim_id3 + 0).into();
             let uv1: Expr<Float2> = uvs.read(prim_id3 + 1).into();
             let uv2: Expr<Float2> = uvs.read(prim_id3 + 2).into();
-            bary.interpolate(uv0, uv1, uv2)
+            (uv0, uv1, uv2)
         } else {
             let uv0 = Float2::expr(0.0, 0.0);
             let uv1 = Float2::expr(1.0, 0.0);
             let uv2 = Float2::expr(0.0, 0.1);
-            bary.interpolate(uv0, uv1, uv2)
+            (uv0, uv1, uv2)
         };
 
+        let uv = bary.interpolate(uv0, uv1, uv2);
+
+        // dpdu
+        // dpdv is not needed
         let tt_local = {
             let t0 = Var::<Float3>::zeroed();
             let t1 = Var::<Float3>::zeroed();
@@ -472,14 +477,21 @@ impl MeshAggregate {
                 *use_default = true;
             };
             if **use_default {
-                let v0 = Expr::<Float3>::from(vertices.read(i.x));
-                let v1 = Expr::<Float3>::from(vertices.read(i.y));
-                let v2 = Expr::<Float3>::from(vertices.read(i.z));
-
-                let t0 = (v1 - v0).normalize();
-                let t1 = (v2 - v1).normalize();
-                let t2 = (v0 - v2).normalize();
-                *t = bary.interpolate(t0, t1, t2).normalize();
+                let duv02 = uv0 - uv2;
+                let duv12 = uv1 - uv2;
+                let dp02 = v0 - v2;
+                let dp12 = v1 - v2;
+                let determinant = difference_of_products(duv02.x, duv12.y, duv02.y, duv12.x);
+                let degenerate_uv = determinant.abs() < 1e-8;
+                if !degenerate_uv {
+                    let inv_det = 1.0 / determinant;
+                    *t.x = difference_of_products(duv12.y, dp02.x, duv02.y, dp12.x) * inv_det;
+                    *t.y = difference_of_products(duv12.y, dp02.y, duv02.y, dp12.y) * inv_det;
+                }
+                if degenerate_uv || t.length_squared() == 0.0 {
+                    let frame = FrameExpr::from_n(ng_local);
+                    *t = frame.t;
+                }
             };
             **t
         };
