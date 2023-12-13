@@ -307,7 +307,7 @@ class MaterialExporter:
             input("Subsurface Weight", "subsurface_weight", PrimitiveNodeType.FLOAT)
             input("Subsurface Radius", "subsurface_radius", PrimitiveNodeType.FLOAT3)
             input("Subsurface Scale", "subsurface_scale", PrimitiveNodeType.FLOAT)
-            input("Subsurface IOR", "subsurface_ior", PrimitiveNodeType.FLOAT)
+            # input("Subsurface IOR", "subsurface_ior", PrimitiveNodeType.FLOAT)
             input(
                 "Subsurface Anisotropy",
                 "subsurface_anisotropy",

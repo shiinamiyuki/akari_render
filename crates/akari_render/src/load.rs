@@ -331,7 +331,7 @@ impl SceneLoader {
                     let wo = onb.to_world(wo);
                     svm.dispatch_surface(si.surface, color_pipeline, si, **swl, |closure| {
                         let emission = closure.emission(wo, **swl, &bsdf_eval_ctx);
-                        device_log!("surface: {}, prim {} emission: {}", si.surface, i, emission.max());
+                        // device_log!("surface: {}, prim {} emission: {}", si.surface, i, emission.max());
                         *acc += emission.max() * si.prim_area;
                     })
                 }
@@ -512,9 +512,9 @@ impl SceneLoader {
                     let uvs = mesh.uvs.as_ref().map(|uvs| load_slice!(uvs, [f32; 2]));
                     let tangents = mesh.tangents.as_ref().map(|t| load_slice!(t, [f32; 3]));
                     let materials = load_slice!(&mesh.materials, u32);
-                    if materials.len() > 1 {
-                        dbg!(materials);
-                    }
+                    // if materials.len() > 1 {
+                    //     dbg!(materials);
+                    // }
                     let mesh = Mesh::new(
                         device.clone(),
                         MeshRef::new(vertices, normals, indices, materials, uvs, tangents),

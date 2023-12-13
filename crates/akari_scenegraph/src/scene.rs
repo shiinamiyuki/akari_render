@@ -301,7 +301,7 @@ pub enum ImageFormat {
     Jpeg,
     #[serde(rename = "tiff")]
     Tiff,
-    #[serde(rename="tga")]
+    #[serde(rename = "tga")]
     Targa,
     #[serde(rename = "exr")]
     OpenExr,
@@ -458,16 +458,30 @@ impl Scene {
         path: impl AsRef<Path>,
         buffer_in_separate_dir: bool,
     ) -> std::io::Result<()> {
-        let abs_path = std::fs::canonicalize(path)?;
+        let path = path.as_ref();
+        {
+            std::fs::File::create(path)?;
+        }
+        let abs_path = std::fs::canonicalize(path).map_err(|e| {
+            std::io::Error::new(
+                e.kind(),
+                format!("failed to canonicalize path `{}`: {}", path.display(), e),
+            )
+        })?;
         let parent_dir = abs_path.parent().unwrap();
         let buffer_dir = if buffer_in_separate_dir {
             let buffer_dir = parent_dir.join("buffers");
-            std::fs::create_dir_all(&buffer_dir)?;
             buffer_dir
         } else {
             parent_dir.to_owned()
         };
-        dbg!(&buffer_dir);
+        std::fs::create_dir_all(&buffer_dir).map_err(|e| {
+            std::io::Error::new(
+                e.kind(),
+                format!("failed to create buffer directory: {}", e),
+            )
+        })?;
+
         for (r, b) in self.buffers.inner_mut() {
             let filename = format!("{}.bin", r.id);
             // check if filename is valid
@@ -480,7 +494,9 @@ impl Scene {
                 ));
             }
 
-            b.write_to_file(path)?;
+            b.write_to_file(path).map_err(|e| {
+                std::io::Error::new(e.kind(), format!("failed to write buffer {}: {}", r.id, e))
+            })?;
         }
         // save scene to file
         let scene_json = serde_json::to_string_pretty(self)?;

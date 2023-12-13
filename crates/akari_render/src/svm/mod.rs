@@ -105,7 +105,7 @@ pub struct SvmPrincipledBsdf {
     pub subsurface_weight: SvmNodeRef,
     pub subsurface_radius: SvmNodeRef,
     pub subsurface_scale: SvmNodeRef,
-    pub subsurface_ior: SvmNodeRef,
+    // pub subsurface_ior: SvmNodeRef,
     pub subsurface_anisotropy: SvmNodeRef,
     pub specular_ior_level: SvmNodeRef,
     pub specular_tint: SvmNodeRef,

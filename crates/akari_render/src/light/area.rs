@@ -41,9 +41,8 @@ impl Light for AreaLightExpr {
         ctx: &LightEvalContext<'_>,
     ) -> Color {
         let emission = self.emission(-ray.d, si, swl, ctx);
-        let ns = si.ns();
         select(
-            ns.dot(ray.d).lt(0.0),
+            si.ng.dot(ray.d).lt(0.0),
             emission,
             Color::zero(ctx.color_repr()),
         )
@@ -67,7 +66,7 @@ impl Light for AreaLightExpr {
         let frame = si.frame;
         let area = si.prim_area;
         let p = si.p;
-        let n = frame.n;
+        let n = si.ng;
         let wi = p - pn.p;
         if wi.length_squared() == 0.0 {
             LightSample {

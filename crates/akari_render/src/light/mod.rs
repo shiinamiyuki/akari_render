@@ -105,9 +105,9 @@ impl LightAggregate {
         ctx: &LightEvalContext<'_>,
     ) -> Color {
         let light = self.light(si);
-        let _light_choice_pdf = self
-            .light_distribution
-            .pdf(light.dispatch(|_tag, _key, light| light.id()));
+        // let _light_choice_pdf = self
+        //     .light_distribution
+        //     .pdf(light.dispatch(|_tag, _key, light| light.id()));
         let direct = light.dispatch(|_tag, _key, light| light.le(ray, si, swl, ctx));
         direct
     }

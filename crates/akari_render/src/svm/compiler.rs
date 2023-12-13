@@ -174,7 +174,7 @@ impl<'a> Compiler<'a> {
                 let subsurface_weight = self.compile_node(&bsdf.subsurface_weight);
                 let subsurface_radius = self.compile_node(&bsdf.subsurface_radius);
                 let subsurface_scale = self.compile_node(&bsdf.subsurface_scale);
-                let subsurface_ior = self.compile_node(&bsdf.subsurface_ior);
+                // let subsurface_ior = self.compile_node(&bsdf.subsurface_ior);
                 let subsurface_anisotropy = self.compile_node(&bsdf.subsurface_anisotropy);
                 let specular_ior_level = self.compile_node(&bsdf.specular_ior_level);
                 let specular_tint = self.compile_node(&bsdf.specular_tint);
@@ -201,7 +201,7 @@ impl<'a> Compiler<'a> {
                     subsurface_weight,
                     subsurface_radius,
                     subsurface_scale,
-                    subsurface_ior,
+                    // subsurface_ior,
                     subsurface_anisotropy,
                     specular_ior_level,
                     specular_tint,

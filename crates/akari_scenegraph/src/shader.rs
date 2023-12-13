@@ -67,7 +67,7 @@ pub struct PrincipledBsdf {
     pub subsurface_weight: NodeRef<ShaderNode>,
     pub subsurface_radius: NodeRef<ShaderNode>,
     pub subsurface_scale: NodeRef<ShaderNode>,
-    pub subsurface_ior: NodeRef<ShaderNode>,
+    // pub subsurface_ior: NodeRef<ShaderNode>,
     pub subsurface_anisotropy: NodeRef<ShaderNode>,
     pub specular_ior_level: NodeRef<ShaderNode>,
     pub specular_tint: NodeRef<ShaderNode>,
@@ -193,7 +193,7 @@ pub trait NodeVisitor: Sized {
                 graph.visit_mut(self, &bsdf.subsurface_weight);
                 graph.visit_mut(self, &bsdf.subsurface_radius);
                 graph.visit_mut(self, &bsdf.subsurface_scale);
-                graph.visit_mut(self, &bsdf.subsurface_ior);
+                // graph.visit_mut(self, &bsdf.subsurface_ior);
                 graph.visit_mut(self, &bsdf.subsurface_anisotropy);
                 graph.visit_mut(self, &bsdf.specular_ior_level);
                 graph.visit_mut(self, &bsdf.specular_tint);
