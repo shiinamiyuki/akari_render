@@ -2,6 +2,7 @@
 
 use std::{f32::consts::FRAC_1_PI, rc::Rc, sync::Arc, time::Instant};
 
+use akari_render::serde::de;
 use luisa::rtx::offset_ray_origin;
 
 use super::{Integrator, RenderSession};
@@ -35,6 +36,7 @@ pub struct PathTracerBase<'a> {
     pub swl: Var<SampledWavelengths>,
     pub scene: &'a Scene,
     pub need_shift_mapping: bool,
+    pub debug_depth: Option<Expr<u32>>,
 }
 #[derive(Aggregate, Copy, Clone)]
 #[luisa(crate = "luisa")]
@@ -92,11 +94,22 @@ impl<'a> PathTracerBase<'a> {
             color_pipeline,
             force_diffuse: false,
             need_shift_mapping: false,
+            debug_depth: None,
         }
     }
+    #[tracked(crate = "luisa")]
     pub fn add_radiance(&self, r: Color) {
-        self.radiance
-            .store(self.radiance.load() + self.beta.load() * r);
+        let f = || {
+            self.radiance
+                .store(self.radiance.load() + self.beta.load() * r);
+        };
+        if let Some(debug_depth) = self.debug_depth {
+            if self.depth == debug_depth {
+                f();
+            }
+        } else {
+            f();
+        }
         if self.need_shift_mapping {
             self.reconnect_radiance
                 .store(self.reconnect_radiance.load() + self.reconnect_beta.load() * r);
@@ -280,10 +293,13 @@ impl<'a> PathTracerBase<'a> {
             assert!(self.need_shift_mapping);
             if !sm.is_base_path {
                 *sm.success = false;
+                *sm.jacobian = 0.0f32.expr();
+                sm.throughput
+                    .store(Color::zero(self.color_pipeline.color_repr));
             }
         }
         let ray = ray.var();
-        let found_reconnectible_vertex = false.var();
+        // the mininimum depth that a shift path can be connected to
         const MIN_RECONNECT_DEPTH: u32 = 1;
         loop {
             let si = self.scene.intersect(**ray);
@@ -303,15 +319,19 @@ impl<'a> PathTracerBase<'a> {
                 let (direct, w) = self.handle_surface_light(si, **ray);
                 self.add_radiance(direct * w);
             }
-
+            let reconnect_distance_criteria =
+                shift_mapping.map(|sm| (self.prev_p - si.p).length() > sm.min_dist);
+            let prev_roughness_criteria =
+                shift_mapping.map(|sm| self.prev_roughness > sm.min_roughness);
             if let Some(sm) = &shift_mapping {
                 let sm_vertex = sm.vertex;
                 let is_last_vertex = self.depth == self.max_depth;
                 let dist = (self.prev_p - si.p).length();
-                let can_connect = dist > sm.min_dist;
+                let can_connect =
+                    reconnect_distance_criteria.unwrap() & prev_roughness_criteria.unwrap();
+
                 // handle reconnection vertex hits surface light
                 if (self.depth > MIN_RECONNECT_DEPTH) & can_connect & is_last_vertex {
-                    *found_reconnectible_vertex |= sm_vertex.valid();
                     if !sm_vertex.valid() & sm.is_base_path {
                         *sm_vertex = ReconnectionVertex::from_comps_expr(ReconnectionVertexComps {
                             direct: Expr::<FlatColor>::zeroed(),
@@ -329,12 +349,9 @@ impl<'a> PathTracerBase<'a> {
                             depth: **self.depth,
                             type_: VertexType::LAST_HIT_LIGHT.expr(),
                         });
-                    } else if !sm_vertex.valid() & !sm.is_base_path {
-                        // the base path does not have a valid reconnection vertex
-                        // if a connectable vertex is found for shift path, it must be rejected
-                        if can_connect {
-                            break;
-                        }
+                    } else if can_connect & !sm.is_base_path {
+                        // not reversible
+                        break;
                     }
                 }
             }
@@ -352,6 +369,7 @@ impl<'a> PathTracerBase<'a> {
                 sampler.next_3d(),
             );
             let roughness = features.roughness;
+            let roughness_criteria = shift_mapping.map(|sm| roughness > sm.min_roughness);
             let occluded = true.var();
             if direct_lighting.valid {
                 let shadow_ray = direct_lighting.shadow_ray;
@@ -361,18 +379,31 @@ impl<'a> PathTracerBase<'a> {
                 }
             }
             if let Some(sm) = &shift_mapping {
+                let roughness_criteria = roughness_criteria.unwrap();
+                let distance_criteria = reconnect_distance_criteria.unwrap();
+                // let prev_roughness_criteria = prev_roughness_criteria.unwrap();
+                let can_connect = roughness_criteria & distance_criteria;
+
+                // check reversibility
+                // if !sm.is_base_path {
+                //     let can_connect =
+                //         roughness_criteria & distance_criteria & prev_roughness_criteria;
+                //     if can_connect {
+                //         // a connectable vertex is found for shift path with a smaller depth
+                //         // it means that the shift is not reversible, since the smallest connectable depth
+                //         // does not agree
+
+                //         if sm.vertex.valid() {
+                //             if self.depth + 1 != sm.vertex.depth {
+                //                 break;
+                //             }
+                //         } else {
+                //             break;
+                //         }
+                //     }
+                // }
                 // perform reconnection
                 if !sm.is_base_path & sm.vertex.valid() {
-                    if self.depth > MIN_RECONNECT_DEPTH {
-                        let dist = (self.prev_p - si.p).length();
-                        let can_connect = dist > sm.min_dist;
-                        // a connectable vertex is found for shift path with a smaller depth
-                        // it means that the shift is not reversible, since the smallest connectable depth
-                        // does not agree
-                        if can_connect {
-                            break;
-                        }
-                    }
                     // yes, we can connect
                     if sm.vertex.depth == self.depth {
                         let reconnection_vertex = **sm.vertex;
@@ -384,24 +415,19 @@ impl<'a> PathTracerBase<'a> {
                         );
                         let dist = (reconnect_si.p - si.p).length();
                         let wi = (reconnect_si.p - si.p).normalize();
-                        let can_connect = dist > sm.min_dist;
                         // failed to connect, reject
                         if !can_connect {
                             break;
                         }
                         let vis_ray = Ray::new_expr(
-                            si.p,
+                            offset_ray_origin(si.p, face_forward(si.ng, wi)),
                             wi,
                             0.0,
-                            dist,
+                            dist * (1.0f32 - 1e-3f32),
                             Uint2::expr(si.inst_id, si.prim_id),
                             Uint2::expr(reconnect_si.inst_id, reconnect_si.prim_id),
                         );
-                        let occluded = self.scene.occlude(vis_ray);
-                        // visiblity check failed, reject
-                        if occluded {
-                            break;
-                        }
+
                         let cos_theta_y2 = reconnect_si.ng.dot(wi).abs();
                         let cos_theta_x2 = reconnect_si
                             .ng
@@ -411,6 +437,13 @@ impl<'a> PathTracerBase<'a> {
                         if cos_theta_y2 == 0.0 {
                             break;
                         }
+
+                        let occluded = self.scene.occlude(vis_ray);
+                        // visiblity check failed, reject
+                        if occluded {
+                            break;
+                        }
+
                         /*
                          *
                          * x_i                 x_{i+1}                               x_{i+2}
@@ -425,9 +458,14 @@ impl<'a> PathTracerBase<'a> {
                             **self.swl,
                             |closure| closure.evaluate(wo, wi, **self.swl, &self.eval_context().1),
                         );
-                        let (f2, pdf_y2) = if vertex_type == VertexType::LAST_HIT_LIGHT {
+                        let (roughness_y, f2, pdf_y2) = if vertex_type == VertexType::LAST_HIT_LIGHT
+                        {
                             // zero
-                            (Color::zero(self.color_pipeline.color_repr), 0.0f32.expr())
+                            (
+                                0.0f32.expr(),
+                                Color::zero(self.color_pipeline.color_repr),
+                                1.0f32.expr(),
+                            )
                         } else {
                             self.scene.svm.dispatch_surface(
                                 reconnect_si.surface,
@@ -435,15 +473,25 @@ impl<'a> PathTracerBase<'a> {
                                 reconnect_si,
                                 **self.swl,
                                 |closure| {
-                                    closure.evaluate(
+                                    let (f, pdf) = closure.evaluate(
                                         -wi,
                                         Expr::<Float3>::from(reconnection_vertex.wi),
                                         **self.swl,
                                         &self.eval_context().1,
-                                    )
+                                    );
+                                    let roughness =
+                                        closure.roughness(-wi, **self.swl, &self.eval_context().1);
+                                    (roughness, f, pdf)
                                 },
                             )
                         };
+                        // check reversibility
+                        // for path to be reversible, the newly formed path should also satisfy the roughness criteria
+                        // if it fails, reject
+                        if roughness_y < sm.min_roughness {
+                            break;
+                        }
+
                         if pdf_y2 <= 0.0 {
                             break;
                         }
@@ -512,12 +560,13 @@ impl<'a> PathTracerBase<'a> {
                                     ) / pdf_y2)
                             // is this correct???
                         };
-                        let pdf_x = if vertex_type == VertexType::LAST_HIT_LIGHT {
+                        let pdf_x = if vertex_type != VertexType::INTERIOR {
                             reconnection_vertex.prev_bsdf_pdf
                         } else {
                             reconnection_vertex.prev_bsdf_pdf * reconnection_vertex.bsdf_pdf
                         };
                         let pdf_y = pdf_y1 * pdf_y2;
+                        // sm.throughput.store(throughput);
                         self.add_radiance(throughput);
 
                         let jacobian = pdf_y / pdf_x
@@ -534,17 +583,15 @@ impl<'a> PathTracerBase<'a> {
             if debug_mode() {
                 lc_assert!(f.min().ge(0.0));
             };
-            if bsdf_sample.pdf <= 0.0 || !bsdf_sample.valid {
-                break;
-            }
 
             self.mul_beta(f / bsdf_sample.pdf);
             if let Some(sm) = &shift_mapping {
                 if self.depth > MIN_RECONNECT_DEPTH {
                     let reconnect_vertex = sm.vertex;
                     let dist = (self.prev_p - si.p).length();
-                    let can_connect = dist > sm.min_dist;
-                    *found_reconnectible_vertex |= reconnect_vertex.valid();
+                    let can_connect = reconnect_distance_criteria.unwrap()
+                        & prev_roughness_criteria.unwrap()
+                        & roughness_criteria.unwrap();
                     if !reconnect_vertex.valid() & sm.is_base_path & can_connect {
                         *reconnect_vertex =
                             ReconnectionVertex::from_comps_expr(ReconnectionVertexComps {
@@ -572,12 +619,16 @@ impl<'a> PathTracerBase<'a> {
                         self.reconnect_radiance
                             .store(Color::zero(self.color_pipeline.color_repr));
                     }
-                    if !reconnect_vertex.valid() & !sm.is_base_path & can_connect {
-                        // the base path does not have a valid reconnection vertex
-                        // if a connectable vertex is found for shift path, it must be rejected
+                    // we found a connectible vertex, this means the shift is not reversible
+                    // this is because if the shift is reversible, we should already connect to the
+                    // vertex at a smaller depth
+                    if !sm.is_base_path & can_connect {
                         break;
                     }
                 }
+            }
+            if bsdf_sample.pdf <= 0.0 || !bsdf_sample.valid {
+                break;
             }
             let (rr_effective, cont_prob) = self.continue_prob();
             if rr_effective {
@@ -596,7 +647,7 @@ impl<'a> PathTracerBase<'a> {
                 *ray = Ray::new_expr(
                     ro,
                     bsdf_sample.wi,
-                    1e-3,
+                    0.0,
                     1e20,
                     Uint2::expr(si.inst_id, si.prim_id),
                     Uint2::expr(u32::MAX, u32::MAX),
@@ -611,11 +662,12 @@ impl<'a> PathTracerBase<'a> {
             {
                 *reconnect_vertex.indirect = self.reconnect_radiance.load().flatten();
             }
-            if !reconnect_vertex.valid() & !sm.is_base_path {
-                // the base path does not have a valid reconnection vertex
-                // the shift path must be rejected if a connectable vertex is found
-                *sm.success = !found_reconnectible_vertex;
-                *sm.jacobian = found_reconnectible_vertex.select(0.0f32.expr(), 1.0f32.expr());
+            if !sm.is_base_path {
+                if **sm.success {
+                    lc_assert!(sm.jacobian.gt(0.0));
+                } else {
+                    lc_assert!(sm.jacobian.eq(0.0));
+                }
             }
         }
     }
@@ -646,6 +698,7 @@ pub struct Config {
     pub indirect_only: bool,
     pub force_diffuse: bool,
     pub pixel_offset: [i32; 2],
+    pub debug_depth: Option<u32>,
 }
 impl Default for Config {
     fn default() -> Self {
@@ -658,6 +711,7 @@ impl Default for Config {
             indirect_only: false,
             force_diffuse: false,
             pixel_offset: [0, 0],
+            debug_depth: None,
         }
     }
 }
@@ -728,6 +782,7 @@ pub struct ReconnectionShiftMapping {
     pub is_base_path: Expr<bool>,
     pub vertex: Var<ReconnectionVertex>,
     pub jacobian: Var<f32>,
+    pub throughput: ColorVar,
     pub success: Var<bool>,
 }
 #[derive(Clone, Copy, Value, Debug)]
@@ -755,6 +810,7 @@ impl PathTracer {
             self.indirect_only,
             swl,
         );
+        pt.debug_depth = self.config.debug_depth.map(|x| x.expr());
         pt.force_diffuse = self.force_diffuse;
         pt.run_megakernel(ray, sampler);
         pt.radiance.load()
