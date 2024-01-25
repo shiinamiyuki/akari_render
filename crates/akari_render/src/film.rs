@@ -23,7 +23,7 @@ pub enum FilmColorRepr {
 #[serde(tag = "type")]
 pub enum PixelFilter {
     #[serde(rename = "box")]
-    Box,
+    Box { radius: f32 },
     #[serde(rename = "gaussian")]
     Gaussian { radius: f32 },
 }
@@ -31,7 +31,7 @@ impl PixelFilter {
     #[tracked(crate = "luisa")]
     pub fn sample(&self, u: Expr<Float2>) -> (Expr<Float2>, Expr<f32>) {
         match self {
-            PixelFilter::Box => (u * 0.5 - 0.5, 1.0f32.expr()),
+            PixelFilter::Box { radius } => ((u - 0.5) * radius, 1.0f32.expr()),
             PixelFilter::Gaussian { radius: width } => {
                 let sigma = *width / 3.0;
                 let u1 = u.x;
@@ -201,6 +201,16 @@ impl Film {
         weight: Expr<f32>,
     ) {
         let color = color.remove_nan() * weight;
+        self.add_sample_premultiplied(p, &color, _swl, weight);
+    }
+    #[tracked(crate = "luisa")]
+    pub fn add_sample_premultiplied(
+        &self,
+        p: Expr<Float2>,
+        color: &Color,
+        _swl: Expr<SampledWavelengths>,
+        weight: Expr<f32>,
+    ) {
         let data = self.data.var();
         let i = self.linear_index(p);
         let nvalues = self.repr.nvalues();

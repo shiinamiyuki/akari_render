@@ -62,7 +62,24 @@ pub fn write_image(color: &Tex2d<Float4>, path: &str) {
     }
 }
 pub fn write_image_ldr(color: &Tex2d<Float4>, path: &str) {
-    let color_buf = color.view(0).copy_to_vec::<Float4>();
+    let storage = color.storage();
+    let color_buf = if storage == PixelStorage::Byte4 {
+        color
+            .view(0)
+            .copy_to_vec::<Byte4>()
+            .iter()
+            .map(|x| {
+                Float4::new(
+                    x.x as f32 / 255.0,
+                    x.y as f32 / 255.0,
+                    x.z as f32 / 255.0,
+                    x.w as f32 / 255.0,
+                )
+            })
+            .collect::<Vec<_>>()
+    } else {
+        color.view(0).copy_to_vec::<Float4>()
+    };
     let parent_dir = std::path::Path::new(path).parent().unwrap();
     std::fs::create_dir_all(parent_dir).unwrap();
     let img = image::RgbImage::from_fn(color.width(), color.height(), |x, y| {
@@ -76,7 +93,24 @@ pub fn write_image_ldr(color: &Tex2d<Float4>, path: &str) {
     img.save(path).unwrap();
 }
 pub fn write_image_hdr(color: &Tex2d<Float4>, path: &str) {
-    let color_buf = color.view(0).copy_to_vec::<Float4>();
+    let storage = color.storage();
+    let color_buf = if storage == PixelStorage::Byte4 {
+        color
+            .view(0)
+            .copy_to_vec::<Byte4>()
+            .iter()
+            .map(|x| {
+                Float4::new(
+                    x.x as u8 as f32 / 255.0,
+                    x.y as u8 as f32 / 255.0,
+                    x.z as u8 as f32 / 255.0,
+                    x.w as u8 as f32 / 255.0,
+                )
+            })
+            .collect::<Vec<_>>()
+    } else {
+        color.view(0).copy_to_vec::<Float4>()
+    };
     let parent_dir = std::path::Path::new(path).parent().unwrap();
     std::fs::create_dir_all(parent_dir).unwrap();
     exr::prelude::write_rgb_file(
@@ -296,7 +330,6 @@ pub fn difference_of_products(a: Expr<f32>, b: Expr<f32>, c: Expr<f32>, d: Expr<
     diff + err
 }
 
-
 #[derive(Clone, Copy, Debug, Value)]
 #[luisa(crate = "luisa")]
 #[repr(C)]
@@ -470,4 +503,102 @@ pub fn with_current_dir<T>(path: &Path, f: impl FnOnce() -> T) -> T {
     let ret = f();
     std::env::set_current_dir(old_dir).unwrap();
     ret
+}
+
+#[tracked(crate = "luisa")]
+pub fn polynomial(x: Expr<f32>, coeffs: &[Expr<f32>]) -> Expr<f32> {
+    if coeffs.len() == 1 {
+        coeffs[0]
+    } else {
+        x * polynomial(x, &coeffs[1..]) + coeffs[0]
+    }
+}
+
+#[derive(Clone, Copy, Aggregate)]
+#[luisa(crate = "luisa")]
+pub struct Complex {
+    pub re: Expr<f32>,
+    pub im: Expr<f32>,
+}
+impl Complex {
+    pub fn new(re: impl AsExpr<Value = f32>, im: impl AsExpr<Value = f32>) -> Self {
+        let re = re.as_expr();
+        let im = im.as_expr();
+        Self { re, im }
+    }
+    #[tracked(crate = "luisa")]
+    pub fn norm(self) -> Expr<f32> {
+        self.re * self.re + self.im * self.im
+    }
+    pub fn abs(self) -> Expr<f32> {
+        self.norm().sqrt()
+    }
+    #[tracked(crate = "luisa")]
+    pub fn sqr(self) -> Self {
+        self * self
+    }
+    #[tracked(crate = "luisa")]
+    pub fn sqrt(self) -> Self {
+        let n = self.abs();
+        let t1 = (0.5 * (n + self.re.abs())).sqrt();
+        let t2 = 0.5 * self.im / t1;
+        if n == 0.0 {
+            Complex::new(0.0f32.expr(), 0.0f32.expr())
+        } else {
+            if self.re >= 0.0 {
+                Complex::new(t1, t2)
+            } else {
+                Complex::new(t2.abs(), t1.copysign(self.im))
+            }
+        }
+    }
+}
+impl std::ops::Add for Complex {
+    type Output = Self;
+    #[tracked(crate = "luisa")]
+    fn add(self, rhs: Self) -> Self::Output {
+        Self::new(self.re + rhs.re, self.im + rhs.im)
+    }
+}
+impl std::ops::Sub for Complex {
+    type Output = Self;
+    #[tracked(crate = "luisa")]
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self::new(self.re - rhs.re, self.im - rhs.im)
+    }
+}
+impl std::ops::Mul for Complex {
+    type Output = Self;
+    #[tracked(crate = "luisa")]
+    fn mul(self, rhs: Self) -> Self::Output {
+        Self::new(
+            self.re * rhs.re - self.im * rhs.im,
+            self.re * rhs.im + self.im * rhs.re,
+        )
+    }
+}
+impl std::ops::Div for Complex {
+    type Output = Self;
+    #[tracked(crate = "luisa")]
+    fn div(self, rhs: Self) -> Self::Output {
+        let scale = 1.0 / (rhs.re * rhs.re + rhs.im * rhs.im);
+        Self::new(
+            (self.re * rhs.re + self.im * rhs.im) * scale,
+            (self.im * rhs.re - self.re * rhs.im) * scale,
+        )
+    }
+}
+impl std::ops::Mul<Expr<f32>> for Complex {
+    type Output = Self;
+    #[tracked(crate = "luisa")]
+    fn mul(self, rhs: Expr<f32>) -> Self::Output {
+        Self::new(self.re * rhs, self.im * rhs)
+    }
+}
+impl std::ops::Div<Expr<f32>> for Complex {
+    type Output = Self;
+    #[tracked(crate = "luisa")]
+    fn div(self, rhs: Expr<f32>) -> Self::Output {
+        Self::new(self.re / rhs, self.im / rhs)
+    }
 }

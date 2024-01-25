@@ -1,12 +1,12 @@
 use std::f32::consts::{FRAC_1_PI, PI};
 use std::rc::Rc;
 
-use super::BsdfEvalContext;
+use super::{BsdfEvalContext, NullSurface, TransparentSurface};
 use super::{Surface, SurfaceShader};
 use crate::color::Color;
 use crate::geometry::Frame;
 use crate::sampling::cos_sample_hemisphere;
-use crate::svm::eval::SvmEvaluator;
+use crate::svm::eval::{SvmEvalMode, SvmEvaluator};
 use crate::svm::surface::SampledWavelengths;
 use crate::svm::*;
 
@@ -15,6 +15,9 @@ pub struct DiffuseBsdf {
 }
 
 impl Surface for DiffuseBsdf {
+    fn ns(&self) -> Expr<Float3> {
+        Float3::expr(0.0, 0.0, 1.0)
+    }
     #[tracked(crate = "luisa")]
     fn evaluate_impl(
         &self,
@@ -61,6 +64,7 @@ impl Surface for DiffuseBsdf {
     fn roughness_impl(
         &self,
         _wo: Expr<Float3>,
+        _u_select: Expr<f32>,
         _swl: Expr<color::SampledWavelengths>,
         _ctx: &BsdfEvalContext,
     ) -> Expr<f32> {
@@ -76,8 +80,25 @@ impl Surface for DiffuseBsdf {
     }
 }
 impl SurfaceShader for SvmDiffuseBsdf {
+    #[tracked(crate = "luisa")]
     fn closure(&self, svm_eval: &SvmEvaluator<'_>) -> Rc<dyn Surface> {
-        let reflectance = svm_eval.eval_color(self.reflectance) * FRAC_1_PI.expr();
-        Rc::new(DiffuseBsdf { reflectance })
+        let (reflectance, alpha) = svm_eval.eval_color_alpha(self.reflectance);
+        escape!({
+            if let SvmEvalMode::Alpha = svm_eval.mode() {
+                return Rc::new(TransparentSurface {
+                    inner: Rc::new(NullSurface {}),
+                    alpha,
+                });
+            }
+        });
+        // Rc::new(TransparentSurface {
+        //     inner: Rc::new(DiffuseBsdf {
+        //         reflectance: reflectance * FRAC_1_PI.expr(),
+        //     }),
+        //     alpha,
+        // })
+        Rc::new(DiffuseBsdf {
+            reflectance: reflectance * FRAC_1_PI.expr(),
+        })
     }
 }

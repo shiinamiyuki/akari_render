@@ -51,15 +51,15 @@ pub mod mcmc;
 pub mod mcmc_opt;
 pub mod wfpt;
 // pub mod mcmc_s;
-pub mod normal;
+pub mod aov;
 pub mod pt;
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(crate = "serde")]
 #[serde(tag = "type")]
 pub enum Method {
-    #[serde(rename = "normal")]
-    NormalVis(normal::Config),
+    #[serde(rename = "aov")]
+    NormalVis(aov::Config),
     #[serde(rename = "pt")]
     PathTracer(pt::Config),
     #[serde(rename = "gpt")]
@@ -128,6 +128,7 @@ pub fn render(device: Device, scene: Arc<Scene>, task: &RenderTask, options: Ren
             1,
         );
         log::info!("Rendering to {:?}", config.film);
+        scene.svm.init_precompute_tables(config.color.color_repr);
         let tic = std::time::Instant::now();
         match &config.method {
             Method::PathTracer(c) => pt::render(
@@ -175,7 +176,7 @@ pub fn render(device: Device, scene: Arc<Scene>, task: &RenderTask, options: Ren
                 &c,
                 &options,
             ),
-            Method::NormalVis(c) => normal::render(
+            Method::NormalVis(c) => aov::render(
                 device.clone(),
                 scene.clone(),
                 config.sampler,

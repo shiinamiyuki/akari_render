@@ -1,6 +1,6 @@
 use crate::{sampler::Sampler, *};
 use serde::{Deserialize, Serialize};
-#[derive(Clone, Copy, Aggregate, Serialize, Deserialize, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, Aggregate, Serialize, Deserialize, PartialEq, Eq, Debug, Hash)]
 #[luisa(crate = "luisa")]
 #[serde(crate = "serde")]
 pub enum RgbColorSpace {
@@ -8,6 +8,14 @@ pub enum RgbColorSpace {
     SRgb,
     #[serde(rename = "aces")]
     ACEScg,
+}
+impl ToString for RgbColorSpace {
+    fn to_string(&self) -> String {
+        match self {
+            RgbColorSpace::SRgb => "srgb".to_string(),
+            RgbColorSpace::ACEScg => "aces".to_string(),
+        }
+    }
 }
 impl From<akari_scenegraph::ColorSpace> for RgbColorSpace {
     fn from(colorspace: akari_scenegraph::ColorSpace) -> Self {
@@ -67,7 +75,7 @@ pub fn sample_wavelengths(
     }
 }
 
-#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(crate = "serde")]
 #[serde(tag = "type")]
 pub enum ColorRepr {
@@ -75,6 +83,14 @@ pub enum ColorRepr {
     Rgb(RgbColorSpace),
     #[serde(rename = "spectral")]
     Spectral,
+}
+impl ToString for ColorRepr {
+    fn to_string(&self) -> String {
+        match self {
+            ColorRepr::Rgb(cs) => format!("rgb_{}", cs.to_string()),
+            ColorRepr::Spectral => "spectral".to_string(),
+        }
+    }
 }
 impl ColorRepr {
     pub fn rgb_colorspace(&self) -> Option<RgbColorSpace> {
@@ -343,6 +359,31 @@ impl Color {
             Color::Rgb(v, _) => v.dot(Float3::expr(0.2126, 0.7152, 0.0722)),
         }
     }
+    pub fn map(&self, f: impl Fn(Expr<f32>) -> Expr<f32>) -> Self {
+        match self {
+            Color::Spectral(_s) => todo!(),
+            Color::Rgb(v, cs) => Color::Rgb(Float3::expr(f(v.x), f(v.y), f(v.z)), *cs),
+        }
+    }
+    pub fn exp(&self) -> Self {
+        self.map(|x| x.exp())
+    }
+    pub fn sqrt(&self) -> Self {
+        self.map(|x| x.sqrt())
+    }
+}
+impl std::ops::Neg for &Color {
+    type Output = Color;
+    #[tracked(crate = "luisa")]
+    fn neg(self) -> Self::Output {
+        self.map(|x| -x)
+    }
+}
+impl std::ops::Neg for Color {
+    type Output = Color;
+    fn neg(self) -> Self::Output {
+        -&self
+    }
 }
 impl std::ops::Mul<Expr<f32>> for &Color {
     type Output = Color;
@@ -390,6 +431,18 @@ impl std::ops::Mul<Color> for Color {
         &self * &rhs
     }
 }
+impl std::ops::Div<&Color> for Color {
+    type Output = Self;
+    fn div(self, rhs: &Self) -> Self::Output {
+        &self / rhs
+    }
+}
+impl std::ops::Div<Color> for Color {
+    type Output = Self;
+    fn div(self, rhs: Self) -> Self::Output {
+        &self / &rhs
+    }
+}
 impl std::ops::Add<&Color> for Color {
     type Output = Self;
     fn add(self, rhs: &Self) -> Self::Output {
@@ -426,6 +479,21 @@ impl std::ops::Mul<&Color> for &Color {
                 Color::Rgb(*s * *t, *cs0)
             }
             _ => panic!("cannot multiply spectral and rgb"),
+        }
+    }
+}
+impl std::ops::Div<&Color> for &Color {
+    type Output = Color;
+    #[tracked(crate = "luisa")]
+    fn div(self, rhs: &Color) -> Self::Output {
+        assert_eq!(self.repr(), rhs.repr());
+        match (self, rhs) {
+            (Color::Spectral(s), Color::Spectral(t)) => Color::Spectral(*s / *t),
+            (Color::Rgb(s, cs0), Color::Rgb(t, cs1)) => {
+                assert_eq!(cs0, cs1);
+                Color::Rgb(*s / *t, *cs0)
+            }
+            _ => panic!("cannot divide spectral and rgb"),
         }
     }
 }

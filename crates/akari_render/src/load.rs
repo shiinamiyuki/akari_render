@@ -10,12 +10,13 @@ use crate::{
     scene::Scene,
     svm::{
         compiler::{CompilerDriver, SvmCompileContext},
-        surface::{BsdfEvalContext, Surface},
+        surface::{BsdfEvalContext, PreComputedTables, Surface},
         ShaderRef, Svm,
     },
     util::distribution::AliasTable,
     *,
 };
+use akari_common::parking_lot::lock_api::Mutex;
 use akari_scenegraph as scenegraph;
 use akari_scenegraph::{CoordinateSystem, Geometry, Material, NodeRef, ShaderGraph, ShaderNode};
 use image::io::Reader as ImageReader;
@@ -258,7 +259,9 @@ impl SceneLoader {
                 .unwrap()
                 .upload(&self.device),
             heap: self.heap.clone(),
+            precompute_tables: Mutex::new(HashMap::new()),
         });
+        svm.init_precompute_tables(ColorRepr::Rgb(color::RgbColorSpace::SRgb));
         log::info!(
             "Shader variant count: {}",
             svm.surface_shaders().variant_count()
@@ -463,7 +466,7 @@ impl SceneLoader {
             for (_, mat) in &scene_view.scene().materials {
                 for (_, n) in &mat.shader.nodes {
                     match n {
-                        ShaderNode::TexImage { image: tex } => images.push(tex.clone()),
+                        ShaderNode::TexImage { image: tex, .. } => images.push(tex.clone()),
                         _ => {}
                     }
                 }
@@ -556,8 +559,12 @@ impl SceneLoader {
                             for c in 0..key.channels {
                                 rgbaf32.push(data[i * key.channels as usize + c as usize]);
                             }
-                            for _ in key.channels..4 {
-                                rgbaf32.push(0.0);
+                            for c in key.channels..4 {
+                                if c != 3 {
+                                    rgbaf32.push(0.0);
+                                } else {
+                                    rgbaf32.push(1.0);
+                                }
                             }
                         }
                         rgbaf32.as_slice()
@@ -576,15 +583,19 @@ impl SceneLoader {
                     tex
                 } else {
                     let cursor = std::io::Cursor::new(data);
+                    let mut reader = ImageReader::new(cursor);
+
                     let format = match key.format {
                         scenegraph::ImageFormat::Png => image::ImageFormat::Png,
                         scenegraph::ImageFormat::Jpeg => image::ImageFormat::Jpeg,
                         scenegraph::ImageFormat::Tiff => image::ImageFormat::Tiff,
                         scenegraph::ImageFormat::OpenExr => image::ImageFormat::OpenExr,
+                        scenegraph::ImageFormat::Dds => image::ImageFormat::Dds,
                         _ => unreachable!(),
                     };
-                    let mut reader = ImageReader::new(cursor);
+
                     reader.set_format(format);
+
                     let img = reader.decode().unwrap().flipv();
                     if key.format != scenegraph::ImageFormat::OpenExr {
                         let img = img.to_rgba8();

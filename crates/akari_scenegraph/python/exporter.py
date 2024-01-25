@@ -12,6 +12,7 @@ import os
 import struct
 from ctypes import *
 import time
+import numpy as np
 
 AKARI_API = cdll.LoadLibrary(os.environ["AKARI_API_PATH"])
 py_akari_import = AKARI_API.py_akari_import
@@ -132,25 +133,32 @@ VISITED = UniqueName()
 
 def toposort(node_tree):
     nodes = node_tree.nodes
-    visited = set()
+    mark_tmp = "TMP"
+    mark_perm = "PERM"
+    visited = dict()
     order = list()
 
     def dfs(node):
         if node in visited:
-            return
-        visited.add(node)
-        order.append(node)
+            if visited[node] == mark_perm:
+                return
+            if visited[node] == mark_tmp:
+                raise RuntimeError("Not a DAG")
+        visited[node] = mark_tmp
+
         for input in node.inputs:
             for link in input.links:
                 from_node = link.from_node
                 dbg("recurse!", node, from_node)
                 dfs(from_node)
+        visited[node] = mark_perm
+        order.append(node)
 
     sorted = []
     for node in nodes:
         order = []
         dfs(node)
-        order = list(reversed(order))
+        order = list(order)
         sorted.extend(order)
     assert len(sorted) == len(nodes)
     return sorted
@@ -163,6 +171,7 @@ class NodeType:
 # PrimitiveNodeType = Enum("PrimitiveNodeType", ["Float", "Float3", "RGB", "Spectrum", "BSDF"])
 class PrimitiveNodeType(NodeType, Enum):
     FLOAT = auto()
+    FLOAT2 = auto()
     FLOAT3 = auto()
     RGB = auto()
     SPECTRUM = auto()
@@ -194,7 +203,7 @@ class MaterialExporter:
         self.shader_graph[name] = node
         return {"id": name}
 
-    def get_node_input(self, node, key, node_ty, akr_key):
+    def get_node_input(self, node, key, node_ty, akr_key, use_default=True):
         try:
             s = node.inputs[key]
         except KeyError as e:
@@ -204,6 +213,8 @@ class MaterialExporter:
         connected = len(s.links) != 0
         assert not connected or len(s.links) == 1
         if not connected:
+            if not use_default:
+                return None
             if (
                 isinstance(s, T.NodeSocketFloatFactor)
                 or isinstance(s, T.NodeSocketFloat)
@@ -223,7 +234,10 @@ class MaterialExporter:
                 assert (
                     node_ty == PrimitiveNodeType.RGB
                     or node_ty == PrimitiveNodeType.SPECTRUM
-                ), f"Expected {PrimitiveNodeType.RGB} or {PrimitiveNodeType.SPECTRUM} but got {node_ty}"
+                    or node_ty == PrimitiveNodeType.FLOAT3
+                ), f"got {node_ty}"
+                if node_ty == PrimitiveNodeType.FLOAT3:
+                    return self.push_node({"type": "float3", "value": [r, g, b]})
                 rgb = self.push_node(
                     {"type": "rgb", "value": [r, g, b], "colorspace": "srgb"}
                 )
@@ -232,7 +246,12 @@ class MaterialExporter:
                 else:
                     uplift = self.push_node({"rgb": rgb, "type": "spectral_uplift"})
                     return uplift
-            elif isinstance(s, T.NodeSocketVector):
+            elif (
+                isinstance(s, T.NodeSocketVector)
+                or isinstance(s, T.NodeSocketVectorTranslation)
+                or isinstance(s, T.NodeSocketVectorEuler)
+                or isinstance(s, T.NodeSocketVectorXYZ)
+            ):
                 x = s.default_value[0]
                 y = s.default_value[1]
                 z = s.default_value[2]
@@ -256,8 +275,8 @@ class MaterialExporter:
                 input_node = self.push_node(
                     {
                         "type": "extract",
-                        "node": VISITED.get(from_node),
-                        "field": akr_key,
+                        "node": {"id": VISITED.get(from_node)},
+                        "field": from_socket.name,
                     }
                 )
             if isinstance(input_ty, PrimitiveNodeType):
@@ -266,14 +285,15 @@ class MaterialExporter:
                 else:
                     NotImplementedError()
             elif isinstance(input_ty, CompositeNodeType):
-                input_ty = input_ty.fields[akr_key]
+                input_ty = input_ty.fields[from_socket.name]
             if node_ty == PrimitiveNodeType.SPECTRUM:
                 if input_ty == PrimitiveNodeType.RGB:
                     input_node = self.push_node(
                         {"rgb": input_node, "type": "spectral_uplift"}
                     )
             else:
-                assert node_ty == input_ty, f"{node_ty} {input_ty}"
+                if node_ty != input_ty:
+                    print(f"warning expected {node_ty} but got {input_ty}")
             return input_node
 
     def export_node(self, node):
@@ -284,8 +304,8 @@ class MaterialExporter:
         mat = {}
         node_ty = None
 
-        def input(blender_key, akr_key, node_ty):
-            mat[akr_key] = self.get_node_input(node, blender_key, node_ty, akr_key)
+        def input(blender_key, akr_key, node_ty, use_default=True):
+            mat[akr_key] = self.get_node_input(node, blender_key, node_ty, akr_key, use_default)
 
         if isinstance(node, T.ShaderNodeBsdfPrincipled):
             input("Base Color", "base_color", PrimitiveNodeType.SPECTRUM)
@@ -323,6 +343,20 @@ class MaterialExporter:
             mat["type"] = "principled"
             mat["preference"] = "mix"
             node_ty = PrimitiveNodeType.BSDF
+        elif isinstance(node, T.ShaderNodeSeparateColor):
+            mode = {
+                "RGB": "rgb",
+            }[node. mode]
+            mat["type"] = "separate_color"
+            mat['mode'] = mode
+            input("Color", "color", PrimitiveNodeType.FLOAT3)
+            node_ty = CompositeNodeType(
+                {
+                    "Red": PrimitiveNodeType.FLOAT,
+                    "Green": PrimitiveNodeType.FLOAT,
+                    "Blue": PrimitiveNodeType.FLOAT,
+                }
+            )
         elif isinstance(node, T.ShaderNodeOutputMaterial):
             assert self.output_node is None, "Multiple output node"
             input("Surface", "node", PrimitiveNodeType.BSDF)
@@ -343,7 +377,41 @@ class MaterialExporter:
             input("Strength", "strength", PrimitiveNodeType.FLOAT)
             mat["type"] = "emission"
             node_ty = PrimitiveNodeType.BSDF
+        elif isinstance(node, T.ShaderNodeTexCoord):
+            mat["type"] = "texcoords"
+            node_ty = CompositeNodeType(
+                {
+                    "UV": PrimitiveNodeType.FLOAT3,
+                }
+            )
+        elif isinstance(node, T.ShaderNodeNormalMap):
+            input("Color", "normal", PrimitiveNodeType.FLOAT3)
+            input("Strength", "strength", PrimitiveNodeType.FLOAT)
+            node_ty = PrimitiveNodeType.FLOAT3
+            mat["type"] = "normal_map"
+            mat["space"] = {
+                "TANGENT": "tangent",
+            }[node.space]
+        elif isinstance(node, T.ShaderNodeMapping):
+            input("Vector", "vector", PrimitiveNodeType.FLOAT3)
+            input("Location", "location", PrimitiveNodeType.FLOAT3)
+            input("Rotation", "rotation", PrimitiveNodeType.FLOAT3)
+            input("Scale", "scale", PrimitiveNodeType.FLOAT3)
+            mat["mapping"] = {
+                "POINT": "point",
+                "TEXTURE": "texture",
+            }[node.vector_type]
+            mat["type"] = "mapping"
+            node_ty = PrimitiveNodeType.FLOAT3
+        elif isinstance(node, T.ShaderNodeTexChecker):
+            mat['type'] = 'checkerboard'
+            input("Color1", "color1", PrimitiveNodeType.SPECTRUM)
+            input("Color2", "color2", PrimitiveNodeType.SPECTRUM)
+            input("Scale", "scale", PrimitiveNodeType.FLOAT)
+            input("Vector", "vector", PrimitiveNodeType.FLOAT3, use_default=False)
+            node_ty = PrimitiveNodeType.SPECTRUM
         elif isinstance(node, T.ShaderNodeTexImage):
+            input("Vector", "uv", PrimitiveNodeType.FLOAT3, use_default=False)
             extension = {
                 "REPEAT": "repeat",
                 "EXTEND": "extend",
@@ -356,23 +424,30 @@ class MaterialExporter:
                 "Cubic": "linear",
                 "Smart": "linear",
             }[node.interpolation]
+            colorspace = {
+                "sRGB": "srgb",
+                "Non-Color": "none",
+            }[node.image.colorspace_settings.name]
             image_data = self.scene.export_image(node.image)
-            format = {
-                "TARGA": "tga",
-                "TARGA_RAW": "tga",
-                "JPEG": "jpeg",
-                "JPEG2000": "jpeg",
-                "PNG": "png",
-                "BMP": "bmp",
-                "OPEN_EXR": "exr",
-            }[node.image.file_format]
+            if node.image.file_format != "":
+                format = {
+                    "TARGA": "tga",
+                    "TARGA_RAW": "tga",
+                    "JPEG": "jpeg",
+                    "JPEG2000": "jpeg",
+                    "PNG": "png",
+                    "BMP": "bmp",
+                    "OPEN_EXR": "exr",
+                }[node.image.file_format]
+            else:
+                format = "png"
             mat = {
                 "type": "image",
                 "image": {
                     "data": image_data,
                     "extension": extension,
                     "interpolation": interpolation,
-                    "colorspace": "srgb",
+                    "colorspace": colorspace,
                     "format": format,
                     "width": node.image.size[0],
                     "height": node.image.size[1],
@@ -439,6 +514,30 @@ class SceneExporter:
 
         filepath = os.path.normpath(os.path.join(BLEND_FILE_DIR, filepath))
         filepath = filepath.replace("\\", "/")
+        filepath = os.path.abspath(filepath)
+        # print(filepath)
+
+        if filepath.endswith(".dds"):
+            filepath = filepath[:-4] + ".png"
+        #     image.reload()
+        #     image.use_generated_float = True
+        #     pixels = np.array(list(image.pixels[:]), dtype=np.float32)
+        #     ptr = pixels.ctypes.data
+        #     data = invoke_akari_api(
+        #         {
+        #             "ImportBuffer": {
+        #                 "name": VISITED.get(image),
+        #                 "buffer": {
+        #                     "type": "__ext_slice",
+        #                     "slice":{
+        #                         "ptr": ptr,
+        #                         "len": len(pixels) * 4,
+        #                     }
+        #                 },
+        #             }
+        #         }
+        #     )["Buffer"]["value"]
+        # else:
         data = invoke_akari_api(
             {
                 "ImportBuffer": {
@@ -489,7 +588,7 @@ class SceneExporter:
         return out
 
     def export_mesh_data(self, m, name, has_uv):
-        print('Triangulating mesh')
+        print("Triangulating mesh")
         bm = bmesh.new()
         bm.from_mesh(m)
         bmesh.ops.triangulate(bm, faces=bm.faces[:])
@@ -505,6 +604,8 @@ class SceneExporter:
         print(f"    #V: {len(V)} #F: {len(F)}")
         # init loop_face_cache
         _ = m.loop_triangles[0].polygon_index
+        _ = m.vertices[0]
+
         if has_uv:
             assert len(m.uv_layers[0].uv) == len(F) * 3
         export_mesh_args = {
@@ -536,23 +637,26 @@ class SceneExporter:
         print(f"Exporting Mesh `{obj.name}` -> {name}")
         # print(obj.data)
         # print(obj.matrix_local)
-        print(f"World matrix:")
-        print(obj.matrix_world)
+        # print(f"World matrix:")
+        # print(obj.matrix_world)
         # print(self.convert_matrix_to_list(obj.matrix_world))
         # print(self.transfrom_from_object(obj))
         m = obj.data
-        assert (
-            len(m.uv_layers) <= 1
-        ), f"Only one uv layer is supported but found {len(m.uv_layers)}"
-        has_uv = len(m.uv_layers) == 1 and len(m.uv_layers[0].uv) != 0
-        
+        if len(m.uv_layers) > 1:
+            print(
+                f"Only one uv layer is supported but found {len(m.uv_layers)}, obj: {obj.name}",
+                file=sys.stderr,
+            )
+        has_uv = len(m.uv_layers) > 0 and len(m.uv_layers[0].uv) != 0
+
         eval_obj = obj.evaluated_get(depsgraph)
         m = eval_obj.to_mesh()
         self.export_mesh_data(m, f"{name}_mesh", has_uv)
-        print( f"Mesh `{obj.name}` has {len(obj.data.materials)} materials")
+        print(f"Mesh `{obj.name}` has {len(obj.data.materials)} materials")
+        assert len(obj.data.materials) > 0, f"Mesh `{obj.name}` has no material"
         mat = [self.export_material(m) for m in obj.data.materials]
         matrix_world = CONVERT_COORD_SYS_MATRIX @ obj.matrix_world
-        print(matrix_world)
+        # print(matrix_world)
         instance = {
             "geometry": make_ref(f"{name}_mesh"),
             "materials": mat,

@@ -28,6 +28,10 @@ impl SurfaceInteraction {
     pub fn ns(&self) -> Expr<Float3> {
         self.frame.n
     }
+    #[tracked(crate = "luisa")]
+    pub fn has_full_surface(&self) -> Expr<bool> {
+        self.prim_area > 0.0
+    }
     pub fn invalid() -> Self {
         Self {
             frame: Expr::<Frame>::zeroed(),

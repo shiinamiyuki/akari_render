@@ -54,6 +54,8 @@ pub struct Config {
     pub n_chains: usize,
     pub n_bootstrap: usize,
     pub direct_spp: i32,
+    pub wis:bool,
+    pub seed:u64,
 }
 impl Default for Config {
     fn default() -> Self {
@@ -69,6 +71,8 @@ impl Default for Config {
             n_chains: 512,
             n_bootstrap: 100000,
             direct_spp: 64,
+            wis:false,
+            seed:0,
         }
     }
 }

@@ -104,7 +104,7 @@ pub enum Buffer {
     #[serde(rename = "path")]
     Path { path: String, length: u64 },
     // for internal use only, cannot be transformed into other variants directly
-    #[serde(rename = "__unused_slice")]
+    #[serde(rename = "__ext_slice")]
     Slice { slice: ExtSlice },
 }
 
@@ -266,6 +266,8 @@ pub enum ColorSpace {
     ACEScg,
     #[serde(rename = "spectral")]
     Spectral,
+    #[serde(rename = "none")]
+    None,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -307,6 +309,10 @@ pub enum ImageFormat {
     OpenExr,
     #[serde(rename = "float")]
     Float,
+    #[serde(rename = "dds")]
+    Dds,
+    #[serde(rename = "unknown")]
+    Unknown,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]

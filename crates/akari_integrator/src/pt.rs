@@ -1,8 +1,8 @@
 //! Basic megakernel path tracer
 
-use std::{f32::consts::FRAC_1_PI, rc::Rc, sync::Arc, time::Instant};
+use std::{f32::consts::FRAC_1_PI, fs::File, io::BufWriter, rc::Rc, sync::Arc, time::Instant};
 
-use akari_render::serde::de;
+use akari_render::svm::ShaderRef;
 use luisa::rtx::offset_ray_origin;
 
 use super::{Integrator, RenderSession};
@@ -16,6 +16,14 @@ use crate::{
     *,
 };
 use serde::{Deserialize, Serialize};
+#[derive(Clone, Copy, Aggregate)]
+#[luisa(crate = "luisa")]
+pub struct DenoisingFeatures {
+    pub first_hit_albedo: ColorVar,
+    pub first_hit_roughness: Var<f32>,
+    pub first_hit_normal: Var<Float3>,
+    pub first_hit: Var<SurfaceHit>,
+}
 
 pub struct PathTracerBase<'a> {
     pub max_depth: Expr<u32>,
@@ -27,6 +35,7 @@ pub struct PathTracerBase<'a> {
     pub beta: ColorVar,
     pub reconnect_radiance: ColorVar,
     pub reconnect_beta: ColorVar,
+    pub base_replay_throughput: ColorVar,
     pub color_pipeline: ColorPipeline,
     pub depth: Var<u32>,
     pub prev_bsdf_pdf: Var<f32>,
@@ -37,6 +46,14 @@ pub struct PathTracerBase<'a> {
     pub scene: &'a Scene,
     pub need_shift_mapping: bool,
     pub debug_depth: Option<Expr<u32>>,
+    pub min_reconnect_depth: u32,
+    /// disable nee on first hit during shift mapping
+    pub shift_mapping_no_first_nee: bool,
+    /// disable all nee during shift mapping, does not include nee in the base path
+    pub shift_mapping_no_nee: bool,
+    pub denoising: Option<DenoisingFeatures>,
+    pub enable_debug: Var<bool>,
+    pub clamp_indirect: f32,
 }
 #[derive(Aggregate, Copy, Clone)]
 #[luisa(crate = "luisa")]
@@ -57,6 +74,15 @@ impl DirectLighting {
             valid: false.expr(),
         }
     }
+}
+
+#[derive(Copy, Clone, Value)]
+#[repr(C, align(16))]
+#[luisa(crate = "luisa")]
+pub struct SurfaceHit {
+    pub inst_id: u32,
+    pub prim_id: u32,
+    pub bary: Float2,
 }
 
 #[derive(Aggregate, Copy, Clone)]
@@ -84,6 +110,7 @@ impl<'a> PathTracerBase<'a> {
             beta: ColorVar::one(color_pipeline.color_repr),
             reconnect_radiance: ColorVar::zero(color_pipeline.color_repr),
             reconnect_beta: ColorVar::one(color_pipeline.color_repr),
+            base_replay_throughput: ColorVar::zero(color_pipeline.color_repr),
             scene,
             depth: Var::<u32>::zeroed(),
             prev_bsdf_pdf: Var::<f32>::zeroed(),
@@ -95,6 +122,12 @@ impl<'a> PathTracerBase<'a> {
             force_diffuse: false,
             need_shift_mapping: false,
             debug_depth: None,
+            denoising: None,
+            min_reconnect_depth: 1,
+            shift_mapping_no_first_nee: false,
+            shift_mapping_no_nee: false,
+            enable_debug: false.var(),
+            clamp_indirect: 1000.0,
         }
     }
     #[tracked(crate = "luisa")]
@@ -175,15 +208,19 @@ impl<'a> PathTracerBase<'a> {
         }
     }
     #[tracked(crate = "luisa")]
-    pub fn continue_prob(&self) -> (Expr<bool>, Expr<f32>) {
-        let depth = **self.depth;
-        let beta = self.beta.load();
+    pub fn compute_contibue_prob(&self, depth: Expr<u32>, beta: Color) -> (Expr<bool>, Expr<f32>) {
         if depth.gt(self.rr_depth) {
             let cont_prob = beta.max().clamp(0.0.expr(), 1.0.expr()) * 0.95;
             (true.expr(), cont_prob)
         } else {
             (false.expr(), 1.0f32.expr())
         }
+    }
+    #[tracked(crate = "luisa")]
+    pub fn continue_prob(&self) -> (Expr<bool>, Expr<f32>) {
+        let depth = **self.depth;
+        let beta = self.beta.load();
+        self.compute_contibue_prob(depth, beta)
     }
     #[tracked(crate = "luisa")]
     pub fn hit_envmap(&self, _ray: Expr<Ray>) -> (Color, Expr<f32>) {
@@ -220,6 +257,43 @@ impl<'a> PathTracerBase<'a> {
         }
     }
     #[tracked(crate = "luisa")]
+    fn dispatch_surface<R: Aggregate>(
+        &self,
+        shader_kind: Option<u32>,
+        shader_ref: Expr<ShaderRef>,
+        si: SurfaceInteraction,
+        swl: Expr<SampledWavelengths>,
+        f: &impl Fn(&SurfaceClosure) -> R,
+    ) -> R {
+        if self.force_diffuse {
+            let diffuse = Rc::new(DiffuseBsdf {
+                reflectance: Color::one(self.color_pipeline.color_repr)
+                    * FRAC_1_PI.expr()
+                    * 0.8f32.expr(),
+            });
+            let closure = SurfaceClosure {
+                inner: diffuse,
+                frame: si.frame,
+                ng: si.ng,
+            };
+            f(&closure)
+        } else {
+            let svm = &self.scene.svm;
+            if let Some(shader_kind) = shader_kind {
+                svm.dispatch_surface_single_kind(
+                    shader_kind,
+                    shader_ref,
+                    self.color_pipeline,
+                    si,
+                    swl,
+                    f,
+                )
+            } else {
+                svm.dispatch_surface(shader_ref, self.color_pipeline, si, swl, f)
+            }
+        }
+    }
+    #[tracked(crate = "luisa")]
     pub fn sample_surface_and_shade_direct(
         &self,
         shader_kind: Option<u32>,
@@ -240,173 +314,222 @@ impl<'a> PathTracerBase<'a> {
             };
 
             let sample = closure.sample(wo, u_bsdf.x, u_bsdf.yz(), self.swl, &ctx);
-            let albedo = closure.albedo(wo, **self.swl, &ctx);
-            let roughness = closure.roughness(wo, **self.swl, &ctx);
+            let albedo =
+                closure.albedo(wo, **self.swl, &ctx) + closure.emission(wo, **self.swl, &ctx);
+            let roughness = closure.roughness(wo, u_bsdf.x, **self.swl, &ctx);
             (sample, BsdfDenoisingFeatures { albedo, roughness }, direct)
         };
-        if self.force_diffuse {
-            let diffuse = Rc::new(DiffuseBsdf {
-                reflectance: Color::one(self.color_pipeline.color_repr)
-                    * FRAC_1_PI.expr()
-                    * 0.8f32.expr(),
-            });
-            let closure = SurfaceClosure {
-                inner: diffuse,
-                frame: si.frame,
-                ng: si.ng,
-            };
-            sample_and_shade(&closure)
-        } else {
-            let svm = &self.scene.svm;
-            if let Some(shader_kind) = shader_kind {
-                svm.dispatch_surface_single_kind(
-                    shader_kind,
-                    si.surface,
-                    self.color_pipeline,
-                    si,
-                    **self.swl,
-                    sample_and_shade,
-                )
-            } else {
-                svm.dispatch_surface(
-                    si.surface,
-                    self.color_pipeline,
-                    si,
-                    **self.swl,
-                    sample_and_shade,
-                )
-            }
-        }
+        self.dispatch_surface(shader_kind, si.surface, si, **self.swl, &sample_and_shade)
     }
     #[tracked(crate = "luisa")]
     pub fn run_megakernel(&self, ray: Expr<Ray>, sampler: &dyn Sampler) {
-        self.run_pt_hybrid_shift_mapping(ray, sampler, None)
+        self.run_pt_hybrid_shift_mapping(ray, sampler, None, None)
     }
     #[tracked(crate = "luisa")]
     pub fn run_pt_hybrid_shift_mapping(
         &self,
         ray: Expr<Ray>,
         sampler: &dyn Sampler,
-        shift_mapping: Option<ReconnectionShiftMapping>,
+        shift_mapping: Option<&ReconnectionShiftMapping>,
+        load_cached_first_hit: Option<&dyn Fn() -> Expr<SurfaceHit>>,
     ) {
-        if let Some(sm) = &shift_mapping {
+        if let Some(sm) = shift_mapping {
             assert!(self.need_shift_mapping);
             if !sm.is_base_path {
                 *sm.success = false;
                 *sm.jacobian = 0.0f32.expr();
-                sm.throughput
-                    .store(Color::zero(self.color_pipeline.color_repr));
             }
         }
+        let rejected = false.var();
         let ray = ray.var();
-        // the mininimum depth that a shift path can be connected to
-        const MIN_RECONNECT_DEPTH: u32 = 1;
-        loop {
-            let si = self.scene.intersect(**ray);
-            if !si.valid {
-                let (direct, w) = self.hit_envmap(**ray);
-                self.add_radiance(direct * w);
-                break;
-            }
-            if let Some(sm) = &shift_mapping {
-                let sm_vertex = sm.vertex;
-                if sm_vertex.valid() && sm.is_base_path {
-                    *sm_vertex.type_ = VertexType::INTERIOR;
+        let always_reconnect_first_hit = false.var();
+        if let Some(sm) = shift_mapping {
+            if !sm.is_base_path {
+                if (sm.min_dist <= 0.0) & (sm.min_roughness <= 0.0) {
+                    *always_reconnect_first_hit = true;
                 }
             }
+        }
+        loop {
+            let disable_nee = false.var();
+            let disable_first_nee = false.var();
+            if let Some(sm) = shift_mapping {
+                *disable_nee = !sm.is_base_path
+                    & (self.shift_mapping_no_nee
+                        | (self.shift_mapping_no_first_nee & (self.depth == 0)));
+                *disable_first_nee =
+                    !sm.is_base_path & (self.shift_mapping_no_first_nee & (self.depth == 0));
+            }
+            let si = if load_cached_first_hit.is_some() {
+                if self.depth == 0 {
+                    let cached_first_hit = (load_cached_first_hit.unwrap())();
+                    if cached_first_hit.inst_id == u32::MAX {
+                        SurfaceInteraction::invalid()
+                    } else {
+                        self.scene.surface_interaction(
+                            cached_first_hit.inst_id,
+                            cached_first_hit.prim_id,
+                            cached_first_hit.bary,
+                        )
+                    }
+                } else {
+                    self.scene.intersect(**ray)
+                }
+            } else {
+                self.scene.intersect(**ray)
+            };
+            if !si.valid {
+                // if self.enable_debug {
+                //     device_log!("!si.valid; d:{}", **self.depth);
+                // }
+                if !disable_nee {
+                    let (direct, w) = self.hit_envmap(**ray);
+                    self.add_radiance(direct * w);
+                    if self.depth == 0 {
+                        if let Some(df) = self.denoising {
+                            *df.first_hit.inst_id = u32::MAX;
+                            *df.first_hit.prim_id = u32::MAX;
+                        }
+                    }
+                }
+                break;
+            }
+            if self.depth == 0 {
+                if let Some(df) = self.denoising {
+                    *df.first_hit_normal = si.ng;
+                    *df.first_hit = SurfaceHit::from_comps_expr(SurfaceHitComps {
+                        inst_id: si.inst_id,
+                        prim_id: si.prim_id,
+                        bary: si.bary,
+                    });
+                }
+            }
+
             let wo = -ray.d;
-            {
+
+            if !disable_first_nee {
                 let (direct, w) = self.handle_surface_light(si, **ray);
+                // let w = (!disable_nee | (self.depth == 0)).select(w, 1.0f32.expr(), w);
                 self.add_radiance(direct * w);
             }
+            if self.depth == 0 {
+                self.base_replay_throughput.store(self.radiance.load());
+            }
             let reconnect_distance_criteria =
-                shift_mapping.map(|sm| (self.prev_p - si.p).length() > sm.min_dist);
+                shift_mapping.map(|sm| (self.prev_p - si.p).length() >= sm.min_dist);
             let prev_roughness_criteria =
-                shift_mapping.map(|sm| self.prev_roughness > sm.min_roughness);
+                shift_mapping.map(|sm| self.prev_roughness >= sm.min_roughness);
             if let Some(sm) = &shift_mapping {
-                let sm_vertex = sm.vertex;
+                let sm_vertex = sm.read_vertex();
                 let is_last_vertex = self.depth == self.max_depth;
                 let dist = (self.prev_p - si.p).length();
                 let can_connect =
                     reconnect_distance_criteria.unwrap() & prev_roughness_criteria.unwrap();
-
+                // if self.enable_debug {
+                //     device_log!(
+                //         "last hit light; d:{} can connect:{}",
+                //         **self.depth,
+                //         can_connect
+                //     );
+                // }
                 // handle reconnection vertex hits surface light
-                if (self.depth > MIN_RECONNECT_DEPTH) & can_connect & is_last_vertex {
-                    if !sm_vertex.valid() & sm.is_base_path {
-                        *sm_vertex = ReconnectionVertex::from_comps_expr(ReconnectionVertexComps {
-                            direct: Expr::<FlatColor>::zeroed(),
-                            indirect: Expr::<FlatColor>::zeroed(),
-                            bary: si.bary,
-                            direct_wi: Expr::<[f32; 3]>::zeroed(),
-                            direct_light_pdf: 0.0f32.expr(),
-                            wo: wo.into(),
-                            inst_id: si.inst_id,
-                            wi: Expr::<[f32; 3]>::zeroed(),
-                            prim_id: si.prim_id,
-                            prev_bsdf_pdf: **self.prev_bsdf_pdf,
-                            bsdf_pdf: 0.0f32.expr(),
-                            dist,
-                            depth: **self.depth,
-                            type_: VertexType::LAST_HIT_LIGHT.expr(),
-                        });
-                    } else if can_connect & !sm.is_base_path {
+                if (self.depth >= self.min_reconnect_depth) & can_connect {
+                    if !sm_vertex.valid() & sm.is_base_path & is_last_vertex {
+                        sm.write_vertex(ReconnectionVertex::from_comps_expr(
+                            ReconnectionVertexComps {
+                                direct: Expr::<FlatColor>::zeroed(),
+                                indirect: Expr::<FlatColor>::zeroed(),
+                                bary: si.bary,
+                                direct_wi: Expr::<[f32; 3]>::zeroed(),
+                                direct_light_pdf: 0.0f32.expr(),
+                                wo: wo.into(),
+                                inst_id: si.inst_id,
+                                wi: Expr::<[f32; 3]>::zeroed(),
+                                prim_id: si.prim_id,
+                                prev_bsdf_pdf: **self.prev_bsdf_pdf,
+                                bsdf_pdf: 0.0f32.expr(),
+                                u_bsdf_select: 0.0f32.expr(),
+                                dist,
+                                depth: **self.depth,
+                                type_: VertexType::LAST_HIT_LIGHT.expr(),
+                            },
+                        ));
+                    } else if !sm.is_base_path & is_last_vertex {
+                        // this line is incorrect
                         // not reversible
+                        *rejected = true;
                         break;
                     }
                 }
             }
+
             if self.depth >= self.max_depth {
                 break;
             }
             *self.depth += 1;
-            let direct_lighting = self.sample_light(si, sampler.next_3d());
 
-            let (bsdf_sample, features, direct) = self.sample_surface_and_shade_direct(
-                None,
-                si,
-                wo,
-                direct_lighting,
-                sampler.next_3d(),
-            );
-            let roughness = features.roughness;
-            let roughness_criteria = shift_mapping.map(|sm| roughness > sm.min_roughness);
+            let direct_lighting = {
+                let u_direct = sampler.next_3d();
+
+                if !disable_nee {
+                    self.sample_light(si, u_direct)
+                } else {
+                    DirectLighting::invalid(self.color_pipeline)
+                }
+            };
             let occluded = true.var();
-            if direct_lighting.valid {
+            let u_bsdf = sampler.next_3d();
+            let (bsdf_sample, features, direct) = if always_reconnect_first_hit {
+                (
+                    BsdfSample::invalid(self.color_pipeline.color_repr),
+                    BsdfDenoisingFeatures {
+                        albedo: Color::zero(self.color_pipeline.color_repr),
+                        roughness: 0.0f32.expr(),
+                    },
+                    Color::zero(self.color_pipeline.color_repr),
+                )
+            } else {
+                self.sample_surface_and_shade_direct(None, si, wo, direct_lighting, u_bsdf)
+            };
+            let u_select = u_bsdf.x;
+            if self.depth == 1 {
+                if let Some(df) = self.denoising {
+                    df.first_hit_albedo.store(features.albedo);
+                    *df.first_hit_roughness = features.roughness;
+                }
+            }
+            let roughness = features.roughness;
+            let roughness_criteria = shift_mapping.map(|sm| roughness >= sm.min_roughness);
+
+            if !disable_nee & direct_lighting.valid {
                 let shadow_ray = direct_lighting.shadow_ray;
                 *occluded = self.scene.occlude(shadow_ray);
                 if !occluded {
                     self.add_radiance(direct);
                 }
+                if self.depth == 1 {
+                    self.base_replay_throughput.store(self.radiance.load());
+                }
             }
+
             if let Some(sm) = &shift_mapping {
                 let roughness_criteria = roughness_criteria.unwrap();
-                let distance_criteria = reconnect_distance_criteria.unwrap();
-                // let prev_roughness_criteria = prev_roughness_criteria.unwrap();
-                let can_connect = roughness_criteria & distance_criteria;
-
-                // check reversibility
-                // if !sm.is_base_path {
-                //     let can_connect =
-                //         roughness_criteria & distance_criteria & prev_roughness_criteria;
-                //     if can_connect {
-                //         // a connectable vertex is found for shift path with a smaller depth
-                //         // it means that the shift is not reversible, since the smallest connectable depth
-                //         // does not agree
-
-                //         if sm.vertex.valid() {
-                //             if self.depth + 1 != sm.vertex.depth {
-                //                 break;
-                //             }
-                //         } else {
-                //             break;
-                //         }
-                //     }
-                // }
+                let sm_vertex = sm.read_vertex();
                 // perform reconnection
-                if !sm.is_base_path & sm.vertex.valid() {
+                if !sm.is_base_path & sm_vertex.valid() {
+                    if self.depth > self.min_reconnect_depth {
+                        let can_connect = reconnect_distance_criteria.unwrap()
+                            & prev_roughness_criteria.unwrap()
+                            & roughness_criteria;
+                        // not reversible
+                        if can_connect {
+                            *rejected = true;
+                            break;
+                        }
+                    }
                     // yes, we can connect
-                    if sm.vertex.depth == self.depth {
-                        let reconnection_vertex = **sm.vertex;
+                    if sm_vertex.depth == self.depth {
+                        let reconnection_vertex = sm_vertex;
                         let vertex_type = reconnection_vertex.type_;
                         let reconnect_si = self.scene.surface_interaction(
                             reconnection_vertex.inst_id,
@@ -415,8 +538,10 @@ impl<'a> PathTracerBase<'a> {
                         );
                         let dist = (reconnect_si.p - si.p).length();
                         let wi = (reconnect_si.p - si.p).normalize();
+                        let can_connect = (dist >= sm.min_dist) & roughness_criteria;
                         // failed to connect, reject
                         if !can_connect {
+                            *rejected = true;
                             break;
                         }
                         let vis_ray = Ray::new_expr(
@@ -435,12 +560,14 @@ impl<'a> PathTracerBase<'a> {
                             .abs();
                         // prevent NaN
                         if cos_theta_y2 == 0.0 {
+                            *rejected = true;
                             break;
                         }
 
                         let occluded = self.scene.occlude(vis_ray);
                         // visiblity check failed, reject
                         if occluded {
+                            *rejected = true;
                             break;
                         }
 
@@ -451,48 +578,121 @@ impl<'a> PathTracerBase<'a> {
                          * y_i                 y_{i+1}                               y_{i+2} =x_{i+2}
                          *    pdf_y1                 pdf(x_i -> x_{i+1}, x_{i+1} -> x_{i+2}) = pdf_y2
                          */
-                        let (f1, pdf_y1) = self.scene.svm.dispatch_surface(
-                            si.surface,
-                            self.color_pipeline,
-                            si,
-                            **self.swl,
-                            |closure| closure.evaluate(wo, wi, **self.swl, &self.eval_context().1),
-                        );
-                        let (roughness_y, f2, pdf_y2) = if vertex_type == VertexType::LAST_HIT_LIGHT
-                        {
-                            // zero
+                        let (f1, pdf_y1) = {
+                            let f1_v = ColorVar::zero(self.color_pipeline.color_repr);
+                            let pdf_y1_v = 0.0f32.var();
+                            outline(|| {
+                                let e = self.dispatch_surface(
+                                    None,
+                                    si.surface,
+                                    si,
+                                    **self.swl,
+                                    &|closure| {
+                                        closure.evaluate(wo, wi, **self.swl, &self.eval_context().1)
+                                    },
+                                );
+                                f1_v.store(e.0);
+                                *pdf_y1_v = e.1;
+                            });
+                            (f1_v.load(), pdf_y1_v.load())
+                        };
+                        let direct_wi = Expr::<Float3>::from(reconnection_vertex.direct_wi);
+                        let (direct_f, roughness_y, f2, pdf_y2) = {
+                            let direct_f_v = ColorVar::zero(self.color_pipeline.color_repr);
+                            let roughness_y_v = 0.0f32.var();
+                            let f2_v = ColorVar::zero(self.color_pipeline.color_repr);
+                            let pdf_y2_v = 0.0f32.var();
+                            outline(|| {
+                                let e = self.dispatch_surface(
+                                    None,
+                                    reconnect_si.surface,
+                                    reconnect_si,
+                                    **self.swl,
+                                    &|closure| {
+                                        let (roughness_y, f2, pdf_y2) =
+                                            if vertex_type == VertexType::LAST_HIT_LIGHT {
+                                                // zero
+                                                (
+                                                    0.0f32.expr(),
+                                                    Color::zero(self.color_pipeline.color_repr),
+                                                    0.0f32.expr(),
+                                                )
+                                            } else {
+                                                let (f, pdf) = closure.evaluate(
+                                                    -wi,
+                                                    Expr::<Float3>::from(reconnection_vertex.wi),
+                                                    **self.swl,
+                                                    &self.eval_context().1,
+                                                );
+                                                let roughness = closure.roughness(
+                                                    -wi,
+                                                    reconnection_vertex.u_bsdf_select,
+                                                    **self.swl,
+                                                    &self.eval_context().1,
+                                                );
+                                                (roughness, f, pdf)
+                                            };
+                                        let direct_f = if (direct_wi != 0.0).any() {
+                                            let (f, bsdf_pdf) = closure.evaluate(
+                                                -wi,
+                                                direct_wi,
+                                                **self.swl,
+                                                &self.eval_context().1,
+                                            );
+                                            let w = mis_weight(
+                                                reconnection_vertex.direct_light_pdf,
+                                                bsdf_pdf,
+                                                1,
+                                            );
+                                            f * w
+                                        } else {
+                                            Color::zero(self.color_pipeline.color_repr)
+                                        };
+                                        (direct_f, roughness_y, f2, pdf_y2)
+                                    },
+                                );
+                                direct_f_v.store(e.0);
+                                *roughness_y_v = e.1;
+                                f2_v.store(e.2);
+                                *pdf_y2_v = e.3;
+                            });
                             (
-                                0.0f32.expr(),
-                                Color::zero(self.color_pipeline.color_repr),
-                                1.0f32.expr(),
-                            )
-                        } else {
-                            self.scene.svm.dispatch_surface(
-                                reconnect_si.surface,
-                                self.color_pipeline,
-                                reconnect_si,
-                                **self.swl,
-                                |closure| {
-                                    let (f, pdf) = closure.evaluate(
-                                        -wi,
-                                        Expr::<Float3>::from(reconnection_vertex.wi),
-                                        **self.swl,
-                                        &self.eval_context().1,
-                                    );
-                                    let roughness =
-                                        closure.roughness(-wi, **self.swl, &self.eval_context().1);
-                                    (roughness, f, pdf)
-                                },
+                                direct_f_v.load(),
+                                roughness_y_v.load(),
+                                f2_v.load(),
+                                pdf_y2_v.load(),
                             )
                         };
+
                         // check reversibility
                         // for path to be reversible, the newly formed path should also satisfy the roughness criteria
                         // if it fails, reject
-                        if roughness_y < sm.min_roughness {
+                        if (vertex_type != VertexType::LAST_HIT_LIGHT)
+                            & (roughness_y < sm.min_roughness)
+                        {
+                            *rejected = true;
                             break;
                         }
 
-                        if pdf_y2 <= 0.0 {
+                        // let pdf_x = if vertex_type != VertexType::INTERIOR {
+                        //     reconnection_vertex.prev_bsdf_pdf
+                        // } else {
+                        //     reconnection_vertex.prev_bsdf_pdf * reconnection_vertex.bsdf_pdf
+                        // };
+                        // let pdf_y = pdf_y1 * pdf_y2;
+                        let compute_ratio = |pdf_y: Expr<f32>, pdf_x: Expr<f32>| {
+                            if pdf_x == 0.0 {
+                                (pdf_y == 0.0).select(1.0f32.expr(), 0.0f32.expr())
+                            } else {
+                                pdf_y / pdf_x
+                            }
+                        };
+                        let pdf_ratio = (pdf_y1 / reconnection_vertex.prev_bsdf_pdf).var();
+                        if vertex_type != VertexType::LAST_HIT_LIGHT {
+                            *pdf_ratio *= compute_ratio(pdf_y2, reconnection_vertex.bsdf_pdf);
+                        }
+                        if pdf_ratio <= 0.0 {
+                            *rejected = true;
                             break;
                         }
                         let throughput = {
@@ -519,82 +719,81 @@ impl<'a> PathTracerBase<'a> {
                                 0.0f32.expr()
                             };
 
-                            let w = if self.use_nee {
+                            let w = if self.use_nee
+                                & (!self.shift_mapping_no_nee | (self.depth == 1))
+                            {
                                 mis_weight(pdf_y1, light_pdf, 1)
                             } else {
                                 1.0f32.expr()
                             };
                             let vertex_le = le * w;
-                            let direct_wi = Expr::<Float3>::from(reconnection_vertex.direct_wi);
-                            let direct_f = if (direct_wi != 0.0).any() {
-                                let (f, bsdf_pdf) = self.scene.svm.dispatch_surface(
-                                    reconnect_si.surface,
-                                    self.color_pipeline,
-                                    reconnect_si,
-                                    **self.swl,
-                                    |closure| {
-                                        closure.evaluate(
-                                            -wi,
-                                            direct_wi,
-                                            **self.swl,
-                                            &self.eval_context().1,
-                                        )
-                                    },
-                                );
-                                let w =
-                                    mis_weight(reconnection_vertex.direct_light_pdf, bsdf_pdf, 1);
-                                f * w
-                            } else {
+                            let vertex_le = if self.indirect_only & (self.depth == 1) {
                                 Color::zero(self.color_pipeline.color_repr)
+                            } else {
+                                vertex_le
                             };
-                            f1 / pdf_y1
+
+                            let f_pdf = f1 / pdf_y1;
+                            let (_, cont_prob) = self.compute_contibue_prob(
+                                reconnection_vertex.depth,
+                                self.reconnect_beta.load() * f_pdf,
+                            );
+                            f_pdf
                                 * (vertex_le
                                     + direct_f
                                         * Color::from_flat(
                                             self.color_pipeline.color_repr,
                                             reconnection_vertex.direct,
                                         )
-                                    + f2 * Color::from_flat(
-                                        self.color_pipeline.color_repr,
-                                        reconnection_vertex.indirect,
-                                    ) / pdf_y2)
+                                    + if pdf_y2 > 0.0f32 {
+                                        f2 * Color::from_flat(
+                                            self.color_pipeline.color_repr,
+                                            reconnection_vertex.indirect,
+                                        ) / pdf_y2
+                                    } else {
+                                        Color::zero(self.color_pipeline.color_repr)
+                                    })
+                                / cont_prob
                             // is this correct???
                         };
-                        let pdf_x = if vertex_type != VertexType::INTERIOR {
-                            reconnection_vertex.prev_bsdf_pdf
-                        } else {
-                            reconnection_vertex.prev_bsdf_pdf * reconnection_vertex.bsdf_pdf
-                        };
-                        let pdf_y = pdf_y1 * pdf_y2;
-                        // sm.throughput.store(throughput);
+
                         self.add_radiance(throughput);
 
-                        let jacobian = pdf_y / pdf_x
+                        let jacobian = pdf_ratio
                             * (cos_theta_y2 / cos_theta_x2).abs()
                             * (reconnection_vertex.dist / dist).sqr();
                         let jacobian = jacobian.is_finite().select(jacobian, 0.0f32.expr());
                         *sm.success = jacobian > 0.0;
                         *sm.jacobian = jacobian;
+                        if !sm.success {
+                            *rejected = true;
+                        }
                         break;
                     }
                 }
             }
+            if always_reconnect_first_hit {
+                break;
+            }
             let f = &bsdf_sample.color;
-            if debug_mode() {
-                lc_assert!(f.min().ge(0.0));
-            };
+            // if debug_mode() {
+            //     lc_assert!(f.min().ge(0.0));
+            // };
 
             self.mul_beta(f / bsdf_sample.pdf);
             if let Some(sm) = &shift_mapping {
-                if self.depth > MIN_RECONNECT_DEPTH {
-                    let reconnect_vertex = sm.vertex;
+                if self.depth > self.min_reconnect_depth {
+                    let reconnect_vertex = sm.read_vertex();
                     let dist = (self.prev_p - si.p).length();
                     let can_connect = reconnect_distance_criteria.unwrap()
                         & prev_roughness_criteria.unwrap()
                         & roughness_criteria.unwrap();
+                    // if self.enable_debug {
+                    //     device_log!("LAST_NEE; d:{} can connect:{}", **self.depth, can_connect);
+                    // }
                     if !reconnect_vertex.valid() & sm.is_base_path & can_connect {
-                        *reconnect_vertex =
-                            ReconnectionVertex::from_comps_expr(ReconnectionVertexComps {
+                        sm.write_vertex(ReconnectionVertex::from_comps_expr(
+                            ReconnectionVertexComps {
                                 direct: if direct_lighting.valid & !occluded {
                                     direct_lighting.irradiance.flatten() / direct_lighting.pdf
                                 } else {
@@ -610,10 +809,12 @@ impl<'a> PathTracerBase<'a> {
                                 prim_id: si.prim_id,
                                 prev_bsdf_pdf: **self.prev_bsdf_pdf,
                                 bsdf_pdf: bsdf_sample.pdf,
+                                u_bsdf_select: u_select,
                                 dist,
                                 depth: self.depth - 1,
                                 type_: VertexType::LAST_NEE.expr(),
-                            });
+                            },
+                        ));
                         self.reconnect_beta
                             .store(Color::one(self.color_pipeline.color_repr));
                         self.reconnect_radiance
@@ -623,11 +824,20 @@ impl<'a> PathTracerBase<'a> {
                     // this is because if the shift is reversible, we should already connect to the
                     // vertex at a smaller depth
                     if !sm.is_base_path & can_connect {
+                        *rejected = true;
                         break;
                     }
                 }
             }
-            if bsdf_sample.pdf <= 0.0 || !bsdf_sample.valid {
+            if (bsdf_sample.pdf <= 0.0) | !bsdf_sample.valid | (bsdf_sample.color.min() < 0.0) {
+                // if self.enable_debug {
+                //     device_log!(
+                //         "bsdf sample invalid, d:{} {} {}",
+                //         **self.depth,
+                //         bsdf_sample.pdf,
+                //         bsdf_sample.wi
+                //     );
+                // }
                 break;
             }
             let (rr_effective, cont_prob) = self.continue_prob();
@@ -654,19 +864,36 @@ impl<'a> PathTracerBase<'a> {
                 );
             }
         }
+        // if self.enable_debug {
+        //     device_log!("end, d:{}", **self.depth);
+        // }
+
+        if self.clamp_indirect > 0.0 {
+            let indirect = self.radiance.load() - self.base_replay_throughput.load();
+            let indirect = indirect.clamp(self.clamp_indirect.expr());
+            self.radiance
+                .store(self.base_replay_throughput.load() + indirect);
+        }
+
         if let Some(sm) = &shift_mapping {
-            let reconnect_vertex = sm.vertex;
+            let reconnect_vertex = sm.read_vertex().var();
             if reconnect_vertex.valid()
                 & (reconnect_vertex.type_ != VertexType::LAST_HIT_LIGHT)
                 & sm.is_base_path
             {
                 *reconnect_vertex.indirect = self.reconnect_radiance.load().flatten();
+                sm.write_vertex(reconnect_vertex);
             }
             if !sm.is_base_path {
-                if **sm.success {
-                    lc_assert!(sm.jacobian.gt(0.0));
+                if reconnect_vertex.valid() {
+                    if **sm.success {
+                        lc_assert!(sm.jacobian.gt(0.0));
+                    } else {
+                        lc_assert!(sm.jacobian.eq(0.0));
+                    }
                 } else {
-                    lc_assert!(sm.jacobian.eq(0.0));
+                    *sm.success = !rejected;
+                    *sm.jacobian = sm.success.select(1.0f32.expr(), 0.0f32.expr());
                 }
             }
         }
@@ -766,24 +993,34 @@ pub struct ReconnectionVertex {
     pub prim_id: u32,
     pub prev_bsdf_pdf: f32,
     pub bsdf_pdf: f32,
+    pub u_bsdf_select: f32,
     pub dist: f32,
     pub depth: u32,
     pub type_: u32,
 }
-impl ReconnectionVertexVar {
+impl ReconnectionVertexExpr {
     pub fn valid(&self) -> Expr<bool> {
-        self.type_.load().ne(VertexType::INVALID)
+        self.type_.ne(VertexType::INVALID)
     }
 }
-#[derive(Clone, Copy)]
-pub struct ReconnectionShiftMapping {
+
+pub struct ReconnectionShiftMapping<'a> {
     pub min_dist: Expr<f32>,
     pub min_roughness: Expr<f32>,
-    pub is_base_path: Expr<bool>,
-    pub vertex: Var<ReconnectionVertex>,
+    pub is_base_path: Var<bool>,
+    // pub vertex: Var<ReconnectionVertex>,
+    pub read_vertex: Box<dyn Fn() -> Expr<ReconnectionVertex> + 'a>,
+    pub write_vertex: Box<dyn Fn(Expr<ReconnectionVertex>) + 'a>,
     pub jacobian: Var<f32>,
-    pub throughput: ColorVar,
     pub success: Var<bool>,
+}
+impl<'a> ReconnectionShiftMapping<'a> {
+    pub fn read_vertex(&self) -> Expr<ReconnectionVertex> {
+        (self.read_vertex)()
+    }
+    pub fn write_vertex(&self, x: impl AsExpr<Value = ReconnectionVertex>) {
+        (self.write_vertex)(x.as_expr())
+    }
 }
 #[derive(Clone, Copy, Value, Debug)]
 #[luisa(crate = "luisa")]
@@ -872,6 +1109,13 @@ impl Integrator for PathTracer {
         let mut cnt = 0;
         let progress = util::create_progess_bar(self.spp as usize, "spp");
         let mut acc_time = 0.0;
+        let mut stats: RenderStats = Default::default();
+        let output_image: Tex2d<Float4> = self.device.create_tex2d(
+            PixelStorage::Float4,
+            scene.camera.resolution().x,
+            scene.camera.resolution().y,
+            1,
+        );
         let update = || {
             if let Some(channel) = &session.display {
                 film.copy_to_rgba_image(channel.screen_tex(), false);
@@ -890,10 +1134,25 @@ impl Integrator for PathTracer {
             let toc = Instant::now();
             acc_time += toc.duration_since(tic).as_secs_f64();
             update();
-            progress.inc(cur_pass as u64);
             cnt += cur_pass;
+            if session.save_intermediate {
+                film.copy_to_rgba_image(&output_image, true);
+                let path = format!("{}-{}.exr", session.name, cnt);
+                util::write_image(&output_image, &path);
+                stats.intermediate.push(IntermediateStats {
+                    time: acc_time,
+                    spp: cnt,
+                    path,
+                });
+            }
+            progress.inc(cur_pass as u64);
         }
-
+        if session.save_stats {
+            let file = File::create(format!("{}.json", session.name)).unwrap();
+            let json = serde_json::to_value(&stats).unwrap();
+            let writer = BufWriter::new(file);
+            serde_json::to_writer(writer, &json).unwrap();
+        }
         progress.finish();
         log::info!("Rendering finished in {:.2}s", acc_time);
     }

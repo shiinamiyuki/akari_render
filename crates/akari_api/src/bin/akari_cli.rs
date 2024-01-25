@@ -6,6 +6,7 @@ use clap::{arg, builder::BoolishValueParser, Arg, ArgAction, Command};
 use std::{env::current_exe, fs::File, process::exit};
 
 fn main() {
+    
     let mut cmd = Command::new("akari_cli")
         .arg(arg!(-s --scene <SCENE> "Scene file to render"))
         .arg(arg!(-m --method <METHOD> "Render method config file"))

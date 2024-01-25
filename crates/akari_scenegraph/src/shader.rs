@@ -86,6 +86,31 @@ pub struct PrincipledBsdf {
     pub emission_strength: NodeRef<ShaderNode>,
     pub preference: BsdfPreference,
 }
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
+#[serde(crate = "serde")]
+pub enum NormalMapSpace {
+    #[serde(rename = "tangent")]
+    TangentSpace,
+    #[serde(rename = "object")]
+    ObjectSpace,
+    #[serde(rename = "world")]
+    WorldSpace,
+}
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
+#[serde(crate = "serde")]
+pub enum MappingType {
+    #[serde(rename = "point")]
+    Point,
+    #[serde(rename = "texture")]
+    Texture,
+}
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
+#[serde(crate = "serde")]
+pub enum SeparateColorMode {
+    #[serde(rename = "rgb")]
+    Rgb,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(crate = "serde")]
 #[serde(tag = "type")]
@@ -108,14 +133,38 @@ pub enum ShaderNode {
         colorspace: ColorSpace,
     },
     #[serde(rename = "image")]
-    TexImage { image: Image },
+    TexImage {
+        image: Image,
+        #[serde(default)]
+        uv: Option<NodeRef<ShaderNode>>,
+    },
     #[serde(rename = "noise")]
     PerlinNoise {
         dim: u32,
         scale: NodeRef<ShaderNode>,
     },
+    #[serde(rename = "mapping")]
+    Mapping {
+        vector: NodeRef<ShaderNode>,
+        mapping: MappingType,
+        location: NodeRef<ShaderNode>,
+        rotation: NodeRef<ShaderNode>,
+        scale: NodeRef<ShaderNode>,
+    },
     #[serde(rename = "diffuse")]
     DiffuseBsdf { color: NodeRef<ShaderNode> },
+    #[serde(rename = "metal")]
+    MetalBsdf {
+        eta: String,
+        roughness: NodeRef<ShaderNode>,
+    },
+    #[serde(rename = "plastic")]
+    PlasticBsdf {
+        kd: NodeRef<ShaderNode>,
+        ks: NodeRef<ShaderNode>,
+        eta: NodeRef<ShaderNode>,
+        roughness: NodeRef<ShaderNode>,
+    },
     #[serde(rename = "glass")]
     GlassBsdf {
         color: NodeRef<ShaderNode>,
@@ -129,6 +178,21 @@ pub enum ShaderNode {
         #[serde(flatten)]
         bsdf: Box<PrincipledBsdf>,
     },
+    #[serde(rename = "checkerboard")]
+    Checkerboard {
+        vector: Option<NodeRef<ShaderNode>>,
+        scale: NodeRef<ShaderNode>,
+        color1: NodeRef<ShaderNode>,
+        color2: NodeRef<ShaderNode>,
+    },
+    #[serde(rename = "normal_map")]
+    NormalMap {
+        normal: NodeRef<ShaderNode>,
+        strength: NodeRef<ShaderNode>,
+        space: NormalMapSpace,
+    },
+    #[serde(rename = "texcoords")]
+    TexCoords {},
     #[serde(rename = "emission")]
     Emission {
         color: NodeRef<ShaderNode>,
@@ -144,6 +208,11 @@ pub enum ShaderNode {
     Extract {
         node: NodeRef<ShaderNode>,
         field: String,
+    },
+    #[serde(rename = "separate_color")]
+    SeparateColor {
+        mode: SeparateColorMode,
+        color: NodeRef<ShaderNode>,
     },
     #[serde(rename = "output")]
     Output { node: NodeRef<ShaderNode> },
@@ -231,6 +300,7 @@ pub trait NodeVisitor: Sized {
             ShaderNode::Output { node } => {
                 graph.visit_mut(self, &node);
             }
+            _ => {}
         }
     }
 }

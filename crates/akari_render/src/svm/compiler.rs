@@ -7,6 +7,7 @@ use crate::{
     util::ByteVecBuilder,
 };
 use akari_scenegraph::{shader::ShaderNode, NodeRef, ShaderGraph, ShaderKind};
+use scene_graph::ColorSpace;
 #[derive(Clone, Copy)]
 pub struct SvmCompileContext<'a> {
     pub images: &'a HashMap<(ImageKey, TextureSampler), usize>,
@@ -133,7 +134,7 @@ impl<'a> Compiler<'a> {
                 })
             }
             ShaderNode::Float4 { .. } => todo!(),
-            ShaderNode::TexImage { image } => {
+            ShaderNode::TexImage { image, uv } => {
                 let colorspace = &image.colorspace;
                 let data = &image.data;
                 let sampler = sampler_from_rgb_image_tex_node(image);
@@ -148,9 +149,15 @@ impl<'a> Compiler<'a> {
                 };
                 let tex_idx = self.ctx.images[&(key, sampler)] as u32;
                 let tex_idx = self.push_data(tex_idx);
+                let uv = uv.as_ref().map(|uv| self.compile_node(uv));
                 SvmNode::RgbImageTex(SvmRgbImageTex {
                     tex_idx,
-                    colorspace: ColorSpaceId::from_colorspace((*colorspace).into()),
+                    colorspace: if *colorspace != ColorSpace::None {
+                        ColorSpaceId::from_colorspace((*colorspace).into())
+                    } else {
+                        ColorSpaceId::NONE
+                    },
+                    uv,
                 })
             }
             ShaderNode::PerlinNoise { .. } => {
@@ -251,7 +258,11 @@ impl<'a> Compiler<'a> {
                 second: _,
                 factor: _,
             } => todo!(),
-            ShaderNode::Extract { node: _, field: _ } => todo!(),
+            ShaderNode::Extract { node, field } => {
+                let node = self.compile_node(&node);
+                let field = field.clone();
+                SvmNode::ExtractField(SvmExtractField { node, field })
+            }
             ShaderNode::Output { node } => match self.ctx.graph.kind {
                 ShaderKind::Surface => {
                     let surface = self.compile_node(&node);
@@ -261,7 +272,64 @@ impl<'a> Compiler<'a> {
                     todo!()
                 }
             },
-            ShaderNode::Math { op, first, second } => todo!(),
+            ShaderNode::TexCoords {} => SvmNode::TexCoords(SvmTexCoords {}),
+            ShaderNode::Mapping {
+                vector,
+                mapping,
+                location,
+                rotation,
+                scale,
+            } => {
+                let vector = self.compile_node(&vector);
+                let location = self.compile_node(&location);
+                let rotation = self.compile_node(&rotation);
+                let scale = self.compile_node(&scale);
+                SvmNode::Mapping(SvmMapping {
+                    vector,
+                    ty: *mapping,
+                    location,
+                    rotation,
+                    scale,
+                })
+            }
+            ShaderNode::NormalMap {
+                normal,
+                strength,
+                space,
+            } => {
+                let normal = self.compile_node(&normal);
+                let strength = self.compile_node(&strength);
+                SvmNode::NormalMap(SvmNormalMap {
+                    normal,
+                    space: *space,
+                    strength,
+                })
+            }
+            ShaderNode::Checkerboard {
+                vector,
+                scale,
+                color1,
+                color2,
+            } => {
+                let vector = vector.as_ref().map(|v| self.compile_node(v));
+                let scale = self.compile_node(&scale);
+                let color1 = self.compile_node(&color1);
+                let color2 = self.compile_node(&color2);
+                SvmNode::CheckerBoard(SvmCheckerboardTex {
+                    vector,
+                    scale,
+                    color1,
+                    color2,
+                })
+            }
+            ShaderNode::SeparateColor { mode, color }=>{
+                let color = self.compile_node(&color);
+                SvmNode::SeparateColor(SeparateColor {
+                    color,
+                    mode: *mode,
+                })
+            }
+            _ => todo!(),
         };
 
         let node_ref = self.push(node);

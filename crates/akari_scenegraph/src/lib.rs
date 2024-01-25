@@ -14,6 +14,7 @@ pub(crate) use serde::{Deserialize, Serialize};
 pub mod blender;
 pub mod scene;
 pub mod shader;
+pub mod parser;
 
 pub use scene::*;
 pub use shader::*;

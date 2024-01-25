@@ -59,13 +59,13 @@ pub fn uniform_discrete_choice_and_remap(n: Expr<u32>, u: Expr<f32>) -> (Expr<u3
 }
 #[tracked(crate = "luisa")]
 pub fn weighted_discrete_choice2_and_remap<A: Aggregate>(
-    frac: Expr<f32>,
+    weight_a: Expr<f32>,
     a: A,
     b: A,
     u: Expr<f32>,
 ) -> (A, Expr<f32>) {
-    let first = u.lt(frac);
+    let first = u.lt(weight_a);
     let i = select(first, a, b);
-    let remapped = select(first, u / frac, (u - frac) / (1.0 - frac));
+    let remapped = select(first, u / weight_a, (u - weight_a) / (1.0 - weight_a));
     (i, remapped)
 }

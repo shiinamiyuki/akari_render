@@ -1,10 +1,15 @@
+use akari_common::luisa::rtx::SurfaceCandidate;
 use luisa::rtx::{AccelTraceOptions, CommittedHit, SurfaceHit};
+use std::rc::Rc;
 use std::sync::Arc;
 
+use crate::color::ColorPipeline;
 use crate::heap::MegaHeap;
 use crate::light::LightAggregate;
 
+use crate::svm::surface::Surface;
 use crate::svm::Svm;
+use crate::util::hash::{xxhash32_2, xxhash32_3, xxhash32_4};
 use crate::{camera::Camera, geometry::*, interaction::*, mesh::*, *};
 
 pub struct Scene {
@@ -41,21 +46,67 @@ impl Scene {
         self.meshes.accel.intersect(rtx_ray, self.trace_options())
     }
     #[tracked(crate = "luisa")]
+    fn alpha_test(&self, candidate: &SurfaceCandidate) -> Expr<bool> {
+        let result = false.var();
+        outline(|| {
+            let si = self.meshes.surface_interaction_for_alpha_test(
+                candidate.inst,
+                candidate.prim,
+                candidate.bary,
+            );
+            let h = xxhash32_4(Uint4::expr(
+                candidate.inst,
+                candidate.prim,
+                candidate.bary.x.bitcast::<u32>(),
+                candidate.bary.y.bitcast::<u32>(),
+            ));
+            let h = h.as_f32() * (1.0 / u32::MAX as f64) as f32;
+            let alpha = self.svm.dispatch_svm(
+                si.surface,
+                ColorPipeline {
+                    color_repr: ColorRepr::Rgb(color::RgbColorSpace::SRgb),
+                    rgb_colorspace: color::RgbColorSpace::SRgb,
+                },
+                si,
+                None,
+                svm::eval::SvmEvalMode::Alpha,
+                |eval| {
+                    let shader = eval
+                        .eval_shader()
+                        .downcast_ref::<Rc<dyn Surface>>()
+                        .unwrap()
+                        .clone();
+                    shader.alpha()
+                },
+            );
+            // device_log!("alpha: {}, hash: {}", alpha, hash);
+            *result = (alpha >= 1.0) | (alpha > h);
+        });
+        **result
+    }
+    #[tracked(crate = "luisa")]
     pub fn _trace_closest_rq(&self, ray: Expr<Ray>) -> Expr<CommittedHit> {
-        let ro: Expr<[f32; 3]> = ray.o.into();
-        let rd: Expr<[f32; 3]> = ray.d.into();
-        let rtx_ray = rtx::Ray::new_expr(ro, ray.t_min, rd, ray.t_max);
-        self.meshes
-            .accel
-            .traverse(rtx_ray, self.trace_options())
-            .on_surface_hit(|candidate: rtx::SurfaceCandidate| {
-                if (candidate.inst.ne(ray.exclude0.x) | candidate.prim.ne(ray.exclude0.y))
-                    & (candidate.inst.ne(ray.exclude1.x) | candidate.prim.ne(ray.exclude1.y))
-                {
-                    candidate.commit();
-                }
-            })
-            .trace()
+        // let hit = CommittedHit::var_zeroed();
+        // outline(|| {
+            let ro: Expr<[f32; 3]> = ray.o.into();
+            let rd: Expr<[f32; 3]> = ray.d.into();
+            let rtx_ray = rtx::Ray::new_expr(ro, ray.t_min, rd, ray.t_max);
+            self
+                .meshes
+                .accel
+                .traverse(rtx_ray, self.trace_options())
+                .on_surface_hit(|candidate: rtx::SurfaceCandidate| {
+                    if (candidate.inst.ne(ray.exclude0.x) | candidate.prim.ne(ray.exclude0.y))
+                        & (candidate.inst.ne(ray.exclude1.x) | candidate.prim.ne(ray.exclude1.y))
+                    {
+                        if self.alpha_test(&candidate) {
+                            candidate.commit();
+                        }
+                    }
+                })
+                .trace()
+        // });
+        // **hit
     }
     #[tracked(crate = "luisa")]
     pub fn intersect_hit_info(
@@ -102,27 +153,34 @@ impl Scene {
     }
     #[tracked(crate = "luisa")]
     pub fn occlude(&self, ray: Expr<Ray>) -> Expr<bool> {
-        let ro: Expr<[f32; 3]> = ray.o.into();
-        let rd: Expr<[f32; 3]> = ray.d.into();
-        let rtx_ray = rtx::Ray::new_expr(ro, ray.t_min, rd, ray.t_max);
-        if !self.use_rq {
-            self.meshes
-                .accel
-                .intersect_any(rtx_ray, self.trace_options())
-        } else {
-            let hit = self
-                .meshes
-                .accel
-                .traverse_any(rtx_ray, self.trace_options())
-                .on_surface_hit(|candidate: rtx::SurfaceCandidate| {
-                    if (candidate.inst.ne(ray.exclude0.x) | candidate.prim.ne(ray.exclude0.y))
-                        & (candidate.inst.ne(ray.exclude1.x) | candidate.prim.ne(ray.exclude1.y))
-                    {
-                        candidate.commit();
-                    }
-                })
-                .trace();
-            !hit.miss()
-        }
+        let result = false.var();
+        outline(|| {
+            let ro: Expr<[f32; 3]> = ray.o.into();
+            let rd: Expr<[f32; 3]> = ray.d.into();
+            let rtx_ray = rtx::Ray::new_expr(ro, ray.t_min, rd, ray.t_max);
+            *result = if !self.use_rq {
+                self.meshes
+                    .accel
+                    .intersect_any(rtx_ray, self.trace_options())
+            } else {
+                let hit = self
+                    .meshes
+                    .accel
+                    .traverse_any(rtx_ray, self.trace_options())
+                    .on_surface_hit(|candidate: rtx::SurfaceCandidate| {
+                        if (candidate.inst.ne(ray.exclude0.x) | candidate.prim.ne(ray.exclude0.y))
+                            & (candidate.inst.ne(ray.exclude1.x)
+                                | candidate.prim.ne(ray.exclude1.y))
+                        {
+                            if self.alpha_test(&candidate) {
+                                candidate.commit();
+                            }
+                        }
+                    })
+                    .trace();
+                !hit.miss()
+            }
+        });
+        **result
     }
 }

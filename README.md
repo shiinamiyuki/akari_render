@@ -1,6 +1,6 @@
 <h1 align="center">AkariRender</h1>
 <h5 align="center">High Performance CPU/GPU Physically Based Renderer</h5>
-<h5 align="center"> ⚠ The new based on <a href=https://github.com/LuisaGroup/luisa-compute-rs>LuisaCompute</a> is updated! ⚠ </h5>
+<h5 align="center"> ⚠ The new version based on <a href=https://github.com/LuisaGroup/luisa-compute-rs>LuisaCompute</a> is updated! ⚠ </h5>
 
 <!-- ![](gallery/beauty4k.png) -->
 ![](gallery/psor.png)
@@ -14,7 +14,7 @@ AkariRender is a CPU/GPU physically based renderer written in Rust and powered b
 - RGB/Spectral Rendering (WIP)
 - Path Tracing
 - Path Tracing with Metropolis Sampling
-- Gradient Domain Path Tracing (WIP)
+- Gradient Domain Path Tracing
 
 
 ## Building:

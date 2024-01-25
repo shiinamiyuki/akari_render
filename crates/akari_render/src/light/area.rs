@@ -63,7 +63,7 @@ impl Light for AreaLightExpr {
 
         let bary = uniform_sample_triangle(u_sample);
         let si = meshes.surface_interaction(self.instance_id, prim_id, bary);
-        let frame = si.frame;
+
         let area = si.prim_area;
         let p = si.p;
         let n = si.ng;

@@ -152,6 +152,10 @@ impl Frame {
 
 impl FrameExpr {
     #[tracked(crate = "luisa")]
+    pub fn identity() -> Expr<Frame> {
+        Frame::new_expr(Float3::expr(0.0, 0.0, 1.0), Float3::expr(1.0, 0.0, 0.0), Float3::expr(0.0, 1.0, 0.0))
+    }
+    #[tracked(crate = "luisa")]
     pub fn from_n(n: Expr<Float3>) -> Expr<Frame> {
         let t = if n.x.abs().gt(n.y.abs()) {
             Float3::expr(-n.z, 0.0, n.x) / (n.x * n.x + n.z * n.z).sqrt()
@@ -160,6 +164,30 @@ impl FrameExpr {
         };
         let s = n.cross(t);
         Frame::new_expr(n, t, s)
+    }
+    #[tracked(crate = "luisa")]
+    pub fn from_n_t(n: Expr<Float3>, tt: Expr<Float3>) -> Expr<Frame> {
+        let frame = Frame::var_zeroed();
+        let tt = (tt - n * n.dot(tt)).var();
+        let good = true.var();
+        if tt.length() < 1e-4 {
+            *good = false;
+        }else {
+            *tt = tt.normalize();
+        }
+        if good {
+            let ss = n.cross(tt).var();
+            if ss.length() < 1e-4 {
+                *good = false;
+            }else {
+                *ss = ss.normalize();
+                *frame = Frame::new_expr(n, tt, ss);
+            }
+        }
+        if !good {
+            *frame = FrameExpr::from_n(n);
+        }
+        **frame
     }
     #[tracked(crate = "luisa")]
     pub fn to_world(&self, v: Expr<Float3>) -> Expr<Float3> {
@@ -241,6 +269,8 @@ pub fn face_forward(
     let n = n.as_expr();
     select(v.dot(n) < 0.0, -v, v)
 }
+#[tracked(crate = "luisa")]
+pub fn clamp_shading_normal(ns: Expr<Float3>, ng: Expr<Float3>, w: Expr<Float3>) {}
 
 #[tracked(crate = "luisa")]
 pub fn reflect(w: impl AsExpr<Value = Float3>, n: impl AsExpr<Value = Float3>) -> Expr<Float3> {

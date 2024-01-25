@@ -312,7 +312,8 @@ impl McmcOpt {
         filter: PixelFilter,
         color_pipeline: ColorPipeline,
     ) -> RenderState {
-        let seeds = init_pcg32_buffer_with_seed(self.device.clone(), self.n_bootstrap, 0);
+        let seeds =
+            init_pcg32_buffer_with_seed(self.device.clone(), self.n_bootstrap, self.config.seed);
         let fs = self
             .device
             .create_buffer_from_fn(self.n_bootstrap, |_| 0.0f32);
@@ -394,7 +395,8 @@ impl McmcOpt {
                 states.write(i, state);
             }))
             .dispatch([self.n_chains as u32, 1, 1]);
-        let rng_states = init_pcg32_buffer_with_seed(self.device.clone(), self.n_chains, 1);
+        let rng_states =
+            init_pcg32_buffer_with_seed(self.device.clone(), self.n_chains, self.config.seed);
         RenderState {
             rng_states,
             samples: sample_buffer,
@@ -619,7 +621,7 @@ impl McmcOpt {
             }
         };
         let mut acc_time = 0.0f64;
-        let mut stats = RenderStats::default();
+        let mut stats: RenderStats = Default::default();
         {
             let mut cnt = 0;
             let spp_per_pass = self.pt.spp_per_pass;

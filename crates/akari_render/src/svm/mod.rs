@@ -1,4 +1,6 @@
+use akari_common::parking_lot::Mutex;
 use akari_scenegraph::{NodeRef, ShaderNode};
+use scene_graph::{MappingType, NormalMapSpace, SeparateColorMode};
 use std::{
     collections::{hash_map::DefaultHasher, HashMap},
     hash::{Hash, Hasher},
@@ -7,7 +9,7 @@ use std::{
 
 use crate::{heap::MegaHeap, *};
 
-use self::surface::{EmissiveSurface, SurfaceShader};
+use self::surface::{EmissiveSurface, PreComputedTable, PreComputedTables, SurfaceShader};
 pub mod compiler;
 pub mod eval;
 pub mod surface;
@@ -53,8 +55,16 @@ pub struct SvmRgbTex {
 pub struct SvmRgbImageTex {
     pub tex_idx: SvmConst<u32>,
     pub colorspace: u32,
+    pub uv: Option<SvmNodeRef>,
 }
-
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+#[repr(C)]
+pub struct SvmCheckerboardTex {
+    pub vector: Option<SvmNodeRef>,
+    pub scale: SvmNodeRef,
+    pub color1: SvmNodeRef,
+    pub color2: SvmNodeRef,
+}
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 #[repr(C)]
 pub struct SvmSpectralUplift {
@@ -78,6 +88,24 @@ pub struct SvmGlassBsdf {
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 #[repr(C)]
+pub struct SvmPlasticBsdf {
+    pub kd: SvmNodeRef,
+    pub roughness: SvmNodeRef,
+    pub eta: SvmNodeRef,
+    pub sigma_a: SvmNodeRef,
+    pub thickness: SvmNodeRef,
+}
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+#[repr(C)]
+pub struct SvmMetalBsdf {
+    pub kd: SvmNodeRef,
+    pub roughness: SvmNodeRef,
+    pub eta: SvmNodeRef,
+    pub sigma_a: SvmNodeRef,
+    pub thickness: SvmNodeRef,
+}
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+#[repr(C)]
 pub struct SvmEmission {
     pub color: SvmNodeRef,
     pub strength: SvmNodeRef,
@@ -92,6 +120,22 @@ impl SurfaceShader for SvmEmission {
             emission: color * strength,
         })
     }
+}
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+#[repr(C)]
+pub struct SvmNormalMap {
+    pub normal: SvmNodeRef,
+    pub strength: SvmNodeRef,
+    pub space: NormalMapSpace,
+}
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+#[repr(C)]
+pub struct SvmMapping {
+    pub ty: MappingType,
+    pub vector: SvmNodeRef,
+    pub location: SvmNodeRef,
+    pub scale: SvmNodeRef,
+    pub rotation: SvmNodeRef,
 }
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 #[repr(C)]
@@ -123,7 +167,21 @@ pub struct SvmPrincipledBsdf {
     pub emission_color: SvmNodeRef,
     pub emission_strength: SvmNodeRef,
 }
-
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[repr(C)]
+pub struct SvmTexCoords {}
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[repr(C)]
+pub struct SvmExtractField {
+    pub node: SvmNodeRef,
+    pub field: String,
+}
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+#[repr(C)]
+pub struct SeparateColor {
+    pub color: SvmNodeRef,
+    pub mode: SeparateColorMode,
+}
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 #[repr(C)]
 pub struct SvmMaterialOutput {
@@ -137,11 +195,19 @@ pub enum SvmNode {
     MakeFloat3(SvmMakeFloat3),
     RgbTex(SvmRgbTex),
     RgbImageTex(SvmRgbImageTex),
+    CheckerBoard(SvmCheckerboardTex),
     SpectralUplift(SvmSpectralUplift),
     Emission(SvmEmission),
     DiffuseBsdf(SvmDiffuseBsdf),
     GlassBsdf(SvmGlassBsdf),
+    PlasticBsdf(SvmPlasticBsdf),
+    MetalBsdf(SvmMetalBsdf),
     PrincipledBsdf(SvmPrincipledBsdf),
+    NormalMap(SvmNormalMap),
+    Mapping(SvmMapping),
+    ExtractField(SvmExtractField),
+    TexCoords(SvmTexCoords),
+    SeparateColor(SeparateColor),
     MaterialOutput(SvmMaterialOutput),
 }
 #[derive(Clone, Copy, Debug, Soa, Value)]
@@ -192,9 +258,28 @@ pub struct Svm {
     pub(crate) device: Device,
     pub(crate) surface_shaders: ShaderCollection,
     pub(crate) heap: Arc<MegaHeap>,
+    pub(crate) precompute_tables: Mutex<HashMap<ColorRepr, PreComputedTables>>,
 }
 
 impl Svm {
+    pub fn init_precompute_tables(&self, color_repr: ColorRepr) {
+        let mut tables = self.precompute_tables.lock();
+        if !tables.contains_key(&color_repr) {
+            tables.insert(
+                color_repr,
+                PreComputedTables::init(self.device.clone(), self.heap.clone(), color_repr),
+            );
+        }
+    }
+    pub fn get_precompute_tables(
+        &self,
+        color_repr: ColorRepr,
+        name: impl AsRef<str>,
+    ) -> PreComputedTable {
+        let tables = self.precompute_tables.lock();
+        let name = format!("{}.{}", name.as_ref(), color_repr.to_string());
+        tables.get(&color_repr).unwrap().get(&name).unwrap().clone()
+    }
     pub fn surface_shaders(&self) -> &ShaderCollection {
         &self.surface_shaders
     }

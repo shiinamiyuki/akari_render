@@ -70,6 +70,12 @@ pub fn xxhash32_3(p: Expr<Uint3>) -> Expr<u32> {
 pub fn xxhash32_4(p: Expr<Uint4>) -> Expr<u32> {
     XXHASH_32_4.call(p)
 }
+#[tracked(crate = "luisa")]
+pub fn hash_float3(p: Expr<Float3>) -> Expr<f32> {
+    let i = p.bitcast::<Uint3>();
+    let h = xxhash32_3(i);
+    h.as_f32() * ((1.0 / u32::MAX as f64) as f32)
+}
 
 /// Hash functions in an attempt to match the behavior of Blender's Cycles.
 pub mod blender {
