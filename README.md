@@ -3,7 +3,8 @@
 <h5 align="center"> ⚠ The new version based on <a href=https://github.com/LuisaGroup/luisa-compute-rs>LuisaCompute</a> is updated! ⚠ </h5>
 
 <!-- ![](gallery/beauty4k.png) -->
-![](gallery/psor.png)
+![](gallery/classroom.png)
+Scene by Christophe Seux (CC0)
 
 AkariRender is a CPU/GPU physically based renderer written in Rust and powered by *LuisaCompute*.
 
