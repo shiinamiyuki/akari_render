@@ -66,7 +66,7 @@ dependencies = [
  "clap 4.4.10",
  "ddsfile",
  "exr",
- "glam",
+ "glam 0.25.0",
  "hexf",
  "image",
  "indicatif",
@@ -262,7 +262,7 @@ version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ec4962977a746d870170532fc92759e04d3dbcae8b7b82e7ca3bb83b1d75277"
 dependencies = [
- "glam",
+ "glam 0.24.2",
 ]
 
 [[package]]
@@ -931,6 +931,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5418c17512bdf42730f9032c74e1ae39afc408745ebb2acf72fbc4691c17945"
 
 [[package]]
+name = "glam"
+version = "0.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "151665d9be52f9bb40fc7966565d39666f2d1e69233571b71b87791c7e0528b3"
+
+[[package]]
 name = "glob"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1246,7 +1252,7 @@ version = "0.1.1-alpha.1"
 dependencies = [
  "bumpalo",
  "env_logger",
- "glam",
+ "glam 0.25.0",
  "half",
  "indexmap 2.1.0",
  "lazy_static",

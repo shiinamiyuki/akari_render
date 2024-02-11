@@ -210,7 +210,7 @@ impl<'a> PathTracerBase<'a> {
     #[tracked(crate = "luisa")]
     pub fn compute_contibue_prob(&self, depth: Expr<u32>, beta: Color) -> (Expr<bool>, Expr<f32>) {
         if depth.gt(self.rr_depth) {
-            let cont_prob = beta.max().clamp(0.0.expr(), 1.0.expr()) * 0.95;
+            let cont_prob = beta.reduce_max().clamp(0.0.expr(), 1.0.expr()) * 0.95;
             (true.expr(), cont_prob)
         } else {
             (false.expr(), 1.0f32.expr())
@@ -829,7 +829,7 @@ impl<'a> PathTracerBase<'a> {
                     }
                 }
             }
-            if (bsdf_sample.pdf <= 0.0) | !bsdf_sample.valid | (bsdf_sample.color.min() < 0.0) {
+            if (bsdf_sample.pdf <= 0.0) | !bsdf_sample.valid | (bsdf_sample.color.reduce_min() < 0.0) {
                 // if self.enable_debug {
                 //     device_log!(
                 //         "bsdf sample invalid, d:{} {} {}",

@@ -221,16 +221,40 @@ impl ColorVar {
     }
 }
 impl Color {
-    pub fn max(&self) -> Expr<f32> {
+    pub fn reduce_max(&self) -> Expr<f32> {
         match self {
             Color::Rgb(v, _) => v.reduce_max(),
             Color::Spectral(_) => todo!(),
         }
     }
-    pub fn min(&self) -> Expr<f32> {
+    pub fn reduce_sum(&self) -> Expr<f32> {
+        match self {
+            Color::Rgb(v, _) => v.reduce_sum(),
+            Color::Spectral(_) => todo!(),
+        }
+    }
+    #[tracked(crate = "luisa")]
+    pub fn avg(&self) -> Expr<f32> {
+        match self {
+            Color::Rgb(v, _) => v.reduce_sum() / 3.0,
+            Color::Spectral(_) => todo!(),
+        }
+    }
+    pub fn reduce_min(&self) -> Expr<f32> {
         match self {
             Color::Rgb(v, _) => v.reduce_min(),
             Color::Spectral(_) => todo!(),
+        }
+    }
+    #[tracked(crate = "luisa")]
+    pub fn min(&self, other: Color)-> Color {
+        match (self, other) {
+            (Color::Spectral(_s), Color::Spectral(_t)) => todo!(),
+            (Color::Rgb(s, cs0), Color::Rgb(t, cs1)) => {
+                assert_eq!(*cs0, cs1);
+                Color::Rgb(s.min_(t), *cs0)
+            }
+            _ => panic!("cannot min spectral and rgb"),
         }
     }
     #[tracked(crate = "luisa")]

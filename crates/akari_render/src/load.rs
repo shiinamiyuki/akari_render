@@ -335,7 +335,7 @@ impl SceneLoader {
                     svm.dispatch_surface(si.surface, color_pipeline, si, **swl, |closure| {
                         let emission = closure.emission(wo, **swl, &bsdf_eval_ctx);
                         // device_log!("surface: {}, prim {} emission: {}", si.surface, i, emission.max());
-                        *acc += emission.max() * si.prim_area;
+                        *acc += emission.reduce_max() * si.prim_area;
                     })
                 }
                 powers.write(i, acc / n_samples as f32);

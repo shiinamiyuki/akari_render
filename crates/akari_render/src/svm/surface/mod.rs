@@ -473,6 +473,98 @@ impl Surface for ScaledBsdf {
         self.inner.emission(wo, swl, ctx) * weight
     }
 }
+pub struct CoatedBsdf {
+    pub top: Rc<dyn Surface>,
+    pub bottom: Rc<dyn Surface>,
+    pub e_top: Box<dyn Fn(Expr<Float3>, &BsdfEvalContext) -> Color>,
+}
+impl Surface for CoatedBsdf {
+    fn ns(&self) -> Expr<Float3> {
+        self.bottom.ns()
+    }
+    #[tracked(crate = "luisa")]
+    fn evaluate_impl(
+        &self,
+        wo: Expr<Float3>,
+        wi: Expr<Float3>,
+        swl: Expr<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> (Color, Expr<f32>) {
+        let (f_top, pdf_top) = self.top.evaluate(wo, wi, swl, ctx);
+        let (f_bottom, pdf_bottom) = self.bottom.evaluate(wo, wi, swl, ctx);
+        let eo = (self.e_top)(wo, ctx);
+        let ei = (self.e_top)(wi, ctx);
+        let pdf_select_top = eo.avg();
+        let one = Color::one(ctx.color_repr);
+        let pdf_select_bottom = 1.0 - pdf_select_top;
+        let pdf = pdf_top * pdf_select_top + pdf_bottom * pdf_select_bottom;
+        let f = f_top + f_bottom * (one - eo).min(one - ei);
+        (f, pdf)
+    }
+    #[tracked(crate = "luisa")]
+    fn sample_wi_impl(
+        &self,
+        wo: Expr<Float3>,
+        u_select: Expr<f32>,
+        u_sample: Expr<Float2>,
+        swl: Var<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> (Expr<Float3>, Expr<bool>) {
+        let eo = (self.e_top)(wo, ctx);
+        let pdf_select_top = eo.avg();
+        let (which, remapped) =
+            weighted_discrete_choice2_and_remap(pdf_select_top, 0u32.expr(), 1u32.expr(), u_select);
+        if which.eq(0) {
+            self.top.sample_wi(wo, remapped, u_sample, swl, ctx)
+        } else {
+            self.bottom.sample_wi(wo, remapped, u_sample, swl, ctx)
+        }
+    }
+    #[tracked(crate = "luisa")]
+    fn albedo_impl(
+        &self,
+        wo: Expr<Float3>,
+        swl: Expr<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> Color {
+        let eo = (self.e_top)(wo, ctx);
+        let albedo_top = self.top.albedo(wo, swl, ctx);
+        let albedo_bottom = self.bottom.albedo(wo, swl, ctx);
+        let one = Color::one(ctx.color_repr);
+        albedo_top * eo + albedo_bottom * (one - eo)
+    }
+    #[tracked(crate = "luisa")]
+    fn roughness_impl(
+        &self,
+        wo: Expr<Float3>,
+        u_select: Expr<f32>,
+        swl: Expr<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> Expr<f32> {
+        let eo = (self.e_top)(wo, ctx);
+        let pdf_select_top = eo.avg();
+        let (which, remapped) =
+            weighted_discrete_choice2_and_remap(pdf_select_top, 0u32.expr(), 1u32.expr(), u_select);
+        if which.eq(0) {
+            self.top.roughness(wo, remapped, swl, ctx)
+        } else {
+            self.bottom.roughness(wo, remapped, swl, ctx)
+        }
+    }
+    #[tracked(crate = "luisa")]
+    fn emission_impl(
+        &self,
+        wo: Expr<Float3>,
+        swl: Expr<SampledWavelengths>,
+        ctx: &BsdfEvalContext,
+    ) -> Color {
+        let eo = (self.e_top)(wo, ctx);
+        let emission_top = self.top.emission(wo, swl, ctx);
+        let emission_bottom = self.bottom.emission(wo, swl, ctx);
+        let one = Color::one(ctx.color_repr);
+        emission_top * eo + emission_bottom * (one - eo)
+    }
+}
 pub struct BsdfMixture {
     /// `frac` controls how two bsdfs are mixed:
     /// - Under [`BsdfBlendMode::Addictive`], frac is used as a MIS weight
@@ -849,8 +941,7 @@ impl Surface for MicrofacetTransmission {
                     Color::zero(ctx.color_repr),
                     (Color::one(ctx.color_repr) - f)
                         * &self.color
-                        * (self.dist.d(wh, ctx.ad_mode)
-                            * self.dist.g(wo, wi, ctx.ad_mode)
+                        * (self.dist.d(wh, ctx.ad_mode) * self.dist.g(wo, wi, ctx.ad_mode)
                             / eta.sqr()
                             * wi.dot(wh).abs()
                             * wo.dot(wh).abs()

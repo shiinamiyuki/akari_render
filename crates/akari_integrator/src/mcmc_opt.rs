@@ -303,7 +303,7 @@ impl McmcOpt {
         )
     }
     pub fn scalar_contribution(color: &Color) -> Expr<f32> {
-        color.max().clamp(0.0f32.expr(), 1e5f32.expr())
+        color.reduce_max().clamp(0.0f32.expr(), 1e5f32.expr())
         // 1.0f32.expr()
     }
     fn bootstrap(
