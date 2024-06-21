@@ -7,7 +7,7 @@
 Scene by Christophe Seux (CC0)
 
 AkariRender is a CPU/GPU physically based renderer written in Rust and powered by *LuisaCompute*.
-
+Previous version with PPG and SMCMC is in [legacy-cpp](https://github.com/shiinamiyuki/akari_render/tree/legacy-cpp) branch
 
 ## Features
 - Loading Blender scene
