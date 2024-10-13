@@ -1,1 +1,0 @@
-cargo run --bin akari_cli -- -s scenes/cbox/scene.json -m scenes/cbox/test.json

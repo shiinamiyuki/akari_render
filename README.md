@@ -1,36 +1,24 @@
-<h1 align="center">AkariRender</h1>
+<h1 align="center">AkariRender v3 (Experimental)</h1>
 <h5 align="center">High Performance CPU/GPU Physically Based Renderer</h5>
-<h5 align="center"> ⚠ The new version based on <a href=https://github.com/LuisaGroup/luisa-compute-rs>LuisaCompute</a> is updated! ⚠ </h5>
 
-<!-- ![](gallery/beauty4k.png) -->
 ![](gallery/classroom.png)
 Scene by Christophe Seux (CC0)
 
 AkariRender is a CPU/GPU physically based renderer written in Rust and powered by *LuisaCompute*.
 
+## Build and Run
+To build and run the project, you need to have the following dependencies installed:
+- [CMake](https://cmake.org/)
+- [Ninja](https://ninja-build.org/)
+- C++23 compiler (MSVC, GCC, Clang)
+- [Rust](https://www.rust-lang.org/)
+- [Python 3.11+](https://www.python.org/)
+- [Vulkan SDK](https://vulkan.lunarg.com/sdk/home) (Optional, for GPU rendering)
+<!-- - [CUDA 12.2](https://developer.nvidia.com/cuda) (Optional, for GPU rendering) -->
 
-## Features
-- Loading Blender scene
-- Supports a subset of Cycles shader graph via JIT
-- RGB/Spectral Rendering (WIP)
-- Path Tracing
-- Path Tracing with Metropolis Sampling
-- Gradient Domain Path Tracing
+Building and running the project is handled by the `run.py` script, which has similar interface to `cargo`. For example, to build the project, simply run:
+```bash
+python run.py build # a debug build
+python run.py build --release # a release build
 
-
-## Building:
-If you are using < Windows 10, please upgrade to Windows 10 or above.
-- CMake > 3.23
-- Ninja
-- Clone Blender 4.0 source code from `blender-v4.0-release` branch
-- Put path to blender source in `blender_src_path.txt`
-- Clone [LuisaCompute](https://github.com/LuisaGroup/luisa-compute-rs) alongside this repo
-  
-If you intend to run the renderer on cpu, the following runtime requirement must be satisfied:
-- clang++ in `PATH`
-- llvm dynamic library of the same version. For Windows users, it is the `LLVM-C.dll`.
-
-## Run
-```
-cargo run --release --bin akari-cli -- -d (cpu|cuda|dx|metal) -s scenes/cbox/scene.json -m scenes/cbox/test.json
 ```

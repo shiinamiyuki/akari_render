@@ -1,20 +1,7 @@
 [workspace]
-members = [
-    "crates/akari_render",
-    "crates/akari_data",
-    "crates/akari_scenegraph",
-    "crates/akari_api",
-    "crates/akari_common",
-    "crates/akari_integrator",
-    "crates/akari_cpp_ext"
-]
-resolver = "2"
+resolver = "1"
+members = ["crates/akari_core", "crates/akari_cpp_ext"]
 
 
 [profile.dev]
 opt-level = 2
-incremental = true
-debug = true
-lto = "off"
-
-[profile.release]

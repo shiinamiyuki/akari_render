@@ -3,11 +3,9 @@ name = "akari_cpp_ext"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-akari_common = { path = "../akari_common" }
+libloading = "0.8.5"
+
 
 [build-dependencies]
-cmake = "0.1"
-bindgen = "0.69.1"
+bindgen = "0.70.1"
