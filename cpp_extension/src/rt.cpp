@@ -131,7 +131,7 @@ struct EmbreeTlasImpl {
                rh.hit.primID != RTC_INVALID_GEOMETRY_ID;
     }
 };
-extern "C" EmbreeApi embree_api_create() {
+AKR_API extern "C" EmbreeApi create_embree_api() {
     EmbreeApi api{};
     api.data = new EmbreeApiImpl{};
     api.dtor = [](EmbreeApi *api) {

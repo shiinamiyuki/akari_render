@@ -1,6 +1,6 @@
 [workspace]
 resolver = "1"
-members = [ "crates/akari_cli","crates/akari_core", "crates/akari_cpp_ext", "crates/akari_data", "crates/find_msvc"]
+members = [ "crates/akari_cli","crates/akari_core", "crates/akari_cpp_ext", "crates/akari_data"]
 
 
 [profile.dev]

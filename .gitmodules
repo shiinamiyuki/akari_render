@@ -1,3 +1,6 @@
 [submodule "cpp_extension/ext/embree"]
 	path = cpp_extension/ext/embree
 	url = https://github.com/RenderKit/embree.git
+[submodule "cpp_extension/vcpkg"]
+	path = cpp_extension/vcpkg
+	url = https://github.com/microsoft/vcpkg.git

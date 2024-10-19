@@ -18,10 +18,3 @@ To build the project, you need to have the following dependencies installed:
 <!-- - [CUDA 12.2](https://developer.nvidia.com/cuda) (Optional, for GPU rendering) -->
 
 The project makes extensive use of runtime code generation, which requires `clang++` to be avilable in the system path during runtime.
-
-Building and running the project is handled by the `akari.py` script, which has similar interface to `cargo`. For example, to build the project, simply run:
-```bash
-python akari.py build # a debug build
-python akari.py build --release # a release build
-```
-Attempting to run the artifacts without `akari.py` might result in an error.

@@ -16,3 +16,9 @@ add_library(akari_cpp_ext SHARED src/rt.cpp src/image.cpp include/rust-api.h)
 
 target_include_directories(akari_cpp_ext PUBLIC include)
 target_link_libraries(akari_cpp_ext embree embree_sse42 embree_avx embree_avx2  OpenImageIO::OpenImageIO)
+
+install(TARGETS akari_cpp_ext
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib
+        RUNTIME DESTINATION bin
+        )

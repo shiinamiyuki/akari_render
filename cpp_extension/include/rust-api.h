@@ -6,7 +6,11 @@
 #include <cstdlib>
 #include <ostream>
 #include <new>
-
+#ifdef _WIN32
+#define AKR_API __declspec(dllexport)
+#else
+#define AKR_API
+#endif
 namespace akari {
 namespace rt {
 
@@ -79,14 +83,10 @@ struct EmbreeApi {
     bool (*traverse)(const EmbreeTlas *, EmbreeRayQuery *);
 };
 
-extern "C" {
 
-extern EmbreeApi embree_api_create();
-
-}// extern "C"
 }// namespace rt
 namespace image {
-enum PixelFormat : uint8_t {
+enum class PixelFormat : uint8_t {
     R8,
     RGBA8,
     RF32,
@@ -99,13 +99,18 @@ struct Image {
     size_t height = 0;
     PixelFormat format{};
 };
+// for reading/writing images using OpenImageIO
 struct ImageApi {
-    Image *(*read)(const char *path, PixelFormat format);
-    bool (*write)(const char *path, const Image *image);
-    void (*destroy_image)(Image *);
+    Image (*read)(const char *path, PixelFormat format);
+    bool (*write)(const char *path, const Image &image);
+    void (*destroy_image)(const Image &);
 };
-extern "C" {
-extern ImageApi image_api_create();
-}
+
 }// namespace image
 }// namespace akari
+
+extern "C" {
+AKR_API extern akari::rt::EmbreeApi create_embree_api();
+
+AKR_API extern akari::image::ImageApi create_image_api();
+}
