@@ -1,4 +1,13 @@
 /target
 crates/akari_cpp_ext/src/bindings.rs
 cmake-build
+cmake-build-embree
 cpp_extension/ext/embree
+cpp_extension/vcpkg
+build/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+crates/akari_cpp_ext/src/bindings.rs
