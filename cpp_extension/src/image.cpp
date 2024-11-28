@@ -92,7 +92,19 @@ AKR_API extern ImageApi create_image_api() {
         TypeDesc type = is_hdr ? TypeDesc::FLOAT : TypeDesc::UINT8;
         ImageSpec spec(xres, yres, nchannels, type);
         out->open(path, spec);
-        out->write_image(type, image.data);
+        switch (image.format) {
+            case PixelFormat::R8:
+            case PixelFormat::RGBA8: {
+                out->write_image(TypeDesc::UINT8, image.data);
+                break;
+            }
+            case PixelFormat::RF32:
+            case PixelFormat::RGBF32:
+            case PixelFormat::RGBAF32: {
+                out->write_image(TypeDesc::FLOAT, image.data);
+                break;
+            }
+        }
         out->close();
         return true;
     };

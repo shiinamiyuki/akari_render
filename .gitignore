@@ -7,4 +7,5 @@ build/
 __pycache__/
 *.py[cod]
 *$py.class
+.mypy_cache/
 crates/akari_cpp_ext/src/bindings.rs

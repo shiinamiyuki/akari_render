@@ -40,6 +40,10 @@ name = "akari_data"
 version = "0.1.0"
 
 [[package]]
+name = "akari_sdl"
+version = "0.1.0"
+
+[[package]]
 name = "bindgen"
 version = "0.70.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
