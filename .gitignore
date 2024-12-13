@@ -9,3 +9,4 @@ __pycache__/
 *$py.class
 .mypy_cache/
 crates/akari_cpp_ext/src/bindings.rs
+.vscode
