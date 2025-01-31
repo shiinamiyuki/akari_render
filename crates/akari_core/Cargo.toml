@@ -5,3 +5,4 @@ edition = "2021"
 
 [dependencies]
 akari_cpp_ext = { path = "../akari_cpp_ext" }
+akari_scenegraph = { path = "../akari_scenegraph" }

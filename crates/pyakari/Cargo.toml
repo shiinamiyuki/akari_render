@@ -11,3 +11,5 @@ crate-type = ["cdylib"]
 [dependencies]
 pyo3 = "0.23.3"
 akari_core = {path = "../akari_core"}
+akari_scenegraph = { path = "../akari_scenegraph" }
+mimalloc = "0.1.43"
