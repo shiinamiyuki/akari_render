@@ -1,6 +1,6 @@
 #include <rust-api.h>
 #include <util.h>
-#include <openimageio/imageio.h>
+#include <OpenImageIO/imageio.h>
 #include <memory>
 #include <filesystem>
 

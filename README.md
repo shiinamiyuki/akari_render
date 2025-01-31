@@ -9,11 +9,11 @@ AkariRender is a CPU/GPU physically based renderer written in Rust and powered b
 ## Build and Run
 ### Dependencies
 To build the project, you need to have the following dependencies installed:
-- [CMake](https://cmake.org/)
+- [CMake 3.29+](https://cmake.org/)
 - [Ninja](https://ninja-build.org/)
-- [Clang 18](https://github.com/llvm/llvm-project/releases)
+- [Clang 18+](https://github.com/llvm/llvm-project/releases)
 - [Rust](https://www.rust-lang.org/)
-- [Python 3.11+](https://www.python.org/)
+- [Python 3.12+](https://www.python.org/)
 - [LuisaCompute Python DSL 2](https://github.com/LuisaGroup/luisa-python-lang)
 - [Vulkan SDK](https://vulkan.lunarg.com/sdk/home) (Optional, for GPU rendering)
 <!-- - [CUDA 12.2](https://developer.nvidia.com/cuda) (Optional, for GPU rendering) -->
