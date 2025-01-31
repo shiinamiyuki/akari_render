@@ -19,3 +19,8 @@ To build the project, you need to have the following dependencies installed:
 <!-- - [CUDA 12.2](https://developer.nvidia.com/cuda) (Optional, for GPU rendering) -->
 
 The project makes extensive use of runtime code generation, which requires `clang++` to be avilable in the system path during runtime.
+
+### Build
+```bash
+python build.py [profile]
+```
