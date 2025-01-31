@@ -10,3 +10,5 @@ __pycache__/
 .mypy_cache/
 crates/akari_cpp_ext/src/bindings.rs
 .vscode
+
+Cargo.lock

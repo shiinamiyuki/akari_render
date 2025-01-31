@@ -2,13 +2,23 @@ import os
 import sys
 import subprocess
 from typing import List
+import threading
 
 def run_process(command: List[str], cwd: str):
     process = subprocess.Popen(
         command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
-    stdout, stderr = process.communicate()
-    print(stdout.decode())
-    print(stderr.decode())
+    # stdout, stderr = process.communicate()
+    def print_output(pipe):
+        for line in iter(pipe.readline, b''):
+            print(line.decode(), end='')
+
+    stdout_thread = threading.Thread(target=print_output, args=(process.stdout,))
+    stderr_thread = threading.Thread(target=print_output, args=(process.stderr,))
+    stdout_thread.start()
+    stderr_thread.start()
+    stdout_thread.join()
+    stderr_thread.join()
+    process.wait()
     if process.returncode != 0:
         raise RuntimeError(
             f'Error running {command}, exit code {process.returncode:0x}')
@@ -21,6 +31,7 @@ def run_maturin(profile: str, verbose: str | None):
         cmds.append(verbose)
     cur_file_dir = os.path.dirname(os.path.abspath(__file__))
     cwd = cur_file_dir + '/crates/pyakari/'
+    print(' '.join(cmds))
     run_process(cmds, cwd)
 
 def fix_config_toml():

@@ -82,7 +82,7 @@ AKR_API extern ImageApi create_image_api() {
         const auto path = std::filesystem::path(path_);
         const auto ext = path.extension().string();
         const bool is_hdr = ext == ".hdr" || ext == ".exr";
-        auto out = ImageOutput::create(path);
+        auto out = ImageOutput::create(path_);
         if (!out) {
             return false;
         }
@@ -91,7 +91,7 @@ AKR_API extern ImageApi create_image_api() {
         const int nchannels = static_cast<int>(pixel_channels(image.format));
         TypeDesc type = is_hdr ? TypeDesc::FLOAT : TypeDesc::UINT8;
         ImageSpec spec(xres, yres, nchannels, type);
-        out->open(path, spec);
+        out->open(path_, spec);
         switch (image.format) {
             case PixelFormat::R8:
             case PixelFormat::RGBA8: {
