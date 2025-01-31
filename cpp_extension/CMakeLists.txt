@@ -5,6 +5,9 @@ project(akari-cpp-ext)
 # if on windows and not using clang-cl and msvc
 
 set(CMAKE_CXX_STANDARD 23)
+if(MSVC)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /utf-8")
+endif()
 
 message(STATUS "${CMAKE_CXX_COMPILER}")
 add_subdirectory(ext)
