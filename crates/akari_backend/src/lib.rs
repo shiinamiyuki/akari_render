@@ -1,5 +1,6 @@
 use std::{ops::Range, sync::Arc};
-
+pub mod cpu;
+pub mod vk;
 pub trait RawBuffer {
     fn native_handle(&self) -> Option<u64>;
     fn upload<'a>(&self, submission: &dyn Submission<'a>, range: Range<usize>, data: &'a [u8]);
@@ -21,12 +22,17 @@ pub struct Buffer<T: Copy> {
     pub align: usize,
     marker: std::marker::PhantomData<T>,
 }
+pub trait SubmissionToken<'a> {
+    fn wait(&self);
+    fn completed(&self) -> bool;
+}
 pub trait Submission<'a> {
-    fn submit(&self);
+    fn submit(&self) -> Box<dyn SubmissionToken<'a>>;
 }
 pub trait Stream {
     fn new_submission(&self) -> Box<dyn Submission>;
     fn native_handle(&self) -> Option<u64>;
+    fn sync(&self);
 }
 
 pub trait RawKernel {}
@@ -34,9 +40,7 @@ pub struct Kernel<F> {
     pub raw_kernel: Box<dyn RawKernel>,
     marker: std::marker::PhantomData<F>,
 }
-struct Accel {
-
-}
+pub struct Accel {}
 pub trait Backend {
     fn create_raw_buffer(&self, size: usize, align: usize) -> Box<dyn RawBuffer>;
     fn create_stream(&self) -> Box<dyn Stream>;
