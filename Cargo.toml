@@ -10,6 +10,18 @@ members = [
 ]
 resolver = "2"
 
+[workspace.dependencies]
+akari_common = { path = "crates/akari_common" }
+akari_data = { path = "crates/akari_data" }
+akari_scenegraph = { path = "crates/akari_scenegraph" }
+akari_render = { path = "crates/akari_render" }
+akari_integrator = { path = "crates/akari_integrator" }
+akari_cpp_ext = { path = "crates/akari_cpp_ext" }
+bindgen = "0.71"
+clap = "4"
+cmake = "0.1"
+serde = "1"
+serde_json = "1"
 
 [profile.dev]
 opt-level = 2

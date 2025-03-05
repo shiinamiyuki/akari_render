@@ -6,17 +6,15 @@ version = "0.1.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-akari_common = { path = "../akari_common" }
-akari_data = { path = "../akari_data" }
-akari_scenegraph = { path = "../akari_scenegraph" }
-akari_cpp_ext = { path = "../akari_cpp_ext" }
-
+akari_common.workspace = true
+akari_data.workspace = true
+akari_scenegraph.workspace = true
+akari_cpp_ext.workspace = true
 
 [build-dependencies]
-cmake = "0.1.50"
-serde = { version = "1" }
-serde_json = "1"
-
+cmake.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 
 # [lib]
 # crate-type = ["dylib"]
