@@ -1,0 +1,30 @@
+{
+    "name": "luisa",
+    "build": {
+        "dockerfile": "Dockerfile",
+        "args": {
+            "CONTAINER_USER": "luisa",
+            "CONTAINER_GROUP": "luisa"
+        }
+    },
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "lldb.executable": "/usr/bin/lldb",
+                "files.watcherExclude": {
+                    "**/target/**": true
+                }
+            },
+            "extensions": [
+                "vadimcn.vscode-lldb",
+                "rust-lang.rust-analyzer",
+                "tamasfe.even-better-toml",
+                "ms-vscode.cpptools"
+            ]
+        }
+    },
+    "postCreateCommand": "echo '/home/luisa/blender_src' > /home/luisa/akari_render/blender_src_path.txt",
+    "workspaceMount": "source=${localWorkspaceFolder},target=/home/luisa/akari_render,type=bind,consistency=cached",
+    "workspaceFolder": "/home/luisa/akari_render",
+    "remoteUser": "luisa"
+}

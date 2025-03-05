@@ -6,12 +6,12 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-akari_common = { path = "../akari_common" }
-akari_cpp_ext = { path = "../akari_cpp_ext" }
+akari_common.workspace = true
+akari_cpp_ext.workspace = true
 
 [build-dependencies]
-cmake = "0.1"
-bindgen = "0.69.1"
+bindgen.workspace = true
+cmake.workspace = true
 
 # [lib]
 # crate-type = ["dylib"]
