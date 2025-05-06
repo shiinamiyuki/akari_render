@@ -33,6 +33,7 @@ fn copy_if_different(src: &str, dst: &str) {
 }
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-env-changed=PROFILE");
     println!("cargo:rerun-if-changed=../../cpp_extension/include");
     println!("cargo:rerun-if-changed=../../cpp_extension/src");
     println!("cargo:rerun-if-changed=../../cpp_extension/CMakeLists.txt");
@@ -96,7 +97,11 @@ fn main() {
             if entry_path.extension().and_then(|s| s.to_str()) == Some("dll") {
                 copy_if_different(
                     entry_path.to_str().unwrap(),
-                    &format!("{}/{}", target_dir, entry_path.file_name().unwrap().to_str().unwrap()),
+                    &format!(
+                        "{}/{}",
+                        target_dir,
+                        entry_path.file_name().unwrap().to_str().unwrap()
+                    ),
                 );
             }
         }
