@@ -1,3 +1,6 @@
+<h1 align="center">Archived</h1>
+<h4 align="center">I'm archiving this repo as I'm no longer working on physically based rendering. </h4>
+
 <h1 align="center">AkariRender</h1>
 <h5 align="center">High Performance CPU/GPU Physically Based Renderer</h5>
 <h5 align="center"> ⚠ The new version based on <a href=https://github.com/LuisaGroup/luisa-compute-rs>LuisaCompute</a> is updated! ⚠ </h5>
